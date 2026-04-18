@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #2e7d52;
+  --color-canvas: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-ink: #1e1e1e;
+  --color-muted: #6b6b6b;
+  --color-border: #e5e3df;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-sidebar: #1a3d2b;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+}
