@@ -452,7 +452,6 @@ export async function createBaustopp(input: {
   if (aErr || !auf) return { ok: false, message: 'Auftrag nicht gefunden' }
 
   const altes = (auf.end_datum as string | null) ?? input.neues_enddatum
-  const beginn = new Date(input.beginn_datum.includes('T') ? input.beginn_datum : `${input.beginn_datum}T12:00:00`)
   const neuEnd = new Date(input.neues_enddatum.includes('T') ? input.neues_enddatum : `${input.neues_enddatum}T12:00:00`)
   const verzug = Math.max(0, Math.round((neuEnd.getTime() - new Date(altes ?? input.neues_enddatum).getTime()) / 86400000))
 

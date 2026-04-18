@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import { loadNachtragPublicByToken } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { NachtragPublicForm } from '@/components/nachtrag/NachtragPublicForm'
 

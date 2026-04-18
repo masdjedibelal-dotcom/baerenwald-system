@@ -167,7 +167,6 @@ export default async function AuftragFinanzenPage({ params }: { params: { id: st
 
       <AuftragFinanzenClient
         auftragId={id}
-        kundenName={kunde?.name ?? ''}
         einbehalte={einbehalte}
         eingangsrechnungen={eingangsrechnungen}
         zuweisungen={hwRows}
