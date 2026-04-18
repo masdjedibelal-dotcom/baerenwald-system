@@ -66,7 +66,6 @@ function einbehaltStatusBadge(s: Einbehalt['status']) {
 
 export function AuftragFinanzenClient({
   auftragId,
-  kundenName,
   einbehalte,
   eingangsrechnungen,
   zuweisungen,
@@ -74,7 +73,6 @@ export function AuftragFinanzenClient({
   metrics,
 }: {
   auftragId: string
-  kundenName: string
   einbehalte: Einbehalt[]
   eingangsrechnungen: Eingangsrechnung[]
   zuweisungen: AuftragHandwerkerRow[]
