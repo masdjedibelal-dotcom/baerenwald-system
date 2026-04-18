@@ -2,7 +2,27 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+function supabaseEnvMissing(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  return !url || !key
+}
+
 export async function middleware(request: NextRequest) {
+  if (supabaseEnvMissing()) {
+    return new NextResponse(
+      [
+        'Konfigurationsfehler: NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY müssen gesetzt sein',
+        '(z. B. in Netlify: Site settings → Environment variables).',
+        'Ohne diese Werte kann die Middleware nicht starten — die Seite wirkt dann „tot“ oder liefert 5xx.',
+      ].join('\n'),
+      {
+        status: 503,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      }
+    )
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -31,7 +51,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isPublic = path.startsWith('/login') || path.startsWith('/projekt/')
+  const isPublic =
+    path.startsWith('/login') || path.startsWith('/projekt/') || path.startsWith('/nachtrag/')
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
