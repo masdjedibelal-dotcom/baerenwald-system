@@ -22,7 +22,13 @@ export default async function DatenschutzPage() {
 
   return (
     <div>
-      <PageHeader title="Datenschutz & DSGVO" />
+      <PageHeader
+        title="Datenschutz & DSGVO"
+        breadcrumbs={[
+          { label: 'Einstellungen', href: '/einstellungen/firma' },
+          { label: 'Datenschutz' },
+        ]}
+      />
       <DatenschutzPageClient fristen={fristen} faellig={faellig} log={log} anfragen={anfragen} />
     </div>
   )

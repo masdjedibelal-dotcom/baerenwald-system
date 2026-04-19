@@ -3,10 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin, LeadKanal, LeadStatus } from '@/lib/types'
+import { STATUS_LABELS } from '@/lib/utils'
+import { insertKalenderAutoTermin, tomorrowYmd } from '@/lib/kalender-auto-termine'
 
 export async function updateLeadStatus(
   leadId: string,
-  neuerStatus: LeadStatus
+  neuerStatus: LeadStatus,
+  notiz?: string | null
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const {
@@ -39,10 +42,23 @@ export async function updateLeadStatus(
     status_alt: alterStatus,
     status_neu: neuerStatus,
     user_id: user?.id ?? null,
+    notiz: notiz ?? null,
   })
 
   if (histErr) {
     return { ok: false, message: histErr.message }
+  }
+
+  const titel = `Status geändert: → ${STATUS_LABELS[neuerStatus]}`
+  const { error: tlErr } = await supabase.from('lead_timeline').insert({
+    lead_id: leadId,
+    typ: 'status_change',
+    titel,
+    beschreibung: notiz ?? null,
+    erstellt_von: user?.id ?? null,
+  })
+  if (tlErr) {
+    console.warn('lead_timeline:', tlErr.message)
   }
 
   revalidatePath(`/anfragen/${leadId}`)
@@ -76,6 +92,9 @@ export async function insertKalenderTermin(input: {
   beschreibung: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const { error } = await supabase.from('kalender_termine').insert({
     lead_id: input.lead_id,
     titel: input.titel,
@@ -90,6 +109,16 @@ export async function insertKalenderTermin(input: {
   })
 
   if (error) return { ok: false, message: error.message }
+
+  const { error: tlErr } = await supabase.from('lead_timeline').insert({
+    lead_id: input.lead_id,
+    typ: 'termin',
+    titel: `Termin vereinbart: ${input.titel}`,
+    beschreibung: input.beschreibung,
+    erstellt_von: user?.id ?? null,
+  })
+  if (tlErr) console.warn('lead_timeline termin:', tlErr.message)
+
   revalidatePath(`/anfragen/${input.lead_id}`)
   revalidatePath('/kalender')
   return { ok: true }
@@ -207,6 +236,22 @@ export async function createAnfrage(
     status_alt: null,
     status_neu: 'neu',
     user_id: actor?.id ?? null,
+  })
+
+  const { error: tlErr } = await supabase.from('lead_timeline').insert({
+    lead_id: leadId,
+    typ: 'created',
+    titel: 'Anfrage erstellt',
+    beschreibung: null,
+    erstellt_von: actor?.id ?? null,
+  })
+  if (tlErr) console.warn('lead_timeline created:', tlErr.message)
+
+  await insertKalenderAutoTermin({
+    titel: `Kontakt: ${name}`,
+    datum: tomorrowYmd(),
+    typ: 'sonstiges',
+    lead_id: leadId,
   })
 
   revalidatePath('/anfragen')

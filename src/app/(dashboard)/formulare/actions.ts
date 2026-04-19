@@ -1,7 +1,10 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import {
+  deleteFormularTemplate as softDeleteFormularTemplate,
+  saveFormularTemplate as persistFormularTemplate,
+} from '@/app/actions/formulare'
 import type { FormularFeld, FormularTemplate } from '@/lib/types'
 
 function parseFelder(raw: unknown): FormularFeld[] {
@@ -88,6 +91,7 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
     name: string
     gewerk_id: string | null
     typ: FormularTemplate['typ']
+    subtyp: string | null
     phase: FormularTemplate['phase']
     felder: FormularFeld[]
     aktiv: boolean
@@ -98,6 +102,7 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
       name: 'Bad & Sanitär — Vorab',
       gewerk_id: (bySlug['bad'] as string | undefined) ?? (bySlug['sanitaer'] as string | undefined) ?? null,
       typ: 'handwerker',
+      subtyp: 'bautagebuch',
       phase: 'vorab',
       felder: standardFelderBad(),
       aktiv: true,
@@ -108,6 +113,7 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
       name: 'Heizung — Vorab',
       gewerk_id: (bySlug['heizung'] as string | undefined) ?? null,
       typ: 'handwerker',
+      subtyp: 'bautagebuch',
       phase: 'vorab',
       felder: standardFelderHeizung(),
       aktiv: true,
@@ -118,6 +124,7 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
       name: 'Allgemein — Abnahme',
       gewerk_id: null,
       typ: 'handwerker',
+      subtyp: 'abnahme',
       phase: 'abnahme',
       felder: standardFelderAbnahme(),
       aktiv: true,
@@ -128,6 +135,7 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
       name: 'Betreuer — Vor Ort',
       gewerk_id: null,
       typ: 'betreuer',
+      subtyp: 'checkliste',
       phase: 'vorab',
       felder: standardFelderBetreuer(),
       aktiv: true,
@@ -145,7 +153,8 @@ export async function loadFormularTemplates(): Promise<FormularTemplate[]> {
   const { data, error } = await supabase
     .from('formular_templates')
     .select('*, gewerke(id, name, slug)')
-    .order('name', { ascending: true })
+    .eq('aktiv', true)
+    .order('created_at', { ascending: false })
 
   if (error || !data) return []
   return (data as FormularTemplate[]).map((row) => ({
@@ -172,32 +181,28 @@ export async function saveFormularTemplate(input: {
   name: string
   gewerk_id: string | null
   typ: FormularTemplate['typ']
+  subtyp: string | null
   phase: FormularTemplate['phase']
   felder: FormularFeld[]
   aktiv: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const payload = {
-    name: input.name.trim(),
-    gewerk_id: input.gewerk_id,
-    typ: input.typ,
-    phase: input.phase,
-    felder: input.felder,
-    aktiv: input.aktiv,
+  try {
+    const id = await persistFormularTemplate(
+      {
+        name: input.name,
+        subtyp: input.subtyp,
+        phase: input.phase,
+        typ: input.typ,
+        gewerk_id: input.gewerk_id,
+        felder: input.felder,
+        aktiv: input.aktiv,
+      },
+      input.id ?? undefined
+    )
+    return { ok: true, id }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Speichern fehlgeschlagen' }
   }
-
-  if (input.id) {
-    const { error } = await supabase.from('formular_templates').update(payload).eq('id', input.id)
-    if (error) return { ok: false, message: error.message }
-    revalidatePath('/formulare')
-    revalidatePath(`/formulare/${input.id}`)
-    return { ok: true, id: input.id }
-  }
-
-  const { data, error } = await supabase.from('formular_templates').insert(payload).select('id').single()
-  if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath('/formulare')
-  return { ok: true, id: data.id as string }
 }
 
 export async function loadBetreuerVorabTemplate(): Promise<FormularTemplate | null> {
@@ -230,9 +235,10 @@ export async function loadBetreuerVorabTemplate(): Promise<FormularTemplate | nu
 export async function deleteFormularTemplate(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase.from('formular_templates').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
-  revalidatePath('/formulare')
-  return { ok: true }
+  try {
+    await softDeleteFormularTemplate(id)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Löschen fehlgeschlagen' }
+  }
 }

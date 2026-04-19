@@ -15,12 +15,13 @@ import { angebotPositionenFromVorOrt, isVorOrtStruktur } from '@/lib/vorab-angeb
 export default async function AngebotNeuPage({
   searchParams,
 }: {
-  searchParams: { lead_id?: string; angebot_id?: string; kopie_von?: string }
+  searchParams: { lead_id?: string; angebot_id?: string; kopie_von?: string; vorlage_id?: string }
 }) {
   const supabase = createClient()
   const leadId = searchParams.lead_id
   const angebotId = searchParams.angebot_id
   const kopieVonId = searchParams.kopie_von
+  const vorlageId = searchParams.vorlage_id
 
   const [{ data: gewerke }, { data: preisRaw }, { data: hwRaw }] = await Promise.all([
     supabase.from('gewerke').select('id, name, slug, aktiv').eq('aktiv', true).order('name'),
@@ -149,6 +150,22 @@ export default async function AngebotNeuPage({
     }
   }
 
+  let vorlageBootstrap: { name: string; positionen: AngebotPosition[] } | null = null
+  if (vorlageId && !angebotId && !kopieVonId) {
+    const { data: vRow } = await supabase
+      .from('angebot_vorlagen')
+      .select('name, positionen')
+      .eq('id', vorlageId)
+      .eq('aktiv', true)
+      .maybeSingle()
+    if (vRow?.name) {
+      vorlageBootstrap = {
+        name: vRow.name as string,
+        positionen: normalizeAngebotPositionen((vRow as { positionen: unknown }).positionen),
+      }
+    }
+  }
+
   if (angebotId) {
     const { data: ang } = await supabase
       .from('angebote')
@@ -207,6 +224,7 @@ export default async function AngebotNeuPage({
       kopieVon={kopieVon}
       kopieKunde={kopieKunde}
       vorabVorOrt={vorabVorOrt}
+      vorlageBootstrap={vorlageBootstrap}
     />
   )
 }

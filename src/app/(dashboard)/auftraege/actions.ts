@@ -6,16 +6,19 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { buildAbnahmePdfZusatz } from '@/lib/auftraege/abnahme-protokoll-zusatz'
 import { renderAbnahmeProtokollPdfBuffer } from '@/lib/pdf/abnahme-protokoll-pdf'
+import { buildInternFormularSubmittedHtml, sendEmailHtml } from '@/lib/auftraege/emails'
+import { getMailBranding } from '@/lib/mail-branding'
+import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
 import {
-  buildAbnahmeProtokollMailHtml,
-  buildAuftragsbestaetigungHtml,
-  buildFormularLinkHtml,
-  buildInternFormularSubmittedHtml,
-  sendEmailHtml,
-} from '@/lib/auftraege/emails'
-import * as emailTemplates from '@/lib/email-templates'
+  mailAbnahme,
+  mailAuftragsbestaetigung,
+  mailHandwerkerFormular,
+  mailUpdateHinweis,
+} from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mail-service'
 import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
-import { FORMULAR_PHASE_LABELS } from '@/lib/utils'
+import { AUFTRAG_STATUS_LABELS, FORMULAR_PHASE_LABELS, getPublicAppUrl } from '@/lib/utils'
+import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import type {
   AngebotPosition,
   AuftragDetail,
@@ -77,7 +80,12 @@ export async function loadAuftragDetail(id: string): Promise<AuftragDetail | nul
         handwerker(id, name, firma),
         buergschaften(*)
       ),
-      eingangsrechnungen(*)
+      eingangsrechnungen(*),
+      auftrag_milestones(*),
+      hw_formular_tabs(
+        *,
+        hw_formular_einreichungen(*)
+      )
     `
     )
     .eq('id', id)
@@ -88,9 +96,13 @@ export async function loadAuftragDetail(id: string): Promise<AuftragDetail | nul
   const ang = row.angebote
   const tl = [...(row.auftrag_timeline ?? [])] as AuftragTimelineEvent[]
   tl.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const milestones = [...(row.auftrag_milestones ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  )
   return {
     ...row,
     auftrag_timeline: tl,
+    auftrag_milestones: milestones,
     angebote: ang
       ? {
           ...ang,
@@ -143,7 +155,12 @@ async function loadAuftragDetailAdmin(id: string): Promise<AuftragDetail | null>
         handwerker(id, name, firma),
         buergschaften(*)
       ),
-      eingangsrechnungen(*)
+      eingangsrechnungen(*),
+      auftrag_milestones(*),
+      hw_formular_tabs(
+        *,
+        hw_formular_einreichungen(*)
+      )
     `
     )
     .eq('id', id)
@@ -154,9 +171,13 @@ async function loadAuftragDetailAdmin(id: string): Promise<AuftragDetail | null>
   const ang = row.angebote
   const tl = [...(row.auftrag_timeline ?? [])] as AuftragTimelineEvent[]
   tl.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const milestones = [...(row.auftrag_milestones ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  )
   return {
     ...row,
     auftrag_timeline: tl,
+    auftrag_milestones: milestones,
     angebote: ang
       ? {
           ...ang,
@@ -180,17 +201,86 @@ export async function updateAuftragNotizen(
   return { ok: true }
 }
 
+const FORTSCHRITT_BY_STATUS: Record<AuftragStatus, number> = {
+  offen: 35,
+  in_arbeit: 65,
+  abnahme: 85,
+  abgeschlossen: 100,
+  storniert: 0,
+}
+
 async function setAuftragStatus(
   auftragId: string,
   status: AuftragStatus
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const patch: Record<string, string> = { status, updated_at: new Date().toISOString() }
+  const fortschritt = FORTSCHRITT_BY_STATUS[status] ?? 0
+  const patch: Record<string, unknown> = {
+    status,
+    fortschritt,
+    updated_at: new Date().toISOString(),
+  }
   if (status === 'abgeschlossen') {
     patch.abnahme_datum = new Date().toISOString().slice(0, 10)
   }
   const { error } = await supabase.from('auftraege').update(patch).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }
+
+  if (status === 'in_arbeit') {
+    const { data: exists } = await supabase
+      .from('auftrag_milestones')
+      .select('id')
+      .eq('auftrag_id', auftragId)
+      .eq('titel', 'Arbeiten gestartet')
+      .maybeSingle()
+    if (!exists) {
+      const ins = await supabase.from('auftrag_milestones').insert({
+        auftrag_id: auftragId,
+        titel: 'Arbeiten gestartet',
+        erledigt: true,
+        erledigt_at: new Date().toISOString(),
+        fuer_kunden_sichtbar: true,
+        ist_system: true,
+        sort_order: 10,
+      })
+      if (ins.error) console.warn('[auftrag_milestones]', ins.error.message)
+    }
+  }
+
+  if (status === 'abgeschlossen') {
+    const freigabe = new Date()
+    freigabe.setFullYear(freigabe.getFullYear() + 5)
+    const freigabeStr = freigabe.toISOString().slice(0, 10)
+    const { error: eErr } = await supabase
+      .from('einbehalte')
+      .update({ freigabe_datum: freigabeStr })
+      .eq('auftrag_id', auftragId)
+      .eq('status', 'einbehalten')
+    if (eErr) console.warn('[einbehalte]', eErr.message)
+
+    const kal = await saveKalenderTermin({
+      titel: 'Einbehalt prüfen',
+      typ: 'sonstiges',
+      datum: freigabeStr,
+      uhrzeit_von: null,
+      uhrzeit_bis: null,
+      adresse: null,
+      beschreibung: 'Automatisch: Einbehalte prüfen (nach Auftragsabschluss).',
+      lead_id: null,
+      auftrag_id: auftragId,
+    })
+    if (!kal.ok) console.warn('[kalender]', kal.message)
+    revalidatePath('/kalender')
+  }
+
+  const uid = await getAuthUserId()
+  await logAuftragTimeline({
+    auftrag_id: auftragId,
+    typ: 'status_change',
+    titel: `Status: ${AUFTRAG_STATUS_LABELS[status] ?? status}`,
+    erstellt_von: uid,
+  })
+
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
   return { ok: true }
@@ -227,31 +317,34 @@ export async function startAuftragArbeit(auftragId: string) {
   if (!st.ok) return st
 
   const rows = detail.auftrag_handwerker ?? []
-  const gewerkParts = rows
-    .map((r) => `${r.gewerke?.name ?? 'Gewerk'}: ${r.handwerker?.name ?? '—'}`)
-    .filter(Boolean)
-  const gewerkeHtml = `<ul>${gewerkParts.map((p) => `<li>${p}</li>`).join('')}</ul>`
-  const hwLines = rows
-    .map((r) => `${r.handwerker?.name ?? '—'} (${r.gewerke?.name ?? '—'})`)
-    .join('<br/>')
 
   const email = detail.kunden.email
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
-    const projektLink = token ? projektUrlFromToken(token) : null
-    const html = buildAuftragsbestaetigungHtml({
-      kunde: detail.kunden,
-      gewerkeHtml,
-      handwerkerHtml: hwLines || '—',
-      startDatum: detail.start_datum,
-      projektLink,
+    const projektLink = token ? projektUrlFromToken(token) : getPublicAppUrl()
+    const gewerkNamen = rows.map((r) => r.gewerke?.name).filter(Boolean) as string[]
+    const branding = await getMailBranding(supabaseAdmin)
+    const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
+    const tpl = mailAuftragsbestaetigung(
+      {
+        name: vorname,
+        gewerke: gewerkNamen.length ? gewerkNamen : ['Ihr Projekt'],
+        startDatum: formatDatumDeFromIso(detail.start_datum) ?? '—',
+        endDatum: detail.end_datum ? formatDatumDeFromIso(detail.end_datum) : null,
+        statusLink: projektLink,
+      },
+      branding
+    )
+    const sent = await sendMail({
+      typ: 'auftragsbestaetigung',
+      an: email,
+      anName: detail.kunden.name,
+      betreff: tpl.betreff,
+      html: tpl.html,
+      kundeId: detail.kunde_id,
+      auftragId,
     })
-    const sent = await sendEmailHtml({
-      to: email,
-      subject: 'Ihr Auftrag wurde bestätigt — Bärenwald München',
-      html,
-    })
-    if (!sent.ok) return sent
+    if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
   }
 
   const uid = await getAuthUserId()
@@ -284,16 +377,18 @@ export async function setAuftragZurAbnahme(auftragId: string) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
     if (token) {
       const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
-      const html = emailTemplates.emailUpdateHinweis({
-        name: vorname,
-        link: projektUrlFromToken(token),
+      const branding = await getMailBranding(supabaseAdmin)
+      const tpl = mailUpdateHinweis({ name: vorname, statusLink: projektUrlFromToken(token) }, branding)
+      const sent = await sendMail({
+        typ: 'update_hinweis',
+        an: email,
+        anName: detail.kunden.name,
+        betreff: tpl.betreff,
+        html: tpl.html,
+        kundeId: detail.kunde_id,
+        auftragId,
       })
-      const sent = await sendEmailHtml({
-        to: email,
-        subject: 'Update zu Ihrem Projekt — Bärenwald München',
-        html,
-      })
-      if (!sent.ok) return sent
+      if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
     }
   }
 
@@ -419,14 +514,31 @@ export async function completeAuftragAbnahme(auftragId: string) {
   const st = await setAuftragStatus(auftragId, 'abgeschlossen')
   if (!st.ok) return st
 
-  const html = buildAbnahmeProtokollMailHtml({ kunde: detail.kunden })
-  const mail = await sendEmailHtml({
-    to: detail.kunden.email,
-    subject: 'Abnahmeprotokoll — Bärenwald München',
-    html,
-    attachments: [{ filename: `abnahme-${auftragId}.pdf`, content: pdf.buffer }],
+  const branding = await getMailBranding(supabaseAdmin)
+  const gw = (detail.auftrag_handwerker ?? [])
+    .map((r) => r.gewerke?.name)
+    .filter((n): n is string => Boolean(n))
+  const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
+  const tpl = mailAbnahme(
+    {
+      name: vorname,
+      gewerke: gw.length ? gw : ['—'],
+      abnahmeDatum: new Date().toLocaleDateString('de-DE'),
+    },
+    branding
+  )
+  const mail = await sendMail({
+    typ: 'abnahme',
+    an: detail.kunden.email,
+    anName: detail.kunden.name,
+    betreff: tpl.betreff,
+    html: tpl.html,
+    pdfBuffer: pdf.buffer,
+    pdfName: `abnahme-${auftragId}.pdf`,
+    kundeId: detail.kunde_id ?? null,
+    auftragId,
   })
-  if (!mail.ok) return mail
+  if (!mail.success) return { ok: false as const, message: mail.error ?? 'E-Mail fehlgeschlagen' }
 
   const uid = await getAuthUserId()
   await logAuftragTimeline({
@@ -488,21 +600,36 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     .maybeSingle()
 
   const phaseLabel = FORMULAR_PHASE_LABELS[input.phase] ?? input.phase
-  const html = buildFormularLinkHtml({
-    templateName: (tpl?.name as string) ?? 'Formular',
-    phaseLabel,
-    kundenname: kunde?.name ?? '—',
-    adresse: kunde ? kundenAdresseText(kunde) : '—',
-    gewerkName: (gw?.name as string) ?? '—',
-    token,
-  })
+  const { data: hw } = await supabaseAdmin
+    .from('handwerker')
+    .select('name')
+    .eq('id', input.handwerkerId)
+    .maybeSingle()
 
-  const sent = await sendEmailHtml({
-    to: input.handwerkerEmail.trim(),
-    subject: `Formular: ${(tpl?.name as string) ?? 'Formular'} — ${kunde?.name ?? 'Kunde'}`,
-    html,
+  const branding = await getMailBranding(supabaseAdmin)
+  const link = `${getPublicAppUrl()}/formular/${token}`
+  const tabName = `${(tpl?.name as string) ?? 'Formular'} (${phaseLabel} · ${(gw?.name as string) ?? 'Gewerk'})`
+  const tplMail = mailHandwerkerFormular(
+    {
+      name: String(hw?.name ?? 'Guten Tag'),
+      tabName,
+      auftragName: kunde?.name ?? 'Auftrag',
+      adresse: kunde ? kundenAdresseText(kunde) : undefined,
+      link,
+    },
+    branding
+  )
+
+  const sent = await sendMail({
+    typ: 'handwerker_formular',
+    an: input.handwerkerEmail.trim(),
+    anName: (hw?.name as string | null) ?? null,
+    betreff: tplMail.betreff,
+    html: tplMail.html,
+    kundeId: auftrag?.kunde_id ?? null,
+    auftragId: input.auftragId,
   })
-  if (!sent.ok) return sent
+  if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
 
   const uid = await getAuthUserId()
   await logAuftragTimeline({
@@ -530,6 +657,7 @@ export async function notifyInternFormularSubmitted(input: {
     to: intern,
     subject: `Formular abgesendet: ${input.templateName}`,
     html,
+    typ: 'intern_hinweis',
   })
 }
 
@@ -629,4 +757,30 @@ export async function createNachtragEntwurfFromRegiebericht(
 
   revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
+}
+
+export type EmailLogRow = {
+  id: string
+  typ: string
+  an_email: string
+  an_name: string | null
+  betreff: string
+  status: string | null
+  fehler_nachricht: string | null
+  created_at: string
+}
+
+export async function loadEmailLogForAuftrag(auftragId: string): Promise<EmailLogRow[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('email_log')
+    .select('id, typ, an_email, an_name, betreff, status, fehler_nachricht, created_at')
+    .eq('auftrag_id', auftragId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('[loadEmailLogForAuftrag]', error.message)
+    return []
+  }
+  return (data ?? []) as EmailLogRow[]
 }

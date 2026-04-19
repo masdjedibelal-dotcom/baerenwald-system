@@ -6,7 +6,24 @@ export default async function RechnungenPage() {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('rechnungen')
-    .select('id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, bezahlt_at, kunden(name)')
+    .select(
+      `
+      id,
+      rechnungsnummer,
+      status,
+      brutto,
+      rechnungsdatum,
+      faellig_am,
+      bezahlt_at,
+      positionen,
+      lohn_netto,
+      material_netto,
+      netto,
+      mwst_satz,
+      kunden(name),
+      auftraege(titel)
+    `
+    )
     .order('created_at', { ascending: false })
 
   if (error) {

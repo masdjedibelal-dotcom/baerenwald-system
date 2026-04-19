@@ -7,7 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { sendEmailHtml } from '@/lib/auftraege/emails'
-import { emails } from '@/lib/email'
+import { getMailBranding } from '@/lib/mail-branding'
+import { mailNachtrag } from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mail-service'
 import type { AngebotPosition, Kunde } from '@/lib/types'
 
 const DEFAULT_MWST = 19
@@ -342,8 +344,9 @@ export async function sendNachtragEmailAnKunde(
   const pos = normalizeAngebotPositionen(row.positionen ?? [])
   const name = auf?.kunden?.name?.split(/\s+/)[0] ?? auf?.kunden?.name ?? 'Kundin'
 
-  try {
-    await emails.nachtragKunde(email, {
+  const branding = await getMailBranding(supabaseAdmin)
+  const tpl = mailNachtrag(
+    {
       name,
       grund: String(row.grund ?? ''),
       positionen: pos.map((p) => ({
@@ -353,11 +356,19 @@ export async function sendNachtragEmailAnKunde(
       })),
       gesamt_min: Number(row.gesamt_min ?? 0),
       gesamt_max: Number(row.gesamt_max ?? 0),
-      link,
-    })
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Mail fehlgeschlagen' }
-  }
+      bestaetigungsLink: link,
+    },
+    branding
+  )
+  const mail = await sendMail({
+    typ: 'nachtrag',
+    an: email,
+    anName: name,
+    betreff: tpl.betreff,
+    html: tpl.html,
+    auftragId,
+  })
+  if (!mail.success) return { ok: false, message: mail.error ?? 'Mail fehlgeschlagen' }
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
@@ -399,8 +410,9 @@ export async function sendNachtragErinnerungAnKunde(
   const pos = normalizeAngebotPositionen(row.positionen ?? [])
   const name = auf?.kunden?.name?.split(/\s+/)[0] ?? auf?.kunden?.name ?? 'Kundin'
 
-  try {
-    await emails.nachtragKunde(email, {
+  const branding = await getMailBranding(supabaseAdmin)
+  const tpl = mailNachtrag(
+    {
       name,
       grund: `Erinnerung: ${String(row.grund ?? '')}`,
       positionen: pos.map((p) => ({
@@ -410,12 +422,19 @@ export async function sendNachtragErinnerungAnKunde(
       })),
       gesamt_min: Number(row.gesamt_min ?? 0),
       gesamt_max: Number(row.gesamt_max ?? 0),
-      link,
-      erinnerung: true,
-    })
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Mail fehlgeschlagen' }
-  }
+      bestaetigungsLink: link,
+    },
+    branding
+  )
+  const mail = await sendMail({
+    typ: 'nachtrag',
+    an: email,
+    anName: name,
+    betreff: `Erinnerung — ${tpl.betreff}`,
+    html: tpl.html,
+    auftragId,
+  })
+  if (!mail.success) return { ok: false, message: mail.error ?? 'Mail fehlgeschlagen' }
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
@@ -500,6 +519,7 @@ export async function createBaustopp(input: {
     await sendEmailHtml({
       to: k.email.trim(),
       subject: 'Kurze Info zu Ihrem Projekt — Bärenwald München',
+      typ: 'termin',
       html: `<p>Guten Tag ${vorname},</p>
         <p>aufgrund von <strong>${typLabel}</strong> müssen wir die Arbeiten vorübergehend unterbrechen.</p>
         <p>${input.grund.replace(/</g, '&lt;')}</p>

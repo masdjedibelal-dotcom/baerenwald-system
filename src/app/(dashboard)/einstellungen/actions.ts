@@ -28,6 +28,7 @@ export async function saveEinstellungen(
   const { error } = await supabase.from('einstellungen').upsert(payload, { onConflict: 'key' })
   if (error) return { ok: false, message: error.message }
   revalidatePath('/einstellungen')
+  revalidatePath('/einstellungen/firma')
   revalidatePath('/angebote')
   revalidatePath('/rechnungen')
   return { ok: true }

@@ -1,14 +1,8 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase-server'
 import { AngeboteListeClient } from '@/components/angebote/AngeboteListeClient'
-import type { Angebot, AngebotPosition, Kunde, Lead } from '@/lib/types'
+import type { AngebotListeEintrag, AngebotPosition } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-
-type Row = Omit<Angebot, 'kunden' | 'leads' | 'positionen'> & {
-  positionen: unknown
-  kunden?: Pick<Kunde, 'id' | 'name' | 'email'> | null
-  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche'> | null
-}
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -28,11 +22,18 @@ export default async function AngebotePage() {
       `
       *,
       kunden(id, name, email),
-      leads(id, situation, bereiche)
+      leads(id, situation, bereiche),
+      angebot_handwerker(
+        id,
+        status,
+        handwerker_id,
+        gewerk_id,
+        handwerker(name)
+      )
     `
     )
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(100)
 
   if (error) {
     return (
@@ -43,8 +44,8 @@ export default async function AngebotePage() {
     )
   }
 
-  const rows = (data ?? []).map((row) => {
-    const r = row as Row
+  const rows: AngebotListeEintrag[] = (data ?? []).map((row) => {
+    const r = row as AngebotListeEintrag & { positionen: unknown }
     return {
       ...r,
       positionen: parsePositionen(r.positionen),

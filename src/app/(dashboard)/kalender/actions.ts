@@ -69,3 +69,23 @@ export async function setTerminErledigt(
   revalidatePath('/kalender')
   return { ok: true }
 }
+
+export async function moveKalenderTermin(
+  id: string,
+  datum: string,
+  uhrzeit_von: string | null,
+  uhrzeit_bis: string | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('kalender_termine')
+    .update({
+      datum,
+      uhrzeit_von,
+      uhrzeit_bis,
+    })
+    .eq('id', id)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/kalender')
+  return { ok: true }
+}

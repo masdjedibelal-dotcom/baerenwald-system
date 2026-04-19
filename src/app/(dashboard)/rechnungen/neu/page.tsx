@@ -1,11 +1,10 @@
-import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { RechnungEntwurfForm } from '@/components/rechnungen/RechnungEntwurfForm'
+import { RechnungNeuForm } from '@/components/rechnungen/RechnungNeuForm'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { DEFAULT_ZAHLUNGSZIEL_TAGE } from '@/lib/rechnung-config'
+import type { AngebotPosition } from '@/lib/types'
 
 export default async function RechnungNeuPage({
   searchParams,
@@ -13,71 +12,69 @@ export default async function RechnungNeuPage({
   searchParams: { auftrag_id?: string }
 }) {
   const auftragId = searchParams.auftrag_id
+  const supabase = createClient()
+  const firm = await fetchFirmenEinstellungen(supabase)
+  const zt = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || DEFAULT_ZAHLUNGSZIEL_TAGE)
+
   if (!auftragId) {
-    redirect('/rechnungen')
+    return (
+      <RechnungNeuForm
+        angebot_id={null}
+        auftrag_id={null}
+        initialKundeId={null}
+        kundenAdresseReadonly={null}
+        positionen={[]}
+        zahlungszielTage={zt}
+        backHref="/rechnungen"
+      />
+    )
   }
 
-  const supabase = createClient()
-  const [{ data: auf }, firm] = await Promise.all([
-    supabase
-      .from('auftraege')
-      .select(
-        `
-        id,
-        kunde_id,
-        angebot_id,
-        angebote(id, positionen),
-        kunden(id, name)
+  const { data: auf } = await supabase
+    .from('auftraege')
+    .select(
       `
-      )
-      .eq('id', auftragId)
-      .maybeSingle(),
-    fetchFirmenEinstellungen(supabase),
-  ])
+      id,
+      kunde_id,
+      angebot_id,
+      angebote(id, positionen),
+      kunden(id, name, adresse, plz, ort)
+    `
+    )
+    .eq('id', auftragId)
+    .maybeSingle()
 
   if (!auf?.kunde_id) notFound()
 
   const angRaw = auf.angebote as { positionen?: unknown } | unknown[] | null | undefined
   const ang = Array.isArray(angRaw) ? angRaw[0] : angRaw
-  const positionen = normalizeAngebotPositionen(
-    (ang as { positionen?: unknown } | null)?.positionen ?? []
-  )
-  if (!positionen.length) {
-    return (
-      <div>
-        <PageHeader title="Rechnung erstellen" />
-        <p className="text-sm text-danger">
-          Keine Angebotspositionen vorhanden. Bitte zuerst ein Angebot mit Positionen verknüpfen.
-        </p>
-        <Link href={`/auftraege/${auftragId}`} className="mt-4 inline-block text-primary underline">
-          Zurück zum Auftrag
-        </Link>
-      </div>
-    )
-  }
+  const rawPos = (ang as { positionen?: unknown } | null)?.positionen ?? []
+  const positionen: AngebotPosition[] = normalizeAngebotPositionen(rawPos)
 
-  const zt = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || DEFAULT_ZAHLUNGSZIEL_TAGE)
+  const k = auf.kunden as
+    | { name?: string; adresse?: string | null; plz?: string | null; ort?: string | null }
+    | { name?: string; adresse?: string | null; plz?: string | null; ort?: string | null }[]
+    | null
+  const kundeRow = Array.isArray(k) ? k[0] : k
 
   return (
-    <div>
-      <PageHeader
-        title="Rechnung erstellen"
-        action={
-          <Link
-            href={`/auftraege/${auftragId}`}
-            className="text-sm font-medium text-primary"
-          >
-            Zurück
-          </Link>
-        }
-      />
-      <RechnungEntwurfForm
-        angebot_id={(auf as { angebot_id: string | null }).angebot_id ?? null}
-        auftrag_id={auftragId}
-        kunde_id={auf.kunde_id as string}
-        positionen={positionen}
-        zahlungszielTage={zt}
-      />
-    </div>
+    <RechnungNeuForm
+      angebot_id={(auf as { angebot_id: string | null }).angebot_id ?? null}
+      auftrag_id={auftragId}
+      initialKundeId={auf.kunde_id as string}
+      kundenAdresseReadonly={
+        kundeRow?.name
+          ? {
+              name: kundeRow.name,
+              adresse: kundeRow.adresse ?? null,
+              plz: kundeRow.plz ?? null,
+              ort: kundeRow.ort ?? null,
+            }
+          : null
+      }
+      positionen={positionen}
+      zahlungszielTage={zt}
+      backHref={`/auftraege/${auftragId}`}
+    />
   )
 }

@@ -5,14 +5,16 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
+import { Toggle } from '@/components/ui/Toggle'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import type { LeadKanal } from '@/lib/types'
-import { BEREICH_LABELS } from '@/lib/utils'
+import { BEREICH_LABELS, cn } from '@/lib/utils'
 
 const KANAL_OPTIONS: { value: LeadKanal; label: string }[] = [
+  { value: 'website', label: 'Website' },
   { value: 'telefon', label: 'Telefon' },
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'email', label: 'E-Mail' },
@@ -50,6 +52,7 @@ export default function NeueAnfragePage() {
   const [preisMax, setPreisMax] = useState('')
   const [zeitraum, setZeitraum] = useState('')
   const [notizen, setNotizen] = useState('')
+  const [sendBestaetigung, setSendBestaetigung] = useState(false)
 
   function toggleBereich(key: string) {
     setBereiche((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -110,27 +113,31 @@ export default function NeueAnfragePage() {
       return
     }
 
+    if (sendBestaetigung && email.trim()) {
+      const { sendAnfrageBestaetigung } = await import('@/app/actions/mails')
+      const mailRes = await sendAnfrageBestaetigung(res.id, true)
+      if (!mailRes.ok) {
+        console.warn('[Bestätigungsmail]', mailRes.message)
+      }
+    }
+
     router.push(`/anfragen/${res.id}`)
     router.refresh()
   }
 
   return (
-    <div>
+    <div className="mx-auto max-w-2xl px-4 py-6">
       <PageHeader
         title="Neue Anfrage"
-        action={
-          <Link
-            href="/anfragen"
-            className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary"
-          >
-            Abbrechen
-          </Link>
-        }
+        breadcrumbs={[
+          { label: 'Anfragen', href: '/anfragen' },
+          { label: 'Neue Anfrage' },
+        ]}
       />
 
-      <form onSubmit={onSubmit} className="mx-auto max-w-xl space-y-6">
-        <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-4">
-          <legend className="px-1 text-base font-semibold text-ink">Kontakt</legend>
+      <form onSubmit={onSubmit} className="mt-6 space-y-6 pb-28">
+        <fieldset className="card-body card space-y-4">
+          <legend className="card-title px-1">Kunde</legend>
           <Input
             name="name"
             label="Name *"
@@ -165,8 +172,8 @@ export default function NeueAnfragePage() {
           />
         </fieldset>
 
-        <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-4">
-          <legend className="px-1 text-base font-semibold text-ink">Kanal</legend>
+        <fieldset className="card-body card space-y-4">
+          <legend className="card-title px-1">Anfrage</legend>
           <Select
             name="kanal"
             label="Wie kam die Anfrage?"
@@ -177,8 +184,8 @@ export default function NeueAnfragePage() {
           />
         </fieldset>
 
-        <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-4">
-          <legend className="px-1 text-base font-semibold text-ink">Projekt</legend>
+        <fieldset className="card-body card space-y-4">
+          <legend className="card-title px-1">Projekt</legend>
           <Select
             name="situation"
             label="Situation"
@@ -193,13 +200,18 @@ export default function NeueAnfragePage() {
               {BEREICH_KEYS.map((key) => (
                 <label
                   key={key}
-                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-border bg-canvas px-3 py-2"
+                  className={cn(
+                    'flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
+                    bereiche[key]
+                      ? 'border-bw-primary bg-bw-green-bg'
+                      : 'border-bw-border bg-bw-bg hover:bg-bw-hover'
+                  )}
                 >
                   <input
                     type="checkbox"
                     checked={!!bereiche[key]}
                     onChange={() => toggleBereich(key)}
-                    className="h-5 w-5 accent-primary"
+                    className="h-5 w-5 accent-bw-primary"
                   />
                   <span className="text-base text-ink">{BEREICH_LABELS[key]}</span>
                 </label>
@@ -233,8 +245,8 @@ export default function NeueAnfragePage() {
           />
         </fieldset>
 
-        <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-4">
-          <legend className="px-1 text-base font-semibold text-ink">Notizen</legend>
+        <fieldset className="card-body card space-y-4">
+          <legend className="card-title px-1">Notizen</legend>
           <Textarea
             name="notizen"
             label="Interne Notizen"
@@ -244,15 +256,29 @@ export default function NeueAnfragePage() {
           />
         </fieldset>
 
+        <div className="flex items-center gap-3 rounded-lg bg-bw-hover p-4">
+          <Toggle
+            checked={sendBestaetigung}
+            onChange={setSendBestaetigung}
+            label="Bestätigungsmail senden"
+            hint="Sendet automatisch eine Bestätigung an den Kunden (wie bei Website-Anfragen)."
+          />
+        </div>
+
         {error ? (
           <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
             {error}
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" size="lg" fullWidth loading={loading}>
-          Speichern
-        </Button>
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex gap-2 border-t border-bw-border bg-bw-card p-4 shadow-[0_-4px_12px_rgba(0,0,0,.08)] md:relative md:z-0 md:border-0 md:bg-transparent md:p-0 md:shadow-none">
+          <Link href="/anfragen" className="btn btn-secondary btn-lg flex-1 md:flex-none">
+            Abbrechen
+          </Link>
+          <Button type="submit" variant="primary" size="lg" className="flex-1 md:w-auto" loading={loading}>
+            Anfrage speichern
+          </Button>
+        </div>
       </form>
     </div>
   )

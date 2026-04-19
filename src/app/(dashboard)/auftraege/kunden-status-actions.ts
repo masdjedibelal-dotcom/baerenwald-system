@@ -3,9 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import * as emailTemplates from '@/lib/email-templates'
+import { getMailBranding } from '@/lib/mail-branding'
+import { mailUpdateHinweis } from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mail-service'
 import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
-import { sendEmailHtml } from '@/lib/auftraege/emails'
 
 async function assertAuftragZugriff(auftragId: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -54,7 +55,7 @@ export async function setTimelineKundenfreigabe(input: {
   if (input.fuerKunde && input.kundeBenachrichtigen) {
     const { data: auf } = await supabaseAdmin
       .from('auftraege')
-      .select('kunden_token, kunden(name, email)')
+      .select('kunden_token, kunde_id, kunden(name, email)')
       .eq('id', input.auftragId)
       .maybeSingle()
     const kunden = auf?.kunden as { name?: string; email?: string | null } | null
@@ -63,11 +64,16 @@ export async function setTimelineKundenfreigabe(input: {
     if (email && token) {
       const vorname = (kunden?.name ?? 'Guten Tag').trim().split(/\s+/)[0] || 'Guten Tag'
       const link = projektUrlFromToken(token)
-      const html = emailTemplates.emailUpdateHinweis({ name: vorname, link })
-      await sendEmailHtml({
-        to: email,
-        subject: 'Update zu Ihrem Projekt — Bärenwald München',
-        html,
+      const branding = await getMailBranding(supabaseAdmin)
+      const tpl = mailUpdateHinweis({ name: vorname, statusLink: link }, branding)
+      await sendMail({
+        typ: 'update_hinweis',
+        an: email,
+        anName: kunden?.name ?? null,
+        betreff: tpl.betreff,
+        html: tpl.html,
+        kundeId: (auf?.kunde_id as string | null) ?? null,
+        auftragId: input.auftragId,
       })
     }
   }
@@ -85,7 +91,7 @@ export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ o
 
   const { data: auf } = await supabaseAdmin
     .from('auftraege')
-    .select('kunden(name, email)')
+    .select('kunde_id, kunden(name, email)')
     .eq('id', auftragId)
     .maybeSingle()
   const kunden = auf?.kunden as { name?: string; email?: string | null } | null
@@ -94,13 +100,18 @@ export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ o
 
   const vorname = (kunden?.name ?? 'Guten Tag').trim().split(/\s+/)[0] || 'Guten Tag'
   const link = projektUrlFromToken(token)
-  const html = emailTemplates.emailUpdateHinweis({ name: vorname, link })
-  const sent = await sendEmailHtml({
-    to: email,
-    subject: 'Ihr Projekt-Link — Bärenwald München',
-    html,
+  const branding = await getMailBranding(supabaseAdmin)
+  const tpl = mailUpdateHinweis({ name: vorname, statusLink: link }, branding)
+  const sent = await sendMail({
+    typ: 'update_hinweis',
+    an: email,
+    anName: kunden?.name ?? null,
+    betreff: tpl.betreff,
+    html: tpl.html,
+    kundeId: (auf?.kunde_id as string | null) ?? null,
+    auftragId,
   })
-  if (!sent.ok) return sent
+  if (!sent.success) return { ok: false, message: sent.error ?? 'Versand fehlgeschlagen' }
   revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
 }

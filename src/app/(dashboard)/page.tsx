@@ -1,15 +1,15 @@
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-// Demo-Modus: gelbes Banner bei E-Mail mit „demo“/„test“ — siehe DemoModeBanner in (dashboard)/layout.tsx
-import { sendBehinderungInternMail } from '@/lib/formulare/behinderung-intern-mail'
-import {
-  DashboardHomeClient,
-  type DashboardInitial,
-  type DashboardWarnung,
-} from '@/components/dashboard/DashboardHomeClient'
-import { labelKundeAblehnung } from '@/lib/angebote/ablehnung-labels'
-import { countDatenschutzFaellige } from '@/lib/datenschutz/queries'
-import type { Lead } from '@/lib/types'
+import { StatCard } from '@/components/dashboard/StatCard'
+import { Begruessing } from '@/components/dashboard/Begruessing'
+import { DashboardListen } from '@/components/dashboard/DashboardListen'
+import { DashboardTermineHeute } from '@/components/dashboard/DashboardTermineHeute'
+import { Warnungen, type DashboardWarnungEintrag } from '@/components/dashboard/Warnungen'
+import { DASHBOARD_FILTER_LINKS } from '@/lib/dashboard-filters'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import type { AngebotListeEintrag, AngebotPosition, KalenderTermin, LeadWithAngebote } from '@/lib/types'
+import type { AuftragListeEintrag } from '@/lib/types'
+import type { HandwerkerZeile } from '@/components/handwerker/HandwerkerListeClient'
+import { Inbox, FileText, Wrench, HardHat, Receipt } from 'lucide-react'
 
 export const revalidate = 60
 
@@ -19,71 +19,160 @@ function startOfTodayIso() {
   return d.toISOString()
 }
 
+function localDatePlusDays(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function pickOne<T>(x: T | T[] | null | undefined): T | null {
   if (x == null) return null
   return Array.isArray(x) ? (x[0] as T) ?? null : x
 }
 
-function weekRangeIso() {
-  const d = new Date()
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  const mon = new Date(d)
-  mon.setDate(mon.getDate() + diff)
-  mon.setHours(0, 0, 0, 0)
-  const sun = new Date(mon)
-  sun.setDate(sun.getDate() + 6)
-  return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) }
+function parseAngebote(rows: unknown[]): AngebotListeEintrag[] {
+  return (rows ?? []).map((row) => {
+    const r = row as AngebotListeEintrag & { positionen: unknown }
+    return {
+      ...r,
+      positionen: normalizeAngebotPositionen(r.positionen) as AngebotPosition[],
+    }
+  })
 }
 
 export default async function DashboardPage() {
   const supabase = createClient()
   const t0 = startOfTodayIso()
-  const { from: wFrom, to: wTo } = weekRangeIso()
-  const ms3d = new Date(Date.now() - 3 * 86400000).toISOString()
-  const ms2d = new Date(Date.now() - 2 * 86400000).toISOString()
+  const heuteDatum = localDatePlusDays(0)
+  const in3TagenIso = new Date(Date.now() - 3 * 86400000).toISOString()
+  const einbehaltBis = localDatePlusDays(30)
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: profil } = user
+    ? await supabase.from('user_profiles').select('name').eq('id', user.id).maybeSingle()
+    : { data: null }
 
   const [
-    { count: neueHeute },
-    { count: offeneAngebote },
-    { count: aktiveAuftraege },
-    { count: termineWoche },
-    { data: leadsData },
-    { data: hwAbRaw },
-    { data: kundeAltRaw },
-    { data: hwAngRaw },
-    { count: nGesendetKunde },
-    { count: nAuftragMitAng },
-    { data: ablehnRaw },
+    neueAnfragen,
+    offeneAngebote,
+    aktiveAuftraege,
+    hwImEinsatz,
+    ueberfaelligeRechnungen,
+    heutigeTermine,
+    letzteAnfragen,
+    letzteAngebote,
+    letzteAuftraege,
+    aktiveHandwercher,
+    naechsteTermine,
+    hwAbRows,
+    kundeAltRows,
+    complianceRows,
+    einbehaltRows,
   ] = await Promise.all([
-    supabase.from('leads').select('id', { count: 'exact', head: true }).gte('created_at', t0),
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'neu')
+      .gte('created_at', t0),
     supabase
       .from('angebote')
       .select('id', { count: 'exact', head: true })
-      .not('status', 'eq', 'abgelehnt')
-      .not('status', 'eq', 'kunde_akzeptiert'),
+      .in('status', ['gesendet_kunde', 'gesendet_handwerker', 'handwerker_akzeptiert']),
     supabase
       .from('auftraege')
       .select('id', { count: 'exact', head: true })
-      .not('status', 'eq', 'abgeschlossen')
-      .not('status', 'eq', 'storniert'),
+      .in('status', ['offen', 'in_arbeit', 'abnahme']),
+    supabase
+      .from('auftrag_handwerker')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['in_arbeit', 'zugewiesen']),
+    supabase
+      .from('rechnungen')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'gesendet')
+      .lt('faellig_am', heuteDatum),
     supabase
       .from('kalender_termine')
-      .select('id', { count: 'exact', head: true })
-      .gte('datum', wFrom)
-      .lte('datum', wTo)
-      .eq('erledigt', false),
+      .select(
+        `
+        *,
+        leads(kontakt_name),
+        auftraege(titel, kunden(name))
+      `
+      )
+      .eq('datum', heuteDatum)
+      .eq('erledigt', false)
+      .order('uhrzeit_von', { ascending: true }),
     supabase
       .from('leads')
-      .select('id, kontakt_name, status, situation, plz, created_at')
+      .select(
+        `
+        id, status, kanal,
+        bereiche, preis_min, preis_max,
+        kontakt_name, kontakt_email, kontakt_telefon,
+        plz, created_at,
+        kunden(id, name, email, telefon)
+      `
+      )
       .order('created_at', { ascending: false })
-      .limit(5),
+      .limit(8),
+    supabase
+      .from('angebote')
+      .select(
+        `
+        *,
+        kunden(id, name, email),
+        leads(id, situation, bereiche),
+        angebot_handwerker(id, status, handwerker_id, gewerk_id, handwerker(name))
+      `
+      )
+      .order('created_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('auftraege')
+      .select(
+        `
+        *,
+        kunden(id, name, email, telefon),
+        angebote(id, gesamt_min, gesamt_max, positionen),
+        auftrag_handwerker(*, handwerker(name), gewerke(name))
+      `
+      )
+      .in('status', ['offen', 'in_arbeit', 'abnahme'])
+      .order('created_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('handwerker')
+      .select('id, name, firma, gewerke, compliance_status, created_at')
+      .eq('aktiv', true)
+      .order('name', { ascending: true })
+      .limit(8),
+    supabase
+      .from('kalender_termine')
+      .select(
+        `
+        *,
+        leads(kontakt_name),
+        auftraege(titel, kunden(name))
+      `
+      )
+      .gte('datum', heuteDatum)
+      .lte('datum', einbehaltBis)
+      .eq('erledigt', false)
+      .order('datum', { ascending: true })
+      .order('uhrzeit_von', { ascending: true })
+      .limit(12),
     supabase
       .from('angebot_handwerker')
       .select(
         `
         id,
-        angebot_id,
         gewerke(name),
         angebote(id, status, kunden(name))
       `
@@ -91,205 +180,153 @@ export default async function DashboardPage() {
       .eq('status', 'abgelehnt'),
     supabase
       .from('angebote')
-      .select('id, gesendet_kunde_at, kunden(name)')
+      .select('id, kunden(name), gesendet_kunde_at')
       .eq('status', 'gesendet_kunde')
-      .lt('gesendet_kunde_at', ms3d),
+      .lt('gesendet_kunde_at', in3TagenIso),
     supabase
-      .from('angebot_handwerker')
+      .from('handwerker')
+      .select('id, name')
+      .eq('aktiv', true)
+      .eq('ist_fachbetrieb', true)
+      .eq('compliance_status', 'unvollständig')
+      .limit(8),
+    supabase
+      .from('einbehalte')
       .select(
         `
         id,
-        gesendet_at,
-        handwerker(name),
-        angebot_id,
-        angebote(id, status, kunden(name))
+        freigabe_datum,
+        auftrag_id,
+        auftraege(id, titel, kunden(name))
       `
       )
-      .eq('status', 'angefragt')
-      .lt('gesendet_at', ms2d),
-    supabase
-      .from('angebote')
-      .select('id', { count: 'exact', head: true })
-      .not('gesendet_kunde_at', 'is', null),
-    supabase
-      .from('auftraege')
-      .select('id', { count: 'exact', head: true })
-      .not('angebot_id', 'is', null),
-    supabase
-      .from('angebote')
-      .select('ablehnung_grund')
-      .eq('status', 'abgelehnt')
-      .not('ablehnung_grund', 'is', null),
+      .eq('status', 'einbehalten')
+      .gte('freigabe_datum', heuteDatum)
+      .lte('freigabe_datum', einbehaltBis)
+      .limit(8),
   ])
 
-  const warnungen: DashboardWarnung[] = []
-  const seenHwAb = new Set<string>()
+  const warnungen: DashboardWarnungEintrag[] = []
+  const seen = new Set<string>()
 
-  for (const row of hwAbRaw ?? []) {
+  for (const row of hwAbRows.data ?? []) {
     const r = row as Record<string, unknown>
-    const ang = pickOne(r.angebote) as { id: string; status: string; kunden: unknown } | null
+    const ang = pickOne(r.angebote as { id: string; status: string; kunden: unknown } | null)
     if (!ang || ang.status === 'abgelehnt' || ang.status === 'kunde_akzeptiert') continue
-    const k = pickOne(ang.kunden) as { name: string } | null
-    const gw = pickOne(r.gewerke) as { name: string } | null
-    const key = `${ang.id}-${gw?.name ?? ''}`
-    if (seenHwAb.has(key)) continue
-    seenHwAb.add(key)
+    const k = pickOne(ang.kunden as { name: string } | null)
+    const gw = pickOne(r.gewerke as { name: string } | null)
+    const key = `hw-${ang.id}-${gw?.name ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
     warnungen.push({
-      angebot_id: ang.id,
-      kunde: k?.name?.trim() || 'Kundin',
+      id: key,
       typ: 'handwerker_abgelehnt',
-      gewerk_name: gw?.name ?? null,
+      name: k?.name?.trim() ?? 'Kundin',
+      link: `/angebote/${ang.id}`,
     })
   }
 
-  for (const row of kundeAltRaw ?? []) {
+  for (const row of kundeAltRows.data ?? []) {
     const r = row as { id: string; kunden: unknown }
-    const k = pickOne(r.kunden) as { name: string } | null
+    const k = pickOne(r.kunden as { name: string } | null)
     warnungen.push({
-      angebot_id: r.id,
-      kunde: k?.name?.trim() || 'Kundin',
+      id: `knd-${r.id}`,
       typ: 'keine_antwort_kunde',
+      name: k?.name?.trim() ?? 'Kundin',
+      link: `/angebote/${r.id}`,
     })
   }
 
-  for (const row of hwAngRaw ?? []) {
-    const r = row as Record<string, unknown>
-    const ang = pickOne(r.angebote) as { id: string; status: string; kunden: unknown } | null
-    if (!ang || ang.status === 'abgelehnt') continue
-    const k = pickOne(ang.kunden) as { name: string } | null
-    const hw = pickOne(r.handwerker) as { name: string } | null
+  for (const row of complianceRows.data ?? []) {
+    const r = row as { id: string; name: string }
     warnungen.push({
-      angebot_id: ang.id,
-      kunde: k?.name?.trim() || 'Kundin',
-      typ: 'keine_antwort_handwerker',
-      handwerker_name: hw?.name ?? null,
-      zuweisung_id: r.id as string,
+      id: `cmp-${r.id}`,
+      typ: 'compliance_fehlt',
+      name: r.name?.trim() ?? 'Handwercher',
+      link: `/handwerker/${r.id}`,
     })
   }
 
-  const d7beh = new Date(Date.now() - 7 * 86400000).toISOString()
-  const { data: behindRows } = await supabaseAdmin
-    .from('formular_eintraege')
-    .select(
-      `
-      id,
-      submitted_at,
-      daten,
-      auftrag_id,
-      behinderung_intern_mail_at,
-      handwerker(name),
-      formular_templates(name, subtyp),
-      auftraege(id, kunden(name, email))
-    `
-    )
-    .gte('submitted_at', d7beh)
-    .not('submitted_at', 'is', null)
-    .order('submitted_at', { ascending: false })
-
-  for (const row of behindRows ?? []) {
+  for (const row of einbehaltRows.data ?? []) {
     const r = row as Record<string, unknown>
-    const ft = r.formular_templates as { subtyp?: string | null } | null
-    if (ft?.subtyp !== 'behinderung') continue
-    const auf = pickOne(r.auftraege) as {
-      id: string
-      kunden: { name: string; email: string | null } | null
-    } | null
+    const auf = pickOne(
+      r.auftraege as { id: string; titel: string | null; kunden: { name: string } | null } | null
+    )
     if (!auf?.id) continue
-    const k = auf.kunden
-    const daten = (r.daten ?? {}) as Record<string, unknown>
-    const grund = String(daten.grund ?? '')
-    const verzug = Math.round(Number(daten.geschaetzter_verzug ?? 0))
-    const hw = pickOne(r.handwerker) as { name: string } | null
-
-    if (!r.behinderung_intern_mail_at) {
-      const mail = await sendBehinderungInternMail({
-        kundeName: k?.name?.trim() || 'Kundin',
-        auftragId: auf.id,
-        handwerkerName: hw?.name ?? '—',
-        grund,
-        verzugTage: String(verzug),
-        beschreibung: String(daten.beschreibung ?? ''),
-      })
-      if (mail.ok && !('skipped' in mail && mail.skipped)) {
-        await supabaseAdmin
-          .from('formular_eintraege')
-          .update({ behinderung_intern_mail_at: new Date().toISOString() })
-          .eq('id', r.id as string)
-      }
-    }
-
-    warnungen.push({
-      typ: 'behinderung',
-      auftrag_id: auf.id,
-      eintrag_id: r.id as string,
-      kunde: k?.name?.trim() || 'Kundin',
-      handwerker_name: hw?.name ?? null,
-      behinderung_grund: grund,
-      behinderung_verzug_tage: verzug,
-      kunde_email: k?.email ?? null,
-    })
-  }
-
-  const { data: baustoppRows } = await supabase
-    .from('baustopps')
-    .select(
-      `
-      id,
-      typ,
-      grund,
-      auftrag_id,
-      auftraege(id, status, kunden(name))
-    `
-    )
-    .is('ende_datum', null)
-
-  for (const row of baustoppRows ?? []) {
-    const r = row as Record<string, unknown>
-    const auf = pickOne(r.auftraege as { id: string; status: string; kunden: unknown } | null)
-    if (!auf || auf.status === 'abgeschlossen' || auf.status === 'storniert') continue
     const k = pickOne(auf.kunden as { name: string } | null)
     warnungen.push({
-      typ: 'baustopp_aktiv',
-      auftrag_id: auf.id,
-      kunde: k?.name?.trim() || 'Kundin',
-      baustopp_typ: String(r.typ ?? ''),
-      baustopp_grund: String(r.grund ?? ''),
+      id: `ein-${r.id}`,
+      typ: 'einbehalt_faellig',
+      name: k?.name?.trim() ?? auf.titel?.trim() ?? 'Auftrag',
+      link: `/auftraege/${auf.id}/finanzen`,
     })
   }
 
-  const ng = nGesendetKunde ?? 0
-  const na = nAuftragMitAng ?? 0
-  const conversionProzent = ng > 0 ? Math.round((na / ng) * 100) : null
+  const anfragenListe = (letzteAnfragen.data ?? []) as unknown as LeadWithAngebote[]
+  const angeboteListe = parseAngebote(letzteAngebote.data ?? [])
+  const auftraegeListe = (letzteAuftraege.data ?? []) as AuftragListeEintrag[]
+  const hwListe = (aktiveHandwercher.data ?? []) as HandwerkerZeile[]
+  const termineHeute = (heutigeTermine.data ?? []) as KalenderTermin[]
+  const termine3d = (naechsteTermine.data ?? []) as KalenderTermin[]
 
-  const counts = new Map<string, number>()
-  for (const row of ablehnRaw ?? []) {
-    const g = (row as { ablehnung_grund: string | null }).ablehnung_grund
-    if (!g) continue
-    counts.set(g, (counts.get(g) ?? 0) + 1)
-  }
-  const ablehnungTop = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([grund, anzahl]) => ({ grund: labelKundeAblehnung(grund), anzahl }))
+  const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
-  const datenschutzFaellig = await countDatenschutzFaellige()
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 md:px-6">
+      <Begruessing name={vorname} />
 
-  const initial: DashboardInitial = {
-    neueHeute: neueHeute ?? 0,
-    offeneAngebote: offeneAngebote ?? 0,
-    aktiveAuftraege: aktiveAuftraege ?? 0,
-    termineWoche: termineWoche ?? 0,
-    letzteAnfragen: (leadsData ?? []) as Pick<
-      Lead,
-      'id' | 'kontakt_name' | 'status' | 'situation' | 'plz' | 'created_at'
-    >[],
-    warnungen,
-    statistik: {
-      conversionProzent,
-      ablehnungTop,
-    },
-    datenschutzFaellig,
-  }
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <StatCard
+          zahl={neueAnfragen.count ?? 0}
+          label="Neue Anfragen heute"
+          icon={Inbox}
+          href={DASHBOARD_FILTER_LINKS.neueAnfragen}
+          farbe="blau"
+          warnung
+        />
+        <StatCard
+          zahl={offeneAngebote.count ?? 0}
+          label="Offene Angebote"
+          icon={FileText}
+          href={DASHBOARD_FILTER_LINKS.offeneAngebote}
+          farbe="orange"
+          warnung
+        />
+        <StatCard
+          zahl={aktiveAuftraege.count ?? 0}
+          label="Aktive Aufträge"
+          icon={Wrench}
+          href={DASHBOARD_FILTER_LINKS.aktiveAuftraege}
+          farbe="gruen"
+        />
+        <StatCard
+          zahl={hwImEinsatz.count ?? 0}
+          label="Handwercher im Einsatz"
+          icon={HardHat}
+          href={DASHBOARD_FILTER_LINKS.hwImEinsatz}
+          farbe="lila"
+        />
+        <StatCard
+          zahl={ueberfaelligeRechnungen.count ?? 0}
+          label="Überfällige Rechnungen"
+          icon={Receipt}
+          href={DASHBOARD_FILTER_LINKS.ueberfaellig}
+          farbe="rot"
+          warnung
+        />
+      </div>
 
-  return <DashboardHomeClient initial={initial} />
+      {termineHeute.length > 0 ? <DashboardTermineHeute termine={termineHeute} /> : null}
+
+      <DashboardListen
+        anfragen={anfragenListe}
+        angebote={angeboteListe}
+        auftraege={auftraegeListe}
+        handwercherZeilen={hwListe}
+        termine={termine3d}
+      />
+
+      {warnungen.length > 0 ? <Warnungen items={warnungen} /> : null}
+    </div>
+  )
 }

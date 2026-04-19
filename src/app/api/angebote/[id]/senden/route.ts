@@ -1,23 +1,13 @@
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { persistPdfForAngebot } from '@/app/(dashboard)/angebote/actions'
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
-import { buildKundenAngebotMail } from '@/lib/angebote/angebot-mail-templates'
-import { sendKundenAngebotEmail } from '@/lib/angebote/emails'
+import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail, AngebotPosition, AngebotStatus } from '@/lib/types'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
-}
-
-function vorname(name: string): string {
-  const t = name.trim()
-  if (!t) return ''
-  return t.split(/\s+/)[0] ?? t
 }
 
 async function loadDetail(
@@ -48,26 +38,6 @@ async function loadDetail(
   }
 }
 
-async function logEmail(input: {
-  typ: string
-  angebot_id: string
-  zuweisung_id?: string | null
-  to_email: string
-  subject: string
-}) {
-  const { error } = await supabaseAdmin.from('email_logs').insert({
-    typ: input.typ,
-    angebot_id: input.angebot_id,
-    zuweisung_id: input.zuweisung_id ?? null,
-    to_email: input.to_email,
-    subject: input.subject,
-    meta: {},
-  })
-  if (error) {
-    console.warn('email_logs:', error.message)
-  }
-}
-
 type BodyKunde = { typ: 'kunde'; subject?: string }
 type BodyHandwerker = { typ: 'handwerker'; zuweisung_id: string; send_email: boolean }
 
@@ -93,8 +63,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Angebot nicht gefunden' }, { status: 404 })
   }
 
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-
   if (body.typ === 'kunde') {
     const allowed: AngebotStatus[] = ['entwurf', 'handwerker_akzeptiert']
     if (!allowed.includes(detail.status)) {
@@ -107,61 +75,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Kunden-E-Mail fehlt' }, { status: 400 })
     }
 
-    const pdf = await persistPdfForAngebot(angebotId)
-    if (!pdf.ok) {
-      return NextResponse.json({ error: pdf.message }, { status: 400 })
+    const r = await sendAngebotToKunde(angebotId)
+    if (!r.ok) {
+      return NextResponse.json({ error: r.message }, { status: 502 })
     }
-
-    const pos = normalizeAngebotPositionen(detail.positionen)
-    const summen = summenAusPositionen(pos, 19)
-    const gueltigTage = Math.max(1, parseInt(firm.angebot_gueltig_tage, 10) || 30)
-    const gueltigBis = new Date(
-      Date.now() + gueltigTage * 24 * 60 * 60 * 1000
-    ).toLocaleDateString('de-DE')
-
-    const subject =
-      (body.subject?.trim() && body.subject.trim()) || 'Ihr Angebot von Bärenwald München'
-
-    const html = buildKundenAngebotMail({
-      kundeVorname: vorname(detail.kunden.name),
-      positionen: pos,
-      bruttoMin: summen.bruttoMin,
-      bruttoMax: summen.bruttoMax,
-      gueltigBis,
-      firm,
-    })
-
-    const mail = await sendKundenAngebotEmail({
-      to: detail.kunden.email.trim(),
-      subject,
-      html,
-      pdfBuffer: pdf.buffer,
-      pdfFilename: `angebot-${angebotId}.pdf`,
-    })
-    if (!mail.ok) {
-      return NextResponse.json({ error: mail.message }, { status: 502 })
-    }
-
-    const now = new Date().toISOString()
-    const { error: upErr } = await supabase
-      .from('angebote')
-      .update({
-        status: 'gesendet_kunde' as AngebotStatus,
-        gesendet_kunde_at: now,
-        updated_at: now,
-      })
-      .eq('id', angebotId)
-
-    if (upErr) {
-      return NextResponse.json({ error: upErr.message }, { status: 500 })
-    }
-
-    await logEmail({
-      typ: 'angebot_kunde',
-      angebot_id: angebotId,
-      to_email: detail.kunden.email.trim(),
-      subject,
-    })
 
     revalidatePath(`/angebote/${angebotId}`)
     revalidatePath('/angebote')

@@ -1,38 +1,56 @@
-import Link from 'next/link'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { Users } from 'lucide-react'
+import { createClient } from '@/lib/supabase-server'
+import {
+  HandwerkerListeClient,
+  type HandwerkerZeile,
+} from '@/components/handwerker/HandwerkerListeClient'
 
-const demo: { id: string; name: string; firma: string | null }[] = []
+export default async function HandwercherPage({
+  searchParams,
+}: {
+  searchParams: { filter?: string }
+}) {
+  const supabase = createClient()
 
-export default function HandwerkerPage() {
+  const einsatzFilter = searchParams.filter === 'einsatz'
+
+  let einsatzIds: string[] = []
+  if (einsatzFilter) {
+    const { data: zu } = await supabase
+      .from('auftrag_handwerker')
+      .select('handwerker_id')
+      .in('status', ['zugewiesen', 'in_arbeit'])
+    einsatzIds = Array.from(
+      new Set((zu ?? []).map((r) => r.handwerker_id as string))
+    )
+  }
+
+  const { data, error } = await supabase
+    .from('handwerker')
+    .select('id, name, firma, email, telefon, gewerke, compliance_status, created_at')
+    .order('name', { ascending: true })
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-status-cancel-bg p-4 text-sm text-status-cancel-text">
+        Handwercher konnten nicht geladen werden: {error.message}
+      </div>
+    )
+  }
+
+  let rows = (data ?? []) as HandwerkerZeile[]
+  if (einsatzFilter) {
+    if (einsatzIds.length === 0) {
+      rows = []
+    } else {
+      const set = new Set(einsatzIds)
+      rows = rows.filter((r) => set.has(r.id))
+    }
+  }
+
   return (
-    <div>
-      <PageHeader title="Handwerker" />
-
-      {demo.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Keine Handwerker"
-          description="Lege Handwerker an, um sie hier zu verwalten."
-        />
-      ) : (
-        <ul className="space-y-3">
-          {demo.map((h) => (
-            <li key={h.id}>
-              <Link
-                href={`/handwerker/${h.id}`}
-                className="block rounded-lg border border-border bg-surface p-4 shadow-card hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                <p className="font-semibold text-ink">{h.name}</p>
-                {h.firma ? (
-                  <p className="text-sm text-muted">{h.firma}</p>
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <HandwerkerListeClient
+      rows={rows}
+      einsatzFilterAktiv={einsatzFilter}
+    />
   )
 }

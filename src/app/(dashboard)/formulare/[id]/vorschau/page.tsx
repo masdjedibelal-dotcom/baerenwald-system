@@ -19,7 +19,7 @@ export default async function FormularVorschauPage({ params }: { params: { id: s
     <div className="mx-auto max-w-lg space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-ink">Vorschau: {template.name}</h1>
-        <Link href={`/formulare/${params.id}`} className="text-sm font-medium text-primary hover:underline">
+        <Link href={`/formulare/${params.id}/bearbeiten`} className="text-sm font-medium text-primary hover:underline">
           Bearbeiten
         </Link>
       </div>

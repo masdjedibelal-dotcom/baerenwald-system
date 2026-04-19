@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadDatenschutzAnfragen, loadDatenschutzFaellige } from '@/lib/datenschutz/queries'
-import { sendEmail } from '@/lib/email'
-import * as templates from '@/lib/email-templates'
+import { sendMail } from '@/lib/mail-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,10 +50,14 @@ export async function GET(req: NextRequest) {
       'Bitte innerhalb von 30 Tagen prüfen und verarbeiten.',
     ].join('\n')
     try {
-      await sendEmail({
-        to: intern,
-        subject: `DSGVO — ${faellig.length} Einträge zur Löschung fällig`,
-        html: templates.emailInternHinweis(body),
+      await sendMail({
+        typ: 'intern_hinweis',
+        an: intern,
+        betreff: `DSGVO — ${faellig.length} Einträge zur Löschung fällig`,
+        html: `<pre style="font-family:system-ui,sans-serif;font-size:13px;white-space:pre-wrap;">${body
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')}</pre>`,
       })
     } catch (e) {
       console.error('[cron/datenschutz] Mail fällig', e)
@@ -72,10 +75,14 @@ export async function GET(req: NextRequest) {
       `Bearbeiten: ${link}`,
     ].join('\n')
     try {
-      await sendEmail({
-        to: intern,
-        subject: `DSGVO Frist läuft ab — ${kritisch.length} Anfrage(n) noch offen`,
-        html: templates.emailInternHinweis(body),
+      await sendMail({
+        typ: 'intern_hinweis',
+        an: intern,
+        betreff: `DSGVO Frist läuft ab — ${kritisch.length} Anfrage(n) noch offen`,
+        html: `<pre style="font-family:system-ui,sans-serif;font-size:13px;white-space:pre-wrap;">${body
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')}</pre>`,
       })
     } catch (e) {
       console.error('[cron/datenschutz] Mail Anfragen', e)

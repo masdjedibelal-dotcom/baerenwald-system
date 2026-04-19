@@ -5,15 +5,12 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { renderAngebotPdfBuffer } from '@/lib/pdf/angebot-pdf'
-import {
-  buildHandwerkerEmailHtml,
-  buildKundenAngebotEmailHtml,
-  sendHandwerkerAngebotEmail,
-  sendKundenAngebotEmail,
-  sendTransactionalHtmlEmail,
-} from '@/lib/angebote/emails'
-import { buildAuftragsbestaetigung, buildHandwerkerAuftragsMail } from '@/lib/angebote/auftrag-mail-templates'
+import { sendMail } from '@/lib/mail-service'
+import { getMailBranding } from '@/lib/mail-branding'
+import { mailAngebot, mailAuftragsbestaetigung, mailHandwerkerAnfrage } from '@/lib/mail-templates'
+import { formatDatumDeFromIso, projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/kunden-token'
+import { getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -23,9 +20,12 @@ import type {
   AngebotHandwerkerZuweisungInput,
   AngebotPosition,
   AngebotStatus,
+  AngebotVorlage,
   Kunde,
+  PreisTyp,
 } from '@/lib/types'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import { addDaysYmd, insertKalenderAutoTermin } from '@/lib/kalender-auto-termine'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
@@ -134,6 +134,8 @@ export type CreateAngebotInput = {
   gesamt_min: number
   gesamt_max: number
   notizen: string | null
+  preis_typ?: PreisTyp | null
+  vorlage_id?: string | null
   /** Mehrere Handwerker pro Gewerk möglich */
   handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
 }
@@ -156,6 +158,8 @@ export async function createAngebot(
       gesamt_max: summen.nettoMax,
       notizen: input.notizen,
       pdf_url: null,
+      preis_typ: input.preis_typ ?? 'range',
+      vorlage_id: input.vorlage_id ?? null,
     })
     .select('id')
     .single()
@@ -177,7 +181,15 @@ export async function createAngebot(
     })
   }
 
+  if (input.lead_id) {
+    await supabase
+      .from('leads')
+      .update({ status: 'angebot', updated_at: new Date().toISOString() })
+      .eq('id', input.lead_id)
+  }
+
   revalidatePath('/angebote')
+  if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
   return { ok: true, id }
 }
 
@@ -209,6 +221,8 @@ export async function updateAngebot(
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
       notizen: input.notizen,
+      preis_typ: input.preis_typ ?? 'range',
+      vorlage_id: input.vorlage_id ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', angebotId)
@@ -252,9 +266,14 @@ export async function setAngebotStatus(
   status: AngebotStatus
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const now = new Date().toISOString()
+  const extra: Record<string, string> = {}
+  if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
+  if (status === 'gesendet_kunde') extra.gesendet_kunde_at = now
+
   const { error } = await supabase
     .from('angebote')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ status, updated_at: now, ...extra })
     .eq('id', angebotId)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/angebote/${angebotId}`)
@@ -329,38 +348,44 @@ export async function sendAngebotToHandwerker(angebotId: string) {
   const st = await setAngebotStatus(angebotId, 'gesendet_handwerker')
   if (!st.ok) return st
 
+  const branding = await getMailBranding(supabaseAdmin)
   const rows = detail.angebot_handwerker ?? []
-  const byEmail = new Map<string, { email: string; html: string; subject: string }>()
+  const posAll = normalizeAngebotPositionen(detail.positionen)
+  const plz = detail.kunden.plz?.trim() || detail.leads?.plz?.trim() || '—'
+  const zeitraum = detail.leads?.zeitraum?.trim() || ''
 
   for (const r of rows) {
-    const email = r.handwerker?.email
+    const email = r.handwerker?.email?.trim()
     if (!email) continue
     const gewerkName = r.gewerke?.name ?? 'Gewerk'
-    const subject = `Neue Anfrage: ${detail.kunden.name} — ${gewerkName}`
-    const html = buildHandwerkerEmailHtml({
-      kunde: detail.kunden,
-      lead: detail.leads ?? null,
-      positionen: detail.positionen,
+    const tok = (r as { token?: string | null }).token?.trim()
+    if (!tok) continue
+    const link = `${getPublicAppUrl()}/handwerker/anfrage/${tok}`
+    const posFiltered = posAll.filter((p) => p.gewerk_id === r.gewerk_id)
+    const tpl = mailHandwerkerAnfrage(
+      {
+        name: r.handwerker?.name ?? 'Guten Tag',
+        gewerk: gewerkName,
+        plz,
+        zeitraum: zeitraum || undefined,
+        positionen: (posFiltered.length ? posFiltered : posAll).map((p) => ({
+          beschreibung: p.beschreibung || p.leistung,
+        })),
+        link,
+      },
+      branding
+    )
+    const sent = await sendMail({
+      typ: 'handwerker_anfrage',
+      an: email,
+      anName: r.handwerker?.name ?? null,
+      betreff: tpl.betreff,
+      html: tpl.html,
+      kundeId: detail.kunde_id,
+      leadId: detail.lead_id,
+      angebotId,
     })
-    const existing = byEmail.get(email)
-    if (existing) {
-      byEmail.set(email, {
-        email,
-        subject: existing.subject.replace(/ — $/, '') + `, ${gewerkName}`,
-        html: existing.html + `<hr/><p>${gewerkName}</p>` + html,
-      })
-    } else {
-      byEmail.set(email, { email, subject, html })
-    }
-  }
-
-  for (const v of Array.from(byEmail.values())) {
-    const sent = await sendHandwerkerAngebotEmail({
-      to: v.email,
-      subject: v.subject,
-      html: v.html,
-    })
-    if (!sent.ok) return sent
+    if (!sent.success) return { ok: false as const, message: sent.error ?? 'Versand fehlgeschlagen' }
   }
 
   return { ok: true as const }
@@ -397,21 +422,43 @@ export async function sendAngebotToKunde(angebotId: string) {
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
   ).toLocaleDateString('de-DE')
 
-  const html = buildKundenAngebotEmailHtml({
-    kunde: detail.kunden,
-    gesamtMin: summenMail.nettoMin,
-    gesamtMax: summenMail.nettoMax,
-    gueltigBis: gueltig,
-  })
+  const branding = await getMailBranding(supabaseAdmin)
+  const statusLink = await projektOderStatusLink(detail.lead_id)
+  const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
+  const tpl = mailAngebot(
+    {
+      name: vorname,
+      positionen: posMail,
+      gesamt_min: summenMail.nettoMin,
+      gesamt_max: summenMail.nettoMax,
+      lohn_gesamt: summenMail.lohnZeileMin,
+      gueltig_bis: gueltig,
+      statusLink,
+    },
+    branding
+  )
 
-  const mail = await sendKundenAngebotEmail({
-    to: detail.kunden.email,
-    subject: 'Ihr Angebot von Bärenwald München',
-    html,
+  const mail = await sendMail({
+    typ: 'angebot',
+    an: detail.kunden.email.trim(),
+    anName: detail.kunden.name,
+    betreff: tpl.betreff,
+    html: tpl.html,
     pdfBuffer: pdf.buffer,
-    pdfFilename: `angebot-${angebotId}.pdf`,
+    pdfName: `angebot-${angebotId}.pdf`,
+    kundeId: detail.kunde_id,
+    leadId: detail.lead_id,
+    angebotId,
   })
-  if (!mail.ok) return mail
+  if (!mail.success) return { ok: false as const, message: mail.error ?? 'Versand fehlgeschlagen' }
+
+  const nachfassenDatum = addDaysYmd(new Date().toISOString().slice(0, 10), 3)
+  await insertKalenderAutoTermin({
+    titel: `Nachfassen: ${detail.kunden.name}`,
+    datum: nachfassenDatum,
+    typ: 'sonstiges',
+    lead_id: detail.lead_id ?? null,
+  })
 
   return { ok: true as const }
 }
@@ -727,6 +774,7 @@ export async function createAuftragFromAngebot(
       abnahme_datum: null,
       abnahme_protokoll_url: null,
       kunden_token: kundenToken,
+      fortschritt: 35,
     })
     .select('id, kunden_token')
     .single()
@@ -746,6 +794,21 @@ export async function createAuftragFromAngebot(
   )
   if (hErr) return { ok: false, message: hErr.message }
 
+  await insertKalenderAutoTermin({
+    titel: `Start: ${titel}`,
+    datum: start,
+    typ: 'beginn',
+    lead_id: angebot.lead_id ?? null,
+    auftrag_id: auftragId,
+  })
+  await insertKalenderAutoTermin({
+    titel: `Abnahme: ${titel}`,
+    datum: end,
+    typ: 'abnahme',
+    lead_id: angebot.lead_id ?? null,
+    auftrag_id: auftragId,
+  })
+
   if (angebot.lead_id) {
     await supabaseAdmin
       .from('leads')
@@ -753,55 +816,69 @@ export async function createAuftragFromAngebot(
       .eq('id', angebot.lead_id)
   }
 
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
+  const branding = await getMailBranding(supabaseAdmin)
   const kunde = angebot.kunden
   const vorname = kunde.name.trim().split(/\s+/)[0] || kunde.name.trim()
   const plzKunde = kunde.plz?.trim() || angebot.leads?.plz?.trim() || '—'
 
   if (sendKunde && kunde.email?.trim()) {
-    const hwNamen = Array.from(
-      new Set(hwRows.map((z) => z.handwerker?.name?.trim()).filter(Boolean) as string[])
+    const tplK = mailAuftragsbestaetigung(
+      {
+        name: vorname,
+        gewerke: gewerkNamen.length ? gewerkNamen : ['Ihr Projekt'],
+        startDatum: formatDatumDeFromIso(start),
+        endDatum: formatDatumDeFromIso(end),
+        statusLink: projektLink,
+      },
+      branding
     )
-    const htmlK = buildAuftragsbestaetigung({
-      name: vorname,
-      gewerke: gewerkNamen.length ? gewerkNamen : ['Ihr Projekt'],
-      start_datum: start,
-      end_datum: end,
-      handwerker_liste: hwNamen,
-      firm,
-      projektLink,
-    })
-    await sendTransactionalHtmlEmail({
-      to: kunde.email.trim(),
-      subject: 'Ihr Auftrag ist bestätigt — Bärenwald München',
-      html: htmlK,
+    await sendMail({
+      typ: 'auftragsbestaetigung',
+      an: kunde.email.trim(),
+      anName: kunde.name,
+      betreff: tplK.betreff,
+      html: tplK.html,
+      kundeId: angebot.kunde_id,
+      leadId: angebot.lead_id,
+      angebotId,
+      auftragId,
     })
   }
 
   if (sendHw) {
+    const partnerLink = `${getPublicAppUrl()}/partner`
     for (const z of hwRows) {
       const email = z.handwerker?.email?.trim()
       if (!email) continue
       const gewerkName = z.gewerke?.name ?? 'Gewerk'
       const posFiltered = pos.filter((p) => p.gewerk_id === z.gewerk_id)
-      const htmlH = buildHandwerkerAuftragsMail({
-        handwerker_name: z.handwerker?.name ?? 'Handwerkerin',
-        gewerk_name: gewerkName,
-        kunde_plz: plzKunde,
-        start_datum: start,
-        end_datum: end,
-        positionen: (posFiltered.length ? posFiltered : pos).map((p) => ({
-          beschreibung: p.beschreibung || p.leistung,
-          menge: p.menge,
-          einheit: p.einheit,
-        })),
-        notizen: notizenAuftrag,
-        firm,
-      })
-      await sendTransactionalHtmlEmail({
-        to: email,
-        subject: `Auftrag bestätigt: ${gewerkName} — Bärenwald`,
-        html: htmlH,
+      const zeitraum =
+        notizenAuftrag?.trim() != null && notizenAuftrag.trim() !== ''
+          ? `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)} · ${notizenAuftrag.trim()}`
+          : `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)}`
+      const tplH = mailHandwerkerAnfrage(
+        {
+          name: z.handwerker?.name ?? 'Guten Tag',
+          gewerk: gewerkName,
+          plz: plzKunde,
+          zeitraum,
+          positionen: (posFiltered.length ? posFiltered : pos).map((p) => ({
+            beschreibung: [p.beschreibung || p.leistung, `${p.menge} ${p.einheit}`].filter(Boolean).join(' · '),
+          })),
+          link: partnerLink,
+        },
+        branding
+      )
+      await sendMail({
+        typ: 'handwerker_anfrage',
+        an: email,
+        anName: z.handwerker?.name ?? null,
+        betreff: tplH.betreff,
+        html: tplH.html,
+        kundeId: angebot.kunde_id,
+        leadId: angebot.lead_id,
+        angebotId,
+        auftragId,
       })
     }
   }
@@ -811,6 +888,16 @@ export async function createAuftragFromAngebot(
     typ: 'auftrag_erstellt',
     titel: 'Auftrag erstellt',
     beschreibung: `Aus Angebot ${angebotId.slice(0, 8).toUpperCase()} · ${titel}`,
+  })
+
+  await supabaseAdmin.from('auftrag_milestones').insert({
+    auftrag_id: auftragId,
+    titel: 'Auftrag erstellt',
+    erledigt: true,
+    erledigt_at: new Date().toISOString(),
+    fuer_kunden_sichtbar: true,
+    ist_system: true,
+    sort_order: 0,
   })
   if (sendKunde && kunde.email?.trim()) {
     await insertAuftragTimelineEvent({
@@ -859,4 +946,195 @@ export async function markKundeAkzeptiert(
     return { ok: false, message: 'Nur bei Status „Gesendet Kunde“ möglich.' }
   }
   return setAngebotStatus(angebotId, 'kunde_akzeptiert')
+}
+
+export async function listAngebotVorlagen(): Promise<AngebotVorlage[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('angebot_vorlagen')
+    .select('*')
+    .eq('aktiv', true)
+    .order('name', { ascending: true })
+  if (error) {
+    console.warn('listAngebotVorlagen', error.message)
+    return []
+  }
+  return (data ?? []).map((row) => ({
+    ...(row as AngebotVorlage),
+    positionen: normalizeAngebotPositionen((row as { positionen: unknown }).positionen),
+  }))
+}
+
+function prepareVorlagePositionenForDb(
+  positionen: AngebotPosition[],
+  mitPreisen: boolean
+): AngebotPosition[] {
+  let pos = normalizeAngebotPositionen(positionen).map((p) => {
+    const { handwerker_id, handwerker_name, ...rest } = p
+    void handwerker_id
+    void handwerker_name
+    return rest
+  })
+  if (!mitPreisen) {
+    pos = pos.map((p) => ({
+      ...p,
+      preis_typ: 'range' as const,
+      lohn_min: 0,
+      lohn_max: 0,
+      material_min: 0,
+      material_max: 0,
+      gesamt_min: 0,
+      gesamt_max: 0,
+      lohn_fix: undefined,
+      material_fix: undefined,
+      gesamt_fix: undefined,
+      einkaufspreis_min: undefined,
+      einkaufspreis_max: undefined,
+      einkaufspreis: undefined,
+      marge: undefined,
+    }))
+  }
+  return pos
+}
+
+export async function listAngebotVorlagenEinstellungen(): Promise<AngebotVorlage[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('angebot_vorlagen')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.warn('listAngebotVorlagenEinstellungen', error.message)
+    return []
+  }
+  return (data ?? []).map((row) => ({
+    ...(row as AngebotVorlage),
+    positionen: normalizeAngebotPositionen((row as { positionen: unknown }).positionen),
+  }))
+}
+
+export async function saveAngebotVorlage(
+  name: string,
+  beschreibung: string | null,
+  positionen: AngebotPosition[],
+  mitPreisen: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const pos = prepareVorlagePositionenForDb(positionen, mitPreisen)
+  const summen = summenAusPositionen(pos, 19)
+  const fix =
+    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
+  const { error } = await supabase.from('angebot_vorlagen').insert({
+    name: name.trim(),
+    beschreibung: beschreibung?.trim() || null,
+    positionen: pos,
+    gesamt_min: summen.nettoMin,
+    gesamt_max: summen.nettoMax,
+    gesamt_fix: fix,
+    aktiv: true,
+    erstellt_von: user?.id ?? null,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/angebote/neu')
+  revalidatePath('/einstellungen/vorlagen')
+  return { ok: true }
+}
+
+export async function updateAngebotVorlage(
+  id: string,
+  name: string,
+  beschreibung: string | null,
+  positionen: AngebotPosition[],
+  mitPreisen: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const pos = prepareVorlagePositionenForDb(positionen, mitPreisen)
+  const summen = summenAusPositionen(pos, 19)
+  const fix =
+    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
+  const { error } = await supabase
+    .from('angebot_vorlagen')
+    .update({
+      name: name.trim(),
+      beschreibung: beschreibung?.trim() || null,
+      positionen: pos,
+      gesamt_min: summen.nettoMin,
+      gesamt_max: summen.nettoMax,
+      gesamt_fix: fix,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/angebote/neu')
+  revalidatePath('/einstellungen/vorlagen')
+  return { ok: true }
+}
+
+export async function deleteAngebot(
+  angebotId: string
+): Promise<{ success: true } | { error: string }> {
+  const supabase = createClient()
+  const { data: auf } = await supabase.from('auftraege').select('id').eq('angebot_id', angebotId).maybeSingle()
+  if (auf) {
+    return {
+      error: 'Angebot kann nicht gelöscht werden — es existiert bereits ein Auftrag dazu.',
+    }
+  }
+  const { data: ang } = await supabase.from('angebote').select('lead_id').eq('id', angebotId).maybeSingle()
+  const { error: delHw } = await supabase.from('angebot_handwerker').delete().eq('angebot_id', angebotId)
+  if (delHw) return { error: delHw.message }
+  const { error } = await supabase.from('angebote').delete().eq('id', angebotId)
+  if (error) return { error: error.message }
+  revalidatePath('/angebote')
+  revalidatePath(`/angebote/${angebotId}`)
+  const leadId = (ang as { lead_id?: string | null } | null)?.lead_id
+  if (leadId) revalidatePath(`/anfragen/${leadId}`)
+  revalidatePath('/anfragen')
+  return { success: true }
+}
+
+export async function deleteAngebotVorlage(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase.from('angebot_vorlagen').delete().eq('id', id)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/einstellungen/vorlagen')
+  revalidatePath('/angebote/neu')
+  return { ok: true }
+}
+
+export async function duplicateAngebotVorlage(
+  id: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: row, error: loadErr } = await supabase
+    .from('angebot_vorlagen')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (loadErr || !row) return { ok: false, message: loadErr?.message ?? 'Vorlage nicht gefunden' }
+
+  const r = row as Record<string, unknown>
+  const { error } = await supabase.from('angebot_vorlagen').insert({
+    name: `Kopie: ${String(r.name ?? 'Vorlage')}`,
+    beschreibung: (r.beschreibung as string | null) ?? null,
+    positionen: r.positionen,
+    gesamt_min: r.gesamt_min,
+    gesamt_max: r.gesamt_max,
+    gesamt_fix: r.gesamt_fix,
+    aktiv: r.aktiv ?? true,
+    erstellt_von: user?.id ?? null,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/einstellungen/vorlagen')
+  return { ok: true }
 }
