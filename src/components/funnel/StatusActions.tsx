@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronUp } from 'lucide-react'
+import { ChevronUp, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type StatusActionsEntity = 'lead' | 'angebot' | 'auftrag' | 'rechnung'
@@ -14,6 +14,8 @@ export type StatusActionsProps = {
   data?: Record<string, unknown>
   onAction: (action: string, data?: unknown) => void
   disabled?: boolean
+  /** Standard: fixierte Leiste (unten mobil / oben rechts Desktop). `inline`: eingebettet im Fluss (z. B. Angebots-Detail). */
+  layout?: 'fixed' | 'inline'
 }
 
 type Tier = 'primary' | 'secondary' | 'destructive' | 'milestone'
@@ -108,6 +110,7 @@ function buildModel(
       const ok = num(data, 'hw_angenommen')
       const total = num(data, 'hw_gesamt') || 1
       info = { message: `Warte auf Handwerker (${ok} von ${total} bestätigt)` }
+      secondary.unshift({ id: 'angebot.hw_akzeptiert', label: '✅ Handwerker hat bestätigt', tier: 'secondary' })
       if (ok >= total && total > 0) {
         primary = { id: 'angebot.send_kunde', label: '📧 An Kunden senden', tier: 'primary' }
       }
@@ -122,7 +125,7 @@ function buildModel(
       return { info, primary, secondary, destructive, milestone }
     }
     if (status === 'gesendet_kunde') {
-      primary = { id: 'auftrag.create_modal', label: '✅ Kunde hat angenommen', tier: 'primary' }
+      primary = { id: 'angebot.mark_kunde_akzeptiert', label: '✅ Kunde hat angenommen', tier: 'primary' }
       secondary.push({ id: 'angebot.nachfassen', label: '📞 Nachfassen', tier: 'secondary' })
       destructive.push({ id: 'angebot.kunde_abgelehnt', label: '❌ Kunde hat abgelehnt', tier: 'destructive' })
       return { info, primary, secondary, destructive, milestone }
@@ -252,7 +255,81 @@ function btnClass(tier: Tier, disabled?: boolean) {
   )
 }
 
-export function StatusActions({ typ, status, id, data, onAction, disabled }: StatusActionsProps) {
+function InlineActions({
+  model,
+  run,
+  primary,
+  rest,
+  disabled,
+}: {
+  model: ReturnType<typeof buildModel>
+  run: (b: ActionBtn) => void
+  primary: ActionBtn | undefined
+  rest: ActionBtn[]
+  disabled?: boolean
+}) {
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  return (
+    <div className="mb-4 rounded-xl border border-bw-border bg-bw-card p-4 shadow-card">
+      {model.info ? (
+        <div className="mb-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text">
+          <p className="font-medium">{model.info.message}</p>
+          {model.info.hint ? <p className="mt-1 text-xs text-bw-text-muted">{model.info.hint}</p> : null}
+          {model.info.href ? (
+            <Link href={model.info.href} className="mt-2 inline-block text-sm font-medium text-bw-link underline">
+              Öffnen
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+        {primary ? (
+          <button
+            type="button"
+            className={cn(btnClass(primary.tier, primary.disabled || disabled), 'w-full sm:w-auto')}
+            onClick={() => run(primary)}
+          >
+            {primary.label}
+          </button>
+        ) : null}
+        {rest.length > 0 ? (
+          <div className="relative w-full min-w-0 sm:w-auto">
+            <button
+              type="button"
+              className={cn(btnClass('secondary', disabled), 'inline-flex w-full items-center justify-center gap-2 sm:w-auto')}
+              onClick={() => setMoreOpen((v) => !v)}
+              aria-expanded={moreOpen}
+              aria-haspopup="true"
+            >
+              <MoreHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+              Weitere Aktionen
+            </button>
+            {moreOpen ? (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[min(60vh,320px)] overflow-y-auto rounded-lg border border-bw-border bg-bw-card p-2 shadow-lg sm:right-auto sm:min-w-[260px]">
+                {rest.map((b) => (
+                  <button
+                    key={`${b.tier}-${b.label}`}
+                    type="button"
+                    className={cn(btnClass(b.tier, b.disabled || disabled), 'mb-1 w-full last:mb-0')}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      run(b)
+                    }}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+export function StatusActions({ typ, status, id, data, onAction, disabled, layout = 'fixed' }: StatusActionsProps) {
   const model = useMemo(() => buildModel(typ, status, id, data), [typ, status, id, data])
   const [sheet, setSheet] = useState(false)
 
@@ -277,6 +354,10 @@ export function StatusActions({ typ, status, id, data, onAction, disabled }: Sta
 
   const primary = model.primary
   const rest = [...model.secondary, ...(model.milestone ? [model.milestone] : []), ...model.destructive]
+
+  if (layout === 'inline') {
+    return <InlineActions model={model} run={run} primary={primary} rest={rest} disabled={disabled} />
+  }
 
   return (
     <>

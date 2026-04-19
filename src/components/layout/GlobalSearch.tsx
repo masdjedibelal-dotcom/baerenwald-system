@@ -1,288 +1,313 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, Inbox, Wrench, HardHat, Receipt, Users } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
-import { useSearchModal } from '@/components/layout/SearchContext'
 
-type LeadHit = { id: string; kontakt_name: string | null; kontakt_email: string | null; status: string }
-type KundeHit = { id: string; name: string; email: string | null }
-type AuftragHit = { id: string; titel: string | null; status: string }
+type SearchResultType = 'anfrage' | 'auftrag' | 'handwerker' | 'rechnung' | 'kunde'
+
+type LeadHit = { id: string; kontakt_name: string | null; kontakt_email: string | null; status: string | null }
 type HwHit = { id: string; name: string; firma: string | null }
+type KundeHit = { id: string; name: string; email: string | null }
+
+interface SearchResult {
+  id: string
+  title: string
+  subtitle: string
+  type: SearchResultType
+  href: string
+}
+
+const TYPE_CONFIG: Record<
+  SearchResultType,
+  { icon: typeof Inbox; label: string; color: string }
+> = {
+  anfrage: { icon: Inbox, label: 'Anfragen', color: 'text-bw-link' },
+  auftrag: { icon: Wrench, label: 'Aufträge', color: 'text-bw-success' },
+  handwerker: { icon: HardHat, label: 'Handwerker', color: 'text-bw-accent' },
+  rechnung: { icon: Receipt, label: 'Rechnungen', color: 'text-purple-500' },
+  kunde: { icon: Users, label: 'Kunden', color: 'text-bw-mid' },
+}
+
+const TYPE_ORDER: SearchResultType[] = ['anfrage', 'auftrag', 'handwerker', 'rechnung', 'kunde']
 
 function sanitizeTerm(raw: string) {
   return raw.trim().slice(0, 80).replace(/[%]/g, '')
 }
 
-function mergeById<T extends { id: string }>(rows: T[], limit: number) {
-  const m = new Map<string, T>()
-  for (const r of rows) {
-    if (!m.has(r.id)) m.set(r.id, r)
-  }
-  return Array.from(m.values()).slice(0, limit)
-}
-
 export function GlobalSearch() {
-  const { isOpen, close, open } = useSearchModal()
-  const [q, setQ] = useState('')
-  const [leads, setLeads] = useState<LeadHit[]>([])
-  const [kunden, setKunden] = useState<KundeHit[]>([])
-  const [auftraege, setAuftraege] = useState<AuftragHit[]>([])
-  const [handwerker, setHandwerker] = useState<HwHit[]>([])
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const router = useRouter()
 
-  const runSearch = useCallback(async (raw: string) => {
-    const term = sanitizeTerm(raw)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setOpen(true)
+      }
+      if (e.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    const handleOpen = () => setOpen(true)
+
+    document.addEventListener('keydown', handleKey)
+    document.addEventListener('open-search', handleOpen)
+
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.removeEventListener('open-search', handleOpen)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      const t = window.setTimeout(() => inputRef.current?.focus(), 100)
+      setQuery('')
+      setResults([])
+      setSelected(0)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  const search = useCallback(async (q: string) => {
+    const term = sanitizeTerm(q)
     if (term.length < 2) {
-      setLeads([])
-      setKunden([])
-      setAuftraege([])
-      setHandwerker([])
+      setResults([])
       return
     }
+    setLoading(true)
     const pct = `%${term}%`
     const supabase = createClient()
-    setLoading(true)
-    try {
-      const [
-        leadsName,
-        leadsEmail,
-        kundenName,
-        kundenEmail,
-        aufRes,
-        hwName,
-        hwFirma,
-      ] = await Promise.all([
-        supabase
-          .from('leads')
-          .select('id, kontakt_name, kontakt_email, status')
-          .ilike('kontakt_name', pct)
-          .limit(5),
-        supabase
-          .from('leads')
-          .select('id, kontakt_name, kontakt_email, status')
-          .ilike('kontakt_email', pct)
-          .limit(5),
-        supabase.from('kunden').select('id, name, email').ilike('name', pct).limit(5),
-        supabase.from('kunden').select('id, name, email').ilike('email', pct).limit(5),
-        supabase.from('auftraege').select('id, titel, status').ilike('titel', pct).limit(5),
-        supabase.from('handwerker').select('id, name, firma').ilike('name', pct).limit(5),
-        supabase.from('handwerker').select('id, name, firma').ilike('firma', pct).limit(5),
-      ])
 
-      setLeads(
-        mergeById(
-          [...(leadsName.data ?? []), ...(leadsEmail.data ?? [])] as LeadHit[],
-          5
-        )
-      )
-      setKunden(
-        mergeById(
-          [...(kundenName.data ?? []), ...(kundenEmail.data ?? [])] as KundeHit[],
-          5
-        )
-      )
-      setAuftraege((aufRes.data ?? []) as AuftragHit[])
-      setHandwerker(
-        mergeById([...(hwName.data ?? []), ...(hwFirma.data ?? [])] as HwHit[], 5)
-      )
+    try {
+      const [leadsName, leadsEmail, auftraege, handwerkerName, handwerkerFirma, kundenName, kundenEmail, rechnungen] =
+        await Promise.all([
+          supabase.from('leads').select('id, kontakt_name, kontakt_email, status').ilike('kontakt_name', pct).limit(4),
+          supabase.from('leads').select('id, kontakt_name, kontakt_email, status').ilike('kontakt_email', pct).limit(4),
+          supabase.from('auftraege').select('id, titel, status').ilike('titel', pct).limit(4),
+          supabase.from('handwerker').select('id, name, firma').ilike('name', pct).limit(4),
+          supabase.from('handwerker').select('id, name, firma').ilike('firma', pct).limit(4),
+          supabase.from('kunden').select('id, name, email').ilike('name', pct).limit(4),
+          supabase.from('kunden').select('id, name, email').ilike('email', pct).limit(4),
+          supabase.from('rechnungen').select('id, rechnungsnummer, status').ilike('rechnungsnummer', pct).limit(4),
+        ])
+
+      const leadMap = new Map<string, LeadHit>()
+      for (const row of [...(leadsName.data ?? []), ...(leadsEmail.data ?? [])] as LeadHit[]) {
+        if (row?.id) leadMap.set(row.id, row)
+      }
+
+      const hwMap = new Map<string, HwHit>()
+      for (const row of [...(handwerkerName.data ?? []), ...(handwerkerFirma.data ?? [])] as HwHit[]) {
+        if (row?.id) hwMap.set(row.id, row)
+      }
+
+      const kundeMap = new Map<string, KundeHit>()
+      for (const row of [...(kundenName.data ?? []), ...(kundenEmail.data ?? [])] as KundeHit[]) {
+        if (row?.id) kundeMap.set(row.id, row)
+      }
+
+      const flat: SearchResult[] = []
+
+      for (const l of Array.from(leadMap.values())) {
+        flat.push({
+          id: l.id,
+          title: l.kontakt_name || 'Unbekannt',
+          subtitle: l.kontakt_email || l.status || '',
+          type: 'anfrage',
+          href: `/anfragen/${l.id}`,
+        })
+      }
+
+      for (const a of auftraege.data ?? []) {
+        flat.push({
+          id: a.id,
+          title: a.titel || 'Auftrag',
+          subtitle: a.status ?? '',
+          type: 'auftrag',
+          href: `/auftraege/${a.id}`,
+        })
+      }
+
+      for (const h of Array.from(hwMap.values())) {
+        flat.push({
+          id: h.id,
+          title: h.name,
+          subtitle: h.firma || '',
+          type: 'handwerker',
+          href: `/handwerker/${h.id}`,
+        })
+      }
+
+      for (const r of rechnungen.data ?? []) {
+        flat.push({
+          id: r.id,
+          title: r.rechnungsnummer || 'Rechnung',
+          subtitle: r.status ?? '',
+          type: 'rechnung',
+          href: `/rechnungen/${r.id}`,
+        })
+      }
+
+      for (const k of Array.from(kundeMap.values())) {
+        flat.push({
+          id: k.id,
+          title: k.name,
+          subtitle: k.email || '',
+          type: 'kunde',
+          href: k.email ? `mailto:${encodeURIComponent(k.email)}` : '',
+        })
+      }
+
+      setResults(flat)
+      setSelected(0)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (!isOpen) {
-      setQ('')
-      setLeads([])
-      setKunden([])
-      setAuftraege([])
-      setHandwerker([])
+    const timer = window.setTimeout(() => {
+      void search(query)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [query, search])
+
+  const navigate = (href: string) => {
+    setOpen(false)
+    if (!href) return
+    if (href.startsWith('mailto:')) {
+      window.location.href = href
       return
     }
-    const t = requestAnimationFrame(() => inputRef.current?.focus())
-    return () => cancelAnimationFrame(t)
-  }, [isOpen])
+    router.push(href)
+  }
 
-  useEffect(() => {
-    if (!isOpen) return
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      void runSearch(q)
-    }, 300)
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelected((s) => Math.min(s + 1, Math.max(results.length - 1, 0)))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelected((s) => Math.max(s - 1, 0))
+    } else if (e.key === 'Enter' && results[selected]?.href) {
+      navigate(results[selected].href)
     }
-  }, [q, isOpen, runSearch])
+  }
 
-  useEffect(() => {
-    if (!isOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, close])
+  if (!open) return null
 
-  useEffect(() => {
-    const onDoc = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        open()
-      }
-    }
-    window.addEventListener('keydown', onDoc)
-    return () => window.removeEventListener('keydown', onDoc)
-  }, [open])
-
-  const total = leads.length + kunden.length + auftraege.length + handwerker.length
+  const grouped = results.reduce(
+    (acc, r) => {
+      if (!acc[r.type]) acc[r.type] = []
+      acc[r.type].push(r)
+      return acc
+    },
+    {} as Record<string, SearchResult[]>
+  )
 
   return (
-    <>
-      {isOpen ? (
-        <div className="fixed inset-0 z-[100] md:flex md:items-start md:justify-center md:pt-[12vh] md:p-4" role="dialog" aria-modal="true" aria-label="Suche">
-          <button type="button" className="absolute inset-0 bg-black/40" aria-label="Schließen" onClick={close} />
-          <div
-            className={cn(
-              'absolute bottom-0 left-0 right-0 z-[101] flex max-h-[90dvh] flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-card md:relative md:bottom-auto md:max-h-[min(70vh,560px)] md:w-full md:max-w-lg md:rounded-xl'
-            )}
-          >
-            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-              <Search className="h-5 w-5 shrink-0 text-muted" aria-hidden />
-              <input
-                ref={inputRef}
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Anfragen, Kunden, Aufträge, Handwerker …"
-                className="min-h-[44px] flex-1 border-0 bg-transparent text-base text-ink outline-none placeholder:text-muted"
-                autoComplete="off"
-                aria-label="Suchbegriff"
-              />
-              <button
-                type="button"
-                onClick={close}
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-canvas"
-                aria-label="Schließen"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-3">
-              {loading ? (
-                <ul className="space-y-2" aria-busy="true">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <li key={i} className="h-10 animate-pulse rounded-lg bg-border/60" />
-                  ))}
-                </ul>
-              ) : q.trim().length < 2 ? (
-                <p className="text-sm text-muted">Mindestens 2 Zeichen eingeben.</p>
-              ) : total === 0 ? (
-                <p className="text-sm text-muted">Nichts gefunden für „{q.trim()}“.</p>
-              ) : (
-                <div className="space-y-5">
-                  {leads.length > 0 ? (
-                    <section>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                        Anfragen ({leads.length})
-                      </h3>
-                      <ul className="space-y-1">
-                        {leads.map((l) => (
-                          <li key={l.id}>
-                            <Link
-                              href={`/anfragen/${l.id}`}
-                              onClick={close}
-                              className="block rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                            >
-                              <span className="font-medium text-ink">{l.kontakt_name ?? 'Ohne Namen'}</span>
-                              {l.kontakt_email ? (
-                                <span className="mt-0.5 block text-xs text-muted">{l.kontakt_email}</span>
-                              ) : null}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                  {kunden.length > 0 ? (
-                    <section>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                        Kunden ({kunden.length})
-                      </h3>
-                      <ul className="space-y-1">
-                        {kunden.map((k) => (
-                          <li key={k.id}>
-                            {k.email ? (
-                              <a
-                                href={`mailto:${k.email}`}
-                                onClick={close}
-                                className="block rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                              >
-                                <span className="font-medium text-ink">{k.name}</span>
-                                <span className="mt-0.5 block text-xs text-muted">{k.email}</span>
-                              </a>
-                            ) : (
-                              <div className="rounded-lg px-3 py-2 text-sm">
-                                <span className="font-medium text-ink">{k.name}</span>
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                  {auftraege.length > 0 ? (
-                    <section>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                        Aufträge ({auftraege.length})
-                      </h3>
-                      <ul className="space-y-1">
-                        {auftraege.map((a) => (
-                          <li key={a.id}>
-                            <Link
-                              href={`/auftraege/${a.id}`}
-                              onClick={close}
-                              className="block rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                            >
-                              <span className="font-medium text-ink">{a.titel ?? 'Ohne Titel'}</span>
-                              <span className="mt-0.5 block text-xs text-muted">{a.status}</span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                  {handwerker.length > 0 ? (
-                    <section>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                        Handwerker ({handwerker.length})
-                      </h3>
-                      <ul className="space-y-1">
-                        {handwerker.map((h) => (
-                          <li key={h.id}>
-                            <Link
-                              href={`/handwerker/${h.id}`}
-                              onClick={close}
-                              className="block rounded-lg px-3 py-2 text-sm hover:bg-canvas"
-                            >
-                              <span className="font-medium text-ink">{h.name}</span>
-                              {h.firma ? <span className="mt-0.5 block text-xs text-muted">{h.firma}</span> : null}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </div>
+    <div
+      className="fixed inset-0 z-[100] flex animate-fade-in items-start justify-center bg-black/40 px-4 pt-[10vh]"
+      onClick={() => setOpen(false)}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-xl animate-slide-up overflow-hidden rounded-xl bg-bw-card shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Globale Suche"
+      >
+        <div className="flex items-center gap-3 border-b border-bw-border px-4 py-3">
+          <Search className="h-5 w-5 flex-shrink-0 text-bw-light" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Suchen in Anfragen, Aufträgen, Handwerkern..."
+            className="flex-1 bg-transparent text-sm text-bw-text outline-none placeholder:text-bw-light"
+            style={{ fontSize: '16px' }}
+            autoComplete="off"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery('')} className="text-bw-light hover:text-bw-text">
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+          <kbd className="hidden rounded bg-bw-hover px-2 py-1 font-mono text-xs text-bw-light md:block">ESC</kbd>
         </div>
-      ) : null}
-    </>
+
+        <div className="max-h-96 overflow-y-auto">
+          {loading ? (
+            <div className="px-4 py-8 text-center text-sm text-bw-light">Suche...</div>
+          ) : null}
+
+          {!loading && query.length >= 2 && results.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-bw-light">
+              Keine Ergebnisse für „{query}“
+            </div>
+          ) : null}
+
+          {!loading && query.length < 2 ? (
+            <div className="px-4 py-6 text-center text-sm text-bw-light">Mindestens 2 Zeichen eingeben…</div>
+          ) : null}
+
+          {TYPE_ORDER.map((type) => {
+            const items = grouped[type]
+            if (!items?.length) return null
+            const config = TYPE_CONFIG[type]
+            const Icon = config.icon
+            return (
+              <div key={type}>
+                <div className="sticky top-0 bg-bw-hover px-4 py-2 text-xs font-medium uppercase tracking-wide text-bw-light">
+                  {config.label}
+                </div>
+                {items.map((item) => {
+                  const globalIdx = results.findIndex((r) => r.id === item.id && r.type === item.type && r.href === item.href)
+                  return (
+                    <button
+                      key={`${item.type}-${item.id}-${item.href}`}
+                      type="button"
+                      onClick={() => navigate(item.href)}
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                        globalIdx === selected ? 'bg-bw-hover' : 'hover:bg-bw-hover'
+                      }`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-bw-hover ${config.color}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-bw-text">{item.title}</div>
+                        <div className="truncate text-xs text-bw-light">{item.subtitle || '—'}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+
+        {results.length > 0 ? (
+          <div className="flex items-center gap-4 border-t border-bw-border px-4 py-2 text-xs text-bw-light">
+            <span>↑↓ Navigieren</span>
+            <span>↵ Öffnen</span>
+            <span>ESC Schließen</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 }

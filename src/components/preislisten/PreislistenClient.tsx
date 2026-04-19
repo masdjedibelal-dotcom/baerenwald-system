@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Pencil, Trash2, Upload, X } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -452,6 +453,73 @@ export function PreislistenClient({
         </p>
       ) : null}
 
+      <section className="mb-6" aria-label="Gewerke verwalten">
+        <Accordion title="Gewerke verwalten" defaultOpen={false}>
+          <div className="space-y-4 p-1">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                label="Neues Gewerk"
+                value={newGewerkName}
+                onChange={(e) => setNewGewerkName(e.target.value)}
+                placeholder="Name"
+              />
+              <Button type="button" className="sm:self-end" onClick={addGewerk} disabled={pending}>
+                Anlegen
+              </Button>
+            </div>
+            <ul className="divide-y divide-border">
+              {gewAll
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+                .map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    {gewerkEditId === g.id ? (
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        <input
+                          className="min-h-[44px] min-w-[200px] flex-1 rounded-lg border border-border px-3 text-ink"
+                          value={gewerkDraftName}
+                          onChange={(e) => setGewerkDraftName(e.target.value)}
+                        />
+                        <Button type="button" size="sm" variant="primary" onClick={saveGewerkEdit} disabled={pending}>
+                          Speichern
+                        </Button>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => setGewerkEditId(null)}>
+                          Abbrechen
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="font-medium text-ink">{g.name}</span>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex items-center gap-2 text-sm text-muted">
+                            <span>Aktiv</span>
+                            <input
+                              type="checkbox"
+                              checked={g.aktiv}
+                              onChange={() => void toggleGewerk(g)}
+                              aria-label={`${g.name} aktiv`}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border hover:bg-canvas"
+                            onClick={() => startGewerkEdit(g)}
+                            aria-label="Gewerk bearbeiten"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </Accordion>
+      </section>
+
+      <h2 className="section-header mb-4">Leistungen</h2>
+
       {gewerkeTabs.length === 0 ? (
         <p className="text-sm text-muted">Legen Sie zuerst ein aktives Gewerk an (unten).</p>
       ) : (
@@ -720,78 +788,18 @@ export function PreislistenClient({
         </>
       )}
 
-      <section className="mt-12">
-        <h2 className="mb-3 text-lg font-semibold text-ink">Gewerke verwalten</h2>
-        <Card className="space-y-4 p-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              label="Neues Gewerk"
-              value={newGewerkName}
-              onChange={(e) => setNewGewerkName(e.target.value)}
-              placeholder="Name"
-            />
-            <Button type="button" className="sm:self-end" onClick={addGewerk} disabled={pending}>
-              Anlegen
-            </Button>
-          </div>
-          <ul className="divide-y divide-border">
-            {gewAll
-              .slice()
-              .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-              .map((g) => (
-                <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  {gewerkEditId === g.id ? (
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <input
-                        className="min-h-[44px] min-w-[200px] flex-1 rounded-lg border border-border px-3 text-ink"
-                        value={gewerkDraftName}
-                        onChange={(e) => setGewerkDraftName(e.target.value)}
-                      />
-                      <Button type="button" size="sm" variant="primary" onClick={saveGewerkEdit} disabled={pending}>
-                        Speichern
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setGewerkEditId(null)}
-                      >
-                        Abbrechen
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="font-medium text-ink">{g.name}</span>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-muted">
-                          <span>Aktiv</span>
-                          <input
-                            type="checkbox"
-                            checked={g.aktiv}
-                            onChange={() => void toggleGewerk(g)}
-                            aria-label={`${g.name} aktiv`}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border hover:bg-canvas"
-                          onClick={() => startGewerkEdit(g)}
-                          aria-label="Gewerk bearbeiten"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-          </ul>
-        </Card>
-      </section>
-
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
+            <p className="mb-3 text-xs text-muted">
+              {gewAll.find((g) => g.id === modalGewerk)?.name ?? 'Gewerk'}
+              {modalKategorieModus && modalKategorieModus !== NEUE_KATEGORIE
+                ? ` → ${modalKategorieModus}`
+                : modalKategorieModus === NEUE_KATEGORIE && modalKategorieNeu.trim()
+                  ? ` → ${modalKategorieNeu.trim()}`
+                  : ''}
+              {modalLeistung.trim() ? ` → ${modalLeistung.trim()}` : ''}
+            </p>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-ink">Neue Leistung</h2>
               <button

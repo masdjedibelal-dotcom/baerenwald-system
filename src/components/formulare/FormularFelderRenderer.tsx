@@ -45,19 +45,34 @@ export function validateFormularPflicht(
   return null
 }
 
+const inputPreviewClass =
+  'w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-canvas px-3 text-bw-text opacity-80'
+
 export function FormularFelderRenderer({
   felder,
   daten,
   onChange,
   readonly,
   disabled,
+  /** Nur Darstellung wie Formularfelder, aber nicht editierbar (Builder-Vorschau) */
+  vorschauModus,
+  /** Öffentliches Formular: Datei wählen / Kamera (speichern extern) */
+  oeffentlicherFotoUpload,
+  onFotoDatei,
 }: {
   felder: FormularFeld[]
   daten: Record<string, unknown>
   onChange?: (id: string, value: unknown) => void
   readonly?: boolean
   disabled?: boolean
+  vorschauModus?: boolean
+  oeffentlicherFotoUpload?: boolean
+  onFotoDatei?: (feldId: string, file: File) => void | Promise<void>
 }) {
+  const prev = Boolean(vorschauModus)
+  const ro = readonly && !prev
+  const dis = disabled || prev
+
   function set(id: string, value: unknown) {
     onChange?.(id, value)
   }
@@ -70,87 +85,102 @@ export function FormularFelderRenderer({
 
         return (
           <div key={f.id}>
-            <label className="mb-1 block text-sm font-medium text-ink">
+            <label className="mb-1 block text-sm font-medium text-bw-text">
               {f.label}
-              {pflicht ? <span className="text-danger"> *</span> : null}
-              {readonly ? (
-                <span className="ml-2 text-xs font-normal text-muted">({typBadge(f.typ)})</span>
+              {pflicht ? <span className="text-status-cancel-text"> *</span> : null}
+              {ro ? (
+                <span className="ml-2 text-xs font-normal text-bw-light">({typBadge(f.typ)})</span>
               ) : null}
             </label>
             {f.typ === 'text' ? (
-              readonly ? (
-                <p className="text-sm text-ink">{String(v ?? '—')}</p>
+              ro ? (
+                <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
                 <input
-                  className="w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
                   value={String(v ?? '')}
-                  disabled={disabled}
+                  readOnly={prev}
+                  disabled={dis && !prev}
                   onChange={(e) => set(f.id, e.target.value)}
                 />
               )
             ) : null}
             {f.typ === 'number' ? (
-              readonly ? (
-                <p className="text-sm text-ink">{v != null && v !== '' ? String(v) : '—'}</p>
+              ro ? (
+                <p className="text-sm text-bw-text">{v != null && v !== '' ? String(v) : '—'}</p>
               ) : (
                 <input
                   type="number"
-                  className="w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
                   value={v === undefined || v === null ? '' : String(v)}
-                  disabled={disabled}
+                  readOnly={prev}
+                  disabled={dis && !prev}
                   onChange={(e) => set(f.id, e.target.value === '' ? '' : Number(e.target.value))}
                 />
               )
             ) : null}
             {f.typ === 'date' ? (
-              readonly ? (
-                <p className="text-sm text-ink">{String(v ?? '—')}</p>
+              ro ? (
+                <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
                 <input
                   type="date"
-                  className="w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
                   value={String(v ?? '')}
-                  disabled={disabled}
+                  readOnly={prev}
+                  disabled={dis && !prev}
                   onChange={(e) => set(f.id, e.target.value)}
                 />
               )
             ) : null}
             {f.typ === 'textarea' ? (
-              readonly ? (
-                <p className="whitespace-pre-wrap text-sm text-ink">{String(v ?? '—')}</p>
+              ro ? (
+                <p className="whitespace-pre-wrap text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
                 <textarea
-                  className="w-full rounded-lg border border-border p-3"
+                  className={
+                    prev
+                      ? `${inputPreviewClass} min-h-[88px] py-2`
+                      : 'w-full rounded-lg border border-border p-3'
+                  }
                   rows={4}
                   value={String(v ?? '')}
-                  disabled={disabled}
+                  readOnly={prev}
+                  disabled={dis && !prev}
                   onChange={(e) => set(f.id, e.target.value)}
                 />
               )
             ) : null}
             {f.typ === 'checkbox' ? (
-              readonly ? (
-                <p className="text-sm text-ink">{v ? 'Ja' : 'Nein'}</p>
+              ro ? (
+                <p className="text-sm text-bw-text">{v ? 'Ja' : 'Nein'}</p>
               ) : (
-                <label className="flex items-center gap-2">
+                <label
+                  className={cn(
+                    'flex items-center gap-2',
+                    prev && 'pointer-events-none rounded-lg border border-bw-border bg-bw-canvas px-3 py-2 opacity-90'
+                  )}
+                >
                   <input
                     type="checkbox"
+                    className="rounded border-bw-border"
                     checked={Boolean(v)}
-                    disabled={disabled}
+                    disabled={dis}
+                    readOnly={prev}
                     onChange={(e) => set(f.id, e.target.checked)}
                   />
-                  <span className="text-sm text-muted">Ja</span>
+                  <span className="text-sm text-bw-light">Ja</span>
                 </label>
               )
             ) : null}
             {f.typ === 'select' ? (
-              readonly ? (
-                <p className="text-sm text-ink">{String(v ?? '—')}</p>
+              ro ? (
+                <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
                 <select
-                  className="w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
                   value={String(v ?? '')}
-                  disabled={disabled}
+                  disabled={dis}
                   onChange={(e) => set(f.id, e.target.value)}
                 >
                   <option value="">Bitte wählen</option>
@@ -163,8 +193,8 @@ export function FormularFelderRenderer({
               )
             ) : null}
             {f.typ === 'foto' ? (
-              <div className="text-sm text-muted">
-                {readonly ? (
+              <div className="text-sm text-bw-light">
+                {ro ? (
                   Array.isArray(v) && v.length > 0 ? (
                     <ul className="flex flex-wrap gap-2">
                       {(v as string[]).map((url) => (
@@ -176,8 +206,40 @@ export function FormularFelderRenderer({
                   ) : (
                     '—'
                   )
+                ) : oeffentlicherFotoUpload && onFotoDatei ? (
+                  <div className="space-y-2">
+                    <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover">
+                      <span aria-hidden>📸</span> Foto aufnehmen / wählen
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="sr-only"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (file) await onFotoDatei(f.id, file)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                    {Array.isArray(v) && (v as string[]).length > 0 ? (
+                      <ul className="flex flex-wrap gap-2">
+                        {(v as string[]).map((url) => (
+                          <li key={url} className="text-xs text-bw-mid">
+                            ✓ Foto gespeichert
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                 ) : (
-                  <p>Foto-Upload ist hier nicht verfügbar (nur in öffentlichem Formular).</p>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text opacity-90"
+                  >
+                    📸 Foto aufnehmen
+                  </button>
                 )}
               </div>
             ) : null}

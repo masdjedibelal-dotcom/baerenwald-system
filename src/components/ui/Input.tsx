@@ -1,36 +1,41 @@
+'use client'
+
 import { forwardRef, type InputHTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string
-  hint?: string
   error?: string
+  hint?: string
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, label, hint, error, id, ...props },
+  { label, error, hint, className = '', id, ...props },
   ref
 ) {
   const inputId = id ?? props.name
   return (
-    <label className="block w-full space-y-1.5" htmlFor={inputId}>
+    <div className="w-full">
       {label ? (
-        <span className="block text-base font-medium text-ink">{label}</span>
+        <label className="input-label" htmlFor={inputId}>
+          {label}
+          {props.required ? (
+            <span className="ml-0.5 text-bw-accent" aria-hidden>
+              *
+            </span>
+          ) : null}
+        </label>
       ) : null}
       <input
         ref={ref}
         id={inputId}
-        className={cn(
-          'w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 py-2 text-base text-ink outline-none transition-shadow placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary',
-          error && 'border-danger focus:border-danger focus:ring-danger',
-          className
-        )}
         {...props}
+        className={cn('input', error && 'input-error', className)}
       />
-      {hint && !error ? (
-        <span className="block text-sm text-muted">{hint}</span>
-      ) : null}
-      {error ? <span className="block text-sm text-danger">{error}</span> : null}
-    </label>
+      {hint && !error ? <p className="mt-1 text-xs text-bw-light">{hint}</p> : null}
+      {error ? <p className="input-error-msg">{error}</p> : null}
+    </div>
   )
 })
+
+Input.displayName = 'Input'

@@ -1,79 +1,68 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react'
-import { cn } from '@/lib/utils'
-import { LoadingSpinner } from '@/components/layout/LoadingSpinner'
+'use client'
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
-type ButtonSize = 'sm' | 'md' | 'lg'
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Size = 'sm' | 'md' | 'lg'
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: ButtonVariant
-  size?: ButtonSize
-  fullWidth?: boolean
+  children?: ReactNode
+  variant?: Variant
+  size?: Size
   loading?: boolean
+  fullWidth?: boolean
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    'bg-primary text-white hover:opacity-95 active:opacity-90 disabled:opacity-60',
-  secondary:
-    'bg-surface text-ink border border-border hover:bg-canvas active:bg-canvas disabled:opacity-60',
-  danger:
-    'bg-danger text-white hover:opacity-95 active:opacity-90 disabled:opacity-60',
-  ghost:
-    'bg-transparent text-ink hover:bg-black/[0.04] active:bg-black/[0.06] disabled:opacity-50',
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    children,
+    variant = 'primary',
+    size = 'md',
+    loading = false,
+    disabled = false,
+    fullWidth = false,
+    className,
+    type = 'button',
+    ...props
+  },
+  ref
+) {
+  const variantClass = {
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    ghost: 'btn-ghost',
+    danger: 'btn-danger',
+  }[variant]
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'min-h-[44px] px-3 text-sm',
-  md: 'min-h-[44px] px-4 text-base',
-  lg: 'min-h-[48px] px-5 text-base',
-}
+  const sizeClass = {
+    sm: 'btn-sm',
+    md: '',
+    lg: 'btn-lg',
+  }[size]
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  function Button(
-    {
-      className,
-      variant = 'primary',
-      size = 'md',
-      fullWidth,
-      loading,
-      disabled,
-      children,
-      type = 'button',
-      ...props
-    },
-    ref
-  ) {
-    return (
-      <button
-        ref={ref}
-        type={type}
-        className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-          variantClasses[variant],
-          sizeClasses[size],
-          fullWidth && 'w-full',
-          className
-        )}
-        disabled={disabled || loading}
-        {...props}
-      >
-        {loading ? (
-          <>
-            <LoadingSpinner
-              className="h-5 w-5"
-              tone={
-                variant === 'primary' || variant === 'danger'
-                  ? 'inverted'
-                  : 'default'
-              }
-            />
-            <span>{children}</span>
-          </>
-        ) : (
-          children
-        )}
-      </button>
-    )
-  }
-)
+  return (
+    <button
+      ref={ref}
+      type={type}
+      disabled={disabled || loading}
+      className={cn(variantClass, sizeClass, fullWidth && 'w-full', className)}
+      {...props}
+    >
+      {loading ? (
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray="30"
+            strokeDashoffset="10"
+          />
+        </svg>
+      ) : null}
+      {children}
+    </button>
+  )
+})

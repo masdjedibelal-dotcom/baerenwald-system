@@ -1,77 +1,175 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { Receipt } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
+import { Download, Pencil, Receipt, Send } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/layout/EmptyState'
+import { SidePanel } from '@/components/ui/SidePanel'
+import { Button } from '@/components/ui/Button'
+import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { useExport, type ExportField } from '@/hooks/useExport'
 import type { RechnungListeZeile, RechnungStatus } from '@/lib/types'
-import { formatDatum, formatPreis } from '@/lib/utils'
+import { formatDatum, formatPreis, cn } from '@/lib/utils'
 import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
-import { cn } from '@/lib/utils'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import {
+  sendRechnung,
+  sendRechnungErinnerung,
+  updateRechnungStatus,
+} from '@/app/(dashboard)/rechnungen/actions'
+import { toast } from '@/components/ui/app-toast'
 
-function kundenName(
-  k: RechnungListeZeile['kunden']
-): string | null {
+const FILTER_CHIPS: { value: 'alle' | RechnungStatus | 'ueberfaellig'; label: string }[] = [
+  { value: 'alle', label: 'Alle' },
+  { value: 'entwurf', label: 'Entwurf' },
+  { value: 'gesendet', label: 'Gesendet' },
+  { value: 'bezahlt', label: 'Bezahlt' },
+  { value: 'ueberfaellig', label: 'Überfällig' },
+  { value: 'storniert', label: 'Storniert' },
+]
+
+const RECHNUNG_EXPORT_FIELDS: ExportField[] = [
+  { key: 'rechnungsnummer', label: 'Nummer' },
+  { key: 'kunde', label: 'Kunde' },
+  { key: 'brutto', label: 'Betrag' },
+  { key: 'status', label: 'Status' },
+  { key: 'rechnungsdatum', label: 'Datum' },
+  { key: 'faellig_am', label: 'Fällig' },
+  { key: 'auftrag', label: 'Auftrag' },
+]
+
+function kundenName(k: RechnungListeZeile['kunden']): string | null {
   if (!k) return null
   if (Array.isArray(k)) return k[0]?.name ?? null
   return k.name ?? null
 }
 
-function statusBadgeClass(s: RechnungStatus, faellig: string | null, bezahlt: string | null) {
-  if (s === 'storniert') return 'bg-red-100 text-red-900'
-  if (s === 'bezahlt') return 'bg-emerald-100 text-emerald-900'
-  if (faellig && !bezahlt) {
-    const d = new Date(faellig)
-    if (!Number.isNaN(d.getTime()) && d < new Date()) {
-      return 'bg-red-200 text-red-950 font-bold'
-    }
-  }
-  if (s === 'gesendet') return 'bg-blue-100 text-blue-900'
-  return 'bg-canvas text-muted'
+function auftragTitel(r: RechnungListeZeile): string | null {
+  const a = r.auftraege
+  if (!a) return null
+  if (Array.isArray(a)) return a[0]?.titel ?? null
+  return a.titel ?? null
+}
+
+function parseYmdLocal(ymd: string): Date {
+  const p = ymd.split('-').map((x) => parseInt(x, 10))
+  if (p.length !== 3 || p.some((n) => Number.isNaN(n))) return new Date(NaN)
+  return new Date(p[0], p[1] - 1, p[2])
+}
+
+function isUeberfaellig(r: RechnungListeZeile): boolean {
+  if (r.status !== 'gesendet' || !r.faellig_am) return false
+  const due = parseYmdLocal(r.faellig_am)
+  if (Number.isNaN(due.getTime())) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  due.setHours(0, 0, 0, 0)
+  return due < today
+}
+
+function eurBetrag(n: number) {
+  return `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+}
+
+function displayStatusLabel(r: RechnungListeZeile): string {
+  if (isUeberfaellig(r)) return 'Überfällig'
+  return RECHNUNG_STATUS_LABELS[r.status]
+}
+
+function statusBadgeClass(r: RechnungListeZeile) {
+  if (r.status === 'storniert') return 'bg-red-100 text-red-900'
+  if (r.status === 'bezahlt') return 'bg-emerald-100 text-emerald-900'
+  if (isUeberfaellig(r)) return 'bg-red-200 text-red-950 font-semibold'
+  if (r.status === 'gesendet') return 'bg-blue-100 text-blue-900'
+  return 'bg-bw-hover text-bw-text'
 }
 
 export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) {
-  const [status, setStatus] = useState<'' | RechnungStatus>('')
+  const router = useRouter()
+  const { exportToCSV } = useExport()
+  const [chip, setChip] = useState<(typeof FILTER_CHIPS)[number]['value']>('alle')
+  const [panel, setPanel] = useState<RechnungListeZeile | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [pending, startTransition] = useTransition()
 
   const filtered = useMemo(() => {
-    if (!status) return rows
-    return rows.filter((r) => r.status === status)
-  }, [rows, status])
+    return rows.filter((r) => {
+      if (chip === 'alle') return true
+      if (chip === 'ueberfaellig') return isUeberfaellig(r)
+      return r.status === chip
+    })
+  }, [rows, chip])
+
+  const panelPos = useMemo(() => {
+    if (!panel) return []
+    return normalizeAngebotPositionen(panel.positionen ?? [])
+  }, [panel])
+
+  const panelSummen = useMemo(() => {
+    if (!panel) return null
+    const mwst = Number(panel.mwst_satz) || 19
+    return summenAusPositionen(panelPos, mwst)
+  }, [panel, panelPos])
+
+  function exportRow(r: RechnungListeZeile): Record<string, unknown> {
+    return {
+      rechnungsnummer: r.rechnungsnummer,
+      kunde: kundenName(r.kunden) ?? '',
+      brutto: r.brutto,
+      status: displayStatusLabel(r),
+      rechnungsdatum: r.rechnungsdatum,
+      faellig_am: r.faellig_am ?? '',
+      auftrag: auftragTitel(r) ?? '',
+    }
+  }
+
+  function runPanelAction(fn: () => Promise<{ ok: true } | { ok: false; message: string }>) {
+    startTransition(async () => {
+      const res = await fn()
+      if (!res.ok) {
+        toast.message('Fehler', { description: res.message })
+        return
+      }
+      router.refresh()
+      setPanel(null)
+    })
+  }
+
+  const panelUeberfaellig = panel ? isUeberfaellig(panel) : false
 
   return (
-    <div>
+    <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
       <PageHeader
         title="Rechnungen"
         action={
-          <span className="text-sm text-muted">
-            Anlage über Auftrag → „Rechnung erstellen“
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setExportOpen(true)}>
+              <Download className="mr-1 h-4 w-4" aria-hidden />
+              Export
+            </Button>
+            <Link href="/rechnungen/neu" className="btn btn-primary btn-sm inline-flex items-center justify-center">
+              + Neue Rechnung
+            </Link>
+          </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setStatus('')}
-          className={cn(
-            'rounded-full px-3 py-1 text-sm',
-            status === '' ? 'bg-primary text-white' : 'bg-canvas text-ink'
-          )}
-        >
-          Alle
-        </button>
-        {(Object.keys(RECHNUNG_STATUS_LABELS) as RechnungStatus[]).map((s) => (
+        {FILTER_CHIPS.map((c) => (
           <button
-            key={s}
+            key={c.value}
             type="button"
-            onClick={() => setStatus(s)}
+            onClick={() => setChip(c.value)}
             className={cn(
-              'rounded-full px-3 py-1 text-sm',
-              status === s ? 'bg-primary text-white' : 'bg-canvas text-ink'
+              'rounded-full px-3 py-1.5 text-sm transition-colors',
+              chip === c.value
+                ? 'bg-bw-accent font-medium text-white'
+                : 'border border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
             )}
           >
-            {RECHNUNG_STATUS_LABELS[s]}
+            {c.label}
           </button>
         ))}
       </div>
@@ -80,51 +178,261 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
         <EmptyState
           icon={Receipt}
           title="Keine Rechnungen"
-          description="Legen Sie eine Rechnung aus einem Auftrag an."
+          description="Legen Sie eine Rechnung an oder passen Sie die Filter an."
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-card">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-canvas text-muted">
-                <th className="px-3 py-2 font-medium">Nr.</th>
-                <th className="px-3 py-2 font-medium">Kunde</th>
-                <th className="px-3 py-2 font-medium">Brutto</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Datum</th>
-                <th className="px-3 py-2 font-medium">Fällig</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2">
-                    <Link href={`/rechnungen/${r.id}`} className="font-medium text-primary underline">
-                      {r.rechnungsnummer}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2">{kundenName(r.kunden) ?? '—'}</td>
-                  <td className="px-3 py-2">{formatPreis(r.brutto, r.brutto)}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={cn(
-                        'inline-block rounded-full px-2 py-0.5 text-xs',
-                        statusBadgeClass(r.status, r.faellig_am, r.bezahlt_at)
-                      )}
-                    >
-                      {RECHNUNG_STATUS_LABELS[r.status]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-muted">{formatDatum(r.rechnungsdatum)}</td>
-                  <td className="px-3 py-2 text-muted">
-                    {r.faellig_am ? formatDatum(r.faellig_am) : '—'}
-                  </td>
+        <>
+          <div className="hidden overflow-x-auto rounded-xl border border-bw-border bg-bw-card md:block">
+            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-bw-border bg-bw-canvas text-bw-light">
+                  <th className="px-3 py-3 font-medium">Nummer</th>
+                  <th className="px-3 py-3 font-medium">Kunde</th>
+                  <th className="px-3 py-3 font-medium">Betrag</th>
+                  <th className="px-3 py-3 font-medium">Status</th>
+                  <th className="px-3 py-3 font-medium">Datum</th>
+                  <th className="px-3 py-3 font-medium">Fällig</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((r) => (
+                  <tr
+                    key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setPanel(r)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setPanel(r)
+                      }
+                    }}
+                    className="cursor-pointer border-b border-bw-border last:border-0 hover:bg-bw-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-bw-accent"
+                  >
+                    <td className="px-3 py-3 font-medium text-bw-link">{r.rechnungsnummer}</td>
+                    <td className="px-3 py-3 text-bw-text">{kundenName(r.kunden) ?? '—'}</td>
+                    <td className="px-3 py-3">{formatPreis(r.brutto, r.brutto)}</td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={cn(
+                          'inline-block rounded-full px-2 py-0.5 text-xs',
+                          statusBadgeClass(r)
+                        )}
+                      >
+                        {displayStatusLabel(r)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-bw-light">{formatDatum(r.rechnungsdatum)}</td>
+                    <td className="px-3 py-3 text-bw-light">
+                      {r.faellig_am ? formatDatum(r.faellig_am) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-3 md:hidden">
+            {filtered.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setPanel(r)}
+                className="w-full rounded-xl border border-bw-border bg-bw-card p-4 text-left shadow-sm transition-colors hover:bg-bw-hover"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-semibold text-bw-text">{r.rechnungsnummer}</span>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-2 py-0.5 text-xs',
+                      statusBadgeClass(r)
+                    )}
+                  >
+                    {displayStatusLabel(r)}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-bw-text">{kundenName(r.kunden) ?? '—'}</p>
+                <div className="mt-2 flex justify-between text-sm">
+                  <span className="font-medium text-bw-text">{formatPreis(r.brutto, r.brutto)}</span>
+                  <span className="text-bw-light">
+                    Fällig: {r.faellig_am ? formatDatum(r.faellig_am) : '—'}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
       )}
+
+      <SidePanel
+        open={!!panel}
+        onClose={() => setPanel(null)}
+        title={panel?.rechnungsnummer ?? ''}
+        subtitle={panel ? kundenName(panel.kunden) ?? undefined : undefined}
+        width="md"
+        badge={
+          panel ? (
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-xs',
+                statusBadgeClass(panel)
+              )}
+            >
+              {displayStatusLabel(panel)}
+            </span>
+          ) : null
+        }
+      >
+        {panel ? (
+          <div className="space-y-4 p-5 text-sm text-bw-text">
+            {panelUeberfaellig ? (
+              <div
+                className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-900"
+                role="status"
+              >
+                Diese Rechnung ist überfällig.
+              </div>
+            ) : null}
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-bw-light">Betrag (brutto)</p>
+              <p className="text-2xl font-semibold text-bw-accent">
+                {formatPreis(panel.brutto, panel.brutto)}
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-bw-light">
+                Positionen
+              </p>
+              <ul className="space-y-2">
+                {panelPos.map((p, i) => (
+                  <li key={p.id} className="rounded-lg border border-bw-border bg-bw-canvas/50 px-3 py-2">
+                    <p className="font-medium">
+                      {i + 1}. {(p.beschreibung || p.leistung).trim() || '—'}
+                    </p>
+                    <p className="text-xs text-bw-light">
+                      Lohn {eurBetrag(p.lohn_min * (p.menge || 1))} · Material{' '}
+                      {eurBetrag(p.material_min * (p.menge || 1))}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {panel.status === 'bezahlt' && panel.bezahlt_at ? (
+              <p className="text-bw-light">
+                Bezahlt am <span className="text-bw-text">{formatDatum(panel.bezahlt_at)}</span>
+              </p>
+            ) : null}
+
+            <div className="flex flex-col gap-2 border-t border-bw-border pt-4">
+              {panel.status === 'entwurf' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    fullWidth
+                    loading={pending}
+                    onClick={() =>
+                      runPanelAction(() => sendRechnung(panel.id))
+                    }
+                  >
+                    <Send className="mr-2 h-4 w-4" aria-hidden />
+                    Senden
+                  </Button>
+                  <Link
+                    href={`/rechnungen/${panel.id}`}
+                    onClick={() => setPanel(null)}
+                    className="btn btn-secondary inline-flex w-full items-center justify-center gap-2"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden />
+                    Bearbeiten
+                  </Link>
+                </>
+              ) : null}
+
+              {panel.status === 'gesendet' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    fullWidth
+                    loading={pending}
+                    onClick={() =>
+                      runPanelAction(() => updateRechnungStatus(panel.id, 'bezahlt'))
+                    }
+                  >
+                    Als bezahlt markieren
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    fullWidth
+                    loading={pending}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const res = await sendRechnungErinnerung(panel.id)
+                        if (!res.ok) {
+                          toast.message('Hinweis', { description: res.message })
+                          return
+                        }
+                        toast.message('Erinnerung', {
+                          description:
+                            'E-Mail-Versand ist noch an Resend anzubinden; Kalender kann ergänzt werden.',
+                        })
+                        router.refresh()
+                      })
+                    }
+                  >
+                    Erinnerung senden
+                  </Button>
+                </>
+              ) : null}
+
+              {panel.status === 'bezahlt' ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  fullWidth
+                  onClick={() =>
+                    window.open(`/api/rechnungen/${panel.id}/pdf`, '_blank', 'noopener,noreferrer')
+                  }
+                >
+                  PDF laden
+                </Button>
+              ) : null}
+
+              <Link
+                href={`/rechnungen/${panel.id}`}
+                onClick={() => setPanel(null)}
+                className="btn btn-secondary inline-flex w-full justify-center"
+              >
+                Zur Detailseite
+              </Link>
+            </div>
+
+            {panelSummen ? (
+              <p className="text-xs text-bw-light">
+                Netto laut Positionen (Min.): {formatPreis(panelSummen.nettoMin, panelSummen.nettoMin)}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </SidePanel>
+
+      <CsvExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="Rechnungen exportieren"
+        fields={RECHNUNG_EXPORT_FIELDS}
+        onDownload={({ scope, keys }) => {
+          const source = scope === 'view' ? filtered : rows
+          const data = source.map(exportRow)
+          const fields = RECHNUNG_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
+          exportToCSV(data, fields, 'rechnungen')
+        }}
+      />
     </div>
   )
 }

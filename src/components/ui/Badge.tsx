@@ -10,25 +10,13 @@ import {
 import { cn, KANAL_LABELS, STATUS_LABELS } from '@/lib/utils'
 import type { LeadKanal, LeadStatus } from '@/lib/types'
 
-const leadStatusStyles: Record<
-  LeadStatus,
-  { bg: string; text: string }
-> = {
-  neu: { bg: 'bg-[#DBEAFE]', text: 'text-[#1D4ED8]' },
-  kontaktiert: {
-    bg: 'bg-[#FEF3C7]',
-    text: 'text-[#92400E]',
-  },
-  angebot: { bg: 'bg-[#FFEDD5]', text: 'text-[#C2410C]' },
-  auftrag: { bg: 'bg-[#DCFCE7]', text: 'text-[#166534]' },
-  abgeschlossen: {
-    bg: 'bg-[#F3F4F6]',
-    text: 'text-[#374151]',
-  },
-  abgebrochen: {
-    bg: 'bg-[#FEE2E2]',
-    text: 'text-[#991B1B]',
-  },
+const leadStatusStyles: Record<LeadStatus, { bg: string; text: string }> = {
+  neu: { bg: 'bg-status-new-bg', text: 'text-status-new-text' },
+  kontaktiert: { bg: 'bg-status-contact-bg', text: 'text-status-contact-text' },
+  angebot: { bg: 'bg-status-offer-bg', text: 'text-status-offer-text' },
+  auftrag: { bg: 'bg-status-order-bg', text: 'text-status-order-text' },
+  abgeschlossen: { bg: 'bg-status-done-bg', text: 'text-status-done-text' },
+  abgebrochen: { bg: 'bg-status-cancel-bg', text: 'text-status-cancel-text' },
 }
 
 export function LeadStatusBadge({ status }: { status: LeadStatus }) {
@@ -66,11 +54,11 @@ export function KanalBadge({
   return (
     <span
       className={cn(
-        'inline-flex min-h-[28px] items-center gap-1 rounded-lg border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-ink',
+        'inline-flex min-h-[28px] items-center gap-1 rounded-lg border border-bw-border bg-bw-bg px-2 py-0.5 text-xs font-medium text-bw-text',
         className
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+      <Icon className="h-3.5 w-3.5 shrink-0 text-bw-light" aria-hidden />
       <span>{KANAL_LABELS[kanal]}</span>
     </span>
   )
@@ -86,7 +74,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex min-h-[28px] items-center rounded-lg bg-[#F3F4F6] px-2 py-0.5 text-xs font-medium text-[#374151]',
+        'inline-flex min-h-[28px] items-center rounded-lg bg-status-done-bg px-2 py-0.5 text-xs font-medium text-status-done-text',
         className
       )}
     >

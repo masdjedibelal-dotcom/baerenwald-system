@@ -1,94 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { X } from 'lucide-react'
+import FullCalendar from '@fullcalendar/react'
+import type { EventClickArg, EventDropArg, EventInput } from '@fullcalendar/core'
+import type { DateClickArg } from '@fullcalendar/interaction'
+import deLocale from '@fullcalendar/core/locales/de'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import listPlugin from '@fullcalendar/list'
+import interactionPlugin from '@fullcalendar/interaction'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
-import { toast } from 'sonner'
-import { KALENDER_TYP_BG, cn, formatDatum } from '@/lib/utils'
+import { toast } from '@/components/ui/app-toast'
+import { cn } from '@/lib/utils'
 import {
   deleteKalenderTermin,
+  moveKalenderTermin,
   saveKalenderTermin,
-  setTerminErledigt,
 } from '@/app/(dashboard)/kalender/actions'
 
-type ViewMode = 'liste' | 'woche' | 'monat'
-
-function parseLocalDate(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-function startOfWeekMonday(d: Date): Date {
-  const x = new Date(d)
-  const day = x.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  x.setDate(x.getDate() + diff)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d)
-  x.setDate(x.getDate() + n)
-  return x
-}
-
-function sameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-function isToday(d: Date) {
-  const t = new Date()
-  return sameDay(d, t)
-}
-
-function typLabel(t: KalenderTermin['typ']) {
-  switch (t) {
-    case 'besichtigung':
-      return 'Besichtigung'
-    case 'beginn':
-      return 'Beginn'
-    case 'abnahme':
-      return 'Abnahme'
-    default:
-      return 'Sonstiges'
-  }
-}
-
-function zeitSpanne(t: KalenderTermin) {
-  if (t.uhrzeit_von && t.uhrzeit_bis) return `${t.uhrzeit_von}–${t.uhrzeit_bis}`
-  if (t.uhrzeit_von) return `ab ${t.uhrzeit_von}`
-  return ''
-}
-
-function verknuepfungLabel(t: KalenderTermin) {
-  const l = t.leads?.kontakt_name
-  const a = t.auftraege?.titel
-  const k = t.auftraege?.kunden?.name
-  if (l) return `Lead: ${l}`
-  if (a || k) return `Auftrag: ${a ?? k ?? '—'}`
-  return null
-}
-
-function listGroupKey(d: Date): string {
-  const t = new Date()
-  t.setHours(0, 0, 0, 0)
-  const day = new Date(d)
-  day.setHours(0, 0, 0, 0)
-  const diff = (day.getTime() - t.getTime()) / 86400000
-  if (diff === 0) return 'Heute'
-  if (diff === 1) return 'Morgen'
-  if (diff > 1 && diff <= 7 - t.getDay()) return 'Diese Woche'
-  if (diff > 0) return 'Später'
-  if (diff === -1) return 'Gestern'
-  return 'Früher'
+export const TYP_FARBEN: Record<KalenderTermin['typ'], string> = {
+  besichtigung: '#C4922A',
+  beginn: '#2E7D52',
+  abnahme: '#0091AE',
+  sonstiges: '#6B7280',
 }
 
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
@@ -98,13 +39,50 @@ const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
   { value: 'sonstiges', label: 'Sonstiges' },
 ]
 
+type UiView = 'tag' | 'woche' | 'monat' | 'liste'
+
+const VIEW_MAP: Record<UiView, string> = {
+  tag: 'timeGridDay',
+  woche: 'timeGridWeek',
+  monat: 'dayGridMonth',
+  liste: 'listWeek',
+}
+
+const REVERSE_VIEW: Partial<Record<string, UiView>> = {
+  timeGridDay: 'tag',
+  timeGridWeek: 'woche',
+  dayGridMonth: 'monat',
+  listWeek: 'liste',
+}
+
+function normalizeTime(s: string): string {
+  const t = s.trim()
+  if (t.length === 5 && t.includes(':')) return `${t}:00`
+  return t
+}
+
+function ymdFromDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function timeFromDate(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${h}:${m}:${s}`
+}
+
 export function KalenderClient() {
   const supabase = createClient()
+  const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
+  const [mounted, setMounted] = useState(false)
   const [termine, setTermine] = useState<KalenderTermin[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [view, setView] = useState<ViewMode>('liste')
-  const [weekAnchor, setWeekAnchor] = useState(() => new Date())
-  const [monthAnchor, setMonthAnchor] = useState(() => new Date())
+  const [isMobile, setIsMobile] = useState(false)
+  const [uiView, setUiView] = useState<UiView>('woche')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<KalenderTermin | null>(null)
   const [pending, startTransition] = useTransition()
@@ -125,6 +103,34 @@ export function KalenderClient() {
   const [auftragHits, setAuftragHits] = useState<
     { id: string; titel: string | null; kunden?: { name: string } | null }[]
   >([])
+
+  const plugins = useMemo(
+    () => [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin],
+    []
+  )
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    const want = isMobile ? 'listWeek' : 'timeGridWeek'
+    if (api.view.type !== want) {
+      api.changeView(want)
+      setUiView(isMobile ? 'liste' : 'woche')
+    }
+  }, [mounted, isMobile])
 
   const load = useCallback(async () => {
     setLoadErr(null)
@@ -152,14 +158,6 @@ export function KalenderClient() {
   useEffect(() => {
     void load()
   }, [load])
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const apply = () => setView(mq.matches ? 'woche' : 'liste')
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [])
 
   useEffect(() => {
     if (!leadQ.trim()) {
@@ -206,11 +204,31 @@ export function KalenderClient() {
     return () => clearTimeout(t)
   }, [auftragQ, supabase])
 
-  function openNeu() {
+  const events: EventInput[] = useMemo(() => {
+    return termine.map((t) => {
+      const ymd = t.datum.slice(0, 10)
+      const hasTime = Boolean(t.uhrzeit_von?.trim())
+      const start = hasTime ? `${ymd}T${normalizeTime(t.uhrzeit_von!)}` : ymd
+      const end =
+        t.uhrzeit_bis?.trim() && hasTime ? `${ymd}T${normalizeTime(t.uhrzeit_bis)}` : undefined
+      return {
+        id: t.id,
+        title: t.titel,
+        start,
+        end,
+        allDay: !hasTime,
+        backgroundColor: TYP_FARBEN[t.typ] ?? TYP_FARBEN.sonstiges,
+        borderColor: TYP_FARBEN[t.typ] ?? TYP_FARBEN.sonstiges,
+        extendedProps: { termin: t },
+      }
+    })
+  }, [termine])
+
+  function openNeu(prefillDatum?: string) {
     setEditing(null)
     setFTitel('')
     setFTyp('besichtigung')
-    setFDatum(new Date().toISOString().slice(0, 10))
+    setFDatum(prefillDatum ?? new Date().toISOString().slice(0, 10))
     setFVon('')
     setFBis('')
     setFAdr('')
@@ -228,8 +246,8 @@ export function KalenderClient() {
     setFTitel(t.titel)
     setFTyp(t.typ)
     setFDatum(t.datum.slice(0, 10))
-    setFVon(t.uhrzeit_von ?? '')
-    setFBis(t.uhrzeit_bis ?? '')
+    setFVon(t.uhrzeit_von?.slice(0, 5) ?? '')
+    setFBis(t.uhrzeit_bis?.slice(0, 5) ?? '')
     setFAdr(t.adresse ?? '')
     setFDesc(t.beschreibung ?? '')
     setFLeadId(t.lead_id ?? '')
@@ -240,6 +258,43 @@ export function KalenderClient() {
     setModalOpen(true)
   }
 
+  function handleDateClick(arg: DateClickArg) {
+    const d =
+      arg.dateStr && arg.dateStr.length >= 10
+        ? arg.dateStr.slice(0, 10)
+        : ymdFromDate(arg.date)
+    openNeu(d)
+  }
+
+  function handleEventClick(arg: EventClickArg) {
+    const raw = arg.event.extendedProps as { termin?: KalenderTermin }
+    if (raw.termin) openEdit(raw.termin)
+  }
+
+  async function handleEventDrop(info: EventDropArg) {
+    const raw = info.event.extendedProps as { termin?: KalenderTermin }
+    const t = raw.termin
+    const start = info.event.start
+    if (!t || !start) {
+      info.revert()
+      return
+    }
+    const ymd = ymdFromDate(start)
+    const allDay = info.event.allDay
+    const von = allDay ? null : normalizeTime(timeFromDate(start))
+    const end = info.event.end
+    const bis =
+      !allDay && end ? normalizeTime(timeFromDate(end)) : allDay ? null : null
+    const res = await moveKalenderTermin(t.id, ymd, von, bis)
+    if (!res.ok) {
+      toast.error(res.message)
+      info.revert()
+      return
+    }
+    toast.success('Termin verschoben')
+    await load()
+  }
+
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
@@ -248,8 +303,8 @@ export function KalenderClient() {
         titel: fTitel,
         typ: fTyp,
         datum: fDatum,
-        uhrzeit_von: fVon.trim() || null,
-        uhrzeit_bis: fBis.trim() || null,
+        uhrzeit_von: fVon.trim() ? normalizeTime(fVon.trim()) : null,
+        uhrzeit_bis: fBis.trim() ? normalizeTime(fBis.trim()) : null,
         adresse: fAdr.trim() || null,
         beschreibung: fDesc.trim() || null,
         lead_id: fLeadId || null,
@@ -279,45 +334,30 @@ export function KalenderClient() {
     await load()
   }
 
-  async function toggleErledigt(t: KalenderTermin) {
-    const res = await setTerminErledigt(t.id, !t.erledigt)
-    if (!res.ok) return
-    setTermine((prev) => prev.map((x) => (x.id === t.id ? { ...x, erledigt: !t.erledigt } : x)))
+  function changeUiView(v: UiView) {
+    setUiView(v)
+    const api = calendarRef.current?.getApi()
+    if (api) api.changeView(VIEW_MAP[v])
   }
 
-  const groupedListe = useMemo(() => {
-    const map = new Map<string, KalenderTermin[]>()
-    for (const t of termine) {
-      const d = parseLocalDate(t.datum.slice(0, 10))
-      const key = listGroupKey(d)
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(t)
-    }
-    const order = ['Heute', 'Morgen', 'Diese Woche', 'Später', 'Gestern', 'Früher']
-    return order.filter((k) => map.has(k)).map((k) => ({ key: k, items: map.get(k)! }))
-  }, [termine])
+  const initialView = isMobile ? 'listWeek' : 'timeGridWeek'
 
-  const weekDays = useMemo(() => {
-    const start = startOfWeekMonday(weekAnchor)
-    return Array.from({ length: 7 }, (_, i) => addDays(start, i))
-  }, [weekAnchor])
-
-  const monthGrid = useMemo(() => {
-    const y = monthAnchor.getFullYear()
-    const m = monthAnchor.getMonth()
-    const first = new Date(y, m, 1)
-    const start = startOfWeekMonday(first)
-    const days: Date[] = []
-    let cur = start
-    while (days.length < 42) {
-      days.push(new Date(cur))
-      cur = addDays(cur, 1)
-    }
-    return days
-  }, [monthAnchor])
-
-  function termineForDay(day: Date) {
-    return termine.filter((t) => sameDay(parseLocalDate(t.datum.slice(0, 10)), day))
+  if (!mounted) {
+    return (
+      <div>
+        <PageHeader
+          title="Kalender"
+          action={
+            <Button type="button" variant="primary" size="sm" disabled>
+              + Termin
+            </Button>
+          }
+        />
+        <div className="rounded-lg border border-bw-border bg-bw-card p-8 text-center text-sm text-bw-text-muted">
+          Kalender wird geladen …
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -325,267 +365,100 @@ export function KalenderClient() {
       <PageHeader
         title="Kalender"
         action={
-          <Button type="button" variant="primary" size="sm" onClick={openNeu}>
-            + Neuer Termin
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden flex-wrap gap-1 md:flex">
+              {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => changeUiView(v)}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    uiView === v
+                      ? 'border-bw-primary bg-bw-primary text-white'
+                      : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
+                  )}
+                >
+                  {v === 'tag' ? 'Tag' : v === 'woche' ? 'Woche' : v === 'monat' ? 'Monat' : 'Liste'}
+                </button>
+              ))}
+            </div>
+            <Button type="button" variant="primary" size="sm" onClick={() => openNeu()}>
+              + Termin
+            </Button>
+          </div>
         }
       />
 
+      <div className="mb-3 flex flex-wrap gap-1 md:hidden">
+        {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => changeUiView(v)}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+              uiView === v
+                ? 'border-bw-primary bg-bw-primary text-white'
+                : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
+            )}
+          >
+            {v === 'tag' ? 'Tag' : v === 'woche' ? 'Woche' : v === 'monat' ? 'Monat' : 'Liste'}
+          </button>
+        ))}
+      </div>
+
       {loadErr ? (
-        <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-sm text-status-cancel-text">
           {loadErr}
         </p>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(['liste', 'woche', 'monat'] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setView(v)}
-            className={cn(
-              'rounded-full border px-4 py-2 text-sm font-medium',
-              view === v ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-surface'
-            )}
-          >
-            {v === 'liste' ? 'Liste' : v === 'woche' ? 'Woche' : 'Monat'}
-          </button>
-        ))}
-        {view === 'woche' ? (
-          <div className="ml-auto flex gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => setWeekAnchor(addDays(weekAnchor, -7))}>
-              ←
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setWeekAnchor(new Date())}>
-              Heute
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setWeekAnchor(addDays(weekAnchor, 7))}>
-              →
-            </Button>
-          </div>
-        ) : null}
-        {view === 'monat' ? (
-          <div className="ml-auto flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1))}
-            >
-              ←
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setMonthAnchor(new Date())}>
-              Heute
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1))}
-            >
-              →
-            </Button>
-          </div>
-        ) : null}
+      <div className="fc-root-wrapper rounded-lg border border-bw-border bg-bw-card p-2 shadow-card md:p-3">
+        <FullCalendar
+          ref={calendarRef}
+          key={`${initialView}`}
+          plugins={plugins}
+          initialView={initialView}
+          locale={deLocale}
+          firstDay={1}
+          slotMinTime="07:00:00"
+          slotMaxTime="20:00:00"
+          height="auto"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: '',
+          }}
+          buttonText={{
+            today: 'Heute',
+            week: 'Woche',
+            day: 'Tag',
+            month: 'Monat',
+            list: 'Liste',
+          }}
+          events={events}
+          dateClick={handleDateClick}
+          eventClick={handleEventClick}
+          editable
+          eventDrop={handleEventDrop}
+          datesSet={(arg) => {
+            const t = REVERSE_VIEW[arg.view.type]
+            if (t) setUiView(t)
+          }}
+        />
       </div>
-
-      {view === 'liste' ? (
-        <div className="space-y-6 md:hidden">
-          {groupedListe.length === 0 ? (
-            <p className="text-sm text-muted">Keine Termine.</p>
-          ) : (
-            groupedListe.map((g) => (
-              <section key={g.key}>
-                <h2 className="mb-2 text-sm font-semibold text-muted">{g.key}</h2>
-                <ul className="space-y-2">
-                  {g.items.map((t) => (
-                    <li key={t.id}>
-                      <button
-                        type="button"
-                        className="w-full rounded-lg border border-border bg-surface p-3 text-left"
-                        onClick={() => openEdit(t)}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className="rounded px-2 py-0.5 text-xs font-medium text-ink"
-                            style={{ backgroundColor: KALENDER_TYP_BG[t.typ] ?? KALENDER_TYP_BG.sonstiges }}
-                          >
-                            {typLabel(t.typ)}
-                          </span>
-                          <span className="text-xs text-muted">{formatDatum(t.datum)}</span>
-                          {zeitSpanne(t) ? (
-                            <span className="text-xs text-muted">{zeitSpanne(t)}</span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 font-medium text-ink">{t.titel}</p>
-                        {verknuepfungLabel(t) ? (
-                          <p className="text-xs text-muted">{verknuepfungLabel(t)}</p>
-                        ) : null}
-                        {t.adresse ? <p className="text-xs text-muted">{t.adresse}</p> : null}
-                        <label className="mt-2 flex items-center gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={t.erledigt}
-                            onChange={() => void toggleErledigt(t)}
-                            aria-label="Erledigt"
-                          />
-                          Erledigt
-                        </label>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
-          )}
-        </div>
-      ) : null}
-
-      {view === 'liste' ? (
-        <Card className="hidden overflow-hidden p-0 md:block">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-canvas text-muted">
-                <th className="px-3 py-2 font-medium">Datum</th>
-                <th className="px-3 py-2 font-medium">Zeit</th>
-                <th className="px-3 py-2 font-medium">Titel</th>
-                <th className="px-3 py-2 font-medium">Typ</th>
-                <th className="px-3 py-2 font-medium">Verknüpfung</th>
-                <th className="px-3 py-2 font-medium">Erledigt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {termine.map((t) => (
-                <tr
-                  key={t.id}
-                  className={cn(
-                    'cursor-pointer border-b border-border hover:bg-canvas/80',
-                    isToday(parseLocalDate(t.datum.slice(0, 10))) && 'bg-primary/5'
-                  )}
-                  onClick={() => openEdit(t)}
-                >
-                  <td className="px-3 py-2">{formatDatum(t.datum)}</td>
-                  <td className="px-3 py-2">{zeitSpanne(t) || '—'}</td>
-                  <td className="px-3 py-2 font-medium">{t.titel}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className="rounded px-2 py-0.5 text-xs"
-                      style={{ backgroundColor: KALENDER_TYP_BG[t.typ] }}
-                    >
-                      {typLabel(t.typ)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-muted">{verknuepfungLabel(t) ?? '—'}</td>
-                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={t.erledigt}
-                      onChange={() => void toggleErledigt(t)}
-                      aria-label="Erledigt"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      ) : null}
-
-      {view === 'woche' ? (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-7">
-          {weekDays.map((day) => {
-            const list = termineForDay(day)
-            const today = isToday(day)
-            return (
-              <Card
-                key={day.toISOString()}
-                className={cn('min-h-[200px] p-2', today && 'ring-2 ring-primary/40')}
-              >
-                <p className="mb-2 text-center text-xs font-semibold text-muted">
-                  {day.toLocaleDateString('de-DE', { weekday: 'short' })}
-                </p>
-                <p className={cn('mb-2 text-center text-sm font-medium', today && 'text-primary')}>
-                  {day.getDate()}.{day.getMonth() + 1}.
-                </p>
-                <ul className="space-y-1">
-                  {list.map((t) => (
-                    <li key={t.id}>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-border px-1 py-1 text-left text-xs"
-                        style={{ backgroundColor: KALENDER_TYP_BG[t.typ] }}
-                        onClick={() => openEdit(t)}
-                      >
-                        <span className="block font-medium text-ink">{t.titel}</span>
-                        {zeitSpanne(t) ? <span className="text-muted">{zeitSpanne(t)}</span> : null}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {view === 'monat' ? (
-        <Card className="p-3">
-          <p className="mb-3 text-center font-semibold text-ink">
-            {monthAnchor.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
-          </p>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted">
-            {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => (
-              <div key={d} className="py-1 font-medium">
-                {d}
-              </div>
-            ))}
-            {monthGrid.map((day) => {
-              const inMonth = day.getMonth() === monthAnchor.getMonth()
-              const list = termineForDay(day)
-              const today = isToday(day)
-              return (
-                <div
-                  key={day.toISOString()}
-                  className={cn(
-                    'min-h-[72px] rounded border p-1 text-left',
-                    inMonth ? 'border-border bg-surface' : 'border-transparent bg-canvas/50 text-muted',
-                    today && 'ring-2 ring-primary/50'
-                  )}
-                >
-                  <p className="text-xs font-medium">{day.getDate()}</p>
-                  <ul className="mt-1 space-y-0.5">
-                    {list.slice(0, 3).map((t) => (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          className="block w-full truncate rounded px-0.5 text-[10px] font-medium text-ink"
-                          style={{ backgroundColor: KALENDER_TYP_BG[t.typ] }}
-                          onClick={() => openEdit(t)}
-                          title={t.titel}
-                        >
-                          {t.titel}
-                        </button>
-                      </li>
-                    ))}
-                    {list.length > 3 ? (
-                      <li className="text-[10px] text-muted">+{list.length - 3}</li>
-                    ) : null}
-                  </ul>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      ) : null}
 
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-bw-border bg-bw-card p-4 shadow-card">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">{editing ? 'Termin bearbeiten' : 'Neuer Termin'}</h2>
+              <h2 className="text-lg font-semibold text-bw-text">
+                {editing ? 'Termin bearbeiten' : 'Neuer Termin'}
+              </h2>
               <button
                 type="button"
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-canvas"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-bw-text-muted hover:bg-bw-hover"
                 onClick={() => setModalOpen(false)}
                 aria-label="Schließen"
               >
@@ -607,20 +480,20 @@ export function KalenderClient() {
               <Input label="Adresse" value={fAdr} onChange={(e) => setFAdr(e.target.value)} />
               <Textarea label="Beschreibung" value={fDesc} onChange={(e) => setFDesc(e.target.value)} rows={3} />
               <div>
-                <label className="mb-1 block text-sm font-medium text-ink">Lead suchen (optional)</label>
+                <label className="mb-1 block text-sm font-medium text-bw-text">Lead suchen (optional)</label>
                 <input
-                  className="mb-1 w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-card px-3 text-bw-text"
                   value={leadQ}
                   onChange={(e) => setLeadQ(e.target.value)}
                   placeholder="Name …"
                 />
                 {leadHits.length > 0 ? (
-                  <ul className="max-h-32 overflow-y-auto rounded border border-border text-sm">
+                  <ul className="max-h-32 overflow-y-auto rounded border border-bw-border text-sm">
                     {leadHits.map((h) => (
                       <li key={h.id}>
                         <button
                           type="button"
-                          className="w-full px-2 py-2 text-left hover:bg-canvas"
+                          className="w-full px-2 py-2 text-left hover:bg-bw-hover"
                           onClick={() => {
                             setFLeadId(h.id)
                             setFAuftragId('')
@@ -635,20 +508,20 @@ export function KalenderClient() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-ink">Auftrag suchen (optional)</label>
+                <label className="mb-1 block text-sm font-medium text-bw-text">Auftrag suchen (optional)</label>
                 <input
-                  className="mb-1 w-full min-h-[44px] rounded-lg border border-border px-3"
+                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-card px-3 text-bw-text"
                   value={auftragQ}
                   onChange={(e) => setAuftragQ(e.target.value)}
                   placeholder="Titel …"
                 />
                 {auftragHits.length > 0 ? (
-                  <ul className="max-h-32 overflow-y-auto rounded border border-border text-sm">
+                  <ul className="max-h-32 overflow-y-auto rounded border border-bw-border text-sm">
                     {auftragHits.map((h) => (
                       <li key={h.id}>
                         <button
                           type="button"
-                          className="w-full px-2 py-2 text-left hover:bg-canvas"
+                          className="w-full px-2 py-2 text-left hover:bg-bw-hover"
                           onClick={() => {
                             setFAuftragId(h.id)
                             setFLeadId('')
@@ -662,7 +535,7 @@ export function KalenderClient() {
                   </ul>
                 ) : null}
               </div>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm text-bw-text">
                 <input type="checkbox" checked={fErledigt} onChange={(e) => setFErledigt(e.target.checked)} />
                 Erledigt
               </label>

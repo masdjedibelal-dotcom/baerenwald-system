@@ -13,7 +13,7 @@ import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-p
 import { formatDatum, formatPreis } from '@/lib/utils'
 import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
 import { StatusActions } from '@/components/funnel/StatusActions'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 
 function tageSeitFaelligkeit(faelligAm: string | null): number {
   if (!faelligAm) return 0
