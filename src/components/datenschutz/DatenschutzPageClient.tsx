@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -72,6 +72,8 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
   const [editAnfrage, setEditAnfrage] = useState<DatenschutzAnfrageRow | null>(null)
   const [editNotizen, setEditNotizen] = useState('')
   const [editStatus, setEditStatus] = useState<'offen' | 'in_bearbeitung' | 'erledigt'>('offen')
+
+  const [mainTab, setMainTab] = useState<'fristen' | 'faellig' | 'anfragen'>('fristen')
 
   const offeneAnfragen = useMemo(() => anfragen.filter((a) => a.status !== 'erledigt'), [anfragen])
 
@@ -200,12 +202,36 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+        {(
+          [
+            ['fristen', 'Fristen'],
+            ['faellig', 'Fällige Löschungen'],
+            ['anfragen', 'Kunden-Anfragen'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMainTab(id)}
+            className={
+              mainTab === id
+                ? 'rounded-md border border-bw-primary bg-bw-green-bg px-3 py-1.5 text-sm font-medium text-bw-primary'
+                : 'rounded-md px-3 py-1.5 text-sm text-muted hover:bg-canvas'
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
         <strong className="font-semibold">Hinweis:</strong> Alle Löschungen bzw. Anonymisierungen werden protokolliert.
         Steuerlich relevante Daten (Rechnungen, Belege) werden erst nach Ablauf der gesetzlichen Aufbewahrungspflicht
         (typisch 10 Jahre) zur Löschung vorgeschlagen bzw. hier technisch blockiert.
       </div>
 
+      {mainTab === 'fristen' ? (
       <section>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-ink">Aufbewahrungsfristen</h2>
@@ -253,7 +279,9 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           </table>
         </Card>
       </section>
+      ) : null}
 
+      {mainTab === 'faellig' ? (
       <section>
         <h2 className="mb-3 text-lg font-semibold text-ink">Zur Löschung vorgeschlagen</h2>
         {faellig.length === 0 ? (
@@ -289,7 +317,9 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           </ul>
         )}
       </section>
+      ) : null}
 
+      {mainTab === 'fristen' ? (
       <section>
         <h2 className="mb-1 text-lg font-semibold text-ink">Löschprotokoll</h2>
         <p className="mb-3 text-sm text-muted">
@@ -328,7 +358,9 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           </table>
         </Card>
       </section>
+      ) : null}
 
+      {mainTab === 'anfragen' ? (
       <section>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-ink">Kunden-Anfragen (DSGVO)</h2>
@@ -389,6 +421,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           </details>
         ) : null}
       </section>
+      ) : null}
 
       {/* Frist-Modal */}
       {fristModal ? (

@@ -3,14 +3,16 @@
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { Link2, Mail, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
-import { buildKundenAngebotMail } from '@/lib/angebote/angebot-mail-templates'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
+import { mailAngebot } from '@/lib/mail-templates'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
@@ -54,18 +56,29 @@ export function AngebotVersandSection({
 
   const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
 
-  const previewHtml = useMemo(
-    () =>
-      buildKundenAngebotMail({
-        kundeVorname: vorname,
-        positionen,
-        bruttoMin,
-        bruttoMax,
-        gueltigBis,
-        firm: defaultFirmenEinstellungen(),
-      }),
-    [vorname, positionen, bruttoMin, bruttoMax, gueltigBis]
-  )
+  const previewHtml = useMemo(() => {
+    const posMail = normalizeAngebotPositionen(positionen)
+    const summenMail = summenAusPositionen(posMail, 19)
+    const base = (
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '')
+    const statusLink = detail.lead_id ? `${base}/status/${detail.lead_id}` : base
+    const b = firmenEinstellungenToMailBranding(defaultFirmenEinstellungen())
+    return mailAngebot(
+      {
+        name: vorname,
+        positionen: posMail,
+        gesamt_min: summenMail.nettoMin,
+        gesamt_max: summenMail.nettoMax,
+        lohn_gesamt: summenMail.lohnZeileMin,
+        gueltig_bis: gueltigBis,
+        statusLink,
+      },
+      b
+    ).html
+  }, [vorname, positionen, gueltigBis, detail.lead_id])
 
   const allHandwerkerAngefragt = useMemo(() => {
     if (rows.length === 0) return false

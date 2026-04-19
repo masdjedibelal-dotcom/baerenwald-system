@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { StatTile } from '@/components/dashboard/StatTile'
 import { Card } from '@/components/ui/Card'
 import { LeadStatusBadge } from '@/components/ui/Badge'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import { meilensteinVorlagenFuerKunde } from '@/lib/auftraege/milestone-mail-templates'
 import type { Kunde, Lead, LeadStatus } from '@/lib/types'
 

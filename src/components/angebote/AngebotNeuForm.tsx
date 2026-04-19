@@ -11,8 +11,10 @@ import { Textarea } from '@/components/ui/Textarea'
 import {
   createAngebot,
   createKundeQuick,
+  saveAngebotVorlage,
   searchKunden,
   updateAngebot,
+  updateAngebotVorlage,
 } from '@/app/(dashboard)/angebote/actions'
 import type {
   AngebotHandwerkerZuweisungInput,
@@ -161,6 +163,13 @@ export type AngebotNeuFormProps = {
   /** bei kopieVon: Kundendaten zur Anzeige (optional) */
   kopieKunde?: Kunde | null
   vorabVorOrt?: { positionen: AngebotPosition[]; hinweisBox: string } | null
+  /** Aus URL ?vorlage_id= — Positionen vorbelegen (neues Angebot) */
+  vorlageBootstrap?: { name: string; positionen: AngebotPosition[] } | null
+  /** Einstellungen: Angebot-Vorlage ohne Kunde */
+  modusVorlage?: {
+    id: string | null
+    initial: { name: string; beschreibung: string; positionen: AngebotPosition[]; mitPreisen: boolean }
+  } | null
 }
 
 const HW_STATUS_OPTS: { value: AngebotHandwerkerZuweisungStatus; label: string }[] = [
@@ -180,11 +189,17 @@ export function AngebotNeuForm({
   kopieVon,
   kopieKunde = null,
   vorabVorOrt,
+  vorlageBootstrap = null,
+  modusVorlage = null,
 }: AngebotNeuFormProps) {
   const router = useRouter()
   const isEdit = Boolean(editAngebot?.id)
   const istKopie = Boolean(kopieVon?.quelleId)
   const hervorhebePreise = istKopie
+
+  const [vorlageName, setVorlageName] = useState(modusVorlage?.initial.name ?? '')
+  const [vorlageBeschreibung, setVorlageBeschreibung] = useState(modusVorlage?.initial.beschreibung ?? '')
+  const [vorlageMitPreisen, setVorlageMitPreisen] = useState(modusVorlage?.initial.mitPreisen ?? true)
 
   const [kundeId, setKundeId] = useState<string | null>(
     editAngebot?.kunde_id ?? kopieVon?.kunde_id ?? leadBundle?.kunde.id ?? null
@@ -199,10 +214,14 @@ export function AngebotNeuForm({
   const [neuTelefon, setNeuTelefon] = useState('')
 
   const [rows, setRows] = useState<PosRow[]>(() => {
+    if (modusVorlage?.initial.positionen?.length)
+      return positionsToRows(modusVorlage.initial.positionen, preislisten)
     if (editAngebot) return positionsToRows(editAngebot.positionen, preislisten)
     if (kopieVon) return positionsToRows(kopieVon.positionen, preislisten)
     if (vorabVorOrt?.positionen?.length)
       return vorabPositionenToRows(vorabVorOrt.positionen, preislisten)
+    if (vorlageBootstrap?.positionen?.length)
+      return positionsToRows(vorlageBootstrap.positionen, preislisten)
     return [newRow()]
   })
 
@@ -363,6 +382,42 @@ export function AngebotNeuForm({
 
   const submit = async () => {
     setError(null)
+
+    if (modusVorlage) {
+      if (!vorlageName.trim()) {
+        setError('Bitte einen Namen für die Vorlage eingeben.')
+        return
+      }
+      const positionen = positionenBuilt
+      if (!positionen.length) {
+        setError('Mindestens eine vollständige Position (Gewerk + Leistung) nötig.')
+        return
+      }
+      setSaving(true)
+      const res = modusVorlage.id
+        ? await updateAngebotVorlage(
+            modusVorlage.id,
+            vorlageName.trim(),
+            vorlageBeschreibung.trim() || null,
+            positionen,
+            vorlageMitPreisen
+          )
+        : await saveAngebotVorlage(
+            vorlageName.trim(),
+            vorlageBeschreibung.trim() || null,
+            positionen,
+            vorlageMitPreisen
+          )
+      setSaving(false)
+      if (!res.ok) {
+        setError(res.message)
+        return
+      }
+      router.push('/einstellungen/vorlagen')
+      router.refresh()
+      return
+    }
+
     let kid = kundeId
 
     if (!readonlyKunde && neuKundeOpen) {
@@ -441,17 +496,27 @@ export function AngebotNeuForm({
   return (
     <div>
       <PageHeader
-        title={isEdit ? 'Angebot bearbeiten' : 'Neues Angebot'}
+        title={
+          modusVorlage
+            ? modusVorlage.id
+              ? 'Vorlage bearbeiten'
+              : 'Neue Vorlage'
+            : isEdit
+              ? 'Angebot bearbeiten'
+              : 'Neues Angebot'
+        }
         action={
           <Link
             href={
-              leadBundle
-                ? `/anfragen/${leadBundle.lead.id}`
-                : isEdit && editAngebot
-                  ? `/angebote/${editAngebot.id}`
-                  : istKopie && kopieVon
-                    ? `/angebote/${kopieVon.quelleId}`
-                    : '/angebote'
+              modusVorlage
+                ? '/einstellungen/vorlagen'
+                : leadBundle
+                  ? `/anfragen/${leadBundle.lead.id}`
+                  : isEdit && editAngebot
+                    ? `/angebote/${editAngebot.id}`
+                    : istKopie && kopieVon
+                      ? `/angebote/${kopieVon.quelleId}`
+                      : '/angebote'
             }
             className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary"
           >
@@ -478,6 +543,50 @@ export function AngebotNeuForm({
         </p>
       ) : null}
 
+      {vorlageBootstrap && !editAngebot && !kopieVon && !modusVorlage ? (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Vorlage geladen: <strong>{vorlageBootstrap.name}</strong> — Preise prüfen.
+        </p>
+      ) : null}
+
+      {modusVorlage ? (
+        <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
+          <h2 className="text-lg font-semibold text-ink">Vorlage</h2>
+          <Input
+            label="Name"
+            required
+            value={vorlageName}
+            onChange={(e) => setVorlageName(e.target.value)}
+          />
+          <Textarea
+            label="Beschreibung"
+            value={vorlageBeschreibung}
+            onChange={(e) => setVorlageBeschreibung(e.target.value)}
+            rows={2}
+          />
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium text-ink">Preise speichern?</legend>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="vorlage-preise"
+                checked={vorlageMitPreisen}
+                onChange={() => setVorlageMitPreisen(true)}
+              />
+              Mit Preisen
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="vorlage-preise"
+                checked={!vorlageMitPreisen}
+                onChange={() => setVorlageMitPreisen(false)}
+              />
+              Nur Struktur
+            </label>
+          </fieldset>
+        </section>
+      ) : (
       <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
         <h2 className="text-lg font-semibold text-ink">Kunde</h2>
         {readonlyKunde ? (
@@ -588,6 +697,7 @@ export function AngebotNeuForm({
           </div>
         )}
       </section>
+      )}
 
       <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
         <h2 className="text-lg font-semibold text-ink">Positionen</h2>
@@ -958,19 +1068,25 @@ export function AngebotNeuForm({
         </Button>
       </section>
 
-      <section className="mb-8 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="mb-3 text-lg font-semibold text-ink">Notizen</h2>
-        <Textarea
-          value={notizen}
-          onChange={(e) => setNotizen(e.target.value)}
-          rows={4}
-          placeholder="Interne Notizen…"
-        />
-      </section>
+      {!modusVorlage ? (
+        <section className="mb-8 rounded-lg border border-border bg-surface p-4 shadow-card">
+          <h2 className="mb-3 text-lg font-semibold text-ink">Notizen</h2>
+          <Textarea
+            value={notizen}
+            onChange={(e) => setNotizen(e.target.value)}
+            rows={4}
+            placeholder="Interne Notizen…"
+          />
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-3">
         <Button type="button" variant="primary" loading={saving} onClick={() => void submit()}>
-          {isEdit ? 'Speichern' : 'Angebot speichern'}
+          {modusVorlage
+            ? 'Speichern als Vorlage'
+            : isEdit
+              ? 'Speichern'
+              : 'Angebot speichern'}
         </Button>
       </div>
     </div>

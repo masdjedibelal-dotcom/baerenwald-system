@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import {
   updateLeadPreisindikation,
   upsertVorabFormularByLead,

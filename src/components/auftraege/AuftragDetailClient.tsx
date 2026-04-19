@@ -17,7 +17,8 @@ import {
   updateAuftragNotizen,
 } from '@/app/(dashboard)/auftraege/actions'
 import { AuftragDokumentationPanel } from '@/components/auftraege/AuftragDokumentationPanel'
-import { AuftragKundenstatusSection } from '@/components/auftraege/AuftragKundenstatusSection'
+import { MailUebersicht } from '@/components/auftraege/MailUebersicht'
+import type { EmailLogRow } from '@/app/(dashboard)/auftraege/actions'
 import type {
   AuftragDetail,
   AuftragStatus,
@@ -28,7 +29,7 @@ import type {
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { cn, formatDatum, formatDatumZeit, FORMULAR_PHASE_LABELS } from '@/lib/utils'
 import { StatusActions } from '@/components/funnel/StatusActions'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 
 const STEPS: { status: AuftragStatus; label: string }[] = [
   { status: 'offen', label: 'Offen' },
@@ -53,9 +54,11 @@ function formatFeldwert(v: unknown): string {
 export function AuftragDetailClient({
   detail: initial,
   templates,
+  emailLog = [],
 }: {
   detail: AuftragDetail
   templates: FormularTemplate[]
+  emailLog?: EmailLogRow[]
 }) {
   const router = useRouter()
   const [detail, setDetail] = useState(initial)
@@ -307,7 +310,7 @@ export function AuftragDetailClient({
 
       {tab === 'uebersicht' ? (
         <>
-      <AuftragKundenstatusSection detail={detail} onChanged={() => router.refresh()} />
+      <MailUebersicht detail={detail} emailLog={emailLog} onChanged={() => router.refresh()} />
 
       <section className="mb-6 rounded-lg border border-border bg-surface p-4 shadow-card">
         <h2 className="mb-3 text-sm font-semibold text-ink">Status</h2>

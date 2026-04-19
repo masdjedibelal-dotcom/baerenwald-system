@@ -1,13 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Wrench } from 'lucide-react'
+import { Download, Wrench } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/layout/EmptyState'
+import { SidePanel } from '@/components/ui/SidePanel'
+import { Button } from '@/components/ui/Button'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
-import { formatDatum } from '@/lib/utils'
+import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
+import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { formatDatum, formatPreis, AUFTRAG_STATUS_LABELS } from '@/lib/utils'
+import {
+  getZeitraumRange,
+  datumInZeitraum,
+  zeitraumLabel,
+  type ZeitraumPreset,
+} from '@/lib/listZeitraum'
 import type { AuftragListeEintrag, AuftragStatus } from '@/lib/types'
 
 const STATUS_FILTERS: { value: '' | AuftragStatus; label: string }[] = [
@@ -17,6 +29,16 @@ const STATUS_FILTERS: { value: '' | AuftragStatus; label: string }[] = [
   { value: 'abnahme', label: 'Abnahme' },
   { value: 'abgeschlossen', label: 'Abgeschlossen' },
   { value: 'storniert', label: 'Storniert' },
+]
+
+const AUFTRAG_EXPORT_FIELDS: ExportField[] = [
+  { key: 'titel', label: 'Titel' },
+  { key: 'kunde', label: 'Kunde' },
+  { key: 'status', label: 'Status' },
+  { key: 'start_datum', label: 'Start' },
+  { key: 'end_datum', label: 'Ende' },
+  { key: 'handwerker', label: 'Handwerker' },
+  { key: 'created_at', label: 'Erstellt am' },
 ]
 
 function kundenName(a: AuftragListeEintrag) {
@@ -38,37 +60,133 @@ function handwerkerNamen(a: AuftragListeEintrag) {
   return names.length ? names.join(', ') : '—'
 }
 
+function auftragTitel(a: AuftragListeEintrag) {
+  return a.titel?.trim() || kundenName(a)
+}
+
+function auftragExportRow(a: AuftragListeEintrag): Record<string, unknown> {
+  return {
+    titel: auftragTitel(a),
+    kunde: kundenName(a),
+    status: AUFTRAG_STATUS_LABELS[a.status] ?? a.status,
+    start_datum: a.start_datum ?? '',
+    end_datum: a.end_datum ?? '',
+    handwerker: handwerkerNamen(a),
+    created_at: a.created_at,
+  }
+}
+
 export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEintrag[] }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { exportToCSV } = useExport()
+  const [panelAuftrag, setPanelAuftrag] = useState<AuftragListeEintrag | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   const [status, setStatus] = useState<'' | AuftragStatus>('')
+  const [statusList, setStatusList] = useState<AuftragStatus[] | null>(null)
+  const [q, setQ] = useState('')
+  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
+  useEffect(() => {
+    const raw = searchParams.get('status')
+    if (!raw?.trim()) {
+      setStatusList(null)
+      return
+    }
+    const parts = raw.split(',').map((s) => s.trim()).filter(Boolean) as AuftragStatus[]
+    setStatusList(parts.length ? parts : null)
+  }, [searchParams])
+
+  const dateRange = useMemo(
+    () => getZeitraumRange(zeitraum, customFrom, customTo),
+    [zeitraum, customFrom, customTo]
+  )
 
   const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase()
     return auftraege.filter((a) => {
-      if (status && a.status !== status) return false
-      return true
+      if (statusList?.length) {
+        if (!statusList.includes(a.status)) return false
+      } else if (status && a.status !== status) return false
+      if (dateRange && !datumInZeitraum(a.created_at, dateRange)) return false
+      if (!needle) return true
+      const kunde = kundenName(a).toLowerCase()
+      const titel = (a.titel ?? '').toLowerCase()
+      const hw = handwerkerNamen(a).toLowerCase()
+      return kunde.includes(needle) || titel.includes(needle) || hw.includes(needle)
     })
-  }, [auftraege, status])
+  }, [auftraege, status, statusList, q, dateRange])
+
+  const filterTags = useMemo((): FilterTag[] => {
+    const t: FilterTag[] = []
+    if (status) {
+      const label = STATUS_FILTERS.find((s) => s.value === status)?.label
+      if (label) t.push({ id: 'status', label, onRemove: () => setStatus('') })
+    }
+    if (zeitraum !== 'alle') {
+      t.push({
+        id: 'z',
+        label: zeitraumLabel(zeitraum),
+        onRemove: () => {
+          setZeitraum('alle')
+          setCustomFrom('')
+          setCustomTo('')
+        },
+      })
+    }
+    if (q.trim()) {
+      t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
+    }
+    return t
+  }, [status, zeitraum, q])
+
+  const hasActiveFilters = !!(status || statusList?.length || zeitraum !== 'alle' || q.trim())
+
+  function resetFilters() {
+    setStatus('')
+    setQ('')
+    setZeitraum('alle')
+    setCustomFrom('')
+    setCustomTo('')
+  }
 
   return (
     <div>
-      <PageHeader title="Aufträge" />
-
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
-        <label className="block min-w-0 flex-1 md:max-w-[220px]">
-          <span className="mb-1 block text-sm font-medium text-ink">Status</span>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
-            className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+      <PageHeader
+        title="Aufträge"
+        action={
+          <button
+            type="button"
+            onClick={() => setExportOpen(true)}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 text-sm font-medium text-bw-text shadow-sm transition-colors hover:bg-bw-hover"
           >
-            {STATUS_FILTERS.map((o) => (
-              <option key={o.label} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            <Download className="h-4 w-4" aria-hidden />
+            Export
+          </button>
+        }
+      />
+
+      <ListFilterBar
+        statusOptions={STATUS_FILTERS}
+        statusValue={status}
+        onStatusChange={(v) => setStatus(v as '' | AuftragStatus)}
+        zeitraumValue={zeitraum}
+        onZeitraumChange={setZeitraum}
+        showCustomDates={zeitraum === 'benutzerdefiniert'}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomFromChange={setCustomFrom}
+        onCustomToChange={setCustomTo}
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Kunde, Titel, Handwerker"
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
+        tags={filterTags}
+        className="mb-4"
+      />
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -85,9 +203,10 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
           <ul className="space-y-3 md:hidden">
             {filtered.map((a) => (
               <li key={a.id}>
-                <Link
-                  href={`/auftraege/${a.id}`}
-                  className="block rounded-lg border border-border bg-surface p-4 shadow-card transition-colors hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                <button
+                  type="button"
+                  onClick={() => setPanelAuftrag(a)}
+                  className="block w-full rounded-lg border border-border bg-surface p-4 text-left shadow-card transition-colors hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 space-y-2">
@@ -108,10 +227,16 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
                         <p className="text-xs text-muted">Start: {formatDatum(a.start_datum)}</p>
                       ) : null}
                       <p className="text-sm text-muted">{handwerkerNamen(a)}</p>
+                      {a.angebote ? (
+                        <p className="text-sm text-muted">
+                          Angebot:{' '}
+                          {formatPreis(a.angebote.gesamt_min ?? null, a.angebote.gesamt_max ?? null)}
+                        </p>
+                      ) : null}
                     </div>
                     <AuftragStatusBadge status={a.status} />
                   </div>
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
@@ -121,6 +246,7 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
               <thead>
                 <tr className="border-b border-border bg-canvas text-muted">
                   <th className="px-3 py-3 font-medium">Kunde</th>
+                  <th className="px-3 py-3 font-medium">Angebot</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="px-3 py-3 font-medium">Gewerke</th>
                   <th className="px-3 py-3 font-medium">Handwerker</th>
@@ -134,16 +260,21 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
                     key={a.id}
                     role="link"
                     tabIndex={0}
-                    onClick={() => router.push(`/auftraege/${a.id}`)}
+                    onClick={() => setPanelAuftrag(a)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        router.push(`/auftraege/${a.id}`)
+                        setPanelAuftrag(a)
                       }
                     }}
                     className="cursor-pointer border-b border-border last:border-0 hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
                   >
                     <td className="px-3 py-3 font-medium text-ink">{kundenName(a)}</td>
+                    <td className="px-3 py-3 text-muted">
+                      {a.angebote
+                        ? formatPreis(a.angebote.gesamt_min ?? null, a.angebote.gesamt_max ?? null)
+                        : '—'}
+                    </td>
                     <td className="px-3 py-3">
                       <AuftragStatusBadge status={a.status} />
                     </td>
@@ -160,7 +291,7 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
                         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-sm font-medium text-primary hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        Öffnen
+                        Seite
                       </Link>
                     </td>
                   </tr>
@@ -170,6 +301,51 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
           </div>
         </>
       )}
+
+      <SidePanel
+        open={!!panelAuftrag}
+        onClose={() => setPanelAuftrag(null)}
+        title={panelAuftrag ? kundenName(panelAuftrag) : ''}
+        subtitle={panelAuftrag?.start_datum ? `Start: ${formatDatum(panelAuftrag.start_datum)}` : undefined}
+        badge={panelAuftrag ? <AuftragStatusBadge status={panelAuftrag.status} /> : null}
+      >
+        {panelAuftrag ? (
+          <div className="space-y-4 p-5 text-sm">
+            <p className="text-bw-text-muted">{handwerkerNamen(panelAuftrag)}</p>
+            {panelAuftrag.angebote ? (
+              <p>
+                Angebot:{' '}
+                {formatPreis(
+                  panelAuftrag.angebote.gesamt_min ?? null,
+                  panelAuftrag.angebote.gesamt_max ?? null
+                )}
+              </p>
+            ) : null}
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={() => {
+                router.push(`/auftraege/${panelAuftrag.id}`)
+                setPanelAuftrag(null)
+              }}
+            >
+              Vollständig öffnen
+            </Button>
+          </div>
+        ) : null}
+      </SidePanel>
+
+      <CsvExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        fields={AUFTRAG_EXPORT_FIELDS}
+        onDownload={({ scope, keys }) => {
+          const source = scope === 'view' ? filtered : auftraege
+          const data = source.map(auftragExportRow)
+          const fields = AUFTRAG_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
+          exportToCSV(data, fields, 'auftraege')
+        }}
+      />
     </div>
   )
 }

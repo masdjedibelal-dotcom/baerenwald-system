@@ -22,6 +22,7 @@ import {
   replaceAngebotHandwerkerUndSenden,
   schliesseLeadNachAngebotVerlust,
   updateAngebotNotizen,
+  deleteAngebot,
 } from '@/app/(dashboard)/angebote/actions'
 import {
   KUNDE_ABLEHNUNG_GRUND_LABELS,
@@ -36,7 +37,7 @@ import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { cn, formatDatum, formatPreis } from '@/lib/utils'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { StatusActions } from '@/components/funnel/StatusActions'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 
 const STEPS: { status: AngebotStatus; label: string }[] = [
   { status: 'entwurf', label: 'Entwurf' },
@@ -234,7 +235,27 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
         toast.message('Versand an Kundin', { description: 'Hier können Sie das Angebot per E-Mail senden.' })
         return
       }
+      if (action === 'angebot.hw_akzeptiert') {
+        startTransition(async () => {
+          await acceptHandwerker(detail.id)
+          router.refresh()
+        })
+        return
+      }
+      if (action === 'angebot.mark_kunde_akzeptiert') {
+        startTransition(async () => {
+          await markKundeAkzeptiert(detail.id)
+          router.refresh()
+        })
+        return
+      }
       if (action === 'auftrag.create_modal') {
+        const s = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
+        setAufStart(s)
+        setAufEnde(addDaysYmd(s, 14))
+        setAufNotizen('')
+        setAufMailKunde(true)
+        setAufMailHw(true)
         setAuftragModalOpen(true)
         return
       }
@@ -269,10 +290,20 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
         return
       }
       if (action === 'angebot.loeschen') {
-        toast.message('Löschen', { description: 'Löschen ist in dieser Ansicht noch nicht angebunden.' })
+        if (!window.confirm('Angebot wirklich löschen?')) return
+        startTransition(async () => {
+          const r = await deleteAngebot(detail.id)
+          if ('error' in r) {
+            toast.error(r.error)
+            return
+          }
+          toast.success('Angebot gelöscht')
+          router.push(detail.lead_id ? `/anfragen/${detail.lead_id}` : '/angebote')
+          router.refresh()
+        })
       }
     },
-    [detail.angebot_handwerker, gewerkWarnungen, router]
+    [detail.angebot_handwerker, detail.id, gewerkWarnungen, router]
   )
 
   const idx = stepIndex(detail.status)
@@ -285,13 +316,13 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
   const gueltigBis = new Date(Date.now() + gueltigTage * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
 
   return (
-    <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
+    <div className="pb-6">
       <PageHeader
         title={
           <span className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center md:gap-3">
             <Link
-              href="/angebote"
-              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary"
+              href={detail.lead_id ? `/anfragen/${detail.lead_id}` : '/anfragen'}
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-bw-link"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden />
               Zurück
@@ -299,20 +330,7 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
             <span className="min-w-0 truncate text-xl font-semibold md:text-2xl">{name}</span>
           </span>
         }
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <AngebotStatusBadge status={detail.status} />
-            {detail.status === 'entwurf' ? (
-              <Link
-                href={`/angebote/neu?angebot_id=${detail.id}`}
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-ink hover:bg-canvas"
-              >
-                <Pencil className="h-4 w-4" aria-hidden />
-                Bearbeiten
-              </Link>
-            ) : null}
-          </div>
-        }
+        action={<AngebotStatusBadge status={detail.status} />}
       />
 
       {err ? (
@@ -325,6 +343,16 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
           {msg}
         </p>
       ) : null}
+
+      <StatusActions
+        typ="angebot"
+        status={detail.status}
+        id={detail.id}
+        data={statusActionData}
+        onAction={onStatusAction}
+        disabled={pending}
+        layout="inline"
+      />
 
       {gewerkWarnungen.length > 0 && detail.status !== 'abgelehnt' ? (
         <div className="mb-4 space-y-2">
@@ -407,58 +435,6 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
           </ol>
         )}
 
-        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-          {detail.status === 'gesendet_handwerker' ? (
-            <Button
-              variant="primary"
-              loading={pending}
-              onClick={() => run(() => acceptHandwerker(detail.id))}
-            >
-              Handwerker hat akzeptiert
-            </Button>
-          ) : null}
-          {detail.status === 'gesendet_kunde' ? (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="primary"
-                loading={pending}
-                onClick={() => run(() => markKundeAkzeptiert(detail.id))}
-              >
-                Kunde hat akzeptiert
-              </Button>
-              <Button
-                variant="danger"
-                loading={pending}
-                onClick={() => {
-                  setKAbGrund('')
-                  setKAbKonkurrenz('')
-                  setKAbNotiz('')
-                  setKundeAbModalOpen(true)
-                }}
-              >
-                Kunde hat abgelehnt
-              </Button>
-            </div>
-          ) : null}
-          {detail.status === 'kunde_akzeptiert' ? (
-            <Button
-              type="button"
-              variant="primary"
-              loading={pending}
-              onClick={() => {
-                const s = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
-                setAufStart(s)
-                setAufEnde(addDaysYmd(s, 14))
-                setAufNotizen('')
-                setAufMailKunde(true)
-                setAufMailHw(true)
-                setAuftragModalOpen(true)
-              }}
-            >
-              Auftrag erstellen
-            </Button>
-          ) : null}
-        </div>
       </section>
 
       {detail.status === 'abgelehnt' && detail.ablehnung_grund ? (
@@ -1035,14 +1011,6 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
         </div>
       ) : null}
 
-      <StatusActions
-        typ="angebot"
-        status={detail.status}
-        id={detail.id}
-        data={statusActionData}
-        onAction={onStatusAction}
-        disabled={pending}
-      />
     </div>
   )
 }

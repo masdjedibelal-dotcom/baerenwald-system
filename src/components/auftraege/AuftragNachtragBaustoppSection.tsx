@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import {
   type BaustoppTyp,
   beendeBaustopp,

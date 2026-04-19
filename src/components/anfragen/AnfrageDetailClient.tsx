@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { ArrowLeft, CalendarPlus, ClipboardList, FileText, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarPlus, ClipboardList, FileText, X } from 'lucide-react'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -11,14 +11,23 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
-import { toast } from 'sonner'
+import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
+import { SidePanel } from '@/components/ui/SidePanel'
+import { toast } from '@/components/ui/app-toast'
 import {
   insertKalenderTermin,
   updateLeadNotizen,
   updateLeadStatus,
 } from '@/app/(dashboard)/anfragen/actions'
 import { StatusActions } from '@/components/funnel/StatusActions'
-import type { FormularFeld, KalenderTermin, LeadDetail, LeadStatus, VorabFormular } from '@/lib/types'
+import type {
+  AngebotStatus,
+  FormularFeld,
+  KalenderTermin,
+  LeadDetail,
+  LeadStatus,
+  VorabFormular,
+} from '@/lib/types'
 import {
   BEREICH_LABELS,
   FORMULAR_PHASE_LABELS,
@@ -82,9 +91,24 @@ function komplexitaetLabel(k: string): string {
   return 'Standard'
 }
 
-export function AnfrageDetailClient({ lead: initial }: { lead: LeadDetail }) {
+type AngebotKurz = {
+  id: string
+  status: string
+  gesamt_min: number | null
+  gesamt_max: number | null
+  created_at: string
+}
+
+export function AnfrageDetailClient({
+  lead: initial,
+  angeboteListe = [],
+}: {
+  lead: LeadDetail
+  angeboteListe?: AngebotKurz[]
+}) {
   const router = useRouter()
   const [lead, setLead] = useState(initial)
+  const [angebotPanelId, setAngebotPanelId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [statusErr, setStatusErr] = useState<string | null>(null)
   const [notizen, setNotizen] = useState(initial.notizen ?? '')
@@ -566,6 +590,84 @@ export function AnfrageDetailClient({ lead: initial }: { lead: LeadDetail }) {
           </div>
         ) : null}
       </section>
+
+      <Card className="mb-6 p-4">
+        <h2 className="mb-3 text-base font-semibold text-ink">Angebot</h2>
+        {angeboteListe.length === 0 ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted">Noch kein Angebot</p>
+            <Link href={`/angebote/neu?lead_id=${lead.id}`} className="btn btn-primary text-center text-sm">
+              + Angebot erstellen
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {angeboteListe.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-col gap-2 rounded-lg border border-border bg-bw-bg/50 p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AngebotStatusBadge status={a.status as AngebotStatus} />
+                    <span className="text-sm font-medium text-ink">{formatPreis(a.gesamt_min, a.gesamt_max)}</span>
+                  </div>
+                  <p className="text-xs text-muted">{formatDatum(a.created_at)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setAngebotPanelId(a.id)}>
+                    Angebot öffnen
+                  </Button>
+                  <Link
+                    href={`/angebote/${a.id}`}
+                    className="btn btn-ghost inline-flex items-center gap-1 text-sm"
+                  >
+                    Zur Detailseite <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <SidePanel
+        open={Boolean(angebotPanelId)}
+        onClose={() => setAngebotPanelId(null)}
+        title="Angebot"
+        subtitle={
+          angeboteListe.find((x) => x.id === angebotPanelId)
+            ? formatDatum(angeboteListe.find((x) => x.id === angebotPanelId)!.created_at)
+            : undefined
+        }
+        badge={
+          angeboteListe.find((x) => x.id === angebotPanelId) ? (
+            <AngebotStatusBadge
+              status={angeboteListe.find((x) => x.id === angebotPanelId)!.status as AngebotStatus}
+            />
+          ) : null
+        }
+      >
+        {(() => {
+          const a = angebotPanelId ? angeboteListe.find((x) => x.id === angebotPanelId) : null
+          if (!a) return null
+          return (
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-muted">
+                Betrag:{' '}
+                <span className="font-semibold text-ink">{formatPreis(a.gesamt_min, a.gesamt_max)}</span>
+              </p>
+              <Link
+                href={`/angebote/${a.id}`}
+                className="btn btn-primary block w-full text-center"
+                onClick={() => setAngebotPanelId(null)}
+              >
+                Vollständig öffnen
+              </Link>
+            </div>
+          )
+        })()}
+      </SidePanel>
 
       <Card>
         <h2 className="mb-3 text-base font-semibold text-ink">Aktionen</h2>

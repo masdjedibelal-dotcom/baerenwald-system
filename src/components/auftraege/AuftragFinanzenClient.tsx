@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/app-toast'
 import {
   createBuergschaft,
   createEinbehalt,
