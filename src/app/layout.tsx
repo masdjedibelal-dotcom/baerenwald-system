@@ -1,9 +1,24 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Bärenwald CRM',
-  description: 'Internes CRM-Dashboard für Bärenwald',
+  description: 'Bärenwald München',
+  manifest: '/manifest.json',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#33475B',
 }
 
 export default function RootLayout({
@@ -13,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de">
-      <body className="min-h-dvh bg-canvas text-ink antialiased">{children}</body>
+      <body className={`${inter.className} min-h-dvh bg-bw-bg text-bw-text antialiased`}>{children}</body>
     </html>
   )
 }
