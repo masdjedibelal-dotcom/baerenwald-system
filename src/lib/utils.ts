@@ -182,3 +182,68 @@ export const FACHDETAIL_TO_LEISTUNG: Record<string, string> = {
   'elektrik.sicherungskasten': 'Sicherungskasten modernisieren',
   'elektrik.echeck': 'E-Check',
 }
+
+/** Alias gemäß Design-Prompt (Bereiche / Gewerke) */
+export const BEREICHE_LABELS = BEREICH_LABELS
+
+export const KANAL_ICONS: Record<string, string> = {
+  website: '🌐',
+  telefon: '📞',
+  whatsapp: '💬',
+  email: '✉️',
+  vor_ort: '📍',
+  sonstiges: '•',
+}
+
+/** Kompakte Budget-Anzeige für Listen (z. B. 13k–18k €) */
+export function formatBudget(min?: number | null, max?: number | null): string {
+  if (min == null && max == null) return '—'
+  const fmt = (n: number) => {
+    if (n >= 1000) {
+      const k = n / 1000
+      const s = k % 1 === 0 ? String(k) : k.toLocaleString('de-DE', { maximumFractionDigits: 1 })
+      return `${s}k`
+    }
+    return n.toLocaleString('de-DE')
+  }
+  if (min != null && max != null) return `${fmt(min)}–${fmt(max)} €`
+  if (min != null) return `ab ${fmt(min)} €`
+  return '—'
+}
+
+/** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */
+export function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '—'
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const mins = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (mins < 1) return 'gerade eben'
+  if (mins < 60) return `vor ${mins} Min`
+  if (hours < 24) return `vor ${hours}h`
+  if (days === 1) return 'Gestern'
+  if (days < 7) {
+    return date.toLocaleDateString('de-DE', { weekday: 'short' })
+  }
+  return date.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+  })
+}
+
+/** Tabellen-Datum: Heute / Gestern / Wochentag / DD.MM. */
+export function formatLeadListDatum(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const now = new Date()
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startD = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffDays = Math.round((startToday.getTime() - startD.getTime()) / 86400000)
+  if (diffDays === 0) return 'Heute'
+  if (diffDays === 1) return 'Gestern'
+  if (diffDays < 7) return d.toLocaleDateString('de-DE', { weekday: 'short' })
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+}

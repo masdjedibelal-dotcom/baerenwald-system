@@ -1,6 +1,7 @@
 /** Keys in Tabelle `einstellungen` */
 export const EINSTELLUNG_KEYS = {
   firmenname: 'firmenname',
+  rechtsform: 'rechtsform',
   strasse: 'strasse',
   plz: 'plz',
   ort: 'ort',
@@ -15,6 +16,7 @@ export const EINSTELLUNG_KEYS = {
   logo_url: 'logo_url',
   zahlungsziel_tage: 'zahlungsziel_tage',
   angebot_gueltig_tage: 'angebot_gueltig_tage',
+  mwst_satz: 'mwst_satz',
   pdf_fusszeile: 'pdf_fusszeile',
 } as const
 
@@ -25,6 +27,7 @@ export type FirmenEinstellungen = Record<EinstellungKey, string>
 export function defaultFirmenEinstellungen(): FirmenEinstellungen {
   return {
     firmenname: 'Bärenwald München',
+    rechtsform: '',
     strasse: '',
     plz: '',
     ort: '',
@@ -39,6 +42,7 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
     logo_url: '',
     zahlungsziel_tage: '14',
     angebot_gueltig_tage: '30',
-    pdf_fusszeile: '',
+    mwst_satz: '19',
+    pdf_fusszeile: 'Amtsgericht München · HRB …',
   }
 }

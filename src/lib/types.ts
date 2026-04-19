@@ -25,6 +25,7 @@ export type LeadStatusHistory = {
   user_profiles?: { name: string } | null
 }
 
+/** privat | gewerbe | hausverwaltung | sonstiges */
 export type Kunde = {
   id: string
   name: string
@@ -36,6 +37,33 @@ export type Kunde = {
   typ: string
   notizen: string | null
   created_at: string
+  updated_at?: string | null
+  ansprechpartner?: string | null
+  webseite?: string | null
+  geburtstag?: string | null
+  kundennummer?: string | null
+  quelle?: string | null
+  gesamt_umsatz?: number | null
+  letzte_aktivitaet?: string | null
+}
+
+export type KundenNotizRow = {
+  id: string
+  kunde_id: string
+  inhalt: string
+  erstellt_von: string | null
+  created_at: string
+  user_profiles?: { name: string } | null
+}
+
+export type KundenDokumentRow = {
+  id: string
+  kunde_id: string
+  name: string
+  typ: string
+  datei_url: string | null
+  groesse_bytes: number | null
+  created_at: string
 }
 
 /** Kunde eingebettet in Lead-Listenabfrage */
@@ -43,6 +71,15 @@ export type LeadKundeEmbed = Pick<
   Kunde,
   'id' | 'name' | 'email' | 'telefon'
 >
+
+/** Angebots-Zeile in Lead-Listenabfrage (embed) */
+export type LeadListAngebot = {
+  id: string
+  status: string
+  gesamt_min: number | null
+  gesamt_max: number | null
+  created_at?: string | null
+}
 
 export type Lead = {
   id: string
@@ -66,6 +103,21 @@ export type Lead = {
   created_at: string
   updated_at: string
   kunden?: Kunde | LeadKundeEmbed | null
+  angebote?: LeadListAngebot[] | null
+}
+
+export type LeadWithAngebote = Lead & {
+  angebote?: LeadListAngebot[] | null
+}
+
+export type LeadTimelineRow = {
+  id: string
+  lead_id: string
+  typ: string
+  titel: string
+  beschreibung: string | null
+  created_at: string
+  erstellt_von?: string | null
 }
 
 /** Lead inkl. Status-Historie (Detailansicht) */
@@ -73,6 +125,7 @@ export type LeadDetail = Lead & {
   kunden?: Kunde | null
   leads_status_history?: LeadStatusHistory[] | null
   vorab_formulare?: VorabFormular[] | null
+  lead_timeline?: LeadTimelineRow[] | null
 }
 
 export type AngebotStatus =
@@ -83,19 +136,30 @@ export type AngebotStatus =
   | 'kunde_akzeptiert'
   | 'abgelehnt'
 
+/** Gesamtpreis auf Angebots-/Positions-Ebene */
+export type PreisTyp = 'range' | 'fix'
+
 /** Angebots- / Rechnungsposition (Stückpreise Lohn/Material; Gesamt = Summe Stück) */
 export type AngebotPosition = {
   id: string
   gewerk_id: string
   gewerk_name: string
+  /** Alias für Editor / JSON-Export */
+  gewerk_slug?: string
   /** interne Zuordnung Preisliste */
   leistung: string
+  leistung_id?: string
+  leistung_name?: string
   /** Kundentext / Gesamtwerk, nicht nur Handwerksleistung */
   beschreibung: string
+  preis_typ?: PreisTyp
   lohn_min: number
   lohn_max: number
   material_min: number
   material_max: number
+  lohn_fix?: number
+  material_fix?: number
+  gesamt_fix?: number
   /** auto: Lohn + Material (Stück) */
   gesamt_min: number
   gesamt_max: number
@@ -104,9 +168,13 @@ export type AngebotPosition = {
   /** intern, nicht im Kunden-PDF */
   einkaufspreis_min?: number
   einkaufspreis_max?: number
+  einkaufspreis?: number
+  marge?: number
   notiz_intern?: string
   /** sichtbar im Angebot / PDF */
   notiz_extern?: string
+  handwerker_id?: string
+  handwerker_name?: string
 }
 
 export type RechnungPosition = AngebotPosition
@@ -139,6 +207,9 @@ export type Angebot = {
   erstellt_von: string | null
   created_at: string
   updated_at: string
+  preis_typ?: PreisTyp | null
+  vorlage_id?: string | null
+  gesendet_handwerker_at?: string | null
   /** gesetzt wenn Angebot per Mail an Kundin gegangen */
   gesendet_kunde_at?: string | null
   /** Kunden-Ablehnung (Statistik) */
@@ -147,6 +218,19 @@ export type Angebot = {
   ablehnung_notiz?: string | null
   kunden?: Kunde | null
   leads?: Lead | null
+}
+
+export type AngebotVorlage = {
+  id: string
+  name: string
+  beschreibung: string | null
+  positionen: AngebotPosition[]
+  gesamt_min: number | null
+  gesamt_max: number | null
+  gesamt_fix: number | null
+  aktiv: boolean
+  created_at: string
+  updated_at?: string | null
 }
 
 export type AngebotHandwerkerRow = {
@@ -178,6 +262,17 @@ export type AngebotDetail = Angebot & {
   angebot_handwerker?: AngebotHandwerkerRow[] | null
 }
 
+/** Kompakte Zeile für Angebotsliste & Side-Panel */
+export type AngebotListeEintrag = Omit<Angebot, 'kunden' | 'leads'> & {
+  kunden?: Pick<Kunde, 'id' | 'name' | 'email'> | null
+  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche'> | null
+  angebot_handwerker?: Array<
+    Pick<AngebotHandwerkerRow, 'id' | 'status' | 'handwerker_id' | 'gewerk_id'> & {
+      handwerker?: { name: string } | null
+    }
+  > | null
+}
+
 export type AuftragStatus =
   | 'offen'
   | 'in_arbeit'
@@ -202,7 +297,30 @@ export type Auftrag = {
   updated_at: string
   /** Geheimer Schlüssel für öffentliche Kunden-Status-Seite /projekt/[token] */
   kunden_token?: string | null
+  /** CRM-Betreuer:in (auth.users) */
+  betreuer_id?: string | null
+  /** 0–100 */
+  fortschritt?: number | null
+  /** Kurztext auf der Kunden-Status-Seite */
+  naechster_schritt?: string | null
+  /** Öffentliche Kunden-Seite: Aufrufzähler */
+  kunden_seite_aufrufe?: number | null
+  kunden_seite_letzter_aufruf?: string | null
   kunden?: Kunde
+}
+
+export type AuftragMilestoneRow = {
+  id: string
+  auftrag_id: string
+  titel: string
+  beschreibung: string | null
+  datum: string | null
+  erledigt: boolean
+  erledigt_at: string | null
+  fuer_kunden_sichtbar: boolean
+  sort_order: number
+  ist_system: boolean
+  created_at: string
 }
 
 export type AuftragHandwerkerRow = {
@@ -230,6 +348,10 @@ export type AuftragListeEintrag = Auftrag & {
   kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'telefon'> | null
   angebote?: AngebotEmbedListe | null
   auftrag_handwerker?: AuftragHandwerkerRow[] | null
+  auftrag_milestones?: Pick<
+    AuftragMilestoneRow,
+    'id' | 'titel' | 'erledigt' | 'fuer_kunden_sichtbar'
+  >[] | null
 }
 
 export type FormularEintrag = {
@@ -410,6 +532,8 @@ export type AuftragDetail = Auftrag & {
   baustopps?: BaustoppRow[] | null
   einbehalte?: Einbehalt[] | null
   eingangsrechnungen?: Eingangsrechnung[] | null
+  auftrag_milestones?: AuftragMilestoneRow[] | null
+  hw_formular_tabs?: HwFormularTabRow[] | null
 }
 
 export type ComplianceStatus =
@@ -532,6 +656,9 @@ export type FormularSubtyp =
   | 'regiebericht'
   | 'behinderung'
   | 'pruefprotokoll'
+  | 'abnahme'
+  | 'checkliste'
+  | 'sonstiges'
   | 'standard'
   | string
 
@@ -544,6 +671,7 @@ export type FormularTemplate = {
   phase: 'vorab' | 'update' | 'abnahme' | null
   felder: FormularFeld[]
   aktiv: boolean
+  created_at?: string
   gewerke?: Gewerk | null
 }
 
@@ -563,6 +691,35 @@ export type FormularFeld = {
   hinweis?: string
   /** Wenn gesetzt: Feld ist nur pflichtig, wenn `feld_id` den Wert `wert` hat (z. B. Checkbox true). */
   pflicht_wenn?: { feld_id: string; wert?: unknown }
+}
+
+export type HwFormularEinreichungStatus = 'offen' | 'ausgefuellt' | 'abgeschlossen'
+
+export type HwFormularEinreichungRow = {
+  id: string
+  tab_id: string
+  auftrag_id: string
+  handwerker_id: string | null
+  token: string
+  felder_werte: Record<string, unknown>
+  foto_urls: string[]
+  status: HwFormularEinreichungStatus | string
+  gesendet_at: string | null
+  eingereicht_at: string | null
+  created_at: string
+}
+
+export type HwFormularTabRow = {
+  id: string
+  auftrag_id: string
+  handwerker_id: string | null
+  name: string
+  beschreibung: string | null
+  felder: FormularFeld[]
+  sort_order: number
+  aktiv: boolean
+  created_at: string
+  hw_formular_einreichungen?: HwFormularEinreichungRow[] | null
 }
 
 export type VorabFormular = {
@@ -614,7 +771,19 @@ export type Rechnung = {
 /** Nur Felder der Listen-Abfrage `/rechnungen` (kunden je nach Join ein Objekt oder Array) */
 export type RechnungListeZeile = Pick<
   Rechnung,
-  'id' | 'rechnungsnummer' | 'status' | 'brutto' | 'rechnungsdatum' | 'faellig_am' | 'bezahlt_at'
+  | 'id'
+  | 'rechnungsnummer'
+  | 'status'
+  | 'brutto'
+  | 'rechnungsdatum'
+  | 'faellig_am'
+  | 'bezahlt_at'
+  | 'positionen'
+  | 'lohn_netto'
+  | 'material_netto'
+  | 'netto'
+  | 'mwst_satz'
 > & {
   kunden?: { name: string } | { name: string }[] | null
+  auftraege?: { titel: string } | { titel: string }[] | null
 }

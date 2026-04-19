@@ -1,28 +1,10 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { buildHandwerkerMail } from '@/lib/angebote/angebot-mail-templates'
-import { sendHandwerkerAngebotEmail } from '@/lib/angebote/emails'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { getMailBranding } from '@/lib/mail-branding'
+import { mailHandwerkerAnfrage } from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mail-service'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail } from '@/lib/types'
 import { getPublicAppUrl } from '@/lib/utils'
-
-async function logEmail(input: {
-  typ: string
-  angebot_id: string
-  zuweisung_id?: string | null
-  to_email: string
-  subject: string
-}) {
-  const { error } = await supabaseAdmin.from('email_logs').insert({
-    typ: input.typ,
-    angebot_id: input.angebot_id,
-    zuweisung_id: input.zuweisung_id ?? null,
-    to_email: input.to_email,
-    subject: input.subject,
-    meta: {},
-  })
-  if (error) console.warn('email_logs:', error.message)
-}
 
 type ZuRow = {
   id: string
@@ -68,38 +50,41 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   const gewerkName = row.gewerke?.name ?? 'Gewerk'
   const kunde = detail.kunden
   const plz = kunde?.plz?.trim() || detail.leads?.plz?.trim() || '—'
-  const ort = kunde?.ort?.trim() || '—'
   const zeitraum = detail.leads?.zeitraum?.trim() || ''
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
 
   let gesendet = false
   if (sendEmail) {
     if (!hwEmail) {
       return { ok: false, message: 'Handwerker hat keine E-Mail-Adresse.', link }
     }
-    const subject = `Neue Anfrage: ${gewerkName} — Bärenwald`
-    const html = buildHandwerkerMail({
-      handwerker_name: hwName,
-      gewerk_name: gewerkName,
-      positionen: posFiltered.length ? posFiltered : posAll,
-      plz,
-      ort,
-      zeitraum,
-      link,
-      firm,
+    const branding = await getMailBranding(supabaseAdmin)
+    const tpl = mailHandwerkerAnfrage(
+      {
+        name: hwName,
+        gewerk: gewerkName,
+        plz,
+        zeitraum: zeitraum || undefined,
+        positionen: (posFiltered.length ? posFiltered : posAll).map((p) => ({
+          beschreibung: p.beschreibung || p.leistung,
+        })),
+        link,
+      },
+      branding
+    )
+    const mail = await sendMail({
+      typ: 'handwerker_anfrage',
+      an: hwEmail,
+      anName: hwName,
+      betreff: tpl.betreff,
+      html: tpl.html,
+      kundeId: detail.kunde_id,
+      leadId: detail.lead_id,
+      angebotId: detail.id,
     })
-    const mail = await sendHandwerkerAngebotEmail({ to: hwEmail, subject, html })
-    if (!mail.ok) {
-      return { ok: false, message: mail.message, link }
+    if (!mail.success) {
+      return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen', link }
     }
     gesendet = true
-    await logEmail({
-      typ: 'angebot_handwerker',
-      angebot_id: detail.id,
-      zuweisung_id: row.id,
-      to_email: hwEmail,
-      subject,
-    })
   }
 
   const now = new Date().toISOString()
