@@ -4,6 +4,7 @@ import type { Kunde } from '@/lib/types'
 export type KundeListeZeile = Kunde & {
   anzahl_leads: number
   anzahl_auftraege: number
+  gesamt_umsatz: number
 }
 
 export async function loadKundenListe(): Promise<KundeListeZeile[]> {
@@ -21,6 +22,10 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
 
   const { data: leadRows } = await supabase.from('leads').select('kunde_id')
   const { data: aufRows } = await supabase.from('auftraege').select('kunde_id')
+  const { data: reRows } = await supabase
+    .from('rechnungen')
+    .select('kunde_id, brutto, status')
+    .eq('status', 'bezahlt')
 
   const leadCount = new Map<string, number>()
   for (const r of leadRows ?? []) {
@@ -36,12 +41,21 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
     aufCount.set(id, (aufCount.get(id) ?? 0) + 1)
   }
 
+  const umsatzByKunde = new Map<string, number>()
+  for (const r of reRows ?? []) {
+    const id = r.kunde_id as string | null
+    if (!id) continue
+    const b = Number(r.brutto) || 0
+    umsatzByKunde.set(id, (umsatzByKunde.get(id) ?? 0) + b)
+  }
+
   return (kunden ?? []).map((k) => {
     const row = k as Kunde
     return {
       ...row,
       anzahl_leads: leadCount.get(row.id) ?? 0,
       anzahl_auftraege: aufCount.get(row.id) ?? 0,
+      gesamt_umsatz: umsatzByKunde.get(row.id) ?? row.gesamt_umsatz ?? 0,
     }
   })
 }

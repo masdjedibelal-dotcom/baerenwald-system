@@ -76,9 +76,21 @@ export type LeadKundeEmbed = Pick<
 export type LeadListAngebot = {
   id: string
   status: string
+  gesamt_fix?: number | null
   gesamt_min: number | null
   gesamt_max: number | null
   created_at?: string | null
+  pdf_url?: string | null
+}
+
+export type LeadNotizRow = {
+  id: string
+  lead_id: string
+  inhalt: string
+  datei_url: string | null
+  erstellt_von: string | null
+  created_at: string
+  user_profiles?: { name: string } | null
 }
 
 export type Lead = {
@@ -88,8 +100,15 @@ export type Lead = {
   status: LeadStatus
   situation: string | null
   bereiche: string[] | null
+  /** @deprecated Web/API – Anzeige Budget über budget_ca */
   preis_min: number | null
+  /** @deprecated */
   preis_max: number | null
+  budget_ca?: number | null
+  bereiche_sonstiges?: string | null
+  zeitraum_von?: string | null
+  zeitraum_bis?: string | null
+  vor_ort_notizen?: string | null
   plz: string | null
   zeitraum: string | null
   kundentyp: string | null
@@ -126,6 +145,22 @@ export type LeadDetail = Lead & {
   leads_status_history?: LeadStatusHistory[] | null
   vorab_formulare?: VorabFormular[] | null
   lead_timeline?: LeadTimelineRow[] | null
+  /** Besichtigungstermine etc. (gleiche Form wie KalenderTermin) */
+  kalender_termine?: Array<{
+    id: string
+    lead_id: string | null
+    auftrag_id: string | null
+    titel: string
+    beschreibung: string | null
+    typ: string
+    datum: string
+    uhrzeit_von: string | null
+    uhrzeit_bis: string | null
+    adresse: string | null
+    erledigt: boolean
+    created_at: string
+  }> | null
+  lead_notizen?: LeadNotizRow[] | null
 }
 
 export type AngebotStatus =
@@ -200,6 +235,7 @@ export type Angebot = {
   kunde_id: string | null
   status: AngebotStatus
   positionen: AngebotPosition[]
+  gesamt_fix?: number | null
   gesamt_min: number | null
   gesamt_max: number | null
   pdf_url: string | null
@@ -339,15 +375,37 @@ export type AuftragHandwerkerRow = {
   gewerke?: { id?: string; name: string; slug?: string } | null
 }
 
+/** Persistierte Auftragsposition (Tabelle `auftrag_positionen`) */
+export type AuftragPosition = {
+  id: string
+  auftrag_id: string
+  gewerk_slug: string | null
+  gewerk_name: string
+  oberkategorie: string | null
+  unterkategorie: string | null
+  leistung_name: string
+  beschreibung: string | null
+  einheit: string | null
+  menge: number | null
+  preis_fix: number | null
+  lohn_fix: number | null
+  material_fix: number | null
+  handwerker_id: string | null
+  sort_order: number | null
+  created_at?: string | null
+  handwerker?: { id?: string; name: string } | null
+}
+
 export type AngebotEmbedListe = Pick<
   Angebot,
-  'id' | 'gesamt_min' | 'gesamt_max' | 'positionen'
+  'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max' | 'positionen'
 >
 
 export type AuftragListeEintrag = Auftrag & {
-  kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'telefon'> | null
+  kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort'> | null
   angebote?: AngebotEmbedListe | null
   auftrag_handwerker?: AuftragHandwerkerRow[] | null
+  auftrag_positionen?: Pick<AuftragPosition, 'id' | 'gewerk_name'>[] | null
   auftrag_milestones?: Pick<
     AuftragMilestoneRow,
     'id' | 'titel' | 'erledigt' | 'fuer_kunden_sichtbar'
@@ -523,6 +581,7 @@ export type AuftragDetail = Auftrag & {
   kunden?: Kunde | null
   angebote?: (Angebot & { positionen?: unknown }) | null
   auftrag_handwerker?: AuftragHandwerkerRow[] | null
+  auftrag_positionen?: AuftragPosition[] | null
   formular_eintraege?: FormularEintrag[] | null
   kalender_termine?: KalenderTermin[] | null
   auftrag_timeline?: AuftragTimelineEvent[] | null
@@ -672,6 +731,7 @@ export type FormularTemplate = {
   felder: FormularFeld[]
   aktiv: boolean
   created_at?: string
+  updated_at?: string | null
   gewerke?: Gewerk | null
 }
 
@@ -764,7 +824,7 @@ export type Rechnung = {
   created_at: string
   updated_at: string
   kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ'> | null
-  angebote?: Pick<Angebot, 'id' | 'gesamt_min' | 'gesamt_max'> | null
+  angebote?: Pick<Angebot, 'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max'> | null
   auftraege?: Pick<Auftrag, 'id' | 'titel'> | null
 }
 

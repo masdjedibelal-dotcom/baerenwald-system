@@ -1,27 +1,38 @@
-/** Feste Einheiten + Kennzeichen für Freitext-Modus im Modal */
-export const EINHEIT_SONSTIGES = '__sonstiges__'
+/** Select-Wert für Freitext-Einheit im Modal */
+export const EINHEIT_CUSTOM = '__custom__'
 
-export const EINHEIT_VORSCHLAEGE: { value: string; label: string }[] = [
-  { value: 'pauschal', label: 'pauschal' },
-  { value: 'pro m²', label: 'pro m²' },
-  { value: 'pro m² Wandfläche', label: 'pro m² Wandfläche' },
-  { value: 'pro Stück', label: 'pro Stück' },
-  { value: 'pro lfd. m', label: 'pro lfd. m' },
-  { value: 'pro Besuch', label: 'pro Besuch' },
-  { value: 'pro Monat', label: 'pro Monat' },
-  { value: 'pro Saison', label: 'pro Saison' },
-  { value: 'pro Punkt', label: 'pro Punkt' },
-  { value: 'pro m²/Monat', label: 'pro m²/Monat' },
-  { value: EINHEIT_SONSTIGES, label: 'Sonstiges (Freitext)' },
-]
+/** Feste Einheiten (Reihenfolge = Dropdown) */
+export const EINHEIT_VORSCHLAEGE = [
+  'pauschal',
+  'pro m²',
+  'pro m² Wandfläche',
+  'pro Stück',
+  'pro lfd. m',
+  'pro Punkt',
+  'pro Besuch',
+  'pro Monat',
+  'pro Saison',
+  'pro m²/Monat',
+  'Stunden',
+] as const
+
+/** @deprecated Nutze EINHEIT_CUSTOM */
+export const EINHEIT_SONSTIGES = EINHEIT_CUSTOM
+
+export function einheitSelectOptions(): { value: string; label: string }[] {
+  return [
+    ...EINHEIT_VORSCHLAEGE.map((e) => ({ value: e, label: e })),
+    { value: EINHEIT_CUSTOM, label: 'Eigene Einheit…' },
+  ]
+}
 
 export function resolveEinheitwahl(wahl: string, freitext: string): string {
-  if (wahl === EINHEIT_SONSTIGES) return freitext.trim()
+  if (wahl === EINHEIT_CUSTOM) return freitext.trim()
   return wahl.trim()
 }
 
 export function splitEinheitStored(einheit: string): { wahl: string; freitext: string } {
-  const known = EINHEIT_VORSCHLAEGE.filter((x) => x.value !== EINHEIT_SONSTIGES).map((x) => x.value)
+  const known = [...EINHEIT_VORSCHLAEGE] as string[]
   if (known.includes(einheit)) return { wahl: einheit, freitext: '' }
-  return { wahl: EINHEIT_SONSTIGES, freitext: einheit }
+  return { wahl: EINHEIT_CUSTOM, freitext: einheit }
 }

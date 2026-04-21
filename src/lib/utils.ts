@@ -25,16 +25,29 @@ export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ')
 }
 
-export function formatPreis(
-  min?: number | null,
-  max?: number | null
-): string {
-  if (min == null && max == null) return '—'
-  if (min != null && max != null) {
-    return `${min.toLocaleString('de-DE')} – ${max.toLocaleString('de-DE')} €`
+const eur0: Intl.NumberFormatOptions = {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+}
+
+/** Anzeige Gesamt- / Positionspreis: Fix hat Priorität, sonst eine Zahl (kein „X–Y €“). */
+export function formatPreis(fix?: number | null, min?: number | null, max?: number | null): string {
+  if (fix != null && fix > 0) {
+    return `${fix.toLocaleString('de', eur0)} €`
   }
-  if (min != null) return `ab ${min.toLocaleString('de-DE')} €`
-  if (max != null) return `bis ${max.toLocaleString('de-DE')} €`
+  if (min != null && min > 0 && (max == null || max === min)) {
+    return `${min.toLocaleString('de', eur0)} €`
+  }
+  if (min != null && max != null && max > min) {
+    const avg = Math.round((min + max) / 2)
+    return `ca. ${avg.toLocaleString('de', eur0)} €`
+  }
+  if (min != null && min > 0) {
+    return `${min.toLocaleString('de', eur0)} €`
+  }
+  if (max != null && max > 0) {
+    return `${max.toLocaleString('de', eur0)} €`
+  }
   return '—'
 }
 
@@ -195,19 +208,17 @@ export const KANAL_ICONS: Record<string, string> = {
   sonstiges: '•',
 }
 
-/** Kompakte Budget-Anzeige für Listen (z. B. 13k–18k €) */
-export function formatBudget(min?: number | null, max?: number | null): string {
-  if (min == null && max == null) return '—'
-  const fmt = (n: number) => {
-    if (n >= 1000) {
-      const k = n / 1000
-      const s = k % 1 === 0 ? String(k) : k.toLocaleString('de-DE', { maximumFractionDigits: 1 })
-      return `${s}k`
-    }
-    return n.toLocaleString('de-DE')
+/** Budget in Anfragen-Listen (keine Min–Max-Range als „X–Y“). */
+export function formatBudget(budget?: number | null, min?: number | null, max?: number | null): string {
+  if (budget != null && budget > 0) {
+    return `ca. ${budget.toLocaleString('de')} €`
   }
-  if (min != null && max != null) return `${fmt(min)}–${fmt(max)} €`
-  if (min != null) return `ab ${fmt(min)} €`
+  if (min != null && max != null && max > 0) {
+    return `ca. ${Math.round((min + max) / 2).toLocaleString('de')} €`
+  }
+  if (min != null && min > 0) {
+    return `ab ${min.toLocaleString('de')} €`
+  }
   return '—'
 }
 

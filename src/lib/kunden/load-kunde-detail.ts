@@ -7,6 +7,7 @@ export type KundeDetailPayload = Kunde & {
       angebote?: Array<{
         id: string
         status: string
+        gesamt_fix: number | null
         gesamt_min: number | null
         gesamt_max: number | null
         created_at?: string | null
@@ -22,9 +23,22 @@ export type KundeDetailPayload = Kunde & {
     start_datum: string | null
     end_datum: string | null
     created_at: string
+    abnahme_protokoll_url?: string | null
     angebote:
-      | { gesamt_min: number | null; gesamt_max: number | null }
-      | { gesamt_min: number | null; gesamt_max: number | null }[]
+      | {
+          gesamt_fix: number | null
+          gesamt_min: number | null
+          gesamt_max: number | null
+          pdf_url?: string | null
+          id?: string
+        }
+      | {
+          gesamt_fix: number | null
+          gesamt_min: number | null
+          gesamt_max: number | null
+          pdf_url?: string | null
+          id?: string
+        }[]
       | null
     einbehalte?: Array<{
       id: string
@@ -43,6 +57,8 @@ export type KundeDetailPayload = Kunde & {
     pdf_url: string | null
     faellig_am: string | null
     bezahlt_at: string | null
+    auftrag_id?: string | null
+    auftraege?: { titel: string | null } | { titel: string | null }[] | null
   }> | null
   kunden_notizen?: KundenNotizRow[] | null
   kunden_dokumente?: KundenDokumentRow[] | null
@@ -52,6 +68,7 @@ export type KundeDetailPayload = Kunde & {
     to_email: string | null
     subject: string | null
     created_at: string
+    angebot_id?: string | null
   }> | null
 }
 
@@ -64,18 +81,21 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
       *,
       leads(
         id, status, situation, bereiche, created_at, kunde_id, kanal,
-        angebote(id, status, gesamt_min, gesamt_max, created_at, pdf_url)
+        angebote(id, status, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url)
       ),
       auftraege(
         id, titel, status, fortschritt, start_datum, end_datum, created_at,
-        angebote(gesamt_min, gesamt_max),
+        abnahme_protokoll_url,
+        angebote(id, gesamt_fix, gesamt_min, gesamt_max, pdf_url),
         einbehalte(
           id, einbehalt_betrag, status, freigabe_datum,
           handwerker(name, firma)
         )
       ),
       rechnungen(
-        id, rechnungsnummer, status, brutto, rechnungsdatum, pdf_url, faellig_am, bezahlt_at
+        id, rechnungsnummer, status, brutto, rechnungsdatum, pdf_url, faellig_am, bezahlt_at,
+        auftrag_id,
+        auftraege(titel)
       ),
       kunden_notizen(
         id, kunde_id, inhalt, erstellt_von, created_at
@@ -101,14 +121,14 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
   const byMail = em
     ? await supabase
         .from('email_logs')
-        .select('id, typ, to_email, subject, created_at')
+        .select('id, typ, to_email, subject, created_at, angebot_id')
         .eq('to_email', em)
         .order('created_at', { ascending: false })
         .limit(40)
     : { data: [] as KundeDetailPayload['email_logs'] }
   const byKunde = await supabase
     .from('email_logs')
-    .select('id, typ, to_email, subject, created_at')
+    .select('id, typ, to_email, subject, created_at, angebot_id')
     .eq('kunde_id', id)
     .order('created_at', { ascending: false })
     .limit(40)
