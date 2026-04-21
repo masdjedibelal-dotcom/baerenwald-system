@@ -37,12 +37,12 @@ export type HandwerkerZeile = {
 
 export type GewerkOption = { slug: string; name: string }
 
-const COMPLIANCE_CHIPS = [
-  { value: 'alle', label: 'Alle' },
-  { value: 'ok', label: 'OK' },
-  { value: 'warnung', label: 'Warnung' },
-  { value: 'fehlt', label: 'Fehlt' },
-] as const
+function complianceFilterTagLabel(value: string): string {
+  if (value === 'ok') return '✓ OK'
+  if (value === 'warnung') return '⚠️ Warnung'
+  if (value === 'fehlt') return '✗ Fehlt'
+  return value
+}
 
 const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -101,7 +101,7 @@ export function HandwerkerListeClient({
   const [panel, setPanel] = useState<HandwerkerZeile | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [gewerkChip, setGewerkChip] = useState('alle')
-  const [complianceChip, setComplianceChip] = useState('alle')
+  const [complianceFilter, setComplianceFilter] = useState('alle')
   const [q, setQ] = useState('')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
@@ -124,12 +124,12 @@ export function HandwerkerListeClient({
         const matchSlug = names.some((n) => n.includes(slug)) || gewerkeStrRaw(h.gewerke).toLowerCase().includes(slug)
         if (!matchName && !matchSlug) return false
       }
-      if (complianceChip !== 'alle') {
+      if (complianceFilter !== 'alle') {
         const k = normalizeComplianceBadgeKey(h.compliance_status)
-        if (complianceChip === 'ok' && k !== 'ok') return false
-        if (complianceChip === 'warnung' && k !== 'bald_ablaufend') return false
-        if (complianceChip === 'fehlt' && k === 'ok') return false
-        if (complianceChip === 'fehlt' && k === 'bald_ablaufend') return false
+        if (complianceFilter === 'ok' && k !== 'ok') return false
+        if (complianceFilter === 'warnung' && k !== 'bald_ablaufend') return false
+        if (complianceFilter === 'fehlt' && k === 'ok') return false
+        if (complianceFilter === 'fehlt' && k === 'bald_ablaufend') return false
       }
       if (dateRange && !datumInZeitraum(h.created_at, dateRange)) return false
       if (!needle) return true
@@ -138,7 +138,7 @@ export function HandwerkerListeClient({
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [rows, gewerkChip, complianceChip, q, dateRange, gewerkeOptionen])
+  }, [rows, gewerkChip, complianceFilter, q, dateRange, gewerkeOptionen])
 
   const sorted = useMemo(() => {
     const copy = [...filtered]
@@ -158,9 +158,12 @@ export function HandwerkerListeClient({
       const label = gewerkeOptionen.find((g) => g.slug === gewerkChip)?.name ?? gewerkChip
       t.push({ id: 'gw', label, onRemove: () => setGewerkChip('alle') })
     }
-    if (complianceChip !== 'alle') {
-      const label = COMPLIANCE_CHIPS.find((c) => c.value === complianceChip)?.label ?? complianceChip
-      t.push({ id: 'co', label, onRemove: () => setComplianceChip('alle') })
+    if (complianceFilter !== 'alle') {
+      t.push({
+        id: 'co',
+        label: complianceFilterTagLabel(complianceFilter),
+        onRemove: () => setComplianceFilter('alle'),
+      })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -177,13 +180,18 @@ export function HandwerkerListeClient({
       t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
     }
     return t
-  }, [gewerkChip, complianceChip, zeitraum, q, gewerkeOptionen])
+  }, [gewerkChip, complianceFilter, zeitraum, q, gewerkeOptionen])
 
-  const hasActiveFilters = !!(gewerkChip !== 'alle' || complianceChip !== 'alle' || zeitraum !== 'alle' || q.trim())
+  const hasActiveFilters = !!(
+    gewerkChip !== 'alle' ||
+    complianceFilter !== 'alle' ||
+    zeitraum !== 'alle' ||
+    q.trim()
+  )
 
   function resetFilters() {
     setGewerkChip('alle')
-    setComplianceChip('alle')
+    setComplianceFilter('alle')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -223,57 +231,71 @@ export function HandwerkerListeClient({
         }
       />
 
-      <ListFilterBar
-        hideStatusFilter
-        statusLabel="—"
-        statusOptions={[{ value: '', label: '—' }]}
-        statusValue=""
-        onStatusChange={() => {}}
-        zeitraumValue={zeitraum}
-        onZeitraumChange={setZeitraum}
-        showCustomDates={zeitraum === 'benutzerdefiniert'}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-        searchValue={q}
-        onSearchChange={setQ}
-        searchPlaceholder="Name, Firma, E-Mail, Telefon"
-        onReset={resetFilters}
-        hasActiveFilters={hasActiveFilters}
-        tags={filterTags}
-        className="mb-3"
-      />
+      <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:-mx-6 md:px-6">
+        <ListFilterBar
+          hideStatusFilter
+          statusLabel="—"
+          statusOptions={[{ value: '', label: '—' }]}
+          statusValue=""
+          onStatusChange={() => {}}
+          zeitraumValue={zeitraum}
+          onZeitraumChange={setZeitraum}
+          showCustomDates={zeitraum === 'benutzerdefiniert'}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          searchValue={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Name, Firma, E-Mail, Telefon"
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+          tags={filterTags}
+          className="mb-0"
+        />
 
-      <div className="mb-2 space-y-2 border-b border-bw-border pb-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">Gewerk</p>
-        <FilterChips
-          options={gewerkChipOptions}
-          selected={gewerkChip === 'alle' ? [] : [gewerkChip]}
-          onChange={(v) => setGewerkChip(v[0] ?? 'alle')}
-        />
-        <p className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">Compliance</p>
-        <FilterChips
-          options={[...COMPLIANCE_CHIPS]}
-          selected={complianceChip === 'alle' ? [] : [complianceChip]}
-          onChange={(v) => setComplianceChip(v[0] ?? 'alle')}
-          className="scale-95"
-        />
+        <div className="mt-3 flex flex-col gap-2">
+          <div>
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Gewerk</p>
+            <FilterChips
+              options={gewerkChipOptions}
+              selected={gewerkChip === 'alle' ? [] : [gewerkChip]}
+              onChange={(v) => setGewerkChip(v[0] ?? 'alle')}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">Compliance</span>
+            <select
+              id="handwerker-compliance-filter"
+              aria-label="Compliance-Filter"
+              value={complianceFilter}
+              onChange={(e) => setComplianceFilter(e.target.value)}
+              className="input w-auto min-w-[8.5rem] text-sm"
+            >
+              <option value="alle">Alle</option>
+              <option value="ok">✓ OK</option>
+              <option value="warnung">⚠️ Warnung</option>
+              <option value="fehlt">✗ Fehlt</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <MobileSortSelect
-        options={[
-          { field: 'name', label: 'Name' },
-          { field: 'gewerk', label: 'Gewerk' },
-          { field: 'compliance', label: 'Compliance' },
-        ]}
-        currentField={sortField}
-        currentDir="asc"
-        onSort={(f) => {
-          if (!f) setSortField('name')
-          else if (f === 'name' || f === 'gewerk' || f === 'compliance') setSortField(f)
-        }}
-      />
+      <div className="mt-3">
+        <MobileSortSelect
+          options={[
+            { field: 'name', label: 'Name' },
+            { field: 'gewerk', label: 'Gewerk' },
+            { field: 'compliance', label: 'Compliance' },
+          ]}
+          currentField={sortField}
+          currentDir="asc"
+          onSort={(f) => {
+            if (!f) setSortField('name')
+            else if (f === 'name' || f === 'gewerk' || f === 'compliance') setSortField(f)
+          }}
+        />
+      </div>
 
       {sorted.length === 0 ? (
         <EmptyState

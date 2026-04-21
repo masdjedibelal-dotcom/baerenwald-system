@@ -22,6 +22,7 @@ import {
 } from '@/lib/listZeitraum'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { PartnerPanelContent } from '@/components/partner/PartnerPanelContent'
 
 export type PartnerKategorie = {
   id: string
@@ -405,53 +406,7 @@ export function PartnerNetzwerkClient({
         width="md"
       >
         {selected ? (
-          <div className="p-5 space-y-4">
-            <div>
-              <div className="text-base font-semibold text-bw-text">{selected.name}</div>
-              {selected.partner_kategorien?.name ? (
-                <div className="mt-0.5 text-xs text-bw-text-muted">
-                  {selected.partner_kategorien.name}
-                  {selected.subkategorie ? ` · ${selected.subkategorie}` : ''}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="space-y-1">
-              {selected.telefon ? (
-                <a href={`tel:${selected.telefon}`} className="flex items-center gap-2 py-1 text-sm text-bw-link">
-                  📞 {selected.telefon}
-                </a>
-              ) : null}
-              {selected.email ? (
-                <a href={`mailto:${selected.email}`} className="flex items-center gap-2 truncate py-1 text-sm text-bw-link">
-                  ✉️ {selected.email}
-                </a>
-              ) : null}
-              {selected.website ? (
-                <a
-                  href={selected.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 truncate py-1 text-sm text-bw-link"
-                >
-                  🌐 {selected.website}
-                </a>
-              ) : null}
-              {selected.adresse ? (
-                <div className="py-1 text-sm text-bw-text-muted">📍 {selected.adresse}</div>
-              ) : null}
-            </div>
-
-            {selected.notizen ? (
-              <div className="rounded-lg bg-bw-hover p-3 text-sm text-bw-text-muted">{selected.notizen}</div>
-            ) : null}
-
-            <div className="border-t border-bw-border pt-2">
-              <button type="button" onClick={() => openBearbeiten(selected)} className="btn btn-secondary btn-sm w-full">
-                ✏️ Bearbeiten
-              </button>
-            </div>
-          </div>
+          <PartnerPanelContent partner={selected} onBearbeiten={() => openBearbeiten(selected)} />
         ) : null}
       </SidePanel>
 
@@ -461,11 +416,12 @@ export function PartnerNetzwerkClient({
           setBearbeitenOpen(false)
           setEdit(null)
         }}
-        title="Partner bearbeiten"
+        title="Eintrag bearbeiten"
+        size="sm"
       >
         {edit ? (
-          <div className="space-y-4">
-            <div className="form-grid-2 grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
+            <div className="grid gap-3">
               <Input label="Name *" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
               <Select
                 label="Typ"
@@ -507,14 +463,14 @@ export function PartnerNetzwerkClient({
             <label className="block text-sm">
               <span className="mb-1 block text-xs font-medium text-bw-mid">Notizen</span>
               <textarea
-                className="input min-h-[80px]"
+                className="input min-h-[72px]"
                 placeholder="Notizen…"
                 rows={3}
                 value={edit.notizen ?? ''}
                 onChange={(e) => setEdit({ ...edit, notizen: e.target.value })}
               />
             </label>
-            <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
+            <div className="flex justify-end gap-2 border-t border-bw-border pt-3">
               <Button type="button" variant="secondary" onClick={() => setBearbeitenOpen(false)}>
                 Abbrechen
               </Button>
