@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { isRedirectError } from 'next/dist/client/components/redirect'
 import { createClient } from '@/lib/supabase-server'
 import { ensureStandardTemplates } from '@/lib/standard-templates'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
@@ -59,7 +60,8 @@ export default async function DashboardLayout({
         </div>
       </DashboardProviders>
     )
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     redirect('/login')
   }
 }

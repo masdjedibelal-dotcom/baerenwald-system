@@ -21,10 +21,14 @@ export default async function AnfragenPage() {
       kanal,
       situation,
       bereiche,
+      bereiche_sonstiges,
+      budget_ca,
       preis_min,
       preis_max,
       plz,
       zeitraum,
+      zeitraum_von,
+      zeitraum_bis,
       kundentyp,
       funnel_daten,
       kontakt_name,
@@ -36,7 +40,7 @@ export default async function AnfragenPage() {
       created_at,
       updated_at,
       kunden(id, name, email, telefon),
-      angebote(id, status, gesamt_min, gesamt_max, created_at)
+      angebote(id, status, gesamt_fix, gesamt_min, gesamt_max, created_at)
     `
     )
     .order('created_at', { ascending: false })

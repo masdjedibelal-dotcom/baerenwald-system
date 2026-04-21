@@ -53,9 +53,12 @@ export async function deleteKalenderTermin(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const { data: row } = await supabase.from('kalender_termine').select('lead_id').eq('id', id).maybeSingle()
   const { error } = await supabase.from('kalender_termine').delete().eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath('/kalender')
+  const lid = row && typeof (row as { lead_id?: string }).lead_id === 'string' ? (row as { lead_id: string }).lead_id : null
+  if (lid) revalidatePath(`/anfragen/${lid}`)
   return { ok: true }
 }
 

@@ -22,6 +22,7 @@ import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import type {
   AngebotPosition,
   AuftragDetail,
+  AuftragPosition,
   AuftragStatus,
   AuftragTimelineEvent,
   FormularEintrag,
@@ -85,6 +86,10 @@ export async function loadAuftragDetail(id: string): Promise<AuftragDetail | nul
       hw_formular_tabs(
         *,
         hw_formular_einreichungen(*)
+      ),
+      auftrag_positionen(
+        *,
+        handwerker(id, name)
       )
     `
     )
@@ -99,10 +104,14 @@ export async function loadAuftragDetail(id: string): Promise<AuftragDetail | nul
   const milestones = [...(row.auftrag_milestones ?? [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
   )
+  const positionenSorted = [...(row.auftrag_positionen ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  ) as AuftragPosition[]
   return {
     ...row,
     auftrag_timeline: tl,
     auftrag_milestones: milestones,
+    auftrag_positionen: positionenSorted,
     angebote: ang
       ? {
           ...ang,
@@ -160,6 +169,10 @@ async function loadAuftragDetailAdmin(id: string): Promise<AuftragDetail | null>
       hw_formular_tabs(
         *,
         hw_formular_einreichungen(*)
+      ),
+      auftrag_positionen(
+        *,
+        handwerker(id, name)
       )
     `
     )
@@ -174,10 +187,14 @@ async function loadAuftragDetailAdmin(id: string): Promise<AuftragDetail | null>
   const milestones = [...(row.auftrag_milestones ?? [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
   )
+  const positionenSorted = [...(row.auftrag_positionen ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  ) as AuftragPosition[]
   return {
     ...row,
     auftrag_timeline: tl,
     auftrag_milestones: milestones,
+    auftrag_positionen: positionenSorted,
     angebote: ang
       ? {
           ...ang,
@@ -283,6 +300,145 @@ async function setAuftragStatus(
 
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
+  return { ok: true }
+}
+
+export async function updateAuftragStatusFromUi(
+  auftragId: string,
+  status: AuftragStatus
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return setAuftragStatus(auftragId, status)
+}
+
+export async function updateAuftragFortschrittManual(
+  auftragId: string,
+  fortschritt: number
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const v = Math.max(0, Math.min(100, Math.round(fortschritt)))
+  const { error } = await supabase
+    .from('auftraege')
+    .update({ fortschritt: v, updated_at: new Date().toISOString() })
+    .eq('id', auftragId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+  return { ok: true }
+}
+
+export async function updateAuftragProjektFelder(
+  auftragId: string,
+  patch: { titel?: string | null; start_datum?: string | null; end_datum?: string | null }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const db: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (patch.titel !== undefined) db.titel = patch.titel?.trim() ? patch.titel.trim() : null
+  if (patch.start_datum !== undefined) db.start_datum = patch.start_datum?.trim() || null
+  if (patch.end_datum !== undefined) db.end_datum = patch.end_datum?.trim() || null
+  const { error } = await supabase.from('auftraege').update(db).eq('id', auftragId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+  return { ok: true }
+}
+
+export async function addAuftragPosition(
+  auftragId: string,
+  data: {
+    gewerk_slug?: string | null
+    gewerk_name: string
+    oberkategorie?: string | null
+    unterkategorie?: string | null
+    leistung_name: string
+    beschreibung?: string | null
+    einheit?: string | null
+    menge?: number | null
+    preis_fix?: number | null
+    lohn_fix?: number | null
+    material_fix?: number | null
+    handwerker_id?: string | null
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: last } = await supabase
+    .from('auftrag_positionen')
+    .select('sort_order')
+    .eq('auftrag_id', auftragId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const nextOrder = (last?.sort_order ?? 0) + 10
+  const { error } = await supabase.from('auftrag_positionen').insert({
+    auftrag_id: auftragId,
+    gewerk_slug: data.gewerk_slug?.trim() || null,
+    gewerk_name: data.gewerk_name.trim(),
+    oberkategorie: data.oberkategorie?.trim() || null,
+    unterkategorie: data.unterkategorie?.trim() || null,
+    leistung_name: data.leistung_name.trim(),
+    beschreibung: data.beschreibung?.trim() || null,
+    einheit: data.einheit?.trim() || 'pauschal',
+    menge: data.menge ?? 1,
+    preis_fix: data.preis_fix ?? null,
+    lohn_fix: data.lohn_fix ?? null,
+    material_fix: data.material_fix ?? null,
+    handwerker_id: data.handwerker_id?.trim() || null,
+    sort_order: nextOrder,
+  })
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
+  return { ok: true }
+}
+
+export async function updateAuftragPosition(
+  posId: string,
+  auftragId: string,
+  data: Partial<
+    Pick<
+      AuftragPosition,
+      | 'gewerk_slug'
+      | 'gewerk_name'
+      | 'oberkategorie'
+      | 'unterkategorie'
+      | 'leistung_name'
+      | 'beschreibung'
+      | 'einheit'
+      | 'menge'
+      | 'preis_fix'
+      | 'lohn_fix'
+      | 'material_fix'
+      | 'handwerker_id'
+    >
+  >
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const patch: Record<string, unknown> = {}
+  if (data.gewerk_slug !== undefined) patch.gewerk_slug = data.gewerk_slug
+  if (data.gewerk_name !== undefined) patch.gewerk_name = data.gewerk_name
+  if (data.oberkategorie !== undefined) patch.oberkategorie = data.oberkategorie
+  if (data.unterkategorie !== undefined) patch.unterkategorie = data.unterkategorie
+  if (data.leistung_name !== undefined) patch.leistung_name = data.leistung_name
+  if (data.beschreibung !== undefined) patch.beschreibung = data.beschreibung
+  if (data.einheit !== undefined) patch.einheit = data.einheit
+  if (data.menge !== undefined) patch.menge = data.menge
+  if (data.preis_fix !== undefined) patch.preis_fix = data.preis_fix
+  if (data.lohn_fix !== undefined) patch.lohn_fix = data.lohn_fix
+  if (data.material_fix !== undefined) patch.material_fix = data.material_fix
+  if (data.handwerker_id !== undefined) patch.handwerker_id = data.handwerker_id
+  if (!Object.keys(patch).length) return { ok: true }
+  const { error } = await supabase.from('auftrag_positionen').update(patch).eq('id', posId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
+  return { ok: true }
+}
+
+export async function deleteAuftragPosition(
+  posId: string,
+  auftragId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase.from('auftrag_positionen').delete().eq('id', posId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
 }
 

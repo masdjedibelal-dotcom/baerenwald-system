@@ -25,6 +25,7 @@ import type {
   PreisTyp,
 } from '@/lib/types'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { addDaysYmd, insertKalenderAutoTermin } from '@/lib/kalender-auto-termine'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 
@@ -774,7 +775,7 @@ export async function createAuftragFromAngebot(
       abnahme_datum: null,
       abnahme_protokoll_url: null,
       kunden_token: kundenToken,
-      fortschritt: 35,
+      fortschritt: 0,
     })
     .select('id, kunden_token')
     .single()
@@ -793,6 +794,12 @@ export async function createAuftragFromAngebot(
     }))
   )
   if (hErr) return { ok: false, message: hErr.message }
+
+  const posRows = angebotPositionenToAuftragRows(auftragId, pos)
+  if (posRows.length) {
+    const { error: posErr } = await supabaseAdmin.from('auftrag_positionen').insert(posRows)
+    if (posErr) console.warn('[auftrag_positionen]', posErr.message)
+  }
 
   await insertKalenderAutoTermin({
     titel: `Start: ${titel}`,

@@ -140,7 +140,7 @@ export default async function DashboardPage() {
         `
         *,
         kunden(id, name, email, telefon),
-        angebote(id, gesamt_min, gesamt_max, positionen),
+        angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
         auftrag_handwerker(*, handwerker(name), gewerke(name))
       `
       )

@@ -16,13 +16,14 @@ export default async function AuftraegePage() {
     .select(
       `
       *,
-      kunden(id, name, email, telefon),
-      angebote(id, gesamt_min, gesamt_max, positionen),
+      kunden(id, name, email, telefon, adresse, plz, ort),
+      angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
       auftrag_handwerker(
         *,
         handwerker(name),
-        gewerke(name)
-      )
+        gewerke(name, slug)
+      ),
+      auftrag_positionen(id, gewerk_name)
     `
     )
     .order('created_at', { ascending: false })

@@ -153,7 +153,6 @@ export async function loadFormularTemplates(): Promise<FormularTemplate[]> {
   const { data, error } = await supabase
     .from('formular_templates')
     .select('*, gewerke(id, name, slug)')
-    .eq('aktiv', true)
     .order('created_at', { ascending: false })
 
   if (error || !data) return []

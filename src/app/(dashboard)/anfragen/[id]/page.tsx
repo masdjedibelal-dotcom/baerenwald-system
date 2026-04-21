@@ -18,6 +18,7 @@ export default async function AnfrageDetailPage({
       angebote(
         id,
         status,
+        gesamt_fix,
         gesamt_min,
         gesamt_max,
         positionen,
@@ -35,7 +36,8 @@ export default async function AnfrageDetailPage({
         created_at,
         updated_at,
         formular_templates(name, phase, typ, felder)
-      )
+      ),
+      lead_notizen(*)
     `
     )
     .eq('id', params.id)
@@ -53,13 +55,16 @@ export default async function AnfrageDetailPage({
             *,
             user_profiles(name)
           ),
+          lead_timeline(*),
+          kalender_termine(*),
           vorab_formulare(
             id,
             daten,
             created_at,
             updated_at,
             formular_templates(name, phase, typ, felder)
-          )
+          ),
+          lead_notizen(*)
         `
         )
         .eq('id', params.id)
@@ -71,7 +76,7 @@ export default async function AnfrageDetailPage({
       )
       const { data: angebotRows } = await supabase
         .from('angebote')
-        .select('id, status, gesamt_min, gesamt_max, created_at')
+        .select('id, status, gesamt_fix, gesamt_min, gesamt_max, created_at')
         .eq('lead_id', params.id)
         .order('created_at', { ascending: false })
       return (
@@ -81,6 +86,7 @@ export default async function AnfrageDetailPage({
             (angebotRows ?? []) as {
               id: string
               status: string
+              gesamt_fix?: number | null
               gesamt_min: number | null
               gesamt_max: number | null
               created_at: string
@@ -98,7 +104,14 @@ export default async function AnfrageDetailPage({
   )
 
   const angeboteFromLead = lead.angebote as
-    | { id: string; status: string; gesamt_min: number | null; gesamt_max: number | null; created_at: string }[]
+    | {
+        id: string
+        status: string
+        gesamt_fix?: number | null
+        gesamt_min: number | null
+        gesamt_max: number | null
+        created_at: string
+      }[]
     | null
     | undefined
 
@@ -113,7 +126,7 @@ export default async function AnfrageDetailPage({
 
   const { data: angebotRows } = await supabase
     .from('angebote')
-    .select('id, status, gesamt_min, gesamt_max, created_at')
+    .select('id, status, gesamt_fix, gesamt_min, gesamt_max, created_at')
     .eq('lead_id', params.id)
     .order('created_at', { ascending: false })
 

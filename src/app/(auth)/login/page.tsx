@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { Card } from '@/components/ui/Card'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -55,8 +56,8 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-bw-light">München</p>
         </div>
 
-        <div className="card">
-          <div className="card-body space-y-4">
+        <Card>
+          <div className="space-y-4">
             <div>
               <label className="input-label">E-Mail</label>
               <input
@@ -96,7 +97,7 @@ export default function LoginPage() {
               {loading ? 'Anmelden…' : 'Anmelden'}
             </button>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   )
