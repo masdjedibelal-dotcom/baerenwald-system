@@ -52,7 +52,16 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname
   const isPublic =
-    path.startsWith('/login') || path.startsWith('/projekt/') || path.startsWith('/nachtrag/')
+    path.startsWith('/login') ||
+    path.startsWith('/formular/') ||
+    path.startsWith('/projekt/') ||
+    path.startsWith('/status/') ||
+    path.startsWith('/nachtrag/') ||
+    path.startsWith('/handwerker/anfrage/') ||
+    path.startsWith('/api/lead') ||
+    path.startsWith('/api/formular/') ||
+    path.startsWith('/api/handwerker/anfrage/') ||
+    path.startsWith('/api/cron/')
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
