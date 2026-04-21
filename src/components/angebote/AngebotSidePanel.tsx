@@ -178,21 +178,23 @@ export function AngebotSidePanel({
                     ) : null}
                     <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                       <dt className="text-bw-mid">Lohn</dt>
-                      <dd>{formatPreis(p.lohn_min * p.menge, p.lohn_max * p.menge)}</dd>
+                      <dd>{formatPreis(undefined, p.lohn_min * p.menge, p.lohn_max * p.menge)}</dd>
                       <dt className="text-bw-mid">Material</dt>
-                      <dd>{formatPreis(p.material_min * p.menge, p.material_max * p.menge)}</dd>
+                      <dd>{formatPreis(undefined, p.material_min * p.menge, p.material_max * p.menge)}</dd>
                       <dt className="text-bw-mid">Gesamt</dt>
-                      <dd className="font-medium">{formatPreis(p.gesamt_min * p.menge, p.gesamt_max * p.menge)}</dd>
+                      <dd className="font-medium">
+                        {formatPreis(undefined, p.gesamt_min * p.menge, p.gesamt_max * p.menge)}
+                      </dd>
                     </dl>
                   </div>
                 ))}
                 <div className="rounded-lg border border-bw-border bg-bw-bg p-3 text-sm">
                   <p className="text-bw-mid">Netto</p>
-                  <p className="font-medium">{formatPreis(summen.nettoMin, summen.nettoMax)}</p>
+                  <p className="font-medium">{formatPreis(undefined, summen.nettoMin, summen.nettoMax)}</p>
                   <p className="mt-2 text-bw-mid">MwSt ({summen.mwstSatz}%)</p>
-                  <p>{formatPreis(summen.mwstBetragMin, summen.mwstBetragMax)}</p>
+                  <p>{formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}</p>
                   <p className="mt-2 text-bw-mid">Brutto</p>
-                  <p className="font-semibold">{formatPreis(bruttoMin, bruttoMax)}</p>
+                  <p className="font-semibold">{formatPreis(undefined, bruttoMin, bruttoMax)}</p>
                 </div>
               </div>
             ) : null}

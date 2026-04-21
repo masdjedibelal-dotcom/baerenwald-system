@@ -22,6 +22,8 @@ type Props = {
   defaultPlz?: string | null
   leadStatus: LeadStatus
   onSaved?: () => void
+  /** Termin-Typ fest (z. B. nur Besichtigung) */
+  typFixed?: KalenderTermin['typ']
 }
 
 export function TerminModal({
@@ -33,8 +35,9 @@ export function TerminModal({
   defaultPlz,
   leadStatus,
   onSaved,
+  typFixed,
 }: Props) {
-  const [typ, setTyp] = useState<KalenderTermin['typ']>('besichtigung')
+  const [typ, setTyp] = useState<KalenderTermin['typ']>(typFixed ?? 'besichtigung')
   const [datum, setDatum] = useState('')
   const [von, setVon] = useState('')
   const [bis, setBis] = useState('')
@@ -59,14 +62,15 @@ export function TerminModal({
       return
     }
     setSaving(true)
-    const titel = TYP_OPTIONS.find((t) => t.value === typ)?.label ?? 'Termin'
+    const effTyp = typFixed ?? typ
+    const titel = TYP_OPTIONS.find((t) => t.value === effTyp)?.label ?? 'Termin'
     const res = await insertKalenderTermin({
       lead_id: leadId,
       titel,
       datum,
       uhrzeit_von: von.trim() || null,
       uhrzeit_bis: bis.trim() || null,
-      typ,
+      typ: effTyp,
       adresse: adresse.trim() || null,
       beschreibung: notiz.trim() || null,
     })
@@ -97,16 +101,18 @@ export function TerminModal({
   return (
     <Modal open={open} onClose={onClose} title="Termin vereinbaren" size="lg">
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-        <label className="md:col-span-1">
-          <span className="input-label">Typ</span>
-          <select className="input" value={typ} onChange={(e) => setTyp(e.target.value as KalenderTermin['typ'])}>
-            {TYP_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {typFixed ? null : (
+          <label className="md:col-span-1">
+            <span className="input-label">Typ</span>
+            <select className="input" value={typ} onChange={(e) => setTyp(e.target.value as KalenderTermin['typ'])}>
+              {TYP_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           <span className="input-label">Datum</span>
           <input type="date" className="input" value={datum} onChange={(e) => setDatum(e.target.value)} required />

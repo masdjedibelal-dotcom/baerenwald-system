@@ -195,7 +195,7 @@ export function VorOrtAufnahmeClient({
   const websitePreisText =
     websitePreisMin == null && websitePreisMax == null
       ? 'Keine Angabe'
-      : formatPreis(websitePreisMin, websitePreisMax)
+      : formatPreis(undefined, websitePreisMin, websitePreisMax)
 
   async function onSpeichern() {
     if (debounceRef.current) clearTimeout(debounceRef.current)

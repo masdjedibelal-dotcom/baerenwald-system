@@ -14,9 +14,10 @@ import {
 } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import type { AuftragDetail, AngebotPosition } from '@/lib/types'
-import { formatDatum, formatDatumZeit } from '@/lib/utils'
+import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 
 function nachtragPublicUrl(token: string) {
@@ -166,10 +167,7 @@ export function AuftragNachtragBaustoppSection({
             {nachtraege.map((n) => {
               const pos = normalizeAngebotPositionen(n.positionen ?? [])
               const link = n.token ? nachtragPublicUrl(n.token) : ''
-              const summe =
-                n.gesamt_min != null && n.gesamt_max != null
-                  ? `${Number(n.gesamt_min).toLocaleString('de-DE')} – ${Number(n.gesamt_max).toLocaleString('de-DE')} €`
-                  : '—'
+              const summe = formatPreis(undefined, n.gesamt_min, n.gesamt_max)
 
               return (
                 <Card key={n.id} className="space-y-3 p-4 text-sm">
@@ -203,8 +201,7 @@ export function AuftragNachtragBaustoppSection({
                           <span className="min-w-0 truncate">{p.beschreibung}</span>
                           <span className="shrink-0 whitespace-nowrap text-muted">
                             {p.menge} {p.einheit} ·{' '}
-                            {(p.gesamt_min * p.menge).toLocaleString('de-DE')} –{' '}
-                            {(p.gesamt_max * p.menge).toLocaleString('de-DE')} €
+                            {formatPreis(undefined, p.gesamt_min * p.menge, p.gesamt_max * p.menge)}
                           </span>
                         </li>
                       ))}
@@ -382,11 +379,8 @@ export function AuftragNachtragBaustoppSection({
         </section>
       ) : null}
 
-      {nachtragOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold text-ink">Nachtrag erstellen</h3>
-            <div className="mt-3 space-y-3 text-sm">
+      <Modal open={nachtragOpen} onClose={() => setNachtragOpen(false)} title="Nachtrag erstellen" size="md">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 <span className="font-medium">Grund</span>
                 <input
@@ -481,15 +475,15 @@ export function AuftragNachtragBaustoppSection({
                 Speichern
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+      </Modal>
 
-      {baustoppOpen && detail.status === 'in_arbeit' ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold text-ink">Baustopp melden</h3>
-            <div className="mt-3 space-y-3 text-sm">
+      <Modal
+        open={baustoppOpen && detail.status === 'in_arbeit'}
+        onClose={() => setBaustoppOpen(false)}
+        title="Baustopp melden"
+        size="md"
+      >
+            <div className="space-y-3 text-sm">
               <label className="block">
                 <span className="font-medium">Typ</span>
                 <select
@@ -579,9 +573,7 @@ export function AuftragNachtragBaustoppSection({
                 Speichern
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+      </Modal>
     </div>
   )
 }

@@ -51,7 +51,7 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
             <div className="pr-10">
               <h3 className="text-md font-semibold text-bw-text">{v.name}</h3>
               <p className="mt-1 text-sm text-bw-light">
-                {posCount(v)} Positionen · {formatPreis(v.gesamt_min, v.gesamt_max)}
+                {posCount(v)} Positionen · {formatPreis(v.gesamt_fix ?? null, v.gesamt_min, v.gesamt_max)}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link

@@ -12,6 +12,7 @@ import {
 } from '@/app/(dashboard)/auftraege/auftraege-finanz-actions'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import type {
   AuftragHandwerkerRow,
   Eingangsrechnung,
@@ -458,11 +459,8 @@ export function AuftragFinanzenClient({
         </Card>
       </section>
 
-      {erModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold">Eingangsrechnung</h3>
-            <div className="mt-3 space-y-3 text-sm">
+      <Modal open={erModal} onClose={() => setErModal(false)} title="Eingangsrechnung" size="md">
+            <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
               <label className="block">
                 Lieferant *
                 <input list="lief" value={lieferant} onChange={(e) => setLieferant(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2" />
@@ -583,15 +581,10 @@ export function AuftragFinanzenClient({
                 Speichern
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+      </Modal>
 
-      {ebModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold">Einbehalt</h3>
-            <div className="mt-3 space-y-3 text-sm">
+      <Modal open={ebModal} onClose={() => setEbModal(false)} title="Einbehalt" size="md">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 Handwerker
                 <select value={ebHw} onChange={(e) => setEbHw(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2">
@@ -656,18 +649,20 @@ export function AuftragFinanzenClient({
                 Speichern
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+      </Modal>
 
-      {buModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold">Bürgschaft</h3>
-            <p className="mt-1 text-sm text-muted">
+      <Modal
+        open={!!buModal}
+        onClose={() => setBuModal(null)}
+        title="Bürgschaft"
+        size="md"
+      >
+        {buModal ? (
+          <>
+            <p className="-mt-1 mb-3 text-sm text-muted">
               Handwerker: {buModal.handwerker?.name ?? '—'} · Einbehalt: {fmtEuro(buModal.einbehalt_betrag)} €
             </p>
-            <div className="mt-3 space-y-3 text-sm">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 Urkunden-Nummer *
                 <input value={buNr} onChange={(e) => setBuNr(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2" />
@@ -753,9 +748,9 @@ export function AuftragFinanzenClient({
                 Speichern
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
     </div>
   )
 }

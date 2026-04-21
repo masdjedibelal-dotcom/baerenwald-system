@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Card } from '@/components/ui/Card'
 import type { KalenderTermin } from '@/lib/types'
 import { KALENDER_TYP_BG } from '@/lib/utils'
 
@@ -27,13 +28,15 @@ export function DashboardTermineHeute({ termine }: { termine: KalenderTermin[] }
   if (!termine.length) return null
 
   return (
-    <div className="card">
-      <div className="card-header flex items-center justify-between">
-        <span className="card-title">Heute</span>
+    <Card
+      title="Heute"
+      action={
         <Link href="/kalender" className="text-xs text-bw-link hover:underline">
           Kalender →
         </Link>
-      </div>
+      }
+      bodyClassName="p-0"
+    >
       <div className="divide-y divide-bw-border">
         {termine.map((t) => (
           <div key={t.id} className="flex gap-3 px-5 py-3">
@@ -55,6 +58,6 @@ export function DashboardTermineHeute({ termine }: { termine: KalenderTermin[] }
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

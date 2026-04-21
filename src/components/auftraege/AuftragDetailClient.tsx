@@ -2,21 +2,32 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { ArrowLeft, Euro, Eye, Receipt, Send } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { ArrowLeft, Eye, Receipt, Send } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
+import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Accordion } from '@/components/ui/Accordion'
+import { Input } from '@/components/ui/Input'
+import { AuftragPositionenTab } from '@/components/auftraege/AuftragPositionenTab'
+import { AuftragFinanzenClient } from '@/components/auftraege/AuftragFinanzenClient'
+import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import {
   completeAuftragAbnahme,
   createFormularEintragUndEmail,
   startAuftragArbeit,
   setAuftragZurAbnahme,
+  updateAuftragFortschrittManual,
   updateAuftragNotizen,
+  updateAuftragProjektFelder,
+  updateAuftragStatusFromUi,
 } from '@/app/(dashboard)/auftraege/actions'
+import { ensureKundenTokenAction } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { AuftragDokumentationPanel } from '@/components/auftraege/AuftragDokumentationPanel'
+import { projektUrlFromToken } from '@/lib/projekt/kunden-token'
 import { MailUebersicht } from '@/components/auftraege/MailUebersicht'
 import type { EmailLogRow } from '@/app/(dashboard)/auftraege/actions'
 import type {
@@ -25,24 +36,13 @@ import type {
   FormularEintrag,
   FormularFeld,
   FormularTemplate,
+  Preisliste,
 } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import { cn, formatDatum, formatDatumZeit, FORMULAR_PHASE_LABELS } from '@/lib/utils'
+import { cn, formatDatum, formatDatumZeit, formatPreis, FORMULAR_PHASE_LABELS } from '@/lib/utils'
 import { StatusActions } from '@/components/funnel/StatusActions'
 import { toast } from '@/components/ui/app-toast'
-
-const STEPS: { status: AuftragStatus; label: string }[] = [
-  { status: 'offen', label: 'Offen' },
-  { status: 'in_arbeit', label: 'In Arbeit' },
-  { status: 'abnahme', label: 'Abnahme' },
-  { status: 'abgeschlossen', label: 'Abgeschlossen' },
-]
-
-function stepIndex(status: AuftragStatus): number {
-  if (status === 'storniert') return -1
-  const i = STEPS.findIndex((s) => s.status === status)
-  return i >= 0 ? i : 0
-}
+import { Modal } from '@/components/ui/Modal'
 
 function formatFeldwert(v: unknown): string {
   if (v == null) return '—'
@@ -51,14 +51,31 @@ function formatFeldwert(v: unknown): string {
   return String(v)
 }
 
+function PropRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 border-b border-border py-2 text-sm last:border-0">
+      <span className="shrink-0 text-muted">{label}</span>
+      <div className="min-w-0 text-right font-medium text-ink">{children}</div>
+    </div>
+  )
+}
+
+type GewerkOpt = { id: string; name: string; slug: string }
+
 export function AuftragDetailClient({
   detail: initial,
   templates,
   emailLog = [],
+  finanzenPayload = null,
+  gewerke = [],
+  preislisten = [],
 }: {
   detail: AuftragDetail
   templates: FormularTemplate[]
   emailLog?: EmailLogRow[]
+  finanzenPayload?: AuftragFinanzenClientPayload | null
+  gewerke?: GewerkOpt[]
+  preislisten?: Preisliste[]
 }) {
   const router = useRouter()
   const [detail, setDetail] = useState(initial)
@@ -75,16 +92,29 @@ export function AuftragDetailClient({
     phase: 'vorab' | 'update' | 'abnahme'
   } | null>(null)
   const [viewEintrag, setViewEintrag] = useState<FormularEintrag | null>(null)
-  const [tab, setTab] = useState<'uebersicht' | 'formulare' | 'dokumentation' | 'punch'>('uebersicht')
+  const [rtab, setRtab] = useState<'uebersicht' | 'positionen' | 'dokumentation' | 'finanzen'>('uebersicht')
+  const [projektModal, setProjektModal] = useState(false)
+  const [projektTitel, setProjektTitel] = useState('')
+  const [projektStart, setProjektStart] = useState('')
+  const [projektEnde, setProjektEnde] = useState('')
+  const [fortSlider, setFortSlider] = useState(initial.fortschritt ?? 0)
 
   useEffect(() => {
     setDetail(initial)
     setNotizen(initial.notizen ?? '')
+    setProjektTitel(initial.titel ?? '')
+    setProjektStart(initial.start_datum?.slice(0, 10) ?? '')
+    setProjektEnde(initial.end_datum?.slice(0, 10) ?? '')
+    setFortSlider(initial.fortschritt ?? 0)
   }, [initial])
 
   useEffect(() => {
+    setFortSlider(detail.fortschritt ?? 0)
+  }, [detail.fortschritt])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
-    if (window.location.hash === '#dokumentation') setTab('dokumentation')
+    if (window.location.hash === '#dokumentation') setRtab('dokumentation')
   }, [])
 
   const flushNotizen = useCallback(async () => {
@@ -113,8 +143,16 @@ export function AuftragDetailClient({
 
   const kunde = detail.kunden
   const name = kunde?.name ?? 'Auftrag'
-  const pos = normalizeAngebotPositionen(detail.angebote?.positionen ?? [])
-  const idx = stepIndex(detail.status)
+  const angebotPos = useMemo(
+    () => normalizeAngebotPositionen(detail.angebote?.positionen ?? []),
+    [detail.angebote?.positionen]
+  )
+  const hasPos = (detail.auftrag_positionen?.length ?? 0) > 0 || angebotPos.length > 0
+
+  const projektUrl = useMemo(() => {
+    const t = detail.kunden_token?.trim()
+    return t ? projektUrlFromToken(t) : ''
+  }, [detail.kunden_token])
 
   const filteredTemplates = formModal
     ? templates.filter(
@@ -183,11 +221,11 @@ export function AuftragDetailClient({
         return
       }
       if (action === 'auftrag.nachtrag') {
-        setTab('dokumentation')
+        setRtab('dokumentation')
         return
       }
       if (action === 'auftrag.mangel') {
-        setTab('punch')
+        setRtab('dokumentation')
         return
       }
       if (action === 'auftrag.mail_kunde' || action === 'auftrag.abnahme_mail' || action === 'auftrag.termin') {
@@ -199,6 +237,30 @@ export function AuftragDetailClient({
     },
     [detail.id, detail.auftrag_handwerker, router]
   )
+
+  const copyKundenlink = useCallback(() => {
+    if (projektUrl) {
+      void navigator.clipboard.writeText(projektUrl).then(
+        () => toast.success('Link kopiert'),
+        () => toast.error('Kopieren nicht möglich')
+      )
+      return
+    }
+    void (async () => {
+      const r = await ensureKundenTokenAction(detail.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(r.url)
+        toast.success('Link kopiert')
+        router.refresh()
+      } catch {
+        toast.error('Kopieren nicht möglich')
+      }
+    })()
+  }, [detail.id, projektUrl, router])
 
   const submitFormular = () => {
     if (!formModal || !formModal.templateId || !formModal.email.trim()) {
@@ -247,36 +309,6 @@ export function AuftragDetailClient({
         </p>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
-        {(
-          [
-            ['uebersicht', 'Übersicht'],
-            ['formulare', 'Formulare'],
-            ['dokumentation', 'Dokumentation'],
-            ['punch', 'Punch List'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              'min-h-[40px] rounded-lg px-3 text-sm font-medium',
-              tab === id ? 'bg-primary text-white' : 'border border-border text-ink hover:bg-canvas'
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        <Link
-          href={`/auftraege/${detail.id}/finanzen`}
-          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-ink hover:bg-canvas"
-        >
-          <Euro className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-          Finanzen
-        </Link>
-      </div>
-
       {detail.status === 'offen' && !(detail.vor_baubeginn_protokolle?.length) ? (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950">
           <p className="font-semibold">⚠️ Vor-Baubeginn Protokoll fehlt noch</p>
@@ -301,83 +333,215 @@ export function AuftragDetailClient({
           <button
             type="button"
             className="mt-2 text-sm font-medium text-primary underline"
-            onClick={() => setTab('dokumentation')}
+            onClick={() => setRtab('dokumentation')}
           >
             In der Dokumentation verwalten
           </button>
         </div>
       ) : null}
 
-      {tab === 'uebersicht' ? (
-        <>
-      <MailUebersicht detail={detail} emailLog={emailLog} onChanged={() => router.refresh()} />
-
-      <section className="mb-6 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="mb-3 text-sm font-semibold text-ink">Status</h2>
-        {detail.status === 'storniert' ? (
-          <p className="text-sm text-muted">Dieser Auftrag ist storniert.</p>
-        ) : (
-          <ol className="flex flex-wrap gap-2 text-xs md:flex-nowrap md:gap-0 md:text-sm">
-            {STEPS.map((s, i) => (
-              <li key={s.status} className="flex min-w-0 flex-1 items-center">
-                <span
-                  className={cn(
-                    'flex min-h-[36px] min-w-0 flex-1 items-center justify-center rounded-lg px-2 py-1 text-center font-medium',
-                    i <= idx ? 'bg-primary/15 text-primary' : 'bg-canvas text-muted'
-                  )}
+      <div className="lg:grid lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start lg:gap-8">
+        <aside className="mb-8 space-y-3 lg:mb-0">
+          <Accordion title="Fortschritt" defaultOpen>
+            <ProgressBar
+              value={detail.fortschritt ?? 0}
+              label={`Fortschritt: ${detail.fortschritt ?? 0}%`}
+            />
+            {detail.status === 'storniert' ? (
+              <p className="mt-3 text-sm text-muted">Status: storniert</p>
+            ) : (
+              <select
+                value={detail.status}
+                onChange={(e) => {
+                  const s = e.target.value as AuftragStatus
+                  run(() => updateAuftragStatusFromUi(detail.id, s))
+                }}
+                className="input mt-3 w-full"
+              >
+                <option value="offen">Offen</option>
+                <option value="in_arbeit">In Arbeit</option>
+                <option value="abnahme">Abnahme</option>
+                <option value="abgeschlossen">Abgeschlossen</option>
+              </select>
+            )}
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-muted">Fortschritt manuell (0–100%)</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={fortSlider}
+                disabled={detail.status === 'storniert'}
+                onChange={(e) => setFortSlider(Number(e.target.value))}
+                onPointerUp={(e) => {
+                  const v = Number((e.target as HTMLInputElement).value)
+                  run(() => updateAuftragFortschrittManual(detail.id, v))
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+              {detail.status === 'offen' ? (
+                <Button
+                  variant="primary"
+                  loading={pending}
+                  onClick={() => run(() => startAuftragArbeit(detail.id))}
                 >
-                  {s.label}
-                </span>
-                {i < STEPS.length - 1 ? (
-                  <span className="hidden px-1 text-muted md:inline" aria-hidden>
-                    →
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        )}
+                  Arbeiten starten
+                </Button>
+              ) : null}
+              {detail.status === 'in_arbeit' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
+                    onClick={() => setRtab('dokumentation')}
+                  >
+                    🌧️ Baustopp melden
+                  </Button>
+                  <Button
+                    variant="primary"
+                    loading={pending}
+                    onClick={() => run(() => setAuftragZurAbnahme(detail.id))}
+                  >
+                    Zur Abnahme
+                  </Button>
+                </>
+              ) : null}
+              {detail.status === 'abnahme' ? (
+                <Button
+                  variant="primary"
+                  loading={pending}
+                  onClick={() => run(() => completeAuftragAbnahme(detail.id))}
+                >
+                  Abnahme abschließen
+                </Button>
+              ) : null}
+            </div>
+          </Accordion>
 
-        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-          {detail.status === 'offen' ? (
-            <Button
-              variant="primary"
-              loading={pending}
-              onClick={() => run(() => startAuftragArbeit(detail.id))}
-            >
-              Arbeiten starten
+          <Accordion title="Kunde" defaultOpen>
+            {kunde ? (
+              <div className="space-y-0">
+                <PropRow label="Name">
+                  {kunde.id ? (
+                    <Link href={`/kunden/${kunde.id}`} className="text-primary underline">
+                      {kunde.name}
+                    </Link>
+                  ) : (
+                    kunde.name
+                  )}
+                </PropRow>
+                <PropRow label="Telefon">
+                  {kunde.telefon ? (
+                    <a className="text-primary underline" href={`tel:${kunde.telefon}`}>
+                      {kunde.telefon}
+                    </a>
+                  ) : (
+                    '—'
+                  )}
+                </PropRow>
+                <PropRow label="E-Mail">
+                  {kunde.email ? (
+                    <a className="text-primary underline" href={`mailto:${kunde.email}`}>
+                      {kunde.email}
+                    </a>
+                  ) : (
+                    '—'
+                  )}
+                </PropRow>
+                <PropRow label="Adresse">
+                  {[kunde.adresse, kunde.plz, kunde.ort].filter(Boolean).join(', ') || '—'}
+                </PropRow>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Kein Kunde verknüpft.</p>
+            )}
+          </Accordion>
+
+          <Accordion title="Projekt">
+            <div className="space-y-0">
+              <PropRow label="Titel">{detail.titel?.trim() || '—'}</PropRow>
+              <PropRow label="Start">
+                {detail.start_datum ? formatDatum(detail.start_datum) : '—'}
+              </PropRow>
+              <PropRow label="Ende (geplant)">
+                {detail.end_datum ? formatDatum(detail.end_datum) : '—'}
+              </PropRow>
+              <PropRow label="Betreuer">
+                {detail.betreuer_id ? <span className="font-mono text-xs">{detail.betreuer_id.slice(0, 8)}…</span> : '—'}
+              </PropRow>
+            </div>
+            <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => setProjektModal(true)}>
+              Bearbeiten
             </Button>
+          </Accordion>
+
+          {detail.angebote ? (
+            <Accordion title="Angebot">
+              <p className="text-sm font-semibold text-ink">
+                {formatPreis(
+                  detail.angebote.gesamt_fix,
+                  detail.angebote.gesamt_min,
+                  detail.angebote.gesamt_max
+                )}
+              </p>
+              <p className="mt-2 text-xs text-muted">Status: {detail.angebote.status}</p>
+              {detail.angebot_id ? (
+                <Link
+                  href={`/angebote/${detail.angebot_id}`}
+                  className="mt-3 inline-block text-sm font-medium text-primary underline"
+                >
+                  Zum Angebot →
+                </Link>
+              ) : null}
+            </Accordion>
           ) : null}
-          {detail.status === 'in_arbeit' ? (
-            <>
-              <Button
+
+          <Accordion title="Kunden-Link">
+            <Button type="button" variant="secondary" className="w-full" onClick={copyKundenlink}>
+              Link kopieren
+            </Button>
+            <p className="mt-2 text-xs text-muted">
+              Aufrufe: {detail.kunden_seite_aufrufe ?? 0}
+              {projektUrl ? (
+                <>
+                  <br />
+                  <span className="break-all">{projektUrl}</span>
+                </>
+              ) : null}
+            </p>
+          </Accordion>
+        </aside>
+
+        <div className="min-w-0">
+          <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
+            {(
+              [
+                ['uebersicht', 'Übersicht'],
+                ['positionen', 'Positionen'],
+                ['dokumentation', 'Dokumentation'],
+                ['finanzen', 'Finanzen'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
                 type="button"
-                variant="secondary"
-                className="border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
-                onClick={() => setTab('dokumentation')}
+                onClick={() => setRtab(id)}
+                className={cn(
+                  'min-h-[40px] rounded-lg px-3 text-sm font-medium',
+                  rtab === id ? 'bg-primary text-white' : 'border border-border text-ink hover:bg-canvas'
+                )}
               >
-                🌧️ Baustopp melden
-              </Button>
-              <Button
-                variant="primary"
-                loading={pending}
-                onClick={() => run(() => setAuftragZurAbnahme(detail.id))}
-              >
-                Zur Abnahme
-              </Button>
-            </>
-          ) : null}
-          {detail.status === 'abnahme' ? (
-            <Button
-              variant="primary"
-              loading={pending}
-              onClick={() => run(() => completeAuftragAbnahme(detail.id))}
-            >
-              Abnahme abschließen
-            </Button>
-          ) : null}
-        </div>
-      </section>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {rtab === 'uebersicht' ? (
+            <>
+              <MailUebersicht detail={detail} emailLog={emailLog} onChanged={() => router.refresh()} />
 
       {(detail.vor_baubeginn_protokolle ?? []).length > 0 ? (
         <section className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
@@ -412,28 +576,42 @@ export function AuftragDetailClient({
         </section>
       ) : null}
 
-      {kunde ? (
-        <section className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold text-ink">Kundendaten</h2>
-          <Card className="space-y-2 p-4 text-sm">
-            <p className="font-medium text-ink">{kunde.name}</p>
-            {kunde.email ? (
-              <a className="text-primary underline" href={`mailto:${kunde.email}`}>
-                {kunde.email}
-              </a>
-            ) : (
-              <p className="text-muted">—</p>
-            )}
-            {kunde.telefon ? (
-              <a className="text-primary underline" href={`tel:${kunde.telefon}`}>
-                {kunde.telefon}
-              </a>
-            ) : (
-              <p className="text-muted">—</p>
-            )}
-          </Card>
-        </section>
-      ) : null}
+      <section className="mb-6">
+        <h2 className="mb-2 text-lg font-semibold text-ink">Meilensteine</h2>
+        {(detail.auftrag_milestones ?? []).length === 0 ? (
+          <p className="text-sm text-muted">Keine Meilensteine.</p>
+        ) : (
+          <div className="space-y-2">
+            {(detail.auftrag_milestones ?? []).map((m) => (
+              <Card key={m.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                <span className="font-medium text-ink">{m.titel}</span>
+                <span className="text-xs text-muted">
+                  {m.erledigt
+                    ? `Erledigt${m.erledigt_at ? ` · ${formatDatumZeit(m.erledigt_at)}` : ''}`
+                    : 'Offen'}
+                </span>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-6">
+        <h2 className="mb-2 text-lg font-semibold text-ink">Timeline</h2>
+        <Card className="divide-y divide-border p-0">
+          {(detail.auftrag_timeline ?? []).length === 0 ? (
+            <p className="p-4 text-sm text-muted">Keine Einträge.</p>
+          ) : (
+            (detail.auftrag_timeline ?? []).slice(0, 25).map((ev) => (
+              <div key={ev.id} className="px-4 py-3 text-sm">
+                <p className="font-medium text-ink">{ev.titel}</p>
+                <p className="text-xs text-muted">{formatDatumZeit(ev.created_at)}</p>
+                {ev.beschreibung ? <p className="mt-1 text-muted">{ev.beschreibung}</p> : null}
+              </div>
+            ))
+          )}
+        </Card>
+      </section>
 
       <section className="mb-6">
         <h2 className="mb-2 text-lg font-semibold text-ink">Gewerke &amp; Handwerker</h2>
@@ -500,123 +678,157 @@ export function AuftragDetailClient({
         </Card>
       </section>
 
-
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Positionen aus Angebot</h2>
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-card">
-          <table className="w-full min-w-[560px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-canvas text-muted">
-                <th className="px-3 py-2 font-medium">Gewerk</th>
-                <th className="px-3 py-2 font-medium">Beschreibung</th>
-                <th className="px-3 py-2 font-medium">Menge</th>
-                <th className="px-3 py-2 font-medium">Einheit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pos.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-4 text-muted">
-                    Keine Positionen.
-                  </td>
-                </tr>
-              ) : (
-                pos.map((p) => (
-                  <tr key={p.id} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2">{p.gewerk_name}</td>
-                    <td className="px-3 py-2">{(p.beschreibung || p.leistung).trim()}</td>
-                    <td className="px-3 py-2">{p.menge}</td>
-                    <td className="px-3 py-2">{p.einheit}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {detail.kunde_id && hasPos ? (
+        <div className="mb-6">
+          <Link
+            href={`/rechnungen/neu?auftrag_id=${detail.id}`}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white"
+          >
+            <Receipt className="h-4 w-4" aria-hidden />
+            Rechnung erstellen
+          </Link>
         </div>
-        {detail.kunde_id && pos.length > 0 ? (
-          <div className="mt-3">
-            <Link
-              href={`/rechnungen/neu?auftrag_id=${detail.id}`}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white"
-            >
-              <Receipt className="h-4 w-4" aria-hidden />
-              Rechnung erstellen
-            </Link>
-          </div>
-        ) : null}
-      </section>
+      ) : null}
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-semibold text-ink">Notizen</h2>
         <Textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} rows={5} />
       </section>
-        </>
-      ) : null}
+            </>
+          ) : null}
 
-      {tab === 'formulare' ? (
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Formulare</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {(detail.formular_eintraege ?? []).length === 0 ? (
-            <p className="text-sm text-muted">Noch keine Formular-Einträge.</p>
-          ) : (
-            (detail.formular_eintraege ?? []).map((e) => (
-              <Card key={e.id} className="space-y-2 p-4 text-sm">
-                <p className="font-medium text-ink">{e.formular_templates?.name ?? 'Formular'}</p>
-                <p className="text-xs text-muted">
-                  {e.phase ? FORMULAR_PHASE_LABELS[e.phase] ?? e.phase : '—'} ·{' '}
-                  {e.handwerker?.name ?? '—'}
-                </p>
-                <p className="text-xs text-muted">
-                  {e.submitted_at
-                    ? `Eingegangen: ${formatDatumZeit(e.submitted_at)}`
-                    : e.gespeichert_at
-                      ? `Zuletzt gespeichert: ${formatDatumZeit(e.gespeichert_at)}`
-                      : 'Entwurf'}
-                </p>
-                <Button type="button" variant="ghost" onClick={() => setViewEintrag(e)}>
-                  <Eye className="mr-2 inline h-4 w-4" aria-hidden />
-                  Anzeigen
-                </Button>
-              </Card>
-            ))
-          )}
-        </div>
-      </section>
-      ) : null}
+          {rtab === 'positionen' ? (
+            <AuftragPositionenTab
+              auftragId={detail.id}
+              positionen={detail.auftrag_positionen ?? []}
+              gewerke={gewerke}
+              preislisten={preislisten}
+              handwerkerRows={detail.auftrag_handwerker ?? []}
+              onChanged={() => router.refresh()}
+            />
+          ) : null}
 
-      {tab === 'dokumentation' ? (
-        <AuftragDokumentationPanel detail={detail} onChanged={() => router.refresh()} />
-      ) : null}
+          {rtab === 'dokumentation' ? (
+            <div className="space-y-4 pb-8">
+              <Accordion title="Handwerker-Formulare" defaultOpen>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {(detail.formular_eintraege ?? []).length === 0 ? (
+                    <p className="text-sm text-muted">Noch keine Formular-Einträge.</p>
+                  ) : (
+                    (detail.formular_eintraege ?? []).map((e) => (
+                      <Card key={e.id} className="space-y-2 p-4 text-sm">
+                        <p className="font-medium text-ink">{e.formular_templates?.name ?? 'Formular'}</p>
+                        <p className="text-xs text-muted">
+                          {e.phase ? FORMULAR_PHASE_LABELS[e.phase] ?? e.phase : '—'} ·{' '}
+                          {e.handwerker?.name ?? '—'}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {e.submitted_at
+                            ? `Eingegangen: ${formatDatumZeit(e.submitted_at)}`
+                            : e.gespeichert_at
+                              ? `Zuletzt gespeichert: ${formatDatumZeit(e.gespeichert_at)}`
+                              : 'Entwurf'}
+                        </p>
+                        <Button type="button" variant="ghost" onClick={() => setViewEintrag(e)}>
+                          <Eye className="mr-2 inline h-4 w-4" aria-hidden />
+                          Anzeigen
+                        </Button>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </Accordion>
 
-      {tab === 'punch' ? (
-        <section className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold text-ink">Punch List</h2>
-          {(detail.punch_list ?? []).length === 0 ? (
-            <p className="text-sm text-muted">Keine Einträge.</p>
-          ) : (
-            <div className="space-y-2">
-              {(detail.punch_list ?? []).map((p) => (
-                <Card key={p.id} className="p-3 text-sm">
-                  <p className="font-medium">{p.gewerke?.name ?? 'Gewerk'}</p>
-                  <p className="text-muted">{p.beschreibung}</p>
-                  <p className="text-xs text-muted">Status: {p.status}</p>
-                </Card>
-              ))}
+              <Accordion title="Punch List">
+                {(detail.punch_list ?? []).length === 0 ? (
+                  <p className="text-sm text-muted">Keine Einträge.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(detail.punch_list ?? []).map((p) => (
+                      <Card key={p.id} className="p-3 text-sm">
+                        <p className="font-medium">{p.gewerke?.name ?? 'Gewerk'}</p>
+                        <p className="text-muted">{p.beschreibung}</p>
+                        <p className="text-xs text-muted">Status: {p.status}</p>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </Accordion>
+
+              <AuftragDokumentationPanel detail={detail} onChanged={() => router.refresh()} />
             </div>
-          )}
-        </section>
-      ) : null}
+          ) : null}
 
-      {formModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
-          role="dialog"
-          aria-modal
-        >
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-auto p-4">
-            <h3 className="text-lg font-semibold text-ink">Formular-Link senden</h3>
-            <div className="mt-4 space-y-3">
+          {rtab === 'finanzen' ? (
+            <div className="pb-8">
+              {finanzenPayload ? (
+                <AuftragFinanzenClient auftragId={detail.id} {...finanzenPayload} />
+              ) : (
+                <p className="text-sm text-muted">
+                  <Link href={`/auftraege/${detail.id}/finanzen`} className="text-primary underline">
+                    Finanzen-Seite öffnen
+                  </Link>
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <Modal
+        open={projektModal}
+        onClose={() => setProjektModal(false)}
+        title="Projekt bearbeiten"
+        size="md"
+      >
+        <div className="space-y-3">
+          <Input label="Titel" value={projektTitel} onChange={(e) => setProjektTitel(e.target.value)} />
+          <Input
+            label="Start (Datum)"
+            type="date"
+            value={projektStart}
+            onChange={(e) => setProjektStart(e.target.value)}
+          />
+          <Input
+            label="Ende (Datum)"
+            type="date"
+            value={projektEnde}
+            onChange={(e) => setProjektEnde(e.target.value)}
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setProjektModal(false)}>
+            Abbrechen
+          </Button>
+          <Button
+            variant="primary"
+            loading={pending}
+            onClick={() =>
+              run(async () => {
+                const r = await updateAuftragProjektFelder(detail.id, {
+                  titel: projektTitel,
+                  start_datum: projektStart || null,
+                  end_datum: projektEnde || null,
+                })
+                if (r.ok) setProjektModal(false)
+                return r
+              })
+            }
+          >
+            Speichern
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!formModal}
+        onClose={() => setFormModal(null)}
+        title="Formular-Link senden"
+        size="md"
+      >
+        {formModal ? (
+          <>
+            <div className="space-y-3">
               <label className="block text-sm">
                 <span className="font-medium text-ink">Template</span>
                 <select
@@ -675,36 +887,25 @@ export function AuftragDetailClient({
                 Formular-Link senden
               </Button>
             </div>
-          </Card>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
 
-      {viewEintrag ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
-          role="dialog"
-          aria-modal
-        >
-          <Card className="max-h-[90vh] w-full max-w-2xl overflow-auto p-4">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-lg font-semibold text-ink">
-                {viewEintrag.formular_templates?.name ?? 'Formular'}
-              </h3>
-              <button
-                type="button"
-                className="min-h-[44px] min-w-[44px] rounded-lg text-muted hover:bg-canvas"
-                onClick={() => setViewEintrag(null)}
-              >
-                ✕
-              </button>
-            </div>
-            <p className="mt-1 text-sm text-muted">
+      <Modal
+        open={!!viewEintrag}
+        onClose={() => setViewEintrag(null)}
+        title={viewEintrag?.formular_templates?.name ?? 'Formular'}
+        size="lg"
+      >
+        {viewEintrag ? (
+          <>
+            <p className="-mt-1 mb-4 text-sm text-muted">
               {viewEintrag.phase
                 ? FORMULAR_PHASE_LABELS[viewEintrag.phase] ?? viewEintrag.phase
                 : '—'}{' '}
               · {viewEintrag.handwerker?.name ?? '—'}
             </p>
-            <div className="mt-4 space-y-2 border-t border-border pt-4">
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto border-t border-border pt-4">
               {(viewEintrag.formular_templates?.felder ?? []).map((f: FormularFeld) => (
                 <div key={f.id} className="text-sm">
                   <p className="font-medium text-ink">
@@ -740,9 +941,9 @@ export function AuftragDetailClient({
                 <p className="text-muted">{viewEintrag.bemerkungen}</p>
               </div>
             ) : null}
-          </Card>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
 
       <StatusActions
         typ="auftrag"

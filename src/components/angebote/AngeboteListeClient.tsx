@@ -107,7 +107,7 @@ function toExportRow(a: AngebotListeEintrag): Record<string, unknown> {
     kunde: kundenName(a),
     status: ANGEBOT_STATUS_LABELS[a.status] ?? a.status,
     gewerke: tags.join(', ') + (more ? ` +${more}` : ''),
-    gesamt: `${a.gesamt_min ?? '—'}–${a.gesamt_max ?? '—'}`,
+    gesamt: formatPreis(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max),
     handwerker: hw.names.join(', ') + (hw.more ? ` +${hw.more}` : ''),
     created_at: a.created_at,
   }
@@ -176,7 +176,11 @@ export function AngeboteListeClient({ angebote }: { angebote: AngebotListeEintra
         angebot: a,
         name: kundenName(a),
         created_at: a.created_at,
-        gesamt: a.gesamt_min ?? 0,
+        gesamt:
+          a.gesamt_fix ??
+          (a.gesamt_min != null && a.gesamt_max != null
+            ? (a.gesamt_min + a.gesamt_max) / 2
+            : a.gesamt_min ?? a.gesamt_max ?? 0),
         status: a.status,
       })),
     [filtered]
@@ -416,7 +420,9 @@ export function AngeboteListeClient({ angebote }: { angebote: AngebotListeEintra
                             ) : null}
                           </div>
                         ) : null}
-                        <p className="text-sm text-bw-text">{formatPreis(a.gesamt_min, a.gesamt_max)}</p>
+                        <p className="text-sm text-bw-text">
+                          {formatPreis(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                        </p>
                         <p className="text-xs text-bw-text-muted">{formatRelativeDate(a.created_at)}</p>
                       </div>
                       <span className="text-bw-light">→</span>
@@ -516,7 +522,7 @@ export function AngeboteListeClient({ angebote }: { angebote: AngebotListeEintra
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-bw-text">
-                        {formatPreis(a.gesamt_min, a.gesamt_max)}
+                        {formatPreis(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                       </td>
                       <td className="max-w-[200px] px-3 py-3 text-xs text-bw-text-muted">
                         {hw.names.length ? (

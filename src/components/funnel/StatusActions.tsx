@@ -59,7 +59,7 @@ function buildModel(
     if (status === 'neu') {
       primary = { id: 'lead.kontakt', label: '📞 Kontakt aufnehmen', tier: 'primary' }
       secondary.push(
-        { id: 'navigate', label: '📋 Vor-Ort Formular', tier: 'secondary' },
+        { id: 'lead.vor_ort_termin', label: '📋 Vor-Ort Termin', tier: 'secondary' },
         { id: 'navigate', label: '📄 Angebot erstellen', tier: 'secondary' }
       )
       destructive.push({ id: 'lead.nicht_qualifiziert', label: '✗ Nicht qualifiziert', tier: 'destructive' })
@@ -68,10 +68,10 @@ function buildModel(
     if (status === 'kontaktiert') {
       primary = { id: 'navigate', label: '📄 Angebot erstellen', tier: 'primary' }
       secondary.push(
-        { id: 'navigate', label: '📋 Vor-Ort Formular', tier: 'secondary' },
+        { id: 'lead.vor_ort_termin', label: '📋 Vor-Ort Termin', tier: 'secondary' },
         { id: 'lead.termin_anlegen', label: '📅 Termin anlegen', tier: 'secondary' }
       )
-      destructive.push({ id: 'lead.kein_interesse', label: '✗ Kein Interesse', tier: 'destructive' })
+      destructive.push({ id: 'lead.kein_interesse', label: '✗ Nicht qualifiziert', tier: 'destructive' })
       return { info, primary, secondary, destructive, milestone }
     }
     if (status === 'angebot') {
@@ -364,7 +364,7 @@ export function StatusActions({ typ, status, id, data, onAction, disabled, layou
       {/* Desktop */}
       <div
         className={cn(
-          'pointer-events-auto fixed right-4 top-4 z-30 hidden max-w-[min(100vw-2rem,520px)] flex-col gap-2 md:flex',
+          'pointer-events-auto z-header fixed right-4 top-4 hidden max-w-[min(100vw-2rem,520px)] flex-col gap-2 md:flex',
           'rounded-xl border border-border bg-surface/95 p-3 shadow-card backdrop-blur-sm'
         )}
       >
@@ -414,7 +414,7 @@ export function StatusActions({ typ, status, id, data, onAction, disabled, layou
       {/* Mobil */}
       <div
         className={cn(
-          'pointer-events-auto fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-2 px-3 md:hidden',
+          'pointer-events-auto z-header fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col gap-2 px-3 md:hidden',
           'pb-safe'
         )}
       >

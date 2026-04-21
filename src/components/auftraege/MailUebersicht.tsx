@@ -15,6 +15,7 @@ import type { EmailLogRow } from '@/app/(dashboard)/auftraege/actions'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { MailVorschau } from '@/components/ui/MailVorschau'
+import { Modal } from '@/components/ui/Modal'
 import type { AuftragDetail, AuftragTimelineEvent } from '@/lib/types'
 import { projektUrlFromToken } from '@/lib/projekt/kunden-token'
 import { formatDatumZeit } from '@/lib/utils'
@@ -278,31 +279,24 @@ export function MailUebersicht({
         </div>
       </section>
 
-      {showQr ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
-          role="dialog"
-          aria-modal
-        >
-          <Card className="w-full max-w-sm p-4 text-center">
-            <h3 className="text-lg font-semibold">QR-Code</h3>
-            <p className="mt-1 text-xs text-muted">Kundin kann den Code scannen, um den Projekt-Status zu öffnen.</p>
-            {projektUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/api/auftraege/${detail.id}/qrcode`}
-                width={200}
-                height={200}
-                alt="QR-Code Projekt-Link"
-                className="mx-auto mt-4 h-[200px] w-[200px]"
-              />
-            ) : null}
-            <Button type="button" variant="secondary" className="mt-4 w-full" onClick={() => setShowQr(false)}>
-              Schließen
-            </Button>
-          </Card>
-        </div>
-      ) : null}
+      <Modal open={showQr} onClose={() => setShowQr(false)} title="QR-Code" size="sm">
+        <p className="text-center text-xs text-muted">
+          Kundin kann den Code scannen, um den Projekt-Status zu öffnen.
+        </p>
+        {projektUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/auftraege/${detail.id}/qrcode`}
+            width={200}
+            height={200}
+            alt="QR-Code Projekt-Link"
+            className="mx-auto mt-4 h-[200px] w-[200px]"
+          />
+        ) : null}
+        <Button type="button" variant="secondary" className="mt-4 w-full" onClick={() => setShowQr(false)}>
+          Schließen
+        </Button>
+      </Modal>
 
       {preview ? (
         <MailVorschau

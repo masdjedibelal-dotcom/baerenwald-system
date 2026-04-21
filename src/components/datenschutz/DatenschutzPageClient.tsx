@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import type {
   DatenschutzAnfrageRow,
   DatenschutzFaelligRow,
@@ -423,16 +423,14 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
       </section>
       ) : null}
 
-      {/* Frist-Modal */}
-      {fristModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-ink">Frist bearbeiten</h3>
-              <button type="button" className="rounded p-2 text-muted hover:bg-canvas" onClick={() => setFristModal(null)}>
-                <X className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
+      <Modal
+        open={!!fristModal}
+        onClose={() => setFristModal(null)}
+        title="Frist bearbeiten"
+        size="md"
+      >
+        {fristModal ? (
+          <>
             <p className="mb-3 text-sm text-muted">{fristModal.bezeichnung}</p>
             <Input
               label="Frist (Monate)"
@@ -457,20 +455,18 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
                 Abbrechen
               </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
 
-      {/* Löschen bestätigen */}
-      {delModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-4 shadow-card">
-            <h3 className="mb-2 text-base font-semibold text-ink">Löschung bestätigen</h3>
-            <p className="mb-3 text-sm text-ink">
+      <Modal open={!!delModal} onClose={() => setDelModal(null)} title="Löschung bestätigen" size="md">
+        {delModal ? (
+          <>
+            <p className="text-sm text-ink">
               {delModal.beschreibung} für <strong>{delModal.titel}</strong> wirklich ausführen? Dieser Vorgang kann nicht
               rückgängig gemacht werden (Fotos werden aus dem Speicher entfernt, personenbezogene Felder anonymisiert).
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" variant="danger" loading={busy === 'del'} onClick={() => void runLoeschen()}>
                 Endgültig ausführen
               </Button>
@@ -478,15 +474,18 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
                 Abbrechen
               </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
 
-      {/* Aufschub */}
-      {aufschubModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-4 shadow-card">
-            <h3 className="mb-2 text-base font-semibold text-ink">Zurückstellung +12 Monate</h3>
+      <Modal
+        open={!!aufschubModal}
+        onClose={() => setAufschubModal(null)}
+        title="Zurückstellung +12 Monate"
+        size="md"
+      >
+        {aufschubModal ? (
+          <>
             <p className="mb-2 text-sm text-muted">{aufschubModal.titel}</p>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-ink">Begründung (Pflicht)</span>
@@ -504,97 +503,81 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
                 Abbrechen
               </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
 
-      {/* Anfrage neu */}
-      {anfrageOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-ink">Anfrage erfassen</h3>
-              <button type="button" className="rounded p-2 text-muted hover:bg-canvas" onClick={() => setAnfrageOpen(false)}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <label className="mb-3 block text-sm font-medium text-ink">
-              Typ
-              <select
-                className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-ink"
-                value={anfrageTyp}
-                onChange={(e) => setAnfrageTyp(e.target.value as typeof anfrageTyp)}
-              >
-                <option value="loeschung">Löschungsanfrage (Art. 17)</option>
-                <option value="auskunft">Auskunftsanfrage (Art. 15)</option>
-                <option value="einschraenkung">Einschränkung (Art. 18)</option>
-              </select>
-            </label>
-            <div className="space-y-3">
-              <Input label="Name" name="an_name" value={anfrageName} onChange={(e) => setAnfrageName(e.target.value)} />
-              <Input
-                label="E-Mail"
-                name="an_email"
-                type="email"
-                value={anfrageEmail}
-                onChange={(e) => setAnfrageEmail(e.target.value)}
-              />
-              <label className="block text-sm">
-                <span className="mb-1 block font-medium text-ink">Beschreibung</span>
-                <textarea
-                  className="min-h-[80px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                  value={anfrageDesc}
-                  onChange={(e) => setAnfrageDesc(e.target.value)}
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button type="button" variant="primary" loading={busy === 'anfrage'} onClick={() => void runCreateAnfrage()}>
-                Speichern
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setAnfrageOpen(false)}>
-                Abbrechen
-              </Button>
-            </div>
-          </div>
+      <Modal open={anfrageOpen} onClose={() => setAnfrageOpen(false)} title="Anfrage erfassen" size="md">
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+          <label className="block text-sm font-medium text-ink">
+            Typ
+            <select
+              className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-ink"
+              value={anfrageTyp}
+              onChange={(e) => setAnfrageTyp(e.target.value as typeof anfrageTyp)}
+            >
+              <option value="loeschung">Löschungsanfrage (Art. 17)</option>
+              <option value="auskunft">Auskunftsanfrage (Art. 15)</option>
+              <option value="einschraenkung">Einschränkung (Art. 18)</option>
+            </select>
+          </label>
+          <Input label="Name" name="an_name" value={anfrageName} onChange={(e) => setAnfrageName(e.target.value)} />
+          <Input
+            label="E-Mail"
+            name="an_email"
+            type="email"
+            value={anfrageEmail}
+            onChange={(e) => setAnfrageEmail(e.target.value)}
+          />
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-ink">Beschreibung</span>
+            <textarea
+              className="min-h-[80px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              value={anfrageDesc}
+              onChange={(e) => setAnfrageDesc(e.target.value)}
+            />
+          </label>
         </div>
-      ) : null}
+        <div className="mt-4 flex gap-2">
+          <Button type="button" variant="primary" loading={busy === 'anfrage'} onClick={() => void runCreateAnfrage()}>
+            Speichern
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => setAnfrageOpen(false)}>
+            Abbrechen
+          </Button>
+        </div>
+      </Modal>
 
-      {/* Anfrage bearbeiten */}
-      {editAnfrage ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-ink">Anfrage bearbeiten</h3>
-              <button type="button" className="rounded p-2 text-muted hover:bg-canvas" onClick={() => setEditAnfrage(null)}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal open={!!editAnfrage} onClose={() => setEditAnfrage(null)} title="Anfrage bearbeiten" size="lg">
+        {editAnfrage ? (
+          <>
             <p className="mb-3 text-sm text-muted">
               {editAnfrage.name} · {editAnfrage.email} · Eingang {editAnfrage.created_at.slice(0, 10)} — Frist: 30 Tage
               (DSGVO)
             </p>
-            <label className="mb-3 block text-sm">
-              <span className="mb-1 block font-medium text-ink">Notizen (Prüfung / Mitteilung)</span>
-              <textarea
-                className="min-h-[120px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                value={editNotizen}
-                onChange={(e) => setEditNotizen(e.target.value)}
-              />
-            </label>
-            <label className="mb-4 block text-sm font-medium text-ink">
-              Status
-              <select
-                className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3"
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as typeof editStatus)}
-              >
-                <option value="offen">Offen</option>
-                <option value="in_bearbeitung">In Bearbeitung</option>
-                <option value="erledigt">Erledigt</option>
-              </select>
-            </label>
-            <div className="flex gap-2">
+            <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-ink">Notizen (Prüfung / Mitteilung)</span>
+                <textarea
+                  className="min-h-[120px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                  value={editNotizen}
+                  onChange={(e) => setEditNotizen(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-medium text-ink">
+                Status
+                <select
+                  className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3"
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as typeof editStatus)}
+                >
+                  <option value="offen">Offen</option>
+                  <option value="in_bearbeitung">In Bearbeitung</option>
+                  <option value="erledigt">Erledigt</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
               <Button type="button" variant="primary" loading={busy === 'edit-anfrage'} onClick={() => void runSaveAnfrage()}>
                 Speichern
               </Button>
@@ -602,9 +585,9 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
                 Abbrechen
               </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
     </div>
   )
 }

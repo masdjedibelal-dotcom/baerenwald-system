@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -151,12 +151,19 @@ function SortableFeldRow({
 export function FormularTemplateForm({
   initial,
   gewerke,
+  embedded = false,
+  onClose,
+  onSaved,
 }: {
   initial: FormularTemplate | null
   gewerke: Gewerk[]
+  embedded?: boolean
+  onClose?: () => void
+  onSaved?: () => void
 }) {
   const router = useRouter()
   const isNew = !initial
+  const [panelTab, setPanelTab] = useState<'felder' | 'einstellungen'>('felder')
   const [name, setName] = useState(initial?.name ?? '')
   const [gewerkId, setGewerkId] = useState(initial?.gewerk_id ?? '')
   const [typ, setTyp] = useState<FormularTemplate['typ']>(initial?.typ ?? 'handwerker')
@@ -178,6 +185,19 @@ export function FormularTemplateForm({
   const [flOpts, setFlOpts] = useState('')
 
   const labelInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!embedded || !initial) return
+    setName(initial.name)
+    setGewerkId(initial.gewerk_id ?? '')
+    setTyp(initial.typ ?? 'handwerker')
+    setSubtyp(initial.subtyp ?? 'sonstiges')
+    setPhase((initial.phase ?? 'vorab') as NonNullable<FormularTemplate['phase']>)
+    setAktiv(initial.aktiv ?? true)
+    setFelder(initial.felder ?? [])
+    setExpandedId(null)
+    setErr(null)
+  }, [embedded, initial])
 
   const previewDaten = useMemo(() => {
     const o: Record<string, unknown> = {}
@@ -277,7 +297,10 @@ export function FormularTemplateForm({
         return
       }
       if (isNew) router.replace(`/formulare/${res.id}/bearbeiten`)
-      else router.refresh()
+      else {
+        router.refresh()
+        onSaved?.()
+      }
     })
   }
 
@@ -294,76 +317,57 @@ export function FormularTemplateForm({
     })
   }
 
-  return (
-    <div className="pb-8">
-      <PageHeader
-        title={isNew ? 'Neues Template' : 'Template bearbeiten'}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
-              Vorschau
-            </Button>
-            <Link href="/formulare" className="text-sm font-medium text-bw-link">
-              Zur Liste
-            </Link>
-          </div>
-        }
+  const grundinfoCard = (
+    <Card className="space-y-4 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Grundinfo</p>
+      <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} required />
+      <Select
+        label="Subtyp"
+        name="subtyp"
+        value={subtyp}
+        onChange={(e) => setSubtyp(e.target.value)}
+        options={FORMULAR_SUBTYP_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
       />
+      <Select
+        label="Phase"
+        name="phase"
+        value={phase}
+        onChange={(e) => setPhase(e.target.value as NonNullable<FormularTemplate['phase']>)}
+        options={[
+          { value: 'vorab', label: FORMULAR_PHASE_LABELS.vorab },
+          { value: 'update', label: FORMULAR_PHASE_LABELS.update },
+          { value: 'abnahme', label: FORMULAR_PHASE_LABELS.abnahme },
+        ]}
+      />
+      <Select
+        label="Zielgruppe"
+        name="typ"
+        value={typ}
+        onChange={(e) => setTyp(e.target.value as FormularTemplate['typ'])}
+        options={[
+          { value: 'handwerker', label: 'Handwerker' },
+          { value: 'betreuer', label: 'Betreuer (Vor-Ort)' },
+        ]}
+      />
+      <Select
+        label="Gewerk (optional)"
+        name="gewerk"
+        value={gewerkId}
+        onChange={(e) => setGewerkId(e.target.value)}
+        options={[
+          { value: '', label: 'Alle Gewerke' },
+          ...gewerke.filter((g) => g.aktiv).map((g) => ({ value: g.id, label: g.name })),
+        ]}
+      />
+      <label className="flex items-center gap-2 text-sm text-bw-text">
+        <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
+        Aktiv
+      </label>
+    </Card>
+  )
 
-      {err ? (
-        <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
-      ) : null}
-
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1 space-y-6">
-          <Card className="space-y-4 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Grundinfo</p>
-            <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} required />
-            <Select
-              label="Subtyp"
-              name="subtyp"
-              value={subtyp}
-              onChange={(e) => setSubtyp(e.target.value)}
-              options={FORMULAR_SUBTYP_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
-            />
-            <Select
-              label="Phase"
-              name="phase"
-              value={phase}
-              onChange={(e) => setPhase(e.target.value as NonNullable<FormularTemplate['phase']>)}
-              options={[
-                { value: 'vorab', label: FORMULAR_PHASE_LABELS.vorab },
-                { value: 'update', label: FORMULAR_PHASE_LABELS.update },
-                { value: 'abnahme', label: FORMULAR_PHASE_LABELS.abnahme },
-              ]}
-            />
-            <Select
-              label="Zielgruppe"
-              name="typ"
-              value={typ}
-              onChange={(e) => setTyp(e.target.value as FormularTemplate['typ'])}
-              options={[
-                { value: 'handwerker', label: 'Handwerker' },
-                { value: 'betreuer', label: 'Betreuer (Vor-Ort)' },
-              ]}
-            />
-            <Select
-              label="Gewerk (optional)"
-              name="gewerk"
-              value={gewerkId}
-              onChange={(e) => setGewerkId(e.target.value)}
-              options={[
-                { value: '', label: 'Alle Gewerke' },
-                ...gewerke.filter((g) => g.aktiv).map((g) => ({ value: g.id, label: g.name })),
-              ]}
-            />
-            <label className="flex items-center gap-2 text-sm text-bw-text">
-              <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
-              Aktiv
-            </label>
-          </Card>
-
-          <Card className="p-4">
+  const felderCard = (
+    <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-bw-text">Felder</h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -452,26 +456,29 @@ export function FormularTemplateForm({
                 )}
               </SortableContext>
             </DndContext>
-          </Card>
+    </Card>
+  )
 
-          <div className="flex flex-wrap gap-2">
-            <Link href="/formulare" className="btn btn-secondary inline-flex items-center justify-center">
-              Abbrechen
-            </Link>
-            <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>
-              Vorschau
-            </Button>
-            <Button type="button" variant="primary" onClick={saveAll} loading={pending}>
-              Speichern
-            </Button>
-            {!isNew ? (
-              <Button type="button" variant="danger" onClick={onDelete} disabled={pending}>
-                Deaktivieren
-              </Button>
-            ) : null}
-          </div>
-        </div>
+  const pageActionBar = !embedded ? (
+    <div className="flex flex-wrap gap-2">
+      <Link href="/formulare" className="btn btn-secondary inline-flex items-center justify-center">
+        Abbrechen
+      </Link>
+      <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>
+        Vorschau
+      </Button>
+      <Button type="button" variant="primary" onClick={saveAll} loading={pending}>
+        Speichern
+      </Button>
+      {!isNew ? (
+        <Button type="button" variant="danger" onClick={onDelete} disabled={pending}>
+          Deaktivieren
+        </Button>
+      ) : null}
+    </div>
+  ) : null
 
+  const previewAside = !embedded ? (
         <aside className="w-full shrink-0 space-y-3 xl:sticky xl:top-20 xl:w-[340px]">
           <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Live-Vorschau</p>
           <div className="flex gap-2">
@@ -515,6 +522,74 @@ export function FormularTemplateForm({
             </div>
           )}
         </aside>
+  ) : null
+
+  const embeddedFooter = embedded ? (
+    <div className="flex flex-wrap gap-2 border-t border-bw-border pt-4">
+      <Button type="button" variant="secondary" onClick={() => onClose?.()}>
+        Abbrechen
+      </Button>
+      <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>
+        Vorschau
+      </Button>
+      <Button type="button" variant="primary" onClick={saveAll} loading={pending}>
+        Speichern
+      </Button>
+      {!isNew ? (
+        <Button type="button" variant="danger" onClick={onDelete} disabled={pending}>
+          Deaktivieren
+        </Button>
+      ) : null}
+    </div>
+  ) : null
+
+  return (
+    <div className={cn('pb-8', embedded && 'pb-2')}>
+      {!embedded ? (
+        <PageHeader
+          title={isNew ? 'Neues Template' : 'Template bearbeiten'}
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
+                Vorschau
+              </Button>
+              <Link href="/formulare" className="text-sm font-medium text-bw-link">
+                Zur Liste
+              </Link>
+            </div>
+          }
+        />
+      ) : (
+        <div className="mb-4 flex flex-wrap gap-1 border-b border-bw-border">
+          <button
+            type="button"
+            className={cn('tab', panelTab === 'felder' && 'active')}
+            onClick={() => setPanelTab('felder')}
+          >
+            Felder
+          </button>
+          <button
+            type="button"
+            className={cn('tab', panelTab === 'einstellungen' && 'active')}
+            onClick={() => setPanelTab('einstellungen')}
+          >
+            Einstellungen
+          </button>
+        </div>
+      )}
+
+      {err ? (
+        <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
+      ) : null}
+
+      <div className={cn('flex flex-col gap-6', !embedded && 'xl:flex-row xl:items-start')}>
+        <div className="min-w-0 flex-1 space-y-6">
+          {!embedded || panelTab === 'einstellungen' ? grundinfoCard : null}
+          {!embedded || panelTab === 'felder' ? felderCard : null}
+          {pageActionBar}
+          {embeddedFooter}
+        </div>
+        {previewAside}
       </div>
 
       <FormularVorschauModal

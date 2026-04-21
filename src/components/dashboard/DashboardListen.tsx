@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo } from 'react'
+import { Card } from '@/components/ui/Card'
 import { Tabs } from '@/components/ui/Tabs'
 import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { useSort } from '@/hooks/useSort'
@@ -47,7 +48,7 @@ export function DashboardListen({
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
   return (
-    <div className="card overflow-hidden">
+    <Card flush className="overflow-hidden">
       <Tabs
         tabs={[
           { id: 'anfragen', label: 'Anfragen', count: anfragen.length },
@@ -147,6 +148,6 @@ export function DashboardListen({
           </div>
         </div>
       </Tabs>
-    </div>
+    </Card>
   )
 }

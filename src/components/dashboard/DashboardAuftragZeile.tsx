@@ -1,9 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { SidePanel } from '@/components/ui/SidePanel'
-import { Button } from '@/components/ui/Button'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { formatDatum, formatPreis, AUFTRAG_STATUS_LABELS } from '@/lib/utils'
@@ -21,7 +20,6 @@ function handwerkerNamen(a: AuftragListeEintrag) {
 }
 
 export function DashboardAuftragZeile({ auftrag }: { auftrag: AuftragListeEintrag }) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const titel = auftrag.titel?.trim() || kundenName(auftrag)
   const pct = auftrag.fortschritt ?? 0
@@ -68,20 +66,21 @@ export function DashboardAuftragZeile({ auftrag }: { auftrag: AuftragListeEintra
           {auftrag.angebote ? (
             <p>
               Angebot:{' '}
-              {formatPreis(auftrag.angebote.gesamt_min ?? null, auftrag.angebote.gesamt_max ?? null)}
+              {formatPreis(
+                auftrag.angebote.gesamt_fix ?? null,
+                auftrag.angebote.gesamt_min ?? null,
+                auftrag.angebote.gesamt_max ?? null
+              )}
             </p>
           ) : null}
           <p className="text-xs text-bw-text-muted">{AUFTRAG_STATUS_LABELS[auftrag.status]}</p>
-          <Button
-            variant="primary"
-            fullWidth
-            onClick={() => {
-              router.push(`/auftraege/${auftrag.id}`)
-              setOpen(false)
-            }}
+          <Link
+            href={`/auftraege/${auftrag.id}`}
+            className="inline-block text-sm font-medium text-bw-link hover:underline"
+            onClick={() => setOpen(false)}
           >
-            Vollständig öffnen
-          </Button>
+            Zum Auftrag →
+          </Link>
         </div>
       </SidePanel>
     </>

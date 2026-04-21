@@ -3,28 +3,31 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, CalendarPlus, ClipboardList, FileText, X } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, ClipboardList } from 'lucide-react'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
+import { Modal } from '@/components/ui/Modal'
 import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
-import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
-import { SidePanel } from '@/components/ui/SidePanel'
+import { TerminModal } from '@/components/anfragen/TerminModal'
+import { VorOrtTermineTab, LeadNotizenListeTab, AngeboteListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { toast } from '@/components/ui/app-toast'
 import {
-  insertKalenderTermin,
+  updateLeadKontakt,
   updateLeadNotizen,
+  updateLeadProjekt,
   updateLeadStatus,
 } from '@/app/(dashboard)/anfragen/actions'
 import { StatusActions } from '@/components/funnel/StatusActions'
 import type {
-  AngebotStatus,
   FormularFeld,
   KalenderTermin,
   LeadDetail,
+  LeadKanal,
+  LeadNotizRow,
   LeadStatus,
   VorabFormular,
 } from '@/lib/types'
@@ -33,9 +36,11 @@ import {
   FORMULAR_PHASE_LABELS,
   SITUATION_LABELS,
   STATUS_LABELS,
+  formatBudget,
   formatDatum,
   formatDatumZeit,
   formatPreis,
+  cn,
 } from '@/lib/utils'
 import { isVorOrtStruktur, type VorOrtFormDaten } from '@/lib/vorab-angebot-from-vorab'
 import {
@@ -44,6 +49,20 @@ import {
   fachdetailKeysForBereich,
   situationLabel,
 } from '@/lib/vorab-formular-config'
+
+const BEREICH_KEYS = Object.keys(BEREICH_LABELS) as string[]
+
+function formatLeadZeitraum(l: LeadDetail) {
+  const von = l.zeitraum_von ? String(l.zeitraum_von).slice(0, 10) : ''
+  const bis = l.zeitraum_bis ? String(l.zeitraum_bis).slice(0, 10) : ''
+  if (von || bis) {
+    const a = von ? new Date(von).toLocaleDateString('de') : ''
+    const b = bis ? new Date(bis).toLocaleDateString('de') : ''
+    if (a && b && von !== bis) return `${a} – ${b}`
+    return a || b || '—'
+  }
+  return l.zeitraum?.trim() || '—'
+}
 
 const STATUS_FLOW: LeadStatus[] = [
   'neu',
@@ -94,6 +113,7 @@ function komplexitaetLabel(k: string): string {
 type AngebotKurz = {
   id: string
   status: string
+  gesamt_fix?: number | null
   gesamt_min: number | null
   gesamt_max: number | null
   created_at: string
@@ -108,7 +128,6 @@ export function AnfrageDetailClient({
 }) {
   const router = useRouter()
   const [lead, setLead] = useState(initial)
-  const [angebotPanelId, setAngebotPanelId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [statusErr, setStatusErr] = useState<string | null>(null)
   const [notizen, setNotizen] = useState(initial.notizen ?? '')
@@ -116,15 +135,28 @@ export function AnfrageDetailClient({
   const notizenSaved = useRef(initial.notizen ?? '')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [terminOpen, setTerminOpen] = useState(false)
-  const [terminSaving, setTerminSaving] = useState(false)
 
-  const [terminTitel, setTerminTitel] = useState('')
-  const [terminDatum, setTerminDatum] = useState('')
-  const [terminVon, setTerminVon] = useState('')
-  const [terminBis, setTerminBis] = useState('')
-  const [terminTyp, setTerminTyp] = useState<KalenderTermin['typ']>('besichtigung')
-  const [terminAdresse, setTerminAdresse] = useState('')
-  const [terminNotiz, setTerminNotiz] = useState('')
+  type DetailTab = 'details' | 'vorort' | 'notizen' | 'aktiv' | 'angebot'
+  const [tab, setTab] = useState<DetailTab>('details')
+  const [kontaktModal, setKontaktModal] = useState(false)
+  const [projektModal, setProjektModal] = useState(false)
+  const [kontaktForm, setKontaktForm] = useState({
+    name: '',
+    telefon: '',
+    email: '',
+    plz: '',
+    kundentyp: 'privat',
+    kanal: 'telefon' as LeadKanal,
+  })
+  const [projektForm, setProjektForm] = useState({
+    situation: '',
+    bereiche: {} as Record<string, boolean>,
+    sonstigesText: '',
+    budget: '',
+    zeitraumTyp: null as 'tag' | 'zeitraum' | null,
+    zeitraumVon: '',
+    zeitraumBis: '',
+  })
 
   useEffect(() => {
     setLead(initial)
@@ -177,14 +209,130 @@ export function AnfrageDetailClient({
     const rec = typeof fd === 'object' && fd !== null ? (fd as Record<string, unknown>) : {}
     const angebotId = typeof rec.angebot_id === 'string' ? rec.angebot_id : undefined
     const auftragId = typeof rec.auftrag_id === 'string' ? rec.auftrag_id : undefined
+    const angeboteArr = lead.angebote
+    const firstAngebot =
+      Array.isArray(angeboteArr) && angeboteArr[0]?.id ? angeboteArr[0].id : angebotId
     return {
-      angebot_href: angebotId ? `/angebote/${angebotId}` : undefined,
-      angebot_id: angebotId,
+      angebot_href: firstAngebot ? `/angebote/${firstAngebot}` : angebotId ? `/angebote/${angebotId}` : undefined,
+      angebot_id: firstAngebot ?? angebotId,
       auftrag_href: auftragId ? `/auftraege/${auftragId}` : undefined,
       auftrag_id: auftragId,
       abgeschlossen_datum: lead.status === 'abgeschlossen' ? formatDatum(lead.updated_at) : undefined,
     }
-  }, [lead.funnel_daten, lead.status, lead.updated_at])
+  }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote])
+
+  const timelineSorted = useMemo(() => {
+    const t = lead.lead_timeline ?? []
+    return [...t].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_timeline])
+
+  const notizenRows = useMemo(() => {
+    const raw = lead.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_notizen])
+
+  function openKontaktModal() {
+    setKontaktForm({
+      name: lead.kontakt_name ?? kundenName(lead),
+      telefon: lead.kontakt_telefon ?? '',
+      email: lead.kontakt_email ?? '',
+      plz: lead.plz ?? '',
+      kundentyp: lead.kundentyp ?? 'privat',
+      kanal: lead.kanal,
+    })
+    setKontaktModal(true)
+  }
+
+  function openProjektModal() {
+    const von = lead.zeitraum_von?.slice(0, 10) ?? ''
+    const bis = lead.zeitraum_bis?.slice(0, 10) ?? ''
+    let zt: 'tag' | 'zeitraum' | null = null
+    if (von && !bis) zt = 'tag'
+    else if (von && bis) zt = 'zeitraum'
+    setProjektForm({
+      situation: lead.situation ?? '',
+      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, !!lead.bereiche?.includes(k)])),
+      sonstigesText: lead.bereiche_sonstiges ?? '',
+      budget: lead.budget_ca != null && lead.budget_ca > 0 ? String(lead.budget_ca) : '',
+      zeitraumTyp: zt,
+      zeitraumVon: von,
+      zeitraumBis: bis,
+    })
+    setProjektModal(true)
+  }
+
+  async function saveKontaktModal() {
+    startTransition(async () => {
+      const r = await updateLeadKontakt(lead.id, {
+        kontakt_name: kontaktForm.name,
+        kontakt_telefon: kontaktForm.telefon,
+        kontakt_email: kontaktForm.email,
+        plz: kontaktForm.plz,
+        kundentyp: kontaktForm.kundentyp,
+        kanal: kontaktForm.kanal,
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Gespeichert')
+      setKontaktModal(false)
+      setLead((l) => ({
+        ...l,
+        kontakt_name: kontaktForm.name.trim(),
+        kontakt_telefon: kontaktForm.telefon.trim() || null,
+        kontakt_email: kontaktForm.email.trim() || null,
+        plz: kontaktForm.plz.trim() || null,
+        kundentyp: kontaktForm.kundentyp,
+        kanal: kontaktForm.kanal,
+      }))
+      router.refresh()
+    })
+  }
+
+  async function saveProjektModal() {
+    const bereicheList = BEREICH_KEYS.filter((k) => projektForm.bereiche[k])
+    const budgetN =
+      projektForm.budget.trim() === '' || Number.isNaN(Number(projektForm.budget))
+        ? null
+        : Number(projektForm.budget)
+    let zVon: string | null = null
+    let zBis: string | null = null
+    if (projektForm.zeitraumTyp === 'tag' && projektForm.zeitraumVon) {
+      zVon = projektForm.zeitraumVon
+      zBis = null
+    } else if (projektForm.zeitraumTyp === 'zeitraum') {
+      zVon = projektForm.zeitraumVon.trim() || null
+      zBis = projektForm.zeitraumBis.trim() || null
+    }
+    startTransition(async () => {
+      const r = await updateLeadProjekt(lead.id, {
+        situation: projektForm.situation || null,
+        bereiche: bereicheList.length ? bereicheList : null,
+        bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
+        budget_ca: budgetN,
+        zeitraum_von: zVon,
+        zeitraum_bis: zBis,
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Gespeichert')
+      setProjektModal(false)
+      setLead((l) => ({
+        ...l,
+        situation: projektForm.situation || null,
+        bereiche: bereicheList.length ? bereicheList : null,
+        bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
+        budget_ca: budgetN,
+        zeitraum_von: zVon,
+        zeitraum_bis: zBis,
+      }))
+      router.refresh()
+    })
+  }
 
   const onStatusAction = useCallback(
     (action: string, payload?: unknown) => {
@@ -213,6 +361,10 @@ export function AnfrageDetailClient({
         })
         return
       }
+      if (action === 'lead.vor_ort_termin') {
+        setTerminOpen(true)
+        return
+      }
       if (action === 'lead.termin_anlegen') {
         setTerminOpen(true)
         return
@@ -224,35 +376,6 @@ export function AnfrageDetailClient({
     },
     [lead.id, router, setStatus]
   )
-
-  async function saveTermin(e: React.FormEvent) {
-    e.preventDefault()
-    setTerminSaving(true)
-    const res = await insertKalenderTermin({
-      lead_id: lead.id,
-      titel: terminTitel.trim(),
-      datum: terminDatum,
-      uhrzeit_von: terminVon.trim() || null,
-      uhrzeit_bis: terminBis.trim() || null,
-      typ: terminTyp,
-      adresse: terminAdresse.trim() || null,
-      beschreibung: terminNotiz.trim() || null,
-    })
-    setTerminSaving(false)
-    if (!res.ok) {
-      toast.error(res.message)
-      return
-    }
-    toast.success('Termin gespeichert')
-    setTerminOpen(false)
-    setTerminTitel('')
-    setTerminDatum('')
-    setTerminVon('')
-    setTerminBis('')
-    setTerminAdresse('')
-    setTerminNotiz('')
-    router.refresh()
-  }
 
   return (
     <div className="space-y-6 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-6">
@@ -270,14 +393,19 @@ export function AnfrageDetailClient({
               {kundenName(lead)}
             </h1>
             <LeadStatusBadge status={lead.status} />
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => notizenRef.current?.focus()}
+            <select
+              value={lead.status}
+              onChange={(e) => setStatus(e.target.value as LeadStatus)}
+              disabled={pending}
+              className="min-h-[40px] rounded-md border border-border bg-surface px-2 text-sm text-ink"
+              aria-label="Status ändern"
             >
-              Bearbeiten
-            </Button>
+              {(['neu', 'kontaktiert', 'angebot', 'auftrag', 'abgeschlossen', 'abgebrochen'] as const).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </header>
@@ -288,6 +416,24 @@ export function AnfrageDetailClient({
         </p>
       ) : null}
 
+      <div className="tabs border-b border-border -mx-4 px-2 md:-mx-8 md:px-8">
+        {(
+          [
+            ['details', 'Details'],
+            ['vorort', 'Vor-Ort'],
+            ['notizen', 'Notizen'],
+            ['aktiv', 'Aktivitäten'],
+            ['angebot', 'Angebot'],
+          ] as const
+        ).map(([id, label]) => (
+          <button key={id} type="button" className={cn('tab', tab === id && 'active')} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' ? (
+        <>
       <section aria-label="Status ändern">
         <h2 className="mb-2 text-sm font-semibold text-ink">Status ändern</h2>
         <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -366,7 +512,16 @@ export function AnfrageDetailClient({
               <KanalBadge kanal={lead.kanal} />
             </dd>
           </div>
+          <div>
+            <dt className="text-muted">Kundentyp</dt>
+            <dd className="font-medium text-ink">{lead.kundentyp ?? '—'}</dd>
+          </div>
         </dl>
+        <div className="mt-3 flex justify-end">
+          <button type="button" onClick={openKontaktModal} className="btn btn-ghost btn-sm">
+            ✏️ Bearbeiten
+          </button>
+        </div>
       </Card>
 
       <Card>
@@ -395,23 +550,30 @@ export function AnfrageDetailClient({
                 : '—'}
             </dd>
           </div>
+          {lead.bereiche?.includes('sonstiges') && lead.bereiche_sonstiges?.trim() ? (
+            <div>
+              <dt className="text-muted">Sonstiges</dt>
+              <dd className="whitespace-pre-wrap text-ink">{lead.bereiche_sonstiges}</dd>
+            </div>
+          ) : null}
           <div>
-            <dt className="text-muted">Preisindikation</dt>
-            <dd className="text-ink">{formatPreis(lead.preis_min, lead.preis_max)}</dd>
+            <dt className="text-muted">Budget</dt>
+            <dd className="text-ink">{formatBudget(lead.budget_ca ?? undefined, lead.preis_min, lead.preis_max)}</dd>
           </div>
           <div>
             <dt className="text-muted">Zeitraum</dt>
-            <dd className="text-ink">{lead.zeitraum ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Kundentyp</dt>
-            <dd className="text-ink">{lead.kundentyp ?? '—'}</dd>
+            <dd className="text-ink">{formatLeadZeitraum(lead)}</dd>
           </div>
           <div>
             <dt className="text-muted">Eingegangen</dt>
             <dd className="text-ink">{formatDatumZeit(lead.created_at)}</dd>
           </div>
         </dl>
+        <div className="mt-3 flex justify-end">
+          <button type="button" onClick={openProjektModal} className="btn btn-ghost btn-sm">
+            ✏️ Bearbeiten
+          </button>
+        </div>
       </Card>
 
       {lead.kontakt_nachricht ? (
@@ -424,12 +586,12 @@ export function AnfrageDetailClient({
       ) : null}
 
       <Card>
-        <h2 className="mb-2 text-base font-semibold text-ink">Notizen</h2>
+        <h2 className="mb-2 text-base font-semibold text-ink">Interne Notiz</h2>
         <Textarea
           ref={notizenRef}
           id="notizen"
           name="notizen"
-          aria-label="Notizen"
+          aria-label="Interne Notiz"
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
           rows={5}
@@ -527,6 +689,7 @@ export function AnfrageDetailClient({
                   <div>
                     <span className="text-muted">Angepasste Kalkulation: </span>
                     {formatPreis(
+                      undefined,
                       Number(daten.kalkulation.kalk_min),
                       Number(daten.kalkulation.kalk_max)
                     )}
@@ -549,12 +712,6 @@ export function AnfrageDetailClient({
                     className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-ink"
                   >
                     Bearbeiten
-                  </Link>
-                  <Link
-                    href={`/angebote/neu?lead_id=${lead.id}`}
-                    className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white"
-                  >
-                    Angebot erstellen
                   </Link>
                 </div>
               </div>
@@ -591,94 +748,9 @@ export function AnfrageDetailClient({
         ) : null}
       </section>
 
-      <Card className="mb-6 p-4">
-        <h2 className="mb-3 text-base font-semibold text-ink">Angebot</h2>
-        {angeboteListe.length === 0 ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted">Noch kein Angebot</p>
-            <Link href={`/angebote/neu?lead_id=${lead.id}`} className="btn btn-primary text-center text-sm">
-              + Angebot erstellen
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {angeboteListe.map((a) => (
-              <div
-                key={a.id}
-                className="flex flex-col gap-2 rounded-lg border border-border bg-bw-bg/50 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AngebotStatusBadge status={a.status as AngebotStatus} />
-                    <span className="text-sm font-medium text-ink">{formatPreis(a.gesamt_min, a.gesamt_max)}</span>
-                  </div>
-                  <p className="text-xs text-muted">{formatDatum(a.created_at)}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setAngebotPanelId(a.id)}>
-                    Angebot öffnen
-                  </Button>
-                  <Link
-                    href={`/angebote/${a.id}`}
-                    className="btn btn-ghost inline-flex items-center gap-1 text-sm"
-                  >
-                    Zur Detailseite <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <SidePanel
-        open={Boolean(angebotPanelId)}
-        onClose={() => setAngebotPanelId(null)}
-        title="Angebot"
-        subtitle={
-          angeboteListe.find((x) => x.id === angebotPanelId)
-            ? formatDatum(angeboteListe.find((x) => x.id === angebotPanelId)!.created_at)
-            : undefined
-        }
-        badge={
-          angeboteListe.find((x) => x.id === angebotPanelId) ? (
-            <AngebotStatusBadge
-              status={angeboteListe.find((x) => x.id === angebotPanelId)!.status as AngebotStatus}
-            />
-          ) : null
-        }
-      >
-        {(() => {
-          const a = angebotPanelId ? angeboteListe.find((x) => x.id === angebotPanelId) : null
-          if (!a) return null
-          return (
-            <div className="space-y-4 p-5">
-              <p className="text-sm text-muted">
-                Betrag:{' '}
-                <span className="font-semibold text-ink">{formatPreis(a.gesamt_min, a.gesamt_max)}</span>
-              </p>
-              <Link
-                href={`/angebote/${a.id}`}
-                className="btn btn-primary block w-full text-center"
-                onClick={() => setAngebotPanelId(null)}
-              >
-                Vollständig öffnen
-              </Link>
-            </div>
-          )
-        })()}
-      </SidePanel>
-
       <Card>
         <h2 className="mb-3 text-base font-semibold text-ink">Aktionen</h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Link
-            href={`/angebote/neu?lead_id=${lead.id}`}
-            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-base font-medium text-white transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-auto"
-          >
-            <FileText className="h-5 w-5" aria-hidden />
-            Angebot erstellen
-          </Link>
           <Button
             type="button"
             variant="secondary"
@@ -698,119 +770,248 @@ export function AnfrageDetailClient({
         </div>
       </Card>
 
-      <section aria-label="Status-Historie">
-        <h2 className="mb-3 text-base font-semibold text-ink">Status-Historie</h2>
-        {history.length === 0 ? (
-          <p className="text-sm text-muted">Noch keine Einträge.</p>
-        ) : (
-          <ol className="space-y-4 border-l border-border pl-4">
-            {history.map((h) => (
-              <li key={h.id} className="relative">
-                <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
-                <p className="text-xs text-muted">{formatDatumZeit(h.created_at)}</p>
-                <p className="text-sm text-ink">
-                  {h.status_alt != null
-                    ? `${STATUS_LABELS[h.status_alt]} → ${STATUS_LABELS[h.status_neu]}`
-                    : STATUS_LABELS[h.status_neu]}
-                </p>
-                {h.notiz ? (
-                  <p className="mt-1 text-sm text-muted">{h.notiz}</p>
-                ) : null}
-                <p className="text-xs text-muted">
-                  {h.user_profiles?.name ?? 'System'}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+        </>
+      ) : tab === 'vorort' ? (
+        <VorOrtTermineTab
+          leadId={lead.id}
+          termine={(lead.kalender_termine ?? []) as KalenderTermin[]}
+          vorOrtNotiz={lead.vor_ort_notizen ?? ''}
+          onReload={() => router.refresh()}
+        />
+      ) : tab === 'notizen' ? (
+        <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => router.refresh()} />
+      ) : tab === 'aktiv' ? (
+        <div className="space-y-6">
+          <section aria-label="Timeline">
+            <h2 className="mb-3 text-base font-semibold text-ink">Aktivitäten</h2>
+            {timelineSorted.length === 0 ? (
+              <p className="text-sm text-muted">Noch keine Timeline-Einträge.</p>
+            ) : (
+              <ul className="space-y-3 text-sm">
+                {timelineSorted.map((ev) => (
+                  <li key={ev.id} className="border-b border-border pb-2">
+                    <p className="text-xs text-muted">{formatDatumZeit(ev.created_at)}</p>
+                    <p className="font-medium text-ink">{ev.titel}</p>
+                    {ev.beschreibung ? <p className="text-muted">{ev.beschreibung}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section aria-label="Status-Historie">
+            <h2 className="mb-3 text-base font-semibold text-ink">Status-Historie</h2>
+            {history.length === 0 ? (
+              <p className="text-sm text-muted">Noch keine Einträge.</p>
+            ) : (
+              <ol className="space-y-4 border-l border-border pl-4">
+                {history.map((h) => (
+                  <li key={h.id} className="relative">
+                    <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
+                    <p className="text-xs text-muted">{formatDatumZeit(h.created_at)}</p>
+                    <p className="text-sm text-ink">
+                      {h.status_alt != null
+                        ? `${STATUS_LABELS[h.status_alt]} → ${STATUS_LABELS[h.status_neu]}`
+                        : STATUS_LABELS[h.status_neu]}
+                    </p>
+                    {h.notiz ? <p className="mt-1 text-sm text-muted">{h.notiz}</p> : null}
+                    <p className="text-xs text-muted">{h.user_profiles?.name ?? 'System'}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      ) : (
+        <AngeboteListeTab leadId={lead.id} angebote={angeboteListe} />
+      )}
 
-      {terminOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="termin-title"
-            className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 id="termin-title" className="text-lg font-semibold text-ink">
-                Termin anlegen
-              </h2>
-              <button
-                type="button"
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-canvas"
-                onClick={() => setTerminOpen(false)}
-                aria-label="Schließen"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={saveTermin} className="space-y-4">
-              <Input
-                label="Titel"
-                value={terminTitel}
-                onChange={(e) => setTerminTitel(e.target.value)}
-                required
-              />
-              <Input
-                type="date"
-                label="Datum"
-                value={terminDatum}
-                onChange={(e) => setTerminDatum(e.target.value)}
-                required
-              />
-              <Input
-                type="time"
-                label="Uhrzeit von"
-                value={terminVon}
-                onChange={(e) => setTerminVon(e.target.value)}
-              />
-              <Input
-                type="time"
-                label="Uhrzeit bis"
-                value={terminBis}
-                onChange={(e) => setTerminBis(e.target.value)}
-              />
-              <Select
-                name="termin_typ"
-                label="Typ"
-                value={terminTyp}
-                onChange={(e) => setTerminTyp(e.target.value as KalenderTermin['typ'])}
-                options={[
-                  { value: 'besichtigung', label: 'Besichtigung' },
-                  { value: 'beginn', label: 'Beginn' },
-                  { value: 'abnahme', label: 'Abnahme' },
-                  { value: 'sonstiges', label: 'Sonstiges' },
-                ]}
-              />
-              <Input
-                label="Adresse"
-                value={terminAdresse}
-                onChange={(e) => setTerminAdresse(e.target.value)}
-              />
-              <Textarea
-                label="Notizen"
-                value={terminNotiz}
-                onChange={(e) => setTerminNotiz(e.target.value)}
-                rows={3}
-              />
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" variant="primary" loading={terminSaving} className="flex-1">
-                  Speichern
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setTerminOpen(false)}
-                >
-                  Abbrechen
-                </Button>
-              </div>
-            </form>
+      <TerminModal
+        open={terminOpen}
+        onClose={() => setTerminOpen(false)}
+        leadId={lead.id}
+        kontaktEmail={lead.kontakt_email}
+        kontaktName={kundenName(lead)}
+        defaultPlz={lead.plz}
+        leadStatus={lead.status}
+        typFixed="besichtigung"
+        onSaved={() => router.refresh()}
+      />
+
+      <Modal open={kontaktModal} onClose={() => setKontaktModal(false)} title="Kontaktdaten bearbeiten">
+        <div className="space-y-4">
+          <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+            <Input
+              label="Name *"
+              value={kontaktForm.name}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, name: e.target.value }))}
+              required
+            />
+            <Input
+              label="Telefon"
+              type="tel"
+              value={kontaktForm.telefon}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, telefon: e.target.value }))}
+            />
+            <Input
+              label="E-Mail"
+              type="email"
+              value={kontaktForm.email}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <Input label="PLZ" value={kontaktForm.plz} onChange={(e) => setKontaktForm((f) => ({ ...f, plz: e.target.value }))} />
+            <Select
+              label="Kundentyp"
+              name="kt"
+              value={kontaktForm.kundentyp}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, kundentyp: e.target.value }))}
+              options={[
+                { value: 'privat', label: 'Privat' },
+                { value: 'gewerbe', label: 'Gewerbe' },
+                { value: 'hausverwaltung', label: 'Hausverwaltung' },
+              ]}
+            />
+            <Select
+              label="Kanal"
+              name="kan"
+              value={kontaktForm.kanal}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, kanal: e.target.value as LeadKanal }))}
+              options={[
+                { value: 'website', label: 'Website' },
+                { value: 'telefon', label: 'Telefon' },
+                { value: 'whatsapp', label: 'WhatsApp' },
+                { value: 'email', label: 'E-Mail' },
+                { value: 'vor_ort', label: 'Vor Ort' },
+                { value: 'sonstiges', label: 'Sonstiges' },
+              ]}
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setKontaktModal(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => void saveKontaktModal()}>
+              Speichern
+            </Button>
           </div>
         </div>
-      ) : null}
+      </Modal>
+
+      <Modal open={projektModal} onClose={() => setProjektModal(false)} title="Projektdaten bearbeiten">
+        <div className="space-y-4">
+          <Select
+            label="Situation"
+            name="sit"
+            value={projektForm.situation}
+            onChange={(e) => setProjektForm((f) => ({ ...f, situation: e.target.value }))}
+            options={[
+              { value: '', label: 'Bitte wählen…' },
+              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung', 'gewerbe'] as const).map(
+                (value) => ({
+                  value,
+                  label: SITUATION_LABELS[value] ?? value,
+                })
+              ),
+            ]}
+          />
+          <div>
+            <span className="input-label">Bereiche / Gewerke</span>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {BEREICH_KEYS.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setProjektForm((f) => ({ ...f, bereiche: { ...f.bereiche, [b]: !f.bereiche[b] } }))}
+                  className={cn('chip', projektForm.bereiche[b] ? 'selected' : '')}
+                >
+                  {BEREICH_LABELS[b] ?? b}
+                </button>
+              ))}
+            </div>
+            {projektForm.bereiche.sonstiges ? (
+              <input
+                className="input mt-2"
+                placeholder="Beschreiben…"
+                value={projektForm.sonstigesText}
+                onChange={(e) => setProjektForm((f) => ({ ...f, sonstigesText: e.target.value }))}
+              />
+            ) : null}
+          </div>
+          <div>
+            <label className="input-label">Budget (optional)</label>
+            <div className="relative">
+              <input
+                type="number"
+                className="input pr-8"
+                value={projektForm.budget}
+                onChange={(e) => setProjektForm((f) => ({ ...f, budget: e.target.value }))}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
+            </div>
+          </div>
+          <div>
+            <label className="input-label">Gewünschter Zeitraum (optional)</label>
+            <div className="mb-2 flex gap-2">
+              <button
+                type="button"
+                className={cn('btn btn-sm', projektForm.zeitraumTyp === 'tag' ? 'btn-primary' : 'btn-secondary')}
+                onClick={() =>
+                  setProjektForm((f) => ({ ...f, zeitraumTyp: f.zeitraumTyp === 'tag' ? null : 'tag' }))
+                }
+              >
+                Einzeltag
+              </button>
+              <button
+                type="button"
+                className={cn('btn btn-sm', projektForm.zeitraumTyp === 'zeitraum' ? 'btn-primary' : 'btn-secondary')}
+                onClick={() =>
+                  setProjektForm((f) => ({ ...f, zeitraumTyp: f.zeitraumTyp === 'zeitraum' ? null : 'zeitraum' }))
+                }
+              >
+                Zeitraum
+              </button>
+            </div>
+            {projektForm.zeitraumTyp === 'tag' ? (
+              <input
+                type="date"
+                className="input"
+                value={projektForm.zeitraumVon}
+                onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumVon: e.target.value }))}
+              />
+            ) : null}
+            {projektForm.zeitraumTyp === 'zeitraum' ? (
+              <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="input-label">Von</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={projektForm.zeitraumVon}
+                    onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumVon: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Bis</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={projektForm.zeitraumBis}
+                    onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumBis: e.target.value }))}
+                    min={projektForm.zeitraumVon || undefined}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setProjektModal(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => void saveProjektModal()}>
+              Speichern
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <StatusActions typ="lead" status={lead.status} id={lead.id} data={leadStatusData} onAction={onStatusAction} disabled={pending} />
     </div>

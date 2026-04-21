@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
-import { Link2, Mail, X } from 'lucide-react'
+import { Link2, Mail } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
@@ -213,49 +214,41 @@ export function AngebotVersandSection({
         )}
       </Card>
 
-      {kundeModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold text-ink">An Kunden senden</h3>
-              <button
-                type="button"
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-canvas"
-                onClick={() => setKundeModal(false)}
-                aria-label="Schließen"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="mb-2 text-sm text-muted">
-              Empfänger: <span className="font-medium text-ink">{kundeEmail}</span>
-            </p>
-            <Input label="Betreff" value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
-            <p className="mb-1 text-xs font-medium text-muted">Vorschau</p>
-            <iframe
-              title="Vorschau"
-              sandbox="allow-same-origin"
-              className="mb-3 h-[280px] w-full rounded-lg border border-border bg-white"
-              srcDoc={previewHtml}
-            />
-            <p className="mb-3 text-sm text-ink">
-              Gesamtbetrag (Brutto):{' '}
-              <strong>
-                {bruttoMin.toLocaleString('de-DE')} – {bruttoMax.toLocaleString('de-DE')} €
-              </strong>
-            </p>
-            <p className="mb-4 text-xs text-muted">PDF wird angehängt.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
-                Jetzt senden
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
-                Abbrechen
-              </Button>
-            </div>
+      <Modal
+        open={kundeModal}
+        onClose={() => setKundeModal(false)}
+        title="An Kunden senden"
+        size="lg"
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
+              Jetzt senden
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
+              Abbrechen
+            </Button>
           </div>
-        </div>
-      ) : null}
+        }
+      >
+        <p className="mb-2 text-sm text-bw-text-muted">
+          Empfänger: <span className="font-medium text-bw-text">{kundeEmail}</span>
+        </p>
+        <Input label="Betreff" value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
+        <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
+        <iframe
+          title="Vorschau"
+          sandbox="allow-same-origin"
+          className="mb-3 h-[280px] w-full rounded-lg border border-bw-border bg-white"
+          srcDoc={previewHtml}
+        />
+        <p className="mb-3 text-sm text-bw-text">
+          Gesamtbetrag (Brutto):{' '}
+          <strong>
+            {bruttoMin.toLocaleString('de-DE')} – {bruttoMax.toLocaleString('de-DE')} €
+          </strong>
+        </p>
+        <p className="text-xs text-bw-text-muted">PDF wird angehängt.</p>
+      </Modal>
     </section>
   )
 }

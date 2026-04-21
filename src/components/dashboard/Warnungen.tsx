@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Card } from '@/components/ui/Card'
 
 export type DashboardWarnungEintrag = {
   id: string
@@ -37,14 +38,15 @@ export function Warnungen({ items }: { items: DashboardWarnungEintrag[] }) {
   if (items.length === 0) return null
 
   return (
-    <div className="card">
-      <div className="card-header flex items-center justify-between">
-        <span className="card-title">Handlungsbedarf</span>
-        <span className="text-xs text-bw-text-muted">{items.length} offen</span>
-      </div>
+    <Card
+      title="Handlungsbedarf"
+      action={<span className="text-xs text-bw-text-muted">{items.length} offen</span>}
+      bodyClassName="p-0"
+    >
       <div className="divide-y divide-bw-border">
         {items.map((item) => {
           const config = WARNUNG_CONFIG[item.typ]
+          if (!config) return null
           return (
             <div key={item.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="flex min-w-0 items-start gap-2">
@@ -58,6 +60,6 @@ export function Warnungen({ items }: { items: DashboardWarnungEintrag[] }) {
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }

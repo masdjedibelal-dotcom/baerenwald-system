@@ -1,7 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -14,6 +13,8 @@ import { useExport, type ExportField } from '@/hooks/useExport'
 import { useSort } from '@/hooks/useSort'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { AnfrageSidePanel } from '@/components/anfragen/AnfrageSidePanel'
+import { AnfrageNeuForm } from '@/components/anfragen/AnfrageNeuForm'
+import { Modal } from '@/components/ui/Modal'
 import {
   ANGEBOT_STATUS_LABELS,
   BEREICH_LABELS,
@@ -62,8 +63,9 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'status', label: 'Status' },
   { key: 'kanal', label: 'Kanal' },
   { key: 'bereiche', label: 'Bereiche' },
-  { key: 'preis_min', label: 'Budget Min' },
-  { key: 'preis_max', label: 'Budget Max' },
+  { key: 'budget_ca', label: 'Budget' },
+  { key: 'preis_min', label: 'Budget Min (alt)' },
+  { key: 'preis_max', label: 'Budget Max (alt)' },
   { key: 'plz', label: 'PLZ' },
   { key: 'created_at', label: 'Erstellt am' },
 ]
@@ -124,11 +126,14 @@ function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
 }
 
 export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
   const [panelId, setPanelId] = useState<string | null>(null)
   const [panelSummary, setPanelSummary] = useState<LeadWithAngebote | null>(null)
+  const [neuOpen, setNeuOpen] = useState(false)
+  const defaultKundeId = searchParams.get('kunde_id')
 
   const [statusFilter, setStatusFilter] = useState<'' | LeadStatus>('')
   const [kanal, setKanal] = useState<'' | LeadKanal>('')
@@ -212,9 +217,9 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExportOpen(true)}>
               ⬇️ Export
             </button>
-            <Link href="/anfragen/neu" className="btn btn-primary btn-sm">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setNeuOpen(true)}>
               + Neue Anfrage
-            </Link>
+            </button>
           </div>
         }
       />
@@ -460,9 +465,9 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
           }
           action={
             leads.length === 0 ? (
-              <Link href="/anfragen/neu" className="btn btn-primary btn-sm">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setNeuOpen(true)}>
                 + Erste Anfrage anlegen
-              </Link>
+              </button>
             ) : null
           }
         />
@@ -489,7 +494,9 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                             {tags.join(' · ')}
                             {more > 0 ? ` +${more}` : ''}
                           </p>
-                          <p className="mt-1 text-sm text-bw-text">{formatBudget(lead.preis_min, lead.preis_max)}</p>
+                          <p className="mt-1 text-sm text-bw-text">
+                            {formatBudget(lead.budget_ca, lead.preis_min, lead.preis_max)}
+                          </p>
                           <p className="mt-1 text-xs text-bw-text-muted">
                             {lead.plz ?? '—'} · {formatRelativeDate(lead.created_at)}
                           </p>
@@ -599,7 +606,7 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-bw-text">
-                        {formatBudget(lead.preis_min, lead.preis_max)}
+                        {formatBudget(lead.budget_ca, lead.preis_min, lead.preis_max)}
                       </td>
                       <td className="px-3 py-3">
                         <LeadStatusBadge status={lead.status} />
@@ -610,7 +617,7 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                       <td className="px-3 py-3">
                         {ang ? (
                           <span className="inline-flex items-center gap-1.5 text-sm">
-                            {formatPreis(ang.gesamt_min, ang.gesamt_max)}
+                            {formatPreis(ang.gesamt_fix ?? null, ang.gesamt_min, ang.gesamt_max)}
                             <span
                               className="inline-block h-2 w-2 shrink-0 rounded-full bg-bw-primary"
                               title={ANGEBOT_STATUS_LABELS[ang.status as keyof typeof ANGEBOT_STATUS_LABELS] ?? ang.status}
@@ -639,6 +646,19 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
         leadId={panelId}
         summary={panelSummary}
       />
+
+      <Modal open={neuOpen} onClose={() => setNeuOpen(false)} title="Neue Anfrage" size="lg">
+        <AnfrageNeuForm
+          defaultKundeId={defaultKundeId}
+          onSuccess={(id) => {
+            setNeuOpen(false)
+            setPanelId(id)
+            setPanelSummary(null)
+            router.refresh()
+          }}
+          onCancel={() => setNeuOpen(false)}
+        />
+      </Modal>
 
       <CsvExportModal
         open={exportOpen}

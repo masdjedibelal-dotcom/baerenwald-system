@@ -928,27 +928,27 @@ export function AngebotNeuForm({
         <div className="mt-6 space-y-1 rounded-lg bg-canvas p-4 text-sm">
           <p className="font-semibold text-ink">Gesamt-Übersicht (Angebot)</p>
           <p>
-            Lohn gesamt: {formatPreis(summen.lohnZeileMin, summen.lohnZeileMax)}
+            Lohn gesamt: {formatPreis(undefined, summen.lohnZeileMin, summen.lohnZeileMax)}
           </p>
           <p>
-            Material gesamt: {formatPreis(summen.materialZeileMin, summen.materialZeileMax)}
+            Material gesamt: {formatPreis(undefined, summen.materialZeileMin, summen.materialZeileMax)}
           </p>
           <p className="border-t border-border pt-2 mt-2">
-            Netto gesamt: {formatPreis(summen.nettoMin, summen.nettoMax)}
+            Netto gesamt: {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
           </p>
           <p>
-            MwSt {summen.mwstSatz}%: {formatPreis(summen.mwstBetragMin, summen.mwstBetragMax)}
+            MwSt {summen.mwstSatz}%: {formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}
           </p>
           <p className="font-semibold text-ink">
-            Brutto gesamt: {formatPreis(summen.bruttoMin, summen.bruttoMax)}
+            Brutto gesamt: {formatPreis(undefined, summen.bruttoMin, summen.bruttoMax)}
           </p>
           <div className="mt-3 border-t border-border pt-2 text-xs text-muted">
             <p className="font-medium text-ink text-sm mb-1">Intern</p>
             <p>
-              Einkauf gesamt: {formatPreis(summen.einkaufZeileMin, summen.einkaufZeileMax)}
+              Einkauf gesamt: {formatPreis(undefined, summen.einkaufZeileMin, summen.einkaufZeileMax)}
             </p>
             <p>
-              Marge: {formatPreis(summen.margeMin, summen.margeMax)}
+              Marge: {formatPreis(undefined, summen.margeMin, summen.margeMax)}
             </p>
           </div>
         </div>

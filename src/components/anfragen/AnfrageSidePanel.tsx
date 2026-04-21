@@ -6,15 +6,32 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { SidePanel } from '@/components/ui/SidePanel'
 import { LeadStatusBadge } from '@/components/ui/Badge'
-import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { StatusActions } from '@/components/funnel/StatusActions'
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { Textarea } from '@/components/ui/Textarea'
 import { TerminModal } from '@/components/anfragen/TerminModal'
+import { Modal } from '@/components/ui/Modal'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
+import { AngeboteListeTab, LeadNotizenListeTab, VorOrtTermineTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { createClient } from '@/lib/supabase'
-import { updateLeadNotizen, updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import {
+  updateLeadKontakt,
+  updateLeadNotizen,
+  updateLeadProjekt,
+  updateLeadStatus,
+} from '@/app/(dashboard)/anfragen/actions'
 import { toast } from '@/components/ui/app-toast'
-import type { LeadDetail, LeadListAngebot, LeadStatus, LeadWithAngebote } from '@/lib/types'
+import type {
+  KalenderTermin,
+  LeadDetail,
+  LeadKanal,
+  LeadListAngebot,
+  LeadNotizRow,
+  LeadStatus,
+  LeadWithAngebote,
+} from '@/lib/types'
 import {
   BEREICH_LABELS,
   KANAL_LABELS,
@@ -23,9 +40,10 @@ import {
   formatBudget,
   formatDatum,
   formatDatumZeit,
-  formatPreis,
 } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+
+const BEREICH_KEYS = Object.keys(BEREICH_LABELS) as string[]
 
 function leadName(l: LeadWithAngebote | LeadDetail) {
   const k = l.kunden
@@ -39,7 +57,19 @@ function leadSubtitle(l: LeadWithAngebote | LeadDetail) {
   return `${kanal} · ${plz}`
 }
 
-type TabId = 'details' | 'aktiv' | 'angebot'
+function formatLeadZeitraum(l: LeadWithAngebote | LeadDetail) {
+  const von = 'zeitraum_von' in l && l.zeitraum_von ? String(l.zeitraum_von).slice(0, 10) : ''
+  const bis = 'zeitraum_bis' in l && l.zeitraum_bis ? String(l.zeitraum_bis).slice(0, 10) : ''
+  if (von || bis) {
+    const a = von ? new Date(von).toLocaleDateString('de') : ''
+    const b = bis ? new Date(bis).toLocaleDateString('de') : ''
+    if (a && b && von !== bis) return `${a} – ${b}`
+    return a || b || '—'
+  }
+  return l.zeitraum?.trim() || '—'
+}
+
+type TabId = 'details' | 'vorort' | 'notizen' | 'aktiv' | 'angebot'
 
 export function AnfrageSidePanel({
   open,
@@ -62,6 +92,26 @@ export function AnfrageSidePanel({
   const [accKontakt, setAccKontakt] = useState(true)
   const [accProjekt, setAccProjekt] = useState(true)
   const [notizen, setNotizen] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+  const [kontaktModal, setKontaktModal] = useState(false)
+  const [projektModal, setProjektModal] = useState(false)
+  const [kontaktForm, setKontaktForm] = useState({
+    name: '',
+    telefon: '',
+    email: '',
+    plz: '',
+    kundentyp: 'privat',
+    kanal: 'telefon' as LeadKanal,
+  })
+  const [projektForm, setProjektForm] = useState({
+    situation: '',
+    bereiche: {} as Record<string, boolean>,
+    sonstigesText: '',
+    budget: '',
+    zeitraumTyp: null as 'tag' | 'zeitraum' | null,
+    zeitraumVon: '',
+    zeitraumBis: '',
+  })
 
   useEffect(() => {
     if (!open || !leadId) {
@@ -82,7 +132,9 @@ export function AnfrageSidePanel({
             id, daten, created_at, updated_at,
             formular_templates(name, phase, typ, felder)
           ),
-          angebote(id, status, gesamt_min, gesamt_max, positionen, created_at)
+          angebote(id, status, gesamt_fix, gesamt_min, gesamt_max, positionen, created_at),
+          kalender_termine(*),
+          lead_notizen(*)
         `
         )
         .eq('id', leadId)
@@ -106,7 +158,7 @@ export function AnfrageSidePanel({
       setDetail(d)
       setNotizen(d.notizen ?? '')
     })()
-  }, [open, leadId])
+  }, [open, leadId, reloadKey])
 
   const display = detail ?? summary
   const title = display ? leadName(display) : ''
@@ -156,6 +208,10 @@ export function AnfrageSidePanel({
         router.push(p.href)
         return
       }
+      if (action === 'lead.vor_ort_termin') {
+        setTerminOpen(true)
+        return
+      }
       if (action === 'lead.kontakt') {
         if (!leadId) return
         startTransition(async () => {
@@ -203,15 +259,108 @@ export function AnfrageSidePanel({
     )
   }, [detail?.lead_timeline])
 
-  const angebotFirst = useMemo(() => {
+  const notizenRows = useMemo(() => {
+    const raw = detail?.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [detail?.lead_notizen])
+
+  const angeboteRows = useMemo(() => {
     const raw = detail?.angebote
-    if (!Array.isArray(raw) || !raw.length) return null
-    return [...raw].sort(
-      (a, b) =>
-        new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
-    )[0] as LeadListAngebot
+    if (!Array.isArray(raw)) return []
+    return [...raw] as LeadListAngebot[]
   }, [detail?.angebote])
 
+  function openKontaktModal() {
+    if (!detail) return
+    setKontaktForm({
+      name: detail.kontakt_name ?? leadName(detail),
+      telefon: detail.kontakt_telefon ?? '',
+      email: detail.kontakt_email ?? '',
+      plz: detail.plz ?? '',
+      kundentyp: detail.kundentyp ?? 'privat',
+      kanal: detail.kanal,
+    })
+    setKontaktModal(true)
+  }
+
+  function openProjektModal() {
+    if (!detail) return
+    const von = detail.zeitraum_von?.slice(0, 10) ?? ''
+    const bis = detail.zeitraum_bis?.slice(0, 10) ?? ''
+    let zt: 'tag' | 'zeitraum' | null = null
+    if (von && !bis) zt = 'tag'
+    else if (von && bis) zt = 'zeitraum'
+    setProjektForm({
+      situation: detail.situation ?? '',
+      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, !!detail.bereiche?.includes(k)])),
+      sonstigesText: detail.bereiche_sonstiges ?? '',
+      budget: detail.budget_ca != null && detail.budget_ca > 0 ? String(detail.budget_ca) : '',
+      zeitraumTyp: zt,
+      zeitraumVon: von,
+      zeitraumBis: bis,
+    })
+    setProjektModal(true)
+  }
+
+  function handleStatusDropdown(e: React.ChangeEvent<HTMLSelectElement>) {
+    setStatus(e.target.value as LeadStatus)
+  }
+
+  async function saveKontaktModal() {
+    if (!leadId) return
+    startTransition(async () => {
+      const r = await updateLeadKontakt(leadId, {
+        kontakt_name: kontaktForm.name,
+        kontakt_telefon: kontaktForm.telefon,
+        kontakt_email: kontaktForm.email,
+        plz: kontaktForm.plz,
+        kundentyp: kontaktForm.kundentyp,
+        kanal: kontaktForm.kanal,
+      })
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Gespeichert')
+        setKontaktModal(false)
+        setReloadKey((k) => k + 1)
+        router.refresh()
+      }
+    })
+  }
+
+  async function saveProjektModal() {
+    if (!leadId) return
+    const bereicheList = BEREICH_KEYS.filter((k) => projektForm.bereiche[k])
+    const budgetN = projektForm.budget.trim() === '' || Number.isNaN(Number(projektForm.budget)) ? null : Number(projektForm.budget)
+    let zVon: string | null = null
+    let zBis: string | null = null
+    if (projektForm.zeitraumTyp === 'tag' && projektForm.zeitraumVon) {
+      zVon = projektForm.zeitraumVon
+      zBis = null
+    } else if (projektForm.zeitraumTyp === 'zeitraum') {
+      zVon = projektForm.zeitraumVon.trim() || null
+      zBis = projektForm.zeitraumBis.trim() || null
+    }
+    startTransition(async () => {
+      const r = await updateLeadProjekt(leadId, {
+        situation: projektForm.situation || null,
+        bereiche: bereicheList.length ? bereicheList : null,
+        bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
+        budget_ca: budgetN,
+        zeitraum_von: zVon,
+        zeitraum_bis: zBis,
+      })
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Gespeichert')
+        setProjektModal(false)
+        setReloadKey((k) => k + 1)
+        router.refresh()
+      }
+    })
+  }
+
+  if (!open || !leadId) return null
   if (!display && !loading) return null
 
   return (
@@ -221,7 +370,26 @@ export function AnfrageSidePanel({
         onClose={onClose}
         title={title || (loading ? '…' : '')}
         subtitle={subtitle}
-        badge={display ? <LeadStatusBadge status={display.status} /> : null}
+        badge={
+          display ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <LeadStatusBadge status={display.status} />
+              <select
+                value={display.status}
+                onChange={handleStatusDropdown}
+                disabled={pending}
+                className="cursor-pointer rounded-md border border-bw-border bg-bw-card px-2 py-1 text-xs text-bw-text hover:border-bw-primary"
+                aria-label="Status ändern"
+              >
+                {(['neu', 'kontaktiert', 'angebot', 'auftrag', 'abgeschlossen', 'abgebrochen'] as const).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null
+        }
         width="md"
         actions={
           display ? (
@@ -244,6 +412,8 @@ export function AnfrageSidePanel({
             {(
               [
                 ['details', 'Details'],
+                ['vorort', 'Vor-Ort'],
+                ['notizen', 'Notizen'],
                 ['aktiv', 'Aktivitäten'],
                 ['angebot', 'Angebot'],
               ] as const
@@ -283,9 +453,11 @@ export function AnfrageSidePanel({
                         editable={false}
                       />
                       <PropertyRow label="Kanal" value={KANAL_LABELS[display!.kanal]} editable={false} />
-                      <Link href={`/anfragen/${display!.id}`} className="btn btn-secondary btn-sm mt-2 w-full">
-                        ✏️ Bearbeiten
-                      </Link>
+                      <div className="mb-2 flex justify-end">
+                        <button type="button" onClick={openKontaktModal} className="btn btn-ghost btn-sm">
+                          ✏️ Bearbeiten
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -324,24 +496,33 @@ export function AnfrageSidePanel({
                       </div>
                       <PropertyRow
                         label="Budget"
-                        value={formatBudget(display!.preis_min, display!.preis_max)}
+                        value={formatBudget(
+                          'budget_ca' in display! ? (display as LeadDetail).budget_ca : undefined,
+                          display!.preis_min,
+                          display!.preis_max
+                        )}
                         editable={false}
                       />
-                      <PropertyRow label="Zeitraum" value={display!.zeitraum ?? '—'} editable={false} />
+                      <PropertyRow label="Zeitraum" value={formatLeadZeitraum(display!)} editable={false} />
+                      <div className="mb-2 flex justify-end">
+                        <button type="button" onClick={openProjektModal} className="btn btn-ghost btn-sm">
+                          ✏️ Bearbeiten
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
 
                 <div className="accordion">
                   <div className="accordion-header">
-                    <span className="accordion-title">Vor-Ort</span>
+                    <span className="accordion-title">Vor-Ort Aufnahme (Formular)</span>
                   </div>
                   <div className="accordion-body">
                     {detail?.vorab_formulare?.length ? (
                       <p className="text-sm text-bw-text">Vor-Ort-Aufnahme vorhanden.</p>
                     ) : (
                       <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg p-4 text-center text-sm text-bw-text-muted">
-                        Noch keine Vor-Ort-Aufnahme
+                        Noch keine strukturierte Vor-Ort-Aufnahme
                         <Link
                           href={`/anfragen/${display!.id}/vorab`}
                           className="btn btn-primary btn-sm mt-3 inline-flex"
@@ -355,43 +536,36 @@ export function AnfrageSidePanel({
 
                 <div className="accordion">
                   <div className="accordion-header">
-                    <span className="accordion-title">Notizen</span>
+                    <span className="accordion-title">Interne Notiz</span>
                   </div>
                   <div className="accordion-body">
                     <Textarea
                       value={notizen}
                       onChange={(e) => setNotizen(e.target.value)}
                       onBlur={() => void saveNotizen()}
-                      placeholder="Notiz hinzufügen…"
-                      rows={4}
+                      placeholder="Kurze interne Aktennotiz…"
+                      rows={3}
                     />
                   </div>
                 </div>
-
-                <div className="accordion">
-                  <div className="accordion-header">
-                    <span className="accordion-title">Angebot</span>
-                  </div>
-                  <div className="accordion-body">
-                    {angebotFirst ? (
-                      <div className="rounded-lg border border-bw-border p-3 text-sm">
-                        <AngebotStatusBadge status={angebotFirst.status as never} />
-                        <p className="mt-2">{formatPreis(angebotFirst.gesamt_min, angebotFirst.gesamt_max)}</p>
-                        <Link
-                          href={`/angebote/${angebotFirst.id}`}
-                          className="btn btn-primary btn-sm mt-2 w-full"
-                        >
-                          → Angebot öffnen
-                        </Link>
-                      </div>
-                    ) : (
-                      <Link href={`/angebote/neu?lead_id=${display!.id}`} className="btn btn-primary btn-sm w-full">
-                        + Angebot erstellen
-                      </Link>
-                    )}
-                  </div>
-                </div>
               </div>
+            ) : null}
+
+            {tab === 'vorort' && display && detail ? (
+              <VorOrtTermineTab
+                leadId={display.id}
+                termine={(detail.kalender_termine ?? []) as KalenderTermin[]}
+                vorOrtNotiz={detail.vor_ort_notizen ?? ''}
+                onReload={() => setReloadKey((k) => k + 1)}
+              />
+            ) : null}
+
+            {tab === 'notizen' && display && detail ? (
+              <LeadNotizenListeTab
+                leadId={display.id}
+                notizen={notizenRows}
+                onReload={() => setReloadKey((k) => k + 1)}
+              />
             ) : null}
 
             {tab === 'aktiv' ? (
@@ -423,39 +597,14 @@ export function AnfrageSidePanel({
               </ul>
             ) : null}
 
-            {tab === 'angebot' ? (
-              <div className="space-y-3">
-                {angebotFirst ? (
-                  <>
-                    <AngebotStatusBadge status={angebotFirst.status as never} />
-                    <p className="text-sm text-bw-text-muted">
-                      Erstellt {formatDatum(angebotFirst.created_at ?? '')}
-                    </p>
-                    <p className="text-lg font-semibold">{formatPreis(angebotFirst.gesamt_min, angebotFirst.gesamt_max)}</p>
-                    <div className="flex flex-col gap-2">
-                      <Link href={`/angebote/${angebotFirst.id}`} className="btn btn-primary btn-sm">
-                        Angebot öffnen →
-                      </Link>
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-lg border border-bw-border p-4 text-center text-sm text-bw-text-muted">
-                    Noch kein Angebot
-                    <Link
-                      href={`/angebote/neu?lead_id=${display!.id}`}
-                      className="btn btn-primary btn-sm mt-3 inline-flex"
-                    >
-                      + Angebot erstellen
-                    </Link>
-                  </div>
-                )}
-              </div>
+            {tab === 'angebot' && display && detail ? (
+              <AngeboteListeTab leadId={display.id} angebote={angeboteRows} />
             ) : null}
           </div>
 
           <div className="border-t border-bw-border p-4">
-            <Link href={`/anfragen/${display?.id}`} className="btn btn-secondary btn-sm w-full">
-              Vollständig öffnen →
+            <Link href={`/anfragen/${display?.id}`} className="text-sm font-medium text-bw-link hover:underline">
+              Zur Anfrage →
             </Link>
           </div>
         </div>
@@ -470,12 +619,172 @@ export function AnfrageSidePanel({
           kontaktName={leadName(display)}
           defaultPlz={display.plz}
           leadStatus={display.status}
+          typFixed="besichtigung"
           onSaved={() => {
-            setDetail((d) => d)
+            setReloadKey((k) => k + 1)
             router.refresh()
           }}
         />
       ) : null}
+
+      <Modal open={kontaktModal} onClose={() => setKontaktModal(false)} title="Kontaktdaten bearbeiten">
+        <div className="space-y-4">
+          <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+            <Input label="Name *" value={kontaktForm.name} onChange={(e) => setKontaktForm((f) => ({ ...f, name: e.target.value }))} required />
+            <Input label="Telefon" type="tel" value={kontaktForm.telefon} onChange={(e) => setKontaktForm((f) => ({ ...f, telefon: e.target.value }))} />
+            <Input label="E-Mail" type="email" value={kontaktForm.email} onChange={(e) => setKontaktForm((f) => ({ ...f, email: e.target.value }))} />
+            <Input label="PLZ" value={kontaktForm.plz} onChange={(e) => setKontaktForm((f) => ({ ...f, plz: e.target.value }))} />
+            <Select
+              label="Kundentyp"
+              name="kt"
+              value={kontaktForm.kundentyp}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, kundentyp: e.target.value }))}
+              options={[
+                { value: 'privat', label: 'Privat' },
+                { value: 'gewerbe', label: 'Gewerbe' },
+                { value: 'hausverwaltung', label: 'Hausverwaltung' },
+              ]}
+            />
+            <Select
+              label="Kanal"
+              name="kan"
+              value={kontaktForm.kanal}
+              onChange={(e) => setKontaktForm((f) => ({ ...f, kanal: e.target.value as LeadKanal }))}
+              options={[
+                { value: 'website', label: 'Website' },
+                { value: 'telefon', label: 'Telefon' },
+                { value: 'whatsapp', label: 'WhatsApp' },
+                { value: 'email', label: 'E-Mail' },
+                { value: 'vor_ort', label: 'Vor Ort' },
+                { value: 'sonstiges', label: 'Sonstiges' },
+              ]}
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setKontaktModal(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => void saveKontaktModal()}>
+              Speichern
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={projektModal} onClose={() => setProjektModal(false)} title="Projektdaten bearbeiten">
+        <div className="space-y-4">
+          <Select
+            label="Situation"
+            name="sit"
+            value={projektForm.situation}
+            onChange={(e) => setProjektForm((f) => ({ ...f, situation: e.target.value }))}
+            options={[
+              { value: '', label: 'Bitte wählen…' },
+              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung', 'gewerbe'] as const).map((value) => ({
+                value,
+                label: SITUATION_LABELS[value] ?? value,
+              })),
+            ]}
+          />
+          <div>
+            <span className="input-label">Bereiche / Gewerke</span>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {BEREICH_KEYS.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setProjektForm((f) => ({ ...f, bereiche: { ...f.bereiche, [b]: !f.bereiche[b] } }))}
+                  className={cn('chip', projektForm.bereiche[b] ? 'selected' : '')}
+                >
+                  {BEREICH_LABELS[b] ?? b}
+                </button>
+              ))}
+            </div>
+            {projektForm.bereiche.sonstiges ? (
+              <input
+                className="input mt-2"
+                placeholder="Beschreiben…"
+                value={projektForm.sonstigesText}
+                onChange={(e) => setProjektForm((f) => ({ ...f, sonstigesText: e.target.value }))}
+              />
+            ) : null}
+          </div>
+          <div>
+            <label className="input-label">Budget (optional)</label>
+            <div className="relative">
+              <input
+                type="number"
+                className="input pr-8"
+                value={projektForm.budget}
+                onChange={(e) => setProjektForm((f) => ({ ...f, budget: e.target.value }))}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">€</span>
+            </div>
+          </div>
+          <div>
+            <label className="input-label">Gewünschter Zeitraum (optional)</label>
+            <div className="mb-2 flex gap-2">
+              <button
+                type="button"
+                className={cn('btn btn-sm', projektForm.zeitraumTyp === 'tag' ? 'btn-primary' : 'btn-secondary')}
+                onClick={() =>
+                  setProjektForm((f) => ({ ...f, zeitraumTyp: f.zeitraumTyp === 'tag' ? null : 'tag' }))
+                }
+              >
+                Einzeltag
+              </button>
+              <button
+                type="button"
+                className={cn('btn btn-sm', projektForm.zeitraumTyp === 'zeitraum' ? 'btn-primary' : 'btn-secondary')}
+                onClick={() =>
+                  setProjektForm((f) => ({ ...f, zeitraumTyp: f.zeitraumTyp === 'zeitraum' ? null : 'zeitraum' }))
+                }
+              >
+                Zeitraum
+              </button>
+            </div>
+            {projektForm.zeitraumTyp === 'tag' ? (
+              <input
+                type="date"
+                className="input"
+                value={projektForm.zeitraumVon}
+                onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumVon: e.target.value }))}
+              />
+            ) : null}
+            {projektForm.zeitraumTyp === 'zeitraum' ? (
+              <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="input-label">Von</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={projektForm.zeitraumVon}
+                    onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumVon: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Bis</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={projektForm.zeitraumBis}
+                    onChange={(e) => setProjektForm((f) => ({ ...f, zeitraumBis: e.target.value }))}
+                    min={projektForm.zeitraumVon || undefined}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setProjektModal(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => void saveProjektModal()}>
+              Speichern
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

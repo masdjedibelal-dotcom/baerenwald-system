@@ -7,6 +7,7 @@ import { ArrowLeft, Calendar, Copy, Download, Edit3, Pencil, X } from 'lucide-re
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -548,15 +549,9 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
                       <td className="px-3 py-2">
                         {p.menge} {p.einheit}
                       </td>
-                      <td className="px-3 py-2">
-                        {lmin.toLocaleString('de-DE')} – {lmax.toLocaleString('de-DE')} €
-                      </td>
-                      <td className="px-3 py-2">
-                        {mmin.toLocaleString('de-DE')} – {mmax.toLocaleString('de-DE')} €
-                      </td>
-                      <td className="px-3 py-2">
-                        {zmin.toLocaleString('de-DE')} – {zmax.toLocaleString('de-DE')} €
-                      </td>
+                      <td className="px-3 py-2">{formatPreis(undefined, lmin, lmax)}</td>
+                      <td className="px-3 py-2">{formatPreis(undefined, mmin, mmax)}</td>
+                      <td className="px-3 py-2">{formatPreis(undefined, zmin, zmax)}</td>
                     </tr>
                   )
                 })
@@ -566,22 +561,24 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
         </div>
         <div className="mt-3 space-y-1 rounded-lg bg-canvas p-3 text-sm">
           <p>
-            Lohn gesamt: {formatPreis(summen.lohnZeileMin, summen.lohnZeileMax)}
+            Lohn gesamt: {formatPreis(undefined, summen.lohnZeileMin, summen.lohnZeileMax)}
           </p>
           <p>
-            Material gesamt: {formatPreis(summen.materialZeileMin, summen.materialZeileMax)}
+            Material gesamt: {formatPreis(undefined, summen.materialZeileMin, summen.materialZeileMax)}
           </p>
           <p className="font-semibold">
-            Netto: {formatPreis(summen.nettoMin, summen.nettoMax)} · MwSt 19%:{' '}
-            {formatPreis(summen.mwstBetragMin, summen.mwstBetragMax)} · Brutto:{' '}
-            {formatPreis(summen.bruttoMin, summen.bruttoMax)}
+            Netto: {formatPreis(undefined, summen.nettoMin, summen.nettoMax)} · MwSt 19%:{' '}
+            {formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)} · Brutto:{' '}
+            {formatPreis(undefined, summen.bruttoMin, summen.bruttoMax)}
           </p>
           <p className="text-xs text-muted">
-            Intern — Einkauf: {formatPreis(summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge:{' '}
-            {formatPreis(summen.margeMin, summen.margeMax)}
+            Intern — Einkauf: {formatPreis(undefined, summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge:{' '}
+            {formatPreis(undefined, summen.margeMin, summen.margeMax)}
           </p>
         </div>
-        <p className="mt-2 text-sm text-muted">Gespeichert (DB): {formatPreis(min, max)}</p>
+        <p className="mt-2 text-sm text-muted">
+          Gespeichert (DB): {formatPreis(detail.gesamt_fix ?? null, min, max)}
+        </p>
       </section>
 
       <section className="mb-6">
@@ -692,324 +689,299 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
         <p className="mt-1 text-xs text-muted">Erstellt: {formatDatum(detail.created_at)}</p>
       </section>
 
-      {kundeAbModalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="kunde-ab-title"
-        >
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-xl">
-            <h2 id="kunde-ab-title" className="text-lg font-semibold text-ink">
-              Kunde hat abgelehnt
-            </h2>
-            <p className="mt-1 text-sm text-muted">Warum hat der Kunde abgelehnt? (Pflichtfeld)</p>
-            <div className="mt-4 space-y-4">
-              <Select
-                label="Grund"
-                name="k_ab_grund"
-                value={kAbGrund}
-                onChange={(e) => setKAbGrund(e.target.value as KundeAblehnungGrund | '')}
-                options={[
-                  { value: '', label: 'Grund wählen' },
-                  ...KUNDE_ABLEHNUNG_GRUND_VALUES.map((v) => ({
-                    value: v,
-                    label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
-                  })),
-                ]}
+      <Modal
+        open={kundeAbModalOpen}
+        onClose={() => setKundeAbModalOpen(false)}
+        title="Kunde hat abgelehnt"
+        size="lg"
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setKundeAbModalOpen(false)}
+              disabled={pending}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              loading={pending}
+              onClick={() => {
+                if (!kAbGrund) {
+                  setErr('Bitte einen Ablehnungsgrund wählen.')
+                  return
+                }
+                const kp = kAbKonkurrenz.trim().replace(',', '.')
+                const konk =
+                  kp === '' || Number.isNaN(parseFloat(kp)) ? null : Math.round(parseFloat(kp) * 100) / 100
+                setKundeAbModalOpen(false)
+                run(() =>
+                  recordKundeAbgelehntMitDetails(detail.id, {
+                    grund: kAbGrund,
+                    konkurrenz_preis_eur: konk,
+                    notiz: kAbNotiz.trim() || null,
+                  })
+                )
+              }}
+            >
+              Speichern
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">Warum hat der Kunde abgelehnt? (Pflichtfeld)</p>
+        <div className="mt-4 space-y-4">
+          <Select
+            label="Grund"
+            name="k_ab_grund"
+            value={kAbGrund}
+            onChange={(e) => setKAbGrund(e.target.value as KundeAblehnungGrund | '')}
+            options={[
+              { value: '', label: 'Grund wählen' },
+              ...KUNDE_ABLEHNUNG_GRUND_VALUES.map((v) => ({
+                value: v,
+                label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
+              })),
+            ]}
+          />
+          <div>
+            <label className="mb-1 block text-base font-medium text-ink">
+              Konkurrenz-Angebot (optional)
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                step={100}
+                value={kAbKonkurrenz}
+                onChange={(e) => setKAbKonkurrenz(e.target.value)}
+                placeholder="0"
+                className="flex-1"
               />
-              <div>
-                <label className="mb-1 block text-base font-medium text-ink">
-                  Konkurrenz-Angebot (optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={100}
-                    value={kAbKonkurrenz}
-                    onChange={(e) => setKAbKonkurrenz(e.target.value)}
-                    placeholder="0"
-                    className="flex-1"
-                  />
-                  <span className="text-muted">€</span>
-                </div>
-              </div>
-              <Textarea
-                label="Weitere Details (optional)"
-                value={kAbNotiz}
-                onChange={(e) => setKAbNotiz(e.target.value)}
-                rows={3}
-              />
+              <span className="text-muted">€</span>
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setKundeAbModalOpen(false)}
-                disabled={pending}
-              >
-                Abbrechen
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                loading={pending}
-                onClick={() => {
-                  if (!kAbGrund) {
-                    setErr('Bitte einen Ablehnungsgrund wählen.')
+          </div>
+          <Textarea
+            label="Weitere Details (optional)"
+            value={kAbNotiz}
+            onChange={(e) => setKAbNotiz(e.target.value)}
+            rows={3}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={nachfassenModalOpen}
+        onClose={() => setNachfassenModalOpen(false)}
+        title="Erinnerung anlegen"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={() => setNachfassenModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={pending}
+              onClick={() => {
+                setErr(null)
+                startTransition(async () => {
+                  const r = await planNachfassenTerminFuerAngebot({
+                    angebotId: detail.id,
+                    datum: nachfassenDatum,
+                  })
+                  if (!r.ok) {
+                    setErr(r.message)
                     return
                   }
-                  const kp = kAbKonkurrenz.trim().replace(',', '.')
-                  const konk =
-                    kp === '' || Number.isNaN(parseFloat(kp)) ? null : Math.round(parseFloat(kp) * 100) / 100
-                  setKundeAbModalOpen(false)
-                  run(() =>
-                    recordKundeAbgelehntMitDetails(detail.id, {
-                      grund: kAbGrund,
-                      konkurrenz_preis_eur: konk,
-                      notiz: kAbNotiz.trim() || null,
-                    })
-                  )
-                }}
-              >
-                Speichern
-              </Button>
-            </div>
-          </Card>
+                  setNachfassenModalOpen(false)
+                  setMsg('Kalender-Termin angelegt.')
+                  router.refresh()
+                })
+              }}
+            >
+              Speichern
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">Voreinstellung: +14 Tage</p>
+        <div className="mt-4">
+          <Input
+            label="Datum"
+            type="date"
+            value={nachfassenDatum}
+            onChange={(e) => setNachfassenDatum(e.target.value)}
+          />
         </div>
-      ) : null}
+      </Modal>
 
-      {nachfassenModalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-        >
-          <Card className="w-full max-w-md p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-ink">Erinnerung anlegen</h2>
-            <p className="mt-1 text-sm text-muted">Voreinstellung: +14 Tage</p>
-            <div className="mt-4">
-              <Input
-                label="Datum"
-                type="date"
-                value={nachfassenDatum}
-                onChange={(e) => setNachfassenDatum(e.target.value)}
-              />
-            </div>
-            <div className="mt-6 flex gap-2">
-              <Button type="button" variant="secondary" onClick={() => setNachfassenModalOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                loading={pending}
-                onClick={() => {
-                  setErr(null)
-                  startTransition(async () => {
-                    const r = await planNachfassenTerminFuerAngebot({
-                      angebotId: detail.id,
-                      datum: nachfassenDatum,
-                    })
-                    if (!r.ok) {
-                      setErr(r.message)
-                      return
-                    }
-                    setNachfassenModalOpen(false)
-                    setMsg('Kalender-Termin angelegt.')
-                    router.refresh()
+      <Modal
+        open={Boolean(replaceModal)}
+        onClose={() => setReplaceModal(null)}
+        title={replaceModal ? `${replaceModal.gewerkName} — neuen Handwerker wählen` : 'Handwerker wählen'}
+        size="lg"
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setReplaceModal(null)}>
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={pending}
+              disabled={!replaceSelectedId}
+              onClick={() => {
+                if (!replaceSelectedId || !replaceModal) return
+                const alteId = replaceModal.zuweisungId
+                const neueId = replaceSelectedId
+                setReplaceModal(null)
+                run(() =>
+                  replaceAngebotHandwerkerUndSenden({
+                    angebotId: detail.id,
+                    alteZuweisungId: alteId,
+                    neuerHandwerkerId: neueId,
                   })
-                }}
-              >
-                Speichern
-              </Button>
-            </div>
-          </Card>
-        </div>
-      ) : null}
+                )
+              }}
+            >
+              Auswählen und anfragen
+            </Button>
+          </div>
+        }
+      >
+        {replaceListErr ? <p className="mb-2 text-sm text-danger">{replaceListErr}</p> : null}
+        <ul className="max-h-[55vh] space-y-3 overflow-y-auto">
+          {replaceHwList.map((h) => (
+            <li key={h.id}>
+              <label className="flex cursor-pointer gap-3 rounded-lg border border-border p-3 hover:bg-canvas">
+                <input
+                  type="radio"
+                  name="replace-hw"
+                  className="mt-1"
+                  checked={replaceSelectedId === h.id}
+                  onChange={() => setReplaceSelectedId(h.id)}
+                />
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-medium text-ink">
+                    {h.name}
+                    {h.firma ? <span className="text-muted"> · {h.firma}</span> : null}
+                  </p>
+                  {h.telefon ? (
+                    <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="text-primary underline">
+                      {h.telefon}
+                    </a>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                  <p className="text-xs text-muted">
+                    Letzter Einsatz: {h.letzter_einsatz ? formatDatum(h.letzter_einsatz) : '—'}
+                  </p>
+                  <span
+                    className={cn(
+                      'mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium',
+                      h.verfuegbar ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'
+                    )}
+                  >
+                    {h.verfuegbar ? 'Aktuell verfügbar' : 'Mit laufenden Aufträgen'}
+                  </span>
+                </div>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </Modal>
 
-      {replaceModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-        >
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-ink">
-              {replaceModal.gewerkName} — neuen Handwerker wählen
-            </h2>
-            {replaceListErr ? (
-              <p className="mt-2 text-sm text-danger">{replaceListErr}</p>
-            ) : null}
-            <ul className="mt-4 space-y-3">
-              {replaceHwList.map((h) => (
-                <li key={h.id}>
-                  <label className="flex cursor-pointer gap-3 rounded-lg border border-border p-3 hover:bg-canvas">
-                    <input
-                      type="radio"
-                      name="replace-hw"
-                      className="mt-1"
-                      checked={replaceSelectedId === h.id}
-                      onChange={() => setReplaceSelectedId(h.id)}
-                    />
-                    <div className="min-w-0 flex-1 text-sm">
-                      <p className="font-medium text-ink">
-                        {h.name}
-                        {h.firma ? <span className="text-muted"> · {h.firma}</span> : null}
-                      </p>
-                      {h.telefon ? (
-                        <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="text-primary underline">
-                          {h.telefon}
-                        </a>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                      <p className="text-xs text-muted">
-                        Letzter Einsatz:{' '}
-                        {h.letzter_einsatz ? formatDatum(h.letzter_einsatz) : '—'}
-                      </p>
-                      <span
-                        className={cn(
-                          'mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium',
-                          h.verfuegbar ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'
-                        )}
-                      >
-                        {h.verfuegbar ? 'Aktuell verfügbar' : 'Mit laufenden Aufträgen'}
-                      </span>
-                    </div>
-                  </label>
-                </li>
-              ))}
+      <Modal
+        open={auftragModalOpen}
+        onClose={() => setAuftragModalOpen(false)}
+        title="Auftrag erstellen"
+        size="lg"
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setAuftragModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={pending}
+              onClick={() => {
+                setAuftragModalOpen(false)
+                run(() =>
+                  createAuftragFromAngebot(detail.id, {
+                    start_datum: aufStart,
+                    end_datum: aufEnde,
+                    notizen: aufNotizen.trim() || null,
+                    send_kunden_email: aufMailKunde,
+                    send_handwerker_email: aufMailHw,
+                  })
+                )
+              }}
+            >
+              Auftrag erstellen
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <p>
+            <span className="text-muted">Kunde:</span>{' '}
+            <span className="font-medium text-ink">{kunde?.name ?? '—'}</span>
+          </p>
+          <p>
+            <span className="text-muted">Gewerke:</span>{' '}
+            <span className="font-medium text-ink">
+              {Array.from(new Set(pos.map((p) => p.gewerk_name))).join(', ') || '—'}
+            </span>
+          </p>
+          <div className="rounded-lg border border-border bg-canvas/40 p-3">
+            <p className="text-xs font-semibold uppercase text-muted">Handwerker (akzeptiert)</p>
+            <ul className="mt-2 space-y-1">
+              {(detail.angebot_handwerker ?? [])
+                .filter((z) => z.status === 'akzeptiert')
+                .map((z) => (
+                  <li key={z.id}>
+                    {z.gewerke?.name ?? 'Gewerk'}: {z.handwerker?.name ?? '—'}
+                  </li>
+                ))}
             </ul>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={() => setReplaceModal(null)}>
-                Abbrechen
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                loading={pending}
-                disabled={!replaceSelectedId}
-                onClick={() => {
-                  if (!replaceSelectedId || !replaceModal) return
-                  const alteId = replaceModal.zuweisungId
-                  const neueId = replaceSelectedId
-                  setReplaceModal(null)
-                  run(() =>
-                    replaceAngebotHandwerkerUndSenden({
-                      angebotId: detail.id,
-                      alteZuweisungId: alteId,
-                      neuerHandwerkerId: neueId,
-                    })
-                  )
-                }}
-              >
-                Auswählen und anfragen
-              </Button>
-            </div>
-          </Card>
+          </div>
+          <Input
+            label="Start-Datum"
+            type="date"
+            required
+            value={aufStart}
+            onChange={(e) => {
+              const v = e.target.value
+              setAufStart(v)
+              setAufEnde(addDaysYmd(v, 14))
+            }}
+          />
+          <Input
+            label="Geschätztes End-Datum"
+            type="date"
+            value={aufEnde}
+            onChange={(e) => setAufEnde(e.target.value)}
+          />
+          <Textarea
+            label="Interne Notizen"
+            value={aufNotizen}
+            onChange={(e) => setAufNotizen(e.target.value)}
+            rows={3}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={aufMailKunde} onChange={(e) => setAufMailKunde(e.target.checked)} />
+            Auftragsbestätigung an Kundin senden
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={aufMailHw} onChange={(e) => setAufMailHw(e.target.checked)} />
+            Info an alle Handwerker senden
+          </label>
         </div>
-      ) : null}
-
-      {auftragModalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-        >
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-ink">Auftrag erstellen</h2>
-            <div className="mt-4 space-y-3 text-sm">
-              <p>
-                <span className="text-muted">Kunde:</span>{' '}
-                <span className="font-medium text-ink">{kunde?.name ?? '—'}</span>
-              </p>
-              <p>
-                <span className="text-muted">Gewerke:</span>{' '}
-                <span className="font-medium text-ink">
-                  {Array.from(new Set(pos.map((p) => p.gewerk_name))).join(', ') || '—'}
-                </span>
-              </p>
-              <div className="rounded-lg border border-border bg-canvas/40 p-3">
-                <p className="text-xs font-semibold uppercase text-muted">Handwerker (akzeptiert)</p>
-                <ul className="mt-2 space-y-1">
-                  {(detail.angebot_handwerker ?? [])
-                    .filter((z) => z.status === 'akzeptiert')
-                    .map((z) => (
-                      <li key={z.id}>
-                        {z.gewerke?.name ?? 'Gewerk'}: {z.handwerker?.name ?? '—'}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-              <Input
-                label="Start-Datum"
-                type="date"
-                required
-                value={aufStart}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setAufStart(v)
-                  setAufEnde(addDaysYmd(v, 14))
-                }}
-              />
-              <Input
-                label="Geschätztes End-Datum"
-                type="date"
-                value={aufEnde}
-                onChange={(e) => setAufEnde(e.target.value)}
-              />
-              <Textarea
-                label="Interne Notizen"
-                value={aufNotizen}
-                onChange={(e) => setAufNotizen(e.target.value)}
-                rows={3}
-              />
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={aufMailKunde}
-                  onChange={(e) => setAufMailKunde(e.target.checked)}
-                />
-                Auftragsbestätigung an Kundin senden
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={aufMailHw}
-                  onChange={(e) => setAufMailHw(e.target.checked)}
-                />
-                Info an alle Handwerker senden
-              </label>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={() => setAuftragModalOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                loading={pending}
-                onClick={() => {
-                  setAuftragModalOpen(false)
-                  run(() =>
-                    createAuftragFromAngebot(detail.id, {
-                      start_datum: aufStart,
-                      end_datum: aufEnde,
-                      notizen: aufNotizen.trim() || null,
-                      send_kunden_email: aufMailKunde,
-                      send_handwerker_email: aufMailHw,
-                    })
-                  )
-                }}
-              >
-                Auftrag erstellen
-              </Button>
-            </div>
-          </Card>
-        </div>
-      ) : null}
+      </Modal>
 
     </div>
   )
