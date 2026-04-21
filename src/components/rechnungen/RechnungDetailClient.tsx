@@ -122,7 +122,7 @@ export function RechnungDetailClient({ detail: initial }: { detail: Rechnung }) 
           {detail.faellig_am ? formatDatum(detail.faellig_am) : '—'}
         </p>
         <p>
-          <span className="text-muted">Brutto:</span> {formatPreis(detail.brutto, detail.brutto)}
+          <span className="text-muted">Brutto:</span> {formatPreis(detail.brutto)}
         </p>
         <div className="flex flex-wrap gap-2 pt-2">
           {detail.status === 'entwurf' ? (
@@ -144,15 +144,15 @@ export function RechnungDetailClient({ detail: initial }: { detail: Rechnung }) 
       <section className="mb-6">
         <h2 className="mb-2 text-lg font-semibold text-ink">Summen</h2>
         <Card className="space-y-1 p-4 text-sm">
-          <p>Lohn netto: {formatPreis(detail.lohn_netto, detail.lohn_netto)}</p>
-          <p>Material netto: {formatPreis(detail.material_netto, detail.material_netto)}</p>
-          <p>Netto: {formatPreis(detail.netto, detail.netto)}</p>
+          <p>Lohn netto: {formatPreis(detail.lohn_netto)}</p>
+          <p>Material netto: {formatPreis(detail.material_netto)}</p>
+          <p>Netto: {formatPreis(detail.netto)}</p>
           <p>
-            MwSt ({detail.mwst_satz ?? 19}%): {formatPreis(detail.mwst_betrag, detail.mwst_betrag)}
+            MwSt ({detail.mwst_satz ?? 19}%): {formatPreis(detail.mwst_betrag)}
           </p>
-          <p className="font-semibold">Brutto: {formatPreis(detail.brutto, detail.brutto)}</p>
+          <p className="font-semibold">Brutto: {formatPreis(detail.brutto)}</p>
           <p className="text-xs text-muted pt-2 border-t border-border">
-            Aus Positionen berechnet (Min): Netto {formatPreis(summen.nettoMin, summen.nettoMin)}
+            Aus Positionen berechnet (Min): Netto {formatPreis(summen.nettoMin)}
           </p>
         </Card>
       </section>

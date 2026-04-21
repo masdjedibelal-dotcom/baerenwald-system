@@ -50,9 +50,9 @@ export function FloatingAction() {
     <>
       {open ? (
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} role="presentation" />
+          <div className="z-header fixed inset-0" onClick={() => setOpen(false)} role="presentation" />
 
-          <div className="fixed bottom-24 right-4 z-30 flex flex-col items-end space-y-2">
+          <div className="z-header fixed bottom-24 right-4 flex flex-col items-end space-y-2">
             {ACTIONS.map((item, i) => {
               const Icon = item.icon
               return (

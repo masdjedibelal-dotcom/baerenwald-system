@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PublicProjektPayload } from '@/lib/projekt/load-public-projekt'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
-import { formatDatum, formatDatumZeit } from '@/lib/utils'
+import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {
@@ -284,14 +284,19 @@ export function ProjektStatusClient({
                     <li key={i} className="flex justify-between gap-2 border-b border-dashed border-[#E5E3DF] pb-2 last:border-0">
                       <span className="min-w-0">{(p.beschreibung || p.leistung).trim()}</span>
                       <span className="shrink-0 whitespace-nowrap font-medium text-[#2E7D52]">
-                        {p.gesamt_min.toLocaleString('de-DE')} – {p.gesamt_max.toLocaleString('de-DE')} €
+                        {formatPreis(undefined, p.gesamt_min, p.gesamt_max)}
                       </span>
                     </li>
                   ))}
                 </ul>
                 {angebote.gesamt_min != null && angebote.gesamt_max != null ? (
                   <p className="mt-3 text-sm font-semibold">
-                    Gesamt: {angebote.gesamt_min.toLocaleString('de-DE')} – {angebote.gesamt_max.toLocaleString('de-DE')} €
+                    Gesamt:{' '}
+                    {formatPreis(
+                      (angebote as { gesamt_fix?: number | null }).gesamt_fix ?? null,
+                      angebote.gesamt_min,
+                      angebote.gesamt_max
+                    )}
                   </p>
                 ) : null}
                 <p className="mt-2 text-xs text-[#6B7280]">Detailliertes Angebot finden Sie in Ihrer E-Mail.</p>
@@ -308,9 +313,7 @@ export function ProjektStatusClient({
                 <li key={n.id} className="flex justify-between gap-2">
                   <span className="min-w-0">{n.grund}</span>
                   <span className="shrink-0 font-medium">
-                    {n.gesamt_min != null && n.gesamt_max != null
-                      ? `${Number(n.gesamt_min).toLocaleString('de-DE')} – ${Number(n.gesamt_max).toLocaleString('de-DE')} €`
-                      : '—'}
+                    {formatPreis(undefined, n.gesamt_min, n.gesamt_max)}
                   </span>
                 </li>
               ))}

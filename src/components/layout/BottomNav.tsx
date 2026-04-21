@@ -47,7 +47,7 @@ export function BottomNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex h-16 items-center justify-around border-t border-bw-border bg-bw-card md:hidden"
+        className="z-header fixed bottom-0 left-0 right-0 flex h-16 items-center justify-around border-t border-bw-border bg-bw-card md:hidden"
         style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
       >
         {NAV_ITEMS.map((item) => {

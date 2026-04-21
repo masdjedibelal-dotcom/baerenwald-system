@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Pencil, Trash2, Upload, X } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
@@ -11,33 +12,110 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { cn, formatPreis } from '@/lib/utils'
 import type { Gewerk, Preisliste } from '@/lib/types'
-import {
-  createGewerk,
-  createPreisliste,
-  setGewerkAktiv,
-  softDeletePreisliste,
-  updateGewerk,
-  updatePreisliste,
-} from '@/app/(dashboard)/preislisten/actions'
+import { createPreisliste, softDeletePreisliste, updatePreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { sortPreislistenRows } from '@/lib/preislisten-sort'
-import { EINHEIT_SONSTIGES, EINHEIT_VORSCHLAEGE, resolveEinheitwahl } from '@/lib/preislisten-einheiten'
+import {
+  EINHEIT_CUSTOM,
+  EINHEIT_VORSCHLAEGE,
+  einheitSelectOptions,
+  resolveEinheitwahl,
+  splitEinheitStored,
+} from '@/lib/preislisten-einheiten'
 import { PreislistenCsvImportModal } from '@/components/preislisten/PreislistenCsvImportModal'
+import { Modal } from '@/components/ui/Modal'
+import { Toggle } from '@/components/ui/Toggle'
 import type { PreislistenImportResponse } from '@/lib/preislisten-import'
 
-const NEUE_KATEGORIE = '__neu__'
+const NEUE_KAT = '__neu__'
 
-function kategorieLabel(r: Preisliste): string {
-  return (r.kategorie ?? '').trim() || 'Ohne Kategorie'
+function isPresetEinheit(e: string): boolean {
+  return (EINHEIT_VORSCHLAEGE as readonly string[]).includes(e)
 }
 
-function groupByKategorie(rows: Preisliste[]): [string, Preisliste[]][] {
-  const m = new Map<string, Preisliste[]>()
-  for (const r of rows) {
-    const k = kategorieLabel(r)
-    if (!m.has(k)) m.set(k, [])
-    m.get(k)!.push(r)
+/** DB-Feld `kategorie` = Oberkategorie im UI */
+function oberkategorieLabel(l: Preisliste): string {
+  return (l.kategorie ?? '').trim() || 'Sonstiges'
+}
+
+function groupByOberkategorie(leistungen: Preisliste[]): Record<string, Preisliste[]> {
+  return leistungen.reduce<Record<string, Preisliste[]>>((acc, l) => {
+    const kat = oberkategorieLabel(l)
+    if (!acc[kat]) acc[kat] = []
+    acc[kat].push(l)
+    return acc
+  }, {})
+}
+
+function LeistungsZeile({
+  leistung,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  leistung: Preisliste
+  onEdit: () => void
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  const preisFix = leistung.preis_min === leistung.preis_max ? leistung.preis_min : undefined
+  return (
+    <div
+      className={cn(
+        '-mx-1 flex items-center justify-between rounded-md border-b border-bw-border px-2 py-2.5 transition-colors last:border-0 hover:bg-bw-hover'
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div
+          className={cn(
+            'text-sm font-medium',
+            leistung.aktiv ? 'text-bw-text' : 'text-bw-text-muted line-through'
+          )}
+        >
+          {leistung.leistung}
+        </div>
+        <div className="mt-0.5 text-xs text-bw-text-muted">
+          {leistung.einheit} · {formatPreis(preisFix, leistung.preis_min, leistung.preis_max)}
+        </div>
+      </div>
+      <div className="ml-2 flex flex-shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onEdit()}
+          className="rounded-md p-1.5 text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
+          aria-label="Bearbeiten"
+        >
+          ✏️
+        </button>
+        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+          <Toggle checked={leistung.aktiv} onChange={() => onToggle()} />
+        </div>
+        <button
+          type="button"
+          onClick={() => onDelete()}
+          className="rounded-md p-1.5 text-bw-text-muted transition-colors hover:text-status-cancel-text"
+          aria-label="Entfernen"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type LeistungForm = {
+  gewerk_id: string
+  leistung: string
+  einheit: string
+  aktiv: boolean
+}
+
+function emptyForm(gewerkId: string): LeistungForm {
+  return {
+    gewerk_id: gewerkId,
+    leistung: '',
+    einheit: 'pauschal',
+    aktiv: true,
   }
-  return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b, 'de'))
 }
 
 export function PreislistenClient({
@@ -49,7 +127,7 @@ export function PreislistenClient({
 }) {
   const router = useRouter()
   const [rows, setRows] = useState<Preisliste[]>(() => sortPreislistenRows(initialRows))
-  const [gewAll, setGewAll] = useState(gewerkeAlle)
+  const gewAll = gewerkeAlle
 
   useEffect(() => {
     setRows(sortPreislistenRows(initialRows))
@@ -68,126 +146,234 @@ export function PreislistenClient({
     return rows.filter((r) => r.gewerk_id === activeGewerkId)
   }, [rows, activeGewerkId])
 
-  const grouped = useMemo(() => groupByKategorie(filtered), [filtered])
+  const groupedEntries = useMemo(() => {
+    const grouped = groupByOberkategorie(filtered)
+    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b, 'de'))
+  }, [filtered])
 
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<{
-    kategorie: string
-    leistung: string
-    einheit: string
-    preis_min: string
-    preis_max: string
-    aktiv: boolean
-  } | null>(null)
+  const [editLeistung, setEditLeistung] = useState<Preisliste | null>(null)
+  const [neuOpen, setNeuOpen] = useState(false)
+  const modalOpen = neuOpen || !!editLeistung
 
-  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState<LeistungForm>(() => emptyForm(''))
+  const [oberkatSelect, setOberkatSelect] = useState('')
+  const [neueKategorie, setNeueKategorie] = useState('')
+  const [preisTyp, setPreisTyp] = useState<'fix' | 'range'>('range')
+  const [preFix, setPreFix] = useState('')
+  const [preMin, setPreMin] = useState('')
+  const [preMax, setPreMax] = useState('')
+
   const [csvOpen, setCsvOpen] = useState(false)
   const [importBanner, setImportBanner] = useState<string | null>(null)
-
-  const [modalGewerk, setModalGewerk] = useState('')
-  const [modalKategorieModus, setModalKategorieModus] = useState<string>('')
-  const [modalKategorieNeu, setModalKategorieNeu] = useState('')
-  const [modalLeistung, setModalLeistung] = useState('')
-  const [modalEinheitWahl, setModalEinheitWahl] = useState('pauschal')
-  const [modalEinheitFrei, setModalEinheitFrei] = useState('')
-  const [modalMin, setModalMin] = useState('')
-  const [modalMax, setModalMax] = useState('')
-  const [modalAktiv, setModalAktiv] = useState(true)
-
-  const [newGewerkName, setNewGewerkName] = useState('')
-  const [gewerkEditId, setGewerkEditId] = useState<string | null>(null)
-  const [gewerkDraftName, setGewerkDraftName] = useState('')
-
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
 
-  const kategorienFuerModal = useMemo(() => {
+  const kategorienFuerGewerk = useMemo(() => {
     const s = new Set<string>()
     for (const r of rows) {
-      if (r.gewerk_id === modalGewerk) {
+      if (r.gewerk_id === form.gewerk_id) {
         const c = (r.kategorie ?? '').trim()
         if (c) s.add(c)
       }
     }
     return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'))
-  }, [rows, modalGewerk])
+  }, [rows, form.gewerk_id])
 
-  const kategorieSelectOptions = useMemo(
+  const oberkategorieOptions = useMemo(
     () => [
-      { value: '', label: '— Kategorie wählen —' },
-      ...kategorienFuerModal.map((k) => ({ value: k, label: k })),
-      { value: NEUE_KATEGORIE, label: 'Neue Kategorie …' },
+      { value: '', label: 'Bitte wählen…' },
+      ...kategorienFuerGewerk.map((k) => ({ value: k, label: k })),
+      { value: NEUE_KAT, label: '+ Neue Kategorie…' },
     ],
-    [kategorienFuerModal]
+    [kategorienFuerGewerk]
   )
 
-  useEffect(() => {
-    if (!editingId) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') cancelEdit()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [editingId])
+  const einheitSelectValue = isPresetEinheit(form.einheit) ? form.einheit : EINHEIT_CUSTOM
+  const showCustomEinheit = einheitSelectValue === EINHEIT_CUSTOM
+  const showNeueKat = oberkatSelect === NEUE_KAT
 
-  function beginEdit(row: Preisliste) {
-    setEditingId(row.id)
-    setDraft({
-      kategorie: (row.kategorie ?? '').trim(),
+  const aktuellesGewerk = gewAll.find((g) => g.id === form.gewerk_id)
+
+  function closeModal() {
+    setEditLeistung(null)
+    setNeuOpen(false)
+    setErr(null)
+  }
+
+  function openNeuModal() {
+    const gid = activeGewerkId ?? gewerkeTabs[0]?.id ?? ''
+    setEditLeistung(null)
+    setNeuOpen(true)
+    setForm(emptyForm(gid))
+    setOberkatSelect('')
+    setNeueKategorie('')
+    setPreisTyp('range')
+    setPreFix('')
+    setPreMin('')
+    setPreMax('')
+    setErr(null)
+  }
+
+  function openEditLeistung(row: Preisliste) {
+    const sp = splitEinheitStored(row.einheit)
+    const cats = new Set<string>()
+    for (const r of rows) {
+      if (r.gewerk_id === row.gewerk_id) {
+        const c = (r.kategorie ?? '').trim()
+        if (c) cats.add(c)
+      }
+    }
+    const kat = (row.kategorie ?? '').trim()
+    if (kat && cats.has(kat)) {
+      setOberkatSelect(kat)
+      setNeueKategorie('')
+    } else if (kat) {
+      setOberkatSelect(NEUE_KAT)
+      setNeueKategorie(kat)
+    } else {
+      setOberkatSelect('')
+      setNeueKategorie('')
+    }
+
+    setForm({
+      gewerk_id: row.gewerk_id,
       leistung: row.leistung,
-      einheit: row.einheit,
-      preis_min: String(row.preis_min),
-      preis_max: String(row.preis_max),
+      einheit: sp.wahl === EINHEIT_CUSTOM ? sp.freitext : sp.wahl,
       aktiv: row.aktiv,
     })
+    setPreisTyp(row.preis_min === row.preis_max ? 'fix' : 'range')
+    setPreFix(String(row.preis_min))
+    setPreMin(String(row.preis_min))
+    setPreMax(String(row.preis_max))
+    setEditLeistung(row)
+    setNeuOpen(false)
     setErr(null)
   }
 
-  function cancelEdit() {
-    setEditingId(null)
-    setDraft(null)
-    setErr(null)
+  function resolveOberkategorie(): string {
+    if (oberkatSelect === NEUE_KAT) return neueKategorie.trim()
+    return oberkatSelect.trim()
   }
 
-  function saveEdit() {
-    if (!editingId || !draft) return
-    const min = Number(draft.preis_min.replace(',', '.'))
-    const max = Number(draft.preis_max.replace(',', '.'))
-    if (!draft.leistung.trim() || !draft.einheit.trim() || Number.isNaN(min) || Number.isNaN(max)) {
-      setErr('Bitte alle Pflichtfelder ausfüllen.')
+  function handleSave() {
+    if (!form.gewerk_id || !form.leistung.trim()) {
+      setErr('Gewerk und Leistungsname sind Pflicht.')
       return
     }
-    startTransition(async () => {
-      const res = await updatePreisliste(editingId, {
-        kategorie: draft.kategorie.trim(),
-        leistung: draft.leistung.trim(),
-        einheit: draft.einheit.trim(),
-        preis_min: min,
-        preis_max: max,
-        aktiv: draft.aktiv,
-      })
-      if (!res.ok) {
-        setErr(res.message)
+    const kat = resolveOberkategorie()
+    if (!oberkatSelect || (oberkatSelect === NEUE_KAT && !kat)) {
+      setErr('Bitte eine Oberkategorie wählen oder neu eingeben.')
+      return
+    }
+    const einheit = resolveEinheitwahl(
+      showCustomEinheit ? EINHEIT_CUSTOM : form.einheit,
+      showCustomEinheit ? form.einheit : ''
+    )
+    if (!einheit) {
+      setErr('Bitte eine Einheit angeben.')
+      return
+    }
+    let min: number
+    let max: number
+    if (preisTyp === 'fix') {
+      const v = Number(preFix.replace(',', '.'))
+      if (Number.isNaN(v)) {
+        setErr('Preis als Zahl angeben.')
         return
       }
-      setRows((prev) =>
-        sortPreislistenRows(
-          prev.map((r) =>
-            r.id === editingId
-              ? {
-                  ...r,
-                  kategorie: draft.kategorie.trim(),
-                  leistung: draft.leistung.trim(),
-                  einheit: draft.einheit.trim(),
-                  preis_min: min,
-                  preis_max: max,
-                  aktiv: draft.aktiv,
-                }
-              : r
+      min = v
+      max = v
+    } else {
+      min = Number(preMin.replace(',', '.'))
+      if (Number.isNaN(min)) {
+        setErr('„Von“ als Zahl angeben.')
+        return
+      }
+      const maxRaw = preMax.replace(',', '.').trim()
+      const maxParsed = maxRaw === '' ? min : Number(maxRaw)
+      if (Number.isNaN(maxParsed)) {
+        setErr('„Bis“ als Zahl angeben oder leer lassen.')
+        return
+      }
+      max = maxParsed
+    }
+
+    const editId = editLeistung?.id ?? null
+
+    startTransition(async () => {
+      if (editId) {
+        const res = await updatePreisliste(editId, {
+          gewerk_id: form.gewerk_id,
+          kategorie: kat,
+          leistung: form.leistung.trim(),
+          einheit,
+          preis_min: min,
+          preis_max: max,
+          aktiv: form.aktiv,
+        })
+        if (!res.ok) {
+          setErr(res.message)
+          return
+        }
+        const g = gewAll.find((x) => x.id === form.gewerk_id)
+        setRows((prev) =>
+          sortPreislistenRows(
+            prev.map((r) =>
+              r.id === editId
+                ? {
+                    ...r,
+                    gewerk_id: form.gewerk_id,
+                    kategorie: kat,
+                    leistung: form.leistung.trim(),
+                    einheit,
+                    preis_min: min,
+                    preis_max: max,
+                    aktiv: form.aktiv,
+                    gewerke: g ?? r.gewerke,
+                  }
+                : r
+            )
           )
         )
-      )
-      cancelEdit()
+      } else {
+        const res = await createPreisliste({
+          gewerk_id: form.gewerk_id,
+          kategorie: kat,
+          leistung: form.leistung.trim(),
+          einheit,
+          preis_min: min,
+          preis_max: max,
+          aktiv: form.aktiv,
+        })
+        if (!res.ok) {
+          setErr(res.message)
+          return
+        }
+        const g = gewAll.find((x) => x.id === form.gewerk_id)
+        setRows((prev) =>
+          sortPreislistenRows([
+            ...prev,
+            {
+              id: res.id,
+              gewerk_id: form.gewerk_id,
+              kategorie: kat,
+              leistung: form.leistung.trim(),
+              einheit,
+              preis_min: min,
+              preis_max: max,
+              aktiv: form.aktiv,
+              gewerke: g,
+            },
+          ])
+        )
+      }
+      closeModal()
+      setOberkatSelect('')
+      setNeueKategorie('')
+      setPreFix('')
+      setPreMin('')
+      setPreMax('')
+      setErr(null)
       router.refresh()
     })
   }
@@ -205,141 +391,14 @@ export function PreislistenClient({
     })
   }
 
-  function openNeuModal() {
-    setModalGewerk(activeGewerkId ?? gewerkeTabs[0]?.id ?? '')
-    setModalKategorieModus('')
-    setModalKategorieNeu('')
-    setModalLeistung('')
-    setModalEinheitWahl('pauschal')
-    setModalEinheitFrei('')
-    setModalMin('')
-    setModalMax('')
-    setModalAktiv(true)
-    setErr(null)
-    setModalOpen(true)
-  }
-
-  function resolveModalKategorie(): string {
-    if (modalKategorieModus === NEUE_KATEGORIE) return modalKategorieNeu.trim()
-    return modalKategorieModus.trim()
-  }
-
-  function saveNeu() {
-    if (!modalGewerk || !modalLeistung.trim()) {
-      setErr('Gewerk und Leistung sind Pflicht.')
-      return
-    }
-    const kat = resolveModalKategorie()
-    if (!modalKategorieModus || (modalKategorieModus === NEUE_KATEGORIE && !kat)) {
-      setErr('Bitte eine Kategorie wählen oder neu eingeben.')
-      return
-    }
-    const einheit = resolveEinheitwahl(modalEinheitWahl, modalEinheitFrei)
-    if (!einheit) {
-      setErr('Bitte eine Einheit angeben.')
-      return
-    }
-    const min = Number(modalMin.replace(',', '.'))
-    const max = Number(modalMax.replace(',', '.'))
-    if (Number.isNaN(min) || Number.isNaN(max)) {
-      setErr('Preis Min und Max als Zahl angeben.')
-      return
-    }
+  function quickToggleAktiv(row: Preisliste) {
     startTransition(async () => {
-      const res = await createPreisliste({
-        gewerk_id: modalGewerk,
-        kategorie: kat,
-        leistung: modalLeistung,
-        einheit,
-        preis_min: min,
-        preis_max: max,
-        aktiv: modalAktiv,
-      })
+      const res = await updatePreisliste(row.id, { aktiv: !row.aktiv })
       if (!res.ok) {
         setErr(res.message)
         return
       }
-      const g = gewAll.find((x) => x.id === modalGewerk)
-      setRows((prev) =>
-        sortPreislistenRows([
-          ...prev,
-          {
-            id: res.id,
-            gewerk_id: modalGewerk,
-            kategorie: kat,
-            leistung: modalLeistung.trim(),
-            einheit,
-            preis_min: min,
-            preis_max: max,
-            aktiv: modalAktiv,
-            gewerke: g,
-          },
-        ])
-      )
-      setModalOpen(false)
-      setModalLeistung('')
-      setModalKategorieModus('')
-      setModalKategorieNeu('')
-      setModalMin('')
-      setModalMax('')
-      setModalAktiv(true)
-      setErr(null)
-      router.refresh()
-    })
-  }
-
-  function addGewerk() {
-    if (!newGewerkName.trim()) return
-    startTransition(async () => {
-      const res = await createGewerk(newGewerkName)
-      if (!res.ok) {
-        setErr(res.message)
-        return
-      }
-      setGewAll((prev) => [
-        ...prev,
-        { id: res.id, name: res.name, slug: res.slug, aktiv: true },
-      ])
-      setNewGewerkName('')
-      setErr(null)
-      router.refresh()
-    })
-  }
-
-  async function toggleGewerk(g: Gewerk) {
-    const res = await setGewerkAktiv(g.id, !g.aktiv)
-    if (!res.ok) {
-      setErr(res.message)
-      return
-    }
-    setGewAll((prev) => prev.map((x) => (x.id === g.id ? { ...x, aktiv: !g.aktiv } : x)))
-    router.refresh()
-  }
-
-  function startGewerkEdit(g: Gewerk) {
-    setGewerkEditId(g.id)
-    setGewerkDraftName(g.name)
-  }
-
-  function saveGewerkEdit() {
-    if (!gewerkEditId) return
-    const name = gewerkDraftName.trim()
-    if (!name) return
-    startTransition(async () => {
-      const res = await updateGewerk(gewerkEditId, { name })
-      if (!res.ok) {
-        setErr(res.message)
-        return
-      }
-      setGewAll((prev) => prev.map((x) => (x.id === gewerkEditId ? { ...x, name } : x)))
-      setRows((prev) =>
-        prev.map((r) =>
-          r.gewerk_id === gewerkEditId && r.gewerke
-            ? { ...r, gewerke: { ...r.gewerke, name } }
-            : r
-        )
-      )
-      setGewerkEditId(null)
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, aktiv: !row.aktiv } : r)))
       router.refresh()
     })
   }
@@ -354,75 +413,13 @@ export function PreislistenClient({
     router.refresh()
   }
 
-  function renderRowEditor(row: Preisliste, isMobile: boolean) {
-    if (!draft || editingId !== row.id) return null
-    const fieldClass =
-      'w-full min-h-[40px] rounded border border-border bg-surface px-2 text-sm text-ink outline-none focus:border-primary'
-    const onKey = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !isMobile) {
-        e.preventDefault()
-        saveEdit()
-      }
-    }
-    return (
-      <div className={cn('space-y-2', isMobile ? 'mt-3 border-t border-border pt-3' : '')} onClick={(e) => e.stopPropagation()}>
-        <input
-          className={fieldClass}
-          placeholder="Kategorie"
-          value={draft.kategorie}
-          onChange={(e) => setDraft({ ...draft, kategorie: e.target.value })}
-          onKeyDown={onKey}
-        />
-        <input
-          className={fieldClass}
-          placeholder="Leistung"
-          value={draft.leistung}
-          onChange={(e) => setDraft({ ...draft, leistung: e.target.value })}
-          onKeyDown={onKey}
-        />
-        <input
-          className={fieldClass}
-          placeholder="Einheit"
-          value={draft.einheit}
-          onChange={(e) => setDraft({ ...draft, einheit: e.target.value })}
-          onKeyDown={onKey}
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            type="number"
-            className={fieldClass}
-            value={draft.preis_min}
-            onChange={(e) => setDraft({ ...draft, preis_min: e.target.value })}
-            onKeyDown={onKey}
-          />
-          <input
-            type="number"
-            className={fieldClass}
-            value={draft.preis_max}
-            onChange={(e) => setDraft({ ...draft, preis_max: e.target.value })}
-            onKeyDown={onKey}
-          />
-        </div>
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            checked={draft.aktiv}
-            onChange={(e) => setDraft({ ...draft, aktiv: e.target.checked })}
-          />
-          Aktiv
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="primary" onClick={saveEdit} disabled={pending}>
-            <Check className="mr-1 inline h-4 w-4" aria-hidden />
-            Speichern
-          </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={cancelEdit}>
-            Abbrechen
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  const gewerkSelectOptions = useMemo(() => {
+    const list = gewAll
+      .filter((x) => x.aktiv || x.id === form.gewerk_id)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    return [{ value: '', label: 'Bitte wählen…' }, ...list.map((x) => ({ value: x.id, label: x.name }))]
+  }, [gewAll, form.gewerk_id])
 
   return (
     <div>
@@ -453,75 +450,28 @@ export function PreislistenClient({
         </p>
       ) : null}
 
-      <section className="mb-6" aria-label="Gewerke verwalten">
-        <Accordion title="Gewerke verwalten" defaultOpen={false}>
-          <div className="space-y-4 p-1">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                label="Neues Gewerk"
-                value={newGewerkName}
-                onChange={(e) => setNewGewerkName(e.target.value)}
-                placeholder="Name"
-              />
-              <Button type="button" className="sm:self-end" onClick={addGewerk} disabled={pending}>
-                Anlegen
-              </Button>
-            </div>
-            <ul className="divide-y divide-border">
-              {gewAll
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                .map((g) => (
-                  <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                    {gewerkEditId === g.id ? (
-                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                        <input
-                          className="min-h-[44px] min-w-[200px] flex-1 rounded-lg border border-border px-3 text-ink"
-                          value={gewerkDraftName}
-                          onChange={(e) => setGewerkDraftName(e.target.value)}
-                        />
-                        <Button type="button" size="sm" variant="primary" onClick={saveGewerkEdit} disabled={pending}>
-                          Speichern
-                        </Button>
-                        <Button type="button" size="sm" variant="secondary" onClick={() => setGewerkEditId(null)}>
-                          Abbrechen
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="font-medium text-ink">{g.name}</span>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <label className="flex items-center gap-2 text-sm text-muted">
-                            <span>Aktiv</span>
-                            <input
-                              type="checkbox"
-                              checked={g.aktiv}
-                              onChange={() => void toggleGewerk(g)}
-                              aria-label={`${g.name} aktiv`}
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border hover:bg-canvas"
-                            onClick={() => startGewerkEdit(g)}
-                            aria-label="Gewerk bearbeiten"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </li>
-                ))}
-            </ul>
+      <Card className="mb-6 p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-medium text-bw-text">Gewerke verwalten</div>
+            <div className="mt-0.5 text-xs text-bw-text-muted">Gewerke anlegen, bearbeiten und deaktivieren</div>
           </div>
-        </Accordion>
-      </section>
+          <Link href="/einstellungen/gewerke" className="btn btn-secondary btn-sm shrink-0">
+            → Einstellungen
+          </Link>
+        </div>
+      </Card>
 
       <h2 className="section-header mb-4">Leistungen</h2>
 
       {gewerkeTabs.length === 0 ? (
-        <p className="text-sm text-muted">Legen Sie zuerst ein aktives Gewerk an (unten).</p>
+        <p className="text-sm text-muted">
+          Kein aktives Gewerk. Legen Sie Gewerke unter{' '}
+          <Link href="/einstellungen/gewerke" className="font-medium text-primary underline-offset-2 hover:underline">
+            Einstellungen → Gewerke
+          </Link>{' '}
+          an und markieren Sie sie als aktiv.
+        </p>
       ) : (
         <div className="mb-6 -mx-1 flex gap-0 overflow-x-auto border-b border-border px-1 pb-0 [scrollbar-width:thin]">
           {gewerkeTabs.map((g) => (
@@ -542,356 +492,221 @@ export function PreislistenClient({
         </div>
       )}
 
-      {!activeGewerkId ? null : grouped.length === 0 ? (
+      {!activeGewerkId ? null : groupedEntries.length === 0 ? (
         <p className="text-sm text-muted">Keine aktiven Leistungen für dieses Gewerk.</p>
       ) : (
-        <>
-          {/* Mobil: Karten nach Kategorie */}
-          <div className="space-y-8 md:hidden">
-            {grouped.map(([kat, list]) => (
-              <section key={kat}>
-                <h3 className="mb-3 border-b border-border pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-                  {kat}
-                </h3>
-                <div className="space-y-3">
-                  {list.map((row) => {
-                    const editing = editingId === row.id
-                    return (
-                      <Card key={row.id} className="p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-ink">{row.leistung}</p>
-                            <p className="text-xs text-muted">{row.einheit}</p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <span
-                              className={cn(
-                                'h-2.5 w-2.5 rounded-full',
-                                row.aktiv ? 'bg-emerald-500' : 'bg-muted'
-                              )}
-                              title={row.aktiv ? 'Aktiv' : 'Inaktiv'}
-                              aria-hidden
-                            />
-                            <button
-                              type="button"
-                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-border text-ink hover:bg-canvas"
-                              onClick={() => (editing ? cancelEdit() : beginEdit(row))}
-                              aria-label={editing ? 'Abbrechen' : 'Bearbeiten'}
-                            >
-                              {editing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-sm font-medium text-ink">{formatPreis(row.preis_min, row.preis_max)}</p>
-                        {renderRowEditor(row, true)}
-                        {!editing ? (
-                          <div className="mt-3 flex gap-2">
-                            <Button type="button" variant="secondary" size="sm" onClick={() => onSoftDelete(row)}>
-                              Deaktivieren
-                            </Button>
-                          </div>
-                        ) : null}
-                      </Card>
-                    )
-                  })}
-                </div>
-              </section>
-            ))}
-          </div>
-
-          {/* Desktop: Tabellen pro Kategorie */}
-          <div className="hidden space-y-8 md:block">
-            {grouped.map(([kat, list]) => (
-              <section key={kat}>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{kat}</h3>
-                <Card className="overflow-x-auto p-0">
-                  <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-canvas text-muted">
-                        <th className="px-3 py-2 font-medium">Leistung</th>
-                        <th className="px-3 py-2 font-medium">Einheit</th>
-                        <th className="px-3 py-2 font-medium">Min €</th>
-                        <th className="px-3 py-2 font-medium">Max €</th>
-                        <th className="px-3 py-2 font-medium">Aktiv</th>
-                        <th className="px-3 py-2 font-medium">Aktionen</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((row) => {
-                        const isEdit = editingId === row.id
-                        return (
-                          <tr
-                            key={row.id}
-                            className={cn(
-                              'border-b border-border last:border-0',
-                              !isEdit && 'cursor-pointer hover:bg-canvas/80'
-                            )}
-                            onClick={() => {
-                              if (!isEdit) beginEdit(row)
-                            }}
-                          >
-                            {isEdit && draft ? (
-                              <>
-                                <td className="px-3 py-2 align-top">
-                                  <input
-                                    className="w-full min-h-[40px] rounded border border-border px-2"
-                                    value={draft.kategorie}
-                                    onChange={(e) => setDraft({ ...draft, kategorie: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        saveEdit()
-                                      }
-                                      if (e.key === 'Escape') cancelEdit()
-                                    }}
-                                    placeholder="Kategorie"
-                                  />
-                                  <input
-                                    className="mt-1 w-full min-h-[40px] rounded border border-border px-2"
-                                    value={draft.leistung}
-                                    onChange={(e) => setDraft({ ...draft, leistung: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        saveEdit()
-                                      }
-                                      if (e.key === 'Escape') cancelEdit()
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-2 align-top">
-                                  <input
-                                    className="w-full min-h-[40px] rounded border border-border px-2"
-                                    value={draft.einheit}
-                                    onChange={(e) => setDraft({ ...draft, einheit: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        saveEdit()
-                                      }
-                                      if (e.key === 'Escape') cancelEdit()
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-2 align-top">
-                                  <input
-                                    type="number"
-                                    className="w-full min-h-[40px] rounded border border-border px-2"
-                                    value={draft.preis_min}
-                                    onChange={(e) => setDraft({ ...draft, preis_min: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        saveEdit()
-                                      }
-                                      if (e.key === 'Escape') cancelEdit()
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-2 align-top">
-                                  <input
-                                    type="number"
-                                    className="w-full min-h-[40px] rounded border border-border px-2"
-                                    value={draft.preis_max}
-                                    onChange={(e) => setDraft({ ...draft, preis_max: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        saveEdit()
-                                      }
-                                      if (e.key === 'Escape') cancelEdit()
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={draft.aktiv}
-                                    onChange={(e) => setDraft({ ...draft, aktiv: e.target.checked })}
-                                    aria-label="Aktiv"
-                                  />
-                                </td>
-                                <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex gap-1">
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border bg-primary text-white hover:opacity-95"
-                                      onClick={saveEdit}
-                                      disabled={pending}
-                                      aria-label="Speichern"
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border hover:bg-canvas"
-                                      onClick={cancelEdit}
-                                      aria-label="Abbrechen"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-3 py-2 font-medium text-ink">{row.leistung}</td>
-                                <td className="px-3 py-2">{row.einheit}</td>
-                                <td className="px-3 py-2">{row.preis_min}</td>
-                                <td className="px-3 py-2">{row.preis_max}</td>
-                                <td className="px-3 py-2">
-                                  <span
-                                    className={cn(
-                                      'inline-block h-2 w-2 rounded-full',
-                                      row.aktiv ? 'bg-emerald-500' : 'bg-muted'
-                                    )}
-                                    title={row.aktiv ? 'Aktiv' : 'Inaktiv'}
-                                  />
-                                </td>
-                                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex gap-1">
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border hover:bg-canvas"
-                                      onClick={() => beginEdit(row)}
-                                      aria-label="Bearbeiten"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-border text-danger hover:bg-canvas disabled:opacity-40"
-                                      onClick={() => onSoftDelete(row)}
-                                      disabled={!row.aktiv}
-                                      aria-label="Deaktivieren"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </Card>
-              </section>
-            ))}
-          </div>
-        </>
+        <div className="space-y-3">
+          {groupedEntries.map(([kat, items], idx) => (
+            <Accordion key={kat} title={`${kat} (${items.length})`} defaultOpen={idx === 0}>
+              <div className="px-1 pb-1 pt-0">
+                {items.map((l) => (
+                  <LeistungsZeile
+                    key={l.id}
+                    leistung={l}
+                    onEdit={() => openEditLeistung(l)}
+                    onToggle={() => quickToggleAktiv(l)}
+                    onDelete={() => onSoftDelete(l)}
+                  />
+                ))}
+              </div>
+            </Accordion>
+          ))}
+        </div>
       )}
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <p className="mb-3 text-xs text-muted">
-              {gewAll.find((g) => g.id === modalGewerk)?.name ?? 'Gewerk'}
-              {modalKategorieModus && modalKategorieModus !== NEUE_KATEGORIE
-                ? ` → ${modalKategorieModus}`
-                : modalKategorieModus === NEUE_KATEGORIE && modalKategorieNeu.trim()
-                  ? ` → ${modalKategorieNeu.trim()}`
-                  : ''}
-              {modalLeistung.trim() ? ` → ${modalLeistung.trim()}` : ''}
-            </p>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">Neue Leistung</h2>
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editLeistung ? 'Leistung bearbeiten' : 'Neue Leistung'}
+        size="md"
+        footer={
+          <div className="flex gap-2">
+            <button type="button" onClick={closeModal} className="btn btn-secondary">
+              Abbrechen
+            </button>
+            <button type="button" onClick={handleSave} disabled={pending} className="btn btn-primary">
+              Speichern
+            </button>
+          </div>
+        }
+      >
+        {editLeistung ? (
+          <div className="mb-4 border-b border-bw-border pb-3 text-xs text-bw-text-muted">
+            {aktuellesGewerk?.name}
+            {(editLeistung.kategorie ?? '').trim()
+              ? ` → ${(editLeistung.kategorie ?? '').trim()}`
+              : ''}
+            {` → ${editLeistung.leistung}`}
+          </div>
+        ) : null}
+
+        <div className="space-y-4">
+          <Select
+            label="Gewerk *"
+            name="gewerk"
+            value={form.gewerk_id}
+            onChange={(e) => {
+              const v = e.target.value
+              setForm((f) => ({ ...f, gewerk_id: v }))
+              setOberkatSelect('')
+              setNeueKategorie('')
+            }}
+            options={gewerkSelectOptions}
+          />
+
+          <div>
+            <Select
+              label="Oberkategorie *"
+              name="oberkategorie"
+              value={oberkatSelect}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === NEUE_KAT) {
+                  setOberkatSelect(NEUE_KAT)
+                  setNeueKategorie('')
+                } else {
+                  setOberkatSelect(v)
+                  setNeueKategorie('')
+                }
+              }}
+              options={oberkategorieOptions}
+            />
+            {showNeueKat ? (
+              <Input
+                className="mt-2"
+                label="Neue Kategorie"
+                placeholder="Kategorie Name"
+                value={neueKategorie}
+                onChange={(e) => setNeueKategorie(e.target.value)}
+              />
+            ) : null}
+          </div>
+
+          <Input
+            label="Leistungsname *"
+            value={form.leistung}
+            onChange={(e) => setForm((f) => ({ ...f, leistung: e.target.value }))}
+            required
+          />
+
+          <div>
+            <label className="input-label">Preistyp</label>
+            <div className="mt-1 flex gap-2">
               <button
                 type="button"
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted hover:bg-canvas"
-                onClick={() => setModalOpen(false)}
-                aria-label="Schließen"
+                onClick={() => {
+                  setPreisTyp('fix')
+                  if (preMin) {
+                    setPreFix(preMin)
+                    setPreMax(preMin)
+                  }
+                }}
+                className={cn('btn btn-sm', preisTyp === 'fix' ? 'btn-primary' : 'btn-secondary')}
               >
-                <X className="h-6 w-6" />
+                Fixpreis
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreisTyp('range')}
+                className={cn('btn btn-sm', preisTyp === 'range' ? 'btn-primary' : 'btn-secondary')}
+              >
+                Von / Bis
               </button>
             </div>
-            <div className="space-y-4">
-              <Select
-                label="Gewerk"
-                name="gewerk"
-                value={modalGewerk}
-                onChange={(e) => {
-                  setModalGewerk(e.target.value)
-                  setModalKategorieModus('')
-                  setModalKategorieNeu('')
-                }}
-                options={[
-                  { value: '', label: 'Bitte wählen' },
-                  ...gewAll.filter((x) => x.aktiv).map((x) => ({ value: x.id, label: x.name })),
-                ]}
-              />
-              <Select
-                label="Kategorie"
-                name="kategorie"
-                value={modalKategorieModus}
-                onChange={(e) => setModalKategorieModus(e.target.value)}
-                options={kategorieSelectOptions}
-              />
-              {modalKategorieModus === NEUE_KATEGORIE ? (
-                <Input
-                  label="Neue Kategorie"
-                  value={modalKategorieNeu}
-                  onChange={(e) => setModalKategorieNeu(e.target.value)}
-                  placeholder="z. B. Komplettsanierung"
-                />
-              ) : null}
-              <Input label="Leistung" value={modalLeistung} onChange={(e) => setModalLeistung(e.target.value)} required />
-              <Select
-                label="Einheit"
-                name="einheitwahl"
-                value={modalEinheitWahl}
-                onChange={(e) => setModalEinheitWahl(e.target.value)}
-                options={EINHEIT_VORSCHLAEGE}
-              />
-              {modalEinheitWahl === EINHEIT_SONSTIGES ? (
-                <Input
-                  label="Einheit (Freitext)"
-                  value={modalEinheitFrei}
-                  onChange={(e) => setModalEinheitFrei(e.target.value)}
-                />
-              ) : null}
-              <Input
-                type="number"
-                label="Preis Min (€)"
-                value={modalMin}
-                onChange={(e) => setModalMin(e.target.value)}
-                required
-              />
-              <Input
-                type="number"
-                label="Preis Max (€)"
-                value={modalMax}
-                onChange={(e) => setModalMax(e.target.value)}
-                required
-              />
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input type="checkbox" checked={modalAktiv} onChange={(e) => setModalAktiv(e.target.checked)} />
-                Aktiv
+          </div>
+
+          {preisTyp === 'fix' ? (
+            <div>
+              <label className="input-label" htmlFor="preis-fix">
+                Preis *
               </label>
-              <div className="flex gap-2 pt-2">
-                <Button type="button" variant="primary" className="flex-1" onClick={saveNeu} disabled={pending}>
-                  Speichern
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
-                  Abbrechen
-                </Button>
+              <div className="relative">
+                <input
+                  id="preis-fix"
+                  type="number"
+                  className="input w-full pr-9"
+                  value={preFix}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setPreFix(v)
+                    setPreMin(v)
+                    setPreMax(v)
+                  }}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
+                  €
+                </span>
               </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          ) : (
+            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="input-label" htmlFor="preis-von">
+                  Von *
+                </label>
+                <div className="relative">
+                  <input
+                    id="preis-von"
+                    type="number"
+                    className="input w-full pr-9"
+                    value={preMin}
+                    onChange={(e) => setPreMin(e.target.value)}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
+                    €
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="input-label" htmlFor="preis-bis">
+                  Bis
+                </label>
+                <div className="relative">
+                  <input
+                    id="preis-bis"
+                    type="number"
+                    className="input w-full pr-9"
+                    value={preMax}
+                    onChange={(e) => setPreMax(e.target.value)}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
+                    €
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
-      <PreislistenCsvImportModal
-        open={csvOpen}
-        onClose={() => setCsvOpen(false)}
-        onDone={onImportDone}
-      />
+          <div>
+            <Select
+              label="Einheit"
+              name="einheit"
+              value={einheitSelectValue}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === EINHEIT_CUSTOM) {
+                  setForm((f) => ({ ...f, einheit: '' }))
+                } else {
+                  setForm((f) => ({ ...f, einheit: v }))
+                }
+              }}
+              options={einheitSelectOptions()}
+            />
+            {showCustomEinheit ? (
+              <Input
+                className="mt-2"
+                placeholder="z. B. pro Baum"
+                value={form.einheit}
+                onChange={(e) => setForm((f) => ({ ...f, einheit: e.target.value }))}
+              />
+            ) : null}
+          </div>
+
+          <Toggle label="Aktiv" checked={form.aktiv} onChange={(v) => setForm((f) => ({ ...f, aktiv: v }))} />
+        </div>
+      </Modal>
+
+      <PreislistenCsvImportModal open={csvOpen} onClose={() => setCsvOpen(false)} onDone={onImportDone} />
     </div>
   )
 }

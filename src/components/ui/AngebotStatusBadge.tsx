@@ -11,8 +11,14 @@ const styles: Record<AngebotStatus, { bg: string; text: string }> = {
   abgelehnt: { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]' },
 }
 
-export function AngebotStatusBadge({ status }: { status: AngebotStatus }) {
-  const s = styles[status]
+const FALLBACK_STYLE = { bg: 'bg-[#F3F4F6]', text: 'text-[#374151]' }
+
+export function AngebotStatusBadge({ status }: { status: AngebotStatus | string }) {
+  const s = status in styles ? styles[status as AngebotStatus] : FALLBACK_STYLE
+  const label =
+    status in ANGEBOT_STATUS_LABELS
+      ? ANGEBOT_STATUS_LABELS[status as AngebotStatus]
+      : String(status)
   return (
     <span
       className={cn(
@@ -21,7 +27,7 @@ export function AngebotStatusBadge({ status }: { status: AngebotStatus }) {
         s.text
       )}
     >
-      {ANGEBOT_STATUS_LABELS[status]}
+      {label}
     </span>
   )
 }

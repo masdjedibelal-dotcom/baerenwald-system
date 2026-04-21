@@ -24,13 +24,8 @@ import { kundenAvatarClass, kundenInitialen } from '@/components/kunden/TypBadge
 import { TypBadge } from '@/components/kunden/TypBadge'
 import { KundeSidePanel } from '@/components/kunden/KundeSidePanel'
 import { KundeModal } from '@/components/kunden/KundeModal'
-
-const TYP_FILTERS = [
-  { value: '', label: 'Alle Typen' },
-  { value: 'privat', label: 'Privat' },
-  { value: 'gewerbe', label: 'Gewerbe' },
-  { value: 'hausverwaltung', label: 'Hausverwaltung' },
-]
+import { FilterChips } from '@/components/ui/FilterChips'
+import { ListCard } from '@/components/ui/ListCard'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -49,12 +44,20 @@ function formatEur(n: number | null | undefined) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 }
 
-function projekteCount(k: KundeListeZeile) {
-  return k.anzahl_leads + k.anzahl_auftraege
-}
-
 function letzteAktiv(k: KundeListeZeile) {
   return k.letzte_aktivitaet ?? k.created_at
+}
+
+function typBadgeClass(typ: string) {
+  if (typ === 'gewerbe') return 'badge badge-order'
+  if (typ === 'hausverwaltung') return 'badge badge-offer'
+  return 'badge badge-new'
+}
+
+function typBadgeLabel(typ: string) {
+  if (typ === 'gewerbe') return 'Gewerbe'
+  if (typ === 'hausverwaltung') return 'Hausverwaltung'
+  return 'Privat'
 }
 
 type SortRow = {
@@ -66,6 +69,8 @@ type SortRow = {
   aktiv: string
 }
 
+type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
+
 export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
@@ -74,7 +79,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const [panelId, setPanelId] = useState<string | null>(null)
   const [panelRow, setPanelRow] = useState<KundeListeZeile | null>(null)
 
-  const [typFilter, setTypFilter] = useState('')
+  const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
@@ -86,10 +91,23 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
     [zeitraum, customFrom, customTo]
   )
 
+  const typCounts = useMemo(() => {
+    let privat = 0
+    let gewerbe = 0
+    let hausverwaltung = 0
+    for (const k of kunden) {
+      const t = (k.typ || '').toLowerCase()
+      if (t === 'gewerbe') gewerbe++
+      else if (t === 'hausverwaltung') hausverwaltung++
+      else privat++
+    }
+    return { alle: kunden.length, privat, gewerbe, hausverwaltung }
+  }, [kunden])
+
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
     return kunden.filter((k) => {
-      if (typFilter && (k.typ || '').toLowerCase() !== typFilter) return false
+      if (typFilter !== 'alle' && (k.typ || '').toLowerCase() !== typFilter) return false
       if (dateRange && !datumInZeitraum(k.created_at, dateRange)) return false
       if (!needle) return true
       const pool = [
@@ -112,7 +130,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         row: k,
         name: k.name,
         typ: k.typ,
-        projekte: projekteCount(k),
+        projekte: k.anzahl_auftraege ?? 0,
         umsatz: k.gesamt_umsatz ?? 0,
         aktiv: letzteAktiv(k),
       })),
@@ -121,10 +139,10 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(typFilter || zeitraum !== 'alle' || q.trim())
+  const hasFilters = !!(typFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
 
   function resetFilters() {
-    setTypFilter('')
+    setTypFilter('alle')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -133,9 +151,9 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
-    if (typFilter) {
-      const label = TYP_FILTERS.find((x) => x.value === typFilter)?.label
-      if (label) t.push({ id: 'typ', label, onRemove: () => setTypFilter('') })
+    if (typFilter !== 'alle') {
+      const label = typFilter === 'privat' ? 'Privat' : typFilter === 'gewerbe' ? 'Gewerbe' : 'Hausverwaltung'
+      t.push({ id: 'typ', label, onRemove: () => setTypFilter('alle') })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -190,11 +208,25 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         }
       />
 
+      <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:mx-0 md:rounded-lg md:border md:shadow-sm">
+        <FilterChips
+          options={[
+            { label: 'Alle', value: 'alle', count: typCounts.alle },
+            { label: 'Privat', value: 'privat', count: typCounts.privat },
+            { label: 'Gewerbe', value: 'gewerbe', count: typCounts.gewerbe },
+            { label: 'Hausverwaltung', value: 'hausverwaltung', count: typCounts.hausverwaltung },
+          ]}
+          selected={[typFilter]}
+          onChange={(vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle')}
+        />
+      </div>
+
       <ListFilterBar
-        statusLabel="Typ"
-        statusOptions={TYP_FILTERS}
-        statusValue={typFilter}
-        onStatusChange={setTypFilter}
+        hideStatusFilter
+        statusLabel="—"
+        statusOptions={[{ value: '', label: '—' }]}
+        statusValue=""
+        onStatusChange={() => {}}
         zeitraumValue={zeitraum}
         onZeitraumChange={setZeitraum}
         showCustomDates={zeitraum === 'benutzerdefiniert'}
@@ -250,42 +282,19 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         />
       ) : (
         <>
-          <ul className="space-y-3 md:hidden">
+          <ul className="md:hidden">
             {sorted.map(({ row: k }) => (
-              <li key={k.id}>
-                <button
-                  type="button"
+              <li key={k.id} className="border-b border-bw-border bg-bw-card first:border-t">
+                <ListCard
+                  title={k.name}
+                  badge={<span className={typBadgeClass(k.typ)}>{typBadgeLabel(k.typ)}</span>}
+                  subtitle={k.kundennummer ?? undefined}
+                  meta={`${k.anzahl_auftraege ?? 0} Projekte · ${(k.gesamt_umsatz ?? 0).toLocaleString('de')} € · ${formatRelativeDate(letzteAktiv(k))}`}
                   onClick={() => {
                     setPanelId(k.id)
                     setPanelRow(k)
                   }}
-                  className="card w-full p-4 text-left transition-colors hover:bg-bw-hover"
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={cn(
-                        'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold',
-                        kundenAvatarClass(k.typ)
-                      )}
-                    >
-                      {kundenInitialen(k.name)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-semibold text-bw-text">{k.name}</p>
-                        <TypBadge typ={k.typ} />
-                      </div>
-                      <p className="text-xs text-bw-light">{k.kundennummer ?? '—'}</p>
-                      <p className="mt-1 text-sm text-bw-text">
-                        {projekteCount(k)} Projekte · {formatEur(k.gesamt_umsatz)}
-                      </p>
-                      <p className="mt-1 text-xs text-bw-mid">
-                        Letzte Aktivität: {formatRelativeDate(letzteAktiv(k))}
-                      </p>
-                    </div>
-                    <span className="text-bw-light">→</span>
-                  </div>
-                </button>
+                />
               </li>
             ))}
           </ul>
@@ -380,7 +389,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
                     <td className="px-3 py-3">
                       <TypBadge typ={k.typ} />
                     </td>
-                    <td className="px-3 py-3 text-bw-text">{projekteCount(k)}</td>
+                    <td className="px-3 py-3 text-bw-text">{k.anzahl_auftraege ?? 0}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-bw-text">{formatEur(k.gesamt_umsatz)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-bw-mid">
                       {formatRelativeDate(letzteAktiv(k))}

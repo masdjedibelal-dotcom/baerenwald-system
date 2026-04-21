@@ -8,6 +8,10 @@ interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   children: ReactNode
   collapsible?: boolean
   defaultOpen?: boolean
+  /** Zusätzliche Klassen für `card-body` (z. B. `p-0` für volle Breite). */
+  bodyClassName?: string
+  /** Ohne inneres Padding (nur Rahmen), z. B. für Tabellen/List-Shells. */
+  flush?: boolean
 }
 
 export function Card({
@@ -17,6 +21,8 @@ export function Card({
   className = '',
   collapsible = false,
   defaultOpen = true,
+  bodyClassName,
+  flush = false,
   ...props
 }: CardProps) {
   if (collapsible && typeof title === 'string' && title !== '') {
@@ -34,14 +40,14 @@ export function Card({
           <span className="card-title">{title}</span>
           {action ? <div>{action}</div> : null}
         </div>
-        <div className="card-body">{children}</div>
+        <div className={cn('card-body', bodyClassName)}>{children}</div>
       </div>
     )
   }
 
   return (
     <div className={cn('card', className)} {...props}>
-      <div className="p-5">{children}</div>
+      {flush ? <>{children}</> : <div className={cn('p-5', bodyClassName)}>{children}</div>}
     </div>
   )
 }

@@ -54,14 +54,14 @@ export function SidePanel({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50 md:bg-black/20"
+        className="z-sidepanel fixed inset-0 bg-black/50 md:bg-black/20"
         onClick={onClose}
         role="presentation"
         aria-hidden
       />
 
       <div
-        className={`fixed z-50 flex max-h-[90vh] flex-col rounded-t-2xl bg-bw-card shadow-lg animate-slide-up md:inset-y-0 md:right-0 md:max-h-none md:rounded-none md:rounded-l-xl md:animate-slide-right ${widthClass} bottom-0 left-0 right-0 md:bottom-0 md:left-auto md:top-0`}
+        className={`z-sidepanel-pop fixed flex max-h-[90vh] flex-col rounded-t-2xl bg-bw-card shadow-lg animate-slide-up md:inset-y-0 md:right-0 md:max-h-none md:rounded-none md:rounded-l-xl md:animate-slide-right ${widthClass} bottom-0 left-0 right-0 md:bottom-0 md:left-auto md:top-0`}
       >
         <div className="flex justify-center pb-1 pt-3 md:hidden">
           <div className="h-1 w-10 rounded-full bg-bw-border" />

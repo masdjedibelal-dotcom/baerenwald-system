@@ -216,7 +216,7 @@ export function GlobalSearch() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex animate-fade-in items-start justify-center bg-black/40 px-4 pt-[10vh]"
+      className="z-search fixed inset-0 flex animate-fade-in items-start justify-center bg-black/40 px-4 pt-[10vh]"
       onClick={() => setOpen(false)}
       role="presentation"
     >

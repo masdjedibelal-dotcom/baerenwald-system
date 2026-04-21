@@ -19,8 +19,12 @@ const leadStatusStyles: Record<LeadStatus, { bg: string; text: string }> = {
   abgebrochen: { bg: 'bg-status-cancel-bg', text: 'text-status-cancel-text' },
 }
 
-export function LeadStatusBadge({ status }: { status: LeadStatus }) {
-  const s = leadStatusStyles[status]
+const LEAD_FALLBACK_STYLE = { bg: 'bg-[#F3F4F6]', text: 'text-[#374151]' }
+
+export function LeadStatusBadge({ status }: { status: LeadStatus | string }) {
+  const s = status in leadStatusStyles ? leadStatusStyles[status as LeadStatus] : LEAD_FALLBACK_STYLE
+  const label =
+    status in STATUS_LABELS ? STATUS_LABELS[status as LeadStatus] : String(status)
   return (
     <span
       className={cn(
@@ -29,7 +33,7 @@ export function LeadStatusBadge({ status }: { status: LeadStatus }) {
         s.text
       )}
     >
-      {STATUS_LABELS[status]}
+      {label}
     </span>
   )
 }

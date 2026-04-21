@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/Button'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import type { RechnungListeZeile, RechnungStatus } from '@/lib/types'
+import { FilterChips } from '@/components/ui/FilterChips'
+import { ListCard } from '@/components/ui/ListCard'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDatum, formatPreis, cn } from '@/lib/utils'
 import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
@@ -20,15 +23,6 @@ import {
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { toast } from '@/components/ui/app-toast'
-
-const FILTER_CHIPS: { value: 'alle' | RechnungStatus | 'ueberfaellig'; label: string }[] = [
-  { value: 'alle', label: 'Alle' },
-  { value: 'entwurf', label: 'Entwurf' },
-  { value: 'gesendet', label: 'Gesendet' },
-  { value: 'bezahlt', label: 'Bezahlt' },
-  { value: 'ueberfaellig', label: 'Überfällig' },
-  { value: 'storniert', label: 'Storniert' },
-]
 
 const RECHNUNG_EXPORT_FIELDS: ExportField[] = [
   { key: 'rechnungsnummer', label: 'Nummer' },
@@ -86,18 +80,65 @@ function statusBadgeClass(r: RechnungListeZeile) {
   return 'bg-bw-hover text-bw-text'
 }
 
+type RechnungChip = 'alle' | RechnungStatus | 'ueberfaellig'
+
+function rechnungListCardBadge(r: RechnungListeZeile) {
+  if (isUeberfaellig(r)) {
+    return <StatusBadge status="cancel" label="Überfällig" />
+  }
+  if (r.status === 'bezahlt') {
+    return <StatusBadge status="order" label="Bezahlt" />
+  }
+  if (r.status === 'gesendet') {
+    return <StatusBadge status="offer" label="Gesendet" />
+  }
+  if (r.status === 'storniert') {
+    return <StatusBadge status="cancel" label="Storniert" />
+  }
+  return <StatusBadge status="done" label="Entwurf" />
+}
+
 export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) {
   const router = useRouter()
   const { exportToCSV } = useExport()
-  const [chip, setChip] = useState<(typeof FILTER_CHIPS)[number]['value']>('alle')
+  const [chip, setChip] = useState<RechnungChip>('alle')
   const [panel, setPanel] = useState<RechnungListeZeile | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  const statusCounts = useMemo(() => {
+    const c = {
+      alle: rows.length,
+      entwurf: 0,
+      gesendet: 0,
+      bezahlt: 0,
+      ueberfaellig: 0,
+      storniert: 0,
+    }
+    for (const r of rows) {
+      if (r.status === 'storniert') {
+        c.storniert++
+        continue
+      }
+      if (r.status === 'bezahlt') {
+        c.bezahlt++
+        continue
+      }
+      if (isUeberfaellig(r)) {
+        c.ueberfaellig++
+        continue
+      }
+      if (r.status === 'gesendet') c.gesendet++
+      else if (r.status === 'entwurf') c.entwurf++
+    }
+    return c
+  }, [rows])
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (chip === 'alle') return true
       if (chip === 'ueberfaellig') return isUeberfaellig(r)
+      if (chip === 'gesendet') return r.status === 'gesendet' && !isUeberfaellig(r)
       return r.status === chip
     })
   }, [rows, chip])
@@ -156,22 +197,19 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {FILTER_CHIPS.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onClick={() => setChip(c.value)}
-            className={cn(
-              'rounded-full px-3 py-1.5 text-sm transition-colors',
-              chip === c.value
-                ? 'bg-bw-accent font-medium text-white'
-                : 'border border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div className="sticky top-14 z-10 border-b border-bw-border bg-bw-bg px-4 py-3">
+        <FilterChips
+          options={[
+            { label: 'Alle', value: 'alle', count: statusCounts.alle },
+            { label: 'Entwurf', value: 'entwurf', count: statusCounts.entwurf },
+            { label: 'Gesendet', value: 'gesendet', count: statusCounts.gesendet },
+            { label: 'Bezahlt', value: 'bezahlt', count: statusCounts.bezahlt },
+            { label: 'Überfällig', value: 'ueberfaellig', count: statusCounts.ueberfaellig },
+            { label: 'Storniert', value: 'storniert', count: statusCounts.storniert },
+          ]}
+          selected={[chip]}
+          onChange={(vals) => setChip((vals[0] as RechnungChip) || 'alle')}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -211,7 +249,7 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
                   >
                     <td className="px-3 py-3 font-medium text-bw-link">{r.rechnungsnummer}</td>
                     <td className="px-3 py-3 text-bw-text">{kundenName(r.kunden) ?? '—'}</td>
-                    <td className="px-3 py-3">{formatPreis(r.brutto, r.brutto)}</td>
+                    <td className="px-3 py-3">{formatPreis(r.brutto)}</td>
                     <td className="px-3 py-3">
                       <span
                         className={cn(
@@ -232,35 +270,19 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
             </table>
           </div>
 
-          <div className="space-y-3 md:hidden">
+          <ul className="md:hidden">
             {filtered.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setPanel(r)}
-                className="w-full rounded-xl border border-bw-border bg-bw-card p-4 text-left shadow-sm transition-colors hover:bg-bw-hover"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-bw-text">{r.rechnungsnummer}</span>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-full px-2 py-0.5 text-xs',
-                      statusBadgeClass(r)
-                    )}
-                  >
-                    {displayStatusLabel(r)}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-bw-text">{kundenName(r.kunden) ?? '—'}</p>
-                <div className="mt-2 flex justify-between text-sm">
-                  <span className="font-medium text-bw-text">{formatPreis(r.brutto, r.brutto)}</span>
-                  <span className="text-bw-light">
-                    Fällig: {r.faellig_am ? formatDatum(r.faellig_am) : '—'}
-                  </span>
-                </div>
-              </button>
+              <li key={r.id} className="border-b border-bw-border bg-bw-card first:border-t">
+                <ListCard
+                  title={r.rechnungsnummer}
+                  badge={rechnungListCardBadge(r)}
+                  subtitle={kundenName(r.kunden) ?? undefined}
+                  meta={`${formatPreis(r.brutto)} · fällig ${r.faellig_am ? new Date(r.faellig_am).toLocaleDateString('de') : '—'}`}
+                  onClick={() => setPanel(r)}
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         </>
       )}
 
@@ -270,18 +292,7 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
         title={panel?.rechnungsnummer ?? ''}
         subtitle={panel ? kundenName(panel.kunden) ?? undefined : undefined}
         width="md"
-        badge={
-          panel ? (
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-xs',
-                statusBadgeClass(panel)
-              )}
-            >
-              {displayStatusLabel(panel)}
-            </span>
-          ) : null
-        }
+        badge={panel ? rechnungListCardBadge(panel) : null}
       >
         {panel ? (
           <div className="space-y-4 p-5 text-sm text-bw-text">
@@ -297,7 +308,7 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
             <div>
               <p className="text-xs uppercase tracking-wide text-bw-light">Betrag (brutto)</p>
               <p className="text-2xl font-semibold text-bw-accent">
-                {formatPreis(panel.brutto, panel.brutto)}
+                {formatPreis(panel.brutto)}
               </p>
             </div>
 
@@ -414,7 +425,7 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
 
             {panelSummen ? (
               <p className="text-xs text-bw-light">
-                Netto laut Positionen (Min.): {formatPreis(panelSummen.nettoMin, panelSummen.nettoMin)}
+                Netto laut Positionen (Min.): {formatPreis(panelSummen.nettoMin)}
               </p>
             ) : null}
           </div>

@@ -10,8 +10,14 @@ const styles: Record<AuftragStatus, { bg: string; text: string }> = {
   storniert: { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]' },
 }
 
-export function AuftragStatusBadge({ status }: { status: AuftragStatus }) {
-  const s = styles[status]
+const FALLBACK_STYLE = { bg: 'bg-[#F3F4F6]', text: 'text-[#374151]' }
+
+export function AuftragStatusBadge({ status }: { status: AuftragStatus | string }) {
+  const s = status in styles ? styles[status as AuftragStatus] : FALLBACK_STYLE
+  const label =
+    status in AUFTRAG_STATUS_LABELS
+      ? AUFTRAG_STATUS_LABELS[status as AuftragStatus]
+      : String(status)
   return (
     <span
       className={cn(
@@ -20,7 +26,7 @@ export function AuftragStatusBadge({ status }: { status: AuftragStatus }) {
         s.text
       )}
     >
-      {AUFTRAG_STATUS_LABELS[status]}
+      {label}
     </span>
   )
 }

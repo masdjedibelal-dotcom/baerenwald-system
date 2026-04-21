@@ -21,7 +21,12 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('sticky top-0 z-20 -mx-4 border-b border-bw-border bg-bw-card md:-mx-6', className)}>
+    <div
+      className={cn(
+        'z-header sticky left-0 right-0 top-0 w-full border-b border-bw-border bg-bw-card pt-[env(safe-area-inset-top)] -mx-4 md:-mx-6',
+        className
+      )}
+    >
       <div className="px-4 pb-0 pt-4 md:px-6">
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <div className="mb-2 flex flex-wrap items-center gap-1">

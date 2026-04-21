@@ -154,7 +154,7 @@ export function KundenZeitstrahl({ kunde }: { kunde: KundeDetailPayload }) {
                   ) : null}
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-bw-mid">
                     {e.status ? <span>{e.status}</span> : null}
-                    {e.betrag != null ? <span>{formatPreis(e.betrag, e.betrag)}</span> : null}
+                    {e.betrag != null ? <span>{formatPreis(e.betrag)}</span> : null}
                     {e.link ? (
                       <Link href={e.link} className="font-medium text-bw-link hover:underline">
                         {e.link_label ?? 'Öffnen'}

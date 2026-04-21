@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { X } from 'lucide-react'
 import FullCalendar from '@fullcalendar/react'
 import type { EventClickArg, EventDropArg, EventInput } from '@fullcalendar/core'
 import type { DateClickArg } from '@fullcalendar/interaction'
@@ -18,6 +17,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
+import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 import {
   deleteKalenderTermin,
@@ -449,23 +449,13 @@ export function KalenderClient() {
         />
       </div>
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-bw-border bg-bw-card p-4 shadow-card">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-bw-text">
-                {editing ? 'Termin bearbeiten' : 'Neuer Termin'}
-              </h2>
-              <button
-                type="button"
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-bw-text-muted hover:bg-bw-hover"
-                onClick={() => setModalOpen(false)}
-                aria-label="Schließen"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={submitForm} className="space-y-4">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
+        size="md"
+      >
+            <form onSubmit={submitForm} className="space-y-4 max-h-[60vh] overflow-y-auto">
               <Input label="Titel" value={fTitel} onChange={(e) => setFTitel(e.target.value)} required />
               <Select
                 name="typ"
@@ -553,9 +543,7 @@ export function KalenderClient() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
     </div>
   )
 }

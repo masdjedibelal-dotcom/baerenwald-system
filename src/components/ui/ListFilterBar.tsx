@@ -18,6 +18,8 @@ export function ListFilterBar({
   statusOptions,
   statusValue,
   onStatusChange,
+  /** Wenn true: Status-Filter wird außerhalb (z. B. FilterChips) gerendert. */
+  hideStatusFilter = false,
   secondaryFilter,
   zeitraumValue,
   onZeitraumChange,
@@ -38,6 +40,7 @@ export function ListFilterBar({
   statusOptions: SelectOption[]
   statusValue: string
   onStatusChange: (v: string) => void
+  hideStatusFilter?: boolean
   secondaryFilter?: {
     label: string
     options: SelectOption[]
@@ -66,6 +69,7 @@ export function ListFilterBar({
     <div className={cn('space-y-3', className)}>
       {/* Mobil: Chips-Zeile */}
       <div className="flex flex-wrap items-center gap-2 md:hidden">
+        {!hideStatusFilter ? (
         <select
           aria-label={statusLabel}
           value={statusValue}
@@ -78,6 +82,7 @@ export function ListFilterBar({
             </option>
           ))}
         </select>
+        ) : null}
         {secondaryFilter ? (
           <select
             aria-label={secondaryFilter.label}
@@ -135,6 +140,7 @@ export function ListFilterBar({
       {/* Desktop */}
       <div className="hidden rounded-lg border border-bw-border bg-bw-card p-3 shadow-card md:block">
         <div className="flex flex-wrap items-end gap-3">
+          {!hideStatusFilter ? (
           <label className="block min-w-[140px] max-w-[200px] flex-1">
             <span className="mb-1 block text-xs font-medium text-bw-mid">{statusLabel}</span>
             <select
@@ -149,6 +155,7 @@ export function ListFilterBar({
               ))}
             </select>
           </label>
+          ) : null}
           {secondaryFilter ? (
             <label className="block min-w-[140px] max-w-[200px] flex-1">
               <span className="mb-1 block text-xs font-medium text-bw-mid">{secondaryFilter.label}</span>
