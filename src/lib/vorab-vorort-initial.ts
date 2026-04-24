@@ -82,7 +82,7 @@ export function buildInitialVorOrtFormDaten(
 
   const situation = normalizeSituation(lead.situation) || ('erneuern' as SituationValue)
   const erlaubt = new Set(bereicheFuerSituation(situation).map((b) => b.value))
-  let leadBereiche = [...(lead.bereiche ?? [])]
+  const leadBereiche = [...(lead.bereiche ?? [])]
   if (lead.situation === 'gewerbe' && !leadBereiche.includes('gewerbe')) {
     leadBereiche.push('gewerbe')
   }
