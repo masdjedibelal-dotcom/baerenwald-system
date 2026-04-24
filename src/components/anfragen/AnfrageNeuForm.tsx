@@ -133,7 +133,7 @@ export function AnfrageNeuForm({
       return
     }
 
-    let budgetN: number | null =
+    const budgetN: number | null =
       budget.trim() === '' || Number.isNaN(Number(budget)) ? null : Number(budget)
     if (budgetN != null && budgetN < 0) {
       setError('Budget darf nicht negativ sein.')
