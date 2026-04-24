@@ -82,7 +82,11 @@ export function buildInitialVorOrtFormDaten(
 
   const situation = normalizeSituation(lead.situation) || ('erneuern' as SituationValue)
   const erlaubt = new Set(bereicheFuerSituation(situation).map((b) => b.value))
-  const leadBereiche = lead.bereiche ?? []
+  let leadBereiche = [...(lead.bereiche ?? [])]
+  if (lead.situation === 'gewerbe' && !leadBereiche.includes('gewerbe')) {
+    leadBereiche.push('gewerbe')
+  }
+  if (leadBereiche.includes('gewerbe')) erlaubt.add('gewerbe')
   const bereiche = leadBereiche.filter((b) => erlaubt.has(b))
 
   const funnel = lead.funnel_daten && typeof lead.funnel_daten === 'object' ? lead.funnel_daten : null
@@ -97,6 +101,7 @@ export function buildInitialVorOrtFormDaten(
     }
     if (Array.isArray(fObj.bereiche)) {
       const er2 = new Set(bereicheFuerSituation(sit).map((b) => b.value))
+      if (leadBereiche.includes('gewerbe')) er2.add('gewerbe')
       ber = (fObj.bereiche as string[]).filter((b) => er2.has(b))
     }
     if (typeof fObj.kundentyp === 'string') kt = fObj.kundentyp

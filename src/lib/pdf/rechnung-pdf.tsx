@@ -108,8 +108,8 @@ export function RechnungPdfDocument({
         </View>
         {positionen.map((p, i) => {
           const m = p.menge || 1
-          const l = p.lohn_min * m
-          const mat = p.material_min * m
+          const l = p.lohn_netto * m
+          const mat = p.material_netto * m
           return (
             <View key={p.id} style={styles.row} wrap={false}>
               <Text style={[styles.cell, { flex: 2 }]}>

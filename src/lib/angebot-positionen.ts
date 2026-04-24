@@ -1,28 +1,38 @@
-import type { AngebotPosition, PreisTyp } from '@/lib/types'
+import type {
+  AngebotHandwerkerZuweisungInput,
+  AngebotPosition,
+  PreisTyp,
+} from '@/lib/types'
 
 export function neuePositionsId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
 
-/** Erkennt gespeicherte Positionen ohne Lohn/Material-Aufteilung (Altbestand). */
-function istLegacyPosition(r: Record<string, unknown>): boolean {
-  return (
-    typeof r.preis_min === 'number' ||
-    typeof r.preis_max === 'number' ||
-    (r.preis_min != null && r.lohn_min == null)
-  )
+function num(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : 0
 }
 
-/**
- * Einheitliche Position inkl. Alt-Daten (preis_min/max → komplett Lohn).
- * `gesamt_*` = Stückpreise (pro Einheit), Zeilensumme = × menge.
- */
+/** Alt-JSON mit preis_min/max (ohne Lohn-Netto-Feld). */
+function istLegacyPosition(r: Record<string, unknown>): boolean {
+  return r.preis_min != null || r.preis_max != null
+}
+
 function parsePreisTyp(v: unknown): PreisTyp | undefined {
   if (v === 'fix' || v === 'range') return v
   return undefined
 }
 
+/** Mittelwert zweier Kanten (Legacy Min/Max) → ein Festpreis */
+function mittelOderMax(a: number, b: number): number {
+  if (a > 0 && b > 0) return Math.round(((a + b) / 2) * 100) / 100
+  return Math.max(a, b, 0)
+}
+
+/**
+ * Einheitliche Position inkl. Alt-JSON (lohn_min/max, preis_min/max → lohn_netto/material_netto).
+ */
 export function normalizeAngebotPosition(
   raw: unknown,
   gewerkNameFallback = ''
@@ -48,82 +58,61 @@ export function normalizeAngebotPosition(
 
   if (!gewerk_id && !gewerk_slug && !leistung) return null
 
-  let preis_typ = parsePreisTyp(r.preis_typ)
-
-  let lohn_min = Number(r.lohn_min)
-  let lohn_max = Number(r.lohn_max)
-  let material_min = Number(r.material_min)
-  let material_max = Number(r.material_max)
-
-  if (istLegacyPosition(r)) {
-    const pm = Number(r.preis_min) || 0
-    const px = Number(r.preis_max) || 0
-    lohn_min = Number.isFinite(lohn_min) ? lohn_min : pm
-    lohn_max = Number.isFinite(lohn_max) ? lohn_max : px
-    material_min = Number.isFinite(material_min) ? material_min : 0
-    material_max = Number.isFinite(material_max) ? material_max : 0
-  } else {
-    lohn_min = Number.isFinite(lohn_min) ? lohn_min : 0
-    lohn_max = Number.isFinite(lohn_max) ? lohn_max : 0
-    material_min = Number.isFinite(material_min) ? material_min : 0
-    material_max = Number.isFinite(material_max) ? material_max : 0
-  }
-
-  let lohn_fix =
-    r.lohn_fix != null && r.lohn_fix !== '' ? Number(r.lohn_fix) : undefined
-  let material_fix =
-    r.material_fix != null && r.material_fix !== '' ? Number(r.material_fix) : undefined
-  let gesamt_fix =
-    r.gesamt_fix != null && r.gesamt_fix !== '' ? Number(r.gesamt_fix) : undefined
-
-  if (!preis_typ) {
-    if (
-      (lohn_fix != null && Number.isFinite(lohn_fix)) ||
-      (material_fix != null && Number.isFinite(material_fix)) ||
-      (gesamt_fix != null && Number.isFinite(gesamt_fix))
-    ) {
-      preis_typ = 'fix'
+  let lohn_netto = num(r.lohn_netto)
+  if (lohn_netto <= 0 && (r.lohn_netto == null || r.lohn_netto === '')) {
+    const lmin = num(r.lohn_min)
+    const lmax = num(r.lohn_max)
+    if (lmin > 0 || lmax > 0) {
+      lohn_netto = mittelOderMax(lmin, lmax)
+    } else if (istLegacyPosition(r)) {
+      const pm = num(r.preis_min)
+      const px = num(r.preis_max)
+      lohn_netto = mittelOderMax(pm, px)
     } else {
-      preis_typ = 'range'
+      const lf = num(r.lohn_fix)
+      const gf = num(r.gesamt_fix)
+      const mf = num(r.material_fix)
+      if (lf > 0 || mf > 0) {
+        lohn_netto = lf > 0 ? lf : 0
+      } else if (gf > 0 && mf <= 0) {
+        lohn_netto = gf
+      } else {
+        lohn_netto = 0
+      }
     }
   }
+  if (lohn_netto < 0) lohn_netto = 0
 
-  if (preis_typ === 'fix') {
-    const lf = lohn_fix != null && Number.isFinite(lohn_fix) ? lohn_fix : undefined
-    const mf = material_fix != null && Number.isFinite(material_fix) ? material_fix : undefined
-    const gf = gesamt_fix != null && Number.isFinite(gesamt_fix) ? gesamt_fix : undefined
-    if (lf == null && mf == null && gf != null) {
-      lohn_min = gf
-      lohn_max = gf
-      material_min = 0
-      material_max = 0
+  let material_netto = num(r.material_netto)
+  if (material_netto <= 0 && (r.material_netto == null || r.material_netto === '')) {
+    const mmin = num(r.material_min)
+    const mmax = num(r.material_max)
+    if (mmin > 0 || mmax > 0) {
+      material_netto = mittelOderMax(mmin, mmax)
     } else {
-      lohn_min = lf ?? 0
-      lohn_max = lf ?? 0
-      material_min = mf ?? 0
-      material_max = mf ?? 0
+      const mf = num(r.material_fix)
+      const gf = num(r.gesamt_fix)
+      const lf = num(r.lohn_fix)
+      if (mf > 0) material_netto = mf
+      else if (gf > 0 && lf <= 0) material_netto = gf
+      else material_netto = 0
     }
-    lohn_fix = lohn_min
-    material_fix = material_min
-    gesamt_fix = lohn_min + material_min
   }
+  if (material_netto < 0) material_netto = 0
 
-  const beschreibung = String(r.beschreibung ?? leistung ?? gewerk_name).trim() || leistung
-  const gesamt_min = lohn_min + material_min
-  const gesamt_max = lohn_max + material_max
+  const gesamt_unit = Math.round((lohn_netto + material_netto) * 100) / 100
 
-  const einkaufspreis_min =
-    r.einkaufspreis_min != null && r.einkaufspreis_min !== ''
-      ? Number(r.einkaufspreis_min)
-      : undefined
-  const einkaufspreis_max =
-    r.einkaufspreis_max != null && r.einkaufspreis_max !== ''
-      ? Number(r.einkaufspreis_max)
-      : undefined
-  const einkaufspreisSingle =
-    r.einkaufspreis != null && r.einkaufspreis !== '' ? Number(r.einkaufspreis) : undefined
-
-  const marge = r.marge != null && r.marge !== '' ? Number(r.marge) : undefined
+  let einkaufspreis: number | undefined
+  const ekSingle = r.einkaufspreis
+  if (ekSingle != null && ekSingle !== '') {
+    const e = num(ekSingle)
+    if (e > 0) einkaufspreis = e
+  }
+  if (einkaufspreis == null) {
+    const emin = num(r.einkaufspreis_min)
+    const emax = num(r.einkaufspreis_max)
+    if (emin > 0 || emax > 0) einkaufspreis = mittelOderMax(emin, emax) || undefined
+  }
 
   const notiz_intern =
     r.notiz_intern != null && String(r.notiz_intern).trim()
@@ -145,22 +134,21 @@ export function normalizeAngebotPosition(
       ? String(r.handwerker_name).trim()
       : undefined
 
+  const beschreibung = String(r.beschreibung ?? leistung ?? gewerk_name).trim() || leistung
+  const preis_typ = parsePreisTyp(r.preis_typ) ?? 'fix'
+
   const out: AngebotPosition = {
     id,
     gewerk_id,
     gewerk_name,
     leistung,
     beschreibung,
-    lohn_min,
-    lohn_max,
-    material_min,
-    material_max,
-    gesamt_min,
-    gesamt_max,
+    lohn_netto,
+    material_netto,
+    gesamt_min: gesamt_unit,
+    gesamt_max: gesamt_unit,
     menge,
     einheit,
-    einkaufspreis_min: Number.isFinite(einkaufspreis_min) ? einkaufspreis_min : undefined,
-    einkaufspreis_max: Number.isFinite(einkaufspreis_max) ? einkaufspreis_max : undefined,
     notiz_intern,
     notiz_extern,
     preis_typ,
@@ -168,13 +156,7 @@ export function normalizeAngebotPosition(
   if (gewerk_slug) out.gewerk_slug = gewerk_slug
   if (leistung_id) out.leistung_id = leistung_id
   if (leistung_name) out.leistung_name = leistung_name
-  if (preis_typ === 'fix') {
-    out.lohn_fix = lohn_fix
-    out.material_fix = material_fix
-    out.gesamt_fix = gesamt_fix
-  }
-  if (Number.isFinite(einkaufspreisSingle)) out.einkaufspreis = einkaufspreisSingle
-  if (marge != null && Number.isFinite(marge)) out.marge = marge
+  if (einkaufspreis != null && einkaufspreis > 0) out.einkaufspreis = einkaufspreis
   if (handwerker_id) out.handwerker_id = handwerker_id
   if (handwerker_name) out.handwerker_name = handwerker_name
   return out
@@ -186,6 +168,51 @@ export function normalizeAngebotPositionen(raw: unknown): AngebotPosition[] {
   for (const item of raw) {
     const p = normalizeAngebotPosition(item)
     if (p) out.push(p)
+  }
+  return out
+}
+
+/** Queues aus alter angebot_handwerker-Liste in Positionen einsortieren (Reihenfolge pro Gewerk). */
+export function mergeHandwerkerQueuesIntoPositionen(
+  positionen: AngebotPosition[],
+  zuweisungen: { gewerk_id: string; handwerker_id: string }[]
+): AngebotPosition[] {
+  const queues = new Map<string, string[]>()
+  for (const z of zuweisungen) {
+    if (!z.gewerk_id?.trim() || !z.handwerker_id?.trim()) continue
+    const q = queues.get(z.gewerk_id) ?? []
+    q.push(z.handwerker_id)
+    queues.set(z.gewerk_id, q)
+  }
+  const copy = new Map(Array.from(queues.entries()).map(([k, v]) => [k, [...v]]))
+  return positionen.map((p) => {
+    if (p.handwerker_id?.trim()) return p
+    const q = copy.get(p.gewerk_id)
+    if (!q?.length) return p
+    const hid = q.shift()!
+    if (!q.length) copy.delete(p.gewerk_id)
+    else copy.set(p.gewerk_id, q)
+    return { ...p, handwerker_id: hid }
+  })
+}
+
+export function handwerkerZuweisungenFromPositionen(
+  positionen: AngebotPosition[]
+): AngebotHandwerkerZuweisungInput[] {
+  const out: AngebotHandwerkerZuweisungInput[] = []
+  const seen = new Set<string>()
+  for (const p of positionen) {
+    const hid = p.handwerker_id?.trim()
+    const gid = p.gewerk_id?.trim()
+    if (!hid || !gid) continue
+    const key = `${gid}:${hid}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({
+      gewerk_id: gid,
+      handwerker_id: hid,
+      status: 'ausstehend',
+    })
   }
   return out
 }
@@ -208,36 +235,14 @@ export type AngebotSummen = {
   margeMax: number
 }
 
-function zeilenLohnMaterial(p: AngebotPosition): {
-  lohnMin: number
-  lohnMax: number
-  matMin: number
-  matMax: number
-} {
+function zeileEinkauf(p: AngebotPosition): { min: number; max: number } {
   const m = p.menge || 1
-  const typ = p.preis_typ ?? 'range'
-  if (typ === 'fix') {
-    const lu = p.lohn_fix
-    const mu = p.material_fix
-    const gu = p.gesamt_fix
-    if ((lu == null || !Number.isFinite(lu)) && (mu == null || !Number.isFinite(mu)) && gu != null && Number.isFinite(gu)) {
-      return { lohnMin: gu * m, lohnMax: gu * m, matMin: 0, matMax: 0 }
-    }
-    const l = lu != null && Number.isFinite(lu) ? lu : p.lohn_min
-    const mat = mu != null && Number.isFinite(mu) ? mu : p.material_min
-    return {
-      lohnMin: l * m,
-      lohnMax: l * m,
-      matMin: mat * m,
-      matMax: mat * m,
-    }
+  const ek = p.einkaufspreis
+  if (ek != null && Number.isFinite(ek) && ek > 0) {
+    const z = ek * m
+    return { min: z, max: z }
   }
-  return {
-    lohnMin: p.lohn_min * m,
-    lohnMax: p.lohn_max * m,
-    matMin: p.material_min * m,
-    matMax: p.material_max * m,
-  }
+  return { min: 0, max: 0 }
 }
 
 export function summenAusPositionen(
@@ -252,22 +257,16 @@ export function summenAusPositionen(
   let einkaufZeileMax = 0
 
   for (const p of positionen) {
-    const z = zeilenLohnMaterial(p)
-    lohnZeileMin += z.lohnMin
-    lohnZeileMax += z.lohnMax
-    materialZeileMin += z.matMin
-    materialZeileMax += z.matMax
     const m = p.menge || 1
-    const ez = p.einkaufspreis
-    if (ez != null && Number.isFinite(ez)) {
-      einkaufZeileMin += ez * m
-      einkaufZeileMax += ez * m
-    } else {
-      const emin = p.einkaufspreis_min
-      const emax = p.einkaufspreis_max
-      if (emin != null && Number.isFinite(emin)) einkaufZeileMin += emin * m
-      if (emax != null && Number.isFinite(emax)) einkaufZeileMax += emax * m
-    }
+    const l = p.lohn_netto * m
+    const mat = p.material_netto * m
+    lohnZeileMin += l
+    lohnZeileMax += l
+    materialZeileMin += mat
+    materialZeileMax += mat
+    const ek = zeileEinkauf(p)
+    einkaufZeileMin += ek.min
+    einkaufZeileMax += ek.max
   }
 
   const nettoMin = lohnZeileMin + materialZeileMin
@@ -313,11 +312,14 @@ export function berechneGesamt(positionen: AngebotPosition[]) {
   }
 }
 
-/** Zeilensumme Netto Min/Max (ohne MwSt) */
+/** Zeilensumme Netto (ohne MwSt) */
 export function zeilenNettoMinMax(p: AngebotPosition): { min: number; max: number } {
   const m = p.menge || 1
-  return {
-    min: p.gesamt_min * m,
-    max: p.gesamt_max * m,
-  }
+  const z = (p.lohn_netto + p.material_netto) * m
+  return { min: z, max: z }
+}
+
+export function positionNettoZeile(p: AngebotPosition): number {
+  const { min } = zeilenNettoMinMax(p)
+  return min
 }

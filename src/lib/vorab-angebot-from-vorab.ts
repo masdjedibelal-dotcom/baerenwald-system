@@ -163,21 +163,25 @@ export function angebotPositionenFromVorOrt(
     const beschreibung = (leistungHint ?? pl.leistung).trim()
     const notizExtern = notizParts.length ? notizParts.join(' · ') : undefined
 
+    const lohnFest =
+      preis_min > 0 && preis_max > 0
+        ? Math.round(((preis_min + preis_max) / 2) * 100) / 100
+        : Math.max(preis_min, preis_max, 0)
+
     positionen.push({
       id: neuePositionsId(),
       gewerk_id: g.id,
       gewerk_name: g.name,
       leistung: pl.leistung,
       beschreibung,
-      lohn_min: preis_min,
-      lohn_max: preis_max,
-      material_min: 0,
-      material_max: 0,
-      gesamt_min: preis_min,
-      gesamt_max: preis_max,
+      lohn_netto: lohnFest,
+      material_netto: 0,
+      gesamt_min: lohnFest,
+      gesamt_max: lohnFest,
       menge,
       einheit: pl.einheit,
       notiz_extern: notizExtern,
+      preis_typ: 'fix',
     })
   }
 

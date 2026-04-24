@@ -174,7 +174,7 @@ export type AngebotStatus =
 /** Gesamtpreis auf Angebots-/Positions-Ebene */
 export type PreisTyp = 'range' | 'fix'
 
-/** Angebots- / Rechnungsposition (Stückpreise Lohn/Material; Gesamt = Summe Stück) */
+/** Angebots- / Rechnungsposition (Festpreis netto / Einheit; Gesamt Stück = Lohn + Material) */
 export type AngebotPosition = {
   id: string
   gewerk_id: string
@@ -187,29 +187,25 @@ export type AngebotPosition = {
   leistung_name?: string
   /** Kundentext / Gesamtwerk, nicht nur Handwerksleistung */
   beschreibung: string
-  preis_typ?: PreisTyp
-  lohn_min: number
-  lohn_max: number
-  material_min: number
-  material_max: number
-  lohn_fix?: number
-  material_fix?: number
-  gesamt_fix?: number
-  /** auto: Lohn + Material (Stück) */
+  /** Festpreis Lohn netto / Einheit */
+  lohn_netto: number
+  /** Festpreis Material netto / Einheit */
+  material_netto: number
+  /** Stück netto = Lohn + Material (bei Festpreis i. d. R. gleich min/max) */
   gesamt_min: number
   gesamt_max: number
   menge: number
   einheit: string
-  /** intern, nicht im Kunden-PDF */
-  einkaufspreis_min?: number
-  einkaufspreis_max?: number
+  /** intern: EK / Einheit (für Marge) */
   einkaufspreis?: number
-  marge?: number
   notiz_intern?: string
   /** sichtbar im Angebot / PDF */
   notiz_extern?: string
+  /** Zugeordneter Handwerker für dieses Gewerk (persistiert auch in angebot_handwerker) */
   handwerker_id?: string
   handwerker_name?: string
+  /** Alt-JSON / Lesen aus DB */
+  preis_typ?: PreisTyp
 }
 
 export type RechnungPosition = AngebotPosition
@@ -609,6 +605,9 @@ export type ComplianceDokumentTyp = {
   pflicht_fuer_fachbetriebe: boolean
   erneuerung_monate: number | null
   sort_order: number
+  /** Optional: Gruppen-Titel in der Handwerker-Compliance-Liste */
+  kategorie?: string | null
+  aktiv?: boolean
 }
 
 export type PartnerDokument = {

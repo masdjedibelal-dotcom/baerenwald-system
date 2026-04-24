@@ -152,6 +152,7 @@ export const BEREICH_LABELS: Record<string, string> = {
   hausmeister: 'Hausmeister',
   winterdienst: 'Winterdienst',
   sonstiges: 'Sonstiges',
+  gewerbe: 'Gewerbe',
 }
 
 /** Bereich (Funnel) → Gewerk-Slug in DB */
@@ -220,6 +221,76 @@ export function formatBudget(budget?: number | null, min?: number | null, max?: 
     return `ab ${min.toLocaleString('de')} €`
   }
   return '—'
+}
+
+function websiteLeadKomplexAusFunnel(funnel: unknown): boolean {
+  if (!funnel || typeof funnel !== 'object') return false
+  const f = funnel as Record<string, unknown>
+  if (f.preisKomplex === true || f.komplex === true) return true
+  const modus = f.preis_modus ?? f.preisModus
+  if (typeof modus === 'string' && modus.toLowerCase() === 'komplex') return true
+  return false
+}
+
+/**
+ * Website-Funnel: Anzeige wie für Nutzer:innen (von–bis, Festpreis, ab, ca.-Budget, optional Komplex).
+ * Reihenfolge: echte Min/Max-Angaben vor „ca.“-Budget, damit Rahmen nicht durch Mittelwert ersetzt wird.
+ */
+export function formatWebsiteLeadPreis(
+  budget_ca: number | null | undefined,
+  preis_min: number | null | undefined,
+  preis_max: number | null | undefined,
+  funnel?: unknown
+): string {
+  const komplex = websiteLeadKomplexAusFunnel(funnel)
+  const min = preis_min != null && Number.isFinite(Number(preis_min)) && Number(preis_min) > 0 ? Number(preis_min) : null
+  const max = preis_max != null && Number.isFinite(Number(preis_max)) && Number(preis_max) > 0 ? Number(preis_max) : null
+  const budget = budget_ca != null && Number.isFinite(Number(budget_ca)) && Number(budget_ca) > 0 ? Number(budget_ca) : null
+
+  let basis = ''
+  if (min != null && max != null) {
+    if (max > min) {
+      basis = `${min.toLocaleString('de', eur0)} – ${max.toLocaleString('de', eur0)} €`
+    } else {
+      basis = `${min.toLocaleString('de', eur0)} €`
+    }
+  } else if (min != null) {
+    basis = `ab ${min.toLocaleString('de', eur0)} €`
+  } else if (max != null) {
+    basis = `bis ${max.toLocaleString('de', eur0)} €`
+  } else if (budget != null) {
+    basis = `ca. ${budget.toLocaleString('de', eur0)} €`
+  }
+
+  if (komplex) {
+    if (basis) return `${basis} · Komplex (individuell)`
+    return 'Komplex (individuell)'
+  }
+  return basis || '—'
+}
+
+/** Listen- und Detail-Anzeige: Website = Funnel-Preis, sonst Budget-Logik. */
+export function formatAnfragePreisAnzeige(
+  kanal: LeadKanal,
+  budget_ca: number | null | undefined,
+  preis_min: number | null | undefined,
+  preis_max: number | null | undefined,
+  funnel?: unknown
+): string {
+  if (kanal === 'website') {
+    return formatWebsiteLeadPreis(budget_ca, preis_min, preis_max, funnel)
+  }
+  return formatBudget(budget_ca ?? undefined, preis_min ?? undefined, preis_max ?? undefined)
+}
+
+/** Tabellenkopf bei gemischten Kanälen. */
+export function anfragenPreisSpaltenLabel(): string {
+  return 'Preis / Budget'
+}
+
+/** Detail-Ansicht: Website = Preis, sonst Budget. */
+export function anfragePreisDetailLabel(kanal: LeadKanal): string {
+  return kanal === 'website' ? 'Preis' : 'Budget'
 }
 
 /** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */

@@ -13,9 +13,15 @@ export function createClient() {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // In Server Components sind Cookie-Schreibzugriffe verboten (nur Server Actions / Route Handlers).
+            // Supabase kann beim Token-Refresh trotzdem setAll aufrufen → ohne try/catch bricht das RSC-Rendering ab.
+            // Session-Refresh passiert parallel in der Middleware (middleware.ts).
+          }
         },
       },
     }

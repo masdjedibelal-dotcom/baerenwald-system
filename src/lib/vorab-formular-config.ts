@@ -74,6 +74,7 @@ export const BEREICHE: BereichOption[] = [
   { value: 'reinigung', label: 'Reinigung', emoji: '🧹', situation: ['betreuung'] },
   { value: 'hausmeister', label: 'Hausmeister', emoji: '🔑', situation: ['betreuung'] },
   { value: 'winterdienst', label: 'Winterdienst', emoji: '❄️', situation: ['betreuung'] },
+  { value: 'gewerbe', label: 'Gewerbe / Gastro', emoji: '🏪', situation: ['gewerbe'] },
 ]
 
 export const FACHDETAILS_CONFIG: Record<string, FachdetailBlock> = {
@@ -244,6 +245,7 @@ export function fachdetailKeysForBereich(
   situation: SituationValue | ''
 ): string[] {
   if (!situation) return []
+  if (bereich === 'gewerbe') return []
   if (bereich === 'bad') return ['bad', 'bad_ausstattung']
   if (bereich === 'elektrik') {
     return situation === 'kaputt' || situation === 'notfall' ? ['elektro_kaputt'] : ['elektrik']

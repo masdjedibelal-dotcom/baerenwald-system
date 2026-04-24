@@ -45,6 +45,57 @@ function greenBox(html: string): string {
   return `<div style="background:#EAF3DE;border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
 }
 
+/** Bestätigung Besichtigung / Kalender-Termin an Kund:in */
+export function mailBesichtigungTermin(
+  data: {
+    name: string
+    terminTitel: string
+    datumFmt: string
+    zeitText: string
+    adresse: string
+    notiz: string
+    statusLink: string
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const name = esc(data.name)
+  const tt = esc(data.terminTitel)
+  const zeitBlock =
+    data.zeitText.trim().length > 0
+      ? `<p style="margin:8px 0 0;"><strong>Uhrzeit:</strong> ${esc(data.zeitText)}</p>`
+      : ''
+  const adresseBlock =
+    data.adresse.trim().length > 0
+      ? `<p style="margin:8px 0 0;"><strong>Ort / Adresse:</strong> ${esc(data.adresse)}</p>`
+      : ''
+  const notizBlock =
+    data.notiz.trim().length > 0
+      ? `<p style="margin:20px 0 0;font-size:14px;line-height:1.5;">${esc(data.notiz).replace(/\n/g, '<br/>')}</p>`
+      : ''
+  const tel = esc(b.telefon)
+  return {
+    betreff: `Terminbestätigung: ${data.terminTitel} — ${b.firmenname}`,
+    html: base(
+      `
+      <h2 style="color:#2E7D52;margin:0 0 16px;">Ihr Termin</h2>
+      <p>Guten Tag ${name},</p>
+      <p>wir bestätigen folgenden Termin:</p>
+      ${greenBox(`
+        <p style="margin:0;font-size:16px;font-weight:600;color:#1A3D2B;">${tt}</p>
+        <p style="margin:8px 0 0;"><strong>Datum:</strong> ${esc(data.datumFmt)}</p>
+        ${zeitBlock}
+        ${adresseBlock}
+      `)}
+      ${notizBlock}
+      <p style="margin:24px 0 0;">${btn('Projektstatus ansehen →', data.statusLink)}</p>
+      <p style="margin:16px 0 0;font-size:14px;">Bei Rückfragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a></p>
+    `,
+      `Termin am ${data.datumFmt}`,
+      b
+    ),
+  }
+}
+
 export function mailAnfrageBestaetigung(
   data: { name: string; bereiche?: string[] | null; statusLink: string },
   b: MailBranding

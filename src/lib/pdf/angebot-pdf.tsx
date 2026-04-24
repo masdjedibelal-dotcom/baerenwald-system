@@ -53,9 +53,7 @@ export function AngebotPdfDocument({
   const ust = firm.ust_id?.trim() || firm.steuernummer?.trim() || ''
 
   const lohnNetto = summen.lohnZeileMin
-  const lohnNettoMax = summen.lohnZeileMax
   const matNetto = summen.materialZeileMin
-  const matNettoMax = summen.materialZeileMax
 
   const abschlag20 = Math.round(lohnNetto * 0.2 * 100) / 100
 
@@ -93,10 +91,8 @@ export function AngebotPdfDocument({
         </View>
         {positionen.map((p) => {
           const z = zeilenNettoMinMax(p)
-          const lmin = p.lohn_min * p.menge
-          const lmax = p.lohn_max * p.menge
-          const mmin = p.material_min * p.menge
-          const mmax = p.material_max * p.menge
+          const lZeile = p.lohn_netto * p.menge
+          const mZeile = p.material_netto * p.menge
           return (
             <View key={p.id} style={styles.row} wrap={false}>
               <Text style={[styles.cell, { flex: 2 }]}>
@@ -106,43 +102,25 @@ export function AngebotPdfDocument({
               <Text style={styles.cellNarrow}>
                 {p.menge} {p.einheit}
               </Text>
-              <Text style={styles.cell}>
-                {formatEuro(lmin)} – {formatEuro(lmax)}
-              </Text>
-              <Text style={styles.cell}>
-                {formatEuro(mmin)} – {formatEuro(mmax)}
-              </Text>
-              <Text style={styles.cell}>
-                {formatEuro(z.min)} – {formatEuro(z.max)}
-              </Text>
+              <Text style={styles.cell}>{formatEuro(lZeile)}</Text>
+              <Text style={styles.cell}>{formatEuro(mZeile)}</Text>
+              <Text style={styles.cell}>{formatEuro(z.min)}</Text>
             </View>
           )
         })}
 
-        <Text style={styles.total}>
-          Arbeitskosten (netto): {formatEuro(lohnNetto)} – {formatEuro(lohnNettoMax)}
-        </Text>
-        <Text style={styles.total}>
-          Materialkosten (netto): {formatEuro(matNetto)} – {formatEuro(matNettoMax)}
-        </Text>
-        <Text style={styles.total}>
-          Netto gesamt: {formatEuro(summen.nettoMin)} – {formatEuro(summen.nettoMax)}
-        </Text>
-        <Text style={styles.total}>
-          MwSt {summen.mwstSatz}%: {formatEuro(summen.mwstBetragMin)} –{' '}
-          {formatEuro(summen.mwstBetragMax)}
-        </Text>
-        <Text style={styles.total}>
-          Brutto gesamt: {formatEuro(summen.bruttoMin)} – {formatEuro(summen.bruttoMax)}
-        </Text>
+        <Text style={styles.total}>Arbeitskosten (netto): {formatEuro(lohnNetto)}</Text>
+        <Text style={styles.total}>Materialkosten (netto): {formatEuro(matNetto)}</Text>
+        <Text style={styles.total}>Netto gesamt: {formatEuro(summen.nettoMin)}</Text>
+        <Text style={styles.total}>MwSt {summen.mwstSatz}%: {formatEuro(summen.mwstBetragMin)}</Text>
+        <Text style={styles.total}>Brutto gesamt: {formatEuro(summen.bruttoMin)}</Text>
 
         {kunde.typ === 'privat' || !kunde.typ ? (
           <View style={styles.box35a}>
             <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Hinweis § 35a EStG</Text>
             <Text>
-              Für Privatkunden: Der Lohnkostenanteil von {formatEuro(lohnNetto)} –{' '}
-              {formatEuro(lohnNettoMax)} kann nach § 35a EStG steuerlich geltend gemacht werden (20 %
-              = ca. {formatEuro(abschlag20)} € vom unteren Lohnwert).
+              Für Privatkunden: Der Lohnkostenanteil von {formatEuro(lohnNetto)} kann nach § 35a EStG
+              steuerlich geltend gemacht werden (20 % = ca. {formatEuro(abschlag20)} €).
             </Text>
           </View>
         ) : null}
