@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS } from '@/lib/utils'
 import { insertKalenderAutoTermin, tomorrowYmd } from '@/lib/kalender-auto-termine'
+import {
+  bereicheMitLegacyGewerbeSituation,
+  leadHatGewerbeKontext,
+  situationOhneGewerbe,
+} from '@/lib/lead-gewerbe-storage'
 
 export async function updateLeadStatus(
   leadId: string,
@@ -20,10 +25,13 @@ export async function updateLeadStatus(
     .from('leads')
     .select('status')
     .eq('id', leadId)
-    .single()
+    .maybeSingle()
 
-  if (fetchErr || !lead) {
-    return { ok: false, message: fetchErr?.message ?? 'Lead nicht gefunden' }
+  if (fetchErr) {
+    return { ok: false, message: fetchErr.message }
+  }
+  if (!lead) {
+    return { ok: false, message: 'Lead nicht gefunden oder keine Berechtigung.' }
   }
 
   const alterStatus = lead.status as LeadStatus
@@ -136,6 +144,10 @@ export type NeueAnfragePayload = {
   bereiche: string[]
   bereiche_sonstiges?: string | null
   budget_ca?: number | null
+  /** Website / API: Preisrahmen oder Festpreis (min = max). */
+  preis_min?: number | null
+  preis_max?: number | null
+  funnel_daten?: Record<string, unknown> | null
   zeitraum_von?: string | null
   zeitraum_bis?: string | null
   notizen: string
@@ -181,8 +193,13 @@ export async function createAnfrage(
     }
   }
 
+  const bereicheMerged = bereicheMitLegacyGewerbeSituation(payload.bereiche, payload.situation)
+  const bereicheFinal = bereicheMerged.length ? bereicheMerged : null
+  const situationFinal = situationOhneGewerbe(payload.situation)
+  const istGewerbe = leadHatGewerbeKontext(bereicheMerged, payload.situation)
+
   if (!kundeId) {
-    const kundentyp = payload.situation === 'gewerbe' ? 'gewerbe' : 'privat'
+    const kundentyp = istGewerbe ? 'gewerbe' : 'privat'
     const { data: kundeRow, error: kundeErr } = await supabase
       .from('kunden')
       .insert({
@@ -210,23 +227,23 @@ export async function createAnfrage(
       kunde_id: kundeId,
       kanal: payload.kanal,
       status: 'neu',
-      situation: payload.situation || null,
-      bereiche: payload.bereiche.length ? payload.bereiche : null,
+      situation: situationFinal,
+      bereiche: bereicheFinal,
       bereiche_sonstiges: payload.bereiche_sonstiges?.trim() || null,
       budget_ca: payload.budget_ca ?? null,
-      preis_min: null,
-      preis_max: null,
+      preis_min: payload.preis_min ?? null,
+      preis_max: payload.preis_max ?? null,
       plz: plz || null,
       zeitraum: null,
       zeitraum_von: payload.zeitraum_von?.trim() || null,
       zeitraum_bis: payload.zeitraum_bis?.trim() || null,
-      kundentyp: payload.situation === 'gewerbe' ? 'gewerbe' : 'privat',
+      kundentyp: istGewerbe ? 'gewerbe' : 'privat',
       kontakt_name: name,
       kontakt_email: email || null,
       kontakt_telefon: telefon || null,
       kontakt_nachricht: null,
       notizen: payload.notizen.trim() || null,
-      funnel_daten: {},
+      funnel_daten: payload.funnel_daten && typeof payload.funnel_daten === 'object' ? payload.funnel_daten : {},
     })
     .select('id')
     .single()
@@ -371,8 +388,29 @@ export async function updateLeadProjekt(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (data.situation !== undefined) patch.situation = data.situation
-  if (data.bereiche !== undefined) patch.bereiche = data.bereiche
+
+  if (data.situation !== undefined || data.bereiche !== undefined) {
+    const incomingSit = data.situation
+    if (incomingSit === 'gewerbe') {
+      patch.situation = null
+      if (data.bereiche !== undefined) {
+        const ber = bereicheMitLegacyGewerbeSituation([...(data.bereiche ?? [])], 'gewerbe')
+        patch.bereiche = ber.length ? ber : null
+      } else {
+        const { data: row, error: fetchErr } = await supabase
+          .from('leads')
+          .select('bereiche')
+          .eq('id', leadId)
+          .maybeSingle()
+        if (fetchErr) return { ok: false, message: fetchErr.message }
+        const ber = bereicheMitLegacyGewerbeSituation([...((row?.bereiche as string[] | null) ?? [])], 'gewerbe')
+        patch.bereiche = ber.length ? ber : null
+      }
+    } else {
+      if (incomingSit !== undefined) patch.situation = incomingSit
+      if (data.bereiche !== undefined) patch.bereiche = data.bereiche?.length ? data.bereiche : null
+    }
+  }
   if (data.bereiche_sonstiges !== undefined) patch.bereiche_sonstiges = data.bereiche_sonstiges
   if (data.budget_ca !== undefined) patch.budget_ca = data.budget_ca
   if (data.zeitraum_von !== undefined) patch.zeitraum_von = data.zeitraum_von

@@ -2,7 +2,12 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/mail-branding'
-import { mailAnfrageBestaetigung, mailUpdateHinweis, mailZahlungserinnerung } from '@/lib/mail-templates'
+import {
+  mailAnfrageBestaetigung,
+  mailBesichtigungTermin,
+  mailUpdateHinweis,
+  mailZahlungserinnerung,
+} from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
@@ -56,6 +61,81 @@ function formatDeDate(isoDate: string): string {
   const [y, m, d] = isoDate.split('-')
   if (!y || !m || !d) return isoDate
   return `${d}.${m}.${y}`
+}
+
+function formatUhrzeitKurz(raw: string | null | undefined): string {
+  if (!raw?.trim()) return ''
+  const s = raw.trim()
+  return s.length >= 5 ? s.slice(0, 5) : s
+}
+
+/** E-Mail an Kund:in nach Besichtigung / Termin aus dem CRM (Resend). */
+export async function sendBesichtigungTerminBestaetigung(input: {
+  leadId: string
+  to: string
+  name: string
+  terminTitel: string
+  datum: string
+  uhrzeitVon: string | null
+  uhrzeitBis: string | null
+  adresse: string | null
+  notiz: string | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const email = input.to.trim()
+  if (!email) return { ok: false, message: 'Keine E-Mail-Adresse.' }
+
+  const { data: lead, error } = await supabaseAdmin
+    .from('leads')
+    .select('id, kunde_id')
+    .eq('id', input.leadId)
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!lead) return { ok: false, message: 'Lead nicht gefunden oder keine Berechtigung.' }
+
+  const branding = await getMailBranding(supabaseAdmin)
+  const statusLink = await projektOderStatusLink(input.leadId)
+  const d = input.datum.trim().slice(0, 10)
+  const datumFmt = formatDeDate(d)
+  const v = formatUhrzeitKurz(input.uhrzeitVon)
+  const b = formatUhrzeitKurz(input.uhrzeitBis)
+  let zeitText = ''
+  if (v && b) zeitText = `${v} – ${b} Uhr`
+  else if (v) zeitText = `${v} Uhr`
+  else if (b) zeitText = `bis ${b} Uhr`
+
+  const tpl = mailBesichtigungTermin(
+    {
+      name: input.name.trim() || 'Kundin/Kunde',
+      terminTitel: input.terminTitel.trim() || 'Termin',
+      datumFmt,
+      zeitText,
+      adresse: (input.adresse ?? '').trim(),
+      notiz: (input.notiz ?? '').trim(),
+      statusLink,
+    },
+    branding
+  )
+
+  const r = await sendMail({
+    typ: 'besichtigung_termin',
+    an: email,
+    anName: input.name.trim() || null,
+    betreff: tpl.betreff,
+    html: tpl.html,
+    leadId: input.leadId,
+    kundeId: (lead as { kunde_id?: string | null }).kunde_id ?? null,
+    from: process.env.RESEND_FROM_ANFRAGEN ?? process.env.RESEND_FROM_EMAIL,
+  })
+
+  if (!r.success) {
+    const hint =
+      r.error === 'RESEND_API_KEY fehlt'
+        ? 'RESEND_API_KEY fehlt in .env.local — bitte Resend-API-Key eintragen.'
+        : (r.error ?? 'Versand fehlgeschlagen')
+    return { ok: false, message: hint }
+  }
+  return { ok: true }
 }
 
 function tageUeberfaellig(faelligAm: string): number {

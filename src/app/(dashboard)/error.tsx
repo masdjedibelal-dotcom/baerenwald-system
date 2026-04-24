@@ -11,7 +11,8 @@ export default function DashboardError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error(error)
+    // Im Browser steht oft nur die generische RSC-Meldung; der echte Stack steht in den Server-Logs.
+    console.error('[Dashboard error]', error.digest ?? '(kein digest)', error.message)
   }, [error])
 
   return (
@@ -20,8 +21,21 @@ export default function DashboardError({
       <p className="mt-2 text-sm text-muted">
         Bitte erneut versuchen oder zur Übersicht wechseln.
       </p>
+      <p className="mt-3 text-left text-xs text-muted">
+        Die Zeile mit <code className="rounded bg-canvas px-1">2117-….js</code> kommt vom gebündelten Next.js-Code im
+        Browser. Sie ist <strong>kein</strong> Hinweis auf die Ursache — Server-Component-Fehler werden in Production
+        absichtlich nicht an den Client durchgereicht.
+      </p>
+      {error.digest ? (
+        <p className="mt-3 text-left text-xs text-muted">
+          <span className="font-medium text-ink">Digest (für Abgleich in den Netlify-Server-Logs):</span>
+        </p>
+      ) : null}
+      {error.digest ? (
+        <p className="mt-1 rounded-md bg-canvas px-2 py-2 font-mono text-xs text-ink break-all">{error.digest}</p>
+      ) : null}
       {error.message ? (
-        <p className="mt-3 rounded-md bg-canvas px-2 py-1 font-mono text-xs text-danger">{error.message}</p>
+        <p className="mt-3 rounded-md bg-canvas px-2 py-1 text-left font-mono text-xs text-danger">{error.message}</p>
       ) : null}
       <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
         <Button type="button" variant="primary" onClick={() => reset()}>

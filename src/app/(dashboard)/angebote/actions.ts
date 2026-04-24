@@ -24,7 +24,11 @@ import type {
   Kunde,
   PreisTyp,
 } from '@/lib/types'
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import {
+  handwerkerZuweisungenFromPositionen,
+  normalizeAngebotPositionen,
+  summenAusPositionen,
+} from '@/lib/angebot-positionen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { addDaysYmd, insertKalenderAutoTermin } from '@/lib/kalender-auto-termine'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -137,8 +141,6 @@ export type CreateAngebotInput = {
   notizen: string | null
   preis_typ?: PreisTyp | null
   vorlage_id?: string | null
-  /** Mehrere Handwerker pro Gewerk möglich */
-  handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
 }
 
 export async function createAngebot(
@@ -159,7 +161,7 @@ export async function createAngebot(
       gesamt_max: summen.nettoMax,
       notizen: input.notizen,
       pdf_url: null,
-      preis_typ: input.preis_typ ?? 'range',
+      preis_typ: input.preis_typ ?? 'fix',
       vorlage_id: input.vorlage_id ?? null,
     })
     .select('id')
@@ -171,7 +173,8 @@ export async function createAngebot(
 
   const id = row.id as string
 
-  for (const z of input.handwerkerZuweisungen ?? []) {
+  const hwZu = handwerkerZuweisungenFromPositionen(positionen)
+  for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
     await supabase.from('angebot_handwerker').insert({
       angebot_id: id,
@@ -222,7 +225,7 @@ export async function updateAngebot(
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
       notizen: input.notizen,
-      preis_typ: input.preis_typ ?? 'range',
+      preis_typ: input.preis_typ ?? 'fix',
       vorlage_id: input.vorlage_id ?? null,
       updated_at: new Date().toISOString(),
     })
@@ -230,16 +233,38 @@ export async function updateAngebot(
 
   if (error) return { ok: false, message: error.message }
 
+  const { data: prevHw } = await supabase
+    .from('angebot_handwerker')
+    .select('gewerk_id, handwerker_id, status, aufgabe_notiz')
+    .eq('angebot_id', angebotId)
+
+  const prevHwMap = new Map<
+    string,
+    { status: string; aufgabe_notiz: string | null }
+  >()
+  for (const r of prevHw ?? []) {
+    const g = r.gewerk_id as string
+    const h = r.handwerker_id as string
+    if (!g || !h) continue
+    prevHwMap.set(`${g}|${h}`, {
+      status: String((r as { status?: string }).status ?? 'ausstehend'),
+      aufgabe_notiz: (r as { aufgabe_notiz?: string | null }).aufgabe_notiz ?? null,
+    })
+  }
+
   await supabase.from('angebot_handwerker').delete().eq('angebot_id', angebotId)
 
-  for (const z of input.handwerkerZuweisungen ?? []) {
+  const hwZu = handwerkerZuweisungenFromPositionen(positionen)
+  for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
+    const key = `${z.gewerk_id}|${z.handwerker_id}`
+    const prev = prevHwMap.get(key)
     await supabase.from('angebot_handwerker').insert({
       angebot_id: angebotId,
       gewerk_id: z.gewerk_id,
       handwerker_id: z.handwerker_id,
-      status: z.status ?? 'ausstehend',
-      aufgabe_notiz: z.aufgabe_notiz?.trim() || null,
+      status: (prev?.status as AngebotHandwerkerZuweisungInput['status']) ?? z.status ?? 'ausstehend',
+      aufgabe_notiz: prev?.aufgabe_notiz ?? z.aufgabe_notiz?.trim() ?? null,
     })
   }
 
@@ -325,7 +350,14 @@ export async function persistPdfForAngebot(
       upsert: true,
     })
 
-  if (upErr) return { ok: false, message: upErr.message }
+  if (upErr) {
+    const raw = upErr.message ?? ''
+    const hint =
+      /bucket not found|bucket.*does not exist|storage.*not found/i.test(raw)
+        ? ' — Speicher-Bucket „angebote-pdfs“ fehlt: Migration `20260424180000_storage_angebote_pdfs.sql` ausführen oder in Supabase → Storage einen öffentlichen Bucket `angebote-pdfs` (nur PDF) anlegen.'
+        : ''
+    return { ok: false, message: raw + hint }
+  }
 
   const { data: pub } = supabaseAdmin.storage.from('angebote-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl
@@ -985,20 +1017,12 @@ function prepareVorlagePositionenForDb(
   if (!mitPreisen) {
     pos = pos.map((p) => ({
       ...p,
-      preis_typ: 'range' as const,
-      lohn_min: 0,
-      lohn_max: 0,
-      material_min: 0,
-      material_max: 0,
+      preis_typ: 'fix' as const,
+      lohn_netto: 0,
+      material_netto: 0,
       gesamt_min: 0,
       gesamt_max: 0,
-      lohn_fix: undefined,
-      material_fix: undefined,
-      gesamt_fix: undefined,
-      einkaufspreis_min: undefined,
-      einkaufspreis_max: undefined,
       einkaufspreis: undefined,
-      marge: undefined,
     }))
   }
   return pos

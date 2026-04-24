@@ -4,6 +4,18 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import type { ComplianceDokumentTyp, Handwerker, PartnerDokument } from '@/lib/types'
 
+const PARTNER_DOCS_BUCKET = 'partner-dokumente'
+
+/** Relativer Storage-Pfad oder Legacy-URL → Pfad im Bucket */
+export function partnerDokumentStoragePath(datei_url: string | null | undefined): string | null {
+  if (!datei_url?.trim()) return null
+  const s = datei_url.trim()
+  if (!s.startsWith('http')) return s.replace(/^\/+/, '')
+  const m = s.match(/\/(?:object\/(?:public|sign)\/|storage\/v1\/object\/(?:public|sign)\/)?partner-dokumente\/(.+?)(?:\?|$)/i)
+  if (m?.[1]) return decodeURIComponent(m[1])
+  return null
+}
+
 export type HandwerkerFormInput = {
   name: string
   firma: string | null
@@ -164,7 +176,9 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .maybeSingle(),
     supabase
       .from('compliance_dokument_typen')
-      .select('id, slug, bezeichnung, beschreibung, pflicht_fuer_fachbetriebe, erneuerung_monate, sort_order')
+      .select(
+        'id, slug, bezeichnung, beschreibung, pflicht_fuer_fachbetriebe, erneuerung_monate, sort_order, kategorie, aktiv'
+      )
       .order('sort_order', { ascending: true }),
     supabase
       .from('auftrag_handwerker')
@@ -181,7 +195,9 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   ])
 
   const hw = (h as Handwerker | null) ?? null
-  const typen = (typenRaw ?? []) as ComplianceDokumentTyp[]
+  const typen = (typenRaw ?? []).filter(
+    (t: { aktiv?: boolean }) => t.aktiv !== false
+  ) as ComplianceDokumentTyp[]
 
   const dokumenteRaw = (hw?.partner_dokumente ?? []) as PartnerDokument[]
   const dokumente = dokumenteRaw.map((d) => ({
@@ -261,11 +277,58 @@ export async function insertPartnerDokument(input: {
   return { ok: true, id: data.id as string }
 }
 
+export async function updatePartnerDokument(
+  id: string,
+  handwerker_id: string,
+  patch: {
+    bezeichnung?: string
+    gueltig_bis?: string | null
+    notizen?: string | null
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const row: Record<string, unknown> = {}
+  if (patch.bezeichnung !== undefined) row.bezeichnung = patch.bezeichnung.trim()
+  if (patch.gueltig_bis !== undefined) row.gueltig_bis = patch.gueltig_bis?.trim() || null
+  if (patch.notizen !== undefined) row.notizen = patch.notizen?.trim() || null
+  if (Object.keys(row).length === 0) return { ok: true }
+  const { error } = await supabase.from('partner_dokumente').update(row).eq('id', id)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/handwerker/${handwerker_id}`)
+  revalidatePath('/handwerker')
+  return { ok: true }
+}
+
+/** Kurzzeit-Link zum Öffnen (privater Bucket). */
+export async function signPartnerDokumentUrl(
+  stored: string | null | undefined
+): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  const path = partnerDokumentStoragePath(stored)
+  if (!path) return { ok: false, message: 'Keine Datei hinterlegt.' }
+  const supabase = createClient()
+  const { data, error } = await supabase.storage
+    .from(PARTNER_DOCS_BUCKET)
+    .createSignedUrl(path, 3600)
+  if (error || !data?.signedUrl) {
+    return { ok: false, message: error?.message ?? 'Signierte URL fehlgeschlagen' }
+  }
+  return { ok: true, url: data.signedUrl }
+}
+
 export async function deletePartnerDokument(
   id: string,
   handwerker_id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const { data: row } = await supabase
+    .from('partner_dokumente')
+    .select('datei_url')
+    .eq('id', id)
+    .maybeSingle()
+  const path = partnerDokumentStoragePath((row as { datei_url?: string | null } | null)?.datei_url)
+  if (path) {
+    await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
+  }
   const { error } = await supabase.from('partner_dokumente').delete().eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/handwerker/${handwerker_id}`)

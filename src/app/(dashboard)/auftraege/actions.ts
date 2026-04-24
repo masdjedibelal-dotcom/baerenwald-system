@@ -875,20 +875,22 @@ export async function createNachtragEntwurfFromRegiebericht(
   const beschreibung = str(daten.beschreibung)
   const grundKurz = `Regiebericht ${str(daten.datum)}: ${beschreibung.slice(0, 280)}`
 
+  const lohnNettoUnit = st > 0 ? Math.round((lohn / st) * 100) / 100 : lohn
+  const matNettoUnit = st > 0 ? Math.round((mat / st) * 100) / 100 : mat
+  const netUnit = Math.round((lohnNettoUnit + matNettoUnit) * 100) / 100
   const position = {
     id: randomUUID(),
     gewerk_id: '',
     gewerk_name: 'Regie / Zusatz',
     leistung: 'Regiebericht — Zusatzaufwand',
     beschreibung: beschreibung || grundKurz,
-    lohn_min: lohn,
-    lohn_max: lohn,
-    material_min: mat,
-    material_max: mat,
-    gesamt_min: brutto,
-    gesamt_max: brutto,
+    lohn_netto: lohnNettoUnit,
+    material_netto: matNettoUnit,
+    gesamt_min: netUnit,
+    gesamt_max: netUnit,
     menge: st,
     einheit: 'h',
+    preis_typ: 'fix' as const,
   }
 
   const { error: insErr } = await supabaseAdmin.from('nachtraege').insert({

@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAnfrageBestaetigung } from '@/app/actions/mails'
 import { tomorrowYmd } from '@/lib/kalender-auto-termine'
+import {
+  bereicheMitLegacyGewerbeSituation,
+  leadHatGewerbeKontext,
+  situationOhneGewerbe,
+} from '@/lib/lead-gewerbe-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +19,9 @@ type Body = {
   bereiche?: string[]
   preis_min?: number | null
   preis_max?: number | null
+  budget_ca?: number | null
+  /** z. B. { preisModus: 'komplex' } */
+  funnel_daten?: Record<string, unknown>
   zeitraum?: string
   notizen?: string
   kanal?: string
@@ -59,8 +67,13 @@ export async function POST(req: Request) {
     if (existing?.id) kundeId = existing.id as string
   }
 
+  const bereicheRaw = Array.isArray(body.bereiche) ? body.bereiche.filter((x) => typeof x === 'string') : []
+  const bereicheMerged = bereicheMitLegacyGewerbeSituation(bereicheRaw, body.situation)
+  const situationStored = situationOhneGewerbe(body.situation?.trim() ?? null)
+  const istGewerbe = leadHatGewerbeKontext(bereicheMerged, body.situation)
+
   if (!kundeId) {
-    const kundentyp = body.situation === 'gewerbe' ? 'gewerbe' : 'privat'
+    const kundentyp = istGewerbe ? 'gewerbe' : 'privat'
     const { data: kundeRow, error: kundeErr } = await supabaseAdmin
       .from('kunden')
       .insert({
@@ -81,27 +94,29 @@ export async function POST(req: Request) {
     kundeId = kundeRow.id as string
   }
 
-  const bereiche = Array.isArray(body.bereiche) ? body.bereiche.filter((x) => typeof x === 'string') : []
-
   const { data: leadRow, error: leadErr } = await supabaseAdmin
     .from('leads')
     .insert({
       kunde_id: kundeId,
       kanal,
       status: 'neu',
-      situation: body.situation?.trim() || null,
-      bereiche: bereiche.length ? bereiche : null,
+      situation: situationStored,
+      bereiche: bereicheMerged.length ? bereicheMerged : null,
       preis_min: body.preis_min ?? null,
       preis_max: body.preis_max ?? null,
+      budget_ca: body.budget_ca ?? null,
       plz: plz || null,
       zeitraum: body.zeitraum?.trim() || null,
-      kundentyp: body.situation === 'gewerbe' ? 'gewerbe' : 'privat',
+      kundentyp: istGewerbe ? 'gewerbe' : 'privat',
       kontakt_name: name,
       kontakt_email: email || null,
       kontakt_telefon: telefon || null,
       kontakt_nachricht: null,
       notizen: body.notizen?.trim() || null,
-      funnel_daten: {},
+      funnel_daten:
+        body.funnel_daten && typeof body.funnel_daten === 'object' && !Array.isArray(body.funnel_daten)
+          ? body.funnel_daten
+          : {},
     })
     .select('id')
     .single()

@@ -13,6 +13,7 @@ export type ComplianceTypRow = {
   erneuerung_monate: number | null
   sort_order: number
   aktiv: boolean
+  kategorie: string | null
 }
 
 export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
@@ -30,7 +31,9 @@ export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
 
 export async function updateComplianceTyp(
   id: string,
-  patch: Partial<Pick<ComplianceTypRow, 'pflicht_fuer_fachbetriebe' | 'erneuerung_monate' | 'aktiv'>>
+  patch: Partial<
+    Pick<ComplianceTypRow, 'pflicht_fuer_fachbetriebe' | 'erneuerung_monate' | 'aktiv' | 'kategorie'>
+  >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('compliance_dokument_typen').update(patch).eq('id', id)
@@ -45,6 +48,7 @@ export async function createComplianceTyp(input: {
   beschreibung: string | null
   erneuerung_monate: number | null
   pflicht_fuer_fachbetriebe: boolean
+  kategorie?: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const name = input.bezeichnung.trim()
@@ -64,6 +68,7 @@ export async function createComplianceTyp(input: {
       erneuerung_monate: input.erneuerung_monate,
       sort_order: 900 + i,
       aktiv: true,
+      kategorie: input.kategorie?.trim() || null,
     })
     if (error) return { ok: false, message: error.message }
     revalidatePath('/einstellungen/compliance')

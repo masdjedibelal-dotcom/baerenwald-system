@@ -1,15 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { AngebotNeuForm } from '@/components/angebote/AngebotNeuForm'
-import type {
-  AngebotHandwerkerZuweisungInput,
-  AngebotPosition,
-  Gewerk,
-  Handwerker,
-  Kunde,
-  Lead,
-  Preisliste,
-} from '@/lib/types'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import type { AngebotPosition, Gewerk, Handwerker, Kunde, Lead, Preisliste } from '@/lib/types'
+import { mergeHandwerkerQueuesIntoPositionen, normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { angebotPositionenFromVorOrt, isVorOrtStruktur } from '@/lib/vorab-angebot-from-vorab'
 
 export default async function AngebotNeuPage({
@@ -82,7 +74,6 @@ export default async function AngebotNeuPage({
     kunde_id: string
     notizen: string | null
     positionen: AngebotPosition[]
-    handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
   } | null = null
 
   let kopieVon:
@@ -93,7 +84,6 @@ export default async function AngebotNeuPage({
         kunde_id: string
         notizen: string | null
         positionen: AngebotPosition[]
-        handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
       }
     | null = null
   let kopieKunde: Kunde | null = null
@@ -120,7 +110,7 @@ export default async function AngebotNeuPage({
       kunde_id: string | null
       notizen: string | null
       positionen: unknown
-      angebot_handwerker?: AngebotHandwerkerZuweisungInput[] | null
+      angebot_handwerker?: { gewerk_id: string; handwerker_id: string; status?: string; aufgabe_notiz?: string | null }[] | null
     } | null
 
     if (rowK?.kunde_id) {
@@ -132,11 +122,9 @@ export default async function AngebotNeuPage({
       if (kRow) kopieKunde = kRow as Kunde
 
       const posK = normalizeAngebotPositionen(rowK.positionen)
-      const hwK: AngebotHandwerkerZuweisungInput[] = (rowK.angebot_handwerker ?? []).map((z) => ({
-        gewerk_id: z.gewerk_id,
-        handwerker_id: z.handwerker_id,
-        status: 'ausstehend',
-        aufgabe_notiz: z.aufgabe_notiz ?? null,
+      const hwK = (rowK.angebot_handwerker ?? []).map((z) => ({
+        gewerk_id: z.gewerk_id as string,
+        handwerker_id: z.handwerker_id as string,
       }))
       kopieVon = {
         quelleId: rowK.id,
@@ -144,8 +132,7 @@ export default async function AngebotNeuPage({
         lead_id: rowK.lead_id,
         kunde_id: rowK.kunde_id,
         notizen: rowK.notizen,
-        positionen: posK,
-        handwerkerZuweisungen: hwK,
+        positionen: mergeHandwerkerQueuesIntoPositionen(posK, hwK),
       }
     }
   }
@@ -190,26 +177,21 @@ export default async function AngebotNeuPage({
       status: string
       notizen: string | null
       positionen: unknown
-      angebot_handwerker?: AngebotHandwerkerZuweisungInput[] | null
+      angebot_handwerker?: { gewerk_id: string; handwerker_id: string; status?: string; aufgabe_notiz?: string | null }[] | null
     } | null
 
     if (row?.status === 'entwurf' && row.kunde_id) {
       const pos = normalizeAngebotPositionen(row.positionen)
-      const handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[] = (
-        row.angebot_handwerker ?? []
-      ).map((z) => ({
-        gewerk_id: z.gewerk_id,
-        handwerker_id: z.handwerker_id,
-        status: (z.status as AngebotHandwerkerZuweisungInput['status']) ?? 'ausstehend',
-        aufgabe_notiz: z.aufgabe_notiz ?? null,
+      const hwList = (row.angebot_handwerker ?? []).map((z) => ({
+        gewerk_id: z.gewerk_id as string,
+        handwerker_id: z.handwerker_id as string,
       }))
       editAngebot = {
         id: row.id,
         lead_id: row.lead_id,
         kunde_id: row.kunde_id,
         notizen: row.notizen,
-        positionen: pos,
-        handwerkerZuweisungen,
+        positionen: mergeHandwerkerQueuesIntoPositionen(pos, hwList),
       }
     }
   }

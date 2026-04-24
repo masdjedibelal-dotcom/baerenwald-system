@@ -34,13 +34,18 @@ function pickOne<T>(x: T | T[] | null | undefined): T | null {
 }
 
 function parseAngebote(rows: unknown[]): AngebotListeEintrag[] {
-  return (rows ?? []).map((row) => {
-    const r = row as AngebotListeEintrag & { positionen: unknown }
-    return {
-      ...r,
-      positionen: normalizeAngebotPositionen(r.positionen) as AngebotPosition[],
-    }
-  })
+  try {
+    return (rows ?? []).map((row) => {
+      const r = row as AngebotListeEintrag & { positionen: unknown }
+      return {
+        ...r,
+        positionen: normalizeAngebotPositionen(r.positionen) as AngebotPosition[],
+      }
+    })
+  } catch (e) {
+    console.error('parseAngebote', e)
+    return []
+  }
 }
 
 type SupabaseErr = { message: string } | null

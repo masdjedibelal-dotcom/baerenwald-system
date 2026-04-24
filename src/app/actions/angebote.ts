@@ -2,7 +2,7 @@
 
 import { createAngebot, updateAngebot, setAngebotStatus } from '@/app/(dashboard)/angebote/actions'
 import type { CreateAngebotInput } from '@/app/(dashboard)/angebote/actions'
-import type { AngebotHandwerkerZuweisungInput, AngebotPosition, PreisTyp } from '@/lib/types'
+import type { AngebotPosition, PreisTyp } from '@/lib/types'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 
 export {
@@ -23,27 +23,8 @@ export {
 /** Alias für Aufrufer nach Prompt-Spezifikation */
 export const updateAngebotStatus = setAngebotStatus
 
-function handwerkerZuweisungenFromPositionen(
-  positionen: AngebotPosition[]
-): AngebotHandwerkerZuweisungInput[] {
-  const out: AngebotHandwerkerZuweisungInput[] = []
-  const seen = new Set<string>()
-  for (const p of positionen) {
-    if (!p.handwerker_id?.trim() || !p.gewerk_id?.trim()) continue
-    const key = `${p.gewerk_id}:${p.handwerker_id}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push({
-      gewerk_id: p.gewerk_id.trim(),
-      handwerker_id: p.handwerker_id.trim(),
-      status: 'ausstehend',
-    })
-  }
-  return out
-}
-
-function angebotPreisTypAusPositionen(positionen: AngebotPosition[]): PreisTyp {
-  return positionen.some((p) => (p.preis_typ ?? 'range') === 'range') ? 'range' : 'fix'
+function angebotPreisTypAusPositionen(_positionen: AngebotPosition[]): PreisTyp {
+  return 'fix'
 }
 
 export async function saveAngebot(
@@ -60,7 +41,6 @@ export async function saveAngebot(
   const positionen = normalizeAngebotPositionen(data.positionen)
   const summen = summenAusPositionen(positionen, 19)
   const preis_typ = data.preis_typ ?? angebotPreisTypAusPositionen(positionen)
-  const handwerkerZuweisungen = handwerkerZuweisungenFromPositionen(positionen)
 
   const payload: CreateAngebotInput = {
     lead_id: data.lead_id ?? null,
@@ -71,7 +51,6 @@ export async function saveAngebot(
     notizen: data.notizen ?? null,
     preis_typ,
     vorlage_id: data.vorlage_id ?? null,
-    handwerkerZuweisungen,
   }
 
   if (angebotId) {
