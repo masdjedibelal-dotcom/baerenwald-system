@@ -22,6 +22,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
   const [besch, setBesch] = useState('')
   const [monate, setMonate] = useState('')
   const [pflicht, setPflicht] = useState(true)
+  const [kategorieNeu, setKategorieNeu] = useState('')
   const [pending, startTransition] = useTransition()
 
   async function patchRow(id: string, patch: Partial<ComplianceTypRow>) {
@@ -42,6 +43,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
         beschreibung: besch.trim() || null,
         erneuerung_monate: m != null && Number.isFinite(m) ? m : null,
         pflicht_fuer_fachbetriebe: pflicht,
+        kategorie: kategorieNeu.trim() || null,
       })
       if (!r.ok) {
         toast.error(r.message)
@@ -52,6 +54,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
       setBez('')
       setBesch('')
       setMonate('')
+      setKategorieNeu('')
       const fresh = await loadComplianceTypen()
       setRows(fresh)
       router.refresh()
@@ -69,6 +72,20 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
         {rows.map((t) => (
           <Card key={t.id} title={t.bezeichnung}>
             <p className="mb-3 text-sm text-bw-light">{t.beschreibung ?? '—'}</p>
+            <div className="mb-3 max-w-md">
+              <Input
+                label="Kategorie (Gruppe in Handwerker-Compliance)"
+                defaultValue={t.kategorie ?? ''}
+                key={`kat-${t.id}-${t.kategorie ?? ''}`}
+                placeholder="z. B. Sicherheit, Versicherung…"
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  const cur = (t.kategorie ?? '').trim()
+                  if (v === cur) return
+                  void patchRow(t.id, { kategorie: v || null })
+                }}
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <label className="flex items-center gap-2">
                 <input
@@ -135,6 +152,12 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
             min={0}
             value={monate}
             onChange={(e) => setMonate(e.target.value)}
+          />
+          <Input
+            label="Kategorie (optional)"
+            value={kategorieNeu}
+            onChange={(e) => setKategorieNeu(e.target.value)}
+            placeholder="Gruppierung in der Compliance-Liste"
           />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={pflicht} onChange={(e) => setPflicht(e.target.checked)} />

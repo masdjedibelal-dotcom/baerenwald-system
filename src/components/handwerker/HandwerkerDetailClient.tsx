@@ -13,6 +13,7 @@ import { PropertyRow } from '@/components/ui/PropertyRow'
 import { Textarea } from '@/components/ui/Textarea'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
+import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   updateHandwerker,
@@ -20,7 +21,7 @@ import {
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import type { Handwerker } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 function gewerkTagsFromSlugs(
   gewerke: unknown,
@@ -65,7 +66,7 @@ export function HandwerkerDetailClient({
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
 
-  const [tab, setTab] = useState<'auftraege' | 'notizen'>('auftraege')
+  const [tab, setTab] = useState<'auftraege' | 'notizen' | 'compliance'>('auftraege')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -223,34 +224,9 @@ export function HandwerkerDetailClient({
             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Status</p>
             <ComplianceBadge status={hw.compliance_status} />
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Dokumente</p>
-            {payload.dokumente.length === 0 ? (
-              <p className="text-sm text-bw-text-muted">Keine Dokumente erfasst.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {payload.dokumente.map((d) => (
-                  <li key={d.id} className="rounded-lg border border-bw-border bg-bw-card px-3 py-2">
-                    <div className="font-medium text-bw-text">{d.bezeichnung}</div>
-                    <div className="text-xs text-bw-text-muted">
-                      {d.compliance_dokument_typen?.bezeichnung ?? d.typ}
-                      {d.gueltig_bis ? ` · gültig bis ${formatDatum(d.gueltig_bis)}` : null}
-                    </div>
-                    {d.datei_url ? (
-                      <a
-                        href={d.datei_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 inline-block text-xs text-bw-link hover:underline"
-                      >
-                        Datei öffnen
-                      </a>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <p className="text-sm text-bw-text-muted">
+            Nachweise nach Kategorie, Upload und signierte Links: Tab „Compliance“.
+          </p>
         </div>
       </Accordion>
 
@@ -286,10 +262,27 @@ export function HandwerkerDetailClient({
         >
           Notizen
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('compliance')}
+          className={cn(
+            'border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+            tab === 'compliance' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
+          )}
+        >
+          Compliance
+        </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-        {tab === 'auftraege' ? (
+        {tab === 'compliance' ? (
+          <HandwerkerComplianceTab
+            handwerkerId={hw.id}
+            istFachbetrieb={hw.ist_fachbetrieb}
+            typen={payload.typen}
+            dokumente={payload.dokumente}
+          />
+        ) : tab === 'auftraege' ? (
           <div className="space-y-6">
             <section>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Aktive Aufträge</h3>
