@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { SidePanel } from '@/components/ui/SidePanel'
+import { Card } from '@/components/ui/Card'
 import { LeadStatusBadge } from '@/components/ui/Badge'
 import { StatusActions } from '@/components/funnel/StatusActions'
 import { PropertyRow } from '@/components/ui/PropertyRow'
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { AngeboteListeTab, LeadNotizenListeTab, VorOrtTermineTab } from '@/components/anfragen/AnfrageLeadTabsShared'
+import { LeadVorOrtAufnahmeSection } from '@/components/anfragen/LeadVorOrtAufnahmeSection'
 import { createClient } from '@/lib/supabase'
 import {
   updateLeadKontakt,
@@ -37,11 +39,18 @@ import {
   KANAL_LABELS,
   SITUATION_LABELS,
   STATUS_LABELS,
-  formatBudget,
+  anfragePreisDetailLabel,
+  formatAnfragePreisAnzeige,
   formatDatum,
   formatDatumZeit,
 } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import {
+  bereicheFuerAnzeige,
+  bereicheMitLegacyGewerbeSituation,
+  situationFuerAnzeige,
+  situationOhneGewerbe,
+} from '@/lib/lead-gewerbe-storage'
 
 const BEREICH_KEYS = Object.keys(BEREICH_LABELS) as string[]
 
@@ -238,11 +247,23 @@ export function AnfrageSidePanel({
     [leadId, router, setStatus]
   )
 
+  const [notizSaving, setNotizSaving] = useState(false)
+
   async function saveNotizen() {
     if (!leadId) return
-    const res = await updateLeadNotizen(leadId, notizen)
-    if (!res.ok) toast.error(res.message)
-    else toast.success('Notiz gespeichert')
+    setNotizSaving(true)
+    try {
+      const res = await updateLeadNotizen(leadId, notizen)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success('Notiz gespeichert')
+      setReloadKey((k) => k + 1)
+      router.refresh()
+    } finally {
+      setNotizSaving(false)
+    }
   }
 
   const historySorted = useMemo(() => {
@@ -291,9 +312,10 @@ export function AnfrageSidePanel({
     let zt: 'tag' | 'zeitraum' | null = null
     if (von && !bis) zt = 'tag'
     else if (von && bis) zt = 'zeitraum'
+    const bereicheMerged = bereicheFuerAnzeige(detail.bereiche, detail.situation)
     setProjektForm({
-      situation: detail.situation ?? '',
-      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, !!detail.bereiche?.includes(k)])),
+      situation: situationFuerAnzeige(detail.situation) ?? '',
+      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, bereicheMerged.includes(k)])),
       sonstigesText: detail.bereiche_sonstiges ?? '',
       budget: detail.budget_ca != null && detail.budget_ca > 0 ? String(detail.budget_ca) : '',
       zeitraumTyp: zt,
@@ -330,7 +352,10 @@ export function AnfrageSidePanel({
 
   async function saveProjektModal() {
     if (!leadId) return
-    const bereicheList = BEREICH_KEYS.filter((k) => projektForm.bereiche[k])
+    const bereicheList = bereicheMitLegacyGewerbeSituation(
+      BEREICH_KEYS.filter((k) => projektForm.bereiche[k]),
+      projektForm.situation || null
+    )
     const budgetN = projektForm.budget.trim() === '' || Number.isNaN(Number(projektForm.budget)) ? null : Number(projektForm.budget)
     let zVon: string | null = null
     let zBis: string | null = null
@@ -343,7 +368,7 @@ export function AnfrageSidePanel({
     }
     startTransition(async () => {
       const r = await updateLeadProjekt(leadId, {
-        situation: projektForm.situation || null,
+        situation: situationOhneGewerbe(projektForm.situation || null),
         bereiche: bereicheList.length ? bereicheList : null,
         bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
         budget_ca: budgetN,
@@ -476,30 +501,36 @@ export function AnfrageSidePanel({
                       <PropertyRow
                         label="Situation"
                         value={
-                          display!.situation
-                            ? SITUATION_LABELS[display!.situation] ?? display!.situation
-                            : '—'
+                          (() => {
+                            const s = situationFuerAnzeige(display!.situation)
+                            return s ? (SITUATION_LABELS[s] ?? s) : '—'
+                          })()
                         }
                         editable={false}
                       />
                       <div className="property-row">
                         <span className="property-label">Bereiche</span>
                         <span className="property-value flex flex-wrap gap-1">
-                          {display!.bereiche?.length
-                            ? display!.bereiche!.map((b) => (
-                                <span key={b} className="badge rounded bg-bw-bg px-2 py-0.5 text-xs">
-                                  {BEREICH_LABELS[b] ?? b}
-                                </span>
-                              ))
-                            : '—'}
+                          {(() => {
+                            const list = bereicheFuerAnzeige(display!.bereiche, display!.situation)
+                            return list.length
+                              ? list.map((b) => (
+                                  <span key={b} className="badge rounded bg-bw-bg px-2 py-0.5 text-xs">
+                                    {BEREICH_LABELS[b] ?? b}
+                                  </span>
+                                ))
+                              : '—'
+                          })()}
                         </span>
                       </div>
                       <PropertyRow
-                        label="Budget"
-                        value={formatBudget(
+                        label={anfragePreisDetailLabel(display!.kanal)}
+                        value={formatAnfragePreisAnzeige(
+                          display!.kanal,
                           'budget_ca' in display! ? (display as LeadDetail).budget_ca : undefined,
                           display!.preis_min,
-                          display!.preis_max
+                          display!.preis_max,
+                          display!.funnel_daten
                         )}
                         editable={false}
                       />
@@ -513,59 +544,44 @@ export function AnfrageSidePanel({
                   ) : null}
                 </div>
 
-                <div className="accordion">
-                  <div className="accordion-header">
-                    <span className="accordion-title">Vor-Ort Aufnahme (Formular)</span>
-                  </div>
-                  <div className="accordion-body">
-                    {detail?.vorab_formulare?.length ? (
-                      <p className="text-sm text-bw-text">Vor-Ort-Aufnahme vorhanden.</p>
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg p-4 text-center text-sm text-bw-text-muted">
-                        Noch keine strukturierte Vor-Ort-Aufnahme
-                        <Link
-                          href={`/anfragen/${display!.id}/vorab`}
-                          className="btn btn-primary btn-sm mt-3 inline-flex"
-                        >
-                          📋 Aufnehmen →
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="accordion">
-                  <div className="accordion-header">
-                    <span className="accordion-title">Interne Notiz</span>
-                  </div>
-                  <div className="accordion-body">
-                    <Textarea
-                      value={notizen}
-                      onChange={(e) => setNotizen(e.target.value)}
-                      onBlur={() => void saveNotizen()}
-                      placeholder="Kurze interne Aktennotiz…"
-                      rows={3}
-                    />
-                  </div>
-                </div>
               </div>
             ) : null}
 
             {tab === 'vorort' && display && detail ? (
-              <VorOrtTermineTab
-                leadId={display.id}
-                termine={(detail.kalender_termine ?? []) as KalenderTermin[]}
-                vorOrtNotiz={detail.vor_ort_notizen ?? ''}
-                onReload={() => setReloadKey((k) => k + 1)}
-              />
+              <div className="space-y-8">
+                <LeadVorOrtAufnahmeSection leadId={display.id} vorabFormulare={detail.vorab_formulare} />
+                <VorOrtTermineTab
+                  leadId={display.id}
+                  termine={(detail.kalender_termine ?? []) as KalenderTermin[]}
+                  vorOrtNotiz={detail.vor_ort_notizen ?? ''}
+                  onReload={() => setReloadKey((k) => k + 1)}
+                />
+              </div>
             ) : null}
 
             {tab === 'notizen' && display && detail ? (
-              <LeadNotizenListeTab
-                leadId={display.id}
-                notizen={notizenRows}
-                onReload={() => setReloadKey((k) => k + 1)}
-              />
+              <div className="space-y-6">
+                <Card className="p-4">
+                  <h2 className="mb-2 text-sm font-semibold text-ink">Interne Notiz</h2>
+                  <Textarea
+                    value={notizen}
+                    onChange={(e) => setNotizen(e.target.value)}
+                    placeholder="Kurze interne Aktennotiz…"
+                    rows={4}
+                  />
+                  <p className="mt-1 text-xs text-bw-text-muted">Bitte mit dem Button unten speichern.</p>
+                  <div className="mt-3 flex justify-end">
+                    <Button type="button" variant="primary" size="sm" loading={notizSaving} onClick={() => void saveNotizen()}>
+                      Speichern
+                    </Button>
+                  </div>
+                </Card>
+                <LeadNotizenListeTab
+                  leadId={display.id}
+                  notizen={notizenRows}
+                  onReload={() => setReloadKey((k) => k + 1)}
+                />
+              </div>
             ) : null}
 
             {tab === 'aktiv' ? (
@@ -680,7 +696,7 @@ export function AnfrageSidePanel({
             onChange={(e) => setProjektForm((f) => ({ ...f, situation: e.target.value }))}
             options={[
               { value: '', label: 'Bitte wählen…' },
-              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung', 'gewerbe'] as const).map((value) => ({
+              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung'] as const).map((value) => ({
                 value,
                 label: SITUATION_LABELS[value] ?? value,
               })),

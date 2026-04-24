@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,51 +16,27 @@ import {
   updateAngebot,
   updateAngebotVorlage,
 } from '@/app/(dashboard)/angebote/actions'
-import type {
-  AngebotHandwerkerZuweisungInput,
-  AngebotHandwerkerZuweisungStatus,
-  AngebotPosition,
-  Gewerk,
-  Handwerker,
-  Kunde,
-  Lead,
-  Preisliste,
-} from '@/lib/types'
+import type { AngebotPosition, Gewerk, Handwerker, Kunde, Lead, Preisliste } from '@/lib/types'
 import {
   neuePositionsId,
   normalizeAngebotPosition,
   summenAusPositionen,
 } from '@/lib/angebot-positionen'
-import { cn, formatPreis } from '@/lib/utils'
+import { formatPreis } from '@/lib/utils'
+import {
+  gewerkOptionsFromList,
+  OfferPositionCard,
+  type OfferPositionRow,
+} from '@/components/angebote/OfferPositionCard'
 
-type PosRow = {
-  key: string
-  gewerk_id: string
-  preisliste_id: string
-  leistung: string
-  beschreibung: string
-  einheit: string
-  menge: number
-  lohn_min: number
-  lohn_max: number
-  material_min: number
-  material_max: number
-  einkaufspreis_min: number | ''
-  einkaufspreis_max: number | ''
-  notiz_intern: string
-  notiz_extern: string
-  internOpen: boolean
+function mittelPreisliste(pl: Preisliste): number {
+  const a = pl.preis_min
+  const b = pl.preis_max
+  if (a > 0 && b > 0) return Math.round(((a + b) / 2) * 100) / 100
+  return Math.max(a, b, 0)
 }
 
-type HwRow = {
-  key: string
-  gewerk_id: string
-  handwerker_id: string
-  status: AngebotHandwerkerZuweisungStatus
-  aufgabe_notiz: string
-}
-
-function newRow(): PosRow {
+function newRow(): OfferPositionRow {
   return {
     key: neuePositionsId(),
     gewerk_id: '',
@@ -69,35 +45,24 @@ function newRow(): PosRow {
     beschreibung: '',
     einheit: 'Stk.',
     menge: 1,
-    lohn_min: 0,
-    lohn_max: 0,
-    material_min: 0,
-    material_max: 0,
-    einkaufspreis_min: '',
-    einkaufspreis_max: '',
+    lohn_netto: 0,
+    material_netto: 0,
+    einkaufspreis: '',
+    handwerker_id: '',
     notiz_intern: '',
     notiz_extern: '',
-    internOpen: false,
+    guInternOpen: false,
   }
 }
 
-function newHwRow(gewerk_id = ''): HwRow {
-  return {
-    key: neuePositionsId(),
-    gewerk_id,
-    handwerker_id: '',
-    status: 'ausstehend',
-    aufgabe_notiz: '',
-  }
-}
-
-function positionToRow(p: AngebotPosition, preislisten: Preisliste[]): PosRow {
+function positionToRow(p: AngebotPosition, preislisten: Preisliste[]): OfferPositionRow {
   const n = normalizeAngebotPosition(p) ?? (p as AngebotPosition)
   let pl = preislisten.find(
     (x) =>
       x.gewerk_id === n.gewerk_id && x.leistung === n.leistung && x.einheit === n.einheit
   )
   if (!pl) pl = preislisten.find((x) => x.gewerk_id === n.gewerk_id && x.leistung === n.leistung)
+  const ek = n.einkaufspreis
   return {
     key: n.id || neuePositionsId(),
     gewerk_id: n.gewerk_id,
@@ -106,25 +71,17 @@ function positionToRow(p: AngebotPosition, preislisten: Preisliste[]): PosRow {
     beschreibung: n.beschreibung || n.leistung,
     einheit: n.einheit,
     menge: n.menge,
-    lohn_min: n.lohn_min,
-    lohn_max: n.lohn_max,
-    material_min: n.material_min,
-    material_max: n.material_max,
-    einkaufspreis_min:
-      n.einkaufspreis_min != null && Number.isFinite(n.einkaufspreis_min)
-        ? n.einkaufspreis_min
-        : '',
-    einkaufspreis_max:
-      n.einkaufspreis_max != null && Number.isFinite(n.einkaufspreis_max)
-        ? n.einkaufspreis_max
-        : '',
+    lohn_netto: n.lohn_netto,
+    material_netto: n.material_netto,
+    einkaufspreis: ek != null && Number.isFinite(ek) && ek > 0 ? ek : '',
+    handwerker_id: n.handwerker_id ?? '',
     notiz_intern: n.notiz_intern ?? '',
     notiz_extern: n.notiz_extern ?? '',
-    internOpen: false,
+    guInternOpen: false,
   }
 }
 
-function positionsToRows(positionen: AngebotPosition[], preislisten: Preisliste[]): PosRow[] {
+function positionsToRows(positionen: AngebotPosition[], preislisten: Preisliste[]): OfferPositionRow[] {
   if (!positionen.length) return [newRow()]
   return positionen.map((p) => positionToRow(p, preislisten))
 }
@@ -132,7 +89,7 @@ function positionsToRows(positionen: AngebotPosition[], preislisten: Preisliste[
 function vorabPositionenToRows(
   positionen: AngebotPosition[],
   preislisten: Preisliste[]
-): PosRow[] {
+): OfferPositionRow[] {
   if (!positionen.length) return [newRow()]
   return positionen.map((p) => positionToRow(p, preislisten))
 }
@@ -148,7 +105,6 @@ export type AngebotNeuFormProps = {
     kunde_id: string
     notizen: string | null
     positionen: AngebotPosition[]
-    handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
   } | null
   /** Vorlage aus bestehendem Angebot — erzeugt immer ein neues Angebot (Entwurf) */
   kopieVon?: {
@@ -158,7 +114,6 @@ export type AngebotNeuFormProps = {
     kunde_id: string
     notizen: string | null
     positionen: AngebotPosition[]
-    handwerkerZuweisungen: AngebotHandwerkerZuweisungInput[]
   } | null
   /** bei kopieVon: Kundendaten zur Anzeige (optional) */
   kopieKunde?: Kunde | null
@@ -171,14 +126,6 @@ export type AngebotNeuFormProps = {
     initial: { name: string; beschreibung: string; positionen: AngebotPosition[]; mitPreisen: boolean }
   } | null
 }
-
-const HW_STATUS_OPTS: { value: AngebotHandwerkerZuweisungStatus; label: string }[] = [
-  { value: 'ausstehend', label: 'Ausstehend' },
-  { value: 'angefragt', label: 'Angefragt' },
-  { value: 'akzeptiert', label: 'Akzeptiert' },
-  { value: 'abgelehnt', label: 'Abgelehnt' },
-  { value: 'ersetzt', label: 'Ersetzt' },
-]
 
 export function AngebotNeuForm({
   gewerke,
@@ -213,7 +160,7 @@ export function AngebotNeuForm({
   const [neuEmail, setNeuEmail] = useState('')
   const [neuTelefon, setNeuTelefon] = useState('')
 
-  const [rows, setRows] = useState<PosRow[]>(() => {
+  const [rows, setRows] = useState<OfferPositionRow[]>(() => {
     if (modusVorlage?.initial.positionen?.length)
       return positionsToRows(modusVorlage.initial.positionen, preislisten)
     if (editAngebot) return positionsToRows(editAngebot.positionen, preislisten)
@@ -223,18 +170,6 @@ export function AngebotNeuForm({
     if (vorlageBootstrap?.positionen?.length)
       return positionsToRows(vorlageBootstrap.positionen, preislisten)
     return [newRow()]
-  })
-
-  const [hwRows, setHwRows] = useState<HwRow[]>(() => {
-    const list = editAngebot?.handwerkerZuweisungen ?? kopieVon?.handwerkerZuweisungen ?? []
-    if (!list.length) return [newHwRow()]
-    return list.map((z) => ({
-      key: neuePositionsId(),
-      gewerk_id: z.gewerk_id,
-      handwerker_id: z.handwerker_id,
-      status: (z.status as AngebotHandwerkerZuweisungStatus) ?? 'ausstehend',
-      aufgabe_notiz: z.aufgabe_notiz ?? '',
-    }))
   })
 
   const [notizen, setNotizen] = useState(() => {
@@ -275,52 +210,42 @@ export function AngebotNeuForm({
     [gewerkSlug, handwerker]
   )
 
-  const gewerkeInAngebot = useMemo(() => {
-    const ids = new Set<string>()
-    for (const r of rows) {
-      if (r.gewerk_id) ids.add(r.gewerk_id)
-    }
-    return Array.from(ids)
-  }, [rows])
-
   const positionenBuilt = useMemo((): AngebotPosition[] => {
     const out: AngebotPosition[] = []
     for (const r of rows) {
       if (!r.gewerk_id || !r.preisliste_id) continue
       const g = gewerke.find((x) => x.id === r.gewerk_id)
       const pl = preislisten.find((x) => x.id === r.preisliste_id)
-      const lmin = Number(r.lohn_min) || 0
-      const lmax = Number(r.lohn_max) || 0
-      const mmin = Number(r.material_min) || 0
-      const mmax = Number(r.material_max) || 0
-      const emin = r.einkaufspreis_min === '' ? undefined : Number(r.einkaufspreis_min)
-      const emax = r.einkaufspreis_max === '' ? undefined : Number(r.einkaufspreis_max)
-      out.push({
+      const lohn = Number(r.lohn_netto) || 0
+      const mat = Number(r.material_netto) || 0
+      const stueck = Math.round((lohn + mat) * 100) / 100
+      const ek = r.einkaufspreis === '' ? undefined : Number(r.einkaufspreis)
+      const pos: AngebotPosition = {
         id: r.key,
         gewerk_id: r.gewerk_id,
         gewerk_name: g?.name ?? pl?.gewerke?.name ?? '',
         leistung: pl?.leistung ?? r.leistung,
         beschreibung: (r.beschreibung || pl?.leistung || '').trim() || (pl?.leistung ?? ''),
-        lohn_min: lmin,
-        lohn_max: lmax,
-        material_min: mmin,
-        material_max: mmax,
-        gesamt_min: lmin + mmin,
-        gesamt_max: lmax + mmax,
+        lohn_netto: lohn,
+        material_netto: mat,
+        gesamt_min: stueck,
+        gesamt_max: stueck,
         menge: Number(r.menge) || 1,
         einheit: r.einheit || pl?.einheit || 'Stk.',
-        einkaufspreis_min: emin != null && Number.isFinite(emin) ? emin : undefined,
-        einkaufspreis_max: emax != null && Number.isFinite(emax) ? emax : undefined,
         notiz_intern: r.notiz_intern.trim() || undefined,
         notiz_extern: r.notiz_extern.trim() || undefined,
-      })
+        preis_typ: 'fix',
+      }
+      if (ek != null && Number.isFinite(ek) && ek > 0) pos.einkaufspreis = ek
+      if (r.handwerker_id.trim()) pos.handwerker_id = r.handwerker_id.trim()
+      out.push(pos)
     }
     return out
   }, [rows, gewerke, preislisten])
 
   const summen = useMemo(() => summenAusPositionen(positionenBuilt, 19), [positionenBuilt])
 
-  const updateRow = (key: string, patch: Partial<PosRow>) => {
+  const updateRow = (key: string, patch: Partial<OfferPositionRow>) => {
     setRows((prev) =>
       prev.map((row) => (row.key === key ? { ...row, ...patch } : row))
     )
@@ -333,10 +258,9 @@ export function AngebotNeuForm({
       leistung: '',
       beschreibung: '',
       einheit: 'Stk.',
-      lohn_min: 0,
-      lohn_max: 0,
-      material_min: 0,
-      material_max: 0,
+      lohn_netto: 0,
+      material_netto: 0,
+      handwerker_id: '',
     })
   }
 
@@ -346,39 +270,20 @@ export function AngebotNeuForm({
       updateRow(key, { preisliste_id: '', leistung: '' })
       return
     }
+    const fest = mittelPreisliste(pl)
     updateRow(key, {
       preisliste_id,
       leistung: pl.leistung,
       beschreibung: pl.leistung,
       einheit: pl.einheit,
-      lohn_min: pl.preis_min,
-      lohn_max: pl.preis_max,
-      material_min: 0,
-      material_max: 0,
+      lohn_netto: fest,
+      material_netto: 0,
     })
   }
 
   const addRow = () => setRows((p) => [...p, newRow()])
   const removeRow = (key: string) =>
     setRows((p) => (p.length <= 1 ? p : p.filter((r) => r.key !== key)))
-
-  const addHwRow = () => setHwRows((p) => [...p, newHwRow()])
-  const removeHwRow = (key: string) =>
-    setHwRows((p) => (p.length <= 1 ? p : p.filter((r) => r.key !== key)))
-
-  const buildHandwerkerZuweisungen = (): AngebotHandwerkerZuweisungInput[] => {
-    const out: AngebotHandwerkerZuweisungInput[] = []
-    for (const h of hwRows) {
-      if (!h.gewerk_id || !h.handwerker_id) continue
-      out.push({
-        gewerk_id: h.gewerk_id,
-        handwerker_id: h.handwerker_id,
-        status: h.status,
-        aufgabe_notiz: h.aufgabe_notiz.trim() || null,
-      })
-    }
-    return out
-  }
 
   const submit = async () => {
     setError(null)
@@ -451,8 +356,6 @@ export function AngebotNeuForm({
       return
     }
 
-    const handwerkerZuweisungen = buildHandwerkerZuweisungen()
-
     setSaving(true)
     const payload = {
       lead_id: editAngebot?.lead_id ?? kopieVon?.lead_id ?? leadBundle?.lead.id ?? null,
@@ -461,7 +364,7 @@ export function AngebotNeuForm({
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
       notizen: notizen.trim() || null,
-      handwerkerZuweisungen,
+      preis_typ: 'fix' as const,
     }
 
     if (isEdit && editAngebot && !istKopie) {
@@ -486,15 +389,10 @@ export function AngebotNeuForm({
     router.refresh()
   }
 
-  const gewerkSelectOptions = [
-    { value: '', label: 'Gewerk wählen' },
-    ...gewerke
-      .filter((g) => g.aktiv)
-      .map((g) => ({ value: g.id, label: g.name })),
-  ]
+  const gewerkSelectOptions = useMemo(() => gewerkOptionsFromList(gewerke), [gewerke])
 
   return (
-    <div>
+    <div className="pb-28">
       <PageHeader
         title={
           modusVorlage
@@ -700,223 +598,37 @@ export function AngebotNeuForm({
       )}
 
       <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="text-lg font-semibold text-ink">Positionen</h2>
-        <div className="space-y-8">
-          {rows.map((row) => {
-            const plForGewerk = preislisten.filter(
-              (p) => p.gewerk_id === row.gewerk_id && p.aktiv
-            )
-            const gesamtMin = (Number(row.lohn_min) || 0) + (Number(row.material_min) || 0)
-            const gesamtMax = (Number(row.lohn_max) || 0) + (Number(row.material_max) || 0)
-            const m = Number(row.menge) || 1
-            const emax = row.einkaufspreis_max === '' ? null : Number(row.einkaufspreis_max)
-            const emin = row.einkaufspreis_min === '' ? null : Number(row.einkaufspreis_min)
-            const margeMin =
-              emax != null && Number.isFinite(emax)
-                ? gesamtMin * m - emax * m
-                : null
-            const margeMax =
-              emin != null && Number.isFinite(emin)
-                ? gesamtMax * m - emin * m
-                : null
-
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Positionen</h2>
+            <p className="text-sm text-muted">
+              Festpreise pro Einheit; Handwerker pro Position zuordnen.
+            </p>
+          </div>
+        </div>
+        <div className="space-y-5">
+          {rows.map((row, idx) => {
+            const plForGewerk = preislisten.filter((p) => p.gewerk_id === row.gewerk_id && p.aktiv)
+            const hwOpts = handwerkerOptions(row.gewerk_id)
+            const selectedHw =
+              hwOpts.find((h) => h.id === row.handwerker_id) ??
+              handwerker.find((h) => h.id === row.handwerker_id) ??
+              null
             return (
-              <div
+              <OfferPositionCard
                 key={row.key}
-                className="space-y-3 border-b border-border pb-8 last:border-0 last:pb-0"
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block space-y-1.5">
-                    <span className="text-base font-medium text-ink">Gewerk</span>
-                    <select
-                      value={row.gewerk_id}
-                      onChange={(e) => onGewerkChange(row.key, e.target.value)}
-                      className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base text-ink focus:border-primary focus:ring-2 focus:ring-primary"
-                    >
-                      {gewerkSelectOptions.map((o) => (
-                        <option key={o.value || '_'} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="text-base font-medium text-ink">Leistung (Preisliste)</span>
-                    <select
-                      value={row.preisliste_id}
-                      onChange={(e) => onPreislisteChange(row.key, e.target.value)}
-                      disabled={!row.gewerk_id}
-                      className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base text-ink focus:border-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
-                    >
-                      <option value="">Leistung wählen</option>
-                      {plForGewerk.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.leistung}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <Textarea
-                  label="Beschreibung (Kundentext)"
-                  hint="Wird im Angebot / PDF angezeigt"
-                  value={row.beschreibung}
-                  onChange={(e) => updateRow(row.key, { beschreibung: e.target.value })}
-                  rows={2}
-                />
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Input
-                    label="Menge"
-                    type="number"
-                    min={0.01}
-                    step={0.1}
-                    value={row.menge}
-                    onChange={(e) =>
-                      updateRow(row.key, { menge: Number(e.target.value) || 1 })
-                    }
-                  />
-                  <Input
-                    label="Einheit"
-                    value={row.einheit}
-                    onChange={(e) => updateRow(row.key, { einheit: e.target.value })}
-                  />
-                </div>
-                <div
-                  className={cn(
-                    'space-y-3 rounded-lg',
-                    hervorhebePreise && 'border border-amber-300 bg-amber-50 p-3'
-                  )}
-                >
-                  {hervorhebePreise ? (
-                    <p className="text-xs font-medium text-amber-950">
-                      Bitte prüfen und anpassen (Preise aus Vorlage).
-                    </p>
-                  ) : null}
-                  <p className="text-sm font-semibold text-ink">Lohn (€ / Einheit, netto)</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input
-                      label="Lohn Min"
-                      type="number"
-                      min={0}
-                      step={50}
-                      value={row.lohn_min}
-                      onChange={(e) =>
-                        updateRow(row.key, { lohn_min: Number(e.target.value) || 0 })
-                      }
-                    />
-                    <Input
-                      label="Lohn Max"
-                      type="number"
-                      min={0}
-                      step={50}
-                      value={row.lohn_max}
-                      onChange={(e) =>
-                        updateRow(row.key, { lohn_max: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                  <p className="text-sm font-semibold text-ink">Material (€ / Einheit, netto)</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input
-                      label="Material Min"
-                      type="number"
-                      min={0}
-                      step={50}
-                      value={row.material_min}
-                      onChange={(e) =>
-                        updateRow(row.key, { material_min: Number(e.target.value) || 0 })
-                      }
-                    />
-                    <Input
-                      label="Material Max"
-                      type="number"
-                      min={0}
-                      step={50}
-                      value={row.material_max}
-                      onChange={(e) =>
-                        updateRow(row.key, { material_max: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                </div>
-                <p className="text-sm text-muted">
-                  Gesamt Stückpreis: {gesamtMin.toLocaleString('de-DE')} –{' '}
-                  {gesamtMax.toLocaleString('de-DE')} € · Zeile netto:{' '}
-                  {(gesamtMin * m).toLocaleString('de-DE')} – {(gesamtMax * m).toLocaleString('de-DE')}{' '}
-                  €
-                </p>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 text-sm font-medium text-primary"
-                  onClick={() => updateRow(row.key, { internOpen: !row.internOpen })}
-                >
-                  {row.internOpen ? (
-                    <ChevronUp className="h-4 w-4" aria-hidden />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" aria-hidden />
-                  )}
-                  Intern (Einkauf / Marge)
-                </button>
-                {row.internOpen ? (
-                  <div className="rounded-lg border border-dashed border-border bg-canvas/40 p-3 space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Input
-                        label="Einkaufspreis Min (€ / Einheit)"
-                        type="number"
-                        min={0}
-                        value={row.einkaufspreis_min === '' ? '' : String(row.einkaufspreis_min)}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          updateRow(row.key, {
-                            einkaufspreis_min: v === '' ? '' : Number(v),
-                          })
-                        }}
-                      />
-                      <Input
-                        label="Einkaufspreis Max (€ / Einheit)"
-                        type="number"
-                        min={0}
-                        value={row.einkaufspreis_max === '' ? '' : String(row.einkaufspreis_max)}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          updateRow(row.key, {
-                            einkaufspreis_max: v === '' ? '' : Number(v),
-                          })
-                        }}
-                      />
-                    </div>
-                    {margeMin != null || margeMax != null ? (
-                      <p className="text-xs text-muted">
-                        Marge (Schätzung):{' '}
-                        {margeMin != null ? `${margeMin.toLocaleString('de-DE')} €` : '—'} –{' '}
-                        {margeMax != null ? `${margeMax.toLocaleString('de-DE')} €` : '—'} (netto Zeile)
-                      </p>
-                    ) : null}
-                    <Textarea
-                      label="Notiz intern"
-                      value={row.notiz_intern}
-                      onChange={(e) => updateRow(row.key, { notiz_intern: e.target.value })}
-                      rows={2}
-                    />
-                  </div>
-                ) : null}
-                <Textarea
-                  label="Notiz für Kunden"
-                  value={row.notiz_extern}
-                  onChange={(e) => updateRow(row.key, { notiz_extern: e.target.value })}
-                  rows={2}
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-danger hover:bg-danger/10"
-                    aria-label="Position löschen"
-                    onClick={() => removeRow(row.key)}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
+                index={idx}
+                row={row}
+                gewerkSelectOptions={gewerkSelectOptions}
+                preislistenForGewerk={plForGewerk}
+                handwerkerForGewerk={hwOpts}
+                selectedHandwerker={selectedHw}
+                hervorhebePreise={hervorhebePreise}
+                onGewerkChange={(v) => onGewerkChange(row.key, v)}
+                onPreislisteChange={(v) => onPreislisteChange(row.key, v)}
+                onPatch={(patch) => updateRow(row.key, patch)}
+                onRemove={() => removeRow(row.key)}
+              />
             )
           })}
         </div>
@@ -925,147 +637,12 @@ export function AngebotNeuForm({
           Position hinzufügen
         </Button>
 
-        <div className="mt-6 space-y-1 rounded-lg bg-canvas p-4 text-sm">
-          <p className="font-semibold text-ink">Gesamt-Übersicht (Angebot)</p>
-          <p>
-            Lohn gesamt: {formatPreis(undefined, summen.lohnZeileMin, summen.lohnZeileMax)}
-          </p>
-          <p>
-            Material gesamt: {formatPreis(undefined, summen.materialZeileMin, summen.materialZeileMax)}
-          </p>
-          <p className="border-t border-border pt-2 mt-2">
-            Netto gesamt: {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
-          </p>
-          <p>
-            MwSt {summen.mwstSatz}%: {formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}
-          </p>
-          <p className="font-semibold text-ink">
-            Brutto gesamt: {formatPreis(undefined, summen.bruttoMin, summen.bruttoMax)}
-          </p>
-          <div className="mt-3 border-t border-border pt-2 text-xs text-muted">
-            <p className="font-medium text-ink text-sm mb-1">Intern</p>
-            <p>
-              Einkauf gesamt: {formatPreis(undefined, summen.einkaufZeileMin, summen.einkaufZeileMax)}
-            </p>
-            <p>
-              Marge: {formatPreis(undefined, summen.margeMin, summen.margeMax)}
-            </p>
+        {modusVorlage ? (
+          <div className="mt-4 rounded-lg border border-dashed border-bw-border bg-bw-bg/60 p-3 text-sm text-bw-text-muted">
+            <span className="font-medium text-ink">Summe Vorlage (netto): </span>
+            {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
           </div>
-        </div>
-      </section>
-
-      <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="text-lg font-semibold text-ink">Handwerker zuweisen</h2>
-        <p className="text-sm text-muted">
-          Pro Zeile ein Handwerker — gleiches Gewerk mehrfach möglich. Notiz: wer was macht.
-        </p>
-        {gewerkeInAngebot.length === 0 ? (
-          <p className="text-sm text-muted">Zuerst Gewerke in den Positionen wählen.</p>
         ) : null}
-        <div className="space-y-4">
-          {hwRows.map((h) => (
-            <div key={h.key} className="rounded-lg border border-border p-3 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-ink">Gewerk</span>
-                  <select
-                    value={h.gewerk_id}
-                    onChange={(e) =>
-                      setHwRows((prev) =>
-                        prev.map((x) =>
-                          x.key === h.key ? { ...x, gewerk_id: e.target.value } : x
-                        )
-                      )
-                    }
-                    className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base"
-                  >
-                    <option value="">— Gewerk —</option>
-                    {gewerkeInAngebot.map((gid) => {
-                      const g = gewerke.find((x) => x.id === gid)
-                      return (
-                        <option key={gid} value={gid}>
-                          {g?.name ?? gid}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-ink">Handwerker</span>
-                  <select
-                    value={h.handwerker_id}
-                    onChange={(e) =>
-                      setHwRows((prev) =>
-                        prev.map((x) =>
-                          x.key === h.key ? { ...x, handwerker_id: e.target.value } : x
-                        )
-                      )
-                    }
-                    disabled={!h.gewerk_id}
-                    className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base disabled:opacity-50"
-                  >
-                    <option value="">— Auswahl —</option>
-                    {handwerkerOptions(h.gewerk_id).map((hw) => (
-                      <option key={hw.id} value={hw.id}>
-                        {hw.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block space-y-1.5 sm:col-span-2">
-                  <span className="text-sm font-medium text-ink">Status</span>
-                  <select
-                    value={h.status}
-                    onChange={(e) =>
-                      setHwRows((prev) =>
-                        prev.map((x) =>
-                          x.key === h.key
-                            ? {
-                                ...x,
-                                status: e.target
-                                  .value as AngebotHandwerkerZuweisungStatus,
-                              }
-                            : x
-                        )
-                      )
-                    }
-                    className="w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-base"
-                  >
-                    {HW_STATUS_OPTS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <Input
-                label="Notiz (z. B. wer übernimmt welchen Teil)"
-                value={h.aufgabe_notiz}
-                onChange={(e) =>
-                  setHwRows((prev) =>
-                    prev.map((x) =>
-                      x.key === h.key ? { ...x, aufgabe_notiz: e.target.value } : x
-                    )
-                  )
-                }
-              />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  className="text-sm text-danger"
-                  onClick={() => removeHwRow(h.key)}
-                >
-                  Zeile entfernen
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={addHwRow}>
-          <Plus className="mr-1 inline h-4 w-4" aria-hidden />
-          Handwerker-Zeile
-        </Button>
       </section>
 
       {!modusVorlage ? (
@@ -1078,6 +655,56 @@ export function AngebotNeuForm({
             placeholder="Interne Notizen…"
           />
         </section>
+      ) : null}
+
+      {!modusVorlage ? (
+        <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-bw-card/95 px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                {formatPreis(undefined, summen.lohnZeileMin, summen.lohnZeileMax)}
+              </p>
+              <p className="text-xs text-bw-text-muted">netto</p>
+            </div>
+            <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Material</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                {formatPreis(undefined, summen.materialZeileMin, summen.materialZeileMax)}
+              </p>
+              <p className="text-xs text-bw-text-muted">netto</p>
+            </div>
+            <div className="rounded-lg border border-bw-border bg-primary/8 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Netto Summe</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-primary">
+                {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
+              </p>
+              <p className="text-xs text-bw-text-muted">zzgl. MwSt.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 border-t border-bw-border pt-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="text-sm text-bw-text-muted">
+              MwSt. {summen.mwstSatz}%:{' '}
+              <span className="font-medium text-ink">
+                {formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-bw-light">Brutto Endsumme</p>
+              <p
+                className="text-2xl font-bold tabular-nums tracking-tight"
+                style={{ color: 'var(--fl-accent)' }}
+              >
+                {formatPreis(undefined, summen.bruttoMin, summen.bruttoMax)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 border-t border-bw-border pt-2 text-xs text-bw-text-muted">
+            <span className="font-medium text-ink">Intern: </span>
+            Einkauf {formatPreis(undefined, summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge{' '}
+            {formatPreis(undefined, summen.margeMin, summen.margeMax)}
+          </div>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-3">

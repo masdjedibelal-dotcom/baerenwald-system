@@ -531,12 +531,9 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
               ) : (
                 pos.map((p) => {
                   const m = p.menge || 1
-                  const lmin = p.lohn_min * m
-                  const lmax = p.lohn_max * m
-                  const mmin = p.material_min * m
-                  const mmax = p.material_max * m
-                  const zmin = p.gesamt_min * m
-                  const zmax = p.gesamt_max * m
+                  const lZeile = p.lohn_netto * m
+                  const matZeile = p.material_netto * m
+                  const z = (p.lohn_netto + p.material_netto) * m
                   return (
                     <tr key={p.id} className="border-b border-border last:border-0">
                       <td className="px-3 py-2">{p.gewerk_name}</td>
@@ -549,9 +546,9 @@ export function AngebotDetailClient({ detail: initial }: { detail: AngebotDetail
                       <td className="px-3 py-2">
                         {p.menge} {p.einheit}
                       </td>
-                      <td className="px-3 py-2">{formatPreis(undefined, lmin, lmax)}</td>
-                      <td className="px-3 py-2">{formatPreis(undefined, mmin, mmax)}</td>
-                      <td className="px-3 py-2">{formatPreis(undefined, zmin, zmax)}</td>
+                      <td className="px-3 py-2">{formatPreis(undefined, lZeile, lZeile)}</td>
+                      <td className="px-3 py-2">{formatPreis(undefined, matZeile, matZeile)}</td>
+                      <td className="px-3 py-2">{formatPreis(undefined, z, z)}</td>
                     </tr>
                   )
                 })

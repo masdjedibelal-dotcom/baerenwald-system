@@ -97,20 +97,20 @@ export function AuftragNachtragBaustoppSection({
     const gw = detail.auftrag_handwerker?.[0]
     const min = Math.max(0, Number(String(posMin).replace(',', '.')) || 0)
     const max = Math.max(min, Number(String(posMax).replace(',', '.')) || min)
+    const fest = Math.round(((min + max) / 2) * 100) / 100
     return {
       id: neuePositionsId(),
       gewerk_id: gw?.gewerk_id ?? '',
       gewerk_name: gw?.gewerke?.name ?? 'Nachtrag',
       leistung: 'Nachtrag',
       beschreibung: posText.trim() || grund.trim() || 'Zusatzleistung',
-      lohn_min: 0,
-      lohn_max: 0,
-      material_min: 0,
-      material_max: 0,
-      gesamt_min: min,
-      gesamt_max: max,
+      lohn_netto: fest,
+      material_netto: 0,
+      gesamt_min: fest,
+      gesamt_max: fest,
       menge: 1,
       einheit: 'Stk.',
+      preis_typ: 'fix',
     }
   }
 

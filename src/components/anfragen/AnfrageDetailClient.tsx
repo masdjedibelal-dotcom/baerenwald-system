@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { ArrowLeft, CalendarPlus, ClipboardList } from 'lucide-react'
-import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { ArrowLeft, CalendarPlus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -14,6 +13,7 @@ import { Modal } from '@/components/ui/Modal'
 import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
 import { TerminModal } from '@/components/anfragen/TerminModal'
 import { VorOrtTermineTab, LeadNotizenListeTab, AngeboteListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
+import { LeadVorOrtAufnahmeSection } from '@/components/anfragen/LeadVorOrtAufnahmeSection'
 import { toast } from '@/components/ui/app-toast'
 import {
   updateLeadKontakt,
@@ -22,33 +22,23 @@ import {
   updateLeadStatus,
 } from '@/app/(dashboard)/anfragen/actions'
 import { StatusActions } from '@/components/funnel/StatusActions'
-import type {
-  FormularFeld,
-  KalenderTermin,
-  LeadDetail,
-  LeadKanal,
-  LeadNotizRow,
-  LeadStatus,
-  VorabFormular,
-} from '@/lib/types'
+import type { KalenderTermin, LeadDetail, LeadKanal, LeadNotizRow, LeadStatus } from '@/lib/types'
 import {
   BEREICH_LABELS,
-  FORMULAR_PHASE_LABELS,
   SITUATION_LABELS,
   STATUS_LABELS,
-  formatBudget,
+  anfragePreisDetailLabel,
+  formatAnfragePreisAnzeige,
   formatDatum,
   formatDatumZeit,
-  formatPreis,
   cn,
 } from '@/lib/utils'
-import { isVorOrtStruktur, type VorOrtFormDaten } from '@/lib/vorab-angebot-from-vorab'
 import {
-  FACHDETAILS_CONFIG,
-  bereichMeta,
-  fachdetailKeysForBereich,
-  situationLabel,
-} from '@/lib/vorab-formular-config'
+  bereicheFuerAnzeige,
+  bereicheMitLegacyGewerbeSituation,
+  situationFuerAnzeige,
+  situationOhneGewerbe,
+} from '@/lib/lead-gewerbe-storage'
 
 const BEREICH_KEYS = Object.keys(BEREICH_LABELS) as string[]
 
@@ -76,40 +66,6 @@ function kundenName(lead: LeadDetail) {
   return lead.kunden?.name ?? lead.kontakt_name ?? 'Ohne Namen'
 }
 
-function parseFelder(raw: unknown): FormularFeld[] {
-  if (!Array.isArray(raw)) return []
-  return raw as FormularFeld[]
-}
-
-function vorOrtBesuchDatum(v: VorabFormular, daten: VorOrtFormDaten): string {
-  const raw = daten.abgeschlossen_am ?? v.updated_at ?? v.created_at
-  return formatDatum(raw)
-}
-
-function fachdetailLabel(blockKey: string, value: string): string {
-  const cfg = FACHDETAILS_CONFIG[blockKey]
-  const o = cfg?.optionen.find((x) => x.value === value)
-  return o?.label ?? value
-}
-
-function logistikHighlights(d: VorOrtFormDaten): string[] {
-  const L = d.logistik
-  const parts: string[] = []
-  if (L.etage !== '' && L.etage != null) {
-    parts.push(`${Number(L.etage)}. OG`)
-    if (!L.aufzug && Number(L.etage) > 0) parts.push('kein Aufzug')
-  }
-  if (L.halteverbot) parts.push('Halteverbot nötig')
-  if (L.schluesseluebergabe) parts.push('Schlüssel-Übergabe')
-  return parts
-}
-
-function komplexitaetLabel(k: string): string {
-  if (k === 'erhoeht') return 'Erhöht'
-  if (k === 'komplex') return 'Komplex'
-  return 'Standard'
-}
-
 type AngebotKurz = {
   id: string
   status: string
@@ -134,6 +90,7 @@ export function AnfrageDetailClient({
   const notizenRef = useRef<HTMLTextAreaElement>(null)
   const notizenSaved = useRef(initial.notizen ?? '')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [notizSaving, setNotizSaving] = useState(false)
   const [terminOpen, setTerminOpen] = useState(false)
 
   type DetailTab = 'details' | 'vorort' | 'notizen' | 'aktiv' | 'angebot'
@@ -204,6 +161,27 @@ export function AnfrageDetailClient({
     }
   }, [notizen, lead.id, router])
 
+  async function saveInterneNotiz() {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    setNotizSaving(true)
+    try {
+      const res = await updateLeadNotizen(lead.id, notizen)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      notizenSaved.current = notizen
+      toast.success('Gespeichert')
+      setLead((l) => ({ ...l, notizen }))
+      router.refresh()
+    } finally {
+      setNotizSaving(false)
+    }
+  }
+
   const leadStatusData = useMemo(() => {
     const fd = lead.funnel_daten
     const rec = typeof fd === 'object' && fd !== null ? (fd as Record<string, unknown>) : {}
@@ -250,9 +228,10 @@ export function AnfrageDetailClient({
     let zt: 'tag' | 'zeitraum' | null = null
     if (von && !bis) zt = 'tag'
     else if (von && bis) zt = 'zeitraum'
+    const bereicheMerged = bereicheFuerAnzeige(lead.bereiche, lead.situation)
     setProjektForm({
-      situation: lead.situation ?? '',
-      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, !!lead.bereiche?.includes(k)])),
+      situation: situationFuerAnzeige(lead.situation) ?? '',
+      bereiche: Object.fromEntries(BEREICH_KEYS.map((k) => [k, bereicheMerged.includes(k)])),
       sonstigesText: lead.bereiche_sonstiges ?? '',
       budget: lead.budget_ca != null && lead.budget_ca > 0 ? String(lead.budget_ca) : '',
       zeitraumTyp: zt,
@@ -292,7 +271,10 @@ export function AnfrageDetailClient({
   }
 
   async function saveProjektModal() {
-    const bereicheList = BEREICH_KEYS.filter((k) => projektForm.bereiche[k])
+    const bereicheList = bereicheMitLegacyGewerbeSituation(
+      BEREICH_KEYS.filter((k) => projektForm.bereiche[k]),
+      projektForm.situation || null
+    )
     const budgetN =
       projektForm.budget.trim() === '' || Number.isNaN(Number(projektForm.budget))
         ? null
@@ -308,7 +290,7 @@ export function AnfrageDetailClient({
     }
     startTransition(async () => {
       const r = await updateLeadProjekt(lead.id, {
-        situation: projektForm.situation || null,
+        situation: situationOhneGewerbe(projektForm.situation || null),
         bereiche: bereicheList.length ? bereicheList : null,
         bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
         budget_ca: budgetN,
@@ -323,7 +305,7 @@ export function AnfrageDetailClient({
       setProjektModal(false)
       setLead((l) => ({
         ...l,
-        situation: projektForm.situation || null,
+        situation: situationOhneGewerbe(projektForm.situation || null),
         bereiche: bereicheList.length ? bereicheList : null,
         bereiche_sonstiges: projektForm.bereiche.sonstiges ? projektForm.sonstigesText.trim() || null : null,
         budget_ca: budgetN,
@@ -530,24 +512,28 @@ export function AnfrageDetailClient({
           <div>
             <dt className="text-muted">Situation</dt>
             <dd className="text-ink">
-              {lead.situation
-                ? (SITUATION_LABELS[lead.situation] ?? lead.situation)
-                : '—'}
+              {(() => {
+                const s = situationFuerAnzeige(lead.situation)
+                return s ? (SITUATION_LABELS[s] ?? s) : '—'
+              })()}
             </dd>
           </div>
           <div>
             <dt className="text-muted">Bereiche</dt>
             <dd className="flex flex-wrap gap-1 pt-1">
-              {lead.bereiche?.length
-                ? lead.bereiche.map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-md bg-canvas px-2 py-1 text-xs text-ink"
-                    >
-                      {BEREICH_LABELS[b] ?? b}
-                    </span>
-                  ))
-                : '—'}
+              {(() => {
+                const list = bereicheFuerAnzeige(lead.bereiche, lead.situation)
+                return list.length
+                  ? list.map((b) => (
+                      <span
+                        key={b}
+                        className="rounded-md bg-canvas px-2 py-1 text-xs text-ink"
+                      >
+                        {BEREICH_LABELS[b] ?? b}
+                      </span>
+                    ))
+                  : '—'
+              })()}
             </dd>
           </div>
           {lead.bereiche?.includes('sonstiges') && lead.bereiche_sonstiges?.trim() ? (
@@ -557,8 +543,16 @@ export function AnfrageDetailClient({
             </div>
           ) : null}
           <div>
-            <dt className="text-muted">Budget</dt>
-            <dd className="text-ink">{formatBudget(lead.budget_ca ?? undefined, lead.preis_min, lead.preis_max)}</dd>
+            <dt className="text-muted">{anfragePreisDetailLabel(lead.kanal)}</dt>
+            <dd className="text-ink">
+              {formatAnfragePreisAnzeige(
+                lead.kanal,
+                lead.budget_ca,
+                lead.preis_min,
+                lead.preis_max,
+                lead.funnel_daten
+              )}
+            </dd>
           </div>
           <div>
             <dt className="text-muted">Zeitraum</dt>
@@ -586,169 +580,6 @@ export function AnfrageDetailClient({
       ) : null}
 
       <Card>
-        <h2 className="mb-2 text-base font-semibold text-ink">Interne Notiz</h2>
-        <Textarea
-          ref={notizenRef}
-          id="notizen"
-          name="notizen"
-          aria-label="Interne Notiz"
-          value={notizen}
-          onChange={(e) => setNotizen(e.target.value)}
-          rows={5}
-        />
-        <p className="mt-1 text-xs text-muted">Wird automatisch nach 1 Sek. Pause gespeichert.</p>
-      </Card>
-
-      <section aria-label="Vor-Ort Aufnahme">
-        <h2 className="mb-3 text-base font-semibold text-ink">Vor-Ort Aufnahme</h2>
-        {(() => {
-          const rows = lead.vorab_formulare ?? []
-          const strukturRow = rows.find((v) => isVorOrtStruktur(v.daten))
-          if (!strukturRow) {
-            return (
-              <div className="rounded-lg border border-dashed border-border bg-canvas/80 p-6 text-center">
-                <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted" aria-hidden />
-                <p className="text-sm text-muted">Noch keine Vor-Ort-Aufnahme</p>
-                <Link
-                  href={`/anfragen/${lead.id}/vorab`}
-                  className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white"
-                >
-                  Jetzt aufnehmen
-                </Link>
-              </div>
-            )
-          }
-          const daten = strukturRow.daten as VorOrtFormDaten
-          const sit = daten.projekt.situation
-            ? situationLabel(daten.projekt.situation)
-            : '—'
-          const bereicheTxt = daten.projekt.bereiche
-            .map((b) => bereichMeta(b)?.label ?? BEREICH_LABELS[b] ?? b)
-            .join(', ')
-          const kalkAbw =
-            daten.kalkulation.kalk_min !== '' &&
-            daten.kalkulation.kalk_max !== '' &&
-            !Number.isNaN(Number(daten.kalkulation.kalk_min)) &&
-            !Number.isNaN(Number(daten.kalkulation.kalk_max))
-          const logistik = logistikHighlights(daten)
-          return (
-            <Card className="overflow-hidden p-0">
-              <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="font-semibold text-emerald-900">✓ Vor-Ort Aufnahme</p>
-                <p className="text-xs text-emerald-800">
-                  Besuch / Stand: {vorOrtBesuchDatum(strukturRow, daten)}
-                </p>
-              </div>
-              <div className="space-y-3 p-4 text-sm text-ink">
-                <div>
-                  <span className="text-muted">Situation: </span>
-                  {sit}
-                </div>
-                <div>
-                  <span className="text-muted">Bereiche: </span>
-                  {bereicheTxt || '—'}
-                </div>
-                <div>
-                  <span className="text-muted">Fachdetails: </span>
-                  <ul className="mt-1 list-inside list-disc text-ink">
-                    {daten.projekt.bereiche.flatMap((bereich) => {
-                      const situation = daten.projekt.situation
-                      const blockKeys = fachdetailKeysForBereich(bereich, situation)
-                      const items: ReactNode[] = []
-                      for (const blockKey of blockKeys) {
-                        const storageKey =
-                          blockKey === 'elektro_kaputt' ? 'elektrik' : blockKey
-                        const val = daten.fachdetails[storageKey]
-                        if (!val) continue
-                        items.push(
-                          <li key={`${bereich}-${blockKey}`}>
-                            {bereichMeta(bereich)?.label ?? bereich}:{' '}
-                            {fachdetailLabel(blockKey, val)}
-                          </li>
-                        )
-                      }
-                      return items
-                    })}
-                  </ul>
-                </div>
-                <div>
-                  <span className="text-muted">Größen: </span>
-                  <ul className="mt-1 list-inside list-disc">
-                    {daten.projekt.bereiche.map((b) => {
-                      const g = daten.groessen[b]
-                      if (g === '' || g == null) return null
-                      return (
-                        <li key={b}>
-                          {bereichMeta(b)?.label ?? b}: {String(g)}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-                {kalkAbw ? (
-                  <div>
-                    <span className="text-muted">Angepasste Kalkulation: </span>
-                    {formatPreis(
-                      undefined,
-                      Number(daten.kalkulation.kalk_min),
-                      Number(daten.kalkulation.kalk_max)
-                    )}
-                  </div>
-                ) : null}
-                {logistik.length > 0 ? (
-                  <div>
-                    <span className="text-muted">Logistik: </span>
-                    {logistik.join(' · ')}
-                  </div>
-                ) : null}
-                <p>
-                  <span className="rounded-full bg-canvas px-2 py-1 text-xs font-medium text-ink">
-                    Komplexität: {komplexitaetLabel(daten.kalkulation.komplexitaet || 'standard')}
-                  </span>
-                </p>
-                <div className="flex flex-col gap-2 pt-2 sm:flex-row">
-                  <Link
-                    href={`/anfragen/${lead.id}/vorab`}
-                    className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-ink"
-                  >
-                    Bearbeiten
-                  </Link>
-                </div>
-              </div>
-            </Card>
-          )
-        })()}
-        {lead.vorab_formulare?.some((v) => !isVorOrtStruktur(v.daten)) ? (
-          <div className="mt-4 space-y-4">
-            <h3 className="text-sm font-semibold text-muted">Weitere Vorab-Formulare (Legacy)</h3>
-            {lead.vorab_formulare
-              ?.filter((v) => !isVorOrtStruktur(v.daten))
-              .map((v) => {
-                const tpl = v.formular_templates
-                const felder = tpl?.felder ? parseFelder(tpl.felder as unknown) : []
-                const daten = (v.daten ?? {}) as Record<string, unknown>
-                return (
-                  <Card key={v.id} className="p-4">
-                    <p className="text-sm font-medium text-ink">{tpl?.name ?? 'Formular'}</p>
-                    <p className="text-xs text-muted">
-                      {tpl?.phase ? (FORMULAR_PHASE_LABELS[tpl.phase] ?? tpl.phase) : null}
-                      {v.created_at ? ` · ${formatDatumZeit(v.created_at)}` : null}
-                    </p>
-                    {felder.length > 0 ? (
-                      <div className="mt-4">
-                        <FormularFelderRenderer felder={felder} daten={daten} readonly />
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-muted">Keine Felddefinition.</p>
-                    )}
-                  </Card>
-                )
-              })}
-          </div>
-        ) : null}
-      </section>
-
-      <Card>
         <h2 className="mb-3 text-base font-semibold text-ink">Aktionen</h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button
@@ -772,14 +603,44 @@ export function AnfrageDetailClient({
 
         </>
       ) : tab === 'vorort' ? (
-        <VorOrtTermineTab
-          leadId={lead.id}
-          termine={(lead.kalender_termine ?? []) as KalenderTermin[]}
-          vorOrtNotiz={lead.vor_ort_notizen ?? ''}
-          onReload={() => router.refresh()}
-        />
+        <div className="space-y-8">
+          <LeadVorOrtAufnahmeSection leadId={lead.id} vorabFormulare={lead.vorab_formulare} />
+          <VorOrtTermineTab
+            leadId={lead.id}
+            termine={(lead.kalender_termine ?? []) as KalenderTermin[]}
+            vorOrtNotiz={lead.vor_ort_notizen ?? ''}
+            onReload={() => router.refresh()}
+          />
+        </div>
       ) : tab === 'notizen' ? (
-        <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => router.refresh()} />
+        <div className="space-y-8">
+          <Card>
+            <h2 className="mb-2 text-base font-semibold text-ink">Interne Notiz</h2>
+            <Textarea
+              ref={notizenRef}
+              id="notizen"
+              name="notizen"
+              aria-label="Interne Notiz"
+              value={notizen}
+              onChange={(e) => setNotizen(e.target.value)}
+              rows={5}
+            />
+            <p className="mt-1 text-xs text-muted">
+              Wird automatisch nach 1 Sek. Pause gespeichert — oder explizit mit dem Button unten.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="primary"
+                loading={notizSaving}
+                onClick={() => void saveInterneNotiz()}
+              >
+                Speichern
+              </Button>
+            </div>
+          </Card>
+          <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => router.refresh()} />
+        </div>
       ) : tab === 'aktiv' ? (
         <div className="space-y-6">
           <section aria-label="Timeline">
@@ -905,7 +766,7 @@ export function AnfrageDetailClient({
             onChange={(e) => setProjektForm((f) => ({ ...f, situation: e.target.value }))}
             options={[
               { value: '', label: 'Bitte wählen…' },
-              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung', 'gewerbe'] as const).map(
+              ...(['zuhause_erneuern', 'reparatur', 'defekt', 'notfall', 'neu_bauen', 'betreuung'] as const).map(
                 (value) => ({
                   value,
                   label: SITUATION_LABELS[value] ?? value,

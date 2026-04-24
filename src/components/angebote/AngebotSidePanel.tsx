@@ -178,9 +178,11 @@ export function AngebotSidePanel({
                     ) : null}
                     <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                       <dt className="text-bw-mid">Lohn</dt>
-                      <dd>{formatPreis(undefined, p.lohn_min * p.menge, p.lohn_max * p.menge)}</dd>
+                      <dd>{formatPreis(undefined, p.lohn_netto * p.menge, p.lohn_netto * p.menge)}</dd>
                       <dt className="text-bw-mid">Material</dt>
-                      <dd>{formatPreis(undefined, p.material_min * p.menge, p.material_max * p.menge)}</dd>
+                      <dd>
+                        {formatPreis(undefined, p.material_netto * p.menge, p.material_netto * p.menge)}
+                      </dd>
                       <dt className="text-bw-mid">Gesamt</dt>
                       <dd className="font-medium">
                         {formatPreis(undefined, p.gesamt_min * p.menge, p.gesamt_max * p.menge)}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { insertKalenderTermin, updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { sendBesichtigungTerminBestaetigung } from '@/app/actions/mails'
 import { toast } from '@/components/ui/app-toast'
 import type { KalenderTermin, LeadStatus } from '@/lib/types'
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
@@ -85,12 +86,35 @@ export function TerminModal({
       if (!st.ok) toast.error(st.message)
     }
 
-    if (sendMail && mailToggle && kontaktEmail) {
-      toast.info('E-Mail-Versand: bitte API anbinden (Resend).')
+    if (sendMail && mailToggle && kontaktEmail?.trim()) {
+      const mailRes = await sendBesichtigungTerminBestaetigung({
+        leadId,
+        to: kontaktEmail.trim(),
+        name: kontaktName?.trim() || 'Kundin/Kunde',
+        terminTitel: titel,
+        datum,
+        uhrzeitVon: von.trim() || null,
+        uhrzeitBis: bis.trim() || null,
+        adresse: adresse.trim() || null,
+        notiz: notiz.trim() || null,
+      })
+      if (!mailRes.ok) {
+        setSaving(false)
+        toast.success('Termin gespeichert.')
+        toast.error(mailRes.message)
+        reset()
+        onClose()
+        onSaved?.()
+        return
+      }
     }
 
     setSaving(false)
-    toast.success('Termin gespeichert')
+    toast.success(
+      sendMail && mailToggle && kontaktEmail?.trim()
+        ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
+        : 'Termin gespeichert.'
+    )
     reset()
     onClose()
     onSaved?.()

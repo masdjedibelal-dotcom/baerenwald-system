@@ -21,7 +21,8 @@ import {
   KANAL_ICONS,
   KANAL_LABELS,
   STATUS_LABELS,
-  formatBudget,
+  anfragenPreisSpaltenLabel,
+  formatAnfragePreisAnzeige,
   formatLeadListDatum,
   formatPreis,
   formatRelativeDate,
@@ -63,9 +64,10 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'status', label: 'Status' },
   { key: 'kanal', label: 'Kanal' },
   { key: 'bereiche', label: 'Bereiche' },
-  { key: 'budget_ca', label: 'Budget' },
-  { key: 'preis_min', label: 'Budget Min (alt)' },
-  { key: 'preis_max', label: 'Budget Max (alt)' },
+  { key: 'preis_anzeige', label: 'Preis / Budget (Anzeige)' },
+  { key: 'budget_ca', label: 'budget_ca' },
+  { key: 'preis_min', label: 'preis_min' },
+  { key: 'preis_max', label: 'preis_max' },
   { key: 'plz', label: 'PLZ' },
   { key: 'created_at', label: 'Erstellt am' },
 ]
@@ -118,8 +120,16 @@ function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
     status: STATUS_LABELS[lead.status] ?? lead.status,
     kanal: KANAL_LABELS[lead.kanal] ?? lead.kanal,
     bereiche: (lead.bereiche ?? []).map((b) => BEREICH_LABELS[b] ?? b).join(', '),
-    preis_min: lead.preis_min,
-    preis_max: lead.preis_max,
+    preis_anzeige: formatAnfragePreisAnzeige(
+      lead.kanal,
+      lead.budget_ca,
+      lead.preis_min,
+      lead.preis_max,
+      lead.funnel_daten
+    ),
+    budget_ca: lead.budget_ca ?? '',
+    preis_min: lead.preis_min ?? '',
+    preis_max: lead.preis_max ?? '',
     plz: lead.plz ?? '',
     created_at: lead.created_at,
   }
@@ -446,7 +456,7 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
         options={[
           { field: 'name', label: 'Name' },
           { field: 'created_at', label: 'Datum' },
-          { field: 'preis_min', label: 'Budget' },
+          { field: 'preis_min', label: anfragenPreisSpaltenLabel() },
           { field: 'status', label: 'Status' },
         ]}
         currentField={field}
@@ -495,7 +505,13 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                             {more > 0 ? ` +${more}` : ''}
                           </p>
                           <p className="mt-1 text-sm text-bw-text">
-                            {formatBudget(lead.budget_ca, lead.preis_min, lead.preis_max)}
+                            {formatAnfragePreisAnzeige(
+                              lead.kanal,
+                              lead.budget_ca,
+                              lead.preis_min,
+                              lead.preis_max,
+                              lead.funnel_daten
+                            )}
                           </p>
                           <p className="mt-1 text-xs text-bw-text-muted">
                             {lead.plz ?? '—'} · {formatRelativeDate(lead.created_at)}
@@ -531,7 +547,7 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                   </th>
                   <th className="px-3 py-3" style={{ width: 140 }}>
                     <SortableHeader
-                      label="Budget"
+                      label={anfragenPreisSpaltenLabel()}
                       field="preis_min"
                       currentField={field}
                       currentDir={dir}
@@ -606,7 +622,13 @@ export function AnfragenListeClient({ leads }: { leads: LeadWithAngebote[] }) {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-bw-text">
-                        {formatBudget(lead.budget_ca, lead.preis_min, lead.preis_max)}
+                        {formatAnfragePreisAnzeige(
+                          lead.kanal,
+                          lead.budget_ca,
+                          lead.preis_min,
+                          lead.preis_max,
+                          lead.funnel_daten
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <LeadStatusBadge status={lead.status} />

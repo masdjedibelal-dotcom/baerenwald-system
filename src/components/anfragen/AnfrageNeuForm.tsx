@@ -27,10 +27,18 @@ const SITUATION_OPTIONS: { value: string; label: string }[] = [
   { value: 'notfall', label: 'Notfall' },
   { value: 'neu_bauen', label: 'Neu bauen' },
   { value: 'betreuung', label: 'Betreuung' },
-  { value: 'gewerbe', label: 'Gewerbe' },
 ]
 
 const BEREICH_KEYS = Object.keys(BEREICH_LABELS) as string[]
+
+type WebsitePreisArt = 'budget' | 'fix' | 'range' | 'komplex'
+
+const WEBSITE_PREIS_OPTIONS: { value: WebsitePreisArt; label: string }[] = [
+  { value: 'budget', label: 'Ca.-Budget' },
+  { value: 'fix', label: 'Festpreis' },
+  { value: 'range', label: 'Preisrahmen (von – bis)' },
+  { value: 'komplex', label: 'Komplex (individuell)' },
+]
 
 export function AnfrageNeuForm({
   defaultKundeId,
@@ -57,6 +65,10 @@ export function AnfrageNeuForm({
   )
   const [sonstigesText, setSonstigesText] = useState('')
   const [budget, setBudget] = useState('')
+  const [websitePreisArt, setWebsitePreisArt] = useState<WebsitePreisArt>('budget')
+  const [websiteFix, setWebsiteFix] = useState('')
+  const [websiteMin, setWebsiteMin] = useState('')
+  const [websiteMax, setWebsiteMax] = useState('')
   const [zeitraumTyp, setZeitraumTyp] = useState<'tag' | 'zeitraum' | null>(null)
   const [zeitraumVon, setZeitraumVon] = useState('')
   const [zeitraumBis, setZeitraumBis] = useState('')
@@ -82,7 +94,9 @@ export function AnfrageNeuForm({
         if (data.email) setEmail(String(data.email))
         if (data.telefon) setTelefon(String(data.telefon))
         if (data.plz) setPlz(String(data.plz))
-        if (data.typ === 'gewerbe') setSituation('gewerbe')
+        if (data.typ === 'gewerbe') {
+          setBereiche((prev) => ({ ...prev, gewerbe: true }))
+        }
       })
   }, [defaultKundeId])
 
@@ -119,10 +133,70 @@ export function AnfrageNeuForm({
       return
     }
 
-    const budgetN = budget.trim() === '' || Number.isNaN(Number(budget)) ? null : Number(budget)
+    let budgetN: number | null =
+      budget.trim() === '' || Number.isNaN(Number(budget)) ? null : Number(budget)
     if (budgetN != null && budgetN < 0) {
       setError('Budget darf nicht negativ sein.')
       return
+    }
+
+    let preis_min: number | null = null
+    let preis_max: number | null = null
+    let funnel_daten: Record<string, unknown> | null = null
+    let budgetOut: number | null = null
+
+    if (kanal === 'website') {
+      budgetOut = null
+      if (websitePreisArt === 'budget') {
+        budgetOut = budgetN
+      } else if (websitePreisArt === 'fix') {
+        const n = Number(String(websiteFix).replace(',', '.').trim())
+        if (!Number.isFinite(n) || n <= 0) {
+          setError('Bitte einen gültigen Festpreis eingeben.')
+          return
+        }
+        preis_min = n
+        preis_max = n
+      } else if (websitePreisArt === 'range') {
+        const mn = Number(String(websiteMin).replace(',', '.').trim())
+        const mx = Number(String(websiteMax).replace(',', '.').trim())
+        if (!Number.isFinite(mn) || mn <= 0 || !Number.isFinite(mx) || mx <= 0) {
+          setError('Bitte Unter- und Obergrenze des Preisrahmens angeben.')
+          return
+        }
+        if (mx < mn) {
+          setError('„Bis“ darf nicht kleiner als „Von“ sein.')
+          return
+        }
+        preis_min = mn
+        preis_max = mx
+      } else {
+        funnel_daten = { preisModus: 'komplex' }
+        const mnRaw = String(websiteMin).replace(',', '.').trim()
+        const mxRaw = String(websiteMax).replace(',', '.').trim()
+        if (mnRaw !== '') {
+          const mn = Number(mnRaw)
+          if (!Number.isFinite(mn) || mn <= 0) {
+            setError('Optionale Untergrenze: bitte gültige Zahl.')
+            return
+          }
+          preis_min = mn
+        }
+        if (mxRaw !== '') {
+          const mx = Number(mxRaw)
+          if (!Number.isFinite(mx) || mx <= 0) {
+            setError('Optionale Obergrenze: bitte gültige Zahl.')
+            return
+          }
+          preis_max = mx
+        }
+        if (preis_min != null && preis_max != null && preis_max < preis_min) {
+          setError('„Bis“ darf nicht kleiner als „Von“ sein.')
+          return
+        }
+      }
+    } else {
+      budgetOut = budgetN
     }
 
     let zVon: string | null = null
@@ -146,7 +220,10 @@ export function AnfrageNeuForm({
       situation,
       bereiche: bereicheList,
       bereiche_sonstiges: sonstigesSelected ? sonstigesText.trim() || null : null,
-      budget_ca: budgetN,
+      budget_ca: budgetOut,
+      preis_min,
+      preis_max,
+      funnel_daten,
       zeitraum_von: zVon,
       zeitraum_bis: zBis,
       notizen: notizen.trim(),
@@ -250,23 +327,108 @@ export function AnfrageNeuForm({
             ) : null}
           </div>
 
-          <div>
-            <label className="input-label">Budget (optional)</label>
-            <div className="relative">
-              <input
-                type="number"
-                placeholder="z.B. 15000"
-                className="input pr-8"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                min={0}
+          {kanal === 'website' ? (
+            <div className="space-y-3">
+              <Select
+                name="website_preis_art"
+                label="Preisangabe (wie auf der Website)"
+                value={websitePreisArt}
+                onChange={(e) => setWebsitePreisArt(e.target.value as WebsitePreisArt)}
+                options={WEBSITE_PREIS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
-                €
-              </span>
+              {websitePreisArt === 'budget' ? (
+                <div>
+                  <label className="input-label">Ca.-Budget (optional)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="z.B. 15000"
+                      className="input pr-8"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      min={0}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
+                      €
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+              {websitePreisArt === 'fix' ? (
+                <Input
+                  name="website_fix"
+                  label="Festpreis (€)"
+                  value={websiteFix}
+                  onChange={(e) => setWebsiteFix(e.target.value)}
+                  placeholder="z.B. 12500"
+                  inputMode="decimal"
+                />
+              ) : null}
+              {websitePreisArt === 'range' ? (
+                <div className="form-grid-2 grid gap-3 sm:grid-cols-2">
+                  <Input
+                    name="website_min"
+                    label="Von (€)"
+                    value={websiteMin}
+                    onChange={(e) => setWebsiteMin(e.target.value)}
+                    placeholder="z.B. 8000"
+                    inputMode="decimal"
+                  />
+                  <Input
+                    name="website_max"
+                    label="Bis (€)"
+                    value={websiteMax}
+                    onChange={(e) => setWebsiteMax(e.target.value)}
+                    placeholder="z.B. 12000"
+                    inputMode="decimal"
+                  />
+                </div>
+              ) : null}
+              {websitePreisArt === 'komplex' ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-bw-text-muted">
+                    Optional: grober Rahmen, wie im Funnel bei „Komplex (individuell)“.
+                  </p>
+                  <div className="form-grid-2 grid gap-3 sm:grid-cols-2">
+                    <Input
+                      name="website_komplex_min"
+                      label="Von (€, optional)"
+                      value={websiteMin}
+                      onChange={(e) => setWebsiteMin(e.target.value)}
+                      placeholder="—"
+                      inputMode="decimal"
+                    />
+                    <Input
+                      name="website_komplex_max"
+                      label="Bis (€, optional)"
+                      value={websiteMax}
+                      onChange={(e) => setWebsiteMax(e.target.value)}
+                      placeholder="—"
+                      inputMode="decimal"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <p className="mt-1 text-xs text-bw-text-muted">Ungefähres Budget des Kunden — auch bei B2B optional</p>
-          </div>
+          ) : (
+            <div>
+              <label className="input-label">Budget (optional)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  placeholder="z.B. 15000"
+                  className="input pr-8"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  min={0}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
+                  €
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-bw-text-muted">Ungefähres Budget des Kunden — auch bei B2B optional</p>
+            </div>
+          )}
 
           <div>
             <label className="input-label">Gewünschter Zeitraum (optional)</label>
