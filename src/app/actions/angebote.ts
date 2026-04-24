@@ -23,7 +23,8 @@ export {
 /** Alias für Aufrufer nach Prompt-Spezifikation */
 export const updateAngebotStatus = setAngebotStatus
 
-function angebotPreisTypAusPositionen(_positionen: AngebotPosition[]): PreisTyp {
+function angebotPreisTypAusPositionen(positionen: AngebotPosition[]): PreisTyp {
+  void positionen
   return 'fix'
 }
 
