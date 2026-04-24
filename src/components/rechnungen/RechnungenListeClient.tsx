@@ -323,8 +323,8 @@ export function RechnungenListeClient({ rows }: { rows: RechnungListeZeile[] }) 
                       {i + 1}. {(p.beschreibung || p.leistung).trim() || '—'}
                     </p>
                     <p className="text-xs text-bw-light">
-                      Lohn {eurBetrag(p.lohn_min * (p.menge || 1))} · Material{' '}
-                      {eurBetrag(p.material_min * (p.menge || 1))}
+                      Lohn {eurBetrag(p.lohn_netto * (p.menge || 1))} · Material{' '}
+                      {eurBetrag(p.material_netto * (p.menge || 1))}
                     </p>
                   </li>
                 ))}

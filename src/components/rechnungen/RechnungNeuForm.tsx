@@ -38,12 +38,12 @@ function positionToRow(p: AngebotPosition): PosEdit {
     beschreibung: (p.beschreibung || p.leistung || '').trim() || 'Position',
     menge: Math.max(p.menge || 1, 0.0001),
     typ: p.preis_typ === 'range' ? 'range' : 'fix',
-    lohn: p.lohn_min,
-    mat: p.material_min,
-    lohnMin: p.lohn_min,
-    lohnMax: p.lohn_max,
-    matMin: p.material_min,
-    matMax: p.material_max,
+    lohn: p.lohn_netto,
+    mat: p.material_netto,
+    lohnMin: p.lohn_netto,
+    lohnMax: p.lohn_netto,
+    matMin: p.material_netto,
+    matMax: p.material_netto,
   }
 }
 
@@ -51,7 +51,9 @@ function rowToAngebotPosition(r: PosEdit): AngebotPosition {
   const beschreibung = r.beschreibung.trim() || 'Position'
   const leistung = beschreibung.slice(0, 120)
   if (r.typ === 'fix') {
-    const sum = r.lohn + r.mat
+    const lohn = r.lohn
+    const mat = r.mat
+    const stueck = Math.round((lohn + mat) * 100) / 100
     return {
       id: r.key,
       gewerk_id: '',
@@ -59,16 +61,17 @@ function rowToAngebotPosition(r: PosEdit): AngebotPosition {
       leistung,
       beschreibung,
       preis_typ: 'fix',
-      lohn_min: r.lohn,
-      lohn_max: r.lohn,
-      material_min: r.mat,
-      material_max: r.mat,
-      gesamt_min: sum,
-      gesamt_max: sum,
+      lohn_netto: lohn,
+      material_netto: mat,
+      gesamt_min: stueck,
+      gesamt_max: stueck,
       menge: r.menge,
       einheit: 'Stk.',
     }
   }
+  const lohnN = Math.round(((r.lohnMin + r.lohnMax) / 2) * 100) / 100
+  const matN = Math.round(((r.matMin + r.matMax) / 2) * 100) / 100
+  const stueck = Math.round((lohnN + matN) * 100) / 100
   return {
     id: r.key,
     gewerk_id: '',
@@ -76,12 +79,10 @@ function rowToAngebotPosition(r: PosEdit): AngebotPosition {
     leistung,
     beschreibung,
     preis_typ: 'range',
-    lohn_min: r.lohnMin,
-    lohn_max: r.lohnMax,
-    material_min: r.matMin,
-    material_max: r.matMax,
-    gesamt_min: r.lohnMin + r.matMin,
-    gesamt_max: r.lohnMax + r.matMax,
+    lohn_netto: lohnN,
+    material_netto: matN,
+    gesamt_min: stueck,
+    gesamt_max: stueck,
     menge: r.menge,
     einheit: 'Stk.',
   }
