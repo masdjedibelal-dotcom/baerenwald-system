@@ -5,6 +5,10 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --fl-accent: #2e7d52;
+  }
+
   * {
     box-sizing: border-box;
   }
