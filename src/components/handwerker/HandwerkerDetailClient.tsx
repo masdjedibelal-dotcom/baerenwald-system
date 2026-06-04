@@ -3,25 +3,33 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RecordLayout } from '@/components/layout/RecordLayout'
 import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { DetailTabBar } from '@/components/ui/DetailTabBar'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
+import { FormSheet } from '@/components/ui/FormSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { Textarea } from '@/components/ui/Textarea'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
+import { DetailHead } from '@/components/layout/DetailHead'
+import { AppDetailScreen } from '@/components/layout/app'
+import { Briefcase, LayoutGrid, Phone, Mail, Pencil, Shield, MessageSquare, Star, User } from 'lucide-react'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
+import {
+  formatHandwerkerBewertung,
+  HANDWERKER_BEWERTUNG_KATEGORIEN,
+} from '@/lib/handwerker/bewertung-kategorien'
 import {
   updateHandwerker,
   updateHandwerkerNotizen,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import type { Handwerker } from '@/lib/types'
-import { cn } from '@/lib/utils'
 
 function gewerkTagsFromSlugs(
   gewerke: unknown,
@@ -59,14 +67,19 @@ export function HandwerkerDetailClient({
   gewerkeSlugs: { slug: string; name: string }[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const hw = payload.handwerker as Handwerker
   const slugToName = useMemo(
     () => new Map(gewerkeSlugs.map((g) => [g.slug.toLowerCase(), g.name])),
     [gewerkeSlugs]
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
+  const dokumenteAnzahl = useMemo(
+    () => payload.dokumente.filter((d) => d.datei_url?.trim()).length,
+    [payload.dokumente]
+  )
 
-  const [tab, setTab] = useState<'auftraege' | 'notizen' | 'compliance'>('auftraege')
+  const [tab, setTab] = useState<'stammdaten' | 'auftraege' | 'compliance' | 'notizen'>('stammdaten')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -166,9 +179,17 @@ export function HandwerkerDetailClient({
   ])
 
   const sidebar = (
-    <div className="space-y-3">
-      <Accordion title="KONTAKT" defaultOpen>
-        <div className="space-y-1 pt-1">
+    <>
+      <Card
+        title="Kontakt"
+        action={
+          <button type="button" onClick={() => setModalOpen(true)} className="btn btn-ghost btn-sm">
+            <Pencil className="h-3.5 w-3.5" />
+            Bearbeiten
+          </button>
+        }
+      >
+        <div className="space-y-1">
           <PropertyRow label="Name" value={hw.name} editable={false} />
           <PropertyRow label="Firma" value={hw.firma || '—'} editable={false} />
           <PropertyRow
@@ -198,14 +219,11 @@ export function HandwerkerDetailClient({
             editable={false}
           />
           <PropertyRow label="Adresse" value={hw.adresse || '—'} editable={false} />
-          <Button type="button" variant="secondary" size="sm" className="mt-2 w-full" onClick={() => setModalOpen(true)}>
-            ✏️ Bearbeiten
-          </Button>
         </div>
-      </Accordion>
+      </Card>
 
-      <Accordion title="GEWERKE" defaultOpen={false}>
-        <div className="flex flex-wrap gap-2 pt-1">
+      <Card title="Gewerke">
+        <div className="flex flex-wrap gap-2">
           {gewerkNamen.length === 0 ? (
             <p className="text-sm text-bw-text-muted">Keine Gewerke hinterlegt.</p>
           ) : (
@@ -216,163 +234,218 @@ export function HandwerkerDetailClient({
             ))
           )}
         </div>
-      </Accordion>
+      </Card>
 
-      <Accordion title="COMPLIANCE" defaultOpen={false}>
-        <div className="space-y-3 pt-1">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Status</p>
-            <ComplianceBadge status={hw.compliance_status} />
-          </div>
-          <p className="text-sm text-bw-text-muted">
-            Nachweise nach Kategorie, Upload und signierte Links: Tab „Compliance“.
-          </p>
-        </div>
-      </Accordion>
+      <Card title="Dokumente">
+        <p className="text-sm text-bw-text">
+          <span className="font-medium tabular-nums">{dokumenteAnzahl}</span>
+          {' '}
+          {dokumenteAnzahl === 1 ? 'Dokument' : 'Dokumente'} hochgeladen
+        </p>
+        <p className="mt-2 text-sm text-bw-text-muted">
+          Unter Tab „Compliance“ Dateien hochladen, ansehen und löschen.
+        </p>
+      </Card>
 
-      <Accordion title="BANK & STEUER" defaultOpen={false}>
-        <div className="space-y-1 pt-1">
+      <Card title="Bank & Steuer">
+        <div className="space-y-1">
           <PropertyRow label="IBAN" value={hw.iban || '—'} editable={false} />
           <PropertyRow label="USt-ID" value={hw.ustid || '—'} editable={false} />
         </div>
+      </Card>
+
+      {(hw.bewertung_anzahl ?? 0) > 0 ? (
+        <Card title="Bewertungen">
+          <div className="mb-3 flex items-center gap-2">
+            <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
+            <span className="text-2xl font-semibold tabular-nums text-bw-text">
+              {formatHandwerkerBewertung(hw.bewertung_gesamt)}
+            </span>
+            <span className="text-sm text-bw-text-muted">
+              Ø · {hw.bewertung_anzahl} {hw.bewertung_anzahl === 1 ? 'Bewertung' : 'Bewertungen'}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {HANDWERKER_BEWERTUNG_KATEGORIEN.map((kat) => {
+              const keyMap = {
+                qualitaet: hw.bewertung_qualitaet,
+                termintreue: hw.bewertung_termintreue,
+                sauberkeit: hw.bewertung_sauberkeit,
+                kommunikation: hw.bewertung_kommunikation,
+                preis_leistung: hw.bewertung_preis_leistung,
+              } as const
+              const val = keyMap[kat.key]
+              return (
+                <div key={kat.key} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-bw-text-muted">{kat.label}</span>
+                  <span className="inline-flex items-center gap-1 font-medium tabular-nums text-bw-text">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
+                    {formatHandwerkerBewertung(val)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      ) : null}
+    </>
+  )
+
+  const detailTabs = useMemo(
+    () => [
+      { id: 'stammdaten', label: 'Übersicht', icon: LayoutGrid },
+      {
+        id: 'auftraege',
+        label: 'Aufträge',
+        icon: Briefcase,
+        count: aktivAuftraege.length + fertigeAuftraege.length || undefined,
+      },
+      {
+        id: 'notizen',
+        label: 'Notizen',
+        icon: MessageSquare,
+        count: hw.notizen?.trim() ? 1 : undefined,
+      },
+      {
+        id: 'compliance',
+        label: 'Compliance',
+        icon: Shield,
+        count: dokumenteAnzahl || undefined,
+      },
+    ],
+    [aktivAuftraege.length, fertigeAuftraege.length, hw.notizen, dokumenteAnzahl]
+  )
+
+  const tabAuftraege = (
+    <div className="space-y-6">
+      <section>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Aktive Aufträge</h3>
+        {aktivAuftraege.length === 0 ? (
+          <p className="text-sm text-bw-text-muted">Keine laufenden Aufträge.</p>
+        ) : (
+          <ul className="space-y-3">
+            {aktivAuftraege.map((a) => (
+              <li key={a.id}>
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
+                      <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
+                      <div className="mt-2">
+                        <AuftragStatusBadge status={a.auftrag_status} />
+                      </div>
+                    </div>
+                    <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
+                      Zum Auftrag
+                    </Link>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Accordion title={`Abgeschlossene Aufträge (${fertigeAuftraege.length})`} defaultOpen={false}>
+        {fertigeAuftraege.length === 0 ? (
+          <p className="pt-1 text-sm text-bw-text-muted">Keine abgeschlossenen Aufträge.</p>
+        ) : (
+          <ul className="space-y-3 pt-1">
+            {fertigeAuftraege.map((a) => (
+              <li key={a.id}>
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
+                      <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
+                      <div className="mt-2">
+                        <AuftragStatusBadge status={a.auftrag_status} />
+                      </div>
+                    </div>
+                    <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
+                      Zum Auftrag
+                    </Link>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
       </Accordion>
     </div>
   )
 
-  const main = (
-    <div className="flex min-h-[50vh] flex-col border-b border-bw-border md:border-b-0">
-      <div className="flex shrink-0 border-b border-bw-border px-4 pt-3 md:px-6">
-        <button
-          type="button"
-          onClick={() => setTab('auftraege')}
-          className={cn(
-            'border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            tab === 'auftraege' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
-          )}
-        >
-          Aufträge
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('notizen')}
-          className={cn(
-            'border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            tab === 'notizen' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
-          )}
-        >
+  const tabNotizen = (
+    <Card>
+      <div className="space-y-2">
+        <label className="input-label" htmlFor="hw-notizen">
           Notizen
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('compliance')}
-          className={cn(
-            'border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            tab === 'compliance' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
-          )}
-        >
-          Compliance
-        </button>
+        </label>
+        <Textarea
+          id="hw-notizen"
+          rows={12}
+          value={notizen}
+          onChange={(e) => setNotizen(e.target.value)}
+          placeholder="Notizen zum Handwerker…"
+          className="min-h-[200px]"
+        />
+        <p className="text-xs text-bw-text-muted">Wird automatisch gespeichert.</p>
+        {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
       </div>
+    </Card>
+  )
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-        {tab === 'compliance' ? (
-          <HandwerkerComplianceTab
-            handwerkerId={hw.id}
-            istFachbetrieb={hw.ist_fachbetrieb}
-            typen={payload.typen}
-            dokumente={payload.dokumente}
-          />
-        ) : tab === 'auftraege' ? (
-          <div className="space-y-6">
-            <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Aktive Aufträge</h3>
-              {aktivAuftraege.length === 0 ? (
-                <p className="text-sm text-bw-text-muted">Keine laufenden Aufträge.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {aktivAuftraege.map((a) => (
-                    <li key={a.id}>
-                      <Card className="p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
-                            <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
-                            <div className="mt-2">
-                              <AuftragStatusBadge status={a.auftrag_status} />
-                            </div>
-                          </div>
-                          <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
-                            → Zum Auftrag
-                          </Link>
-                        </div>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <Accordion title={`Abgeschlossene Aufträge (${fertigeAuftraege.length})`} defaultOpen={false}>
-              {fertigeAuftraege.length === 0 ? (
-                <p className="pt-1 text-sm text-bw-text-muted">Keine abgeschlossenen Aufträge.</p>
-              ) : (
-                <ul className="space-y-3 pt-1">
-                  {fertigeAuftraege.map((a) => (
-                    <li key={a.id}>
-                      <Card className="p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
-                            <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
-                            <div className="mt-2">
-                              <AuftragStatusBadge status={a.auftrag_status} />
-                            </div>
-                          </div>
-                          <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
-                            → Zum Auftrag
-                          </Link>
-                        </div>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Accordion>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <label className="input-label" htmlFor="hw-notizen">
-              Notizen
-            </label>
-            <Textarea
-              id="hw-notizen"
-              rows={12}
-              value={notizen}
-              onChange={(e) => setNotizen(e.target.value)}
-              placeholder="Notizen zum Handwerker…"
-              className="min-h-[200px]"
-            />
-            <p className="text-xs text-bw-text-muted">Wird automatisch gespeichert.</p>
-            {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
-          </div>
-        )}
-      </div>
-    </div>
+  const tabCompliance = (
+    <HandwerkerComplianceTab handwerkerId={hw.id} dokumente={payload.dokumente} />
   )
 
   return (
     <>
-      <RecordLayout sidebar={sidebar}>{main}</RecordLayout>
+      <DetailHead
+        backHref="/handwerker"
+        backLabel="Zurück zu Handwerker"
+        title={hw.name}
+        sub={
+          <span>
+            {hw.firma ? `${hw.firma} · ` : null}
+            {hw.subkategorie ?? 'Handwerker'}
+            {gewerkNamen.length ? ` · ${gewerkNamen.slice(0, 3).join(', ')}` : null}
+            {hw.adresse ? ` · ${hw.adresse}` : null}
+          </span>
+        }
+        badges={<ComplianceBadge status={hw.compliance_status} />}
+        actions={
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
+            <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Bearbeiten
+          </button>
+        }
+      />
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Handwerker bearbeiten" size="md">
-        <div className="space-y-4">
-          {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
-          <Input label="Name *" value={formName} onChange={(e) => setFormName(e.target.value)} required />
-          <Input label="Firma" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
-          <Input label="Telefon *" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} required />
-          <Input label="E-Mail" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
-          <Input label="Adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} />
-          <div className="flex gap-2 pt-2">
+      <AppDetailScreen
+        tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
+      >
+        <div className="min-w-0 space-y-3">
+          {tab === 'stammdaten' ? sidebar : null}
+          {tab === 'auftraege' ? tabAuftraege : null}
+          {tab === 'notizen' ? tabNotizen : null}
+          {tab === 'compliance' ? tabCompliance : null}
+        </div>
+      </AppDetailScreen>
+
+      {(() => {
+        const editForm = (
+          <div className="space-y-4">
+            {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
+            <Input label="Name *" value={formName} onChange={(e) => setFormName(e.target.value)} required />
+            <Input label="Firma" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
+            <Input label="Telefon *" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} required />
+            <Input label="E-Mail" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+            <Input label="Adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} />
+          </div>
+        )
+        const editFooter = (
+          <div className="flex gap-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setModalOpen(false)}>
               Abbrechen
             </Button>
@@ -380,8 +453,27 @@ export function HandwerkerDetailClient({
               Speichern
             </Button>
           </div>
-        </div>
-      </Modal>
+        )
+        if (isMobile) {
+          return (
+            <FormSheet
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+              breadcrumb="Handwerker"
+              title="Bearbeiten"
+              footer={editFooter}
+            >
+              {editForm}
+            </FormSheet>
+          )
+        }
+        return (
+          <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Handwerker bearbeiten" size="md">
+            {editForm}
+            <div className="mt-4">{editFooter}</div>
+          </Modal>
+        )
+      })()}
     </>
   )
 }

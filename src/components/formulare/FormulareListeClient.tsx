@@ -1,13 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import { FileText } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { ListFilterSection, ListSortRow } from '@/components/layout/ListPageParts'
+import { AppListScreen, AppEntityListRow } from '@/components/layout/app'
+import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
+import { ListFilterBar } from '@/components/ui/ListFilterBar'
 import { FilterChips } from '@/components/ui/FilterChips'
-import { ListCard } from '@/components/ui/ListCard'
-import { SidePanel } from '@/components/ui/SidePanel'
-import { FormularBearbeitenPanel } from '@/components/formulare/FormularBearbeitenPanel'
+import { ListAvatar } from '@/components/ui/ListAvatar'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import type { FormularTemplate } from '@/lib/types'
 import { formatRelativeDate } from '@/lib/utils'
@@ -24,6 +28,19 @@ type FilterKey =
 
 type SortKey = 'neueste' | 'name' | 'felder'
 
+const SUBTYP_LABELS: Record<string, string> = {
+  bautagebuch: 'Bautagebuch',
+  checkliste: 'Checkliste',
+  pruefprotokoll: 'Prüfprotokoll',
+  abnahme: 'Abnahme',
+  sonstiges: 'Sonstiges',
+}
+
+function subtypLabel(subtyp?: string | null) {
+  if (!subtyp) return 'Sonstiges'
+  return SUBTYP_LABELS[subtyp] ?? subtyp
+}
+
 function passtZuFilter(f: TemplateRow, filter: FilterKey): boolean {
   if (filter === 'alle') return true
   if (filter === 'sonstiges') return !f.subtyp || f.subtyp === 'sonstiges'
@@ -31,12 +48,11 @@ function passtZuFilter(f: TemplateRow, filter: FilterKey): boolean {
 }
 
 export function FormulareListeClient({ templates }: { templates: FormularTemplate[] }) {
-  const router = useRouter()
   const formulare = templates as TemplateRow[]
   const [filter, setFilter] = useState<FilterKey>('alle')
+  const [q, setQ] = useState('')
+  const debouncedQ = useDebouncedValue(q, 300)
   const [modal, setModal] = useState<FormularTemplate | null>(null)
-  const [selected, setSelected] = useState<TemplateRow | null>(null)
-  const [editFormular, setEditFormular] = useState<TemplateRow | null>(null)
   const [sortierung, setSortierung] = useState<SortKey>('neueste')
 
   const filterOptionen = useMemo(
@@ -71,10 +87,15 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
     [formulare]
   )
 
-  const filtered = useMemo(
-    () => formulare.filter((f) => passtZuFilter(f, filter)),
-    [formulare, filter]
-  )
+  const filtered = useMemo(() => {
+    const needle = debouncedQ.trim().toLowerCase()
+    return formulare.filter((f) => {
+      if (!passtZuFilter(f, filter)) return false
+      if (!needle) return true
+      const hay = [f.name, f.subtyp].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(needle)
+    })
+  }, [formulare, filter, debouncedQ])
 
   const sorted = useMemo(() => {
     const list = [...filtered]
@@ -90,63 +111,102 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
   }, [filtered, sortierung])
 
   return (
-    <div className="space-y-4 px-4 py-4 md:px-6">
+    <AppListScreen
+      filters={
+        <ListFilterSection
+          chips={
+            <FilterChips
+              options={filterOptionen}
+              selected={[filter]}
+              onChange={(vals) => setFilter((vals[0] as FilterKey) || 'alle')}
+            />
+          }
+        >
+          <ListFilterBar
+            hideToolbarOnMobile
+            hideStatusFilter
+            statusLabel="—"
+            statusOptions={[{ value: '', label: '—' }]}
+            statusValue=""
+            onStatusChange={() => {}}
+            zeitraumValue="alle"
+            onZeitraumChange={() => {}}
+            showCustomDates={false}
+            customFrom=""
+            customTo=""
+            onCustomFromChange={() => {}}
+            onCustomToChange={() => {}}
+            searchValue={q}
+            onSearchChange={setQ}
+            searchPlaceholder="Vorlagen suchen…"
+            onReset={() => {
+              setFilter('alle')
+              setQ('')
+            }}
+            hasActiveFilters={filter !== 'alle' || !!q.trim()}
+          />
+        </ListFilterSection>
+      }
+    >
+      <ListSortRow>
+        <MobileSortSelect
+          variant="pill"
+          options={[
+            { field: 'neueste', label: 'Neueste zuerst' },
+            { field: 'name', label: 'Name A–Z' },
+            { field: 'felder', label: 'Meiste Felder' },
+          ]}
+          currentField={sortierung}
+          currentDir={null}
+          onSort={(f) => setSortierung(((f || 'neueste') as SortKey) || 'neueste')}
+        />
+      </ListSortRow>
+
       <PageHeader
-        title="Formular-Templates"
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={sortierung}
-              onChange={(e) => setSortierung(e.target.value as SortKey)}
-              className="input w-auto text-sm min-w-[10rem]"
-              aria-label="Sortierung"
-            >
-              <option value="neueste">Neueste zuerst</option>
-              <option value="name">Name A–Z</option>
-              <option value="felder">Meiste Felder</option>
-            </select>
-            <Link href="/formulare/neu" className="btn btn-primary btn-sm inline-flex items-center justify-center">
-              + Neues Template
-            </Link>
-          </div>
+          <Link
+            href="/formulare/neu"
+            className="btn btn-primary btn-sm inline-flex items-center justify-center md:hidden"
+          >
+            + Neues Template
+          </Link>
         }
       />
 
-      <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:-mx-6 md:px-6">
-        <FilterChips
-          options={filterOptionen}
-          selected={[filter]}
-          onChange={(vals) => setFilter((vals[0] as FilterKey) || 'alle')}
-        />
-      </div>
-
       <div>
         {sorted.length === 0 ? (
-          <p className="py-6 text-sm text-bw-light">Keine Templates für diesen Filter.</p>
+          <EmptyState
+            icon={FileText}
+            title={formulare.length === 0 ? 'Noch keine Formular-Vorlagen' : 'Keine Treffer'}
+            description={
+              formulare.length === 0
+                ? 'Legen Sie ein neues Template an, um Formulare für Handwerker zu nutzen.'
+                : 'Filter anpassen.'
+            }
+            action={
+              formulare.length === 0 ? (
+                <Link href="/formulare/neu" className="btn btn-primary btn-sm">
+                  + Erstes Template anlegen
+                </Link>
+              ) : null
+            }
+          />
         ) : (
-          <ul className="grid gap-3 md:grid-cols-2">
+          <ul className="m-0 list-none space-y-3 p-0">
             {sorted.map((formular) => (
               <li key={formular.id}>
-                <ListCard
+                <AppEntityListRow
+                  href={`/formulare/${formular.id}/bearbeiten`}
+                  avatar={<ListAvatar name={formular.name} tone="soft" />}
                   title={formular.name}
-                  subtitle={
-                    `${formular.felder?.length || 0} Felder` + (formular.subtyp ? ` · ${formular.subtyp}` : '')
-                  }
-                  meta={formatRelativeDate(formular.updated_at || formular.created_at || '')}
-                  tags={!formular.aktiv ? ['Inaktiv'] : undefined}
-                  onClick={() => setSelected(formular)}
-                  actions={
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditFormular(formular)
-                      }}
-                      className="rounded-md p-2 text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
-                      aria-label="Bearbeiten"
-                    >
-                      ✏️
-                    </button>
+                  line2={`${formular.felder?.length || 0} Felder · ${subtypLabel(formular.subtyp)}`}
+                  line3={formatRelativeDate(formular.updated_at || formular.created_at || '')}
+                  badge={
+                    !formular.aktiv ? (
+                      <span className="rounded-md bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
+                        Inaktiv
+                      </span>
+                    ) : undefined
                   }
                 />
               </li>
@@ -155,85 +215,12 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
         )}
       </div>
 
-      <SidePanel
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.name ?? ''}
-        subtitle={
-          selected
-            ? `${selected.subtyp || 'Sonstiges'} · ${selected.felder?.length ?? 0} Felder`
-            : undefined
-        }
-        width="md"
-      >
-        {selected ? (
-          <div className="space-y-4 p-5">
-            <div>
-              <div className="text-base font-semibold text-bw-text">{selected.name}</div>
-              <div className="mt-1 text-xs text-bw-text-muted">
-                {selected.subtyp || 'Sonstiges'} · {selected.felder?.length ?? 0} Felder
-              </div>
-            </div>
-
-            {selected.felder && selected.felder.length > 0 ? (
-              <div className="space-y-1">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Felder</div>
-                {selected.felder.slice(0, 5).map((f, i) => (
-                  <div key={f.id ?? i} className="flex items-center gap-2 py-1 text-sm text-bw-text">
-                    <span className="flex-1 truncate">{f.label}</span>
-                    {f.pflicht ? <span className="text-xs text-bw-accent">*</span> : null}
-                  </div>
-                ))}
-                {selected.felder.length > 5 ? (
-                  <div className="text-xs text-bw-text-muted">+ {selected.felder.length - 5} weitere Felder</div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="space-y-2 border-t border-bw-border pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditFormular(selected)
-                  setSelected(null)
-                }}
-                className="btn btn-primary btn-sm w-full"
-              >
-                ✏️ Bearbeiten
-              </button>
-              <button type="button" onClick={() => setModal(selected)} className="btn btn-secondary btn-sm w-full">
-                👁️ Vorschau
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </SidePanel>
-
-      <SidePanel
-        open={!!editFormular}
-        onClose={() => setEditFormular(null)}
-        title={editFormular?.name || 'Formular bearbeiten'}
-        width="lg"
-      >
-        {editFormular ? (
-          <FormularBearbeitenPanel
-            key={editFormular.id}
-            formular={editFormular}
-            onSave={() => {
-              setEditFormular(null)
-              router.refresh()
-            }}
-            onClose={() => setEditFormular(null)}
-          />
-        ) : null}
-      </SidePanel>
-
       <FormularVorschauModal
         open={!!modal}
         onClose={() => setModal(null)}
         name={modal?.name ?? ''}
         felder={modal?.felder ?? []}
       />
-    </div>
+    </AppListScreen>
   )
 }

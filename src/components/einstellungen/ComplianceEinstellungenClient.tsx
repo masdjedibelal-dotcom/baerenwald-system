@@ -3,7 +3,9 @@
 import { useState, useTransition } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { EinstellungenListBody, EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
 import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -63,15 +65,21 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button type="button" variant="primary" onClick={() => setModal(true)}>
-          + Neuer Dokument-Typ
-        </Button>
-      </div>
-      <div className="space-y-3">
-        {rows.map((t) => (
-          <Card key={t.id} title={t.bezeichnung}>
-            <p className="mb-3 text-sm text-bw-light">{t.beschreibung ?? '—'}</p>
+      <Card
+        title="Compliance-Dokumenttypen"
+        action={
+          <Button type="button" variant="primary" className="btn-sm" onClick={() => setModal(true)}>
+            + Neuer Typ
+          </Button>
+        }
+      >
+        <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Dokumenttypen.' : undefined}>
+          {rows.map((t) => (
+            <li key={t.id} className="space-y-3 py-3 first:pt-0 last:pb-0">
+              <div>
+                <p className="text-[13.5px] font-medium text-bw-text">{t.bezeichnung}</p>
+                <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
+              </div>
             <div className="mb-3 max-w-md">
               <Input
                 label="Kategorie (Gruppe in Handwerker-Compliance)"
@@ -121,9 +129,10 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
                 />
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
+            </li>
+          ))}
+        </EinstellungenListBody>
+      </Card>
 
       <Modal
         open={modal}
@@ -142,10 +151,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
       >
         <div className="space-y-3">
           <Input label="Bezeichnung" required value={bez} onChange={(e) => setBez(e.target.value)} />
-          <div>
-            <label className="input-label">Beschreibung</label>
-            <textarea className="input min-h-[80px]" value={besch} onChange={(e) => setBesch(e.target.value)} />
-          </div>
+          <Textarea label="Beschreibung" value={besch} onChange={(e) => setBesch(e.target.value)} rows={3} />
           <Input
             label="Frist Monate (optional)"
             type="number"

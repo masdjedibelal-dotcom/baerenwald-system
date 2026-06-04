@@ -14,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
   createGewerk,
@@ -24,23 +25,31 @@ import {
   deleteGewerkIfEmpty,
   loadGewerkeEinstellungen,
   reorderGewerke,
+  updateGewerkAusfuehrung,
   type GewerkMitCount,
 } from '@/app/(dashboard)/einstellungen/gewerke/actions'
+import {
+  normalizeGewerkAusfuehrung,
+  type GewerkAusfuehrung,
+} from '@/lib/gewerke-ausfuehrung'
 import { useRouter } from 'next/navigation'
 
 function SortRow({
   g,
   onToggle,
   onRename,
+  onAusfuehrung,
   onDelete,
 }: {
   g: GewerkMitCount
   onToggle: (aktiv: boolean) => void
   onRename: (name: string) => void
+  onAusfuehrung: (patch: { ausfuehrung: GewerkAusfuehrung; fachbetrieb_hinweis: string | null }) => void
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(g.name)
+  const [hinweisDraft, setHinweisDraft] = useState(g.fachbetrieb_hinweis ?? '')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: g.id,
   })
@@ -54,7 +63,7 @@ function SortRow({
     >
       <button
         type="button"
-        className="touch-none text-bw-light hover:text-bw-text"
+        className="touch-none text-bw-text-muted hover:text-bw-text"
         aria-label="Verschieben"
         {...attributes}
         {...listeners}
@@ -89,7 +98,43 @@ function SortRow({
             {g.name}
           </button>
         )}
-        <p className="text-xs text-bw-light">{g.anzahl_leistungen} Leistungen</p>
+        <p className="text-xs text-bw-text-muted">{g.anzahl_leistungen} Leistungen</p>
+        <div className="mt-2 flex w-full flex-col gap-3 sm:max-w-md">
+          <div className="form-field">
+            <span className="form-field-label">Ausführung</span>
+            <select
+              className="input w-full"
+              value={g.ausfuehrung}
+              onChange={(e) => {
+                const ausfuehrung = normalizeGewerkAusfuehrung(e.target.value)
+                onAusfuehrung({
+                  ausfuehrung,
+                  fachbetrieb_hinweis: ausfuehrung === 'eigen' ? null : g.fachbetrieb_hinweis,
+                })
+              }}
+            >
+              <option value="eigen">Eigenleistung</option>
+              <option value="fachbetrieb">Immer Fachbetrieb</option>
+              <option value="beides">Eigen + Fachbetrieb</option>
+            </select>
+          </div>
+          {g.ausfuehrung !== 'eigen' ? (
+            <div className="form-field">
+              <span className="form-field-label">Fachbetrieb-Hinweis</span>
+              <Textarea
+                rows={2}
+                value={hinweisDraft}
+                placeholder="Ausführung durch zugelassenen Fachbetrieb…"
+                onChange={(e) => setHinweisDraft(e.target.value)}
+                onBlur={() => {
+                  const trimmed = hinweisDraft.trim() || null
+                  if (trimmed === (g.fachbetrieb_hinweis?.trim() || null)) return
+                  onAusfuehrung({ ausfuehrung: g.ausfuehrung, fachbetrieb_hinweis: trimmed })
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -160,6 +205,28 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
     router.refresh()
   }
 
+  async function patchAusfuehrung(
+    id: string,
+    patch: { ausfuehrung: GewerkAusfuehrung; fachbetrieb_hinweis: string | null }
+  ) {
+    const r = await updateGewerkAusfuehrung(id, patch)
+    if (!r.ok) {
+      toast.error(r.message)
+      return
+    }
+    setRows((prev) =>
+      prev.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              ausfuehrung: patch.ausfuehrung,
+              fachbetrieb_hinweis: patch.fachbetrieb_hinweis,
+            }
+          : x
+      )
+    )
+  }
+
   async function remove(g: GewerkMitCount) {
     if (!confirm(`Gewerk „${g.name}“ löschen?`)) return
     const r = await deleteGewerkIfEmpty(g.id)
@@ -186,7 +253,6 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
       }
       toast.success('Gewerk angelegt')
       setNeuName('')
-      setNeuOpen(false)
       const fresh = await loadGewerkeEinstellungen()
       setRows(fresh)
       router.refresh()
@@ -204,6 +270,7 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
                 g={g}
                 onToggle={(aktiv) => void toggle(g.id, aktiv)}
                 onRename={(name) => void rename(g.id, name)}
+                onAusfuehrung={(patch) => void patchAusfuehrung(g.id, patch)}
                 onDelete={() => void remove(g)}
               />
             ))}

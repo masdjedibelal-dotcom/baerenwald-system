@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
+import { Textarea } from '@/components/ui/Textarea'
 import type {
   DatenschutzAnfrageRow,
   DatenschutzFaelligRow,
@@ -286,7 +287,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
         <h2 className="mb-3 text-lg font-semibold text-ink">Zur Löschung vorgeschlagen</h2>
         {faellig.length === 0 ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
-            ✓ Keine fälligen Löschungen
+            Keine fälligen Löschungen
           </div>
         ) : (
           <ul className="space-y-3">
@@ -379,7 +380,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
             >
               {warn ? (
                 <p className="mb-2 font-medium">
-                  ⚠️ Anfrage von {a.name} seit {t} Tagen offen — DSGVO-Frist: 30 Tage ab Eingang
+                  Anfrage von {a.name} seit {t} Tagen offen — DSGVO-Frist: 30 Tage ab Eingang
                 </p>
               ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -489,11 +490,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
             <p className="mb-2 text-sm text-muted">{aufschubModal.titel}</p>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-ink">Begründung (Pflicht)</span>
-              <textarea
-                className="min-h-[100px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
-                value={aufschubText}
-                onChange={(e) => setAufschubText(e.target.value)}
-              />
+              <Textarea value={aufschubText} onChange={(e) => setAufschubText(e.target.value)} rows={4} />
             </label>
             <div className="mt-3 flex gap-2">
               <Button type="button" variant="primary" loading={busy === 'aufschub'} onClick={() => void runAufschub()}>
@@ -531,11 +528,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           />
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-ink">Beschreibung</span>
-            <textarea
-              className="min-h-[80px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-              value={anfrageDesc}
-              onChange={(e) => setAnfrageDesc(e.target.value)}
-            />
+            <Textarea value={anfrageDesc} onChange={(e) => setAnfrageDesc(e.target.value)} rows={3} />
           </label>
         </div>
         <div className="mt-4 flex gap-2">
@@ -558,11 +551,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
             <div className="max-h-[50vh] space-y-3 overflow-y-auto">
               <label className="block text-sm">
                 <span className="mb-1 block font-medium text-ink">Notizen (Prüfung / Mitteilung)</span>
-                <textarea
-                  className="min-h-[120px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                  value={editNotizen}
-                  onChange={(e) => setEditNotizen(e.target.value)}
-                />
+                <Textarea value={editNotizen} onChange={(e) => setEditNotizen(e.target.value)} rows={5} />
               </label>
               <label className="block text-sm font-medium text-ink">
                 Status

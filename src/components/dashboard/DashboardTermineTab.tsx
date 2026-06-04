@@ -1,5 +1,5 @@
 import type { KalenderTermin } from '@/lib/types'
-import { KALENDER_TYP_BG } from '@/lib/utils'
+import { KalenderTerminZeile } from '@/components/kalender/KalenderTerminZeile'
 
 function headerForDatum(datumIso: string): string {
   const d = new Date(datumIso.includes('T') ? datumIso : `${datumIso}T12:00:00`)
@@ -10,14 +10,6 @@ function headerForDatum(datumIso: string): string {
   if (diff === 0) return 'Heute'
   if (diff === 1) return 'Morgen'
   return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
-}
-
-function titelZeile(t: KalenderTermin) {
-  if (t.titel?.trim()) return t.titel.trim()
-  const l = t.leads?.kontakt_name
-  const k = t.auftraege?.kunden?.name
-  const a = t.auftraege?.titel
-  return l || a || k || 'Termin'
 }
 
 export function DashboardTermineTab({ termine }: { termine: KalenderTermin[] }) {
@@ -40,20 +32,9 @@ export function DashboardTermineTab({ termine }: { termine: KalenderTermin[] }) 
           <div className="bg-bw-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-bw-mid">
             {headerForDatum(key)}
           </div>
-          <div>
+          <div className="divide-y divide-bw-border">
             {groups.get(key)!.map((t) => (
-              <div key={t.id} className="flex gap-3 px-4 py-3">
-                <span
-                  className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: KALENDER_TYP_BG[t.typ] ?? '#9CA3AF' }}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-bw-text">{t.uhrzeit_von ?? '—'}</div>
-                  <div className="text-sm font-medium text-bw-text">{titelZeile(t)}</div>
-                  {t.adresse ? <div className="text-xs text-bw-text-muted">{t.adresse}</div> : null}
-                </div>
-              </div>
+              <KalenderTerminZeile key={t.id} termin={t} />
             ))}
           </div>
         </div>

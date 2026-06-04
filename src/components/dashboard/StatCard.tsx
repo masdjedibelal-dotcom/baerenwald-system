@@ -1,8 +1,14 @@
-'use client'
-
 import Link from 'next/link'
-import type { LucideIcon } from 'lucide-react'
+import { ChevronRight, Minus, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+export type StatDelta = {
+  /** z. B. „+18 % vs. Vormonat“ oder „−2 vs. gestern“ */
+  label: string
+  trend: 'up' | 'down' | 'neutral'
+  /** Bei Warn-KPIs (z. B. überfällige Rechnungen): Rückgang = positiv (grün). */
+  invertTrendColors?: boolean
+}
 
 interface StatCardProps {
   zahl: number
@@ -12,6 +18,9 @@ interface StatCardProps {
   farbe: 'blau' | 'orange' | 'gruen' | 'lila' | 'rot'
   /** Linker Farbbalken bei Warnung (z. B. neue Anfragen / überfällige Rechnungen). */
   warnung?: boolean
+  delta?: StatDelta
+  /** Zweite Zeile, z. B. Monatsvergleich unter der Wochen-KPI */
+  subDelta?: StatDelta & { prefix?: string }
 }
 
 const FARBEN = {
@@ -42,30 +51,72 @@ const FARBEN = {
   },
 } as const
 
-export function StatCard({ zahl, label, icon: Icon, href, farbe, warnung = false }: StatCardProps) {
+function deltaColor(d: StatDelta): string {
+  if (d.trend === 'neutral') return 'text-bw-text-muted'
+  const positive = d.trend === 'up'
+  const good = d.invertTrendColors ? !positive : positive
+  return good ? 'text-bw-primary' : 'text-status-cancel-text'
+}
+
+function DeltaTrendIcon({ trend }: { trend: StatDelta['trend'] }) {
+  if (trend === 'up') return <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+  if (trend === 'down') return <TrendingDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+  return <Minus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+}
+
+function DeltaLine({ delta, className }: { delta: StatDelta; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1', deltaColor(delta), className)}>
+      <DeltaTrendIcon trend={delta.trend} />
+      <span>{delta.label}</span>
+    </span>
+  )
+}
+
+export function StatCard({
+  zahl,
+  label,
+  icon: Icon,
+  href,
+  farbe,
+  warnung = false,
+  delta,
+  subDelta,
+}: StatCardProps) {
   const f = FARBEN[farbe]
   const zeigBalken = warnung && zahl > 0
 
   return (
-    <Link href={href} className="block">
+    <Link href={href} className="block h-full">
       <div
         className={cn(
-          'relative overflow-hidden rounded-lg border border-bw-border bg-bw-card p-5',
+          'relative h-full overflow-hidden rounded-lg border border-bw-border bg-bw-card p-3 sm:p-4',
           'cursor-pointer transition-all duration-150 hover:border-bw-primary hover:shadow-md'
         )}
       >
         {zeigBalken ? <div className={cn('absolute bottom-0 left-0 top-0 w-1', f.balken)} /> : null}
 
-        <div className="mb-3 flex items-start justify-between">
-          <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', f.bg)}>
-            <Icon className={cn('h-5 w-5', f.icon)} aria-hidden />
-          </div>
-          <span className="text-3xl font-semibold leading-none text-bw-text">{zahl}</span>
-        </div>
+        <Icon
+          className={cn('pointer-events-none absolute -bottom-3 -right-3 h-[60px] w-[60px]', f.icon, 'opacity-10')}
+          aria-hidden
+        />
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-bw-text-muted">{label}</span>
-          <span className="text-xs text-bw-light">→</span>
+        <div className="relative min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-bw-text-muted">{label}</p>
+          <p className="mt-1 text-2xl font-semibold leading-none tabular-nums text-bw-text sm:text-3xl">{zahl}</p>
+          {delta ? (
+            <p className="mt-1.5 text-xs font-medium">
+              <DeltaLine delta={delta} />
+            </p>
+          ) : (
+            <ChevronRight className="mt-1.5 h-4 w-4 text-bw-light" aria-hidden />
+          )}
+          {subDelta ? (
+            <p className="mt-1 text-[11px] font-medium text-bw-text-muted">
+              {subDelta.prefix ? <span>{subDelta.prefix}</span> : null}
+              <DeltaLine delta={subDelta} className="text-[11px]" />
+            </p>
+          ) : null}
         </div>
       </div>
     </Link>

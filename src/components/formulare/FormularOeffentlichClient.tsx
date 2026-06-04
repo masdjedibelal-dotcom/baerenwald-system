@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { Check } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import {
@@ -110,9 +111,7 @@ export function FormularOeffentlichClient({
   if (done) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <div className="mb-4 text-5xl" aria-hidden>
-          ✓
-        </div>
+        <div className="mb-4 text-5xl" aria-hidden><Check className="h-5 w-5 text-[#2E7D52]" aria-hidden /></div>
         <h1 className="text-2xl font-semibold text-bw-text">Vielen Dank!</h1>
         <p className="mt-2 text-bw-light">Ihre Angaben wurden übermittelt.</p>
       </div>

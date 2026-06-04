@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { AlertTriangle, Check, X } from 'lucide-react'
 import { SidePanel } from '@/components/ui/SidePanel'
+import { IconText } from '@/components/ui/IconText'
 import type { HandwerkerZeile } from '@/components/handwerker/HandwerkerListeClient'
 
 function gewerkKurz(h: HandwerkerZeile): string {
@@ -16,10 +18,27 @@ function gewerkKurz(h: HandwerkerZeile): string {
 
 function ComplianceHint({ h }: { h: HandwerkerZeile }) {
   const s = h.compliance_status ?? ''
-  if (s === 'vollständig') return <span className="text-xs text-emerald-700">✓ Compliance OK</span>
-  if (s === 'warnung' || s === 'abgelaufen')
-    return <span className="text-xs text-amber-800">⚠️ Dokument läuft ab</span>
-  if (s === 'unvollständig') return <span className="text-xs text-red-800">❌ Docs fehlen</span>
+  if (s === 'vollständig') {
+    return (
+      <span className="text-xs text-emerald-700">
+        <IconText icon={Check}>Compliance OK</IconText>
+      </span>
+    )
+  }
+  if (s === 'warnung' || s === 'abgelaufen') {
+    return (
+      <span className="text-xs text-amber-800">
+        <IconText icon={AlertTriangle}>Dokument läuft ab</IconText>
+      </span>
+    )
+  }
+  if (s === 'unvollständig') {
+    return (
+      <span className="text-xs text-red-800">
+        <IconText icon={X}>Docs fehlen</IconText>
+      </span>
+    )
+  }
   return <span className="text-xs text-bw-text-muted">—</span>
 }
 

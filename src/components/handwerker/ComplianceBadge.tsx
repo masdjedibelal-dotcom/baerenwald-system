@@ -1,5 +1,7 @@
 'use client'
 
+import { AlertTriangle, Check, X } from 'lucide-react'
+import { IconText } from '@/components/ui/IconText'
 import { cn } from '@/lib/utils'
 
 /** Normalisiert DB-Werte (vollständig, warnung, …) auf Badge-Logik */
@@ -16,17 +18,29 @@ export function normalizeComplianceBadgeKey(
 export function ComplianceBadge({ status }: { status: string | null | undefined }) {
   const k = normalizeComplianceBadgeKey(status)
   if (k === 'ok') {
-    return <span className={cn('badge', 'badge-order')}>✓ OK</span>
+    return (
+      <span className={cn('badge', 'badge-order')}>
+        <IconText icon={Check}>OK</IconText>
+      </span>
+    )
   }
   if (k === 'bald_ablaufend') {
     return (
       <span className={cn('badge', 'badge-contacted')} title="Dokument läuft bald ab">
-        ⚠️ Läuft ab
+        <IconText icon={AlertTriangle}>Läuft ab</IconText>
       </span>
     )
   }
   if (k === 'unvollstaendig') {
-    return <span className={cn('badge', 'badge-offer')}>⚠️ Unvollständig</span>
+    return (
+      <span className={cn('badge', 'badge-offer')}>
+        <IconText icon={AlertTriangle}>Unvollständig</IconText>
+      </span>
+    )
   }
-  return <span className={cn('badge', 'badge-cancel')}>✗ Fehlt</span>
+  return (
+    <span className={cn('badge', 'badge-cancel')}>
+      <IconText icon={X}>Fehlt</IconText>
+    </span>
+  )
 }

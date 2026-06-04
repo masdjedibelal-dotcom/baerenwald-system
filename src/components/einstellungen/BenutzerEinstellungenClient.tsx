@@ -1,11 +1,18 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/app-toast'
+import {
+  EinstellungenListBody,
+  EinstellungenListItem,
+  EinstellungenListMeta,
+} from '@/components/einstellungen/EinstellungenUi'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
   inviteBenutzer,
@@ -24,6 +31,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   const [inviteRolle, setInviteRolle] = useState<'admin' | 'manager'>('manager')
   const [edit, setEdit] = useState<BenutzerZeile | null>(null)
   const [editName, setEditName] = useState('')
+  const [editTelefon, setEditTelefon] = useState('')
   const [editRolle, setEditRolle] = useState<'admin' | 'manager'>('manager')
   const [pending, startTransition] = useTransition()
 
@@ -51,7 +59,11 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   function saveEdit() {
     if (!edit) return
     startTransition(async () => {
-      const r = await updateBenutzerProfil(edit.id, { name: editName, rolle: editRolle })
+      const r = await updateBenutzerProfil(edit.id, {
+        name: editName,
+        rolle: editRolle,
+        telefon: editTelefon,
+      })
       if (!r.ok) {
         toast.error(r.message)
         return
@@ -74,45 +86,58 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button type="button" variant="primary" onClick={() => setInviteOpen(true)}>
-          + Benutzer einladen
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {rows.map((u) => (
-          <Card key={u.id} title={u.name}>
-            <p className="mb-1 text-sm text-bw-light">{u.email}</p>
-            <p className="mb-3 text-sm">
-              Rolle: <strong>{u.rolle}</strong> · Status:{' '}
-              <strong>{u.aktiv ? 'aktiv' : 'deaktiviert'}</strong>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setEdit(u)
-                  setEditName(u.name)
-                  setEditRolle(u.rolle)
-                }}
-              >
-                Bearbeiten
-              </Button>
-              <Button
-                type="button"
-                variant={u.aktiv ? 'danger' : 'secondary'}
-                size="sm"
-                onClick={() => void toggleAktiv(u, !u.aktiv)}
-              >
-                {u.aktiv ? 'Deaktivieren' : 'Aktivieren'}
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <Card
+        title="Team"
+        action={
+          <Button type="button" variant="primary" className="btn-sm" onClick={() => setInviteOpen(true)}>
+            + Einladen
+          </Button>
+        }
+      >
+        <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Benutzer.' : undefined}>
+          {rows.map((u) => (
+            <EinstellungenListItem key={u.id}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13.5px] font-medium text-bw-text">{u.name}</p>
+                <EinstellungenListMeta>{u.email}</EinstellungenListMeta>
+                <EinstellungenListMeta className="mt-0.5">
+                  {u.rolle === 'admin' ? 'Admin' : 'Manager'}
+                  {u.telefon ? ` · ${u.telefon}` : ' · Kein Handy'}
+                </EinstellungenListMeta>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge
+                  status={u.aktiv ? 'done' : 'cancel'}
+                  label={u.aktiv ? 'Aktiv' : 'Deaktiviert'}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="btn-sm"
+                  onClick={() => {
+                    setEdit(u)
+                    setEditName(u.name)
+                    setEditTelefon(u.telefon)
+                    setEditRolle(u.rolle)
+                  }}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Bearbeiten
+                </Button>
+                <Button
+                  type="button"
+                  variant={u.aktiv ? 'danger' : 'secondary'}
+                  size="sm"
+                  onClick={() => void toggleAktiv(u, !u.aktiv)}
+                >
+                  {u.aktiv ? 'Deaktivieren' : 'Aktivieren'}
+                </Button>
+              </div>
+            </EinstellungenListItem>
+          ))}
+        </EinstellungenListBody>
+      </Card>
 
       <Modal
         open={inviteOpen}
@@ -144,7 +169,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </label>
             <select
               id="invite-rolle"
-              className="input max-w-xs"
+              className="input max-w-xs w-full"
               value={inviteRolle}
               onChange={(e) => setInviteRolle(e.target.value as 'admin' | 'manager')}
             >
@@ -172,13 +197,20 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+          <Input
+            label="Handy / Direktwahl"
+            type="tel"
+            value={editTelefon}
+            onChange={(e) => setEditTelefon(e.target.value)}
+            placeholder="+49 …"
+          />
           <div>
             <label className="input-label" htmlFor="edit-rolle">
               Rolle
             </label>
             <select
               id="edit-rolle"
-              className="input max-w-xs"
+              className="input max-w-xs w-full"
               value={editRolle}
               onChange={(e) => setEditRolle(e.target.value as 'admin' | 'manager')}
             >

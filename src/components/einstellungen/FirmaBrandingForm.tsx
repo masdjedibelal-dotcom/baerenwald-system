@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { toast } from '@/components/ui/app-toast'
 
@@ -74,6 +75,12 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             onChange={(e) => set('firmenname', e.target.value)}
           />
           <Input label="Rechtsform" value={v.rechtsform} onChange={(e) => set('rechtsform', e.target.value)} />
+          <Input
+            label="Geschäftsführer / Inhaber (PDF)"
+            value={v.geschaeftsfuehrer}
+            onChange={(e) => set('geschaeftsfuehrer', e.target.value)}
+            placeholder="z. B. Beran Cakmak"
+          />
           <Input label="Straße" value={v.strasse} onChange={(e) => set('strasse', e.target.value)} />
           <Input label="PLZ" value={v.plz} onChange={(e) => set('plz', e.target.value)} />
           <Input label="Ort" value={v.ort} onChange={(e) => set('ort', e.target.value)} />
@@ -107,9 +114,41 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             value={v.steuernummer}
             onChange={(e) => set('steuernummer', e.target.value)}
           />
-          <Input label="IBAN" value={v.iban} onChange={(e) => set('iban', e.target.value)} />
+          <Input
+            label="IBAN"
+            hint="Wird im Angebots-PDF unter „Bankverbindung (Überweisung)“ ausgegeben."
+            value={v.iban}
+            onChange={(e) => set('iban', e.target.value)}
+          />
           <Input label="BIC" value={v.bic} onChange={(e) => set('bic', e.target.value)} />
           <Input label="Bank" value={v.bank_name} onChange={(e) => set('bank_name', e.target.value)} />
+        </div>
+      </Card>
+
+      <Card title="Angebot — Kosten & Anfahrt">
+        <div className="form-grid-2">
+          <Input
+            label="Anfahrt Pauschale (netto, €)"
+            type="number"
+            min={0}
+            step="0.01"
+            value={v.anfahrt_pauschale_netto}
+            onChange={(e) => set('anfahrt_pauschale_netto', e.target.value)}
+          />
+          <Input
+            label="Bezeichnung Anfahrt"
+            value={v.anfahrt_leistung_text}
+            onChange={(e) => set('anfahrt_leistung_text', e.target.value)}
+          />
+          <Input
+            label="Standard-Lohnanteil (%)"
+            type="number"
+            min={0}
+            max={100}
+            value={v.lohn_anteil_standard_prozent}
+            onChange={(e) => set('lohn_anteil_standard_prozent', e.target.value)}
+            hint="Derzeit ohne Wirkung: Bei Kostenart „Allgemein“ gibt es keine automatische Lohn-/Material-Aufteilung mehr. Nur bei expliziter Wahl „Arbeitskosten“ oder „Materialkosten“ (je 100 %)."
+          />
         </div>
       </Card>
 
@@ -145,6 +184,23 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
                 </option>
               ))}
             </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-bw-text">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={v.kleinunternehmer === '1' || v.kleinunternehmer === 'true'}
+                onChange={(e) => set('kleinunternehmer', e.target.checked ? '1' : '')}
+              />
+              <span>
+                <span className="font-medium">Kleinunternehmer (§ 19 UStG)</span>
+                <span className="mt-0.5 block text-xs text-bw-text-muted">
+                  Auf Rechnungen wird keine Umsatzsteuer ausgewiesen; Pflichthinweis § 19 wird
+                  automatisch ergänzt.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
         <div className="mt-4">
@@ -183,16 +239,26 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
                 className="max-h-24 max-w-[240px] rounded border border-bw-border bg-white object-contain p-2"
               />
               <Button type="button" variant="secondary" onClick={removeLogo}>
-                Logo entfernen
+                Eigenes Logo entfernen
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex flex-wrap items-center gap-4 rounded-lg border border-bw-border bg-white p-4">
+              <BrandLogo variant="green" height={44} />
+              <p className="text-sm text-bw-text-muted">
+                Standard-Baumlogo im CRM und in E-Mails. Optional eigenes Logo hochladen (ersetzt
+                das Standardlogo in E-Mails).
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
-      <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
-        Speichern
-      </Button>
+      <div className="flex justify-end pt-2">
+        <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
+          Speichern
+        </Button>
+      </div>
     </div>
   )
 }

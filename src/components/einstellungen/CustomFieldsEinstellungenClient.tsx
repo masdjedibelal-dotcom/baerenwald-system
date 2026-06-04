@@ -13,7 +13,10 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { FilterChips } from '@/components/ui/FilterChips'
+import { EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
 import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
@@ -65,7 +68,7 @@ function SortRow({
     >
       <button
         type="button"
-        className="touch-none text-bw-light hover:text-bw-text"
+        className="touch-none text-bw-text-muted hover:text-bw-text"
         aria-label="Verschieben"
         {...attributes}
         {...listeners}
@@ -77,7 +80,7 @@ function SortRow({
           {f.label}
           {f.pflicht ? <span className="text-bw-accent"> *</span> : null}
         </p>
-        <p className="text-xs text-bw-light">{labelFeldtyp(f.feld_typ)}</p>
+        <EinstellungenListMeta>{labelFeldtyp(f.feld_typ)}</EinstellungenListMeta>
       </div>
       <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
         <Pencil className="h-4 w-4" aria-hidden />
@@ -195,22 +198,11 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2 border-b border-bw-border pb-2">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={
-              tab === t.key
-                ? 'rounded-md bg-bw-green-bg px-3 py-1.5 text-sm font-medium text-bw-primary'
-                : 'rounded-md px-3 py-1.5 text-sm text-bw-light hover:text-bw-text'
-            }
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <FilterChips
+        options={TABS.map((t) => ({ label: t.label, value: t.key }))}
+        selected={[tab]}
+        onChange={(v) => setTab(v[0] ?? TABS[0].key)}
+      />
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={filtered.map((f) => f.id)} strategy={verticalListSortingStrategy}>
@@ -263,8 +255,10 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
           {feldTyp === 'select' ? (
             <div>
               <label className="input-label">Optionen (eine pro Zeile)</label>
-              <textarea
-                className="input min-h-[100px] font-mono text-sm"
+              <Textarea
+                plain
+                className="font-mono text-sm"
+                rows={4}
                 value={optionenText}
                 onChange={(e) => setOptionenText(e.target.value)}
               />

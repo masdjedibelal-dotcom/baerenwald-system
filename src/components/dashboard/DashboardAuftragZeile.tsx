@@ -79,7 +79,7 @@ export function DashboardAuftragZeile({ auftrag }: { auftrag: AuftragListeEintra
             className="inline-block text-sm font-medium text-bw-link hover:underline"
             onClick={() => setOpen(false)}
           >
-            Zum Auftrag →
+            Zum Auftrag
           </Link>
         </div>
       </SidePanel>

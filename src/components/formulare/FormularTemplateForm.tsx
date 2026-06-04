@@ -49,13 +49,13 @@ import { FORMULAR_PHASE_LABELS, cn } from '@/lib/utils'
 import { saveFormularTemplate, deleteFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 
 const TYP_OPTIONS: { value: FormularFeld['typ']; label: string }[] = [
-  { value: 'checkbox', label: '☐ Checkbox' },
+  { value: 'checkbox', label: 'Checkbox' },
   { value: 'text', label: 'T Text' },
   { value: 'textarea', label: '¶ Langer Text' },
   { value: 'number', label: '# Zahl' },
-  { value: 'date', label: '📅 Datum' },
+  { value: 'date', label: 'Datum' },
   { value: 'select', label: '▼ Auswahl' },
-  { value: 'foto', label: '📸 Foto' },
+  { value: 'foto', label: 'Foto' },
 ]
 
 function newFieldId() {
@@ -547,7 +547,6 @@ export function FormularTemplateForm({
     <div className={cn('pb-8', embedded && 'pb-2')}>
       {!embedded ? (
         <PageHeader
-          title={isNew ? 'Neues Template' : 'Template bearbeiten'}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>

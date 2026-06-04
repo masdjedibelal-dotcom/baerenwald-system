@@ -9,6 +9,13 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import { saveEmailTemplate, type EmailTemplateRow } from '@/app/(dashboard)/einstellungen/email/actions'
+import { applyEmailTemplateVars, type EmailPreviewVars } from '@/lib/email-template-preview-vars'
+import {
+  EinstellungenListBody,
+  EinstellungenListItem,
+  EinstellungenListMeta,
+  EinstellungenMeta,
+} from '@/components/einstellungen/EinstellungenUi'
 import { cn } from '@/lib/utils'
 
 const VARIABLES = [
@@ -23,26 +30,6 @@ const VARIABLES = [
   'enddatum',
 ] as const
 
-const SAMPLE: Record<string, string> = {
-  kundenname: 'Maria Muster',
-  betrag: '12.450,00',
-  datum: '17.04.2026',
-  link: 'https://example.com/angebot/demo',
-  rechnungsnummer: 'RE-2026-0042',
-  handwerkername: 'Max Mustermann',
-  gewerk: 'Bad & Sanitär',
-  startdatum: '01.05.2026',
-  enddatum: '30.06.2026',
-}
-
-function applyVars(text: string) {
-  let out = text
-  for (const k of VARIABLES) {
-    out = out.split(`{{${k}}}`).join(SAMPLE[k] ?? '')
-  }
-  return out
-}
-
 function insertAtCursor(el: HTMLInputElement | HTMLTextAreaElement, insert: string) {
   const start = el.selectionStart ?? el.value.length
   const end = el.selectionEnd ?? el.value.length
@@ -54,9 +41,9 @@ function insertAtCursor(el: HTMLInputElement | HTMLTextAreaElement, insert: stri
   el.focus()
 }
 
-type Props = { templates: EmailTemplateRow[] }
+type Props = { templates: EmailTemplateRow[]; previewVars: EmailPreviewVars }
 
-export function EmailTemplatesClient({ templates }: Props) {
+export function EmailTemplatesClient({ templates, previewVars }: Props) {
   const [open, setOpen] = useState<EmailTemplateRow | null>(null)
   const [betreff, setBetreff] = useState('')
   const [bodyHtml, setBodyHtml] = useState('')
@@ -74,8 +61,8 @@ export function EmailTemplatesClient({ templates }: Props) {
     setTab('edit')
   }
 
-  const previewHtml = useMemo(() => applyVars(bodyHtml), [bodyHtml])
-  const previewSubject = useMemo(() => applyVars(betreff), [betreff])
+  const previewHtml = useMemo(() => applyEmailTemplateVars(bodyHtml, previewVars), [bodyHtml, previewVars])
+  const previewSubject = useMemo(() => applyEmailTemplateVars(betreff, previewVars), [betreff, previewVars])
 
   function chipBetreff(v: string) {
     const el = betreffRef.current
@@ -137,22 +124,27 @@ export function EmailTemplatesClient({ templates }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        {templates.map((t) => (
-          <Card key={t.id} title={t.name}>
-            <p className="mb-4 text-sm text-bw-light">{t.beschreibung ?? '—'}</p>
-            <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
-              <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
-              Bearbeiten
-            </Button>
-          </Card>
-        ))}
-      </div>
+      <Card title="System-E-Mails">
+        <EinstellungenListBody empty={templates.length === 0 ? 'Keine Templates konfiguriert.' : undefined}>
+          {templates.map((t) => (
+            <EinstellungenListItem key={t.id}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13.5px] font-medium text-bw-text">{t.name}</p>
+                <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
+              </div>
+              <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
+                <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
+                Bearbeiten
+              </Button>
+            </EinstellungenListItem>
+          ))}
+        </EinstellungenListBody>
+      </Card>
 
       <Modal
         open={Boolean(open)}
         onClose={() => setOpen(null)}
-        title="Template bearbeiten"
+        title={open?.name ?? 'Template bearbeiten'}
         size="lg"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -188,7 +180,7 @@ export function EmailTemplatesClient({ templates }: Props) {
                 type="button"
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium',
-                  tab === 'edit' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-light hover:text-bw-text'
+                  tab === 'edit' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('edit')}
               >
@@ -198,7 +190,7 @@ export function EmailTemplatesClient({ templates }: Props) {
                 type="button"
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium',
-                  tab === 'preview' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-light hover:text-bw-text'
+                  tab === 'preview' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('preview')}
               >
@@ -254,10 +246,10 @@ export function EmailTemplatesClient({ templates }: Props) {
               </>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-bw-light">
+                <EinstellungenMeta>
                   <span className="font-medium text-bw-text">Betreff: </span>
                   {previewSubject}
-                </p>
+                </EinstellungenMeta>
                 <div
                   className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-sm leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
                   dangerouslySetInnerHTML={{ __html: previewHtml }}

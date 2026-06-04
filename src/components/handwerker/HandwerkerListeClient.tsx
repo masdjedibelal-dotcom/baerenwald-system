@@ -1,17 +1,26 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Download, Users } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import {
+  ListFilterSection,
+  ListMobileStack,
+  ListGridShell,
+} from '@/components/layout/ListPageParts'
+import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { ListAvatar } from '@/components/ui/ListAvatar'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { SidePanel } from '@/components/ui/SidePanel'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { FilterChips } from '@/components/ui/FilterChips'
-import { ListCard } from '@/components/ui/ListCard'
 import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
+import { useSort } from '@/hooks/useSort'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   getZeitraumRange,
   datumInZeitraum,
@@ -19,6 +28,7 @@ import {
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
 import { ComplianceBadge, normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
+import { cn } from '@/lib/utils'
 
 export type HandwerkerZeile = {
   id: string
@@ -30,19 +40,12 @@ export type HandwerkerZeile = {
   gewerk_namen?: string[]
   compliance_status: string | null
   docs_vorhanden?: number
-  pflicht_gesamt?: number
   ist_fachbetrieb?: boolean | null
   created_at: string | null
+  aktiver_einsatz?: boolean
 }
 
 export type GewerkOption = { slug: string; name: string }
-
-function complianceFilterTagLabel(value: string): string {
-  if (value === 'ok') return '✓ OK'
-  if (value === 'warnung') return '⚠️ Warnung'
-  if (value === 'fehlt') return '✗ Fehlt'
-  return value
-}
 
 const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -52,6 +55,9 @@ const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
   { key: 'gewerke', label: 'Gewerke' },
   { key: 'compliance_status', label: 'Compliance' },
 ]
+
+const HANDWERKER_GRID_COLS =
+  '42px minmax(180px,1.5fr) minmax(140px,1fr) minmax(180px,1.2fr) 100px'
 
 function gewerkeStr(h: HandwerkerZeile): string {
   const n = h.gewerk_namen?.length ? h.gewerk_namen.join(', ') : gewerkeStrRaw(h.gewerke)
@@ -88,25 +94,46 @@ function complianceRank(h: HandwerkerZeile): number {
   return 3
 }
 
+function dokumenteKurzlabel(h: HandwerkerZeile): string {
+  const n = h.docs_vorhanden ?? 0
+  return n === 1 ? '1 Dokument' : `${n} Dokumente`
+}
+
+type SortRow = {
+  row: HandwerkerZeile
+  name: string
+  gewerk: string
+  compliance: number
+}
+
 export function HandwerkerListeClient({
   rows,
   gewerkeOptionen,
-  einsatzFilterAktiv = false,
+  mode = 'page',
+  selectedId = null,
 }: {
   rows: HandwerkerZeile[]
   gewerkeOptionen: GewerkOption[]
-  einsatzFilterAktiv?: boolean
+  mode?: 'page' | 'pane'
+  selectedId?: string | null
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const einsatzFilterAktiv = searchParams.get('filter') === 'einsatz'
+  const isPane = mode === 'pane'
+
+  const listRows = useMemo(() => {
+    if (!einsatzFilterAktiv) return rows
+    return rows.filter((h) => h.aktiver_einsatz)
+  }, [rows, einsatzFilterAktiv])
   const { exportToCSV } = useExport()
-  const [panel, setPanel] = useState<HandwerkerZeile | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [gewerkChip, setGewerkChip] = useState('alle')
-  const [complianceFilter, setComplianceFilter] = useState('alle')
   const [q, setQ] = useState('')
+  const debouncedQ = useDebouncedValue(q, 300)
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [sortField, setSortField] = useState<'name' | 'gewerk' | 'compliance'>('name')
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
@@ -114,8 +141,8 @@ export function HandwerkerListeClient({
   )
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return rows.filter((h) => {
+    const needle = debouncedQ.trim().toLowerCase()
+    return listRows.filter((h) => {
       if (gewerkChip !== 'alle') {
         const names = (h.gewerk_namen ?? []).map((x) => x.toLowerCase())
         const slug = gewerkChip.toLowerCase()
@@ -124,13 +151,6 @@ export function HandwerkerListeClient({
         const matchSlug = names.some((n) => n.includes(slug)) || gewerkeStrRaw(h.gewerke).toLowerCase().includes(slug)
         if (!matchName && !matchSlug) return false
       }
-      if (complianceFilter !== 'alle') {
-        const k = normalizeComplianceBadgeKey(h.compliance_status)
-        if (complianceFilter === 'ok' && k !== 'ok') return false
-        if (complianceFilter === 'warnung' && k !== 'bald_ablaufend') return false
-        if (complianceFilter === 'fehlt' && k === 'ok') return false
-        if (complianceFilter === 'fehlt' && k === 'bald_ablaufend') return false
-      }
       if (dateRange && !datumInZeitraum(h.created_at, dateRange)) return false
       if (!needle) return true
       const pool = [h.name, h.firma ?? '', h.email ?? '', h.telefon ?? '', gewerkeStr(h)]
@@ -138,32 +158,26 @@ export function HandwerkerListeClient({
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [rows, gewerkChip, complianceFilter, q, dateRange, gewerkeOptionen])
+  }, [listRows, gewerkChip, debouncedQ, dateRange, gewerkeOptionen])
 
-  const sorted = useMemo(() => {
-    const copy = [...filtered]
-    copy.sort((a, b) => {
-      if (sortField === 'name') return a.name.localeCompare(b.name, 'de')
-      if (sortField === 'compliance') return complianceRank(a) - complianceRank(b)
-      const ga = gewerkeStr(a)
-      const gb = gewerkeStr(b)
-      return ga.localeCompare(gb, 'de')
-    })
-    return copy
-  }, [filtered, sortField])
+  const sortRows: SortRow[] = useMemo(
+    () =>
+      filtered.map((h) => ({
+        row: h,
+        name: h.name,
+        gewerk: gewerkeStr(h),
+        compliance: complianceRank(h),
+      })),
+    [filtered]
+  )
+
+  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
     if (gewerkChip !== 'alle') {
       const label = gewerkeOptionen.find((g) => g.slug === gewerkChip)?.name ?? gewerkChip
       t.push({ id: 'gw', label, onRemove: () => setGewerkChip('alle') })
-    }
-    if (complianceFilter !== 'alle') {
-      t.push({
-        id: 'co',
-        label: complianceFilterTagLabel(complianceFilter),
-        onRemove: () => setComplianceFilter('alle'),
-      })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -180,22 +194,21 @@ export function HandwerkerListeClient({
       t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
     }
     return t
-  }, [gewerkChip, complianceFilter, zeitraum, q, gewerkeOptionen])
+  }, [gewerkChip, zeitraum, q, gewerkeOptionen])
 
-  const hasActiveFilters = !!(
-    gewerkChip !== 'alle' ||
-    complianceFilter !== 'alle' ||
-    zeitraum !== 'alle' ||
-    q.trim()
-  )
+  const hasActiveFilters = !!(gewerkChip !== 'alle' || zeitraum !== 'alle' || q.trim())
 
   function resetFilters() {
     setGewerkChip('alle')
-    setComplianceFilter('alle')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
     setCustomTo('')
+    resetSort()
+  }
+
+  function openDetail(id: string) {
+    router.push(`/handwerker/${id}`)
   }
 
   const gewerkChipOptions = useMemo(
@@ -203,237 +216,179 @@ export function HandwerkerListeClient({
     [gewerkeOptionen]
   )
 
+  const sortOptions = [
+    { field: 'name', label: 'Name' },
+    { field: 'gewerk', label: 'Gewerk' },
+    { field: 'compliance', label: 'Compliance' },
+  ]
+
+  const sortSelect = (
+    <MobileSortSelect
+      variant="pill"
+      options={sortOptions}
+      currentField={field}
+      currentDir={dir}
+      onSort={(f) => (f ? handleSort(f) : resetSort())}
+    />
+  )
+
   return (
-    <div>
-      {einsatzFilterAktiv ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bw-border bg-bw-bg px-4 py-2 text-sm text-bw-text">
-          <span>Nur Handwercher mit Auftrag (Status zugewiesen oder in Arbeit).</span>
-          <Link
-            href="/handwerker"
-            className="whitespace-nowrap text-sm font-medium text-bw-link hover:underline"
+    <EntityListShell
+      mode={mode}
+      filters={
+        <>
+          {einsatzFilterAktiv ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bw-border bg-bw-card px-4 py-3 text-sm text-bw-text shadow-sm">
+              <span>Nur Handwercher mit Auftrag (Status zugewiesen oder in Arbeit).</span>
+              <Link
+                href="/handwerker"
+                className="whitespace-nowrap text-sm font-medium text-bw-link hover:underline"
+              >
+                Alle Handwercher anzeigen
+              </Link>
+            </div>
+          ) : null}
+
+          <ListFilterSection
+            chips={
+              <FilterChips
+                options={gewerkChipOptions}
+                selected={gewerkChip === 'alle' ? [] : [gewerkChip]}
+                onChange={(v) => setGewerkChip(v[0] ?? 'alle')}
+              />
+            }
           >
-            Alle Handwercher anzeigen
-          </Link>
-        </div>
-      ) : null}
-
-      <PageHeader
-        title="Handwerker"
-        action={
-          <button
-            type="button"
-            onClick={() => setExportOpen(true)}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 text-sm font-medium text-bw-text shadow-sm transition-colors hover:bg-bw-hover"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            Export
-          </button>
-        }
-      />
-
-      <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:-mx-6 md:px-6">
-        <ListFilterBar
-          hideStatusFilter
-          statusLabel="—"
-          statusOptions={[{ value: '', label: '—' }]}
-          statusValue=""
-          onStatusChange={() => {}}
-          zeitraumValue={zeitraum}
-          onZeitraumChange={setZeitraum}
-          showCustomDates={zeitraum === 'benutzerdefiniert'}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={setCustomFrom}
-          onCustomToChange={setCustomTo}
-          searchValue={q}
-          onSearchChange={setQ}
-          searchPlaceholder="Name, Firma, E-Mail, Telefon"
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-          tags={filterTags}
-          className="mb-0"
-        />
-
-        <div className="mt-3 flex flex-col gap-2">
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Gewerk</p>
-            <FilterChips
-              options={gewerkChipOptions}
-              selected={gewerkChip === 'alle' ? [] : [gewerkChip]}
-              onChange={(v) => setGewerkChip(v[0] ?? 'alle')}
+            <ListFilterBar
+              hideToolbarOnMobile
+              hideStatusFilter
+              statusLabel="—"
+              statusOptions={[{ value: '', label: '—' }]}
+              statusValue=""
+              onStatusChange={() => {}}
+              zeitraumValue={zeitraum}
+              onZeitraumChange={setZeitraum}
+              showCustomDates={zeitraum === 'benutzerdefiniert'}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+              searchValue={q}
+              onSearchChange={setQ}
+              searchPlaceholder="Name, Firma, E-Mail, Telefon"
+              onReset={resetFilters}
+              hasActiveFilters={hasActiveFilters}
+              tags={filterTags}
+              onExportClick={() => setExportOpen(true)}
+              toolbarEnd={sortSelect}
+              mobileRail={
+                <AppListFilterRail
+                  sort={sortSelect}
+                  zeitraumValue={zeitraum}
+                  onZeitraumChange={setZeitraum}
+                  onExportClick={() => setExportOpen(true)}
+                />
+              }
             />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">Compliance</span>
-            <select
-              id="handwerker-compliance-filter"
-              aria-label="Compliance-Filter"
-              value={complianceFilter}
-              onChange={(e) => setComplianceFilter(e.target.value)}
-              className="input w-auto min-w-[8.5rem] text-sm"
-            >
-              <option value="alle">Alle</option>
-              <option value="ok">✓ OK</option>
-              <option value="warnung">⚠️ Warnung</option>
-              <option value="fehlt">✗ Fehlt</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <MobileSortSelect
-          options={[
-            { field: 'name', label: 'Name' },
-            { field: 'gewerk', label: 'Gewerk' },
-            { field: 'compliance', label: 'Compliance' },
-          ]}
-          currentField={sortField}
-          currentDir="asc"
-          onSort={(f) => {
-            if (!f) setSortField('name')
-            else if (f === 'name' || f === 'gewerk' || f === 'compliance') setSortField(f)
-          }}
-        />
-      </div>
+          </ListFilterSection>
+        </>
+      }
+    >
+      {!isPane ? <PageHeader className="hidden md:block" /> : null}
 
       {sorted.length === 0 ? (
         <EmptyState
           icon={Users}
-          title={rows.length === 0 ? 'Keine Handwerker' : 'Keine Treffer'}
+          title={listRows.length === 0 ? 'Keine Handwerker' : 'Keine Treffer'}
           description={
             rows.length === 0
-              ? 'Lege Handwercher an, um sie hier zu verwalten.'
+              ? 'Lege Handwerker an, um sie hier zu verwalten.'
               : 'Passe Filter oder Suche an.'
           }
         />
       ) : (
         <>
-          <div className="card overflow-hidden md:hidden">
-            {sorted.map((h) => (
-              <ListCard
-                key={h.id}
-                title={h.name}
-                badge={<ComplianceBadge status={h.compliance_status} />}
-                subtitle={(h.gewerk_namen ?? []).join(' · ') || gewerkeStrRaw(h.gewerke)}
-                meta={h.firma || h.telefon || ''}
-                onClick={() => setPanel(h)}
-              />
-            ))}
-          </div>
+          <ListMobileStack
+            className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}
+          >
+            {sorted.map(({ row: h }) => {
+              const gewerkeLabel = (h.gewerk_namen ?? []).slice(0, 3).join(', ') || '—'
+              return (
+                <AppEntityListRow
+                  key={h.id}
+                  href={isPane ? `/handwerker/${h.id}` : undefined}
+                  onClick={isPane ? undefined : () => openDetail(h.id)}
+                  className={cn(selectedId === h.id && 'ring-2 ring-bw-primary/40')}
+                  avatar={<ListAvatar name={h.name} />}
+                  title={h.name}
+                  line2={h.firma?.trim() || gewerkeLabel}
+                  line3={
+                    [h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'
+                  }
+                  line4={dokumenteKurzlabel(h)}
+                  badge={<ComplianceBadge status={h.compliance_status} />}
+                />
+              )
+            })}
+          </ListMobileStack>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-bw-border bg-bw-card shadow-card md:block">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-bw-border bg-bw-bg text-muted">
-                  <th className="px-3 py-3 font-medium">Name</th>
-                  <th className="px-3 py-3 font-medium">Firma</th>
-                  <th className="px-3 py-3 font-medium">Gewerke</th>
-                  <th className="px-3 py-3 font-medium">Compliance</th>
-                  <th className="px-3 py-3 font-medium">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((h) => (
-                  <tr
-                    key={h.id}
-                    role="link"
-                    tabIndex={0}
-                    className="cursor-pointer border-b border-bw-border last:border-0 hover:bg-bw-hover"
-                    onClick={() => setPanel(h)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') setPanel(h)
-                    }}
-                  >
-                    <td className="px-3 py-3 font-medium text-ink">{h.name}</td>
-                    <td className="px-3 py-3 text-muted">{h.firma ?? '—'}</td>
-                    <td className="max-w-[220px] px-3 py-3 text-xs text-muted">
-                      {(h.gewerk_namen ?? []).join(' · ') || '—'}
-                    </td>
-                    <td className="px-3 py-3">
-                      <ComplianceBadge status={h.compliance_status} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/handwerker/${h.id}`}
-                        className="text-bw-link hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Seite
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListGridShell
+            minWidth="880px"
+            className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}
+          >
+            <div className="list-row-grid head" style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}>
+              <div />
+              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
+              <div>Firma</div>
+              <SortableHeader label="Gewerke" field="gewerk" currentField={field} currentDir={dir} onSort={handleSort} />
+              <SortableHeader
+                label="Compliance"
+                field="compliance"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
+              />
+            </div>
+            {sorted.map(({ row: h }) => (
+              <Link
+                key={h.id}
+                href={`/handwerker/${h.id}`}
+                onClick={isPane ? (e) => e.preventDefault() : undefined}
+                className={cn(
+                  'list-row-grid',
+                  selectedId === h.id && isPane && 'ring-2 ring-bw-primary/40'
+                )}
+                style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}
+              >
+                <ListAvatar name={h.name} />
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-medium text-bw-text">{h.name}</p>
+                  <p className="truncate text-xs text-bw-text-muted">
+                    {[h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                </div>
+                <p className="truncate text-[13px] text-bw-text">{h.firma?.trim() || '—'}</p>
+                <p className="truncate text-[12.5px] text-bw-text-muted">
+                  {(h.gewerk_namen ?? []).join(' · ') || '—'}
+                </p>
+                <ComplianceBadge status={h.compliance_status} />
+              </Link>
+            ))}
+          </ListGridShell>
         </>
       )}
-
-      <SidePanel
-        open={!!panel}
-        onClose={() => setPanel(null)}
-        title={panel?.name ?? ''}
-        subtitle={panel?.firma ?? undefined}
-        width="md"
-      >
-        {panel ? (
-          <div className="space-y-4 p-5 text-sm">
-            <div>
-              <div className="text-lg font-semibold text-bw-text">{panel.name}</div>
-              {panel.firma ? <div className="text-sm text-bw-text-muted">{panel.firma}</div> : null}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <ComplianceBadge status={panel.compliance_status} />
-                <span className="text-xs text-bw-text-muted">
-                  {panel.docs_vorhanden ?? 0}/{panel.pflicht_gesamt ?? 0} Dokumente
-                </span>
-              </div>
-            </div>
-            {(panel.gewerk_namen ?? []).length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {(panel.gewerk_namen ?? []).map((g, i) => (
-                  <span key={`${g}-${i}`} className="chip selected text-xs">
-                    {g}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            <div className="space-y-1">
-              {panel.telefon ? (
-                <a href={`tel:${panel.telefon}`} className="flex py-1 text-bw-link">
-                  📞 {panel.telefon}
-                </a>
-              ) : null}
-              {panel.email ? (
-                <a href={`mailto:${panel.email}`} className="flex truncate py-1 text-bw-link">
-                  ✉️ {panel.email}
-                </a>
-              ) : null}
-            </div>
-            <div className="border-t border-bw-border pt-2">
-              <Link
-                href={`/handwerker/${panel.id}`}
-                className="btn btn-secondary btn-sm inline-flex w-full justify-center"
-                onClick={() => setPanel(null)}
-              >
-                Zum Handwercher →
-              </Link>
-            </div>
-          </div>
-        ) : null}
-      </SidePanel>
 
       <CsvExportModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
+        title="Handwerker exportieren"
         fields={HANDWERKER_EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? sorted : rows
+          const source = scope === 'view' ? filtered : listRows
           const data = source.map(handwerkerExportRow)
           const fields = HANDWERKER_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
           exportToCSV(data, fields, 'handwerker')
         }}
       />
-    </div>
+    </EntityListShell>
   )
 }

@@ -100,7 +100,6 @@ export function HandwerkerForm({
   return (
     <div>
       <PageHeader
-        title={isNew ? 'Neuer Handwerker' : 'Handwerker bearbeiten'}
         action={
           <Link
             href={isNew ? '/handwerker' : `/handwerker/${initial?.id ?? ''}`}

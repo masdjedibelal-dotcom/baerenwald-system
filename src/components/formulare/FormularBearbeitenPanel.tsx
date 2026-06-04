@@ -27,38 +27,54 @@ import { FormularVorschauModal } from '@/components/formulare/FormularVorschauMo
 import { saveFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 import type { FormularFeld, FormularTemplate } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import {
+  Calendar,
+  Camera,
+  ChevronDown,
+  Hash,
+  Pencil,
+  Pilcrow,
+  Square,
+  Type,
+  type LucideIcon,
+} from 'lucide-react'
 
-const FELD_TYPEN: { value: FormularFeld['typ']; label: string; icon: string }[] = [
-  { value: 'text', label: 'Text', icon: 'T' },
-  { value: 'textarea', label: 'Langer Text', icon: '¶' },
-  { value: 'number', label: 'Zahl', icon: '#' },
-  { value: 'date', label: 'Datum', icon: '📅' },
-  { value: 'checkbox', label: 'Checkbox', icon: '☐' },
-  { value: 'select', label: 'Auswahl', icon: '▼' },
-  { value: 'foto', label: 'Foto', icon: '📸' },
+const FELD_TYPEN: { value: FormularFeld['typ']; label: string }[] = [
+  { value: 'text', label: 'Text' },
+  { value: 'textarea', label: 'Langer Text' },
+  { value: 'number', label: 'Zahl' },
+  { value: 'date', label: 'Datum' },
+  { value: 'checkbox', label: 'Checkbox' },
+  { value: 'select', label: 'Auswahl' },
+  { value: 'foto', label: 'Foto' },
 ]
 
 function newFieldId() {
   return globalThis.crypto?.randomUUID?.() ?? `f_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
-function feldTypIcon(typ: FormularFeld['typ']): string {
+function feldTypIconComponent(typ: FormularFeld['typ']): LucideIcon {
   switch (typ) {
     case 'checkbox':
-      return '☐'
+      return Square
     case 'foto':
-      return '📸'
+      return Camera
     case 'date':
-      return '📅'
+      return Calendar
     case 'number':
-      return '#'
+      return Hash
     case 'select':
-      return '▼'
+      return ChevronDown
     case 'textarea':
-      return '¶'
+      return Pilcrow
     default:
-      return 'T'
+      return Type
   }
+}
+
+function FeldTypIcon({ typ }: { typ: FormularFeld['typ'] }) {
+  const Icon = feldTypIconComponent(typ)
+  return <Icon className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
 }
 
 function BearbeitenSortableRow({
@@ -93,7 +109,7 @@ function BearbeitenSortableRow({
       >
         ≡
       </span>
-      <span className="flex-shrink-0 text-base">{feldTypIcon(feld.typ)}</span>
+      <FeldTypIcon typ={feld.typ} />
       <span className="min-w-0 flex-1 truncate text-sm text-bw-text">
         {feld.label || `Feld ${idx + 1}`}
         {feld.pflicht ? <span className="ml-0.5 text-bw-accent">*</span> : null}
@@ -103,9 +119,7 @@ function BearbeitenSortableRow({
         onClick={onEdit}
         className="rounded p-1 text-bw-text-muted hover:text-bw-text"
         aria-label="Bearbeiten"
-      >
-        ✏️
-      </button>
+      ><Pencil className="h-4 w-4" aria-hidden /></button>
       <button
         type="button"
         onClick={onDelete}
@@ -295,7 +309,7 @@ export function FormularBearbeitenPanel({
     { value: 'abnahme', label: 'Abnahme' },
   ]
 
-  const typSelectOptions = FELD_TYPEN.map((t) => ({ value: t.value, label: `${t.icon} ${t.label}` }))
+  const typSelectOptions = FELD_TYPEN.map((t) => ({ value: t.value, label: t.label }))
 
   return (
     <div className="flex max-h-[calc(100vh-6rem)] flex-col">
@@ -360,7 +374,7 @@ export function FormularBearbeitenPanel({
                       onClick={() => addFeld(typ.value)}
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-bw-text hover:bg-bw-hover"
                     >
-                      <span>{typ.icon}</span>
+                      <FeldTypIcon typ={typ.value} />
                       {typ.label}
                     </button>
                   ))}
@@ -369,7 +383,7 @@ export function FormularBearbeitenPanel({
             </div>
 
             <button type="button" onClick={() => setVorschauOpen(true)} className="btn btn-ghost btn-sm w-full">
-              👁️ Vorschau ansehen
+              Vorschau ansehen
             </button>
 
             <button type="button" onClick={handleSave} disabled={pending} className="btn btn-primary btn-sm w-full">

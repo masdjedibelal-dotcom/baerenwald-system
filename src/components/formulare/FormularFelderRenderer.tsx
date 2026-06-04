@@ -1,6 +1,9 @@
 'use client'
 
+import { Camera } from 'lucide-react'
 import type { FormularFeld } from '@/lib/types'
+import { Textarea } from '@/components/ui/Textarea'
+import { RichTextContent } from '@/components/ui/RichTextContent'
 import { cn } from '@/lib/utils'
 
 function typBadge(t: FormularFeld['typ']) {
@@ -135,14 +138,10 @@ export function FormularFelderRenderer({
             ) : null}
             {f.typ === 'textarea' ? (
               ro ? (
-                <p className="whitespace-pre-wrap text-sm text-bw-text">{String(v ?? '—')}</p>
+                <RichTextContent html={String(v ?? '')} className="text-sm" fallback={<span>—</span>} />
               ) : (
-                <textarea
-                  className={
-                    prev
-                      ? `${inputPreviewClass} min-h-[88px] py-2`
-                      : 'w-full rounded-lg border border-border p-3'
-                  }
+                <Textarea
+                  className={prev ? inputPreviewClass : undefined}
                   rows={4}
                   value={String(v ?? '')}
                   readOnly={prev}
@@ -209,7 +208,7 @@ export function FormularFelderRenderer({
                 ) : oeffentlicherFotoUpload && onFotoDatei ? (
                   <div className="space-y-2">
                     <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover">
-                      <span aria-hidden>📸</span> Foto aufnehmen / wählen
+                      <Camera className="h-4 w-4" aria-hidden /> Foto aufnehmen / wählen
                       <input
                         type="file"
                         accept="image/*"
@@ -226,7 +225,7 @@ export function FormularFelderRenderer({
                       <ul className="flex flex-wrap gap-2">
                         {(v as string[]).map((url) => (
                           <li key={url} className="text-xs text-bw-mid">
-                            ✓ Foto gespeichert
+                            Foto gespeichert
                           </li>
                         ))}
                       </ul>
@@ -238,7 +237,7 @@ export function FormularFelderRenderer({
                     disabled
                     className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text opacity-90"
                   >
-                    📸 Foto aufnehmen
+                    Foto aufnehmen
                   </button>
                 )}
               </div>

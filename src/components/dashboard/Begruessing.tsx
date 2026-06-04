@@ -26,16 +26,16 @@ export function Begruessing({ name }: { name: string }) {
   }, [])
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold text-bw-text">
+        <p className="text-xs text-bw-text-muted">{datum}</p>
+        <h1 className="mt-0.5 text-lg font-semibold leading-tight text-bw-text">
           {gruss}, {name}
         </h1>
-        <p className="mt-0.5 text-sm text-bw-text-muted">{datum}</p>
       </div>
       <Link
-        href="/anfragen/neu"
-        className="btn btn-primary btn-sm inline-flex items-center justify-center gap-1.5 self-start sm:self-auto"
+        href="/anfragen?neu=1"
+        className="btn btn-primary btn-sm inline-flex shrink-0 items-center justify-center gap-1.5"
       >
         <Plus className="h-4 w-4" aria-hidden />
         Neue Anfrage

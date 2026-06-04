@@ -81,7 +81,7 @@ export function DashboardListen({
               </div>
               <div className="border-t border-bw-border px-4 py-3">
                 <Link href="/anfragen" className="text-sm text-bw-link hover:underline">
-                  Alle Anfragen ansehen →
+                  Alle Anfragen ansehen
                 </Link>
               </div>
             </>
@@ -100,7 +100,7 @@ export function DashboardListen({
           )}
           <div className="border-t border-bw-border px-4 py-3">
             <Link href="/angebote" className="text-sm text-bw-link hover:underline">
-              Alle Angebote ansehen →
+              Alle Angebote ansehen
             </Link>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function DashboardListen({
           )}
           <div className="border-t border-bw-border px-4 py-3">
             <Link href="/auftraege" className="text-sm text-bw-link hover:underline">
-              Alle Aufträge ansehen →
+              Alle Aufträge ansehen
             </Link>
           </div>
         </div>
@@ -134,7 +134,7 @@ export function DashboardListen({
           )}
           <div className="border-t border-bw-border px-4 py-3">
             <Link href="/handwerker" className="text-sm text-bw-link hover:underline">
-              Alle Handwercher ansehen →
+              Alle Handwercher ansehen
             </Link>
           </div>
         </div>
@@ -143,7 +143,7 @@ export function DashboardListen({
           <DashboardTermineTab termine={termine} />
           <div className="border-t border-bw-border px-4 py-3">
             <Link href="/kalender" className="text-sm text-bw-link hover:underline">
-              Kalender öffnen →
+              Kalender öffnen
             </Link>
           </div>
         </div>
