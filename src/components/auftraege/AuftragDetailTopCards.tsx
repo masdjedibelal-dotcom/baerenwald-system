@@ -10,7 +10,7 @@ import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AuftragDetail } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { DetailProp } from '@/components/ui/DetailProp'
+import { DetailProp } from '@/components/ui/detail-prop'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 
 export function AuftragDetailTopCards({

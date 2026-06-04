@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Timeline, type TimelineItem } from '@/components/ui/Timeline'
+import { Timeline, type TimelineItem } from '@/components/ui/timeline'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import type { AuftragDetail, LeadTimelineRow } from '@/lib/types'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
