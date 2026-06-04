@@ -2,11 +2,15 @@
   "name": "baerenwald-crm-dashboard",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev",
     "dev:skip-auth": "CRM_DEV_SKIP_AUTH=true WATCHPACK_POLLING=true next dev -p 3001",
     "dev:clean": "rm -rf .next && WATCHPACK_POLLING=true next dev",
-    "build": "next build",
+    "build": "node scripts/check-import-paths.mjs && next build",
+    "build:check-imports": "node scripts/check-import-paths.mjs",
     "start": "next start",
     "lint": "next lint",
     "setup:chrome": "npx @puppeteer/browsers install chrome-headless-shell@stable --path chrome-headless-shell && node scripts/write-pdf-chrome-env.mjs",
@@ -46,10 +50,10 @@
     "react-dom": "^18",
     "resend": "^6.12.0",
     "server-only": "^0.0.1",
-    "sonner": "^1.7.4"
+    "sonner": "^1.7.4",
+    "@netlify/plugin-nextjs": "^5.12.1"
   },
   "devDependencies": {
-    "@netlify/plugin-nextjs": "^5.12.1",
     "@tailwindcss/forms": "^0.5.11",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
