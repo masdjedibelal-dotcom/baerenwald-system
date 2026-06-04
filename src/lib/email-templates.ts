@@ -3,6 +3,11 @@
  * Platzhalter [LOGO_URL], [ADRESSE], [TEL] werden via applyEmailBranding ersetzt.
  */
 
+import { resolveBrandLogoUrl } from '@/lib/brand'
+import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
+import { telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
+import { buildPortalLoginLink, buildPortalButton } from '@/lib/portal-utils'
+
 export type EmailBranding = {
   logoUrl: string
   adresse: string
@@ -19,15 +24,22 @@ export type AngebotKundePosition = {
 export type HandwerkerAnfragePosition = { beschreibung: string }
 
 const DEFAULT_BRANDING: EmailBranding = {
-  logoUrl: process.env.NEXT_PUBLIC_EMAIL_LOGO_URL ?? '',
+  logoUrl: resolveBrandLogoUrl('white'),
   adresse: process.env.EMAIL_FIRMEN_ADRESSE ?? 'München',
-  telefon: process.env.EMAIL_FIRMEN_TEL ?? '+49 89 00000000',
+  telefon: telefonFuerKundenMail(process.env.EMAIL_FIRMEN_TEL),
   googleBewertungUrl: process.env.NEXT_PUBLIC_GOOGLE_BEWERTUNG_URL ?? 'https://maps.google.com',
+}
+
+function resolveLogoSrcForTemplate(branding: EmailBranding): string {
+  if (mailLogoInlineEnabled()) {
+    return mailLogoCidSrc('white')
+  }
+  return escapeHtml(branding.logoUrl)
 }
 
 export function applyEmailBranding(html: string, branding: EmailBranding = DEFAULT_BRANDING): string {
   return html
-    .replaceAll('[LOGO_URL]', escapeHtml(branding.logoUrl))
+    .replaceAll('[LOGO_URL]', resolveLogoSrcForTemplate(branding))
     .replaceAll('[ADRESSE]', escapeHtml(branding.adresse))
     .replaceAll('[TEL]', escapeHtml(branding.telefon))
     .replaceAll('[GOOGLE_BEWERTUNG_URL]', escapeHtml(branding.googleBewertungUrl ?? 'https://maps.google.com'))
@@ -126,6 +138,7 @@ export function emailLeadBestaetigung(
     preis_min,
     preis_max,
     projektLink,
+    includePortalLink,
   }: {
     name: string
     situation?: string
@@ -134,6 +147,8 @@ export function emailLeadBestaetigung(
     preis_max?: number
     /** Persönlicher Link zur Status-Seite (wenn bereits Auftrag/Lead mit Token verknüpft) */
     projektLink?: string | null
+    /** MeinBärenwald Login-Link in der Mail */
+    includePortalLink?: boolean
   },
   branding?: EmailBranding
 ): string {
@@ -170,6 +185,9 @@ export function emailLeadBestaetigung(
       </p>
     `)
       : ''
+  const portalHtml = includePortalLink
+    ? buildPortalButton(buildPortalLoginLink(), 'sie')
+    : ''
 
   return baseTemplate(
     `
@@ -180,6 +198,7 @@ export function emailLeadBestaetigung(
     ${bereicheBlock}
     ${preisText}
     ${projektBlock}
+    ${portalHtml}
     <div style="background:#F7F6F3;border-radius:8px;padding:16px 20px;margin:20px 0;">
       <p style="margin:0;font-weight:600;">Ihr nächster Schritt:</p>
       <p style="margin:8px 0 0;color:#6B6B6B;font-size:13px;">Wir prüfen Ihre Anfrage und rufen Sie zur Terminabsprache an.</p>
@@ -250,7 +269,7 @@ export function emailAngebotKunde(
       <strong>Gültig bis: ${escapeHtml(gueltig_bis)}</strong>
     </p>
     <p>Bei Fragen stehen wir gerne zur Verfügung:</p>
-    <a href="tel:[TEL]" style="color:#2E7D52;font-weight:600;font-size:16px;">📞 [TEL]</a>
+    <a href="tel:[TEL]" style="color:#2E7D52;font-weight:600;font-size:16px;">[TEL]</a>
   `,
     `Ihr Angebot: ${gesamt_min.toLocaleString('de-DE')} – ${gesamt_max.toLocaleString('de-DE')} €`,
     branding
@@ -342,7 +361,7 @@ export function emailAbnahme(
   const rows = infoRow('Abnahmedatum:', abnahme_datum) + infoRow('Gewerke:', gewerke.join(', '))
   return baseTemplate(
     `
-    <h2 style="margin:0 0 8px;color:#2E7D52;font-size:20px;">Ihr Projekt ist abgeschlossen ✓</h2>
+    <h2 style="margin:0 0 8px;color:#2E7D52;font-size:20px;">Ihr Projekt ist abgeschlossen</h2>
     <p>Guten Tag ${escapeHtml(name)},<br/>alle Arbeiten an Ihrem Projekt wurden erfolgreich abgeschlossen und abgenommen.</p>
     ${greenBox(`<table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>`)}
     <p>Das Abnahmeprotokoll mit der vollständigen Dokumentation finden Sie im Anhang.</p>
@@ -527,7 +546,7 @@ export function emailNachtrag(
     </div>
     <a href="${escapeHtml(link)}"
       style="display:block;background:#2E7D52;color:#FFFFFF;text-decoration:none;padding:16px 28px;border-radius:8px;font-weight:600;font-size:16px;text-align:center;margin:20px 0;">
-      ✅ Nachtrag bestätigen
+      Nachtrag bestätigen
     </a>
     <p style="font-size:13px;color:#6B6B6B;text-align:center;">
       Bei Fragen rufen Sie uns an:<br/>
