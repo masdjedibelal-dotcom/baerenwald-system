@@ -1,3 +1,4 @@
+import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import type { Kunde } from '@/lib/types'
 
@@ -8,18 +9,22 @@ export type KundeListeZeile = Kunde & {
 }
 
 export async function loadKundenListe(): Promise<KundeListeZeile[]> {
-  const supabase = createClient()
-  const { data: kunden, error } = await supabase
-    .from('kunden')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(500)
-
-  if (error) {
-    console.warn('loadKundenListe', error.message)
+  const kundenRes = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select(
+        'id, name, vorname, nachname, email, telefon, ort, typ, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
+      )
+      .order('created_at', { ascending: false })
+      .limit(500)
+  )
+  const kunden = kundenRes.data
+  if (kundenRes.error) {
+    console.warn('loadKundenListe', kundenRes.error.message)
     return []
   }
 
+  const supabase = createClient()
   const { data: leadRows } = await supabase.from('leads').select('kunde_id')
   const { data: aufRows } = await supabase.from('auftraege').select('kunde_id')
   const { data: reRows } = await supabase

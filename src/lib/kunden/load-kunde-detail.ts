@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import type { Kunde, KundenDokumentRow, KundenNotizRow, Lead, AuftragStatus } from '@/lib/types'
 
 export type KundeDetailPayload = Kunde & {
@@ -7,11 +8,14 @@ export type KundeDetailPayload = Kunde & {
       angebote?: Array<{
         id: string
         status: string
+        status_einfach?: string | null
+        gueltig_bis?: string | null
         gesamt_fix: number | null
         gesamt_min: number | null
         gesamt_max: number | null
         created_at?: string | null
         pdf_url?: string | null
+        auftrag_id?: string | null
       }> | null
     }
   > | null
@@ -31,6 +35,10 @@ export type KundeDetailPayload = Kunde & {
           gesamt_max: number | null
           pdf_url?: string | null
           id?: string
+          status?: string
+          status_einfach?: string | null
+          gueltig_bis?: string | null
+          created_at?: string | null
         }
       | {
           gesamt_fix: number | null
@@ -38,6 +46,10 @@ export type KundeDetailPayload = Kunde & {
           gesamt_max: number | null
           pdf_url?: string | null
           id?: string
+          status?: string
+          status_einfach?: string | null
+          gueltig_bis?: string | null
+          created_at?: string | null
         }[]
       | null
     einbehalte?: Array<{
@@ -77,19 +89,19 @@ type AngebotKurz = {
   lead_id: string | null
   auftrag_id: string | null
   status: string
+  status_einfach: string | null
+  gueltig_bis: string | null
   gesamt_fix: number | null
   gesamt_min: number | null
   gesamt_max: number | null
   created_at: string
+  pdf_url: string | null
 }
 
-export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | null> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('kunden')
-    .select(
-      `
-      *,
+const KUNDE_DETAIL_SELECT = `
+      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
+      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
+      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
       leads(
         id, status, situation, bereiche, created_at, budget_ca
       ),
@@ -106,9 +118,14 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
         id, kunde_id, name, typ, datei_url, groesse_bytes, created_at
       )
     `
-    )
-    .eq('id', id)
-    .maybeSingle()
+
+export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | null> {
+  const supabase = createClient()
+  const kundeRes = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle()
+  )
+  const data = kundeRes.data
+  const error = kundeRes.error
 
   if (error || !data) {
     if (error) console.warn('loadKundeDetail', error.message)
@@ -131,7 +148,9 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
   if (leadIds.length) {
     const { data: angs, error: eAng } = await supabase
       .from('angebote')
-      .select('id, lead_id, auftrag_id, status, gesamt_fix, gesamt_min, gesamt_max, created_at')
+      .select(
+        'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url'
+      )
       .in('lead_id', leadIds)
     if (!eAng && angs) {
       for (const raw of angs as AngebotKurz[]) {
@@ -147,7 +166,9 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     const [angRes, einRes, abnahmeRes] = await Promise.all([
       supabase
         .from('angebote')
-        .select('id, lead_id, auftrag_id, status, gesamt_fix, gesamt_min, gesamt_max, created_at')
+        .select(
+          'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url'
+        )
         .in('auftrag_id', auftragIds),
       supabase
         .from('einbehalte')
@@ -200,32 +221,37 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     ...l,
     angebote: sortAngebote(angeboteByLead.get(l.id) ?? []).map((x) => ({
       id: x.id,
+      auftrag_id: x.auftrag_id,
       status: x.status,
+      status_einfach: x.status_einfach,
+      gueltig_bis: x.gueltig_bis,
       gesamt_fix: x.gesamt_fix,
       gesamt_min: x.gesamt_min,
       gesamt_max: x.gesamt_max,
       created_at: x.created_at,
-      pdf_url: null as string | null,
+      pdf_url: x.pdf_url ?? null,
     })),
   }))
 
   const auftraegeMerged = (row.auftraege ?? []).map((a) => {
     const list = sortAngebote(angeboteByAuftrag.get(a.id) ?? [])
-    const first = list[0]
-    const angebote =
-      first != null
-        ? {
-            id: first.id,
-            gesamt_fix: first.gesamt_fix,
-            gesamt_min: first.gesamt_min,
-            gesamt_max: first.gesamt_max,
-            pdf_url: null as string | null,
-          }
-        : null
+    const angebote = list.map((x) => ({
+      id: x.id,
+      lead_id: x.lead_id,
+      auftrag_id: x.auftrag_id,
+      status: x.status,
+      status_einfach: x.status_einfach,
+      gueltig_bis: x.gueltig_bis,
+      gesamt_fix: x.gesamt_fix,
+      gesamt_min: x.gesamt_min,
+      gesamt_max: x.gesamt_max,
+      created_at: x.created_at,
+      pdf_url: x.pdf_url ?? null,
+    }))
     return {
       ...a,
       abnahme_protokoll_url: abnahmeUrlByAuftrag.get(a.id) ?? null,
-      angebote,
+      angebote: angebote.length ? angebote : null,
       einbehalte: einbehalteByAuftrag.get(a.id) ?? [],
     }
   })
