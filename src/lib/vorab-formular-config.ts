@@ -1,6 +1,4 @@
-/** Konfiguration Vor-Ort-Formular — Werte/Labels analog Website-Funnel */
-
-export const VOR_ORT_SCHEMA = 'vor_ort_v1' as const
+/** Konfiguration Lead-Funnel (Situation, Bereiche, Fachdetails) — analog Website-Funnel */
 
 export type SituationValue =
   | 'erneuern'
@@ -13,7 +11,6 @@ export type SituationValue =
 export type BereichOption = {
   value: string
   label: string
-  emoji: string
   situation: SituationValue[]
 }
 
@@ -39,42 +36,38 @@ export const SITUATIONEN: { value: SituationValue; label: string }[] = [
 ]
 
 export const BEREICHE: BereichOption[] = [
-  { value: 'bad', label: 'Bad', emoji: '🚿', situation: ['erneuern'] },
+  { value: 'bad', label: 'Bad', situation: ['erneuern'] },
   {
     value: 'heizung',
     label: 'Heizung',
-    emoji: '🔥',
     situation: ['erneuern', 'kaputt', 'notfall'],
   },
   {
     value: 'elektrik',
     label: 'Elektrik',
-    emoji: '⚡',
     situation: ['erneuern', 'kaputt', 'notfall'],
   },
-  { value: 'waende', label: 'Wände / Anstrich', emoji: '🖌️', situation: ['erneuern'] },
-  { value: 'boden', label: 'Boden', emoji: '🪵', situation: ['erneuern'] },
-  { value: 'fenster', label: 'Fenster / Türen', emoji: '🪟', situation: ['erneuern', 'kaputt'] },
-  { value: 'dach', label: 'Dach', emoji: '🏠', situation: ['erneuern', 'kaputt'] },
-  { value: 'fassade', label: 'Fassade', emoji: '🧱', situation: ['erneuern'] },
+  { value: 'waende', label: 'Wände / Anstrich', situation: ['erneuern'] },
+  { value: 'boden', label: 'Boden', situation: ['erneuern'] },
+  { value: 'fenster', label: 'Fenster / Türen', situation: ['erneuern', 'kaputt'] },
+  { value: 'dach', label: 'Dach', situation: ['erneuern', 'kaputt'] },
+  { value: 'fassade', label: 'Fassade', situation: ['erneuern'] },
   {
     value: 'trockenbau',
     label: 'Trockenbau / Umbau',
-    emoji: '🧱',
     situation: ['erneuern', 'neubauen'],
   },
   {
     value: 'sanitaer',
     label: 'Sanitär / Wasser',
-    emoji: '💧',
     situation: ['kaputt', 'notfall'],
   },
-  { value: 'schimmel', label: 'Schimmel / Feuchtigkeit', emoji: '🍄', situation: ['kaputt'] },
-  { value: 'garten', label: 'Garten', emoji: '🌿', situation: ['betreuung'] },
-  { value: 'reinigung', label: 'Reinigung', emoji: '🧹', situation: ['betreuung'] },
-  { value: 'hausmeister', label: 'Hausmeister', emoji: '🔑', situation: ['betreuung'] },
-  { value: 'winterdienst', label: 'Winterdienst', emoji: '❄️', situation: ['betreuung'] },
-  { value: 'gewerbe', label: 'Gewerbe / Gastro', emoji: '🏪', situation: ['gewerbe'] },
+  { value: 'schimmel', label: 'Schimmel / Feuchtigkeit', situation: ['kaputt'] },
+  { value: 'garten', label: 'Garten', situation: ['betreuung'] },
+  { value: 'reinigung', label: 'Reinigung', situation: ['betreuung'] },
+  { value: 'hausmeister', label: 'Hausmeister', situation: ['betreuung'] },
+  { value: 'winterdienst', label: 'Winterdienst', situation: ['betreuung'] },
+  { value: 'gewerbe', label: 'Gewerbe / Gastro', situation: ['gewerbe'] },
 ]
 
 export const FACHDETAILS_CONFIG: Record<string, FachdetailBlock> = {
@@ -256,6 +249,15 @@ export function fachdetailKeysForBereich(
 
 export function hatGroesseFeld(bereich: string): boolean {
   return Boolean(GROESSEN_CONFIG[bereich])
+}
+
+/** Anzeige-Label: m²-Felder einheitlich „Fläche (Bad)“, Sonderfälle (Stück, lfd. m) aus Config. */
+export function groessePropLabel(bereich: string): string {
+  const g = GROESSEN_CONFIG[bereich]
+  const bereichLabel = bereichMeta(bereich)?.label ?? bereich
+  if (!g) return bereichLabel
+  if (g.einheit === 'm²') return `Fläche (${bereichLabel})`
+  return g.label
 }
 
 export function situationLabel(value: string): string {

@@ -25,6 +25,15 @@ export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ')
 }
 
+/** PostgREST/JSON: URL-Listen sind manchmal String oder null statt string[]. */
+export function normalizeUrlList(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string' && Boolean(x.trim()))
+  }
+  if (typeof raw === 'string' && raw.trim()) return [raw.trim()]
+  return []
+}
+
 const eur0: Intl.NumberFormatOptions = {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
@@ -39,8 +48,7 @@ export function formatPreis(fix?: number | null, min?: number | null, max?: numb
     return `${min.toLocaleString('de', eur0)} €`
   }
   if (min != null && max != null && max > min) {
-    const avg = Math.round((min + max) / 2)
-    return `ca. ${avg.toLocaleString('de', eur0)} €`
+    return `${max.toLocaleString('de', eur0)} €`
   }
   if (min != null && min > 0) {
     return `${min.toLocaleString('de', eur0)} €`
@@ -76,10 +84,32 @@ export function formatDatumZeit(datum: string): string {
 export const STATUS_LABELS: Record<LeadStatus, string> = {
   neu: 'Neu',
   kontaktiert: 'Kontaktiert',
+  termin: 'Termin',
   angebot: 'Angebot',
   auftrag: 'Auftrag',
   abgeschlossen: 'Abgeschlossen',
-  abgebrochen: 'Abgebrochen',
+  abgebrochen: 'Abgelehnt', // LEAD_ABGEBROCHEN_LABEL in crm-labels.ts
+}
+
+export const VERLOREN_GRUND_LABELS: Record<string, string> = {
+  zu_teuer: 'Zu teuer',
+  kein_interesse: 'Kein Interesse mehr',
+  konkurrenz: 'Konkurrenz gewählt',
+  nicht_erreichbar: 'Nicht mehr erreichbar',
+  sonstiges: 'Sonstiges',
+}
+
+/** WhatsApp Deep-Link für Lead-Kontakt */
+export function leadWhatsappUrl(
+  telefon: string,
+  name: string,
+  projektText?: string | null
+): string {
+  const digits = telefon.replace(/\D/g, '')
+  if (!digits) return ''
+  const projekt = projektText?.trim() || 'Ihre Anfrage'
+  const text = `Hallo ${name}, vielen Dank für Ihre Anfrage zu „${projekt}". `
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
 }
 
 export const KANAL_LABELS: Record<LeadKanal, string> = {
@@ -182,32 +212,51 @@ export const FACHDETAIL_TO_LEISTUNG: Record<string, string> = {
   'heizung.wartung': 'Heizungswartung',
   'heizung.heizkoerper': 'Heizkörper tauschen',
   'heizung.gas': 'Gas-Therme erneuern',
+  'heizung.waermepumpe': 'Wärmepumpe einbauen',
+  'heizung.fernwaerme': 'Fernwärme Anschluss',
+  'heizung.oel': 'Ölheizung erneuern',
   'boden.laminat': 'Laminat verlegen',
   'boden.parkett': 'Parkett verlegen',
   'boden.parkett_schleifen': 'Parkett abschleifen',
   'boden.vinyl': 'Vinyl verlegen',
   'boden.fliesen': 'Fliesen verlegen',
+  'boden.teppich': 'Teppich verlegen',
   'waende.waende': 'Wände streichen',
   'waende.waende_decke': 'Wände + Decke streichen',
   'waende.tapezieren': 'Tapezieren',
-  'dach.ziegel_wenige': 'Ziegel reparieren',
-  'dach.komplett': 'Dach komplett neu',
-  'fassade.anstrich': 'Fassade streichen',
+  'waende.komplett': 'Komplett streichen',
+  'waende.fassade': 'Fassade streichen',
+  'sanitaer.leck': 'Leck / Rohrbruch beheben',
+  'sanitaer.verstopfung': 'Verstopfung beheben',
+  'sanitaer.wc': 'WC Reparatur',
+  'sanitaer.armatur': 'Armatur tauschen',
   'elektrik.sicherungskasten': 'Sicherungskasten modernisieren',
   'elektrik.echeck': 'E-Check',
+  'elektrik.leitungen': 'Leitungen / Steckdosen neu',
+  'elektro_kaputt.sicherung': 'Sicherung / Verteiler',
+  'elektro_kaputt.strom_weg': 'Stromausfall beheben',
+  'elektro_kaputt.steckdose': 'Steckdose reparieren',
+  'elektro_kaputt.fehlersuche': 'Fehlersuche Elektrik',
+  'fenster.standard': 'Fenster 2-fach erneuern',
+  'fenster.premium': 'Fenster 3-fach erneuern',
+  'fenster.haustuere': 'Haustür erneuern',
+  'fenster.innentueren': 'Innentüren erneuern',
+  'dach.ziegel_wenige': 'Ziegel reparieren',
+  'dach.komplett': 'Dach komplett neu',
+  'dach.daemmung': 'Dachdämmung',
+  'dach.dachfenster': 'Dachfenster einbauen',
+  'dach.regenrinne': 'Regenrinne erneuern',
+  'dach.ziegel_bereich': 'Dachbereich reparieren',
+  'fassade.anstrich': 'Fassade streichen',
+  'fassade.klinker': 'Klinker / Backstein',
+  'garten.pflege': 'Regelmäßige Gartenpflege',
+  'garten.gestaltung': 'Gartengestaltung',
+  'garten.baumarbeiten': 'Baumarbeiten',
+  'garten.hecke': 'Heckenschnitt',
 }
 
 /** Alias gemäß Design-Prompt (Bereiche / Gewerke) */
 export const BEREICHE_LABELS = BEREICH_LABELS
-
-export const KANAL_ICONS: Record<string, string> = {
-  website: '🌐',
-  telefon: '📞',
-  whatsapp: '💬',
-  email: '✉️',
-  vor_ort: '📍',
-  sonstiges: '•',
-}
 
 /** Budget in Anfragen-Listen (keine Min–Max-Range als „X–Y“). */
 export function formatBudget(budget?: number | null, min?: number | null, max?: number | null): string {
@@ -229,6 +278,11 @@ function websiteLeadKomplexAusFunnel(funnel: unknown): boolean {
   if (f.preisKomplex === true || f.komplex === true) return true
   const modus = f.preis_modus ?? f.preisModus
   if (typeof modus === 'string' && modus.toLowerCase() === 'komplex') return true
+  const fq = f.funnel_quelle ?? f.quelle
+  if (fq === 'komplex_rueckruf' || fq === 'beratung') return true
+  if (f.situation === 'gewerbe') return true
+  const bereiche = Array.isArray(f.bereiche) ? f.bereiche : []
+  if (bereiche.includes('gewerbe')) return true
   return false
 }
 

@@ -1,6 +1,7 @@
 export type LeadStatus =
   | 'neu'
   | 'kontaktiert'
+  | 'termin'
   | 'angebot'
   | 'auftrag'
   | 'abgeschlossen'
@@ -29,9 +30,14 @@ export type LeadStatusHistory = {
 export type Kunde = {
   id: string
   name: string
+  vorname?: string | null
+  nachname?: string | null
   email: string | null
   telefon: string | null
+  /** Legacy: wird beim Speichern aus Straße + Hausnummer gesetzt */
   adresse: string | null
+  strasse?: string | null
+  hausnummer?: string | null
   plz: string | null
   ort: string | null
   typ: string
@@ -45,6 +51,23 @@ export type Kunde = {
   quelle?: string | null
   gesamt_umsatz?: number | null
   letzte_aktivitaet?: string | null
+  /** USt-IdNr. des Kunden (Gewerbe / Reverse Charge) */
+  ust_id?: string | null
+  /** Supabase Auth User des Kundenportals (MeinBärenwald) */
+  auth_user_id?: string | null
+}
+
+/** WEG / Gebäude unter Gewerbe- oder Hausverwaltungs-Kunden */
+export type KundenObjekt = {
+  id: string
+  kunde_id: string
+  titel: string
+  strasse: string | null
+  hausnummer: string | null
+  plz: string | null
+  ort: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type KundenNotizRow = {
@@ -88,6 +111,8 @@ export type LeadNotizRow = {
   lead_id: string
   inhalt: string
   datei_url: string | null
+  kalender_termin_id?: string | null
+  titel?: string | null
   erstellt_von: string | null
   created_at: string
   user_profiles?: { name: string } | null
@@ -96,6 +121,8 @@ export type LeadNotizRow = {
 export type Lead = {
   id: string
   kunde_id: string | null
+  /** Ausgewähltes Verwaltungsobjekt (Gewerbe/Hausverwaltung) */
+  kunde_objekt_id?: string | null
   kanal: LeadKanal
   status: LeadStatus
   situation: string | null
@@ -118,6 +145,8 @@ export type Lead = {
   kontakt_telefon: string | null
   kontakt_nachricht: string | null
   notizen: string | null
+  ki_session_id?: string | null
+  ki_zusammenfassung?: string | null
   erstellt_von: string | null
   created_at: string
   updated_at: string
@@ -132,6 +161,8 @@ export type LeadWithAngebote = Lead & {
 export type LeadTimelineRow = {
   id: string
   lead_id: string
+  angebot_id?: string | null
+  email_log_id?: string | null
   typ: string
   titel: string
   beschreibung: string | null
@@ -181,6 +212,8 @@ export type AngebotPosition = {
   gewerk_name: string
   /** Alias für Editor / JSON-Export */
   gewerk_slug?: string
+  /** Abschnitt im Projektangebot (mehrere Blöcke pro Gewerk möglich) */
+  gewerk_block_key?: string
   /** interne Zuordnung Preisliste */
   leistung: string
   leistung_id?: string
@@ -191,6 +224,8 @@ export type AngebotPosition = {
   lohn_netto: number
   /** Festpreis Material netto / Einheit */
   material_netto: number
+  /** Einzelpreis netto (Wizard); verhindert Rundungsfehler beim erneuten Laden */
+  vk_netto?: number
   /** Stück netto = Lohn + Material (bei Festpreis i. d. R. gleich min/max) */
   gesamt_min: number
   gesamt_max: number
@@ -206,6 +241,14 @@ export type AngebotPosition = {
   handwerker_name?: string
   /** Alt-JSON / Lesen aus DB */
   preis_typ?: PreisTyp
+  /** MwSt.-Satz dieser Zeile (z. B. 0, 7, 19) */
+  mwst_satz?: number
+  /** Arbeits-/Material-Zuordnung (Wizard); sonst aus Lohn/Material abgeleitet */
+  kostenverteilung?: 'allgemein' | 'lohn' | 'material'
+  /** Anfahrt vs. Leistung (Wizard) */
+  kostenart?: 'leistung' | 'anfahrt'
+  /** PDF: Ausführung über Fachbetrieb (aus Gewerk.ausfuehrung) */
+  ist_fachbetrieb?: boolean
 }
 
 export type RechnungPosition = AngebotPosition
@@ -229,6 +272,8 @@ export type Angebot = {
   id: string
   lead_id: string | null
   kunde_id: string | null
+  /** Ausführungsort (Verwaltungsobjekt) */
+  kunde_objekt_id?: string | null
   status: AngebotStatus
   positionen: AngebotPosition[]
   gesamt_fix?: number | null
@@ -244,12 +289,39 @@ export type Angebot = {
   gesendet_handwerker_at?: string | null
   /** gesetzt wenn Angebot per Mail an Kundin gegangen */
   gesendet_kunde_at?: string | null
+  /** Fortlaufende Nr. z.B. AG250042 */
+  angebotsnr?: string | null
+  leistungsumfang?: string | null
+  einleitung?: string | null
+  zahlungsbedingungen?: string | null
+  hinweise?: string | null
+  gueltig_bis?: string | null
+  /** einfach | projekt — Layout & Zusatzfelder */
+  dokument_typ?: 'einfach' | 'projekt' | null
+  projektbeschreibung?: string | null
+  /** Öffentliche Bild-URLs (JSON-Array in DB) */
+  fotos_urls?: string[] | unknown | null
+  /** Optionale zweite Variante inkl. Positionen */
+  varianten?: unknown | null
+  /** Ausführliche Hinweise (v. a. Projekt-PDF) */
+  wichtige_hinweise?: string | null
+  /** Kunden-Mail: du | sie */
+  anrede?: 'du' | 'sie' | string | null
+  /** Vereinfachter CRM-Status */
+  status_einfach?: 'entwurf' | 'gesendet' | 'angenommen' | 'abgelehnt' | 'abgelaufen' | string | null
+  /** Erster / letzter Versand an Kunde */
+  gesendet_am?: string | null
+  /** Automatische Nachfass-Mail */
+  nachgefasst_am?: string | null
+  /** Zuletzt Gültigkeit verlängert (Erinnerungs-Mail +7 Tage) */
+  verlaengert_am?: string | null
   /** Kunden-Ablehnung (Statistik) */
   ablehnung_grund?: string | null
   ablehnung_konkurrenz_preis?: number | null
   ablehnung_notiz?: string | null
   kunden?: Kunde | null
   leads?: Lead | null
+  kunden_objekte?: KundenObjekt | null
 }
 
 export type AngebotVorlage = {
@@ -277,6 +349,14 @@ export type AngebotHandwerkerRow = {
   ablehnung_grund?: string | null
   status?: AngebotHandwerkerZuweisungStatus | string | null
   aufgabe_notiz?: string | null
+  hw_preis_netto?: number | null
+  hw_preis_brutto?: number | null
+  hw_angebot_pdf_url?: string | null
+  hw_rechnung_pdf_url?: string | null
+  hw_rechnung_eingereicht_at?: string | null
+  hw_eingereicht_at?: string | null
+  hw_status?: string | null
+  hw_notiz?: string | null
   handwerker?: {
     id: string
     name: string
@@ -296,8 +376,8 @@ export type AngebotDetail = Angebot & {
 
 /** Kompakte Zeile für Angebotsliste & Side-Panel */
 export type AngebotListeEintrag = Omit<Angebot, 'kunden' | 'leads'> & {
-  kunden?: Pick<Kunde, 'id' | 'name' | 'email'> | null
-  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche'> | null
+  kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'plz' | 'ort'> | null
+  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche' | 'kontakt_name' | 'plz'> | null
   angebot_handwerker?: Array<
     Pick<AngebotHandwerkerRow, 'id' | 'status' | 'handwerker_id' | 'gewerk_id'> & {
       handwerker?: { name: string } | null
@@ -361,6 +441,9 @@ export type AuftragHandwerkerRow = {
   handwerker_id: string
   gewerk_id: string
   status?: string | null
+  vereinbarter_preis?: number | null
+  absprachen?: string | null
+  notizen?: string | null
   handwerker?: {
     id?: string
     name: string
@@ -372,11 +455,43 @@ export type AuftragHandwerkerRow = {
 }
 
 /** Persistierte Auftragsposition (Tabelle `auftrag_positionen`) */
+export type AuftragBautagebuchEintrag = {
+  id: string
+  auftrag_id: string
+  timeline_id?: string | null
+  titel: string
+  beschreibung?: string | null
+  datum: string
+  gewerk_id?: string | null
+  gewerk_phase_key?: string | null
+  handwerker_id?: string | null
+  handwerker?: { id: string; name: string; firma?: string | null } | null
+  foto_urls?: string[] | null
+  fuer_kunde_freigegeben?: boolean
+  freigegeben_at?: string | null
+  an_kunde_gesendet_at?: string | null
+  sort_order?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AuftragPositionNotiz = {
+  id: string
+  position_id: string
+  datum: string
+  text: string
+  sort_order: number | null
+  created_at?: string | null
+}
+
+/** Persistierte Auftragsposition (Tabelle `auftrag_positionen`) */
 export type AuftragPosition = {
   id: string
   auftrag_id: string
   gewerk_slug: string | null
   gewerk_name: string
+  gewerk_block_key?: string | null
+  projekt_phase?: string | null
   oberkategorie: string | null
   unterkategorie: string | null
   leistung_name: string
@@ -384,12 +499,22 @@ export type AuftragPosition = {
   einheit: string | null
   menge: number | null
   preis_fix: number | null
+  preis_partner?: number | null
   lohn_fix: number | null
   material_fix: number | null
+  start_datum?: string | null
+  end_datum?: string | null
   handwerker_id: string | null
+  handwerker_status?: string | null
+  handwerker_angefragt_at?: string | null
+  /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt */
+  leistung_status?: string | null
+  absprachen?: string | null
+  notizen_intern?: string | null
   sort_order: number | null
   created_at?: string | null
-  handwerker?: { id?: string; name: string } | null
+  handwerker?: { id?: string; name: string; email?: string | null; telefon?: string | null } | null
+  auftrag_position_notizen?: AuftragPositionNotiz[] | null
 }
 
 export type AngebotEmbedListe = Pick<
@@ -399,6 +524,7 @@ export type AngebotEmbedListe = Pick<
 
 export type AuftragListeEintrag = Auftrag & {
   kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort'> | null
+  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche' | 'plz'> | null
   angebote?: AngebotEmbedListe | null
   auftrag_handwerker?: AuftragHandwerkerRow[] | null
   auftrag_positionen?: Pick<AuftragPosition, 'id' | 'gewerk_name'>[] | null
@@ -589,6 +715,7 @@ export type AuftragDetail = Auftrag & {
   eingangsrechnungen?: Eingangsrechnung[] | null
   auftrag_milestones?: AuftragMilestoneRow[] | null
   hw_formular_tabs?: HwFormularTabRow[] | null
+  auftrag_bautagebuch?: AuftragBautagebuchEintrag[] | null
 }
 
 export type ComplianceStatus =
@@ -664,15 +791,26 @@ export type Handwerker = {
   aktiv: boolean
   notizen: string | null
   created_at: string
+  bewertung_gesamt?: number | null
+  bewertung_qualitaet?: number | null
+  bewertung_termintreue?: number | null
+  bewertung_sauberkeit?: number | null
+  bewertung_kommunikation?: number | null
+  bewertung_preis_leistung?: number | null
+  bewertung_anzahl?: number | null
   partner_kategorien?: PartnerKategorie | null
   partner_dokumente?: PartnerDokument[] | null
 }
+
+export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'
 
 export type Gewerk = {
   id: string
   name: string
   slug: string
   aktiv: boolean
+  ausfuehrung?: GewerkAusfuehrung | string
+  fachbetrieb_hinweis?: string | null
 }
 
 export type Preisliste = {
@@ -682,8 +820,8 @@ export type Preisliste = {
   kategorie?: string
   leistung: string
   einheit: string
+  /** Netto-Einzelpreis (ehemals preis_min; preis_max entfernt) */
   preis_min: number
-  preis_max: number
   aktiv: boolean
   gewerke?: Gewerk
 }
@@ -699,6 +837,7 @@ export type KalenderTermin = {
   uhrzeit_von: string | null
   uhrzeit_bis: string | null
   adresse: string | null
+  zugewiesen_an?: string | null
   erledigt: boolean
   created_at: string
   leads?: { kontakt_name: string | null } | null
@@ -795,12 +934,24 @@ export type VorabFormular = {
 
 export type RechnungStatus = 'entwurf' | 'gesendet' | 'bezahlt' | 'storniert'
 
+export type RechnungBelegTyp = 'rechnung' | 'gutschrift'
+
+export type MwstAufschluesselungJson = {
+  satz: number
+  netto: number
+  mwst: number
+}
+
 export type Rechnung = {
   id: string
   angebot_id: string | null
   auftrag_id: string | null
   kunde_id: string
   rechnungsnummer: string
+  beleg_typ?: RechnungBelegTyp
+  bezug_rechnung_id?: string | null
+  reverse_charge_13b?: boolean
+  mwst_aufschluesselung?: MwstAufschluesselungJson[] | null
   status: RechnungStatus
   positionen: RechnungPosition[]
   lohn_netto: number | null
@@ -811,6 +962,8 @@ export type Rechnung = {
   brutto: number | null
   leistungszeitraum_von: string | null
   leistungszeitraum_bis: string | null
+  einleitung?: string | null
+  hinweise?: string | null
   faellig_am: string | null
   pdf_url: string | null
   rechnungsdatum: string
@@ -822,7 +975,7 @@ export type Rechnung = {
   erstellt_von: string | null
   created_at: string
   updated_at: string
-  kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ'> | null
+  kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ' | 'ust_id'> | null
   angebote?: Pick<Angebot, 'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max'> | null
   auftraege?: Pick<Auftrag, 'id' | 'titel'> | null
 }
