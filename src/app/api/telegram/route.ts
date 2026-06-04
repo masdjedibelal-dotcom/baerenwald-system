@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { getClaudeApiKey } from '@/lib/copilot/claude-api-key'
 import { sendTelegram, sendTelegramTyping } from '@/lib/copilot/telegram'
 import { COPILOT_CLAUDE_TOOLS, COPILOT_MODEL } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
@@ -8,9 +9,20 @@ import { COPILOT_SYSTEM } from '@/lib/copilot/system-prompt'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY ?? '',
-})
+function anthropicClient(): Anthropic {
+  return new Anthropic({ apiKey: getClaudeApiKey() })
+}
+
+function formatCopilotError(e: unknown): string {
+  if (e instanceof Anthropic.AuthenticationError) {
+    return 'Claude API-Key ungültig (CLAUDE_API_KEY in Netlify prüfen: Production-Scope, kein Leerzeichen, Key von console.anthropic.com).'
+  }
+  const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+  if (/401.*no body/i.test(msg)) {
+    return 'Claude API-Key ungültig (CLAUDE_API_KEY in Netlify prüfen).'
+  }
+  return msg
+}
 
 type TelegramUpdate = {
   message?: TelegramMessage
@@ -36,6 +48,7 @@ async function runClaudeChat(userText: string): Promise<string> {
 
   const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userText }]
 
+  const anthropic = anthropicClient()
   let response = await anthropic.messages.create({
     model: COPILOT_MODEL,
     max_tokens: 1024,
@@ -81,8 +94,11 @@ async function runClaudeChat(userText: string): Promise<string> {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.CLAUDE_API_KEY?.trim()) {
-    return Response.json({ ok: false, error: 'CLAUDE_API_KEY fehlt' }, { status: 503 })
+  if (!getClaudeApiKey()) {
+    return Response.json(
+      { ok: false, error: 'CLAUDE_API_KEY oder ANTHROPIC_API_KEY fehlt' },
+      { status: 503 }
+    )
   }
 
   let body: TelegramUpdate
@@ -126,7 +142,7 @@ export async function POST(req: Request) {
     const reply = await runClaudeChat(userText)
     await sendTelegram(reply)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+    const msg = formatCopilotError(e)
     await sendTelegram(`❌ Copilot-Fehler: ${msg.slice(0, 500)}`).catch(() => undefined)
   }
 
