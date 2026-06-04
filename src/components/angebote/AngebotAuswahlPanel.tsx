@@ -7,7 +7,7 @@ import { Copy, Eye, FileText, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } fr
 import { AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/ActionsMenu'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
