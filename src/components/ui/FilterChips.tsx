@@ -38,7 +38,7 @@ export function FilterChips({
   return (
     <div
       className={cn(
-        'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'chiprow flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >
@@ -49,24 +49,10 @@ export function FilterChips({
             key={opt.value}
             type="button"
             onClick={() => toggle(opt.value)}
-            className={cn(
-              'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-150',
-              isOn
-                ? 'border-bw-primary bg-bw-primary text-white'
-                : 'border-bw-border bg-bw-card text-bw-text-mid hover:border-bw-primary hover:text-bw-primary'
-            )}
+            className={cn('chip shrink-0', isOn && 'chip-active')}
           >
             {opt.label}
-            {opt.count !== undefined ? (
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-xs',
-                  isOn ? 'bg-white/20 text-white' : 'bg-bw-hover text-bw-text-muted'
-                )}
-              >
-                {opt.count}
-              </span>
-            ) : null}
+            {opt.count !== undefined ? <span className="chip-count">{opt.count}</span> : null}
           </button>
         )
       })}

@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Paperclip} from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
 
 export interface MailVorschauProps {
@@ -91,7 +92,7 @@ export function MailVorschau({
         </div>
         {hatAnhang ? (
           <div className="flex items-center gap-2 rounded-lg bg-bw-hover px-3 py-2 text-sm text-bw-text-muted">
-            <span aria-hidden>📎</span>
+            <Paperclip className="h-4 w-4" aria-hidden />
             <span>{anhangName ?? 'Dokument.pdf'}</span>
           </div>
         ) : null}
@@ -122,10 +123,11 @@ export function MailVorschau({
             <iframe title="Mail Vorschau" srcDoc={localHtml} className="h-64 w-full border-0" />
           </div>
         ) : (
-          <textarea
+          <Textarea
+            plain
             value={localHtml}
             onChange={(e) => setLocalHtml(e.target.value)}
-            className="input min-h-[240px] font-mono text-xs"
+            className="min-h-[240px] font-mono text-xs"
             rows={12}
           />
         )}

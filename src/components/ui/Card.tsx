@@ -1,11 +1,12 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { Accordion } from '@/components/ui/Accordion'
+import { DetailCollapsibleCard } from '@/components/ui/DetailCollapsibleCard'
 
 interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
   action?: ReactNode
   children: ReactNode
+  /** Detail-Ansicht: hellgrüner Kopf, Klick auf Kopfzeile klappt ein/aus. Standard: an, wenn `title` gesetzt ist. */
   collapsible?: boolean
   defaultOpen?: boolean
   /** Zusätzliche Klassen für `card-body` (z. B. `p-0` für volle Breite). */
@@ -19,17 +20,28 @@ export function Card({
   action,
   children,
   className = '',
-  collapsible = false,
+  collapsible: collapsibleProp,
   defaultOpen = true,
   bodyClassName,
   flush = false,
   ...props
 }: CardProps) {
-  if (collapsible && typeof title === 'string' && title !== '') {
+  const collapsible =
+    collapsibleProp ?? (title != null && title !== '')
+
+  if (collapsible && title != null && title !== '') {
     return (
-      <Accordion title={title} defaultOpen={defaultOpen} className={className} action={action}>
+      <DetailCollapsibleCard
+        title={title}
+        action={action}
+        defaultOpen={defaultOpen}
+        className={className}
+        flush={flush}
+        bodyClassName={bodyClassName}
+        {...props}
+      >
         {children}
-      </Accordion>
+      </DetailCollapsibleCard>
     )
   }
 

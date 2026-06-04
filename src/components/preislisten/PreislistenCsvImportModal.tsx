@@ -12,8 +12,7 @@ const MAP_FIELDS: { key: keyof PreislistenImportMapping; label: string }[] = [
   { key: 'kategorie', label: 'Kategorie' },
   { key: 'leistung', label: 'Leistung' },
   { key: 'einheit', label: 'Einheit' },
-  { key: 'preis_min', label: 'Preis Min' },
-  { key: 'preis_max', label: 'Preis Max' },
+  { key: 'preis', label: 'Preis (netto)' },
 ]
 
 type Props = {
@@ -82,8 +81,7 @@ export function PreislistenCsvImportModal({ open, onClose, onDone }: Props) {
         kategorie: guess('kategorie') || guess('category') || '',
         leistung: guess('leistung') || guess('service') || guess('title') || '',
         einheit: guess('einheit') || guess('unit') || '',
-        preis_min: guess('min') || guess('preis_min') || '',
-        preis_max: guess('max') || guess('preis_max') || '',
+        preis: guess('preis') || guess('preis_min') || guess('min') || '',
       })
     }
     reader.readAsText(f, 'UTF-8')

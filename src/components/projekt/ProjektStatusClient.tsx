@@ -1,10 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { PublicProjektPayload } from '@/lib/projekt/load-public-projekt'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
-import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
+import { Check, Circle, Mail, Phone } from 'lucide-react'
+import { BrandLogo } from '@/components/brand/BrandLogo'
+import { IconText } from '@/components/ui/IconText'
+import { RichTextContent } from '@/components/ui/RichTextContent'
+import { betragAnzeige } from '@/lib/angebot-einfach'
+import { formatDatum, formatDatumZeit } from '@/lib/utils'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {
@@ -58,6 +63,8 @@ export function ProjektStatusClient({
   tel: string
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const highlightUpdateId = searchParams.get('update')?.trim() || null
   const [lastRefresh, setLastRefresh] = useState(() => new Date())
   const [angebotOpen, setAngebotOpen] = useState(false)
   const [alleUpdates, setAlleUpdates] = useState(false)
@@ -80,6 +87,25 @@ export function ProjektStatusClient({
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [router])
+
+  const timelineEarly = initial?.timeline ?? []
+  const updatesFirstEarly = useMemo(() => timelineEarly.slice(0, 3), [timelineEarly])
+
+  useEffect(() => {
+    if (!initial || !highlightUpdateId || !timelineEarly.some((u) => u.id === highlightUpdateId)) return
+    if (!alleUpdates && !updatesFirstEarly.some((u) => u.id === highlightUpdateId)) {
+      setAlleUpdates(true)
+    }
+  }, [highlightUpdateId, initial, timelineEarly, alleUpdates, updatesFirstEarly])
+
+  useEffect(() => {
+    if (!initial || !highlightUpdateId) return
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`update-${highlightUpdateId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+    return () => window.clearTimeout(t)
+  }, [highlightUpdateId, initial, alleUpdates, timelineEarly.length])
 
   const minuten = useMemo(() => Math.max(0, Math.floor((Date.now() - lastRefresh.getTime()) / 60000)), [lastRefresh])
 
@@ -120,8 +146,6 @@ export function ProjektStatusClient({
   const updatesFirst = timeline.slice(0, 3)
   const updatesAnzeige = alleUpdates ? timeline : updatesFirst
 
-  const logoUrl = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL ?? ''
-
   const naechsterFreitext = auftrag.naechster_schritt?.trim()
 
   return (
@@ -129,12 +153,7 @@ export function ProjektStatusClient({
       <header className="bg-[#1A3D2B] px-4 py-4 text-white md:px-6">
         <div className="mx-auto flex max-w-[600px] items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} width={36} height={36} alt="" className="h-9 w-9 object-contain brightness-0 invert" />
-            ) : (
-              <span className="text-lg font-bold">Bärenwald</span>
-            )}
+            <BrandLogo variant="white" height={32} />
             <span className="text-sm font-medium opacity-95">Ihr Projekt</span>
           </div>
           <p className="text-[10px] opacity-80">Aktualisiert vor {minuten} Min.</p>
@@ -173,7 +192,13 @@ export function ProjektStatusClient({
                       }`}
                       aria-current={active ? 'step' : undefined}
                     >
-                      {done ? '✓' : active ? '●' : '○'}
+                      {done ? (
+                        <Check className="h-4 w-4" aria-hidden />
+                      ) : active ? (
+                        <Circle className="h-2.5 w-2.5 fill-current" aria-hidden />
+                      ) : (
+                        <Circle className="h-3 w-3" aria-hidden />
+                      )}
                     </div>
                     {i < PHASEN.length - 1 ? (
                       <div className={`h-0.5 flex-1 ${i < phaseIdx ? 'bg-[#2E7D52]' : 'bg-[#E5E3DF]'}`} />
@@ -222,7 +247,9 @@ export function ProjektStatusClient({
             <ul className="mt-2 space-y-2 text-sm">
               {milestones.map((m) => (
                 <li key={m.id} className="flex items-start gap-2 rounded-lg border border-[#E5E3DF] bg-white px-3 py-2">
-                  <span className={m.erledigt ? 'text-[#2E7D52]' : 'text-[#9CA3AF]'}>{m.erledigt ? '✓' : '○'}</span>
+                  <span className={m.erledigt ? 'text-[#2E7D52]' : 'text-[#9CA3AF]'}>
+                    {m.erledigt ? <Check className="h-4 w-4" aria-hidden /> : <Circle className="h-3 w-3" aria-hidden />}
+                  </span>
                   <div>
                     <p className="font-medium">{m.titel}</p>
                     {m.datum ? <p className="text-xs text-[#6B7280]">{formatDatum(m.datum)}</p> : null}
@@ -237,7 +264,13 @@ export function ProjektStatusClient({
           <section className="mt-8 space-y-3">
             <h2 className="text-sm font-semibold text-ink">Updates zu Ihrem Projekt</h2>
             {updatesAnzeige.map((u) => (
-              <article key={u.id} className="rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
+              <article
+                key={u.id}
+                id={`update-${u.id}`}
+                className={`scroll-mt-24 rounded-xl border bg-white p-4 shadow-sm ${
+                  highlightUpdateId === u.id ? 'border-[#2E7D52] ring-2 ring-[#2E7D52]/25' : 'border-[#E5E3DF]'
+                }`}
+              >
                 <p className="text-xs text-[#6B7280]">{formatDatumZeit(u.created_at)}</p>
                 <p className="mt-1 font-medium text-[#1A3D2B]">{u.titel}</p>
                 {u.beschreibung ? <p className="mt-2 whitespace-pre-wrap text-sm text-[#4B5563]">{u.beschreibung}</p> : null}
@@ -282,9 +315,12 @@ export function ProjektStatusClient({
                 <ul className="space-y-2 text-sm">
                   {angebote.positionen.map((p, i) => (
                     <li key={i} className="flex justify-between gap-2 border-b border-dashed border-[#E5E3DF] pb-2 last:border-0">
-                      <span className="min-w-0">{(p.beschreibung || p.leistung).trim()}</span>
+                      <RichTextContent
+                        html={(p.beschreibung || p.leistung).trim()}
+                        className="min-w-0 text-sm"
+                      />
                       <span className="shrink-0 whitespace-nowrap font-medium text-[#2E7D52]">
-                        {formatPreis(undefined, p.gesamt_min, p.gesamt_max)}
+                        {betragAnzeige(null, p.gesamt_min, p.gesamt_max)}
                       </span>
                     </li>
                   ))}
@@ -292,7 +328,7 @@ export function ProjektStatusClient({
                 {angebote.gesamt_min != null && angebote.gesamt_max != null ? (
                   <p className="mt-3 text-sm font-semibold">
                     Gesamt:{' '}
-                    {formatPreis(
+                    {betragAnzeige(
                       (angebote as { gesamt_fix?: number | null }).gesamt_fix ?? null,
                       angebote.gesamt_min,
                       angebote.gesamt_max
@@ -313,7 +349,7 @@ export function ProjektStatusClient({
                 <li key={n.id} className="flex justify-between gap-2">
                   <span className="min-w-0">{n.grund}</span>
                   <span className="shrink-0 font-medium">
-                    {formatPreis(undefined, n.gesamt_min, n.gesamt_max)}
+                    {betragAnzeige(null, n.gesamt_min, n.gesamt_max)}
                   </span>
                 </li>
               ))}
@@ -330,11 +366,11 @@ export function ProjektStatusClient({
             href={telHref(tel)}
             className="mt-4 flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[#2E7D52] px-4 text-base font-semibold text-white"
           >
-            📞 {tel}
+            <IconText icon={Phone}>{tel}</IconText>
           </a>
           {kunde.email ? (
             <a href={`mailto:${encodeURIComponent(kunde.email)}`} className="mt-3 block text-center text-sm text-[#2E7D52] underline">
-              ✉️ {kunde.email}
+              <IconText icon={Mail}>{kunde.email}</IconText>
             </a>
           ) : null}
         </section>

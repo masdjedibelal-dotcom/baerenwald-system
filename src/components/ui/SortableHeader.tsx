@@ -27,7 +27,7 @@ export function SortableHeader({
     <button
       type="button"
       onClick={() => onSort(field)}
-      className={`flex items-center gap-1 text-xs font-medium uppercase tracking-wide transition-colors hover:text-bw-text ${
+      className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider transition-colors hover:text-bw-text ${
         isActive ? 'text-bw-primary' : 'text-bw-text-muted'
       } ${className}`}
     >

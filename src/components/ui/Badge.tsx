@@ -10,32 +10,22 @@ import {
 import { cn, KANAL_LABELS, STATUS_LABELS } from '@/lib/utils'
 import type { LeadKanal, LeadStatus } from '@/lib/types'
 
-const leadStatusStyles: Record<LeadStatus, { bg: string; text: string }> = {
-  neu: { bg: 'bg-status-new-bg', text: 'text-status-new-text' },
-  kontaktiert: { bg: 'bg-status-contact-bg', text: 'text-status-contact-text' },
-  angebot: { bg: 'bg-status-offer-bg', text: 'text-status-offer-text' },
-  auftrag: { bg: 'bg-status-order-bg', text: 'text-status-order-text' },
-  abgeschlossen: { bg: 'bg-status-done-bg', text: 'text-status-done-text' },
-  abgebrochen: { bg: 'bg-status-cancel-bg', text: 'text-status-cancel-text' },
+const leadStatusClass: Record<LeadStatus, string> = {
+  neu: 'badge badge-new',
+  kontaktiert: 'badge badge-contacted',
+  termin: 'badge badge-contacted',
+  angebot: 'badge badge-offer',
+  auftrag: 'badge badge-order',
+  abgeschlossen: 'badge badge-done',
+  abgebrochen: 'badge badge-cancel',
 }
 
-const LEAD_FALLBACK_STYLE = { bg: 'bg-[#F3F4F6]', text: 'text-[#374151]' }
-
 export function LeadStatusBadge({ status }: { status: LeadStatus | string }) {
-  const s = status in leadStatusStyles ? leadStatusStyles[status as LeadStatus] : LEAD_FALLBACK_STYLE
   const label =
     status in STATUS_LABELS ? STATUS_LABELS[status as LeadStatus] : String(status)
-  return (
-    <span
-      className={cn(
-        'inline-flex min-h-[28px] items-center rounded-lg px-2 py-0.5 text-xs font-medium',
-        s.bg,
-        s.text
-      )}
-    >
-      {label}
-    </span>
-  )
+  const cls =
+    status in leadStatusClass ? leadStatusClass[status as LeadStatus] : 'badge badge-plain badge-no-dot'
+  return <span className={cls}>{label}</span>
 }
 
 const kanalIcon: Record<LeadKanal, LucideIcon> = {

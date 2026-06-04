@@ -1,5 +1,6 @@
 'use client'
 
+import { Textarea } from '@/components/ui/Textarea'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
 
 type Props = {
@@ -18,8 +19,8 @@ export function CustomFieldRenderer({ def, value, onChange, disabled }: Props) {
   switch (def.feld_typ) {
     case 'textarea':
       return (
-        <textarea
-          className="input min-h-[80px]"
+        <Textarea
+          rows={3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}

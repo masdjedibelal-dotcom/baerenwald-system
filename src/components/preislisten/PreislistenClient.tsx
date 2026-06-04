@@ -3,14 +3,16 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload } from 'lucide-react'
+import { Upload, Pencil} from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { cn, formatPreis } from '@/lib/utils'
+import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
+import { cn } from '@/lib/utils'
 import type { Gewerk, Preisliste } from '@/lib/types'
 import { createPreisliste, softDeletePreisliste, updatePreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { sortPreislistenRows } from '@/lib/preislisten-sort'
@@ -57,7 +59,7 @@ function LeistungsZeile({
   onToggle: () => void
   onDelete: () => void
 }) {
-  const preisFix = leistung.preis_min === leistung.preis_max ? leistung.preis_min : undefined
+  const preis = preislisteEinzelpreis(leistung)
   return (
     <div
       className={cn(
@@ -74,7 +76,7 @@ function LeistungsZeile({
           {leistung.leistung}
         </div>
         <div className="mt-0.5 text-xs text-bw-text-muted">
-          {leistung.einheit} · {formatPreis(preisFix, leistung.preis_min, leistung.preis_max)}
+          {leistung.einheit} · {preis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
         </div>
       </div>
       <div className="ml-2 flex flex-shrink-0 items-center gap-1">
@@ -83,9 +85,7 @@ function LeistungsZeile({
           onClick={() => onEdit()}
           className="rounded-md p-1.5 text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
           aria-label="Bearbeiten"
-        >
-          ✏️
-        </button>
+        ><Pencil className="h-4 w-4" aria-hidden /></button>
         <div onClick={(e) => e.stopPropagation()} className="shrink-0">
           <Toggle checked={leistung.aktiv} onChange={() => onToggle()} />
         </div>
@@ -151,6 +151,14 @@ export function PreislistenClient({
     return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b, 'de'))
   }, [filtered])
 
+  const gewerkLeistungCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const r of rows) {
+      if (r.aktiv) c[r.gewerk_id] = (c[r.gewerk_id] ?? 0) + 1
+    }
+    return c
+  }, [rows])
+
   const [editLeistung, setEditLeistung] = useState<Preisliste | null>(null)
   const [neuOpen, setNeuOpen] = useState(false)
   const modalOpen = neuOpen || !!editLeistung
@@ -158,10 +166,7 @@ export function PreislistenClient({
   const [form, setForm] = useState<LeistungForm>(() => emptyForm(''))
   const [oberkatSelect, setOberkatSelect] = useState('')
   const [neueKategorie, setNeueKategorie] = useState('')
-  const [preisTyp, setPreisTyp] = useState<'fix' | 'range'>('range')
-  const [preFix, setPreFix] = useState('')
-  const [preMin, setPreMin] = useState('')
-  const [preMax, setPreMax] = useState('')
+  const [preis, setPreis] = useState(0)
 
   const [csvOpen, setCsvOpen] = useState(false)
   const [importBanner, setImportBanner] = useState<string | null>(null)
@@ -207,10 +212,7 @@ export function PreislistenClient({
     setForm(emptyForm(gid))
     setOberkatSelect('')
     setNeueKategorie('')
-    setPreisTyp('range')
-    setPreFix('')
-    setPreMin('')
-    setPreMax('')
+    setPreis(0)
     setErr(null)
   }
 
@@ -241,10 +243,7 @@ export function PreislistenClient({
       einheit: sp.wahl === EINHEIT_CUSTOM ? sp.freitext : sp.wahl,
       aktiv: row.aktiv,
     })
-    setPreisTyp(row.preis_min === row.preis_max ? 'fix' : 'range')
-    setPreFix(String(row.preis_min))
-    setPreMin(String(row.preis_min))
-    setPreMax(String(row.preis_max))
+    setPreis(preislisteEinzelpreis(row))
     setEditLeistung(row)
     setNeuOpen(false)
     setErr(null)
@@ -273,29 +272,10 @@ export function PreislistenClient({
       setErr('Bitte eine Einheit angeben.')
       return
     }
-    let min: number
-    let max: number
-    if (preisTyp === 'fix') {
-      const v = Number(preFix.replace(',', '.'))
-      if (Number.isNaN(v)) {
-        setErr('Preis als Zahl angeben.')
-        return
-      }
-      min = v
-      max = v
-    } else {
-      min = Number(preMin.replace(',', '.'))
-      if (Number.isNaN(min)) {
-        setErr('„Von“ als Zahl angeben.')
-        return
-      }
-      const maxRaw = preMax.replace(',', '.').trim()
-      const maxParsed = maxRaw === '' ? min : Number(maxRaw)
-      if (Number.isNaN(maxParsed)) {
-        setErr('„Bis“ als Zahl angeben oder leer lassen.')
-        return
-      }
-      max = maxParsed
+    const preisMin = preis
+    if (Number.isNaN(preisMin) || preisMin < 0) {
+      setErr('Preis als Zahl angeben.')
+      return
     }
 
     const editId = editLeistung?.id ?? null
@@ -307,8 +287,7 @@ export function PreislistenClient({
           kategorie: kat,
           leistung: form.leistung.trim(),
           einheit,
-          preis_min: min,
-          preis_max: max,
+          preis_min: preisMin,
           aktiv: form.aktiv,
         })
         if (!res.ok) {
@@ -326,8 +305,7 @@ export function PreislistenClient({
                     kategorie: kat,
                     leistung: form.leistung.trim(),
                     einheit,
-                    preis_min: min,
-                    preis_max: max,
+                    preis_min: preisMin,
                     aktiv: form.aktiv,
                     gewerke: g ?? r.gewerke,
                   }
@@ -341,8 +319,7 @@ export function PreislistenClient({
           kategorie: kat,
           leistung: form.leistung.trim(),
           einheit,
-          preis_min: min,
-          preis_max: max,
+          preis_min: preisMin,
           aktiv: form.aktiv,
         })
         if (!res.ok) {
@@ -359,8 +336,7 @@ export function PreislistenClient({
               kategorie: kat,
               leistung: form.leistung.trim(),
               einheit,
-              preis_min: min,
-              preis_max: max,
+              preis_min: preisMin,
               aktiv: form.aktiv,
               gewerke: g,
             },
@@ -370,9 +346,7 @@ export function PreislistenClient({
       closeModal()
       setOberkatSelect('')
       setNeueKategorie('')
-      setPreFix('')
-      setPreMin('')
-      setPreMax('')
+      setPreis(0)
       setErr(null)
       router.refresh()
     })
@@ -424,7 +398,6 @@ export function PreislistenClient({
   return (
     <div>
       <PageHeader
-        title="Preislisten"
         action={
           <>
             <Button type="button" variant="secondary" size="sm" onClick={() => setCsvOpen(true)}>
@@ -456,8 +429,8 @@ export function PreislistenClient({
             <div className="text-sm font-medium text-bw-text">Gewerke verwalten</div>
             <div className="mt-0.5 text-xs text-bw-text-muted">Gewerke anlegen, bearbeiten und deaktivieren</div>
           </div>
-          <Link href="/einstellungen/gewerke" className="btn btn-secondary btn-sm shrink-0">
-            → Einstellungen
+          <Link href="/einstellungen/preise" className="btn btn-secondary btn-sm shrink-0">
+            Einstellungen
           </Link>
         </div>
       </Card>
@@ -465,35 +438,33 @@ export function PreislistenClient({
       <h2 className="section-header mb-4">Leistungen</h2>
 
       {gewerkeTabs.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="text-sm text-bw-text-muted">
           Kein aktives Gewerk. Legen Sie Gewerke unter{' '}
-          <Link href="/einstellungen/gewerke" className="font-medium text-primary underline-offset-2 hover:underline">
-            Einstellungen → Gewerke
+          <Link href="/einstellungen/preise" className="font-medium text-bw-link underline-offset-2 hover:underline">
+            Einstellungen · Preislisten
           </Link>{' '}
           an und markieren Sie sie als aktiv.
         </p>
       ) : (
-        <div className="mb-6 -mx-1 flex gap-0 overflow-x-auto border-b border-border px-1 pb-0 [scrollbar-width:thin]">
+        <div className="mb-6 flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {gewerkeTabs.map((g) => (
             <button
               key={g.id}
               type="button"
               onClick={() => setTabGewerkId(g.id)}
-              className={cn(
-                'shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                activeGewerkId === g.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-ink'
-              )}
+              className={cn('chip shrink-0', activeGewerkId === g.id && 'chip-active')}
             >
               {g.name}
+              {(gewerkLeistungCounts[g.id] ?? 0) > 0 ? (
+                <span className="chip-count">{gewerkLeistungCounts[g.id]}</span>
+              ) : null}
             </button>
           ))}
         </div>
       )}
 
       {!activeGewerkId ? null : groupedEntries.length === 0 ? (
-        <p className="text-sm text-muted">Keine aktiven Leistungen für dieses Gewerk.</p>
+        <p className="text-sm text-bw-text-muted">Keine aktiven Leistungen für dieses Gewerk.</p>
       ) : (
         <div className="space-y-3">
           {groupedEntries.map(([kat, items], idx) => (
@@ -534,9 +505,9 @@ export function PreislistenClient({
           <div className="mb-4 border-b border-bw-border pb-3 text-xs text-bw-text-muted">
             {aktuellesGewerk?.name}
             {(editLeistung.kategorie ?? '').trim()
-              ? ` → ${(editLeistung.kategorie ?? '').trim()}`
+              ? ` · ${(editLeistung.kategorie ?? '').trim()}`
               : ''}
-            {` → ${editLeistung.leistung}`}
+            {` · ${editLeistung.leistung}`}
           </div>
         ) : null}
 
@@ -590,92 +561,11 @@ export function PreislistenClient({
           />
 
           <div>
-            <label className="input-label">Preistyp</label>
-            <div className="mt-1 flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPreisTyp('fix')
-                  if (preMin) {
-                    setPreFix(preMin)
-                    setPreMax(preMin)
-                  }
-                }}
-                className={cn('btn btn-sm', preisTyp === 'fix' ? 'btn-primary' : 'btn-secondary')}
-              >
-                Fixpreis
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreisTyp('range')}
-                className={cn('btn btn-sm', preisTyp === 'range' ? 'btn-primary' : 'btn-secondary')}
-              >
-                Von / Bis
-              </button>
-            </div>
+            <label className="input-label" htmlFor="preis-netto">
+              Preis (netto) *
+            </label>
+            <EuroNettoInput id="preis-netto" value={preis} onChange={setPreis} />
           </div>
-
-          {preisTyp === 'fix' ? (
-            <div>
-              <label className="input-label" htmlFor="preis-fix">
-                Preis *
-              </label>
-              <div className="relative">
-                <input
-                  id="preis-fix"
-                  type="number"
-                  className="input w-full pr-9"
-                  value={preFix}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setPreFix(v)
-                    setPreMin(v)
-                    setPreMax(v)
-                  }}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
-                  €
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="input-label" htmlFor="preis-von">
-                  Von *
-                </label>
-                <div className="relative">
-                  <input
-                    id="preis-von"
-                    type="number"
-                    className="input w-full pr-9"
-                    value={preMin}
-                    onChange={(e) => setPreMin(e.target.value)}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
-                    €
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label className="input-label" htmlFor="preis-bis">
-                  Bis
-                </label>
-                <div className="relative">
-                  <input
-                    id="preis-bis"
-                    type="number"
-                    className="input w-full pr-9"
-                    value={preMax}
-                    onChange={(e) => setPreMax(e.target.value)}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-bw-text-muted">
-                    €
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div>
             <Select

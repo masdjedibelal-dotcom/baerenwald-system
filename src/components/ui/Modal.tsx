@@ -11,7 +11,7 @@ interface ModalProps {
   title: string
   children: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
@@ -35,6 +35,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
     sm: 'max-w-sm',
     md: 'max-w-lg',
     lg: 'max-w-2xl',
+    xl: 'max-w-[min(96vw,56rem)]',
   }[size]
 
   return (
@@ -54,7 +55,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             className="text-bw-light transition-colors hover:text-bw-text"
             aria-label="Schließen"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
         <div className="modal-body">{children}</div>
