@@ -1,19 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { List, Users, Building2, Calendar, FileText, Settings, LogOut, X, Receipt } from 'lucide-react'
+import { LogOut, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-
-const MORE_ITEMS = [
-  { href: '/rechnungen', icon: Receipt, label: 'Rechnungen' },
-  { href: '/kunden', icon: Users, label: 'Kunden' },
-  { href: '/preislisten', icon: List, label: 'Preislisten' },
-  { href: '/partner', icon: Building2, label: 'Partner' },
-  { href: '/kalender', icon: Calendar, label: 'Kalender' },
-  { href: '/formulare', icon: FileText, label: 'Formulare' },
-  { href: '/einstellungen', icon: Settings, label: 'Einstellungen' },
-] as const
+import { MORE_SHEET_NAV } from '@/lib/nav-config'
 
 export function MoreSheet({
   open,
@@ -52,7 +43,7 @@ export function MoreSheet({
         </div>
 
         <div className="p-3">
-          {MORE_ITEMS.map((item) => {
+          {MORE_SHEET_NAV.map((item) => {
             const Icon = item.icon
             return (
               <Link

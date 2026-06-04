@@ -1,64 +1,55 @@
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type PageHeaderCrumb = { label: string; href?: string }
 
+/**
+ * Optionale Page-Meta unterhalb der TopBar.
+ * Der Seitentitel kommt grundsätzlich aus der TopBar (siehe Sidebar/TopBar) und
+ * wird hier NICHT mehr dupliziert.
+ *
+ * Slots:
+ *  - description: kurze Erläuterung
+ *  - action:      ein/mehrere Buttons rechts (mobil horizontal scrollbar)
+ *  - tabs:        Tab-Bar unterhalb von description/action
+ */
 export function PageHeader({
-  title,
-  breadcrumbs,
   action,
   tabs,
   description,
   className,
 }: {
-  title: ReactNode
-  breadcrumbs?: PageHeaderCrumb[]
   action?: ReactNode
   tabs?: ReactNode
-  description?: string
+  description?: ReactNode
   className?: string
 }) {
+  const hasTopRow = !!description || !!action
+  if (!hasTopRow && !tabs) return null
+
   return (
-    <div
-      className={cn(
-        'z-header sticky left-0 right-0 top-0 w-full border-b border-bw-border bg-bw-card pt-[env(safe-area-inset-top)] -mx-4 md:-mx-6',
-        className
-      )}
-    >
-      <div className="px-4 pb-0 pt-4 md:px-6">
-        {breadcrumbs && breadcrumbs.length > 0 ? (
-          <div className="mb-2 flex flex-wrap items-center gap-1">
-            {breadcrumbs.map((crumb, i) => (
-              <div key={`${crumb.label}-${i}`} className="flex items-center gap-1">
-                {i > 0 ? <ChevronRight className="h-3 w-3 text-bw-light" /> : null}
-                {crumb.href ? (
-                  <Link href={crumb.href} className="text-xs text-bw-link hover:underline">
-                    {crumb.label}
-                  </Link>
-                ) : (
-                  <span className="text-xs text-bw-light">{crumb.label}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            {typeof title === 'string' ? (
-              <h1 className="text-xl font-semibold leading-tight text-bw-text">{title}</h1>
-            ) : (
-              <div className="min-w-0 text-xl font-semibold leading-tight text-bw-text">{title}</div>
-            )}
-            {description ? <p className="mt-0.5 text-sm text-bw-light">{description}</p> : null}
-          </div>
-          {action ? <div className="ml-4 flex-shrink-0">{action}</div> : null}
+    <div className={cn('mb-3 md:mb-4', className)}>
+      {hasTopRow ? (
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-2',
+            description ? 'justify-between' : 'justify-end'
+          )}
+        >
+          {description ? (
+            <div className="min-w-0">
+              <p className="text-sm text-bw-text-muted">{description}</p>
+            </div>
+          ) : null}
+          {action ? (
+            <div className="-mx-1 flex flex-shrink-0 items-center gap-1.5 overflow-x-auto px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {action}
+            </div>
+          ) : null}
         </div>
+      ) : null}
 
-        {tabs ? <div className="-mb-px">{tabs}</div> : null}
-      </div>
+      {tabs ? <div className={cn(hasTopRow && 'mt-3')}>{tabs}</div> : null}
     </div>
   )
 }

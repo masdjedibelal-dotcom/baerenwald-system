@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { Check } from 'lucide-react'
 import { acceptNachtragByToken, type NachtragPublicPayload } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { formatDatum } from '@/lib/utils'
@@ -33,7 +34,7 @@ export function NachtragPublicForm({ initial }: { initial: NachtragPublicPayload
   if (doneAt) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <p className="text-5xl text-[#2E7D52]">✓</p>
+        <Check className="mx-auto h-12 w-12 text-[#2E7D52]" aria-hidden />
         <p className="mt-4 text-xl font-semibold text-ink">Vielen Dank für Ihre Bestätigung.</p>
         <p className="mt-2 text-sm text-muted">Wir setzen die Arbeiten umgehend fort.</p>
         <p className="mt-4 text-xs text-muted">{new Date(doneAt).toLocaleString('de-DE')}</p>
@@ -50,7 +51,7 @@ export function NachtragPublicForm({ initial }: { initial: NachtragPublicPayload
 
       {!n.handwercher_bestaetigt ? (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          ⚠️ Der ausführende Handwerker hat noch nicht bestätigt. Der Nachtrag ist noch nicht final — Sie können trotzdem
+          Der ausführende Handwerker hat noch nicht bestätigt. Der Nachtrag ist noch nicht final — Sie können trotzdem
           bestätigen.
         </div>
       ) : null}
@@ -122,7 +123,7 @@ export function NachtragPublicForm({ initial }: { initial: NachtragPublicPayload
         }}
         className="flex min-h-[48px] w-full items-center justify-center rounded-lg bg-[#2E7D52] px-4 text-base font-semibold text-white disabled:opacity-50"
       >
-        {pending ? '…' : '✅ Ich stimme dem Nachtrag zu'}
+        {pending ? '…' : 'Ich stimme dem Nachtrag zu'}
       </button>
 
       <p className="mt-6 text-center text-sm text-muted">

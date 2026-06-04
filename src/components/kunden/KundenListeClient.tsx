@@ -1,8 +1,18 @@
 'use client'
 
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import {
+  ListFilterSection,
+  ListMobileStack,
+  ListGridShell,
+} from '@/components/layout/ListPageParts'
+import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { ListAvatar } from '@/components/ui/ListAvatar'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
@@ -17,15 +27,11 @@ import {
   zeitraumLabel,
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
-import { formatRelativeDate, formatLeadListDatum, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { Kunde } from '@/lib/types'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
-import { kundenAvatarClass, kundenInitialen } from '@/components/kunden/TypBadge'
-import { TypBadge } from '@/components/kunden/TypBadge'
-import { KundeSidePanel } from '@/components/kunden/KundeSidePanel'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { FilterChips } from '@/components/ui/FilterChips'
-import { ListCard } from '@/components/ui/ListCard'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -44,41 +50,45 @@ function formatEur(n: number | null | undefined) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 }
 
-function letzteAktiv(k: KundeListeZeile) {
-  return k.letzte_aktivitaet ?? k.created_at
+function kundeRegion(k: KundeListeZeile) {
+  const plz = k.plz?.trim()
+  const ort = k.ort?.trim()
+  if (plz && ort) return `${plz} ${ort}`
+  return plz || ort || '—'
 }
 
-function typBadgeClass(typ: string) {
-  if (typ === 'gewerbe') return 'badge badge-order'
-  if (typ === 'hausverwaltung') return 'badge badge-offer'
-  return 'badge badge-new'
+function kundeListStatusBadge(k: KundeListeZeile) {
+  const auf = k.anzahl_auftraege ?? 0
+  if (auf > 0) return <StatusBadge status="order" label="Aktiv" />
+  if ((k.anzahl_leads ?? 0) > 0) return <StatusBadge status="contacted" label="Interessent" />
+  return <StatusBadge status="new" label="Neu" />
 }
 
-function typBadgeLabel(typ: string) {
-  if (typ === 'gewerbe') return 'Gewerbe'
-  if (typ === 'hausverwaltung') return 'Hausverwaltung'
-  return 'Privat'
-}
+const KUNDEN_GRID_COLS = '42px minmax(200px,2fr) minmax(160px,1.2fr) minmax(100px,1fr) 80px 120px 90px'
 
 type SortRow = {
   row: KundeListeZeile
   name: string
-  typ: string
   projekte: number
   umsatz: number
-  aktiv: string
 }
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
 
-export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
+export function KundenListeClient({
+  kunden,
+  mode = 'page',
+  selectedId = null,
+}: {
+  kunden: KundeListeZeile[]
+  mode?: 'page' | 'pane'
+  selectedId?: string | null
+}) {
+  const router = useRouter()
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editKunde, setEditKunde] = useState<Kunde | null>(null)
-  const [panelId, setPanelId] = useState<string | null>(null)
-  const [panelRow, setPanelRow] = useState<KundeListeZeile | null>(null)
-
   const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
@@ -129,10 +139,8 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
       filtered.map((k) => ({
         row: k,
         name: k.name,
-        typ: k.typ,
         projekte: k.anzahl_auftraege ?? 0,
         umsatz: k.gesamt_umsatz ?? 0,
-        aktiv: letzteAktiv(k),
       })),
     [filtered]
   )
@@ -151,10 +159,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
-    if (typFilter !== 'alle') {
-      const label = typFilter === 'privat' ? 'Privat' : typFilter === 'gewerbe' ? 'Gewerbe' : 'Hausverwaltung'
-      t.push({ id: 'typ', label, onRemove: () => setTypFilter('alle') })
-    }
+    // Kundentyp steht bereits in FilterChips
     if (zeitraum !== 'alle') {
       t.push({
         id: 'z',
@@ -184,77 +189,89 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
     }
   }
 
-  return (
-    <div>
-      <PageHeader
-        title="Kunden"
-        breadcrumbs={[{ label: 'Kunden' }]}
-        action={
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExportOpen(true)}>
-              ⬇️ Export
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => {
-                setEditKunde(null)
-                setModalOpen(true)
-              }}
-            >
-              + Neuer Kunde
-            </button>
-          </div>
-        }
-      />
+  function openDetail(id: string) {
+    router.push(`/kunden/${id}`)
+  }
 
-      <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:mx-0 md:rounded-lg md:border md:shadow-sm">
-        <FilterChips
+  const isPane = mode === 'pane'
+
+  return (
+    <EntityListShell
+      mode={mode}
+      filters={
+      <ListFilterSection
+        chips={
+          <FilterChips
+            options={[
+              { label: 'Alle', value: 'alle', count: typCounts.alle },
+              { label: 'Privat', value: 'privat', count: typCounts.privat },
+              { label: 'Gewerbe', value: 'gewerbe', count: typCounts.gewerbe },
+              { label: 'Hausverwaltung', value: 'hausverwaltung', count: typCounts.hausverwaltung },
+            ]}
+            selected={[typFilter]}
+            onChange={(vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle')}
+          />
+        }
+      >
+        <ListFilterBar
+          hideToolbarOnMobile
+          hideStatusFilter
+          statusLabel="—"
+          statusOptions={[{ value: '', label: '—' }]}
+          statusValue=""
+          onStatusChange={() => {}}
+          zeitraumValue={zeitraum}
+          onZeitraumChange={setZeitraum}
+          showCustomDates={zeitraum === 'benutzerdefiniert'}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          searchValue={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Name, E-Mail, Telefon, Nr."
+          onReset={resetFilters}
+          hasActiveFilters={hasFilters}
+          tags={filterTags}
+          onExportClick={() => setExportOpen(true)}
+          mobileRail={
+            <AppListFilterRail
+              sort={
+                <MobileSortSelect
+                  variant="pill"
+                  options={[
+                    { field: 'name', label: 'Kunde' },
+                    { field: 'projekte', label: 'Aufträge' },
+                    { field: 'umsatz', label: 'Umsatz' },
+                  ]}
+                  currentField={field}
+                  currentDir={dir}
+                  onSort={(f) => (f ? handleSort(f) : resetSort())}
+                />
+              }
+              zeitraumValue={zeitraum}
+              onZeitraumChange={setZeitraum}
+              onExportClick={() => setExportOpen(true)}
+            />
+          }
+        />
+      </ListFilterSection>
+      }
+    >
+      <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
+
+      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
+        <MobileSortSelect
           options={[
-            { label: 'Alle', value: 'alle', count: typCounts.alle },
-            { label: 'Privat', value: 'privat', count: typCounts.privat },
-            { label: 'Gewerbe', value: 'gewerbe', count: typCounts.gewerbe },
-            { label: 'Hausverwaltung', value: 'hausverwaltung', count: typCounts.hausverwaltung },
+            { field: 'name', label: 'Kunde' },
+            { field: 'projekte', label: 'Aufträge' },
+            { field: 'umsatz', label: 'Umsatz' },
           ]}
-          selected={[typFilter]}
-          onChange={(vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle')}
+          currentField={field}
+          currentDir={dir}
+          onSort={(f) => (f ? handleSort(f) : resetSort())}
         />
       </div>
-
-      <ListFilterBar
-        hideStatusFilter
-        statusLabel="—"
-        statusOptions={[{ value: '', label: '—' }]}
-        statusValue=""
-        onStatusChange={() => {}}
-        zeitraumValue={zeitraum}
-        onZeitraumChange={setZeitraum}
-        showCustomDates={zeitraum === 'benutzerdefiniert'}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-        searchValue={q}
-        onSearchChange={setQ}
-        searchPlaceholder="Name, E-Mail, Telefon, Nr."
-        onReset={resetFilters}
-        hasActiveFilters={hasFilters}
-        tags={filterTags}
-        className="mb-4"
-      />
-
-      <MobileSortSelect
-        options={[
-          { field: 'name', label: 'Kunde' },
-          { field: 'typ', label: 'Typ' },
-          { field: 'projekte', label: 'Projekte' },
-          { field: 'umsatz', label: 'Umsatz' },
-          { field: 'aktiv', label: 'Aktivität' },
-        ]}
-        currentField={field}
-        currentDir={dir}
-        onSort={(f) => (f ? handleSort(f) : resetSort())}
-      />
 
       {sorted.length === 0 ? (
         <EmptyState
@@ -282,127 +299,89 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         />
       ) : (
         <>
-          <ul className="md:hidden">
+          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
             {sorted.map(({ row: k }) => (
-              <li key={k.id} className="border-b border-bw-border bg-bw-card first:border-t">
-                <ListCard
-                  title={k.name}
-                  badge={<span className={typBadgeClass(k.typ)}>{typBadgeLabel(k.typ)}</span>}
-                  subtitle={k.kundennummer ?? undefined}
-                  meta={`${k.anzahl_auftraege ?? 0} Projekte · ${(k.gesamt_umsatz ?? 0).toLocaleString('de')} € · ${formatRelativeDate(letzteAktiv(k))}`}
-                  onClick={() => {
-                    setPanelId(k.id)
-                    setPanelRow(k)
-                  }}
-                />
-              </li>
+              <AppEntityListRow
+                key={k.id}
+                href={isPane ? `/kunden/${k.id}` : undefined}
+                onClick={isPane ? undefined : () => openDetail(k.id)}
+                className={cn(selectedId === k.id && 'ring-2 ring-bw-primary/40')}
+                avatar={<ListAvatar name={k.name} />}
+                title={k.name}
+                line2={`${k.telefon?.trim() || k.email?.trim() || '—'} · ${kundeRegion(k)}`}
+                line3={
+                  k.kundennummer?.trim()
+                    ? `Nr. ${k.kundennummer.trim()} · ${k.anzahl_auftraege ?? 0} Aufträge`
+                    : `${k.anzahl_auftraege ?? 0} Aufträge`
+                }
+                line4={(k.gesamt_umsatz ?? 0) > 0 ? formatEur(k.gesamt_umsatz) : undefined}
+                badge={kundeListStatusBadge(k)}
+              />
             ))}
-          </ul>
+          </ListMobileStack>
 
-          <div className="hidden min-w-0 overflow-x-auto rounded-lg border border-bw-border bg-bw-card shadow-card md:block">
-            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-bw-border bg-bw-bg">
-                  <th className="px-3 py-3" style={{ width: '32%' }}>
-                    <SortableHeader
-                      label="Kunde"
-                      field="name"
-                      currentField={field}
-                      currentDir={dir}
-                      onSort={handleSort}
-                    />
-                  </th>
-                  <th className="px-3 py-3" style={{ width: 100 }}>
-                    <SortableHeader
-                      label="Typ"
-                      field="typ"
-                      currentField={field}
-                      currentDir={dir}
-                      onSort={handleSort}
-                    />
-                  </th>
-                  <th className="px-3 py-3" style={{ width: 100 }}>
-                    <SortableHeader
-                      label="Projekte"
-                      field="projekte"
-                      currentField={field}
-                      currentDir={dir}
-                      onSort={handleSort}
-                    />
-                  </th>
-                  <th className="px-3 py-3" style={{ width: 120 }}>
-                    <SortableHeader
-                      label="Umsatz"
-                      field="umsatz"
-                      currentField={field}
-                      currentDir={dir}
-                      onSort={handleSort}
-                    />
-                  </th>
-                  <th className="px-3 py-3" style={{ width: 140 }}>
-                    <SortableHeader
-                      label="Letzte Aktivität"
-                      field="aktiv"
-                      currentField={field}
-                      currentDir={dir}
-                      onSort={handleSort}
-                    />
-                  </th>
-                  <th className="px-3 py-3" style={{ width: 80 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map(({ row: k }) => (
-                  <tr
-                    key={k.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setPanelId(k.id)
-                      setPanelRow(k)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setPanelId(k.id)
-                        setPanelRow(k)
-                      }
-                    }}
-                    className="cursor-pointer border-b border-bw-border last:border-0 hover:bg-bw-hover"
-                  >
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={cn(
-                            'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                            kundenAvatarClass(k.typ)
-                          )}
-                        >
-                          {kundenInitialen(k.name)}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-bw-text">{k.name}</p>
-                          <p className="text-xs text-bw-light">{k.kundennummer ?? '—'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <TypBadge typ={k.typ} />
-                    </td>
-                    <td className="px-3 py-3 text-bw-text">{k.anzahl_auftraege ?? 0}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-bw-text">{formatEur(k.gesamt_umsatz)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-bw-mid">
-                      {formatRelativeDate(letzteAktiv(k))}
-                      <span className="ml-1 text-xs text-bw-light">
-                        ({formatLeadListDatum(letzteAktiv(k))})
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-right text-bw-link">→</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListGridShell minWidth="880px" className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}>
+            <div
+              className="list-row-grid head"
+              style={{ gridTemplateColumns: KUNDEN_GRID_COLS }}
+            >
+              <div />
+              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
+              <div>Kontakt</div>
+              <div>Region</div>
+              <SortableHeader
+                label="Aufträge"
+                field="projekte"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
+                className="justify-end text-right"
+              />
+              <SortableHeader
+                label="Umsatz"
+                field="umsatz"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
+                className="justify-end text-right"
+              />
+              <div>Status</div>
+            </div>
+              {sorted.map(({ row: k }) => (
+              <Link
+                key={k.id}
+                href={`/kunden/${k.id}`}
+                onClick={isPane ? (e) => e.preventDefault() : undefined}
+                className={cn('list-row-grid', selectedId === k.id && isPane && 'ring-2 ring-bw-primary/40')}
+                style={{ gridTemplateColumns: KUNDEN_GRID_COLS }}
+              >
+                <ListAvatar name={k.name} />
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-medium text-bw-text">{k.name}</p>
+                  <p className="truncate text-xs text-bw-text-muted">{k.kundennummer ?? '—'}</p>
+                </div>
+                <div className="min-w-0 text-[12.5px]">
+                  {k.telefon?.trim() ? (
+                    <p className="truncate text-bw-primary">{k.telefon}</p>
+                  ) : null}
+                  <p className="truncate text-bw-text-muted">{k.email?.trim() || '—'}</p>
+                </div>
+                <p className="truncate text-[13px] text-bw-text">{kundeRegion(k)}</p>
+                <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                  {k.anzahl_auftraege ?? 0}
+                </p>
+                <p
+                  className={cn(
+                    'text-right text-[13px] font-medium tabular-nums',
+                    (k.gesamt_umsatz ?? 0) > 0 ? 'text-bw-primary' : 'text-bw-text-muted'
+                  )}
+                >
+                  {formatEur(k.gesamt_umsatz)}
+                </p>
+                {kundeListStatusBadge(k)}
+              </Link>
+            ))}
+          </ListGridShell>
         </>
       )}
 
@@ -413,24 +392,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
           setEditKunde(null)
         }}
         editKunde={editKunde}
-      />
-
-      <KundeSidePanel
-        open={!!panelId}
-        onClose={() => {
-          setPanelId(null)
-          setPanelRow(null)
-        }}
-        kundeId={panelId}
-        summary={panelRow}
-        onBearbeiten={() => {
-          if (panelRow) {
-            setEditKunde(panelRow)
-            setModalOpen(true)
-            setPanelId(null)
-            setPanelRow(null)
-          }
-        }}
       />
 
       <CsvExportModal
@@ -445,6 +406,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
           exportToCSV(data, fields, 'kunden')
         }}
       />
-    </div>
+    </EntityListShell>
   )
 }

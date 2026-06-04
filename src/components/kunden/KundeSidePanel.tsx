@@ -1,14 +1,17 @@
 'use client'
 
 import Link from 'next/link'
+import { Mail, Phone } from 'lucide-react'
+import { IconText } from '@/components/ui/IconText'
+import { LinkChevron } from '@/components/ui/LinkChevron'
 import { SidePanel } from '@/components/ui/SidePanel'
 import { formatRelativeDate, cn } from '@/lib/utils'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 
 function typBadgeClass(typ: string) {
-  if (typ === 'gewerbe') return 'badge badge-order'
-  if (typ === 'hausverwaltung') return 'badge badge-offer'
-  return 'badge badge-new'
+  if (typ === 'gewerbe') return 'badge badge-order badge-no-dot'
+  if (typ === 'hausverwaltung') return 'badge badge-offer badge-no-dot'
+  return 'badge badge-new badge-no-dot'
 }
 
 function typBadgeLabel(typ: string) {
@@ -58,12 +61,12 @@ export function KundeSidePanel({
         <div className="space-y-1">
           {summary.telefon ? (
             <a href={`tel:${summary.telefon}`} className="flex items-center gap-2 py-1 text-sm text-bw-link">
-              📞 {summary.telefon}
+              <IconText icon={Phone}>{summary.telefon}</IconText>
             </a>
           ) : null}
           {summary.email ? (
             <a href={`mailto:${summary.email}`} className="flex items-center gap-2 truncate py-1 text-sm text-bw-link">
-              ✉️ {summary.email}
+              <IconText icon={Mail}>{summary.email}</IconText>
             </a>
           ) : null}
         </div>
@@ -82,14 +85,14 @@ export function KundeSidePanel({
         <p className="text-xs text-bw-text-muted">Letzte Aktivität: {formatRelativeDate(aktiv)}</p>
 
         <div className="space-y-2 border-t border-bw-border pt-2">
-          <Link href={`/anfragen/neu?kunde_id=${summary.id}`} className="btn btn-primary btn-sm inline-flex w-full justify-center">
+          <Link href={`/anfragen?neu=1&kunde_id=${summary.id}`} className="btn btn-primary btn-sm inline-flex w-full justify-center">
             + Neue Anfrage
           </Link>
           <Link href={`/kunden/${kundeId}`} className="btn btn-secondary btn-sm inline-flex w-full justify-center">
-            Zur Kundenakte →
+            <LinkChevron>Zur Kundenakte</LinkChevron>
           </Link>
           <button type="button" className="btn btn-secondary btn-sm w-full" onClick={onBearbeiten}>
-            ✏️ Bearbeiten
+            Bearbeiten
           </button>
         </div>
       </div>

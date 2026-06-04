@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useMemo } from 'react'
+import { LinkChevron } from '@/components/ui/LinkChevron'
+import { ZeitstrahlTypIcon } from '@/components/ui/ZeitstrahlTypIcon'
 import {
   ANGEBOT_STATUS_LABELS,
   AUFTRAG_STATUS_LABELS,
@@ -9,6 +11,7 @@ import {
   formatDatum,
   formatPreis,
 } from '@/lib/utils'
+import { sortByDateFieldAsc } from '@/lib/timeline-sort'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 
 export interface ZeitstrahlEintrag {
@@ -23,7 +26,7 @@ export interface ZeitstrahlEintrag {
   link_label?: string
 }
 
-function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
+export function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
   const eintraege: ZeitstrahlEintrag[] = []
 
   for (const lead of kunde.leads ?? []) {
@@ -35,7 +38,7 @@ function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
       beschreibung: lead.bereiche?.length ? lead.bereiche.join(', ') : lead.situation ?? undefined,
       status: STATUS_LABELS[lead.status] ?? lead.status,
       link: `/anfragen/${lead.id}`,
-      link_label: '→ Zur Anfrage',
+      link_label: 'Zur Anfrage',
     })
 
     for (const ang of lead.angebote ?? []) {
@@ -47,7 +50,7 @@ function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
         betrag: ang.gesamt_min,
         status: ANGEBOT_STATUS_LABELS[ang.status as keyof typeof ANGEBOT_STATUS_LABELS] ?? ang.status,
         link: `/angebote/${ang.id}`,
-        link_label: '→ Zum Angebot',
+        link_label: 'Zum Angebot',
       })
     }
   }
@@ -63,7 +66,7 @@ function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
       betrag: angebotRow?.gesamt_min ?? null,
       status: AUFTRAG_STATUS_LABELS[a.status] ?? a.status,
       link: `/auftraege/${a.id}`,
-      link_label: '→ Zum Auftrag',
+      link_label: 'Zum Auftrag',
     })
   }
 
@@ -76,7 +79,7 @@ function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
       betrag: r.brutto,
       status: r.status,
       link: `/rechnungen/${r.id}`,
-      link_label: '→ Zur Rechnung',
+      link_label: 'Zur Rechnung',
     })
   }
 
@@ -100,16 +103,7 @@ function buildZeitstrahl(kunde: KundeDetailPayload): ZeitstrahlEintrag[] {
     })
   }
 
-  return eintraege.sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
-}
-
-const ICON: Record<ZeitstrahlEintrag['typ'], string> = {
-  anfrage: '📥',
-  angebot: '📄',
-  auftrag: '🔨',
-  rechnung: '🧾',
-  notiz: '📝',
-  mail: '✉️',
+  return sortByDateFieldAsc(eintraege, 'datum')
 }
 
 export function KundenZeitstrahl({ kunde }: { kunde: KundeDetailPayload }) {
@@ -141,9 +135,7 @@ export function KundenZeitstrahl({ kunde }: { kunde: KundeDetailPayload }) {
           <ul className="space-y-4">
             {gruppen[monat].map((e) => (
               <li key={e.id} className="flex gap-3 text-sm">
-                <span className="text-lg leading-none" aria-hidden>
-                  {ICON[e.typ]}
-                </span>
+                <ZeitstrahlTypIcon typ={e.typ} className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span className="font-medium text-bw-text">{e.titel}</span>
@@ -157,7 +149,7 @@ export function KundenZeitstrahl({ kunde }: { kunde: KundeDetailPayload }) {
                     {e.betrag != null ? <span>{formatPreis(e.betrag)}</span> : null}
                     {e.link ? (
                       <Link href={e.link} className="font-medium text-bw-link hover:underline">
-                        {e.link_label ?? 'Öffnen'}
+                        <LinkChevron>{e.link_label ?? 'Öffnen'}</LinkChevron>
                       </Link>
                     ) : null}
                   </div>

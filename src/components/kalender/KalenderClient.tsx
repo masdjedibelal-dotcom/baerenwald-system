@@ -24,6 +24,10 @@ import {
   moveKalenderTermin,
   saveKalenderTermin,
 } from '@/app/(dashboard)/kalender/actions'
+import { KalenderHeuteCard } from '@/components/kalender/KalenderHeuteCard'
+import { KalenderTeamAuslastung } from '@/components/kalender/KalenderTeamAuslastung'
+import { computeTeamAuslastung } from '@/lib/kalender-auslastung'
+import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
 
 export const TYP_FARBEN: Record<KalenderTermin['typ'], string> = {
   besichtigung: '#C4922A',
@@ -33,7 +37,7 @@ export const TYP_FARBEN: Record<KalenderTermin['typ'], string> = {
 }
 
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
-  { value: 'besichtigung', label: 'Besichtigung' },
+  { value: 'besichtigung', label: KALENDER_TYP_LABEL.besichtigung },
   { value: 'beginn', label: 'Beginn' },
   { value: 'abnahme', label: 'Abnahme' },
   { value: 'sonstiges', label: 'Sonstiges' },
@@ -80,6 +84,8 @@ export function KalenderClient() {
   const calendarRef = useRef<InstanceType<typeof FullCalendar>>(null)
   const [mounted, setMounted] = useState(false)
   const [termine, setTermine] = useState<KalenderTermin[]>([])
+  const [team, setTeam] = useState<{ id: string; name: string; telefon: string }[]>([])
+  const [betreuerMap, setBetreuerMap] = useState<Map<string, string>>(() => new Map())
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [uiView, setUiView] = useState<UiView>('woche')
@@ -97,6 +103,7 @@ export function KalenderClient() {
   const [fLeadId, setFLeadId] = useState('')
   const [fAuftragId, setFAuftragId] = useState('')
   const [fErledigt, setFErledigt] = useState(false)
+  const [fZugewiesen, setFZugewiesen] = useState('')
   const [leadQ, setLeadQ] = useState('')
   const [auftragQ, setAuftragQ] = useState('')
   const [leadHits, setLeadHits] = useState<{ id: string; kontakt_name: string | null }[]>([])
@@ -152,7 +159,35 @@ export function KalenderClient() {
       setLoadErr(error.message)
       return
     }
-    setTermine((data ?? []) as KalenderTermin[])
+    const rows = (data ?? []) as KalenderTermin[]
+    setTermine(rows)
+
+    const { data: profiles } = await supabase.from('user_profiles').select('id, name, telefon').order('name')
+    setTeam(
+      (profiles ?? []).map((p) => ({
+        id: p.id as string,
+        name: (p.name as string)?.trim() || 'Team',
+        telefon: (p.telefon as string)?.trim() || '',
+      }))
+    )
+
+    const auftragIds = Array.from(
+      new Set(rows.map((t) => t.auftrag_id).filter((id): id is string => Boolean(id)))
+    )
+    if (auftragIds.length) {
+      const { data: aufRows } = await supabase
+        .from('auftraege')
+        .select('id, betreuer_id')
+        .in('id', auftragIds)
+      const m = new Map<string, string>()
+      for (const row of aufRows ?? []) {
+        const bid = row.betreuer_id as string | null
+        if (bid) m.set(row.id as string, bid)
+      }
+      setBetreuerMap(m)
+    } else {
+      setBetreuerMap(new Map())
+    }
   }, [supabase])
 
   useEffect(() => {
@@ -204,6 +239,13 @@ export function KalenderClient() {
     return () => clearTimeout(t)
   }, [auftragQ, supabase])
 
+  const teamAuslastung = useMemo(
+    () => computeTeamAuslastung(termine, team, betreuerMap),
+    [termine, team, betreuerMap]
+  )
+
+  const teamNameById = useMemo(() => new Map(team.map((m) => [m.id, m.name])), [team])
+
   const events: EventInput[] = useMemo(() => {
     return termine.map((t) => {
       const ymd = t.datum.slice(0, 10)
@@ -211,9 +253,11 @@ export function KalenderClient() {
       const start = hasTime ? `${ymd}T${normalizeTime(t.uhrzeit_von!)}` : ymd
       const end =
         t.uhrzeit_bis?.trim() && hasTime ? `${ymd}T${normalizeTime(t.uhrzeit_bis)}` : undefined
+      const ma = t.zugewiesen_an ? teamNameById.get(t.zugewiesen_an) : null
+      const title = ma ? `${t.titel} · ${ma}` : t.titel
       return {
         id: t.id,
-        title: t.titel,
+        title,
         start,
         end,
         allDay: !hasTime,
@@ -222,7 +266,7 @@ export function KalenderClient() {
         extendedProps: { termin: t },
       }
     })
-  }, [termine])
+  }, [termine, teamNameById])
 
   function openNeu(prefillDatum?: string) {
     setEditing(null)
@@ -236,6 +280,7 @@ export function KalenderClient() {
     setFLeadId('')
     setFAuftragId('')
     setFErledigt(false)
+    setFZugewiesen('')
     setLeadQ('')
     setAuftragQ('')
     setModalOpen(true)
@@ -253,6 +298,7 @@ export function KalenderClient() {
     setFLeadId(t.lead_id ?? '')
     setFAuftragId(t.auftrag_id ?? '')
     setFErledigt(t.erledigt)
+    setFZugewiesen(t.zugewiesen_an ?? '')
     setLeadQ('')
     setAuftragQ('')
     setModalOpen(true)
@@ -309,6 +355,7 @@ export function KalenderClient() {
         beschreibung: fDesc.trim() || null,
         lead_id: fLeadId || null,
         auftrag_id: fAuftragId || null,
+        zugewiesen_an: fZugewiesen.trim() || null,
         erledigt: fErledigt,
       })
       if (!res.ok) {
@@ -346,7 +393,6 @@ export function KalenderClient() {
     return (
       <div>
         <PageHeader
-          title="Kalender"
           action={
             <Button type="button" variant="primary" size="sm" disabled>
               + Termin
@@ -363,7 +409,6 @@ export function KalenderClient() {
   return (
     <div>
       <PageHeader
-        title="Kalender"
         action={
           <div className="flex flex-wrap items-center gap-2">
             <div className="hidden flex-wrap gap-1 md:flex">
@@ -438,6 +483,11 @@ export function KalenderClient() {
             list: 'Liste',
           }}
           events={events}
+          eventClassNames={(arg) => {
+            const raw = arg.event.extendedProps as { termin?: KalenderTermin }
+            const typ = raw.termin?.typ
+            return typ ? [`fc-event-typ-${typ}`] : []
+          }}
           dateClick={handleDateClick}
           eventClick={handleEventClick}
           editable
@@ -447,6 +497,11 @@ export function KalenderClient() {
             if (t) setUiView(t)
           }}
         />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <KalenderHeuteCard termine={termine} onTerminClick={openEdit} />
+        <KalenderTeamAuslastung members={teamAuslastung} />
       </div>
 
       <Modal
@@ -468,6 +523,19 @@ export function KalenderClient() {
               <Input type="time" label="Uhrzeit von" value={fVon} onChange={(e) => setFVon(e.target.value)} />
               <Input type="time" label="Uhrzeit bis" value={fBis} onChange={(e) => setFBis(e.target.value)} />
               <Input label="Adresse" value={fAdr} onChange={(e) => setFAdr(e.target.value)} />
+              <Select
+                name="zugewiesen"
+                label="Vor-Ort Mitarbeiter"
+                value={fZugewiesen}
+                onChange={(e) => setFZugewiesen(e.target.value)}
+                options={[
+                  { value: '', label: '—' },
+                  ...team.map((m) => ({
+                    value: m.id,
+                    label: m.telefon ? `${m.name} · ${m.telefon}` : m.name,
+                  })),
+                ]}
+              />
               <Textarea label="Beschreibung" value={fDesc} onChange={(e) => setFDesc(e.target.value)} rows={3} />
               <div>
                 <label className="mb-1 block text-sm font-medium text-bw-text">Lead suchen (optional)</label>

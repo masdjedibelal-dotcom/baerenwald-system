@@ -9,7 +9,14 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Accordion } from '@/components/ui/Accordion'
 import { findKundenDuplikate, saveKunde } from '@/app/actions/kunden'
+import {
+  istKundeFirmaPflichtTyp,
+  istKundeHausverwaltungTyp,
+  istKundeNurGewerbeTyp,
+} from '@/lib/kunde-stammdaten'
+import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import type { Kunde } from '@/lib/types'
+
 const TYP_OPTS = [
   { value: 'privat', label: 'Privat' },
   { value: 'gewerbe', label: 'Gewerbe' },
@@ -30,60 +37,96 @@ export function KundeModal({
   open,
   onClose,
   editKunde,
+  leadFunnelDaten,
+  stayOnPage = false,
+  revalidateAnfrageId,
+  onSaved,
 }: {
   open: boolean
   onClose: () => void
   editKunde?: Kunde | null
+  /** Website-Funnel der verknüpften Anfrage (korrekte Vorname/Nachname-Felder). */
+  leadFunnelDaten?: unknown
+  /** Kein Redirect zur Kundenseite nach Speichern (z. B. Anfrage-Detail). */
+  stayOnPage?: boolean
+  revalidateAnfrageId?: string
+  onSaved?: () => void
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [name, setName] = useState('')
   const [typ, setTyp] = useState('privat')
+  const [firmaName, setFirmaName] = useState('')
+  const [vorname, setVorname] = useState('')
+  const [nachname, setNachname] = useState('')
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
+  const [strasse, setStrasse] = useState('')
+  const [hausnummer, setHausnummer] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
-  const [adresse, setAdresse] = useState('')
   const [webseite, setWebseite] = useState('')
   const [ansprechpartner, setAnsprechpartner] = useState('')
   const [geburtstag, setGeburtstag] = useState('')
   const [quelle, setQuelle] = useState('')
   const [notizen, setNotizen] = useState('')
+  const [ustId, setUstId] = useState('')
   const [dupes, setDupes] = useState<Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>[]>([])
   const [err, setErr] = useState<string | null>(null)
+
+  const firmaPflicht = istKundeFirmaPflichtTyp(typ)
+  const istGewerbe = istKundeNurGewerbeTyp(typ)
+  const istHausverwaltung = istKundeHausverwaltungTyp(typ)
 
   useEffect(() => {
     if (!open) return
     if (editKunde) {
-      setName(editKunde.name ?? '')
-      setTyp(editKunde.typ ?? 'privat')
+      const typVal = editKunde.typ ?? 'privat'
+      const namen = normalizeKundeNamen({
+        typ: typVal,
+        name: editKunde.name,
+        vorname: editKunde.vorname,
+        nachname: editKunde.nachname,
+        funnelDaten: leadFunnelDaten,
+      })
+      setTyp(typVal)
+      setFirmaName(
+        istKundeFirmaPflichtTyp(typVal) ? (editKunde.name ?? namen.name ?? '').trim() : ''
+      )
+      setVorname(namen.vorname ?? '')
+      setNachname(namen.nachname ?? '')
       setTelefon(editKunde.telefon ?? '')
       setEmail(editKunde.email ?? '')
+      setStrasse(editKunde.strasse?.trim() || editKunde.adresse?.trim() || '')
+      setHausnummer(editKunde.hausnummer ?? '')
       setPlz(editKunde.plz ?? '')
       setOrt(editKunde.ort ?? '')
-      setAdresse(editKunde.adresse ?? '')
       setWebseite(editKunde.webseite ?? '')
       setAnsprechpartner(editKunde.ansprechpartner ?? '')
       setGeburtstag(editKunde.geburtstag?.slice(0, 10) ?? '')
       setQuelle(editKunde.quelle ?? '')
       setNotizen(editKunde.notizen ?? '')
+      setUstId(editKunde.ust_id ?? '')
     } else {
-      setName('')
       setTyp('privat')
+      setFirmaName('')
+      setVorname('')
+      setNachname('')
       setTelefon('')
       setEmail('')
+      setStrasse('')
+      setHausnummer('')
       setPlz('')
       setOrt('')
-      setAdresse('')
       setWebseite('')
       setAnsprechpartner('')
       setGeburtstag('')
       setQuelle('')
       setNotizen('')
+      setUstId('')
     }
     setDupes([])
     setErr(null)
-  }, [open, editKunde])
+  }, [open, editKunde, leadFunnelDaten])
 
   useEffect(() => {
     if (!open || editKunde) return
@@ -97,36 +140,42 @@ export function KundeModal({
   }, [open, editKunde, telefon, email])
 
   function submit() {
-    if (!name.trim()) {
-      setErr('Name ist Pflicht.')
-      return
-    }
     setErr(null)
     startTransition(async () => {
       const res = await saveKunde(
         {
-          name: name.trim(),
           typ,
+          name: firmaPflicht ? firmaName : null,
+          vorname: vorname || null,
+          nachname: nachname || null,
+          strasse,
+          hausnummer,
+          plz,
+          ort,
           telefon: telefon || null,
           email: email || null,
-          plz: plz || null,
-          ort: ort || null,
-          adresse: adresse || null,
           webseite: webseite || null,
           ansprechpartner: ansprechpartner || null,
           geburtstag: geburtstag || null,
           quelle: quelle || null,
           notizen: notizen || null,
+          ust_id: istGewerbe ? ustId || null : null,
         },
-        editKunde?.id
+        editKunde?.id,
+        revalidateAnfrageId ? { revalidateAnfrageIds: [revalidateAnfrageId] } : undefined
       )
       if (!res.ok) {
         setErr(res.message)
         return
       }
       onClose()
-      router.push(`/kunden/${res.id}`)
-      router.refresh()
+      onSaved?.()
+      if (stayOnPage) {
+        router.refresh()
+      } else {
+        router.push(`/kunden/${res.id}`)
+        router.refresh()
+      }
     })
   }
 
@@ -134,7 +183,7 @@ export function KundeModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={editKunde ? 'Kunde bearbeiten' : 'Neuer Kunde'}
+      title={editKunde ? 'Stammdaten bearbeiten' : 'Neuer Kunde'}
       size="md"
       footer={
         <div className="flex w-full justify-end gap-2">
@@ -165,13 +214,45 @@ export function KundeModal({
         ) : null}
 
         <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-          <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Select
-            label="Typ *"
-            value={typ}
-            onChange={(e) => setTyp(e.target.value)}
-            options={TYP_OPTS}
-          />
+          <Select label="Typ *" value={typ} onChange={(e) => setTyp(e.target.value)} options={TYP_OPTS} />
+          {firmaPflicht ? (
+            <Input
+              label={istHausverwaltung ? 'Firma *' : 'Firma / Name *'}
+              value={firmaName}
+              onChange={(e) => setFirmaName(e.target.value)}
+              className="md:col-span-1"
+              required
+            />
+          ) : null}
+          {firmaPflicht ? (
+            <>
+              <Input
+                label="Vorname (Ansprechpartner)"
+                value={vorname}
+                onChange={(e) => setVorname(e.target.value)}
+              />
+              <Input
+                label="Nachname (Ansprechpartner)"
+                value={nachname}
+                onChange={(e) => setNachname(e.target.value)}
+              />
+            </>
+          ) : null}
+          {!firmaPflicht ? (
+            <>
+              <Input label="Vorname" value={vorname} onChange={(e) => setVorname(e.target.value)} />
+              <Input
+                label="Nachname *"
+                value={nachname}
+                onChange={(e) => setNachname(e.target.value)}
+                required
+              />
+            </>
+          ) : null}
+          <Input label="Straße *" value={strasse} onChange={(e) => setStrasse(e.target.value)} />
+          <Input label="Hausnummer *" value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
+          <Input label="Postleitzahl *" value={plz} onChange={(e) => setPlz(e.target.value)} />
+          <Input label="Ort *" value={ort} onChange={(e) => setOrt(e.target.value)} />
           <Input
             label="Telefon"
             type="tel"
@@ -184,30 +265,39 @@ export function KundeModal({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <Input label="PLZ" value={plz} onChange={(e) => setPlz(e.target.value)} />
-          <Input label="Ort" value={ort} onChange={(e) => setOrt(e.target.value)} />
+          {istGewerbe ? (
+            <>
+              <Input
+                label="USt-IdNr. (Kunde)"
+                value={ustId}
+                onChange={(e) => setUstId(e.target.value)}
+                placeholder="DE…"
+              />
+              <Input
+                label="Ansprechpartner"
+                value={ansprechpartner}
+                onChange={(e) => setAnsprechpartner(e.target.value)}
+              />
+            </>
+          ) : null}
         </div>
 
         <Accordion title="Weitere Details" defaultOpen={false}>
           <div className="form-grid-2 mt-2 grid gap-3 md:grid-cols-2">
-            <Input label="Straße / Adresse" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
             <Input
               label="Webseite"
               type="url"
               value={webseite}
               onChange={(e) => setWebseite(e.target.value)}
             />
-            <Input
-              label="Ansprechpartner"
-              value={ansprechpartner}
-              onChange={(e) => setAnsprechpartner(e.target.value)}
-            />
-            <Input
-              label="Geburtstag"
-              type="date"
-              value={geburtstag}
-              onChange={(e) => setGeburtstag(e.target.value)}
-            />
+            {!firmaPflicht ? (
+              <Input
+                label="Geburtstag"
+                type="date"
+                value={geburtstag}
+                onChange={(e) => setGeburtstag(e.target.value)}
+              />
+            ) : null}
             <Select
               label="Quelle"
               value={quelle}

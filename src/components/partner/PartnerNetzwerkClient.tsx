@@ -1,28 +1,34 @@
 'use client'
 
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Download, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import {
+  ListFilterSection,
+  ListMobileStack,
+  ListGridShell,
+} from '@/components/layout/ListPageParts'
+import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { ListAvatar } from '@/components/ui/ListAvatar'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { Input } from '@/components/ui/Input'
-import { Modal } from '@/components/ui/Modal'
-import { Select } from '@/components/ui/Select'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { FilterChips } from '@/components/ui/FilterChips'
-import { ListCard } from '@/components/ui/ListCard'
-import { SidePanel } from '@/components/ui/SidePanel'
+import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 import { useExport, type ExportField } from '@/hooks/useExport'
+import { useSort } from '@/hooks/useSort'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   getZeitraumRange,
   datumInZeitraum,
   zeitraumLabel,
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
-import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { PartnerPanelContent } from '@/components/partner/PartnerPanelContent'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 
 export type PartnerKategorie = {
   id: string
@@ -57,6 +63,10 @@ const PARTNER_EXPORT_FIELDS: ExportField[] = [
   { key: 'adresse', label: 'Adresse' },
 ]
 
+const PARTNER_GRID_COLS = '42px minmax(200px,2fr) minmax(160px,1.2fr) minmax(120px,1fr) 100px 90px'
+
+type TypListenFilter = 'alle' | 'partner' | 'netzwerk'
+
 function partnerExportRow(p: PartnerRow): Record<string, unknown> {
   return {
     name: p.name,
@@ -68,53 +78,96 @@ function partnerExportRow(p: PartnerRow): Record<string, unknown> {
   }
 }
 
+function partnerTypLabel(p: PartnerRow): string {
+  return (p.partner_typ ?? 'partner') === 'netzwerk' ? 'Netzwerk' : 'Partner'
+}
+
+function partnerTypBadgeCls(p: PartnerRow): string {
+  return (p.partner_typ ?? 'partner') === 'netzwerk'
+    ? 'bg-violet-50 text-violet-800'
+    : 'bg-bw-green-bg text-bw-primary'
+}
+
+export function PartnerTypBadge({ partner }: { partner: Pick<PartnerRow, 'partner_typ'> }) {
+  return (
+    <span className={cn('badge-no-dot inline-flex rounded-full px-2 py-0.5 text-xs font-medium', partnerTypBadgeCls(partner as PartnerRow))}>
+      {partnerTypLabel(partner as PartnerRow)}
+    </span>
+  )
+}
+
+function partnerAktivBadge(p: PartnerRow) {
+  return p.aktiv ? (
+    <StatusBadge status="order" label="Aktiv" />
+  ) : (
+    <StatusBadge status="cancel" label="Inaktiv" />
+  )
+}
+
+type SortRow = {
+  row: PartnerRow
+  name: string
+  kategorie: string
+}
+
 export function PartnerNetzwerkClient({
-  partners: initial,
+  partners,
   kategorien,
+  mode = 'page',
+  selectedId = null,
 }: {
   partners: PartnerRow[]
   kategorien: PartnerKategorie[]
+  mode?: 'page' | 'pane'
+  selectedId?: string | null
 }) {
+  const router = useRouter()
   const { exportToCSV } = useExport()
-  const [partners, setPartners] = useState(initial)
-  const [tab, setTab] = useState<'partner' | 'netzwerk'>('partner')
+  const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [brancheFilter, setBrancheFilter] = useState('alle')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [q, setQ] = useState('')
+  const debouncedQ = useDebouncedValue(q, 300)
   const [exportOpen, setExportOpen] = useState(false)
-  const [selected, setSelected] = useState<PartnerRow | null>(null)
-  const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
-  const [edit, setEdit] = useState<PartnerRow | null>(null)
-  const [saving, setSaving] = useState(false)
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
     [zeitraum, customFrom, customTo]
   )
 
-  const imTab = useMemo(
-    () => partners.filter((p) => (p.partner_typ ?? 'partner') === tab),
-    [partners, tab]
-  )
+  const typCounts = useMemo(() => {
+    let partner = 0
+    let netzwerk = 0
+    for (const p of partners) {
+      if ((p.partner_typ ?? 'partner') === 'netzwerk') netzwerk++
+      else partner++
+    }
+    return { alle: partners.length, partner, netzwerk }
+  }, [partners])
+
+  const imTyp = useMemo(() => {
+    if (typFilter === 'alle') return partners
+    return partners.filter((p) => (p.partner_typ ?? 'partner') === typFilter)
+  }, [partners, typFilter])
 
   const brancheCounts = useMemo(() => {
     const m = new Map<string, number>()
-    for (const p of imTab) {
+    for (const p of imTyp) {
       if (!p.kategorie_id) continue
       m.set(p.kategorie_id, (m.get(p.kategorie_id) ?? 0) + 1)
     }
     return m
-  }, [imTab])
+  }, [imTyp])
 
   const kategorienMitNutzung = useMemo(() => {
     return [...kategorien].sort((a, b) => a.sort_order - b.sort_order)
   }, [kategorien])
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return imTab.filter((p) => {
+    const needle = debouncedQ.trim().toLowerCase()
+    return imTyp.filter((p) => {
       if (brancheFilter !== 'alle' && p.kategorie_id !== brancheFilter) return false
       if (dateRange && !datumInZeitraum(p.created_at, dateRange)) return false
       if (!needle) return true
@@ -130,10 +183,29 @@ export function PartnerNetzwerkClient({
         .toLowerCase()
       return hay.includes(needle)
     })
-  }, [imTab, brancheFilter, dateRange, q])
+  }, [imTyp, brancheFilter, dateRange, debouncedQ])
+
+  const sortRows: SortRow[] = useMemo(
+    () =>
+      filtered.map((p) => ({
+        row: p,
+        name: p.name,
+        kategorie: p.partner_kategorien?.name ?? '',
+      })),
+    [filtered]
+  )
+
+  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
+    if (typFilter !== 'alle') {
+      t.push({
+        id: 'typ',
+        label: typFilter === 'netzwerk' ? 'Netzwerk' : 'Partner',
+        onRemove: () => setTypFilter('alle'),
+      })
+    }
     if (brancheFilter !== 'alle') {
       const label = kategorien.find((k) => k.id === brancheFilter)?.name ?? 'Branche'
       t.push({ id: 'br', label, onRemove: () => setBrancheFilter('alle') })
@@ -153,338 +225,220 @@ export function PartnerNetzwerkClient({
       t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
     }
     return t
-  }, [brancheFilter, kategorien, zeitraum, q])
+  }, [typFilter, brancheFilter, zeitraum, q, kategorien])
 
-  const hasActiveFilters = !!(brancheFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
+  const hasActiveFilters = !!(typFilter !== 'alle' || brancheFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
 
   function resetFilters() {
+    setTypFilter('alle')
     setBrancheFilter('alle')
     setZeitraum('alle')
     setCustomFrom('')
     setCustomTo('')
     setQ('')
+    resetSort()
   }
 
-  async function savePartner() {
-    if (!edit) return
-    setSaving(true)
-    const supabase = createClient()
-    const kat = kategorien.find((k) => k.id === edit.kategorie_id)
-    const { error } = await supabase
-      .from('partner')
-      .update({
-        name: edit.name,
-        partner_typ: edit.partner_typ,
-        kategorie_id: edit.kategorie_id,
-        subkategorie: edit.subkategorie,
-        ansprechpartner: edit.ansprechpartner,
-        telefon: edit.telefon,
-        email: edit.email,
-        adresse: edit.adresse,
-        website: edit.website,
-        notizen: edit.notizen,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', edit.id)
-    setSaving(false)
-    if (error) return
-    setPartners((prev) =>
-      prev.map((p) =>
-        p.id === edit.id
-          ? {
-              ...p,
-              ...edit,
-              partner_kategorien: kat
-                ? { name: kat.name, slug: kat.slug, sort_order: kat.sort_order }
-                : null,
-            }
-          : p
-      )
-    )
-    setBearbeitenOpen(false)
-    setEdit(null)
-    setSelected((sel) =>
-      sel?.id === edit.id
-        ? {
-            ...sel,
-            ...edit,
-            partner_kategorien: kat
-              ? { name: kat.name, slug: kat.slug, sort_order: kat.sort_order }
-              : null,
-          }
-        : sel
-    )
+  function openDetail(id: string) {
+    router.push(`/partner/${id}`)
   }
 
-  function openBearbeiten(p: PartnerRow) {
-    setEdit({ ...p, partner_typ: p.partner_typ ?? 'partner' })
-    setBearbeitenOpen(true)
-  }
+  const isPane = mode === 'pane'
 
-  const chipOptions = useMemo(
+  const sortOptions = [
+    { field: 'name', label: 'Name' },
+    { field: 'kategorie', label: 'Kategorie' },
+  ]
+
+  const sortSelect = (
+    <MobileSortSelect
+      variant="pill"
+      options={sortOptions}
+      currentField={field}
+      currentDir={dir}
+      onSort={(f) => (f ? handleSort(f) : resetSort())}
+    />
+  )
+
+  const typChipOptions = useMemo(
     () => [
-      { label: 'Alle', value: 'alle', count: imTab.length },
+      { label: 'Alle', value: 'alle', count: typCounts.alle },
+      { label: 'Partner', value: 'partner', count: typCounts.partner },
+      { label: 'Netzwerk', value: 'netzwerk', count: typCounts.netzwerk },
+    ],
+    [typCounts]
+  )
+
+  const brancheChipOptions = useMemo(
+    () => [
+      { label: 'Alle Branchen', value: 'alle', count: imTyp.length },
       ...kategorienMitNutzung.map((k) => ({
         label: k.name,
         value: k.id,
         count: brancheCounts.get(k.id) ?? 0,
       })),
     ],
-    [imTab.length, kategorienMitNutzung, brancheCounts]
+    [imTyp.length, kategorienMitNutzung, brancheCounts]
   )
 
   return (
-    <div>
-      <PageHeader
-        title="Partner & Netzwerk"
-        action={
-          <button
-            type="button"
-            onClick={() => setExportOpen(true)}
-            className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 text-sm font-medium text-bw-text shadow-sm transition-colors hover:bg-bw-hover"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            Export
-          </button>
+    <EntityListShell
+      mode={mode}
+      filters={
+      <ListFilterSection
+        chips={
+          <div className="flex min-w-0 flex-col gap-2">
+            <FilterChips
+              options={typChipOptions}
+              selected={[typFilter]}
+              onChange={(vals) => {
+                setTypFilter((vals[0] as TypListenFilter) || 'alle')
+                setBrancheFilter('alle')
+              }}
+            />
+            <FilterChips
+              options={brancheChipOptions}
+              selected={[brancheFilter]}
+              onChange={(vals) => setBrancheFilter(vals[0] || 'alle')}
+            />
+          </div>
         }
-      />
-
-      <div className="mb-4 flex gap-2 border-b border-bw-border pb-3">
-        <button
-          type="button"
-          onClick={() => {
-            setTab('partner')
-            setBrancheFilter('alle')
-          }}
-          className={cn(
-            'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-            tab === 'partner' ? 'bg-bw-primary text-white' : 'border border-bw-border bg-bw-card text-bw-text'
-          )}
-        >
-          Partner
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTab('netzwerk')
-            setBrancheFilter('alle')
-          }}
-          className={cn(
-            'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-            tab === 'netzwerk' ? 'bg-bw-primary text-white' : 'border border-bw-border bg-bw-card text-bw-text'
-          )}
-        >
-          Netzwerk
-        </button>
-      </div>
-
-      <div className="sticky top-14 z-10 border-b border-bw-border bg-bw-bg px-4 py-3">
-        <FilterChips
-          options={chipOptions}
-          selected={[brancheFilter]}
-          onChange={(vals) => setBrancheFilter(vals[0] || 'alle')}
+      >
+        <ListFilterBar
+          hideToolbarOnMobile
+          hideStatusFilter
+          statusLabel="—"
+          statusOptions={[{ value: '', label: '—' }]}
+          statusValue=""
+          onStatusChange={() => {}}
+          zeitraumValue={zeitraum}
+          onZeitraumChange={setZeitraum}
+          showCustomDates={zeitraum === 'benutzerdefiniert'}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          searchValue={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Name, Kategorie, Telefon, E-Mail, Adresse"
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+          tags={filterTags}
+          onExportClick={() => setExportOpen(true)}
+          mobileRail={
+            <AppListFilterRail
+              sort={
+                <MobileSortSelect
+                  variant="pill"
+                  options={sortOptions}
+                  currentField={field}
+                  currentDir={dir}
+                  onSort={(f) => (f ? handleSort(f) : resetSort())}
+                />
+              }
+              zeitraumValue={zeitraum}
+              onZeitraumChange={setZeitraum}
+              secondaryFilter={{
+                label: 'Branche',
+                options: brancheChipOptions.map((o) => ({ value: o.value, label: o.label })),
+                value: brancheFilter,
+                onChange: setBrancheFilter,
+              }}
+              onExportClick={() => setExportOpen(true)}
+            />
+          }
         />
-      </div>
+      </ListFilterSection>
+      }
+    >
+      <PageHeader className="hidden md:block" />
 
-      <ListFilterBar
-        hideStatusFilter
-        statusLabel="—"
-        statusOptions={[{ value: '', label: '—' }]}
-        statusValue=""
-        onStatusChange={() => {}}
-        zeitraumValue={zeitraum}
-        onZeitraumChange={setZeitraum}
-        showCustomDates={zeitraum === 'benutzerdefiniert'}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-        searchValue={q}
-        onSearchChange={setQ}
-        searchPlaceholder="Name, Kategorie, Telefon, E-Mail, Adresse"
-        onReset={resetFilters}
-        hasActiveFilters={hasActiveFilters}
-        tags={filterTags}
-        className="mb-4"
-      />
-
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <EmptyState
           icon={Users}
-          title={imTab.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
+          title={imTyp.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
           description={
-            imTab.length === 0
+            imTyp.length === 0
               ? 'Erfassen Sie Lieferanten und Partner für Ihr Netzwerk.'
               : 'Passe Filter oder Suche an.'
           }
         />
       ) : (
         <>
-          <ul className="md:hidden">
-            {filtered.map((p) => (
-              <li key={p.id} className="border-b border-bw-border bg-bw-card first:border-t">
-                <ListCard
-                  title={p.name}
-                  subtitle={p.partner_kategorien?.name || p.subkategorie || ''}
-                  meta={p.telefon || ''}
-                  onClick={() => setSelected(p)}
-                />
-              </li>
+          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
+            {sorted.map(({ row: p }) => (
+              <AppEntityListRow
+                key={p.id}
+                href={isPane ? `/partner/${p.id}` : undefined}
+                onClick={isPane ? undefined : () => openDetail(p.id)}
+                className={cn(selectedId === p.id && 'ring-2 ring-bw-primary/40')}
+                avatar={<ListAvatar name={p.name} />}
+                title={p.name}
+                line2={p.partner_kategorien?.name ?? '—'}
+                line3={
+                  [
+                    [p.telefon?.trim(), p.email?.trim()].filter(Boolean).join(' · '),
+                    p.aktiv ? 'Aktiv' : 'Inaktiv',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || '—'
+                }
+                line4={p.subkategorie?.trim() || undefined}
+                badge={<PartnerTypBadge partner={p} />}
+              />
             ))}
-          </ul>
+          </ListMobileStack>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-bw-border bg-bw-card shadow-card md:block">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-bw-border bg-bw-bg text-bw-text-muted">
-                  <th className="px-3 py-3 font-medium">Name</th>
-                  <th className="px-3 py-3 font-medium">Kategorie</th>
-                  <th className="px-3 py-3 font-medium">Telefon</th>
-                  <th className="px-3 py-3 font-medium">E-Mail</th>
-                  <th className="px-3 py-3 font-medium">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    role="button"
-                    tabIndex={0}
-                    className="cursor-pointer border-b border-bw-border last:border-0 hover:bg-bw-hover"
-                    onClick={() => setSelected(p)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setSelected(p)
-                      }
-                    }}
-                  >
-                    <td className="px-3 py-3 font-medium text-bw-text">{p.name}</td>
-                    <td className="px-3 py-3 text-bw-text-muted">{p.partner_kategorien?.name ?? '—'}</td>
-                    <td className="px-3 py-3">
-                      {p.telefon ? (
-                        <a href={`tel:${p.telefon}`} className="text-bw-link hover:underline" onClick={(e) => e.stopPropagation()}>
-                          {p.telefon}
-                        </a>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      {p.email ? (
-                        <a href={`mailto:${p.email}`} className="text-bw-link hover:underline" onClick={(e) => e.stopPropagation()}>
-                          {p.email}
-                        </a>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-bw-link hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openBearbeiten(p)
-                        }}
-                      >
-                        Bearbeiten
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListGridShell minWidth="880px" className="hidden md:block">
+            <div className="list-row-grid head" style={{ gridTemplateColumns: PARTNER_GRID_COLS }}>
+              <div />
+              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
+              <div>Kontakt</div>
+              <SortableHeader
+                label="Kategorie"
+                field="kategorie"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
+              />
+              <div>Typ</div>
+              <div>Status</div>
+            </div>
+            {sorted.map(({ row: p }) => (
+              <Link
+                key={p.id}
+                href={`/partner/${p.id}`}
+                onClick={isPane ? (e) => e.preventDefault() : undefined}
+                className={cn(
+                  'list-row-grid',
+                  selectedId === p.id && isPane && 'ring-2 ring-bw-primary/40'
+                )}
+                style={{ gridTemplateColumns: PARTNER_GRID_COLS }}
+              >
+                <ListAvatar name={p.name} />
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-medium text-bw-text">{p.name}</p>
+                  <p className="truncate text-xs text-bw-text-muted">{p.subkategorie?.trim() || '—'}</p>
+                </div>
+                <div className="min-w-0 text-[12.5px]">
+                  {p.telefon?.trim() ? (
+                    <p className="truncate text-bw-primary">{p.telefon}</p>
+                  ) : null}
+                  <p className="truncate text-bw-text-muted">{p.email?.trim() || '—'}</p>
+                </div>
+                <p className="truncate text-[13px] text-bw-text">{p.partner_kategorien?.name ?? '—'}</p>
+                <PartnerTypBadge partner={p} />
+                {partnerAktivBadge(p)}
+              </Link>
+            ))}
+          </ListGridShell>
         </>
       )}
-
-      <SidePanel
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.name ?? ''}
-        width="md"
-      >
-        {selected ? (
-          <PartnerPanelContent partner={selected} onBearbeiten={() => openBearbeiten(selected)} />
-        ) : null}
-      </SidePanel>
-
-      <Modal
-        open={bearbeitenOpen && !!edit}
-        onClose={() => {
-          setBearbeitenOpen(false)
-          setEdit(null)
-        }}
-        title="Eintrag bearbeiten"
-        size="sm"
-      >
-        {edit ? (
-          <div className="space-y-3">
-            <div className="grid gap-3">
-              <Input label="Name *" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
-              <Select
-                label="Typ"
-                name="partner_typ"
-                value={edit.partner_typ}
-                onChange={(e) =>
-                  setEdit({ ...edit, partner_typ: e.target.value as 'partner' | 'netzwerk' })
-                }
-                options={[
-                  { value: 'partner', label: 'Partner' },
-                  { value: 'netzwerk', label: 'Netzwerk' },
-                ]}
-              />
-              <Select
-                label="Kategorie"
-                name="kat"
-                value={edit.kategorie_id ?? ''}
-                onChange={(e) => setEdit({ ...edit, kategorie_id: e.target.value || null })}
-                options={[
-                  { value: '', label: '—' },
-                  ...kategorien.map((k) => ({ value: k.id, label: k.name })),
-                ]}
-              />
-              <Input
-                label="Unterkategorie"
-                value={edit.subkategorie ?? ''}
-                onChange={(e) => setEdit({ ...edit, subkategorie: e.target.value })}
-              />
-              <Input label="Telefon" value={edit.telefon ?? ''} onChange={(e) => setEdit({ ...edit, telefon: e.target.value })} />
-              <Input
-                label="E-Mail"
-                type="email"
-                value={edit.email ?? ''}
-                onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-              />
-            </div>
-            <Input label="Adresse" value={edit.adresse ?? ''} onChange={(e) => setEdit({ ...edit, adresse: e.target.value })} />
-            <Input label="Webseite" value={edit.website ?? ''} onChange={(e) => setEdit({ ...edit, website: e.target.value })} />
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium text-bw-mid">Notizen</span>
-              <textarea
-                className="input min-h-[72px]"
-                placeholder="Notizen…"
-                rows={3}
-                value={edit.notizen ?? ''}
-                onChange={(e) => setEdit({ ...edit, notizen: e.target.value })}
-              />
-            </label>
-            <div className="flex justify-end gap-2 border-t border-bw-border pt-3">
-              <Button type="button" variant="secondary" onClick={() => setBearbeitenOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button type="button" variant="primary" loading={saving} onClick={() => void savePartner()}>
-                Speichern
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
 
       <CsvExportModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
+        title="Partner exportieren"
         fields={PARTNER_EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
           const source = scope === 'view' ? filtered : partners
@@ -493,6 +447,6 @@ export function PartnerNetzwerkClient({
           exportToCSV(data, fields, 'partner')
         }}
       />
-    </div>
+    </EntityListShell>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, X, Inbox, Wrench, HardHat, Receipt, Users } from 'lucide-react'
+import { Search, X, Inbox, Wrench, HardHat, Receipt, Users, FileText } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { searchKundenGlobal } from '@/app/actions/kunden'
 import { createClient } from '@/lib/supabase'
 
-type SearchResultType = 'anfrage' | 'auftrag' | 'handwerker' | 'rechnung' | 'kunde'
+type SearchResultType = 'anfrage' | 'angebot' | 'auftrag' | 'handwerker' | 'rechnung' | 'kunde'
 
 type LeadHit = { id: string; kontakt_name: string | null; kontakt_email: string | null; status: string | null }
 type HwHit = { id: string; name: string; firma: string | null }
@@ -24,13 +25,14 @@ const TYPE_CONFIG: Record<
   { icon: typeof Inbox; label: string; color: string }
 > = {
   anfrage: { icon: Inbox, label: 'Anfragen', color: 'text-bw-link' },
+  angebot: { icon: FileText, label: 'Angebote', color: 'text-orange-600' },
   auftrag: { icon: Wrench, label: 'Aufträge', color: 'text-bw-success' },
   handwerker: { icon: HardHat, label: 'Handwerker', color: 'text-bw-accent' },
   rechnung: { icon: Receipt, label: 'Rechnungen', color: 'text-purple-500' },
   kunde: { icon: Users, label: 'Kunden', color: 'text-bw-mid' },
 }
 
-const TYPE_ORDER: SearchResultType[] = ['anfrage', 'auftrag', 'handwerker', 'rechnung', 'kunde']
+const TYPE_ORDER: SearchResultType[] = ['anfrage', 'angebot', 'auftrag', 'rechnung', 'kunde', 'handwerker']
 
 function sanitizeTerm(raw: string) {
   return raw.trim().slice(0, 80).replace(/[%]/g, '')
@@ -88,15 +90,19 @@ export function GlobalSearch() {
     const supabase = createClient()
 
     try {
-      const [leadsName, leadsEmail, auftraege, handwerkerName, handwerkerFirma, kundenName, kundenEmail, rechnungen] =
+      const [leadsName, leadsEmail, angeboteNr, auftraege, handwerkerName, handwerkerFirma, kundenHits, rechnungen] =
         await Promise.all([
           supabase.from('leads').select('id, kontakt_name, kontakt_email, status').ilike('kontakt_name', pct).limit(4),
           supabase.from('leads').select('id, kontakt_name, kontakt_email, status').ilike('kontakt_email', pct).limit(4),
+          supabase
+            .from('angebote')
+            .select('id, angebotsnr, status, kunden(name)')
+            .ilike('angebotsnr', pct)
+            .limit(6),
           supabase.from('auftraege').select('id, titel, status').ilike('titel', pct).limit(4),
           supabase.from('handwerker').select('id, name, firma').ilike('name', pct).limit(4),
           supabase.from('handwerker').select('id, name, firma').ilike('firma', pct).limit(4),
-          supabase.from('kunden').select('id, name, email').ilike('name', pct).limit(4),
-          supabase.from('kunden').select('id, name, email').ilike('email', pct).limit(4),
+          searchKundenGlobal(term),
           supabase.from('rechnungen').select('id, rechnungsnummer, status').ilike('rechnungsnummer', pct).limit(4),
         ])
 
@@ -111,7 +117,7 @@ export function GlobalSearch() {
       }
 
       const kundeMap = new Map<string, KundeHit>()
-      for (const row of [...(kundenName.data ?? []), ...(kundenEmail.data ?? [])] as KundeHit[]) {
+      for (const row of kundenHits as KundeHit[]) {
         if (row?.id) kundeMap.set(row.id, row)
       }
 
@@ -124,6 +130,17 @@ export function GlobalSearch() {
           subtitle: l.kontakt_email || l.status || '',
           type: 'anfrage',
           href: `/anfragen/${l.id}`,
+        })
+      }
+
+      for (const a of angeboteNr.data ?? []) {
+        const kunde = (a as { kunden?: { name?: string } | null }).kunden
+        flat.push({
+          id: a.id,
+          title: a.angebotsnr?.trim() || `Angebot ${a.id.slice(0, 8)}`,
+          subtitle: [kunde?.name, a.status].filter(Boolean).join(' · '),
+          type: 'angebot',
+          href: `/angebote/${a.id}`,
         })
       }
 
@@ -163,7 +180,7 @@ export function GlobalSearch() {
           title: k.name,
           subtitle: k.email || '',
           type: 'kunde',
-          href: k.email ? `mailto:${encodeURIComponent(k.email)}` : '',
+          href: `/kunden/${k.id}`,
         })
       }
 
@@ -234,7 +251,7 @@ export function GlobalSearch() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Suchen in Anfragen, Aufträgen, Handwerkern..."
+            placeholder="Suchen in Anfragen, Angeboten, Aufträgen, Rechnungen, Kunden…"
             className="flex-1 bg-transparent text-sm text-bw-text outline-none placeholder:text-bw-light"
             style={{ fontSize: '16px' }}
             autoComplete="off"

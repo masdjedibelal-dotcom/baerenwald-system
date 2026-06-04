@@ -1,30 +1,72 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Accordion } from '@/components/ui/Accordion'
 import { Card } from '@/components/ui/Card'
-import { PropertyRow } from '@/components/ui/PropertyRow'
+import { DetailTabBar } from '@/components/ui/DetailTabBar'
+import { DetailAccordion } from '@/components/ui/DetailAccordion'
+import { Timeline } from '@/components/ui/Timeline'
+import { ListGridShell } from '@/components/layout/ListPageParts'
+import { DetailProp } from '@/components/ui/DetailProp'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
-import { DocCard } from '@/components/ui/DocCard'
-import { PdfViewer } from '@/components/ui/PdfViewer'
-import { ProgressBar } from '@/components/ui/ProgressBar'
+import {
+  CrmDokumenteTabelle,
+  type CrmDokumentZeile,
+} from '@/components/dokumente/CrmDokumenteTabelle'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
-import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
+import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
 import { LeadStatusBadge } from '@/components/ui/Badge'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
-import { addKundenNotiz, deleteKundenNotiz, saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
+import {
+  istKundeFirmaPflichtTyp,
+  istKundeHausverwaltungTyp,
+  istKundeGewerbeTyp,
+  istKundeNurGewerbeTyp,
+} from '@/lib/kunde-stammdaten'
+import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import type { KundenObjekt } from '@/lib/types'
+import { DetailHead } from '@/components/layout/DetailHead'
+import { useCrmRefresh } from '@/hooks/useCrmRefresh'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/ActionsMenu'
+import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
+import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
+import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
+import {
+  AlertTriangle,
+  Briefcase,
+  FileText,
+  Mail,
+  MoreHorizontal,
+  Pencil,
+} from 'lucide-react'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
+import { buildZeitstrahl } from '@/components/kunden/KundenZeitstrahl'
+import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
+import { getPortalLoginHint } from '@/app/actions/kunden'
+import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
+import {
+  buildPortalLoginLink,
+  defaultPortalInviteBetreff,
+  defaultPortalInviteText,
+} from '@/lib/portal-utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
 import type { AngebotStatus, AuftragStatus, LeadStatus } from '@/lib/types'
-import { formatDatum, formatRelativeDate, formatPreis } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { betragAnzeige, resolveStatusEinfach } from '@/lib/angebot-einfach'
+import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
+import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import { kundentypLabel } from '@/lib/lead-display-helpers'
+import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
+import { BEREICH_LABELS, formatAnfragePreisAnzeige, formatDatum, formatRelativeDate } from '@/lib/utils'
+import { parseEmailTokens } from '@/lib/email-recipients'
+import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -46,10 +88,25 @@ function formatEur(n: number | null | undefined) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 }
 
-function mapsUrl(k: KundeDetailPayload) {
-  const q = [k.adresse, k.plz, k.ort].filter(Boolean).join(', ')
-  if (!q.trim()) return null
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
+function normalizeAuftragAngebote(
+  raw:
+    | {
+        id?: string
+        pdf_url?: string | null
+        created_at?: string | null
+        status?: string
+      }
+    | {
+        id?: string
+        pdf_url?: string | null
+        created_at?: string | null
+        status?: string
+      }[]
+    | null
+    | undefined
+) {
+  if (!raw) return []
+  return Array.isArray(raw) ? raw : [raw]
 }
 
 function angebotAgg(
@@ -77,21 +134,40 @@ function auftragTitelFromRechnung(r: NonNullable<KundeDetailPayload['rechnungen'
   return t?.trim() || '—'
 }
 
+function isRechnungUeberfaellig(r: { status: string; faellig_am?: string | null }) {
+  if (r.status === 'bezahlt' || r.status === 'storniert') return false
+  if (!r.faellig_am) return false
+  return new Date(r.faellig_am).getTime() < Date.now()
+}
+
+function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) {
+  if (isRechnungUeberfaellig(r)) {
+    return <StatusBadge status="cancel" label="Überfällig" />
+  }
+  const st = r.status as RechnungStatus
+  if (st === 'bezahlt') return <StatusBadge status="order" label={RECHNUNG_STATUS_LABELS.bezahlt} />
+  if (st === 'gesendet') return <StatusBadge status="offer" label={RECHNUNG_STATUS_LABELS.gesendet} />
+  if (st === 'storniert') return <StatusBadge status="cancel" label={RECHNUNG_STATUS_LABELS.storniert} />
+  return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
+}
+
 export function KundeDetailClient({
   kunde: initialKunde,
   customFieldDefs,
   customValues: initialValues,
+  kundenObjekte = [],
 }: {
   kunde: KundeDetailPayload
   customFieldDefs: CustomFieldDefinition[]
   customValues: CustomFieldValueRow[]
+  kundenObjekte?: KundenObjekt[]
 }) {
   const router = useRouter()
+  const { refresh } = useCrmRefresh()
+  const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
-  const [tab, setTab] = useState<
-    'stammdaten' | 'projekte' | 'dokumente' | 'kommunikation' | 'finanzen'
-  >('stammdaten')
-  const [notizNeu, setNotizNeu] = useState('')
+  type DetailTab = 'vorgaenge' | 'aktivitaet' | 'dokumente'
+  const [tab, setTab] = useState<DetailTab>('vorgaenge')
   const [interneNotiz, setInterneNotiz] = useState(initialKunde.notizen ?? '')
   const [pending, startTransition] = useTransition()
   const [customValues, setCustomValues] = useState(initialValues)
@@ -99,40 +175,61 @@ export function KundeDetailClient({
   const interneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const kundeRef = useRef(kunde)
   kundeRef.current = kunde
-  const [pdfOpen, setPdfOpen] = useState<{ url: string; title: string } | null>(null)
-  const [kommModal, setKommModal] = useState(false)
-  const [kommTyp, setKommTyp] = useState('notiz')
-  const [kommText, setKommText] = useState('')
-  const [kommDt, setKommDt] = useState('')
-  const [projFilter, setProjFilter] = useState<'alle' | 'anfragen' | 'angebote' | 'auftraege' | 'abgeschlossen'>(
-    'alle'
-  )
-  const [kommFilter, setKommFilter] = useState<'alle' | 'mail' | 'notiz' | 'anruf'>('alle')
   const [editOpen, setEditOpen] = useState(false)
+  const [portalModalOpen, setPortalModalOpen] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [portalSending, setPortalSending] = useState(false)
+  const [portalLink, setPortalLink] = useState('')
+  const [portalTo, setPortalTo] = useState('')
+  const [portalCc, setPortalCc] = useState('')
+  const [portalBetreff, setPortalBetreff] = useState('')
+  const [portalText, setPortalText] = useState('')
+  const [portalHtml, setPortalHtml] = useState('')
+  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
+  const [hasPortalAccount, setHasPortalAccount] = useState(false)
   const [editForm, setEditForm] = useState({
-    name: initialKunde.name,
+    firmaName: initialKunde.typ === 'gewerbe' || initialKunde.typ === 'hausverwaltung' ? initialKunde.name : '',
+    vorname: initialKunde.vorname ?? '',
+    nachname: initialKunde.nachname ?? initialKunde.name,
     typ: initialKunde.typ,
     telefon: initialKunde.telefon ?? '',
     email: initialKunde.email ?? '',
     plz: initialKunde.plz ?? '',
     ort: initialKunde.ort ?? '',
-    strasse: initialKunde.adresse ?? '',
+    strasse: (initialKunde.strasse?.trim() || initialKunde.adresse) ?? '',
+    hausnummer: initialKunde.hausnummer ?? '',
     webseite: initialKunde.webseite ?? '',
     ansprechpartner: initialKunde.ansprechpartner ?? '',
     quelle: initialKunde.quelle ?? '',
   })
 
   useEffect(() => {
+    void (async () => {
+      const hint = await getPortalLoginHint(initialKunde.id)
+      if (hint.ok) {
+        setPortalLink(hint.loginLink)
+        setHasPortalAccount(hint.hasAuthAccount)
+      } else {
+        setPortalLink(buildPortalLoginLink())
+      }
+    })()
+  }, [initialKunde.id])
+
+  useEffect(() => {
     setKunde(initialKunde)
     setInterneNotiz(initialKunde.notizen ?? '')
     setEditForm({
-      name: initialKunde.name,
+      firmaName:
+        initialKunde.typ === 'gewerbe' || initialKunde.typ === 'hausverwaltung' ? initialKunde.name : '',
+      vorname: initialKunde.vorname ?? '',
+      nachname: initialKunde.nachname ?? initialKunde.name,
       typ: initialKunde.typ,
       telefon: initialKunde.telefon ?? '',
       email: initialKunde.email ?? '',
       plz: initialKunde.plz ?? '',
       ort: initialKunde.ort ?? '',
-      strasse: initialKunde.adresse ?? '',
+      strasse: (initialKunde.strasse?.trim() || initialKunde.adresse) ?? '',
+      hausnummer: initialKunde.hausnummer ?? '',
       webseite: initialKunde.webseite ?? '',
       ansprechpartner: initialKunde.ansprechpartner ?? '',
       quelle: initialKunde.quelle ?? '',
@@ -148,21 +245,25 @@ export function KundeDetailClient({
       void (async () => {
         const r = await saveKunde(
           {
-            name: k.name,
             typ: k.typ,
+            name: istKundeFirmaPflichtTyp(k.typ) ? k.name : null,
+            vorname: k.vorname ?? null,
+            nachname: k.nachname ?? null,
+            strasse: k.strasse ?? k.adresse,
+            hausnummer: k.hausnummer ?? null,
             telefon: k.telefon,
             email: k.email,
             plz: k.plz,
             ort: k.ort,
-            adresse: k.adresse,
             webseite: k.webseite,
             ansprechpartner: k.ansprechpartner,
             quelle: k.quelle,
             notizen: t || null,
+            stammPflicht: false,
           },
           k.id
         )
-        if (r.ok) router.refresh()
+        if (r.ok) refresh()
       })()
     }, 800)
     return () => {
@@ -171,10 +272,6 @@ export function KundeDetailClient({
   }, [interneNotiz, router])
 
   const rechnungen = useMemo(() => kunde.rechnungen ?? [], [kunde.rechnungen])
-  const bezahltSumme = useMemo(
-    () => rechnungen.filter((r) => r.status === 'bezahlt').reduce((s, r) => s + (Number(r.brutto) || 0), 0),
-    [rechnungen]
-  )
   const offenSumme = useMemo(
     () =>
       rechnungen
@@ -182,22 +279,6 @@ export function KundeDetailClient({
         .reduce((s, r) => s + (Number(r.brutto) || 0), 0),
     [rechnungen]
   )
-
-  const projektZahl = useMemo(() => {
-    const leads = kunde.leads?.length ?? 0
-    const auf = kunde.auftraege?.length ?? 0
-    return leads + auf
-  }, [kunde.leads, kunde.auftraege])
-
-  const letzterKontakt = useMemo(() => {
-    const dates: number[] = []
-    if (kunde.letzte_aktivitaet) dates.push(new Date(kunde.letzte_aktivitaet).getTime())
-    for (const m of kunde.email_logs ?? []) dates.push(new Date(m.created_at).getTime())
-    for (const n of kunde.kunden_notizen ?? []) dates.push(new Date(n.created_at).getTime())
-    if (!dates.length) return '—'
-    const max = Math.max(...dates)
-    return formatDatum(new Date(max).toISOString())
-  }, [kunde.email_logs, kunde.kunden_notizen, kunde.letzte_aktivitaet])
 
   const einbehalteFlat = useMemo(() => {
     const rows: { id: string; label: string; betrag: number; freigabe: string; auftrag: string }[] = []
@@ -220,6 +301,142 @@ export function KundeDetailClient({
 
   const einbehaltSumme = useMemo(() => einbehalteFlat.reduce((s, e) => s + e.betrag, 0), [einbehalteFlat])
 
+  const auftraegeCount = kunde.auftraege?.length ?? 0
+  const anfragenCount = kunde.leads?.length ?? 0
+
+  const alleAngebote = useMemo(() => {
+    type Zeile = {
+      id: string
+      status: string
+      status_einfach?: string | null
+      gueltig_bis?: string | null
+      gesamt_fix: number | null
+      gesamt_min: number | null
+      gesamt_max: number | null
+      created_at?: string | null
+      bezug: string
+    }
+    const byId = new Map<string, Zeile>()
+    for (const l of kunde.leads ?? []) {
+      const leadLabel =
+        leadSituationDisplay(l.situation) ||
+        (l.bereiche?.length ? l.bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ') : 'Anfrage')
+      for (const a of l.angebote ?? []) {
+        byId.set(a.id, {
+          id: a.id,
+          status: a.status,
+          status_einfach: a.status_einfach,
+          gueltig_bis: a.gueltig_bis,
+          gesamt_fix: a.gesamt_fix,
+          gesamt_min: a.gesamt_min,
+          gesamt_max: a.gesamt_max,
+          created_at: a.created_at,
+          bezug: leadLabel,
+        })
+      }
+    }
+    for (const a of kunde.auftraege ?? []) {
+      for (const ang of normalizeAuftragAngebote(a.angebote) as Array<{
+        id: string
+        status?: string
+        status_einfach?: string | null
+        gueltig_bis?: string | null
+        gesamt_fix?: number | null
+        gesamt_min?: number | null
+        gesamt_max?: number | null
+        created_at?: string | null
+      }>) {
+        if (!ang?.id || byId.has(ang.id)) continue
+        byId.set(ang.id, {
+          id: ang.id,
+          status: ang.status ?? 'entwurf',
+          status_einfach: ang.status_einfach ?? null,
+          gueltig_bis: ang.gueltig_bis ?? null,
+          gesamt_fix: ang.gesamt_fix ?? null,
+          gesamt_min: ang.gesamt_min ?? null,
+          gesamt_max: ang.gesamt_max ?? null,
+          created_at: ang.created_at,
+          bezug: a.titel?.trim() || 'Auftrag',
+        })
+      }
+    }
+    return Array.from(byId.values()).sort(
+      (x, y) => new Date(y.created_at ?? 0).getTime() - new Date(x.created_at ?? 0).getTime()
+    )
+  }, [kunde.leads, kunde.auftraege])
+
+  const angeboteCount = alleAngebote.length
+  const avgAuftrag =
+    auftraegeCount > 0 && (kunde.gesamt_umsatz ?? 0) > 0
+      ? (kunde.gesamt_umsatz ?? 0) / auftraegeCount
+      : null
+
+  const timelineItems = useMemo(() => {
+    return buildZeitstrahl(kunde).map((e) => ({
+      id: e.id,
+      text: e.beschreibung ? `${e.titel} — ${e.beschreibung}` : e.titel,
+      time: formatRelativeDate(e.datum),
+      state: 'done' as const,
+    }))
+  }, [kunde])
+
+  const dokumenteCount = useMemo(() => {
+    let n = (kunde.kunden_dokumente ?? []).filter((d) => d.typ !== 'protokoll').length
+    for (const l of kunde.leads ?? []) {
+      n += (l.angebote ?? []).filter((a) => a.pdf_url).length
+    }
+    for (const a of kunde.auftraege ?? []) {
+      for (const ang of normalizeAuftragAngebote(a.angebote)) {
+        if (ang?.pdf_url?.trim()) n += 1
+      }
+      if (a.abnahme_protokoll_url) n += 1
+    }
+    n += rechnungen.filter((r) => r.pdf_url).length
+    return n
+  }, [kunde, rechnungen])
+
+  const vorgaengeCount = anfragenCount + angeboteCount + auftraegeCount + rechnungen.length
+
+  const angeboteAnAuftrag = useMemo(() => {
+    const byAuftrag = new Map<string, CrmDokumentZeile[]>()
+    for (const l of kunde.leads ?? []) {
+      for (const ang of l.angebote ?? []) {
+        const aid = 'auftrag_id' in ang ? ang.auftrag_id : null
+        if (!aid) continue
+        const list = byAuftrag.get(aid) ?? []
+        list.push({
+          id: `angebot-${ang.id}`,
+          datum: ang.created_at ?? l.created_at,
+          name: `Angebot ${ang.id.slice(0, 8).toUpperCase()}`,
+          href: ang.pdf_url?.trim() || `/api/angebote/${ang.id}/pdf`,
+        })
+        byAuftrag.set(aid, list)
+      }
+    }
+    return byAuftrag
+  }, [kunde.leads])
+
+  const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
+
+  const detailTabs = useMemo(
+    () => [
+      {
+        id: 'vorgaenge',
+        label: 'Vorgänge',
+        icon: Briefcase,
+        count: vorgaengeCount || undefined,
+      },
+      { id: 'aktivitaet', label: 'Aktivität', icon: Mail },
+      {
+        id: 'dokumente',
+        label: 'Dokumente',
+        icon: FileText,
+        count: dokumenteCount || undefined,
+      },
+    ],
+    [dokumenteCount, vorgaengeCount]
+  )
+
   const ueberfaellig = useMemo(() => {
     const now = Date.now()
     return rechnungen.filter((r) => {
@@ -230,84 +447,21 @@ export function KundeDetailClient({
     })
   }, [rechnungen])
 
-  const angebotIdToAnfrage = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const l of kunde.leads ?? []) {
-      const lab = l.situation?.trim() || (l.bereiche?.length ? l.bereiche.join(' + ') : 'Anfrage')
-      for (const ang of l.angebote ?? []) {
-        m.set(ang.id, lab)
-      }
-    }
-    return m
-  }, [kunde.leads])
-
-  const projektLabelFromAngebotId = useCallback(
-    (angebotId: string | null | undefined) => {
-      if (!angebotId) return null
-      const v = angebotIdToAnfrage.get(angebotId)
-      return v ? `Anfrage: ${v}` : null
-    },
-    [angebotIdToAnfrage]
-  )
-
-  function refresh() {
-    router.refresh()
-  }
-
-  function speichernNotiz() {
-    const t = notizNeu.trim()
-    if (!t) return
-    startTransition(async () => {
-      const r = await addKundenNotiz(kunde.id, t)
-      if (r.ok) {
-        setNotizNeu('')
-        refresh()
-      }
-    })
-  }
-
-  function removeNotiz(id: string) {
-    startTransition(async () => {
-      await deleteKundenNotiz(id, kunde.id)
-      refresh()
-    })
-  }
-
-  function saveKomm() {
-    const text = kommText.trim()
-    if (!text) return
-    const prefix =
-      kommTyp === 'notiz'
-        ? ''
-        : kommTyp === 'anruf'
-          ? '[Anruf] '
-          : kommTyp === 'termin'
-            ? '[Termin] '
-            : '[Sonstiges] '
-    const zeile = kommDt ? `${prefix}${text} (${kommDt})` : `${prefix}${text}`
-    startTransition(async () => {
-      const r = await addKundenNotiz(kunde.id, zeile)
-      if (r.ok) {
-        setKommModal(false)
-        setKommText('')
-        setKommDt('')
-        refresh()
-      }
-    })
-  }
-
   function saveKundeModal() {
-    if (!editForm.name.trim()) return
     startTransition(async () => {
+      const firmaPflicht = istKundeFirmaPflichtTyp(editForm.typ)
       const r = await saveKunde(
         {
-          name: editForm.name.trim(),
           typ: editForm.typ,
+          name: firmaPflicht ? editForm.firmaName : null,
+          vorname: editForm.vorname || null,
+          nachname: editForm.nachname || null,
+          strasse: editForm.strasse,
+          hausnummer: editForm.hausnummer,
           telefon: editForm.telefon || null,
           email: editForm.email || null,
           plz: editForm.plz || null,
           ort: editForm.ort || null,
-          adresse: editForm.strasse || null,
           webseite: editForm.webseite || null,
           ansprechpartner: editForm.ansprechpartner || null,
           quelle: editForm.quelle || null,
@@ -317,647 +471,778 @@ export function KundeDetailClient({
       )
       if (r.ok) {
         setEditOpen(false)
-        setKunde((k) => ({
-          ...k,
-          name: editForm.name.trim(),
-          typ: editForm.typ,
-          telefon: editForm.telefon || null,
-          email: editForm.email || null,
-          plz: editForm.plz || null,
-          ort: editForm.ort || null,
-          adresse: editForm.strasse || null,
-          webseite: editForm.webseite || null,
-          ansprechpartner: editForm.ansprechpartner || null,
-          quelle: editForm.quelle || null,
-          notizen: interneNotiz.trim() || null,
-        }))
         refresh()
       }
     })
   }
 
-  const projekteCards = useMemo(() => {
-    type Card = {
-      key: string
-      sort: number
-      kind: 'lead' | 'angebot' | 'auftrag'
-      monat: string
-      titel: string
-      meta: string
-      betrag: string
-      href: string
-      badge: ReactNode
-      progress?: number | null
-      abgeschlossen: boolean
-      cta: string
-    }
-    const out: Card[] = []
-    for (const l of kunde.leads ?? []) {
-      const abg = l.status === 'abgeschlossen' || l.status === 'abgebrochen'
-      const d = new Date(l.created_at)
-      const monat = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' }).toUpperCase()
-      out.push({
-        key: `lead-${l.id}`,
-        sort: d.getTime(),
-        kind: 'lead',
-        monat,
-        titel: l.situation?.trim() || (l.bereiche?.length ? l.bereiche.join(' + ') : 'Anfrage'),
-        meta: '',
-        betrag: '',
-        href: `/anfragen/${l.id}`,
-        badge: <LeadStatusBadge status={l.status as LeadStatus} />,
-        abgeschlossen: abg,
-        cta: '→ Zur Anfrage',
-      })
-      for (const ang of l.angebote ?? []) {
-        const ad = new Date(ang.created_at ?? l.created_at)
-        const am = ad.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' }).toUpperCase()
-        out.push({
-          key: `ang-${ang.id}`,
-          sort: ad.getTime(),
-          kind: 'angebot',
-          monat: am,
-          titel: l.situation?.trim() || 'Angebot',
-          meta: '',
-          betrag: formatPreis(ang.gesamt_fix ?? null, ang.gesamt_min, ang.gesamt_max),
-          href: `/angebote/${ang.id}`,
-          badge: <AngebotStatusBadge status={ang.status as AngebotStatus} />,
-          abgeschlossen: ang.status === 'abgelehnt',
-          cta: '→ Zum Angebot',
+  async function openPortalModal() {
+    setPortalLoading(true)
+    const draft = await getKundenPortalMailDraft(kunde.id)
+    setPortalLoading(false)
+    if (!draft.ok) return
+    setPortalLink(draft.portalLink)
+    setPortalTo(draft.to)
+    setPortalCc(draft.cc.join('; '))
+    setPortalBetreff(draft.betreff)
+    setPortalText(draft.text)
+    setPortalHtml(draft.html)
+    setPortalAnrede(draft.anrede)
+    setPortalModalOpen(true)
+  }
+
+  async function sendenPortalLink() {
+    setPortalSending(true)
+    const toList = parseEmailTokens(portalTo)
+    const ccList = parseEmailTokens(portalCc)
+    const toPrimary = toList[0] ?? ''
+    const ccMerged = [...ccList, ...toList.slice(1)].filter(Boolean)
+    const res = await sendKundenPortalLinkMail({
+      kundeId: kunde.id,
+      to: toPrimary,
+      cc: ccMerged,
+      betreff: portalBetreff,
+      text: portalText,
+      anrede: portalAnrede,
+    })
+    setPortalSending(false)
+    if (!res.ok) return
+    setPortalModalOpen(false)
+  }
+
+  useEffect(() => {
+    if (!portalModalOpen) return
+    const timer = setTimeout(() => {
+      void (async () => {
+        const preview = await previewKundenPortalMail({
+          kundeId: kunde.id,
+          text: portalText,
+          anrede: portalAnrede,
         })
+        if (!preview.ok) return
+        setPortalHtml(preview.html)
+      })()
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [portalModalOpen, portalText, portalAnrede, kunde.id])
+
+  const zusatzfelderCard =
+    customFieldDefs.length > 0 ? (
+      <Card title="Zusatzfelder" collapsible>
+        <div className="space-y-3">
+          {customFieldDefs.map((def) => {
+            const row = customValues.find((v) => v.definition_id === def.id)
+            return (
+              <CustomFieldRenderer
+                key={def.id}
+                def={def}
+                value={row?.wert ?? ''}
+                onChange={(wert) => {
+                  setCustomValues((prev) => {
+                    const next = [...prev]
+                    const i = next.findIndex((x) => x.definition_id === def.id)
+                    const stub: CustomFieldValueRow = {
+                      id: row?.id ?? 'local',
+                      definition_id: def.id,
+                      objekt_id: kunde.id,
+                      wert,
+                      created_at: row?.created_at ?? new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                      custom_field_definitions: def,
+                    }
+                    if (i >= 0) next[i] = { ...next[i], wert }
+                    else next.push(stub)
+                    return next
+                  })
+                  const prevT = customSaveTimers.current[def.id]
+                  if (prevT) clearTimeout(prevT)
+                  customSaveTimers.current[def.id] = setTimeout(() => {
+                    void (async () => {
+                      await saveKundeCustomFieldValue(def.id, kunde.id, wert)
+                      refresh()
+                    })()
+                  }, 600)
+                }}
+              />
+            )
+          })}
+        </div>
+      </Card>
+    ) : null
+
+  const stammdatenCard = (
+    <Card
+      collapsible
+      title="Stammdaten"
+      action={
+        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
       }
-    }
-    for (const a of kunde.auftraege ?? []) {
-      const d = new Date(a.created_at)
-      const monat = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' }).toUpperCase()
-      const agg = angebotAgg(a)
-      out.push({
-        key: `auf-${a.id}`,
-        sort: d.getTime(),
-        kind: 'auftrag',
-        monat,
-        titel: a.titel?.trim() || 'Auftrag',
-        meta: a.end_datum ? `bis ${formatDatum(a.end_datum)}` : '',
-        betrag: formatPreis(agg?.gesamt_fix ?? null, agg?.gesamt_min ?? null, agg?.gesamt_max ?? null),
-        href: `/auftraege/${a.id}`,
-        badge: <AuftragStatusBadge status={a.status as AuftragStatus} />,
-        progress: a.fortschritt,
-        abgeschlossen: a.status === 'abgeschlossen' || a.status === 'storniert',
-        cta: '→ Zum Auftrag',
-      })
-    }
-    return out.sort((x, y) => y.sort - x.sort)
-  }, [kunde.leads, kunde.auftraege])
-
-  const projekteFiltered = useMemo(() => {
-    return projekteCards.filter((c) => {
-      if (projFilter === 'alle') return true
-      if (projFilter === 'anfragen') return c.kind === 'lead'
-      if (projFilter === 'angebote') return c.kind === 'angebot'
-      if (projFilter === 'auftraege') return c.kind === 'auftrag' && !c.abgeschlossen
-      if (projFilter === 'abgeschlossen') return c.abgeschlossen
-      return true
-    })
-  }, [projekteCards, projFilter])
-
-  const kommEintraege = useMemo(() => {
-    type Row = {
-      id: string
-      sort: number
-      icon: string
-      titel: string
-      sub?: string
-      datum: string
-      projekt?: string | null
-      mail?: boolean
-    }
-    const rows: Row[] = []
-    for (const m of kunde.email_logs ?? []) {
-      rows.push({
-        id: `mail-${m.id}`,
-        sort: new Date(m.created_at).getTime(),
-        icon: '✉️',
-        titel: m.subject?.trim() || 'E-Mail',
-        sub: m.to_email ? `An ${m.to_email}` : undefined,
-        datum: formatDatum(m.created_at),
-        projekt: projektLabelFromAngebotId(m.angebot_id),
-        mail: true,
-      })
-    }
-    for (const n of kunde.kunden_notizen ?? []) {
-      const raw = n.inhalt
-      let icon = '📝'
-      if (raw.startsWith('[Anruf]')) icon = '📞'
-      if (raw.startsWith('[Termin]')) icon = '📅'
-      rows.push({
-        id: `n-${n.id}`,
-        sort: new Date(n.created_at).getTime(),
-        icon,
-        titel: 'Notiz',
-        sub: raw,
-        datum: formatDatum(n.created_at),
-        projekt: 'Kunde',
-      })
-    }
-    rows.sort((a, b) => b.sort - a.sort)
-    return rows.filter((r) => {
-      if (kommFilter === 'alle') return true
-      if (kommFilter === 'mail') return r.id.startsWith('mail-')
-      if (kommFilter === 'notiz') return r.id.startsWith('n-') && r.icon === '📝'
-      if (kommFilter === 'anruf') return r.icon === '📞'
-      return true
-    })
-  }, [kunde.email_logs, kunde.kunden_notizen, kommFilter, projektLabelFromAngebotId])
-
-  const tabs = [
-    { id: 'stammdaten' as const, label: 'Stammdaten' },
-    { id: 'projekte' as const, label: 'Projekte' },
-    { id: 'dokumente' as const, label: 'Dokumente' },
-    { id: 'kommunikation' as const, label: 'Kommunikation' },
-    { id: 'finanzen' as const, label: 'Finanzen' },
-  ]
-
-  const tabStammdaten = (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-6">
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-bw-text">Kontakt</h2>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-              Bearbeiten
-            </Button>
-          </div>
-          <div className="space-y-0">
-            <PropertyRow label="Name" value={kunde.name} editable={false} />
-            <PropertyRow label="Telefon" value={kunde.telefon ?? '—'} editable={false} />
-            <PropertyRow label="E-Mail" value={kunde.email ?? '—'} editable={false} />
-            <PropertyRow label="Webseite" value={kunde.webseite ?? '—'} editable={false} />
-            <PropertyRow label="Ansprechpartner" value={kunde.ansprechpartner ?? '—'} editable={false} />
-            <PropertyRow label="Kundentyp" value={<TypBadge typ={kunde.typ} />} editable={false} />
-            <PropertyRow
-              label="Quelle"
-              value={kunde.quelle ? (QUELLE_LABELS[kunde.quelle] ?? kunde.quelle) : '—'}
-              editable={false}
-            />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-bw-text">Adresse</h2>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-              Bearbeiten
-            </Button>
-          </div>
-          <div className="space-y-0">
-            <PropertyRow label="Straße" value={kunde.adresse ?? '—'} editable={false} />
-            <PropertyRow label="PLZ + Ort" value={[kunde.plz, kunde.ort].filter(Boolean).join(' ') || '—'} editable={false} />
-          </div>
-          {mapsUrl(kunde) ? (
+    >
+      {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
+        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+          Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
+        </p>
+      ) : null}
+      <div className="props">
+        {kundenStamm.kundennummer ? (
+          <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
+        ) : null}
+        {istKundeFirmaPflichtTyp(kunde.typ) ? (
+          <>
+            <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
+            {kundenStamm.vorname ? (
+              <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
+            ) : null}
+            {kundenStamm.nachname ? (
+              <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {kundenStamm.vorname ? <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp> : null}
+            <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
+          </>
+        )}
+        {kundenStamm.ansprechpartner && istKundeNurGewerbeTyp(kunde.typ) ? (
+          <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
+        ) : null}
+        <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
+        <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
+        <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
+        <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
+        <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
+        <DetailProp label="Telefon">
+          {kundenStamm.telefon ? (
+            <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
+          ) : (
+            '—'
+          )}
+        </DetailProp>
+        <DetailProp label="E-Mail">
+          {kundenStamm.email ? (
+            <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
+          ) : (
+            '—'
+          )}
+        </DetailProp>
+        {kundenStamm.ust_id ? <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp> : null}
+        {kunde.quelle ? (
+          <DetailProp label="Quelle">{QUELLE_LABELS[kunde.quelle] ?? kunde.quelle}</DetailProp>
+        ) : null}
+        {kunde.webseite ? (
+          <DetailProp label="Webseite">
             <a
-              href={mapsUrl(kunde)!}
+              href={kunde.webseite.startsWith('http') ? kunde.webseite : `https://${kunde.webseite}`}
               target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-block text-sm font-medium text-bw-link"
+              rel="noopener noreferrer"
             >
-              Google Maps öffnen →
+              {kunde.webseite}
             </a>
-          ) : null}
-        </Card>
+          </DetailProp>
+        ) : null}
+        {kunde.geburtstag ? (
+          <DetailProp label="Geburtstag">{formatDatum(kunde.geburtstag)}</DetailProp>
+        ) : null}
       </div>
-      <div className="space-y-6">
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-semibold text-bw-text">Statistik</h2>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-              <div className="text-xs text-bw-mid">Projekte gesamt</div>
-              <div className="mt-1 font-semibold text-bw-text">{projektZahl}</div>
-            </div>
-            <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-              <div className="text-xs text-bw-mid">Umsatz gesamt</div>
-              <div className="mt-1 font-semibold text-bw-text">{formatEur(kunde.gesamt_umsatz)}</div>
-            </div>
-            <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-              <div className="text-xs text-bw-mid">Offener Betrag</div>
-              <div className="mt-1 font-semibold text-bw-text">{formatEur(offenSumme)}</div>
-            </div>
-            <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-              <div className="text-xs text-bw-mid">Letzter Kontakt</div>
-              <div className="mt-1 font-semibold text-bw-text">{letzterKontakt}</div>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-semibold text-bw-text">Notizen</h2>
-          <p className="mb-2 text-xs text-bw-mid">Interne Notiz (wird automatisch gespeichert)</p>
-          <Textarea
-            placeholder="Interne Kundennotiz…"
-            value={interneNotiz}
-            onChange={(e) => setInterneNotiz(e.target.value)}
-            rows={4}
-          />
-          <div className="mt-4 border-t border-bw-border pt-4">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-bw-mid">Aktivitäten / Notizen</p>
-            <Textarea
-              placeholder="Neue Notiz hinzufügen…"
-              value={notizNeu}
-              onChange={(e) => setNotizNeu(e.target.value)}
-              rows={3}
-            />
-            {notizNeu.trim() ? (
-              <div className="mt-2 flex justify-end">
-                <Button type="button" onClick={speichernNotiz} loading={pending}>
-                  Notiz speichern
-                </Button>
-              </div>
-            ) : null}
-            <ul className="mt-4 space-y-3">
-              {(kunde.kunden_notizen ?? []).map((n) => (
-                <li key={n.id} className="rounded-lg border border-bw-border bg-bw-card p-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-xs text-bw-light">
-                        {formatRelativeDate(n.created_at)} · Notiz
-                      </span>
-                      <p className="mt-1 whitespace-pre-wrap text-bw-text">{n.inhalt}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-bw-light hover:text-status-cancel-text"
-                      onClick={() => removeNotiz(n.id)}
-                      aria-label="Löschen"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-semibold text-bw-text">Custom Fields</h2>
-          <div className="space-y-3">
-            {customFieldDefs.length === 0 ? (
-              <p className="text-sm text-bw-mid">Noch keine Felder definiert.</p>
-            ) : (
-              customFieldDefs.map((def) => {
-                const row = customValues.find((v) => v.definition_id === def.id)
-                return (
-                  <CustomFieldRenderer
-                    key={def.id}
-                    def={def}
-                    value={row?.wert ?? ''}
-                    onChange={(wert) => {
-                      setCustomValues((prev) => {
-                        const next = [...prev]
-                        const i = next.findIndex((x) => x.definition_id === def.id)
-                        const stub: CustomFieldValueRow = {
-                          id: row?.id ?? 'local',
-                          definition_id: def.id,
-                          objekt_id: kunde.id,
-                          wert,
-                          created_at: row?.created_at ?? new Date().toISOString(),
-                          updated_at: new Date().toISOString(),
-                          custom_field_definitions: def,
-                        }
-                        if (i >= 0) next[i] = { ...next[i], wert }
-                        else next.push(stub)
-                        return next
-                      })
-                      const prevT = customSaveTimers.current[def.id]
-                      if (prevT) clearTimeout(prevT)
-                      customSaveTimers.current[def.id] = setTimeout(() => {
-                        void (async () => {
-                          await saveKundeCustomFieldValue(def.id, kunde.id, wert)
-                          refresh()
-                        })()
-                      }, 600)
-                    }}
-                  />
-                )
-              })
-            )}
-            <p className="text-xs text-bw-mid">Felder unter Einstellungen pflegen.</p>
-          </div>
-        </Card>
-      </div>
+    </Card>
+  )
+
+  const fixedOverview = (
+    <div className="space-y-3">
+      {stammdatenCard}
+      {zusatzfelderCard}
+      {istKundeGewerbeTyp(kunde.typ) ? (
+        <KundenObjekteCard kundeId={kunde.id} objekte={kundenObjekte} onChanged={() => refresh()} />
+      ) : null}
+      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey} />
     </div>
   )
 
-  const tabProjekte = (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ['alle', 'Alle'],
-            ['anfragen', 'Anfragen'],
-            ['angebote', 'Angebote'],
-            ['auftraege', 'Aufträge'],
-            ['abgeschlossen', 'Abgeschlossen'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setProjFilter(id)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium',
-              projFilter === id
-                ? 'border-bw-primary bg-bw-primary/10 text-bw-text'
-                : 'border-bw-border text-bw-mid hover:bg-bw-hover'
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-3">
-        {projekteFiltered.map((c) => (
-          <Link
-            key={c.key}
-            href={c.href}
-            className="block rounded-lg border border-bw-border bg-bw-card p-4 shadow-card transition-colors hover:bg-bw-hover"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-bw-mid">
-              <span>
-                {c.kind === 'auftrag' ? 'AUFTRAG' : c.kind === 'angebot' ? 'ANGEBOT' : 'ANFRAGE'} · {c.monat}
-              </span>
-              {c.badge}
-            </div>
-            <p className="mt-1 font-medium text-bw-text">{c.titel}</p>
-            {c.progress != null && c.kind === 'auftrag' ? (
-              <div className="mt-2">
-                <ProgressBar value={c.progress} />
-              </div>
-            ) : null}
-            {c.meta ? <p className="mt-1 text-xs text-bw-mid">{c.meta}</p> : null}
-            {c.betrag ? <p className="mt-2 text-sm font-medium text-bw-text">{c.betrag}</p> : null}
-            <p className="mt-3 text-right text-sm font-medium text-bw-link">{c.cta}</p>
-          </Link>
-        ))}
-      </div>
-      <Link href={`/anfragen/neu?kunde_id=${kunde.id}`} className="btn btn-secondary btn-sm inline-flex">
-        + Neue Anfrage für diesen Kunden
-      </Link>
+  const kpiRow = (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      {[
+        ['Anfragen', String(anfragenCount)],
+        ['Angebote', String(angeboteCount)],
+        ['Aufträge', String(auftraegeCount)],
+        ['Umsatz', formatEur(kunde.gesamt_umsatz)],
+        ['Ø Auftrag', formatEur(avgAuftrag)],
+        ['Offen', formatEur(offenSumme)],
+      ].map(([label, value]) => (
+        <div key={label} className="rounded-lg border border-bw-border bg-bw-card px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-bw-text-muted">{label}</div>
+          <div className="mt-0.5 text-base font-semibold tabular-nums text-bw-text">{value}</div>
+        </div>
+      ))}
     </div>
   )
 
-  const tabDokumente = (
+  const tabTimeline = (
+    <>
+      {timelineItems.length === 0 ? (
+        <p className="text-sm text-bw-text-muted">Noch keine Aktivitäten.</p>
+      ) : (
+        <Timeline items={timelineItems} />
+      )}
+    </>
+  )
+
+  const tabDokumenteInhalt = (
     <div className="space-y-10">
-      {(kunde.leads ?? []).filter((l) => (l.angebote ?? []).length > 0).map((l) => {
-        const titel = l.situation?.trim() || (l.bereiche?.length ? l.bereiche.join(' + ') : 'Anfrage')
-        const angebote = l.angebote ?? []
-        return (
-          <section key={l.id}>
-            <h3 className="mb-3 border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
-              Anfrage: {titel}
-            </h3>
-            <div className="space-y-2">
-              {angebote.map((ang) => (
-                <DocCard
-                  key={ang.id}
-                  type="offer"
-                  title={`Angebot ${ang.id.slice(0, 8).toUpperCase()}`}
-                  subtitle={`${formatPreis(ang.gesamt_fix ?? null, ang.gesamt_min, ang.gesamt_max)} · ${formatDatum(ang.created_at ?? l.created_at)}`}
-                  onView={ang.pdf_url ? () => setPdfOpen({ url: ang.pdf_url!, title: titel }) : undefined}
-                  onDownload={ang.pdf_url ? () => window.open(ang.pdf_url!, '_blank') : undefined}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
-
-      {kunde.auftraege?.map((a) => {
+      {(kunde.auftraege ?? []).map((a) => {
         const atitel = a.titel?.trim() || 'Auftrag'
-        const agg = angebotAgg(a)
-        const angSingle = Array.isArray(a.angebote) ? a.angebote[0] : a.angebote
-        const pdf = angSingle?.pdf_url ?? null
-        const aufRechnungen = rechnungen.filter((r) => r.auftrag_id === a.id)
+        const angeboteZeilen: CrmDokumentZeile[] = [
+          ...normalizeAuftragAngebote(a.angebote).map((ang) => ({
+            id: `angebot-${ang.id}`,
+            datum: ang.created_at ?? a.created_at,
+            name: `Angebot ${String(ang.id).slice(0, 8).toUpperCase()}`,
+            href: ang.pdf_url?.trim() || `/api/angebote/${String(ang.id)}/pdf`,
+          })),
+          ...(angeboteAnAuftrag.get(a.id) ?? []).filter(
+            (z) => !normalizeAuftragAngebote(a.angebote).some((ang) => z.id === `angebot-${ang.id}`)
+          ),
+        ]
+        const rechnungZeilen: CrmDokumentZeile[] = rechnungen
+          .filter((r) => r.auftrag_id === a.id)
+          .map((r) => ({
+            id: `rechnung-${r.id}`,
+            name: r.rechnungsnummer?.trim() || 'Rechnung',
+            datum: r.rechnungsdatum,
+            href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
+          }))
+        const dokumentationZeilen: CrmDokumentZeile[] = []
+        if (a.abnahme_protokoll_url) {
+          dokumentationZeilen.push({
+            id: `abnahme-${a.id}`,
+            name: 'Abnahmeprotokoll',
+            datum: a.created_at,
+            href: a.abnahme_protokoll_url,
+          })
+        }
+        dokumentationZeilen.push({
+          id: `abschluss-${a.id}`,
+          name: 'Abschlussdokumentation (PDF)',
+          datum: a.created_at,
+          href: `/api/auftraege/${a.id}/abschlussdokumentation/pdf`,
+        })
         return (
-          <section key={a.id}>
-            <h3 className="mb-3 border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
-              Auftrag: {atitel}
+          <section key={a.id} className="space-y-4">
+            <h3 className="border-b border-bw-border pb-2 text-sm font-semibold text-bw-text">
+              <Link href={`/auftraege/${a.id}`} className="text-bw-link hover:underline">
+                Auftrag: {atitel}
+              </Link>
             </h3>
-            <div className="space-y-2">
-              {pdf ? (
-                <DocCard
-                  type="offer"
-                  title="Angebot (Auftrag)"
-                  subtitle={formatPreis(agg?.gesamt_fix ?? null, agg?.gesamt_min ?? null, agg?.gesamt_max ?? null)}
-                  onView={() => setPdfOpen({ url: pdf, title: atitel })}
-                  onDownload={() => window.open(pdf, '_blank')}
-                />
-              ) : null}
-              {aufRechnungen.map((r) => (
-                <DocCard
-                  key={r.id}
-                  type="invoice"
-                  title={r.rechnungsnummer}
-                  subtitle={`${formatEur(r.brutto)} · ${r.status} · ${formatDatum(r.rechnungsdatum)}`}
-                  onView={r.pdf_url ? () => setPdfOpen({ url: r.pdf_url!, title: r.rechnungsnummer }) : undefined}
-                  onDownload={r.pdf_url ? () => window.open(r.pdf_url!, '_blank') : undefined}
-                />
-              ))}
-              {a.abnahme_protokoll_url ? (
-                <DocCard
-                  type="protocol"
-                  title="Abnahmeprotokoll"
-                  subtitle={atitel}
-                  onView={() => setPdfOpen({ url: a.abnahme_protokoll_url!, title: 'Abnahme' })}
-                  onDownload={() => window.open(a.abnahme_protokoll_url!, '_blank')}
-                />
-              ) : null}
-              {!pdf && aufRechnungen.length === 0 && !a.abnahme_protokoll_url ? (
-                <p className="text-sm text-bw-mid">Keine Dokumente für diesen Auftrag.</p>
-              ) : null}
+            <div className="space-y-3">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Angebote</h4>
+              <CrmDokumenteTabelle zeilen={angeboteZeilen} emptyDescription="Keine Angebots-PDFs." />
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Rechnungen</h4>
+              <CrmDokumenteTabelle zeilen={rechnungZeilen} emptyDescription="Keine Rechnungs-PDFs." />
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">
+                Abnahme & Dokumentation
+              </h4>
+              <CrmDokumenteTabelle
+                zeilen={dokumentationZeilen}
+                emptyDescription="Keine Abnahme- oder Protokolldokumente."
+              />
             </div>
           </section>
         )
       })}
 
-      <section>
-        <h3 className="mb-3 border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
+      {(kunde.leads ?? [])
+        .filter((l) => (l.angebote ?? []).some((ang) => !('auftrag_id' in ang) || !ang.auftrag_id))
+        .map((l) => {
+          const titel =
+            leadSituationDisplay(l.situation) ||
+            (l.bereiche?.length ? l.bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ') : 'Anfrage')
+          const zeilen: CrmDokumentZeile[] = (l.angebote ?? [])
+            .filter((ang) => !('auftrag_id' in ang) || !ang.auftrag_id)
+            .map((ang) => ({
+              id: `angebot-${ang.id}`,
+              datum: ang.created_at ?? l.created_at,
+              name: `Angebot ${ang.id.slice(0, 8).toUpperCase()}`,
+              href: ang.pdf_url?.trim() || `/api/angebote/${ang.id}/pdf`,
+            }))
+          if (!zeilen.length) return null
+          return (
+            <section key={l.id} className="space-y-3">
+              <h3 className="border-b border-bw-border pb-2 text-sm font-semibold text-bw-text">
+                <Link href={`/anfragen/${l.id}`} className="text-bw-link hover:underline">
+                  Anfrage: {titel}
+                </Link>
+              </h3>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Angebote</h4>
+              <CrmDokumenteTabelle zeilen={zeilen} emptyDescription="Keine Angebots-PDFs." />
+            </section>
+          )
+        })}
+
+      <section className="space-y-3">
+        <h3 className="border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
           Sonstige Dokumente
         </h3>
-        <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg px-4 py-8 text-center text-sm text-bw-mid">
-          Datei hierher ziehen oder <span className="text-bw-link">Datei auswählen</span>
+        <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg-soft px-4 py-8 text-center text-sm text-bw-text-muted">
+          Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
           <div className="mt-2 text-xs">PDF, JPG, PNG · max 10MB (Upload folgt)</div>
         </div>
-        <div className="mt-3 space-y-2">
-          {(kunde.kunden_dokumente ?? [])
-            .filter((d) => d.typ !== 'protokoll')
-            .map((d) => (
-              <DocCard
-                key={d.id}
-                type="other"
-                title={d.name}
-                subtitle={formatDatum(d.created_at)}
-                onView={d.datei_url ? () => setPdfOpen({ url: d.datei_url!, title: d.name }) : undefined}
-              />
-            ))}
-        </div>
+        <CrmDokumenteTabelle
+          zeilen={(kunde.kunden_dokumente ?? [])
+            .filter((d) => d.datei_url?.trim())
+            .map((d) => ({
+              id: d.id,
+              name: d.name,
+              datum: d.created_at,
+              href: d.datei_url!.trim(),
+            }))}
+          emptyDescription="Noch keine sonstigen Dokumente."
+        />
       </section>
     </div>
   )
 
-  const tabKommunikation = (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ['alle', 'Alle'],
-              ['mail', 'Mails'],
-              ['notiz', 'Notizen'],
-              ['anruf', 'Anrufe'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setKommFilter(id)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium',
-                kommFilter === id
-                  ? 'border-bw-primary bg-bw-primary/10 text-bw-text'
-                  : 'border-bw-border text-bw-mid hover:bg-bw-hover'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setKommModal(true)}>
-          + Notiz hinzufügen
-        </button>
+  const tabNotizen = (
+    <>
+      <p className="mb-2 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
+      <Textarea
+        placeholder="Interne Kundennotiz…"
+        value={interneNotiz}
+        onChange={(e) => setInterneNotiz(e.target.value)}
+        rows={10}
+      />
+    </>
+  )
+
+  const tabAktivitaet = (
+    <DetailAccordion
+      mobileOnly
+      sections={[
+        {
+          id: 'verlauf',
+          title: ACTIVITY_SECTIONS.verlauf,
+          defaultOpen: true,
+          content: tabTimeline,
+        },
+        {
+          id: 'notizen',
+          title: ACTIVITY_SECTIONS.notizen,
+          content: tabNotizen,
+        },
+      ]}
+    />
+  )
+
+  const AUFTRAEGE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px'
+  const ANFRAGEN_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
+  const ANGEBOTE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
+
+  function VorgaengeSectionHeading({ title, count }: { title: string; count?: number }) {
+    return (
+      <div className="flex items-baseline justify-between gap-2 border-b border-bw-border pb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-bw-text">{title}</h3>
+        {count != null ? <span className="text-xs tabular-nums text-bw-text-muted">{count}</span> : null}
       </div>
-      <ul className="space-y-3">
-        {kommEintraege.map((e) => (
-          <li key={e.id} className="rounded-lg border border-bw-border bg-bw-card p-3 text-sm">
-            <div className="text-xs text-bw-light">
-              {e.icon} {e.titel} · {e.datum}
-            </div>
-            {e.projekt ? (
-              <p className="mt-1 text-xs font-medium text-bw-primary">
-                {e.projekt === 'Kunde' ? 'Kunde (allgemein)' : e.projekt}
-              </p>
-            ) : null}
-            {e.sub ? <p className="mt-1 whitespace-pre-wrap text-bw-text">{e.sub}</p> : null}
-            {e.mail ? (
-              <p className="mt-2 text-xs text-bw-link">Protokoll siehe E-Mail-Archiv (Ansehen folgt)</p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
+    )
+  }
+
+  const tabAnfragen = (
+    <section className="space-y-2">
+      <VorgaengeSectionHeading title="Anfragen" count={(kunde.leads ?? []).length || undefined} />
+      {(kunde.leads ?? []).length === 0 ? (
+        <p className="py-4 text-center text-sm text-bw-text-muted">
+          Noch keine Anfragen.{' '}
+          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+            Anfrage anlegen
+          </Link>
+        </p>
+      ) : (
+        <ListGridShell minWidth="720px">
+          <div className="list-row-grid head" style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}>
+            <div>Nr.</div>
+            <div>Anfrage</div>
+            <div>Eingegangen</div>
+            <div className="text-right">Budget</div>
+            <div>Status</div>
+          </div>
+          {[...(kunde.leads ?? [])]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .map((l) => {
+              const titel =
+                leadSituationDisplay(l.situation) ||
+                (l.bereiche?.length ? l.bereiche.join(' + ') : 'Anfrage')
+              const bereiche = bereicheFuerAnzeige(l.bereiche, l.situation)
+              const bereicheText = bereiche.length
+                ? bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
+                : null
+              return (
+                <Link
+                  key={l.id}
+                  href={`/anfragen/${l.id}`}
+                  className="list-row-grid"
+                  style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}
+                >
+                  <div className="font-mono text-xs text-bw-text-muted">{l.id.slice(0, 8).toUpperCase()}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-bw-text">{titel}</p>
+                    {bereicheText ? (
+                      <p className="truncate text-xs text-bw-text-muted">{bereicheText}</p>
+                    ) : null}
+                  </div>
+                  <p className="text-[13px] tabular-nums text-bw-text-muted">{formatDatum(l.created_at)}</p>
+                  <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                    {formatAnfragePreisAnzeige(
+                      l.kanal,
+                      l.budget_ca,
+                      l.preis_min,
+                      l.preis_max,
+                      l.funnel_daten
+                    )}
+                  </p>
+                  <LeadStatusBadge status={l.status as LeadStatus} />
+                </Link>
+              )
+            })}
+        </ListGridShell>
+      )}
+    </section>
   )
 
-  const tabFinanzen = (
-    <div className="space-y-6">
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          ['Umsatz', formatEur(kunde.gesamt_umsatz)],
-          ['Offen', formatEur(offenSumme)],
-          ['Bezahlt', formatEur(bezahltSumme)],
-          ['Einbehalte', formatEur(einbehaltSumme)],
-        ].map(([a, b]) => (
-          <div key={a} className="rounded-lg border border-bw-border bg-bw-card p-3 text-sm">
-            <div className="text-xs text-bw-mid">{a}</div>
-            <div className="mt-1 font-semibold text-bw-text">{b}</div>
+  const tabAngebote = (
+    <section className="space-y-2">
+      <VorgaengeSectionHeading title="Angebote" count={alleAngebote.length || undefined} />
+      {alleAngebote.length === 0 ? (
+        <p className="py-4 text-center text-sm text-bw-text-muted">
+          Noch keine Angebote.{' '}
+          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+            Anfrage anlegen
+          </Link>
+        </p>
+      ) : (
+        <ListGridShell minWidth="720px">
+          <div className="list-row-grid head" style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}>
+            <div>Nr.</div>
+            <div>Bezug</div>
+            <div className="text-right">Betrag</div>
+            <div>Erstellt</div>
+            <div>Status</div>
           </div>
-        ))}
-      </section>
+          {alleAngebote.map((a) => (
+            <Link
+              key={a.id}
+              href={`/angebote/${a.id}`}
+              className="list-row-grid"
+              style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}
+            >
+              <div className="font-mono text-xs text-bw-text-muted">{a.id.slice(0, 8).toUpperCase()}</div>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-medium text-bw-text">{a.bezug}</p>
+                <p className="truncate text-xs text-bw-text-muted">
+                  {a.created_at ? formatRelativeDate(a.created_at) : '—'}
+                </p>
+              </div>
+              <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
+              </p>
+              <p className="text-[13px] tabular-nums text-bw-text-muted">
+                {a.created_at ? formatDatum(a.created_at) : '—'}
+              </p>
+              <AngebotEinfachStatusBadge
+                status={resolveStatusEinfach({
+                  status: a.status as AngebotStatus,
+                  status_einfach: a.status_einfach ?? null,
+                  gueltig_bis: a.gueltig_bis ?? null,
+                })}
+              />
+            </Link>
+          ))}
+        </ListGridShell>
+      )}
+    </section>
+  )
 
-      <section>
-        <h3 className="mb-2 text-sm font-semibold">Rechnungen</h3>
-        <div className="overflow-x-auto rounded-lg border border-bw-border">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-bw-bg text-xs text-bw-mid">
-              <tr>
-                <th className="px-3 py-2">Nummer</th>
-                <th className="px-3 py-2">Auftrag</th>
-                <th className="px-3 py-2">Datum</th>
-                <th className="px-3 py-2">Betrag</th>
-                <th className="px-3 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rechnungen.map((r) => (
-                <tr key={r.id} className="border-t border-bw-border">
-                  <td className="px-3 py-2 font-medium">{r.rechnungsnummer}</td>
-                  <td className="px-3 py-2">{auftragTitelFromRechnung(r)}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{formatDatum(r.rechnungsdatum)}</td>
-                  <td className="px-3 py-2">{formatEur(r.brutto)}</td>
-                  <td className="px-3 py-2">{r.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <Accordion title="Einbehalte">
-        <ul className="space-y-2 pt-1 text-sm">
-          {einbehalteFlat.length === 0 ? (
-            <li className="text-bw-mid">Keine Einbehalte erfasst.</li>
-          ) : (
-            einbehalteFlat.map((e) => (
-              <li key={e.id}>
-                <span className="font-medium">{e.auftrag}</span> · {e.label} · {formatEur(e.betrag)}
-                <span className="text-bw-mid"> — Freigabe: {formatDatum(e.freigabe)}</span>
-              </li>
-            ))
-          )}
-        </ul>
-      </Accordion>
-
-      <Accordion title="Offene Posten">
-        {ueberfaellig.length === 0 ? (
-          <p className="pt-1 text-sm text-bw-mid">Keine überfälligen Rechnungen.</p>
-        ) : (
-          <ul className="space-y-3 pt-1">
-            {ueberfaellig.map((r) => (
-              <li key={r.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                <div className="font-medium">⚠️ Rechnung {r.rechnungsnummer}</div>
-                <div>
-                  Auftrag: {auftragTitelFromRechnung(r)} · Überfällig · {formatEur(r.brutto)}
+  const tabAuftraege = (
+    <section className="space-y-2">
+      <VorgaengeSectionHeading title="Aufträge" count={(kunde.auftraege ?? []).length || undefined} />
+      {(kunde.auftraege ?? []).length === 0 ? (
+        <p className="py-4 text-center text-sm text-bw-text-muted">
+          Noch keine Aufträge.{' '}
+          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+            Anfrage anlegen
+          </Link>
+        </p>
+      ) : (
+        <ListGridShell minWidth="720px">
+          <div className="list-row-grid head" style={{ gridTemplateColumns: AUFTRAEGE_GRID_COLS }}>
+            <div>Nr.</div>
+            <div>Auftrag</div>
+            <div className="text-right">Wert</div>
+            <div>Status</div>
+          </div>
+          {(kunde.auftraege ?? []).map((a) => {
+            const agg = angebotAgg(a)
+            const wert = betragAnzeige(agg?.gesamt_fix ?? null, agg?.gesamt_min ?? null, agg?.gesamt_max ?? null)
+            return (
+              <Link
+                key={a.id}
+                href={`/auftraege/${a.id}`}
+                className="list-row-grid"
+                style={{ gridTemplateColumns: AUFTRAEGE_GRID_COLS }}
+              >
+                <div className="font-mono text-xs text-bw-text-muted">{a.id.slice(0, 8).toUpperCase()}</div>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium text-bw-text">{a.titel?.trim() || 'Auftrag'}</p>
+                  <p className="truncate text-xs text-bw-text-muted">
+                    {a.end_datum ? `bis ${formatDatum(a.end_datum)}` : formatDatum(a.created_at)}
+                  </p>
                 </div>
+                <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">{wert}</p>
+                <AuftragStatusBadge status={a.status as AuftragStatus} />
+              </Link>
+            )
+          })}
+        </ListGridShell>
+      )}
+    </section>
+  )
+
+  const RECHNUNG_GRID_COLS_SIMPLE = '120px minmax(140px,1.5fr) 110px 100px'
+
+  const tabRechnungen = (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <VorgaengeSectionHeading title="Rechnungen" count={rechnungen.length || undefined} />
+        {rechnungen.length === 0 ? (
+          <p className="py-4 text-center text-sm text-bw-text-muted">Noch keine Rechnungen für diesen Kunden.</p>
+        ) : (
+          <ListGridShell minWidth="640px">
+            <div className="list-row-grid head" style={{ gridTemplateColumns: RECHNUNG_GRID_COLS_SIMPLE }}>
+              <div>Nr.</div>
+              <div>Beschreibung</div>
+              <div className="text-right">Betrag</div>
+              <div>Status</div>
+            </div>
+            {[...rechnungen]
+              .sort(
+                (a, b) =>
+                  new Date(b.rechnungsdatum ?? 0).getTime() - new Date(a.rechnungsdatum ?? 0).getTime()
+              )
+              .map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/rechnungen/${r.id}`}
+                  className="list-row-grid"
+                  style={{ gridTemplateColumns: RECHNUNG_GRID_COLS_SIMPLE }}
+                >
+                  <div className="font-mono text-xs text-bw-text-muted">{r.rechnungsnummer}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-bw-text">
+                      {auftragTitelFromRechnung(r)}
+                    </p>
+                    <p className="truncate text-xs text-bw-text-muted">{formatDatum(r.rechnungsdatum)}</p>
+                  </div>
+                  <p className="text-right text-[13px] font-semibold tabular-nums text-bw-text">
+                    {formatEur(r.brutto)}
+                  </p>
+                  {rechnungStatusBadge(r)}
+                </Link>
+              ))}
+          </ListGridShell>
+        )}
+      </section>
+
+      {einbehalteFlat.length > 0 ? (
+        <section className="space-y-2">
+          <VorgaengeSectionHeading title="Einbehalte" count={einbehalteFlat.length} />
+          <ul className="space-y-2 text-sm">
+            {einbehalteFlat.map((e) => (
+              <li key={e.id} className="text-bw-text">
+                <span className="font-medium">{e.auftrag}</span> · {e.label} · {formatEur(e.betrag)}
+                <span className="text-bw-text-muted"> — Freigabe: {formatDatum(e.freigabe)}</span>
               </li>
             ))}
           </ul>
-        )}
-      </Accordion>
+        </section>
+      ) : null}
+
+      {ueberfaellig.length > 0 ? (
+        <section className="space-y-2">
+          <VorgaengeSectionHeading title="Offene Posten" count={ueberfaellig.length} />
+          <ul className="space-y-2">
+            {ueberfaellig.map((r) => (
+              <li key={r.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                <div className="flex items-center gap-1.5 font-medium">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                  <Link href={`/rechnungen/${r.id}`} className="hover:underline">
+                    Rechnung {r.rechnungsnummer}
+                  </Link>
+                </div>
+                <p>
+                  {auftragTitelFromRechnung(r)} · Überfällig · {formatEur(r.brutto)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   )
 
+  const tabVorgaenge = (
+    <div className="space-y-8">
+      {tabAnfragen}
+      {tabAngebote}
+      {tabAuftraege}
+      {tabRechnungen}
+    </div>
+  )
+
+  const ansprechperson = [kunde.vorname, kunde.nachname].filter(Boolean).join(' ').trim()
+  const headSubParts = [
+    QUELLE_LABELS[kunde.quelle ?? ''] ?? null,
+    [kunde.plz, kunde.ort].filter(Boolean).join(' '),
+    ansprechperson || kunde.ansprechpartner || null,
+  ].filter(Boolean) as string[]
+
+  const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
+    return [
+      {
+        label: 'MeinBärenwald-Einladung',
+        icon: <FileText className="h-4 w-4" aria-hidden />,
+        hint: !kunde.email ? 'Keine E-Mail' : undefined,
+        onClick: () => void openPortalModal(),
+      },
+    ]
+  }, [kunde.email])
+
+  const tabContent =
+    tab === 'vorgaenge' ? tabVorgaenge : tab === 'aktivitaet' ? tabAktivitaet : tabDokumenteInhalt
+
   return (
-    <>
-      <div className="border-b border-bw-border bg-bw-bg">
-        <div className="tabs flex flex-wrap gap-1 px-2 pt-2 md:px-4">
-          {tabs.map((t) => (
+    <div className="space-y-4 pb-6">
+      <DetailHead
+        backHref="/kunden"
+        backLabel="Zurück zu Kunden"
+        title={
+          <div className="detail-head-title-row">
+            <span>{kunde.name}</span>
+            <TypBadge typ={kunde.typ} />
+          </div>
+        }
+        sub={headSubParts.join(' · ') || 'Kunde'}
+        actions={
+          <>
             <button
-              key={t.id}
               type="button"
-              role="tab"
-              onClick={() => setTab(t.id)}
-              className={cn('tab', tab === t.id && 'active')}
+              className="btn btn-primary btn-sm inline-flex shrink-0 gap-1.5"
+              onClick={() => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id))}
             >
-              {t.label}
+              <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              E-Mail
             </button>
-          ))}
+            {hasPortalAccount ? (
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900">
+                Portal-Konto aktiv
+              </span>
+            ) : null}
+            <ActionsMenu
+              trigger={
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                  aria-label="Weitere Aktionen"
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">Mehr</span>
+                </button>
+              }
+              items={kundeMenuItems}
+              sheetTitle="Kunde"
+            />
+          </>
+        }
+      />
+
+      {fixedOverview}
+
+      <div className="app-detail-screen space-y-3 pb-6">
+        <div className="app-detail-tabs sticky top-0 z-[2] bg-app-grouped py-1">
+          <DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
         </div>
+        {kpiRow}
+        <div className="app-detail-body min-w-0 space-y-3">{tabContent}</div>
       </div>
 
-      <div className="px-4 py-4 md:px-6 md:py-6">
-        {tab === 'stammdaten' ? tabStammdaten : null}
-        {tab === 'projekte' ? tabProjekte : null}
-        {tab === 'dokumente' ? tabDokumente : null}
-        {tab === 'kommunikation' ? tabKommunikation : null}
-        {tab === 'finanzen' ? tabFinanzen : null}
-      </div>
-
-      <PdfViewer open={!!pdfOpen} onClose={() => setPdfOpen(null)} url={pdfOpen?.url ?? ''} title={pdfOpen?.title ?? ''} />
+      <Modal
+        open={portalModalOpen}
+        onClose={() => setPortalModalOpen(false)}
+        title="MeinBärenwald-Einladung senden"
+        size="lg"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+              Senden
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            label="An"
+            value={portalTo}
+            onChange={(e) => setPortalTo(e.target.value)}
+            placeholder="kunde@beispiel.de; weitere@beispiel.de"
+          />
+          <Input
+            label="CC (optional)"
+            value={portalCc}
+            onChange={(e) => setPortalCc(e.target.value)}
+            placeholder="intern@baerenwald.de; team@baerenwald.de"
+          />
+          <Select
+            label="Anrede"
+            name="portal-anrede"
+            value={portalAnrede}
+            onChange={(e) => {
+              const next = e.target.value === 'du' ? 'du' : 'sie'
+              setPortalAnrede(next)
+              setPortalBetreff(defaultPortalInviteBetreff(next))
+              setPortalText(defaultPortalInviteText(next))
+            }}
+            options={[
+              { value: 'du', label: 'Du' },
+              { value: 'sie', label: 'Sie' },
+            ]}
+          />
+          <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
+          <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          <div>
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <iframe
+              title="Kundenportal Mail Vorschau"
+              sandbox="allow-same-origin"
+              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              srcDoc={portalHtml}
+            />
+          </div>
+          <Input
+            label="MeinBärenwald Login"
+            value={portalLink}
+            readOnly
+            className="bg-bw-bg-soft"
+          />
+          <p className="text-xs text-bw-text-muted">
+            Der Button in der Mail führt immer zu <strong>/portal/login</strong>. Mehrere Adressen in „An“/„CC“
+            mit Semikolon trennen.
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         open={editOpen}
@@ -976,7 +1261,6 @@ export function KundeDetailClient({
         }
       >
         <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-          <Input label="Name *" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
           <Select
             label="Typ *"
             name="typ"
@@ -984,6 +1268,57 @@ export function KundeDetailClient({
             onChange={(e) => setEditForm((f) => ({ ...f, typ: e.target.value }))}
             options={TYP_OPTIONS}
           />
+          {istKundeFirmaPflichtTyp(editForm.typ) ? (
+            <Input
+              label={istKundeHausverwaltungTyp(editForm.typ) ? 'Firma *' : 'Firma / Name *'}
+              value={editForm.firmaName}
+              onChange={(e) => setEditForm((f) => ({ ...f, firmaName: e.target.value }))}
+            />
+          ) : null}
+          {istKundeFirmaPflichtTyp(editForm.typ) ? (
+            <>
+              <Input
+                label="Vorname (Ansprechpartner)"
+                value={editForm.vorname}
+                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
+              />
+              <Input
+                label="Nachname (Ansprechpartner)"
+                value={editForm.nachname}
+                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
+              />
+            </>
+          ) : null}
+          {!istKundeFirmaPflichtTyp(editForm.typ) ? (
+            <>
+              <Input
+                label="Vorname"
+                value={editForm.vorname}
+                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
+              />
+              <Input
+                label="Nachname *"
+                value={editForm.nachname}
+                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
+              />
+            </>
+          ) : null}
+          <Input
+            label="Straße *"
+            value={editForm.strasse}
+            onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
+          />
+          <Input
+            label="Hausnummer *"
+            value={editForm.hausnummer}
+            onChange={(e) => setEditForm((f) => ({ ...f, hausnummer: e.target.value }))}
+          />
+          <Input
+            label="Postleitzahl *"
+            value={editForm.plz}
+            onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))}
+          />
+          <Input label="Ort *" value={editForm.ort} onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))} />
           <Input
             label="Telefon"
             type="tel"
@@ -996,23 +1331,18 @@ export function KundeDetailClient({
             value={editForm.email}
             onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
           />
-          <Input label="PLZ" value={editForm.plz} onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))} />
-          <Input label="Ort" value={editForm.ort} onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))} />
-          <Input
-            label="Straße"
-            value={editForm.strasse}
-            onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
-          />
           <Input
             label="Webseite"
             value={editForm.webseite}
             onChange={(e) => setEditForm((f) => ({ ...f, webseite: e.target.value }))}
           />
-          <Input
-            label="Ansprechpartner"
-            value={editForm.ansprechpartner}
-            onChange={(e) => setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))}
-          />
+          {istKundeNurGewerbeTyp(editForm.typ) ? (
+            <Input
+              label="Ansprechpartner"
+              value={editForm.ansprechpartner}
+              onChange={(e) => setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))}
+            />
+          ) : null}
           <Select
             label="Quelle"
             name="quelle"
@@ -1026,43 +1356,7 @@ export function KundeDetailClient({
         </div>
       </Modal>
 
-      <Modal
-        open={kommModal}
-        onClose={() => setKommModal(false)}
-        title="Notiz / Kontakt"
-        size="md"
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setKommModal(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" onClick={saveKomm} loading={pending}>
-              Speichern
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <Select
-            label="Typ"
-            value={kommTyp}
-            onChange={(e) => setKommTyp(e.target.value)}
-            options={[
-              { value: 'notiz', label: 'Notiz' },
-              { value: 'anruf', label: 'Anruf' },
-              { value: 'termin', label: 'Termin' },
-              { value: 'sonstiges', label: 'Sonstiges' },
-            ]}
-          />
-          <Textarea label="Inhalt" value={kommText} onChange={(e) => setKommText(e.target.value)} rows={4} />
-          <Input
-            label="Datum / Zeit (optional)"
-            type="datetime-local"
-            value={kommDt}
-            onChange={(e) => setKommDt(e.target.value)}
-          />
-        </div>
-      </Modal>
-    </>
+      {mailCompose.modal}
+    </div>
   )
 }
