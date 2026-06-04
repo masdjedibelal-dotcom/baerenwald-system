@@ -1,3 +1,5 @@
+import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
+import { istPreisPosition } from '@/lib/dokument-zeilen'
 import type {
   AngebotHandwerkerZuweisungInput,
   AngebotPosition,
@@ -22,6 +24,52 @@ function istLegacyPosition(r: Record<string, unknown>): boolean {
 function parsePreisTyp(v: unknown): PreisTyp | undefined {
   if (v === 'fix' || v === 'range') return v
   return undefined
+}
+
+function parseKostenverteilung(
+  v: unknown
+): 'allgemein' | 'lohn' | 'material' | undefined {
+  if (v === 'allgemein' || v === 'lohn' || v === 'material') return v
+  return undefined
+}
+
+/** Zeilensumme netto aus gespeicherten Feldern (Wizard = Line total, Legacy normalize = Stück). */
+function gesamtZeileMinMax(
+  r: Record<string, unknown>,
+  gesamtStueck: number,
+  menge: number,
+  preis_typ: PreisTyp
+): { min: number; max: number } {
+  const lineFromParts = Math.round(gesamtStueck * menge * 100) / 100
+  const rawMin = num(r.gesamt_min)
+  const rawMax = num(r.gesamt_max)
+  if (rawMin <= 0 && rawMax <= 0) {
+    return { min: lineFromParts, max: lineFromParts }
+  }
+  const minCand = rawMin > 0 ? rawMin : rawMax
+  const maxCand = rawMax > 0 ? rawMax : minCand
+  const looksLikeStueckGespeichert =
+    menge > 1 &&
+    gesamtStueck > 0 &&
+    Math.abs(minCand - gesamtStueck) < 0.02 &&
+    Math.abs(minCand - lineFromParts) > 0.02
+  if (looksLikeStueckGespeichert) {
+    const maxStueck = Math.abs(maxCand - minCand) > 0.02 ? maxCand : gesamtStueck
+    return {
+      min: lineFromParts,
+      max: Math.round(maxStueck * menge * 100) / 100,
+    }
+  }
+  if (preis_typ === 'range' && maxCand > minCand) {
+    return { min: minCand, max: maxCand }
+  }
+  if (lineFromParts > 0 && rawMin > 0 && rawMin < lineFromParts - 0.02) {
+    return {
+      min: lineFromParts,
+      max: Math.max(lineFromParts, maxCand > minCand ? maxCand : lineFromParts),
+    }
+  }
+  return { min: minCand, max: maxCand }
 }
 
 /** Mittelwert zweier Kanten (Legacy Min/Max) → ein Festpreis */
@@ -65,9 +113,15 @@ export function normalizeAngebotPosition(
     if (lmin > 0 || lmax > 0) {
       lohn_netto = mittelOderMax(lmin, lmax)
     } else if (istLegacyPosition(r)) {
-      const pm = num(r.preis_min)
-      const px = num(r.preis_max)
-      lohn_netto = mittelOderMax(pm, px)
+      const vk = num(r.vk_netto)
+      if (vk > 0) {
+        lohn_netto = vk
+      } else {
+        const pm = num(r.preis_min)
+        const px = num(r.preis_max)
+        const line = mittelOderMax(pm, px)
+        lohn_netto = menge > 1 ? Math.round((line / menge) * 100) / 100 : line
+      }
     } else {
       const lf = num(r.lohn_fix)
       const gf = num(r.gesamt_fix)
@@ -99,8 +153,6 @@ export function normalizeAngebotPosition(
     }
   }
   if (material_netto < 0) material_netto = 0
-
-  const gesamt_unit = Math.round((lohn_netto + material_netto) * 100) / 100
 
   let einkaufspreis: number | undefined
   const ekSingle = r.einkaufspreis
@@ -134,8 +186,36 @@ export function normalizeAngebotPosition(
       ? String(r.handwerker_name).trim()
       : undefined
 
-  const beschreibung = String(r.beschreibung ?? leistung ?? gewerk_name).trim() || leistung
+  const beschRaw = r.beschreibung != null ? String(r.beschreibung).trim() : ''
+  const beschreibung = beschRaw && beschRaw !== leistung ? beschRaw : ''
   const preis_typ = parsePreisTyp(r.preis_typ) ?? 'fix'
+  const vkRaw = num(r.vk_netto)
+  const unitFromParts = Math.round((lohn_netto + material_netto) * 100) / 100
+  const rawGesamt = num(r.gesamt_min)
+
+  if (unitFromParts <= 0 && vkRaw <= 0 && rawGesamt > 0 && menge > 1) {
+    const lineVk = rawGesamt / menge
+    if (lineVk < rawGesamt / 2) {
+      lohn_netto = rawGesamt
+    }
+  }
+
+  const gesamtStueck =
+    vkRaw > 0
+      ? Math.round(vkRaw * 100) / 100
+      : Math.round((lohn_netto + material_netto) * 100) / 100
+
+  let gesamt_min: number
+  let gesamt_max: number
+  if (vkRaw > 0) {
+    const line = Math.round(vkRaw * menge * 100) / 100
+    gesamt_min = line
+    gesamt_max = line
+  } else {
+    const g = gesamtZeileMinMax(r, gesamtStueck, menge, preis_typ)
+    gesamt_min = g.min
+    gesamt_max = g.max
+  }
 
   const out: AngebotPosition = {
     id,
@@ -145,8 +225,8 @@ export function normalizeAngebotPosition(
     beschreibung,
     lohn_netto,
     material_netto,
-    gesamt_min: gesamt_unit,
-    gesamt_max: gesamt_unit,
+    gesamt_min,
+    gesamt_max,
     menge,
     einheit,
     notiz_intern,
@@ -154,8 +234,19 @@ export function normalizeAngebotPosition(
     preis_typ,
   }
   if (gewerk_slug) out.gewerk_slug = gewerk_slug
+  const gewerk_block_key =
+    r.gewerk_block_key != null && String(r.gewerk_block_key).trim()
+      ? String(r.gewerk_block_key).trim()
+      : undefined
+  if (gewerk_block_key) out.gewerk_block_key = gewerk_block_key
   if (leistung_id) out.leistung_id = leistung_id
   if (leistung_name) out.leistung_name = leistung_name
+  const mwstRaw = num(r.mwst_satz)
+  if (mwstRaw === 0 || mwstRaw === 7 || mwstRaw === 19) out.mwst_satz = mwstRaw
+  const kostenverteilung = parseKostenverteilung(r.kostenverteilung)
+  if (kostenverteilung) out.kostenverteilung = kostenverteilung
+  if (vkRaw > 0) out.vk_netto = vkRaw
+  if (r.kostenart === 'anfahrt' || gewerk_slug === GEWERK_SLUG_ANFAHRT) out.kostenart = 'anfahrt'
   if (einkaufspreis != null && einkaufspreis > 0) out.einkaufspreis = einkaufspreis
   if (handwerker_id) out.handwerker_id = handwerker_id
   if (handwerker_name) out.handwerker_name = handwerker_name
@@ -245,6 +336,29 @@ function zeileEinkauf(p: AngebotPosition): { min: number; max: number } {
   return { min: 0, max: 0 }
 }
 
+/** Nur Positionen mit expliziter Kostenart Lohn/Material (nicht „Allgemein“). */
+export function summenKostenaufstellungAusPositionen(
+  positionen: AngebotPosition[]
+): { lohn_netto: number; material_netto: number } | null {
+  let lohn = 0
+  let material = 0
+  for (const p of normalizeAngebotPositionen(positionen)) {
+    if (!istPreisPosition(p)) continue
+    const kv = p.kostenverteilung ?? 'allgemein'
+    if (kv === 'allgemein') continue
+    const m = p.menge || 1
+    if (kv === 'lohn') {
+      lohn += (Number(p.lohn_netto) || 0) * m
+    } else if (kv === 'material') {
+      material += (Number(p.material_netto) || 0) * m
+    }
+  }
+  lohn = Math.round(lohn * 100) / 100
+  material = Math.round(material * 100) / 100
+  if (lohn <= 0 && material <= 0) return null
+  return { lohn_netto: lohn, material_netto: material }
+}
+
 export function summenAusPositionen(
   positionen: AngebotPosition[],
   mwstSatz = 19
@@ -257,6 +371,7 @@ export function summenAusPositionen(
   let einkaufZeileMax = 0
 
   for (const p of positionen) {
+    if (!istPreisPosition(p)) continue
     const m = p.menge || 1
     const l = p.lohn_netto * m
     const mat = p.material_netto * m
@@ -322,4 +437,71 @@ export function zeilenNettoMinMax(p: AngebotPosition): { min: number; max: numbe
 export function positionNettoZeile(p: AngebotPosition): number {
   const { min } = zeilenNettoMinMax(p)
   return min
+}
+
+/**
+ * Einzelpreis netto (z. B. €/m²) — bevorzugt vk_netto.
+ * Legacy: gesamt_min enthielt oft den Stück-/m²-Preis statt der Zeilensumme → nicht blind /menge teilen.
+ */
+function vkAusGesamtMin(raw: number, menge: number): number {
+  const m = Math.max(menge, 0.0001)
+  if (raw <= 0) return 0
+  if (m <= 1) return Math.round(raw * 100) / 100
+  const lineVk = Math.round((raw / m) * 100) / 100
+  if (lineVk < raw / 2) return Math.round(raw * 100) / 100
+  return lineVk
+}
+
+export function positionVkNettoStueck(p: AngebotPosition): number {
+  const vk = num(p.vk_netto)
+  if (vk > 0) return Math.round(vk * 100) / 100
+
+  const m = Math.max(p.menge || 1, 0.0001)
+  const raw = Math.abs(num(p.gesamt_min))
+  const fromGesamt = vkAusGesamtMin(raw, m)
+  const fromParts = Math.round((Number(p.lohn_netto || 0) + Number(p.material_netto || 0)) * 100) / 100
+
+  if (fromParts > 0 && raw > 0) {
+    const lineFromParts = Math.round(fromParts * m * 100) / 100
+    if (Math.abs(lineFromParts - raw) > 0.05) return fromGesamt > 0 ? fromGesamt : fromParts
+  }
+  if (fromParts > 0) return fromParts
+  return fromGesamt
+}
+
+/** Korrigiert vk_netto, Zeilensumme und ggf. Lohn/Material nach dem Laden oder vor dem Speichern. */
+export function repairAngebotPositionPreise(p: AngebotPosition): AngebotPosition {
+  const slug = p.gewerk_slug ?? ''
+  if (slug === '__freitext__' || slug === '__gesamtrabatt__') return p
+
+  const m = Math.max(p.menge || 1, 0.0001)
+  const vk = positionVkNettoStueck(p)
+  if (vk <= 0) return p
+
+  const line = Math.round(vk * m * 100) / 100
+  let lohn = Number(p.lohn_netto) || 0
+  let mat = Number(p.material_netto) || 0
+  const unitSum = Math.round((lohn + mat) * 100) / 100
+
+  if (unitSum <= 0.01) {
+    lohn = vk
+    mat = 0
+  } else if (Math.abs(unitSum - vk) > 0.05) {
+    const f = vk / unitSum
+    lohn = Math.round(lohn * f * 100) / 100
+    mat = Math.round((vk - lohn) * 100) / 100
+  }
+
+  return {
+    ...p,
+    vk_netto: vk,
+    lohn_netto: lohn,
+    material_netto: mat,
+    gesamt_min: line,
+    gesamt_max: line,
+  }
+}
+
+export function repairAngebotPositionen(positionen: AngebotPosition[]): AngebotPosition[] {
+  return positionen.map(repairAngebotPositionPreise)
 }

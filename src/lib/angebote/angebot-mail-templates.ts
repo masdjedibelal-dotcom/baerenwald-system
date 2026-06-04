@@ -27,7 +27,7 @@ export function buildInternHandwerkerAntwortMail(input: {
     : ''
   const hinweis = !input.angenommen
     ? `<p style="margin-top:16px;padding:12px 14px;background:#FFF8E1;border-radius:8px;border:1px solid #F9A825;">
-        <strong>⚠️ Handlungsbedarf:</strong> Anderen Handwerker für <strong>${esc(input.gewerkName)}</strong> auswählen und erneut anfragen.
+        <strong>Handlungsbedarf:</strong> Anderen Handwerker für <strong>${esc(input.gewerkName)}</strong> auswählen und erneut anfragen.
       </p>`
     : ''
   return `

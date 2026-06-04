@@ -23,23 +23,36 @@ export function isHandwerkerAblehnungGrund(v: string): v is HandwerkerAblehnungG
 
 export const KUNDE_ABLEHNUNG_GRUND_VALUES = [
   'zu_teuer',
+  'konkurrenz',
+  'kein_interesse',
+  'sonstiges',
+  // Legacy-Werte (bestehende Datensätze)
   'anderes_angebot',
   'projekt_verschoben',
   'kein_feedback',
   'qualitaetszweifel',
-  'sonstiges',
 ] as const
 
 export type KundeAblehnungGrund = (typeof KUNDE_ABLEHNUNG_GRUND_VALUES)[number]
 
 export const KUNDE_ABLEHNUNG_GRUND_LABELS: Record<KundeAblehnungGrund, string> = {
   zu_teuer: 'Zu teuer',
+  konkurrenz: 'Konkurrenz gewählt',
+  kein_interesse: 'Kein Interesse mehr',
+  sonstiges: 'Sonstiges',
   anderes_angebot: 'Anderes Angebot günstiger',
   projekt_verschoben: 'Projekt verschoben',
   kein_feedback: 'Kein Feedback erhalten',
   qualitaetszweifel: 'Qualitätszweifel',
-  sonstiges: 'Sonstiges',
 }
+
+/** Optionen für Ablehnungs-Modal (neue Angebots-Detailseite) */
+export const KUNDE_ABLEHNUNG_GRUND_OPTIONS = [
+  'zu_teuer',
+  'konkurrenz',
+  'kein_interesse',
+  'sonstiges',
+] as const satisfies readonly KundeAblehnungGrund[]
 
 export function isKundeAblehnungGrund(v: string): v is KundeAblehnungGrund {
   return (KUNDE_ABLEHNUNG_GRUND_VALUES as readonly string[]).includes(v)
