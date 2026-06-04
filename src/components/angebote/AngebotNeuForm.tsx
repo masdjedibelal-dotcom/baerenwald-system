@@ -17,12 +17,15 @@ import {
   updateAngebotVorlage,
 } from '@/app/(dashboard)/angebote/actions'
 import type { AngebotPosition, Gewerk, Handwerker, Kunde, Lead, Preisliste } from '@/lib/types'
+import { splitNettoStueck } from '@/lib/angebot-kosten-split'
 import {
   neuePositionsId,
   normalizeAngebotPosition,
   summenAusPositionen,
 } from '@/lib/angebot-positionen'
-import { formatPreis } from '@/lib/utils'
+import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { betragAnzeige } from '@/lib/angebot-einfach'
+import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
 import {
   gewerkOptionsFromList,
   OfferPositionCard,
@@ -30,10 +33,7 @@ import {
 } from '@/components/angebote/OfferPositionCard'
 
 function mittelPreisliste(pl: Preisliste): number {
-  const a = pl.preis_min
-  const b = pl.preis_max
-  if (a > 0 && b > 0) return Math.round(((a + b) / 2) * 100) / 100
-  return Math.max(a, b, 0)
+  return preislisteEinzelpreis(pl)
 }
 
 function newRow(): OfferPositionRow {
@@ -86,14 +86,6 @@ function positionsToRows(positionen: AngebotPosition[], preislisten: Preisliste[
   return positionen.map((p) => positionToRow(p, preislisten))
 }
 
-function vorabPositionenToRows(
-  positionen: AngebotPosition[],
-  preislisten: Preisliste[]
-): OfferPositionRow[] {
-  if (!positionen.length) return [newRow()]
-  return positionen.map((p) => positionToRow(p, preislisten))
-}
-
 export type AngebotNeuFormProps = {
   gewerke: Gewerk[]
   preislisten: Preisliste[]
@@ -117,7 +109,6 @@ export type AngebotNeuFormProps = {
   } | null
   /** bei kopieVon: Kundendaten zur Anzeige (optional) */
   kopieKunde?: Kunde | null
-  vorabVorOrt?: { positionen: AngebotPosition[]; hinweisBox: string } | null
   /** Aus URL ?vorlage_id= — Positionen vorbelegen (neues Angebot) */
   vorlageBootstrap?: { name: string; positionen: AngebotPosition[] } | null
   /** Einstellungen: Angebot-Vorlage ohne Kunde */
@@ -135,7 +126,6 @@ export function AngebotNeuForm({
   editAngebot,
   kopieVon,
   kopieKunde = null,
-  vorabVorOrt,
   vorlageBootstrap = null,
   modusVorlage = null,
 }: AngebotNeuFormProps) {
@@ -165,20 +155,12 @@ export function AngebotNeuForm({
       return positionsToRows(modusVorlage.initial.positionen, preislisten)
     if (editAngebot) return positionsToRows(editAngebot.positionen, preislisten)
     if (kopieVon) return positionsToRows(kopieVon.positionen, preislisten)
-    if (vorabVorOrt?.positionen?.length)
-      return vorabPositionenToRows(vorabVorOrt.positionen, preislisten)
     if (vorlageBootstrap?.positionen?.length)
       return positionsToRows(vorlageBootstrap.positionen, preislisten)
     return [newRow()]
   })
 
-  const [notizen, setNotizen] = useState(() => {
-    const base = editAngebot?.notizen ?? kopieVon?.notizen ?? ''
-    if (vorabVorOrt?.hinweisBox) {
-      return base ? `${base}\n\n${vorabVorOrt.hinweisBox}` : vorabVorOrt.hinweisBox
-    }
-    return base
-  })
+  const [notizen, setNotizen] = useState(() => editAngebot?.notizen ?? kopieVon?.notizen ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -271,13 +253,18 @@ export function AngebotNeuForm({
       return
     }
     const fest = mittelPreisliste(pl)
+    const split = splitNettoStueck(fest, {
+      firm: defaultFirmenEinstellungen(),
+      leistung: pl.leistung,
+      preisliste: pl,
+    })
     updateRow(key, {
       preisliste_id,
       leistung: pl.leistung,
       beschreibung: pl.leistung,
       einheit: pl.einheit,
-      lohn_netto: fest,
-      material_netto: 0,
+      lohn_netto: split.lohn_netto,
+      material_netto: split.material_netto,
     })
   }
 
@@ -394,15 +381,6 @@ export function AngebotNeuForm({
   return (
     <div className="pb-28">
       <PageHeader
-        title={
-          modusVorlage
-            ? modusVorlage.id
-              ? 'Vorlage bearbeiten'
-              : 'Neue Vorlage'
-            : isEdit
-              ? 'Angebot bearbeiten'
-              : 'Neues Angebot'
-        }
         action={
           <Link
             href={
@@ -426,12 +404,6 @@ export function AngebotNeuForm({
       {error ? (
         <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
           {error}
-        </p>
-      ) : null}
-
-      {vorabVorOrt?.hinweisBox ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          {vorabVorOrt.hinweisBox}
         </p>
       ) : null}
 
@@ -640,7 +612,7 @@ export function AngebotNeuForm({
         {modusVorlage ? (
           <div className="mt-4 rounded-lg border border-dashed border-bw-border bg-bw-bg/60 p-3 text-sm text-bw-text-muted">
             <span className="font-medium text-ink">Summe Vorlage (netto): </span>
-            {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
+            {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
           </div>
         ) : null}
       </section>
@@ -663,21 +635,21 @@ export function AngebotNeuForm({
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>
               <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
-                {formatPreis(undefined, summen.lohnZeileMin, summen.lohnZeileMax)}
+                {betragAnzeige(null, summen.lohnZeileMin, summen.lohnZeileMax)}
               </p>
               <p className="text-xs text-bw-text-muted">netto</p>
             </div>
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Material</p>
               <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
-                {formatPreis(undefined, summen.materialZeileMin, summen.materialZeileMax)}
+                {betragAnzeige(null, summen.materialZeileMin, summen.materialZeileMax)}
               </p>
               <p className="text-xs text-bw-text-muted">netto</p>
             </div>
             <div className="rounded-lg border border-bw-border bg-primary/8 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Netto Summe</p>
               <p className="mt-1 text-lg font-semibold tabular-nums text-primary">
-                {formatPreis(undefined, summen.nettoMin, summen.nettoMax)}
+                {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
               </p>
               <p className="text-xs text-bw-text-muted">zzgl. MwSt.</p>
             </div>
@@ -686,7 +658,7 @@ export function AngebotNeuForm({
             <div className="text-sm text-bw-text-muted">
               MwSt. {summen.mwstSatz}%:{' '}
               <span className="font-medium text-ink">
-                {formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}
+                {betragAnzeige(null, summen.mwstBetragMin, summen.mwstBetragMax)}
               </span>
             </div>
             <div>
@@ -695,14 +667,14 @@ export function AngebotNeuForm({
                 className="text-2xl font-bold tabular-nums tracking-tight"
                 style={{ color: 'var(--fl-accent)' }}
               >
-                {formatPreis(undefined, summen.bruttoMin, summen.bruttoMax)}
+                {betragAnzeige(null, summen.bruttoMin, summen.bruttoMax)}
               </p>
             </div>
           </div>
           <div className="mt-3 border-t border-bw-border pt-2 text-xs text-bw-text-muted">
             <span className="font-medium text-ink">Intern: </span>
-            Einkauf {formatPreis(undefined, summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge{' '}
-            {formatPreis(undefined, summen.margeMin, summen.margeMax)}
+            Einkauf {betragAnzeige(null, summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge{' '}
+            {betragAnzeige(null, summen.margeMin, summen.margeMax)}
           </div>
         </div>
       ) : null}

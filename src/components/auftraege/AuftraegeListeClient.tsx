@@ -1,115 +1,118 @@
 'use client'
 
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Download, Wrench } from 'lucide-react'
+import { Wrench } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { SidePanel } from '@/components/ui/SidePanel'
+import {
+  ListFilterSection,
+  ListGridShell,
+  ListMobileStack,
+} from '@/components/layout/ListPageParts'
+import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { ListAvatar } from '@/components/ui/ListAvatar'
 import { FilterChips } from '@/components/ui/FilterChips'
-import { ListCard } from '@/components/ui/ListCard'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { SortableHeader } from '@/components/ui/SortableHeader'
+import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { useExport, type ExportField } from '@/hooks/useExport'
-import { formatDatum, formatPreis, AUFTRAG_STATUS_LABELS, cn } from '@/lib/utils'
+import { useSort } from '@/hooks/useSort'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import {
+  auftragFortschritt,
+  auftragKundenName,
+  auftragOrt,
+  auftragSuchtext,
+  auftragTitel,
+  auftragWertAnzeige,
+  auftragWertNum,
+  countAuftragPhase,
+  formatAuftragsNr,
+  lieferdatumAnzeige,
+  matchesAuftragPhase,
+  type AuftragListenPhase,
+} from '@/lib/auftraege/auftrag-liste-helpers'
 import {
   getZeitraumRange,
   datumInZeitraum,
   zeitraumLabel,
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
+import { AUFTRAG_STATUS_LABELS, cn, formatDatum } from '@/lib/utils'
 import type { AuftragListeEintrag, AuftragStatus } from '@/lib/types'
 
-const STATUS_FILTERS: { value: '' | AuftragStatus; label: string }[] = [
+const PHASE_FILTERS: { value: AuftragListenPhase; label: string }[] = [
   { value: '', label: 'Alle' },
-  { value: 'offen', label: 'Offen' },
-  { value: 'in_arbeit', label: 'In Arbeit' },
-  { value: 'abnahme', label: 'Abnahme' },
-  { value: 'abgeschlossen', label: 'Abgeschlossen' },
-  { value: 'storniert', label: 'Storniert' },
+  { value: 'aktiv', label: 'Aktiv' },
+  { value: 'fertig', label: 'Fertig' },
 ]
+
+/** Auftrag | Kunde | Wert | Lieferdatum | Status */
+const AUFTRAGE_GRID_COLS =
+  'minmax(180px,1.65fr) minmax(110px,1fr) minmax(88px,0.7fr) minmax(100px,0.8fr) minmax(108px,0.75fr)'
 
 const AUFTRAG_EXPORT_FIELDS: ExportField[] = [
-  { key: 'titel', label: 'Titel' },
+  { key: 'nr', label: 'Nr.' },
+  { key: 'auftrag', label: 'Auftrag' },
+  { key: 'ort', label: 'Ort' },
   { key: 'kunde', label: 'Kunde' },
   { key: 'status', label: 'Status' },
+  { key: 'wert', label: 'Wert' },
+  { key: 'fortschritt', label: 'Fortschritt %' },
+  { key: 'lieferdatum', label: 'Lieferdatum' },
   { key: 'start_datum', label: 'Start' },
-  { key: 'end_datum', label: 'Ende' },
-  { key: 'handwerker', label: 'Handwerker' },
-  { key: 'created_at', label: 'Erstellt am' },
 ]
 
-function kundenName(a: AuftragListeEintrag) {
-  return a.kunden?.name?.trim() || 'Ohne Kunde'
+type SortRow = {
+  auftrag: AuftragListeEintrag
+  auftrag_titel: string
+  kunde: string
+  wert: number
+  end_datum: string
+  status: AuftragStatus
 }
 
-function gewerkeTags(a: AuftragListeEintrag) {
-  const fromPos = Array.from(
-    new Set((a.auftrag_positionen ?? []).map((p) => p.gewerk_name).filter(Boolean) as string[])
-  )
-  if (fromPos.length) return fromPos.slice(0, 5)
-  const names = new Set<string>()
-  for (const z of a.auftrag_handwerker ?? []) {
-    if (z.gewerke?.name) names.add(z.gewerke.name)
-  }
-  return Array.from(names)
-}
-
-function handwerkerNamen(a: AuftragListeEintrag) {
-  const names = (a.auftrag_handwerker ?? [])
-    .map((z) => z.handwerker?.name)
-    .filter(Boolean) as string[]
-  return names.length ? names.join(', ') : '—'
-}
-
-function auftragTitel(a: AuftragListeEintrag) {
-  return a.titel?.trim() || kundenName(a)
-}
-
-function listSubtitle(a: AuftragListeEintrag) {
-  const titel = a.titel?.trim()
-  if (titel) return titel
-  const fromPos = Array.from(
-    new Set((a.auftrag_positionen ?? []).map((p) => p.gewerk_name).filter(Boolean) as string[])
-  )
-  if (fromPos.length) return fromPos.slice(0, 3).join(' · ')
-  return auftragTitel(a)
-}
-
-function listMeta(a: AuftragListeEintrag): string | undefined {
-  const k = a.kunden
-  const addr = [k?.adresse, k?.plz].filter(Boolean).join(', ').trim() || null
-  const start = a.start_datum ? `Start: ${formatDatum(a.start_datum)}` : null
-  const parts = [addr, start].filter(Boolean)
-  return parts.length ? parts.join(' · ') : undefined
+function lieferdatumSortKey(a: AuftragListeEintrag): string {
+  return a.end_datum || a.abnahme_datum || ''
 }
 
 function auftragExportRow(a: AuftragListeEintrag): Record<string, unknown> {
   return {
-    titel: auftragTitel(a),
-    kunde: kundenName(a),
+    nr: formatAuftragsNr(a),
+    auftrag: auftragTitel(a),
+    ort: auftragOrt(a),
+    kunde: auftragKundenName(a),
     status: AUFTRAG_STATUS_LABELS[a.status] ?? a.status,
-    start_datum: a.start_datum ?? '',
-    end_datum: a.end_datum ?? '',
-    handwerker: handwerkerNamen(a),
-    created_at: a.created_at,
+    wert: auftragWertAnzeige(a),
+    fortschritt: auftragFortschritt(a),
+    lieferdatum: lieferdatumAnzeige(a),
+    start_datum: a.start_datum ? formatDatum(a.start_datum) : '',
   }
 }
 
-export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEintrag[] }) {
+export function AuftraegeListeClient({
+  auftraege,
+  mode = 'page',
+  selectedId = null,
+}: {
+  auftraege: AuftragListeEintrag[]
+  mode?: 'page' | 'pane'
+  selectedId?: string | null
+}) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
-  const [panelAuftrag, setPanelAuftrag] = useState<AuftragListeEintrag | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
-  const [status, setStatus] = useState<'' | AuftragStatus>('')
+  const [phase, setPhase] = useState<AuftragListenPhase>('')
   const [statusList, setStatusList] = useState<AuftragStatus[] | null>(null)
   const [q, setQ] = useState('')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const debouncedQ = useDebouncedValue(q, 300)
 
   useEffect(() => {
     const raw = searchParams.get('status')
@@ -123,10 +126,8 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
 
   useEffect(() => {
     const sid = searchParams.get('selected')
-    if (!sid?.trim()) return
-    const found = auftraege.find((x) => x.id === sid.trim())
-    if (found) setPanelAuftrag(found)
-  }, [searchParams, auftraege])
+    if (sid?.trim()) router.replace(`/auftraege/${sid.trim()}`)
+  }, [searchParams, router])
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
@@ -134,38 +135,49 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
   )
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
+    const needle = debouncedQ.trim().toLowerCase()
     return auftraege.filter((a) => {
       if (statusList?.length) {
         if (!statusList.includes(a.status)) return false
-      } else if (status && a.status !== status) return false
+      } else if (!matchesAuftragPhase(a, phase)) {
+        return false
+      }
       if (dateRange && !datumInZeitraum(a.created_at, dateRange)) return false
       if (!needle) return true
-      const kunde = kundenName(a).toLowerCase()
-      const titel = (a.titel ?? '').toLowerCase()
-      const hw = handwerkerNamen(a).toLowerCase()
-      return kunde.includes(needle) || titel.includes(needle) || hw.includes(needle)
+      return auftragSuchtext(a).includes(needle)
     })
-  }, [auftraege, status, statusList, q, dateRange])
+  }, [auftraege, phase, statusList, debouncedQ, dateRange])
 
-  const statusChipOptions = useMemo(
+  const sortRows: SortRow[] = useMemo(
     () =>
-      STATUS_FILTERS.map((o) => ({
+      filtered.map((a) => ({
+        auftrag: a,
+        auftrag_titel: auftragTitel(a),
+        kunde: auftragKundenName(a),
+        wert: auftragWertNum(a),
+        end_datum: lieferdatumSortKey(a),
+        status: a.status,
+      })),
+    [filtered]
+  )
+
+  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
+
+  const phaseChipOptions = useMemo(
+    () =>
+      PHASE_FILTERS.map((o) => ({
         label: o.label,
         value: o.value,
-        count:
-          o.value === ''
-            ? auftraege.length
-            : auftraege.filter((a) => a.status === o.value).length,
+        count: countAuftragPhase(auftraege, o.value),
       })),
     [auftraege]
   )
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
-    if (status) {
-      const label = STATUS_FILTERS.find((s) => s.value === status)?.label
-      if (label) t.push({ id: 'status', label, onRemove: () => setStatus('') })
+    if (!statusList?.length && phase) {
+      const label = PHASE_FILTERS.find((p) => p.value === phase)?.label
+      if (label) t.push({ id: 'phase', label, onRemove: () => setPhase('') })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -179,72 +191,108 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
       })
     }
     if (q.trim()) {
-      t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
+      t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
     }
     return t
-  }, [status, zeitraum, q])
+  }, [phase, statusList, zeitraum, q])
 
-  const hasActiveFilters = !!(status || statusList?.length || zeitraum !== 'alle' || q.trim())
+  const hasActiveFilters = !!((!statusList?.length && phase) || zeitraum !== 'alle' || q.trim())
 
   function resetFilters() {
-    setStatus('')
+    setPhase('')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
     setCustomTo('')
+    resetSort()
   }
 
+  function openDetail(id: string) {
+    router.push(`/auftraege/${id}`)
+  }
+
+  const isPane = mode === 'pane'
+
   return (
-    <div>
-      <PageHeader
-        title="Aufträge"
-        action={
-          <button
-            type="button"
-            onClick={() => setExportOpen(true)}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 text-sm font-medium text-bw-text shadow-sm transition-colors hover:bg-bw-hover"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            Export
-          </button>
+    <EntityListShell
+      mode={mode}
+      filters={
+      <ListFilterSection
+        chips={
+          !statusList?.length ? (
+            <FilterChips
+              options={phaseChipOptions}
+              selected={[phase]}
+              onChange={(v) => setPhase((v[0] ?? '') as AuftragListenPhase)}
+            />
+          ) : null
         }
-      />
+      >
+        <ListFilterBar
+          hideToolbarOnMobile
+          hideStatusFilter
+          statusLabel="Status"
+          statusOptions={[{ value: '', label: '—' }]}
+          statusValue=""
+          onStatusChange={() => {}}
+          zeitraumValue={zeitraum}
+          onZeitraumChange={setZeitraum}
+          showCustomDates={zeitraum === 'benutzerdefiniert'}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          searchValue={q}
+          onSearchChange={setQ}
+          searchPlaceholder="Aufträge suchen…"
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+          tags={filterTags}
+          onExportClick={() => setExportOpen(true)}
+          mobileRail={
+            <AppListFilterRail
+              sort={
+                <MobileSortSelect
+                  variant="pill"
+                  options={[
+                    { field: 'auftrag_titel', label: 'Auftrag' },
+                    { field: 'kunde', label: 'Kunde' },
+                    { field: 'wert', label: 'Wert' },
+                    { field: 'end_datum', label: 'Lieferdatum' },
+                    { field: 'status', label: 'Status' },
+                  ]}
+                  currentField={field}
+                  currentDir={dir}
+                  onSort={(f) => (f ? handleSort(f) : resetSort())}
+                />
+              }
+              zeitraumValue={zeitraum}
+              onZeitraumChange={setZeitraum}
+              onExportClick={() => setExportOpen(true)}
+            />
+          }
+        />
+      </ListFilterSection>
+      }
+    >
+      <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
 
-      {!statusList?.length ? (
-        <div className="sticky top-14 z-10 -mx-4 border-b border-bw-border bg-bw-bg px-4 py-3 md:-mx-6 md:px-6">
-          <FilterChips
-            options={statusChipOptions}
-            selected={status === '' ? [''] : [status]}
-            onChange={(v) => {
-              const next = (v[0] ?? '') as '' | AuftragStatus
-              setStatus(next)
-            }}
-          />
-        </div>
-      ) : null}
+      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
+        <MobileSortSelect
+          options={[
+            { field: 'auftrag_titel', label: 'Auftrag' },
+            { field: 'kunde', label: 'Kunde' },
+            { field: 'wert', label: 'Wert' },
+            { field: 'end_datum', label: 'Lieferdatum' },
+            { field: 'status', label: 'Status' },
+          ]}
+          currentField={field}
+          currentDir={dir}
+          onSort={(f) => (f ? handleSort(f) : resetSort())}
+        />
+      </div>
 
-      <ListFilterBar
-        statusOptions={STATUS_FILTERS}
-        statusValue={status}
-        onStatusChange={(v) => setStatus(v as '' | AuftragStatus)}
-        hideStatusFilter={!statusList?.length}
-        zeitraumValue={zeitraum}
-        onZeitraumChange={setZeitraum}
-        showCustomDates={zeitraum === 'benutzerdefiniert'}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-        searchValue={q}
-        onSearchChange={setQ}
-        searchPlaceholder="Kunde, Titel, Handwerker"
-        onReset={resetFilters}
-        hasActiveFilters={hasActiveFilters}
-        tags={filterTags}
-        className="mb-4"
-      />
-
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <EmptyState
           icon={Wrench}
           title={auftraege.length === 0 ? 'Keine Aufträge' : 'Keine Treffer'}
@@ -255,135 +303,82 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
           }
         />
       ) : (
-        <div className="card overflow-hidden">
-          <div>
-            {filtered.map((a) => (
-              <ListCard
-                key={a.id}
-                title={kundenName(a)}
-                badge={<AuftragStatusBadge status={a.status} />}
-                subtitle={listSubtitle(a)}
-                tags={gewerkeTags(a)}
-                meta={
-                  [
-                    listMeta(a),
-                    a.angebote
-                      ? formatPreis(
-                          a.angebote.gesamt_fix ?? null,
-                          a.angebote.gesamt_min ?? null,
-                          a.angebote.gesamt_max ?? null
-                        )
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || undefined
-                }
-                onClick={() => setPanelAuftrag(a)}
-              />
+        <>
+          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
+            {sorted.map(({ auftrag: a }) => (
+                <AppEntityListRow
+                  key={a.id}
+                  href={isPane ? `/auftraege/${a.id}` : undefined}
+                  onClick={isPane ? undefined : () => openDetail(a.id)}
+                  className={cn(selectedId === a.id && 'ring-2 ring-bw-primary/40')}
+                  avatar={<ListAvatar name={auftragKundenName(a)} />}
+                  title={auftragTitel(a)}
+                  line2={auftragOrt(a)}
+                  line3={auftragKundenName(a)}
+                  line4={`${auftragWertAnzeige(a)} · ${lieferdatumAnzeige(a)}`}
+                  badge={<AuftragStatusBadge status={a.status} />}
+                />
             ))}
-          </div>
-        </div>
-      )}
+          </ListMobileStack>
 
-      <SidePanel
-        open={!!panelAuftrag}
-        onClose={() => setPanelAuftrag(null)}
-        title={panelAuftrag ? kundenName(panelAuftrag) : ''}
-        subtitle={panelAuftrag?.start_datum ? `Start: ${formatDatum(panelAuftrag.start_datum)}` : undefined}
-        badge={panelAuftrag ? <AuftragStatusBadge status={panelAuftrag.status} /> : null}
-      >
-        {panelAuftrag ? (
-          <div className="space-y-4 p-5">
-            <div>
-              <ProgressBar
-                value={panelAuftrag.fortschritt ?? 0}
-                label={`Fortschritt: ${panelAuftrag.fortschritt ?? 0}%`}
+          <ListGridShell minWidth="980px" className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}>
+            <div className="list-row-grid head" style={{ gridTemplateColumns: AUFTRAGE_GRID_COLS }}>
+              <SortableHeader
+                label="Auftrag"
+                field="auftrag_titel"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
               />
+              <SortableHeader label="Kunde" field="kunde" currentField={field} currentDir={dir} onSort={handleSort} />
+              <div className="text-right">
+                <SortableHeader
+                  label="Wert"
+                  field="wert"
+                  currentField={field}
+                  currentDir={dir}
+                  onSort={handleSort}
+                />
+              </div>
+              <SortableHeader
+                label="Lieferdatum"
+                field="end_datum"
+                currentField={field}
+                currentDir={dir}
+                onSort={handleSort}
+              />
+              <SortableHeader label="Status" field="status" currentField={field} currentDir={dir} onSort={handleSort} />
             </div>
-
-            <div className="space-y-1 text-sm">
-              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Kunde</div>
-              <div className="font-medium text-bw-text">{kundenName(panelAuftrag)}</div>
-              {panelAuftrag.kunden?.telefon ? (
-                <a
-                  href={`tel:${panelAuftrag.kunden.telefon}`}
-                  className="flex items-center gap-1.5 text-bw-link"
+            {sorted.map(({ auftrag: a }) => (
+                <div
+                  key={a.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDetail(a.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openDetail(a.id)
+                    }
+                  }}
+                  className="list-row-grid"
+                  style={{ gridTemplateColumns: AUFTRAGE_GRID_COLS }}
                 >
-                  📞 {panelAuftrag.kunden.telefon}
-                </a>
-              ) : null}
-              {panelAuftrag.kunden &&
-              (panelAuftrag.kunden.adresse || panelAuftrag.kunden.plz || panelAuftrag.kunden.ort) ? (
-                <div className="text-xs text-bw-text-muted">
-                  📍{' '}
-                  {[panelAuftrag.kunden.adresse, panelAuftrag.kunden.plz, panelAuftrag.kunden.ort]
-                    .filter(Boolean)
-                    .join(', ')}
-                </div>
-              ) : null}
-            </div>
-
-            {(panelAuftrag.auftrag_positionen?.length ?? 0) > 0 ? (
-              <div>
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-bw-text-muted">Gewerke</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {Array.from(
-                    new Set((panelAuftrag.auftrag_positionen ?? []).map((p) => p.gewerk_name).filter(Boolean) as string[])
-                  ).map((g, i) => (
-                    <span key={`${g}-${i}`} className={cn('chip selected text-xs')}>
-                      {g}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-2 gap-3">
-              {panelAuftrag.start_datum ? (
-                <div className="rounded-lg bg-bw-hover p-3">
-                  <div className="mb-1 text-xs text-bw-text-muted">Start</div>
-                  <div className="text-sm font-medium text-bw-text">
-                    {new Date(panelAuftrag.start_datum).toLocaleDateString('de')}
+                  <div className="min-w-0">
+                    <p className="truncate text-[13.5px] font-semibold text-bw-text">{auftragTitel(a)}</p>
+                    <p className="truncate text-xs text-bw-text-muted">{auftragOrt(a)}</p>
                   </div>
+                  <p className="truncate text-[13px] text-bw-text">{auftragKundenName(a)}</p>
+                  <p className="text-right text-[13px] font-semibold tabular-nums text-bw-text">
+                    {auftragWertAnzeige(a)}
+                  </p>
+                  <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{lieferdatumAnzeige(a)}</p>
+                  <AuftragStatusBadge status={a.status} />
                 </div>
-              ) : null}
-              {panelAuftrag.end_datum ? (
-                <div className="rounded-lg bg-bw-hover p-3">
-                  <div className="mb-1 text-xs text-bw-text-muted">Geplant fertig</div>
-                  <div className="text-sm font-medium text-bw-text">
-                    {new Date(panelAuftrag.end_datum).toLocaleDateString('de')}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {panelAuftrag.angebote ? (
-              <div className="rounded-lg bg-bw-green-bg p-3">
-                <div className="mb-1 text-xs text-bw-primary">Auftragswert</div>
-                <div className="text-lg font-semibold text-bw-dark">
-                  {formatPreis(
-                    panelAuftrag.angebote.gesamt_fix ?? null,
-                    panelAuftrag.angebote.gesamt_min ?? null,
-                    panelAuftrag.angebote.gesamt_max ?? null
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            <p className="text-xs text-bw-text-muted">{handwerkerNamen(panelAuftrag)}</p>
-
-            <div className="border-t border-bw-border pt-2">
-              <Link
-                href={`/auftraege/${panelAuftrag.id}`}
-                className="text-sm text-bw-link hover:underline"
-                onClick={() => setPanelAuftrag(null)}
-              >
-                Zum Auftrag →
-              </Link>
-            </div>
-          </div>
-        ) : null}
-      </SidePanel>
+            ))}
+          </ListGridShell>
+        </>
+      )}
 
       <CsvExportModal
         open={exportOpen}
@@ -396,6 +391,6 @@ export function AuftraegeListeClient({ auftraege }: { auftraege: AuftragListeEin
           exportToCSV(data, fields, 'auftraege')
         }}
       />
-    </div>
+    </EntityListShell>
   )
 }

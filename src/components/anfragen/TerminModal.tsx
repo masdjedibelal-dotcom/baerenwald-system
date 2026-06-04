@@ -1,14 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
+import { FormSheet } from '@/components/ui/FormSheet'
 import { Button } from '@/components/ui/Button'
-import { insertKalenderTermin, updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
-import { sendBesichtigungTerminBestaetigung } from '@/app/actions/mails'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { Textarea } from '@/components/ui/Textarea'
+import {
+  insertKalenderTermin,
+  loadCrmTeamFuerTermin,
+  saveLeadTerminVereinbart,
+} from '@/app/(dashboard)/anfragen/actions'
+import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
 import { toast } from '@/components/ui/app-toast'
-import type { KalenderTermin, LeadStatus } from '@/lib/types'
+import {
+  TerminBestaetigungMailEditor,
+  type TerminMailDraft,
+} from '@/components/anfragen/TerminBestaetigungMailEditor'
+import type { CrmTeamMitglied } from '@/lib/crm-team'
+import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
+import type { KalenderTermin } from '@/lib/types'
+
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
-  { value: 'besichtigung', label: 'Besichtigung' },
+  { value: 'besichtigung', label: KALENDER_TYP_LABEL.besichtigung },
   { value: 'beginn', label: 'Beginn' },
   { value: 'abnahme', label: 'Abnahme' },
   { value: 'sonstiges', label: 'Sonstiges / Vor-Ort' },
@@ -20,10 +34,11 @@ type Props = {
   leadId: string
   kontaktEmail?: string | null
   kontaktName?: string | null
+  kundenTyp?: string | null
+  leadKundentyp?: string | null
   defaultPlz?: string | null
-  leadStatus: LeadStatus
+  defaultAdresse?: string | null
   onSaved?: () => void
-  /** Termin-Typ fest (z. B. nur Besichtigung) */
   typFixed?: KalenderTermin['typ']
 }
 
@@ -33,27 +48,46 @@ export function TerminModal({
   leadId,
   kontaktEmail,
   kontaktName,
+  kundenTyp,
+  leadKundentyp,
   defaultPlz,
-  leadStatus,
+  defaultAdresse,
   onSaved,
   typFixed,
 }: Props) {
+  const initialAdresse = (defaultAdresse?.trim() || defaultPlz?.trim() || '').trim()
   const [typ, setTyp] = useState<KalenderTermin['typ']>(typFixed ?? 'besichtigung')
   const [datum, setDatum] = useState('')
   const [von, setVon] = useState('')
   const [bis, setBis] = useState('')
-  const [adresse, setAdresse] = useState(defaultPlz ?? '')
+  const [adresse, setAdresse] = useState(initialAdresse)
   const [notiz, setNotiz] = useState('')
+  const [mitarbeiterId, setMitarbeiterId] = useState('')
+  const [team, setTeam] = useState<CrmTeamMitglied[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
   const [mailToggle, setMailToggle] = useState(true)
+  const [mailDraft, setMailDraft] = useState<TerminMailDraft | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const istBesichtigung = (typFixed ?? typ) === 'besichtigung'
+
+  useEffect(() => {
+    if (!open) return
+    setAdresse((defaultAdresse?.trim() || defaultPlz?.trim() || '').trim())
+    setTeamLoading(true)
+    void loadCrmTeamFuerTermin()
+      .then((list) => setTeam(list))
+      .finally(() => setTeamLoading(false))
+  }, [open, defaultAdresse, defaultPlz])
 
   function reset() {
     setTyp('besichtigung')
     setDatum('')
     setVon('')
     setBis('')
-    setAdresse(defaultPlz ?? '')
+    setAdresse((defaultAdresse?.trim() || defaultPlz?.trim() || '').trim())
     setNotiz('')
+    setMitarbeiterId('')
     setMailToggle(true)
   }
 
@@ -62,68 +96,84 @@ export function TerminModal({
       toast.error('Bitte Datum wählen.')
       return
     }
-    setSaving(true)
-    const effTyp = typFixed ?? typ
-    const titel = TYP_OPTIONS.find((t) => t.value === effTyp)?.label ?? 'Termin'
-    const res = await insertKalenderTermin({
-      lead_id: leadId,
-      titel,
-      datum,
-      uhrzeit_von: von.trim() || null,
-      uhrzeit_bis: bis.trim() || null,
-      typ: effTyp,
-      adresse: adresse.trim() || null,
-      beschreibung: notiz.trim() || null,
-    })
-    if (!res.ok) {
-      setSaving(false)
-      toast.error(res.message)
+    if (istBesichtigung && !mitarbeiterId.trim()) {
+      toast.error('Bitte Mitarbeiter für den Vor-Ort-Termin wählen.')
+      return
+    }
+    if (sendMail && mailToggle && kontaktEmail?.trim() && istBesichtigung && !mitarbeiterId.trim()) {
+      toast.error('Für die Bestätigungs-Mail ist ein Mitarbeiter nötig.')
       return
     }
 
-    if (leadStatus === 'neu') {
-      const st = await updateLeadStatus(leadId, 'kontaktiert')
-      if (!st.ok) toast.error(st.message)
-    }
+    setSaving(true)
 
-    if (sendMail && mailToggle && kontaktEmail?.trim()) {
-      const mailRes = await sendBesichtigungTerminBestaetigung({
-        leadId,
-        to: kontaktEmail.trim(),
-        name: kontaktName?.trim() || 'Kundin/Kunde',
-        terminTitel: titel,
-        datum,
-        uhrzeitVon: von.trim() || null,
-        uhrzeitBis: bis.trim() || null,
-        adresse: adresse.trim() || null,
-        notiz: notiz.trim() || null,
-      })
-      if (!mailRes.ok) {
+    if (istBesichtigung) {
+      if (!von.trim()) {
         setSaving(false)
-        toast.success('Termin gespeichert.')
-        toast.error(mailRes.message)
-        reset()
-        onClose()
-        onSaved?.()
+        toast.error('Bitte Uhrzeit wählen.')
         return
       }
+      const res = await saveLeadTerminVereinbart({
+        leadId,
+        kontaktName: kontaktName?.trim() || 'Kundin/Kunde',
+        kontaktEmail: kontaktEmail ?? null,
+        datum,
+        uhrzeit: von.trim(),
+        adresse: adresse.trim() || null,
+        notiz: notiz.trim() || null,
+        zugewiesenAn: mitarbeiterId.trim(),
+        uhrzeitBis: bis.trim() || null,
+        mailSenden: sendMail && mailToggle && Boolean(mailDraft?.to.length || kontaktEmail?.trim()),
+        mailTo: mailDraft?.to,
+        mailCc: mailDraft?.cc,
+        mailBetreff: mailDraft?.betreff,
+        mailHtml: mailDraft?.html,
+        mailBodyText: mailDraft?.bodyText,
+      })
+      if (!res.ok) {
+        setSaving(false)
+        toast.error(res.message)
+        return
+      }
+      setSaving(false)
+      toast.success(
+        sendMail && mailToggle && kontaktEmail?.trim()
+          ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
+          : 'Termin gespeichert.'
+      )
+    } else {
+      const effTyp = typFixed ?? typ
+      const titel = TYP_OPTIONS.find((t) => t.value === effTyp)?.label ?? 'Termin'
+      const res = await insertKalenderTermin({
+        lead_id: leadId,
+        titel,
+        datum,
+        uhrzeit_von: von.trim() || null,
+        uhrzeit_bis: bis.trim() || null,
+        typ: effTyp,
+        adresse: adresse.trim() || null,
+        beschreibung: notiz.trim() || null,
+        zugewiesen_an: null,
+      })
+      if (!res.ok) {
+        setSaving(false)
+        toast.error(res.message)
+        return
+      }
+      setSaving(false)
+      toast.success('Termin gespeichert.')
     }
 
-    setSaving(false)
-    toast.success(
-      sendMail && mailToggle && kontaktEmail?.trim()
-        ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
-        : 'Termin gespeichert.'
-    )
     reset()
     onClose()
     onSaved?.()
   }
 
-  const previewBody = `Guten Tag ${kontaktName ?? 'Kundin/Kunde'},\n\nwir bestätigen Ihren Termin am ${datum || '…'}${von ? ` um ${von} Uhr` : ''}.\n\nAdresse: ${adresse || '—'}\n\nFreundliche Grüße\nBärenwald`
+  const kontaktNameAnzeige = kontaktName?.trim() || 'Kundin/Kunde'
+  const isMobile = useIsMobile()
 
-  return (
-    <Modal open={open} onClose={onClose} title="Termin vereinbaren" size="lg">
+  const formBody = (
+    <>
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
         {typFixed ? null : (
           <label className="md:col-span-1">
@@ -153,36 +203,85 @@ export function TerminModal({
           <span className="input-label">Adresse</span>
           <input type="text" className="input" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
         </label>
+        {istBesichtigung ? (
+          <TerminMitarbeiterSelect
+            team={team}
+            value={mitarbeiterId}
+            onChange={setMitarbeiterId}
+            loading={teamLoading}
+            required
+          />
+        ) : null}
         <label className="md:col-span-2">
           <span className="input-label">Notiz</span>
-          <textarea className="input min-h-[72px]" value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+          <Textarea rows={3} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="Notiz…" />
         </label>
       </div>
 
-      <div className="mt-4 rounded-lg border border-bw-border bg-bw-bg p-3">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
-          Bestätigungs-Mail an Kunden ({kontaktEmail ?? 'keine E-Mail'})
-        </label>
-        {mailToggle && kontaktEmail ? (
-          <div className="mt-2 rounded border border-bw-border bg-bw-card p-2 text-xs text-bw-text">
-            <p className="text-bw-text-muted">An: {kontaktEmail}</p>
-            <p className="mt-1 whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{previewBody}</p>
-          </div>
-        ) : null}
-      </div>
+      {istBesichtigung ? (
+        <div className="mt-4 space-y-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
+            Bestätigungs-Mail an Kunden ({kontaktEmail ?? 'keine E-Mail'})
+          </label>
+          <TerminBestaetigungMailEditor
+            active={mailToggle}
+            leadId={leadId}
+            kontaktEmail={kontaktEmail?.trim() ?? ''}
+            kontaktName={kontaktNameAnzeige}
+            datum={datum}
+            uhrzeitVon={von}
+            uhrzeitBis={bis.trim() || null}
+            adresse={adresse.trim() || null}
+            notiz={notiz.trim() || null}
+            zugewiesenAn={mitarbeiterId}
+            value={mailDraft}
+            onChange={setMailDraft}
+          />
+        </div>
+      ) : null}
+    </>
+  )
 
-      <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-bw-border pt-4">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Abbrechen
-        </Button>
-        <Button type="button" variant="secondary" loading={saving} onClick={() => void save(false)}>
-          Speichern ohne Mail
-        </Button>
+  const formFooter = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button type="button" variant="secondary" onClick={onClose}>
+        Abbrechen
+      </Button>
+      <Button type="button" variant="secondary" loading={saving} onClick={() => void save(false)}>
+        Speichern ohne Mail
+      </Button>
+      {istBesichtigung && kontaktEmail?.trim() ? (
         <Button type="button" variant="primary" loading={saving} onClick={() => void save(true)}>
-          Speichern + Mail senden
+          Speichern + Mail
         </Button>
-      </div>
+      ) : (
+        <Button type="button" variant="primary" loading={saving} onClick={() => void save(false)}>
+          Speichern
+        </Button>
+      )}
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        breadcrumb="Anfragen"
+        title="Termin vereinbaren"
+        footer={formFooter}
+        width="lg"
+      >
+        {formBody}
+      </FormSheet>
+    )
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Termin vereinbaren" size="lg">
+      {formBody}
+      <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-bw-border pt-4">{formFooter}</div>
     </Modal>
   )
 }

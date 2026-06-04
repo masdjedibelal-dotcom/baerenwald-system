@@ -13,14 +13,14 @@ import { updateAngebotNotizen } from '@/app/(dashboard)/angebote/actions'
 import type { AngebotDetail, AngebotListeEintrag } from '@/lib/types'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { formatPreis } from '@/lib/utils'
+import { betragAnzeige, kundeNameAusAngebot } from '@/lib/angebot-einfach'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 
 type TabId = 'positionen' | 'versand' | 'notizen'
 
 function kundenName(d: AngebotDetail | AngebotListeEintrag | null) {
-  return d?.kunden?.name?.trim() || 'Ohne Kunde'
+  return d ? kundeNameAusAngebot(d) : 'Ohne Kunde'
 }
 
 export function AngebotSidePanel({
@@ -178,25 +178,25 @@ export function AngebotSidePanel({
                     ) : null}
                     <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                       <dt className="text-bw-mid">Lohn</dt>
-                      <dd>{formatPreis(undefined, p.lohn_netto * p.menge, p.lohn_netto * p.menge)}</dd>
+                      <dd>{betragAnzeige(null, p.lohn_netto * p.menge, p.lohn_netto * p.menge)}</dd>
                       <dt className="text-bw-mid">Material</dt>
                       <dd>
-                        {formatPreis(undefined, p.material_netto * p.menge, p.material_netto * p.menge)}
+                        {betragAnzeige(null, p.material_netto * p.menge, p.material_netto * p.menge)}
                       </dd>
                       <dt className="text-bw-mid">Gesamt</dt>
                       <dd className="font-medium">
-                        {formatPreis(undefined, p.gesamt_min * p.menge, p.gesamt_max * p.menge)}
+                        {betragAnzeige(null, p.gesamt_min, p.gesamt_max)}
                       </dd>
                     </dl>
                   </div>
                 ))}
                 <div className="rounded-lg border border-bw-border bg-bw-bg p-3 text-sm">
                   <p className="text-bw-mid">Netto</p>
-                  <p className="font-medium">{formatPreis(undefined, summen.nettoMin, summen.nettoMax)}</p>
+                  <p className="font-medium">{betragAnzeige(null, summen.nettoMin, summen.nettoMax)}</p>
                   <p className="mt-2 text-bw-mid">MwSt ({summen.mwstSatz}%)</p>
-                  <p>{formatPreis(undefined, summen.mwstBetragMin, summen.mwstBetragMax)}</p>
+                  <p>{betragAnzeige(null, summen.mwstBetragMin, summen.mwstBetragMax)}</p>
                   <p className="mt-2 text-bw-mid">Brutto</p>
-                  <p className="font-semibold">{formatPreis(undefined, bruttoMin, bruttoMax)}</p>
+                  <p className="font-semibold">{betragAnzeige(null, bruttoMin, bruttoMax)}</p>
                 </div>
               </div>
             ) : null}

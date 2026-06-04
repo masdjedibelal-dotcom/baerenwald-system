@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { List } from 'lucide-react'
-import { EmptyState } from '@/components/layout/EmptyState'
+import { AuftragHandwerkerPanel } from '@/components/auftraege/AuftragHandwerkerPanel'
+import { AuftragPositionenGewerkView } from '@/components/auftraege/AuftragPositionenGewerkView'
+import type { HandwerkerZuweisenKontext } from '@/components/auftraege/HandwerkerZuweisenModal'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -13,7 +14,7 @@ import {
   updateAuftragPosition,
 } from '@/app/(dashboard)/auftraege/actions'
 import { toast } from '@/components/ui/app-toast'
-import type { AuftragHandwerkerRow, AuftragPosition, Preisliste } from '@/lib/types'
+import type { AuftragHandwerkerRow, AuftragPosition, AuftragStatus, Preisliste } from '@/lib/types'
 import { formatPreis } from '@/lib/utils'
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -53,6 +54,10 @@ export function AuftragPositionenTab({
   gewerke,
   preislisten,
   handwerkerRows,
+  auftragStatus = 'offen',
+  fortschritt = 0,
+  handwerkerKontext,
+  showHandwerkerPanel = false,
   onChanged,
 }: {
   auftragId: string
@@ -60,17 +65,16 @@ export function AuftragPositionenTab({
   gewerke: GewerkOpt[]
   preislisten: Preisliste[]
   handwerkerRows: AuftragHandwerkerRow[]
+  auftragStatus?: AuftragStatus
+  fortschritt?: number
+  handwerkerKontext: HandwerkerZuweisenKontext
+  showHandwerkerPanel?: boolean
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [neuOpen, setNeuOpen] = useState(false)
   const [edit, setEdit] = useState<AuftragPosition | null>(null)
-  const [form, setForm] = useState(emptyForm())
-
-  const sorted = useMemo(
-    () => [...positionen].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
-    [positionen]
-  )
+  const [form, setForm] = useState(emptyForm)
 
   const gewerkNameBySlug = useMemo(() => {
     const m = new Map<string, string>()
@@ -106,9 +110,9 @@ export function AuftragPositionenTab({
     return Array.from(m.entries()).map(([id, name]) => ({ id, name }))
   }, [handwerkerRows])
 
-  function openNeu() {
+  function openNeu(gewerkSlug = '') {
     setEdit(null)
-    setForm(emptyForm())
+    setForm({ ...emptyForm(), gewerk_slug: gewerkSlug })
     setNeuOpen(true)
   }
 
@@ -136,10 +140,7 @@ export function AuftragPositionenTab({
       const next = { ...f, leistung_name: value }
       const match = preislisteFiltered.find((p) => p.leistung === value)
       if (match) {
-        const mid =
-          match.preis_min > 0 && match.preis_max > 0
-            ? Math.round(((match.preis_min + match.preis_max) / 2) * 100) / 100
-            : match.preis_min || match.preis_max || 0
+        const mid = match.preis_min > 0 ? match.preis_min : 0
         next.preis_fix = mid > 0 ? String(mid) : f.preis_fix
         next.einheit = match.einheit || f.einheit
       }
@@ -201,90 +202,37 @@ export function AuftragPositionenTab({
     })
   }
 
-  const gesamt = sorted.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
-
   return (
-    <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-bw-text">Positionen</h3>
-        <button type="button" onClick={openNeu} className="btn btn-primary btn-sm">
-          + Position
-        </button>
-      </div>
-
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={List}
-          title="Keine Positionen"
-          description="Füge Gewerke und Leistungen hinzu."
-          action={
-            <button type="button" className="btn btn-primary btn-sm" onClick={openNeu}>
-              + Position
-            </button>
-          }
+    <div className="p-4 md:p-5">
+      {showHandwerkerPanel ? (
+        <AuftragHandwerkerPanel
+          auftragId={auftragId}
+          positionen={positionen}
+          handwerkerRows={handwerkerRows}
+          gewerke={gewerke}
+          kontext={handwerkerKontext}
+          onChanged={onChanged}
         />
-      ) : (
-        <div className="space-y-2">
-          {sorted.map((pos) => (
-            <div
-              key={pos.id}
-              className="flex items-start justify-between rounded-lg bg-bw-hover p-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-bw-primary/10 px-2 py-0.5 text-xs text-bw-primary">
-                    {pos.gewerk_name}
-                  </span>
-                  {pos.oberkategorie ? (
-                    <span className="text-xs text-bw-text-muted">
-                      {pos.oberkategorie}
-                      {pos.unterkategorie ? ` › ${pos.unterkategorie}` : ''}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="text-sm font-medium text-bw-text">{pos.leistung_name}</div>
-                {pos.handwerker?.name ? (
-                  <div className="mt-1 text-xs text-bw-text-muted">👷 {pos.handwerker.name}</div>
-                ) : null}
-                <div className="mt-1 text-sm font-medium text-bw-primary">
-                  {formatPreis(pos.preis_fix ?? null, null, null)}
-                  {pos.einheit && pos.einheit !== 'pauschal' ? ` / ${pos.einheit}` : ''}
-                </div>
-              </div>
-              <div className="ml-2 flex shrink-0 gap-1">
-                <button
-                  type="button"
-                  onClick={() => openEdit(pos)}
-                  className="rounded p-1.5 text-bw-text-muted hover:text-bw-text"
-                  aria-label="Bearbeiten"
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(pos.id)}
-                  className="rounded p-1.5 text-bw-text-muted hover:text-status-cancel-text"
-                  aria-label="Löschen"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {sorted.length > 0 ? (
-        <div className="mt-4 flex items-center justify-between border-t border-bw-border pt-3">
-          <span className="text-sm font-medium text-bw-text">Gesamt</span>
-          <span className="text-lg font-semibold text-bw-primary">{formatPreis(gesamt, null, null)}</span>
-        </div>
       ) : null}
+
+      <AuftragPositionenGewerkView
+        auftragId={auftragId}
+        positionen={positionen}
+        gewerke={gewerke}
+        handwerkerRows={handwerkerRows}
+        handwerkerKontext={handwerkerKontext}
+        auftragStatus={auftragStatus}
+        fortschritt={fortschritt}
+        onAddLeistung={openNeu}
+        onEditPosition={openEdit}
+        onDeletePosition={handleDelete}
+        onChanged={onChanged}
+      />
 
       <Modal
         open={neuOpen || !!edit}
         onClose={closeModal}
-        title={edit ? 'Position bearbeiten' : 'Position hinzufügen'}
+        title={edit ? 'Leistung bearbeiten' : 'Leistung hinzufügen'}
         size="lg"
         footer={
           <div className="flex gap-2">
@@ -329,7 +277,7 @@ export function AuftragPositionenTab({
             <datalist id="leistungen-list-auftrag">
               {preislisteFiltered.map((p) => (
                 <option key={p.id} value={p.leistung}>
-                  {p.leistung} — {formatPreis(null, p.preis_min, p.preis_max)}
+                  {p.leistung} — {formatPreis(p.preis_min, null, null)}
                 </option>
               ))}
             </datalist>
@@ -343,7 +291,7 @@ export function AuftragPositionenTab({
 
           <div className="form-grid-2 grid gap-3 md:grid-cols-2">
             <div>
-              <label className="input-label">Preis *</label>
+              <label className="input-label">VK-Preis (Kunde) *</label>
               <div className="relative">
                 <input
                   type="number"

@@ -2,253 +2,43 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { FileText } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from 'react'
+import { Camera, ChevronRight, ExternalLink, FileText, ImagePlus, Plus, X } from 'lucide-react'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { Note } from '@/components/ui/Note'
 import { Modal } from '@/components/ui/Modal'
-import { StatusBadge } from '@/components/ui/StatusBadge'
-import {
-  addLeadNotizRow,
-  deleteLeadNotizRow,
-  insertKalenderTermin,
-  updateLeadVorOrtNotizen,
-} from '@/app/(dashboard)/anfragen/actions'
-import { deleteKalenderTermin, saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
+import { Textarea } from '@/components/ui/Textarea'
+import { RichTextContent } from '@/components/ui/RichTextContent'
+import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
+import { addLeadNotizRow, deleteLeadNotizRow } from '@/app/(dashboard)/anfragen/actions'
 import { toast } from '@/components/ui/app-toast'
-import type { AngebotStatus, KalenderTermin, LeadNotizRow } from '@/lib/types'
-import { ANGEBOT_STATUS_LABELS, formatPreis, formatRelativeDate } from '@/lib/utils'
+import type { LeadNotizRow } from '@/lib/types'
+import { betragAnzeige } from '@/lib/angebot-einfach'
+import { richTextToPlain } from '@/lib/rich-text'
+import { formatDatumZeit, formatRelativeDate } from '@/lib/utils'
 
-function angebotStatusHub(s: string): 'new' | 'contacted' | 'offer' | 'order' | 'done' | 'cancel' {
-  if (s === 'kunde_akzeptiert') return 'order'
-  if (s === 'gesendet_kunde' || s === 'gesendet_handwerker') return 'offer'
-  if (s === 'abgelehnt') return 'cancel'
-  if (s === 'entwurf') return 'new'
-  return 'contacted'
+function leadNotizErstellerLabel(n: LeadNotizRow): string {
+  const name = n.user_profiles?.name?.trim()
+  if (name) return name
+  if (n.erstellt_von) return 'Nutzer:in'
+  return 'System'
 }
 
-export function VorOrtTermineTab({
-  leadId,
-  termine,
-  vorOrtNotiz,
-  onReload,
-}: {
-  leadId: string
-  termine: KalenderTermin[]
-  vorOrtNotiz: string
-  onReload: () => void
-}) {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [neuOpen, setNeuOpen] = useState(false)
-  const [edit, setEdit] = useState<KalenderTermin | null>(null)
-  const [titel, setTitel] = useState('')
-  const [datum, setDatum] = useState('')
-  const [uhrVon, setUhrVon] = useState('')
-  const [adresse, setAdresse] = useState('')
-  const [notiz, setNotiz] = useState('')
-  const [notizFeld, setNotizFeld] = useState(vorOrtNotiz)
-  const saveVorOrtTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+function istBildAnhangUrl(url: string): boolean {
+  const u = url.split('?')[0].toLowerCase()
+  if (u.includes('/lead-notizen-fotos/')) return true
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(u)
+}
 
-  useEffect(() => {
-    setNotizFeld(vorOrtNotiz)
-  }, [vorOrtNotiz])
-
-  const besichtigungen = useMemo(
-    () =>
-      [...termine].filter((t) => t.typ === 'besichtigung').sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime()),
-    [termine]
-  )
-
-  useEffect(() => {
-    return () => {
-      if (saveVorOrtTimer.current) clearTimeout(saveVorOrtTimer.current)
-    }
-  }, [])
-
-  function scheduleVorOrtSave(text: string) {
-    if (saveVorOrtTimer.current) clearTimeout(saveVorOrtTimer.current)
-    saveVorOrtTimer.current = setTimeout(() => {
-      void (async () => {
-        const r = await updateLeadVorOrtNotizen(leadId, text)
-        if (!r.ok) toast.error(r.message)
-        else router.refresh()
-      })()
-    }, 800)
-  }
-
-  function openNeu() {
-    setEdit(null)
-    setTitel('Besichtigung')
-    setDatum('')
-    setUhrVon('')
-    setAdresse('')
-    setNotiz('')
-    setNeuOpen(true)
-  }
-
-  function openEdit(t: KalenderTermin) {
-    setEdit(t)
-    setTitel(t.titel || 'Besichtigung')
-    setDatum(t.datum?.slice(0, 10) ?? '')
-    setUhrVon(t.uhrzeit_von?.slice(0, 5) ?? '')
-    setAdresse(t.adresse ?? '')
-    setNotiz(t.beschreibung ?? '')
-    setNeuOpen(true)
-  }
-
-  async function saveTermin() {
-    if (!datum.trim()) {
-      toast.error('Bitte Datum wählen.')
-      return
-    }
-    startTransition(async () => {
-      if (edit?.id) {
-        const res = await saveKalenderTermin({
-          id: edit.id,
-          titel: titel.trim() || 'Besichtigung',
-          typ: 'besichtigung',
-          datum,
-          uhrzeit_von: uhrVon.trim() || null,
-          uhrzeit_bis: null,
-          adresse: adresse.trim() || null,
-          beschreibung: notiz.trim() || null,
-          lead_id: leadId,
-          auftrag_id: null,
-        })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-      } else {
-        const ins = await insertKalenderTermin({
-          lead_id: leadId,
-          titel: titel.trim() || 'Besichtigung',
-          datum,
-          uhrzeit_von: uhrVon.trim() || null,
-          uhrzeit_bis: null,
-          typ: 'besichtigung',
-          adresse: adresse.trim() || null,
-          beschreibung: notiz.trim() || null,
-        })
-        if (!ins.ok) {
-          toast.error(ins.message)
-          return
-        }
-      }
-      toast.success('Termin gespeichert')
-      setNeuOpen(false)
-      setEdit(null)
-      onReload()
-      router.refresh()
-    })
-  }
-
-  async function loeschen(id: string) {
-    if (!window.confirm('Termin löschen?')) return
-    startTransition(async () => {
-      const r = await deleteKalenderTermin(id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      onReload()
-      router.refresh()
-    })
-  }
-
+function LeadNotizFotoLightbox({ url, onClose }: { url: string | null; onClose: () => void }) {
+  if (!url) return null
   return (
-    <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-bw-text">Vor-Ort Termine</h3>
-        <button type="button" onClick={openNeu} className="btn btn-primary btn-sm">
-          + Termin
-        </button>
+    <Modal open onClose={onClose} title="Foto" size="xl">
+      <div className="flex max-h-[min(85vh,800px)] items-center justify-center overflow-auto p-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="Notiz-Foto" className="max-h-full max-w-full object-contain" />
       </div>
-
-      {besichtigungen.length === 0 ? (
-        <div className="py-8 text-center">
-          <div className="text-2xl" aria-hidden>
-            📍
-          </div>
-          <p className="mt-2 text-sm font-medium text-bw-text">Noch kein Vor-Ort Termin</p>
-          <p className="mt-1 text-xs text-bw-text-muted">Erstelle einen Termin für die Besichtigung.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {besichtigungen.map((termin) => (
-            <div key={termin.id} className="flex items-start justify-between rounded-lg bg-bw-hover p-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-bw-text">{termin.titel || 'Vor-Ort Termin'}</div>
-                <div className="mt-0.5 text-xs text-bw-text-muted">
-                  {new Date(termin.datum).toLocaleDateString('de', {
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })}
-                  {termin.uhrzeit_von ? ` · ${termin.uhrzeit_von.slice(0, 5)} Uhr` : ''}
-                </div>
-                {termin.adresse ? <div className="mt-0.5 text-xs text-bw-text-muted">📍 {termin.adresse}</div> : null}
-                {termin.beschreibung ? (
-                  <div className="mt-1 text-xs italic text-bw-text-muted">{termin.beschreibung}</div>
-                ) : null}
-              </div>
-              <div className="ml-2 flex shrink-0 gap-1">
-                <button type="button" className="rounded p-1.5 text-bw-text-muted hover:text-bw-text" onClick={() => openEdit(termin)}>
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  className="rounded p-1.5 text-bw-text-muted hover:text-status-cancel-text"
-                  onClick={() => void loeschen(termin.id)}
-                  disabled={pending}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-4 border-t border-bw-border pt-4">
-        <h3 className="mb-3 text-sm font-medium text-bw-text">Vor-Ort Notizen</h3>
-        <textarea
-          className="input"
-          rows={4}
-          placeholder="Beobachtungen, Maße, Besonderheiten…"
-          value={notizFeld}
-          onChange={(e) => {
-            const v = e.target.value
-            setNotizFeld(v)
-            scheduleVorOrtSave(v)
-          }}
-        />
-        <p className="mt-1 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
-      </div>
-
-      <Modal open={neuOpen} onClose={() => setNeuOpen(false)} title={edit ? 'Termin bearbeiten' : 'Vor-Ort Termin'}>
-        <div className="space-y-4">
-          <Input label="Titel" placeholder="Besichtigung Bad" value={titel} onChange={(e) => setTitel(e.target.value)} />
-          <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-            <Input label="Datum *" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} required />
-            <Input label="Uhrzeit" type="time" value={uhrVon} onChange={(e) => setUhrVon(e.target.value)} />
-          </div>
-          <Input label="Adresse" placeholder="Straße, PLZ Ort" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
-          <textarea className="input min-h-[72px]" placeholder="Notiz…" rows={3} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
-          <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setNeuOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={() => void saveTermin()}>
-              Speichern
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+    </Modal>
   )
 }
 
@@ -263,20 +53,67 @@ export function LeadNotizenListeTab({
 }) {
   const router = useRouter()
   const [neue, setNeue] = useState('')
-  const [mitDatei, setMitDatei] = useState(false)
+  const [pendingFoto, setPendingFoto] = useState<{ file: File; url: string } | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const fileGalleryRef = useRef<HTMLInputElement>(null)
+  const fileCameraRef = useRef<HTMLInputElement>(null)
+  const pendingFotoRef = useRef(pendingFoto)
+  pendingFotoRef.current = pendingFoto
+
+  useEffect(() => {
+    return () => {
+      const p = pendingFotoRef.current
+      if (p) URL.revokeObjectURL(p.url)
+    }
+  }, [])
+
+  function clearPendingFoto() {
+    setPendingFoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url)
+      return null
+    })
+    if (fileGalleryRef.current) fileGalleryRef.current.value = ''
+    if (fileCameraRef.current) fileCameraRef.current.value = ''
+  }
+
+  function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setPendingFoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url)
+      return { file: f, url: URL.createObjectURL(f) }
+    })
+  }
 
   async function speichern() {
-    const t = neue.trim()
-    if (!t) return
+    const plain = richTextToPlain(neue).trim()
+    if (!plain && !pendingFoto) return
     startTransition(async () => {
-      const r = await addLeadNotizRow(leadId, t, null)
+      let fotoUrl: string | null = null
+      if (pendingFoto) {
+        const fd = new FormData()
+        fd.append('file', pendingFoto.file)
+        const res = await fetch(`/api/anfragen/${leadId}/notiz-foto`, { method: 'POST', body: fd })
+        const js: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const msg = typeof js.error === 'string' ? js.error : 'Foto-Upload fehlgeschlagen.'
+          toast.error(msg)
+          return
+        }
+        fotoUrl = typeof js.url === 'string' ? js.url : null
+        if (!fotoUrl) {
+          toast.error('Keine Bild-URL erhalten.')
+          return
+        }
+      }
+      const r = await addLeadNotizRow(leadId, neue, fotoUrl)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
       setNeue('')
-      setMitDatei(false)
+      clearPendingFoto()
       onReload()
       router.refresh()
     })
@@ -294,57 +131,143 @@ export function LeadNotizenListeTab({
     })
   }
 
+  const allgemeineNotizen = useMemo(
+    () => notizen.filter((n) => !n.kalender_termin_id?.trim()),
+    [notizen]
+  )
+
+  const canSave = !!(richTextToPlain(neue).trim() || pendingFoto) && !pending
+
   return (
     <div className="p-4">
+      <LeadNotizFotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+
       <div className="mb-4">
-        <textarea
-          className="input"
+        <Textarea
           rows={3}
-          placeholder="Notiz hinzufügen…"
+          placeholder="Notiz hinzufügen… (optional wenn ein Foto dabei ist)"
           value={neue}
           onChange={(e) => setNeue(e.target.value)}
         />
-        <div className="mt-2 flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-bw-text-muted">
-            <input type="checkbox" checked={mitDatei} onChange={(e) => setMitDatei(e.target.checked)} className="rounded" />
-            Datei anhängen
-          </label>
-          <button type="button" disabled={!neue.trim() || pending} onClick={() => void speichern()} className="btn btn-primary btn-sm">
+
+        <input
+          ref={fileGalleryRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-hidden
+          tabIndex={-1}
+          onChange={onFileChosen}
+        />
+        <input
+          ref={fileCameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          aria-hidden
+          tabIndex={-1}
+          onChange={onFileChosen}
+        />
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => fileGalleryRef.current?.click()}
+            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
+          >
+            <ImagePlus className="h-4 w-4 shrink-0" aria-hidden />
+            Foto auswählen
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => fileCameraRef.current?.click()}
+            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
+          >
+            <Camera className="h-4 w-4 shrink-0" aria-hidden />
+            Aufnehmen
+          </button>
+          <button type="button" disabled={!canSave} onClick={() => void speichern()} className="btn btn-primary btn-sm ml-auto">
             Speichern
           </button>
         </div>
-        {mitDatei ? (
-          <p className="mt-2 text-xs text-bw-text-muted">
-            Datei-Upload: bitte zunächst ohne Anhang speichern; Storage-Anbindung kann ergänzt werden.
-          </p>
+
+        {pendingFoto ? (
+          <div className="relative mt-3 inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={pendingFoto.url}
+              alt="Vorschau"
+              className="max-h-40 max-w-full rounded-md border border-bw-border object-contain"
+            />
+            <button
+              type="button"
+              className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white hover:bg-black/75"
+              onClick={() => clearPendingFoto()}
+              aria-label="Foto entfernen"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
         ) : null}
+
+        <p className="mt-2 text-xs text-bw-text-muted">Bis 5 MB · JPEG, PNG, WebP, GIF, HEIC</p>
       </div>
 
-      {notizen.length === 0 ? (
+      {allgemeineNotizen.length === 0 ? (
         <div className="py-8 text-center text-sm text-bw-text-muted">Noch keine Notizen</div>
       ) : (
         <div className="space-y-3">
-          {notizen.map((n) => (
-            <div key={n.id} className="rounded-lg bg-bw-hover p-3">
-              <div className="mb-1 flex justify-between">
-                <span className="text-xs text-bw-text-muted">
-                  {formatRelativeDate(n.created_at)}
-                  {n.user_profiles?.name ? ` · ${n.user_profiles.name}` : ''}
-                </span>
-                <button
-                  type="button"
-                  className="text-xs text-bw-text-muted hover:text-status-cancel-text"
-                  onClick={() => void loeschen(n.id)}
-                >
-                  ×
-                </button>
-              </div>
-              <p className="whitespace-pre-wrap text-sm text-bw-text">{n.inhalt}</p>
-              {n.datei_url ? (
-                <a href={n.datei_url} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-1.5 text-xs text-bw-link">
-                  📎 Anhang öffnen
-                </a>
-              ) : null}
+          {allgemeineNotizen.map((n) => (
+            <div key={n.id} className="relative">
+              <Note
+                variant="plain"
+                meta={
+                  <div className="pr-6">
+                    <div className="text-[13px] font-semibold leading-tight text-bw-text">
+                      {leadNotizErstellerLabel(n)}
+                    </div>
+                    <div className="mt-0.5 tabular-nums text-bw-text-muted">{formatDatumZeit(n.created_at)}</div>
+                  </div>
+                }
+              >
+                {n.inhalt.trim() ? (
+                  <RichTextContent html={n.inhalt} className="text-bw-text-mid" />
+                ) : null}
+                {n.datei_url && istBildAnhangUrl(n.datei_url) ? (
+                  <button
+                    type="button"
+                    className="mt-2 block max-w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-ring"
+                    onClick={() => setLightboxUrl(n.datei_url!)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={n.datei_url}
+                      alt="Notiz-Anhang"
+                      className="max-h-48 max-w-full rounded-md border border-bw-border object-contain"
+                    />
+                  </button>
+                ) : n.datei_url ? (
+                  <a
+                    href={n.datei_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 flex items-center gap-1.5 text-xs text-bw-link"
+                  >
+                    Anhang öffnen
+                  </a>
+                ) : null}
+              </Note>
+              <button
+                type="button"
+                className="absolute right-2 top-2 text-xs text-bw-text-muted hover:text-status-cancel-text"
+                onClick={() => void loeschen(n.id)}
+                aria-label="Notiz löschen"
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
@@ -362,7 +285,18 @@ type AngebotZeile = {
   created_at?: string | null
 }
 
-export function AngeboteListeTab({ leadId, angebote }: { leadId: string; angebote: AngebotZeile[] }) {
+export function AngeboteListeTab({
+  leadId,
+  angebote,
+  variant = 'default',
+  onAngebotErstellen,
+}: {
+  leadId: string
+  angebote: AngebotZeile[]
+  variant?: 'default' | 'wireframe'
+  /** Wizard/Modal auf der Anfrage-Detailseite statt /angebote/neu */
+  onAngebotErstellen?: () => void
+}) {
   const router = useRouter()
   const rows = useMemo(
     () =>
@@ -373,13 +307,67 @@ export function AngeboteListeTab({ leadId, angebote }: { leadId: string; angebot
     [angebote]
   )
 
+  if (variant === 'wireframe') {
+    return (
+      <div>
+        <div>
+          {rows.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-bw-text-muted">Noch kein Angebot</div>
+          ) : (
+            rows.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => router.push(`/angebote/${a.id}`)}
+                className="list-row-grid w-full border-b border-bw-border text-left last:border-b-0 hover:bg-bw-hover"
+                style={{ gridTemplateColumns: '120px 1fr 100px 110px 44px' }}
+              >
+                <span className="font-mono text-xs text-bw-text-muted">AN-{a.id.slice(0, 8).toUpperCase()}</span>
+                <span>
+                  <span className="block text-[13px] font-medium text-bw-text">Angebot</span>
+                  <span className="block text-xs text-bw-text-muted">
+                    {a.created_at ? `erstellt ${formatRelativeDate(a.created_at)}` : '—'}
+                  </span>
+                </span>
+                <span className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                  {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                </span>
+                <AngebotStatusBadge status={a.status} />
+                <ExternalLink className="mx-auto h-4 w-4 text-bw-text-muted" aria-hidden />
+              </button>
+            ))
+          )}
+        </div>
+        <div className="border-t border-bw-border px-4 py-3">
+          {onAngebotErstellen ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+              <Plus className="h-3.5 w-3.5" />
+              Neues Angebot
+            </button>
+          ) : (
+            <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+              <Plus className="h-3.5 w-3.5" />
+              Neues Angebot
+            </Link>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-medium text-bw-text">Angebote</h3>
-        <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
-          + Angebot erstellen
-        </Link>
+        {onAngebotErstellen ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+            + Angebot erstellen
+          </button>
+        ) : (
+          <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+            + Angebot erstellen
+          </Link>
+        )}
       </div>
 
       {rows.length === 0 ? (
@@ -388,9 +376,15 @@ export function AngeboteListeTab({ leadId, angebote }: { leadId: string; angebot
           title="Noch kein Angebot"
           description="Erstelle ein Angebot basierend auf den Projektdetails."
           action={
-            <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
-              + Angebot erstellen
-            </Link>
+            onAngebotErstellen ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+                + Angebot erstellen
+              </button>
+            ) : (
+              <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+                + Angebot erstellen
+              </Link>
+            )
           }
         />
       ) : (
@@ -404,15 +398,15 @@ export function AngeboteListeTab({ leadId, angebote }: { leadId: string; angebot
             >
               <div>
                 <div className="text-sm font-medium text-bw-text">
-                  {formatPreis(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </div>
                 <div className="mt-0.5 text-xs text-bw-text-muted">
                   {a.created_at ? new Date(a.created_at).toLocaleDateString('de') : '—'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge status={angebotStatusHub(a.status)} label={ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status} />
-                <span className="text-bw-text-muted">→</span>
+                <AngebotStatusBadge status={a.status} />
+                <ChevronRight className="h-4 w-4 text-bw-text-muted" aria-hidden />
               </div>
             </button>
           ))}

@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
@@ -129,34 +130,24 @@ export function OfferPositionCard({
           <p className="text-xs font-semibold uppercase tracking-wide text-bw-light">Kalkulation (Kundensicht)</p>
           <div
             className={cn(
-              'rounded-lg border border-sky-200/80 bg-sky-50/90 p-3',
+              'rounded-lg border border-bw-border bg-bw-hover/30 p-3',
               hervorhebePreise && 'ring-1 ring-amber-300'
             )}
           >
             {hervorhebePreise ? (
               <p className="mb-2 text-xs font-medium text-amber-950">Preis prüfen (Vorlage/Kopie).</p>
             ) : null}
-            <p className="mb-2 text-xs font-medium text-sky-900">Lohn (netto / Einheit)</p>
-            <Input
-              label=""
-              type="number"
-              min={0}
-              step={10}
+            <p className="mb-2 text-xs font-medium text-bw-text-mid">Lohn (netto / Einheit)</p>
+            <EuroNettoInput
               value={row.lohn_netto}
-              onChange={(e) => onPatch({ lohn_netto: Number(e.target.value) || 0 })}
-              className="border-sky-200/80 bg-white/90"
+              onChange={(lohn_netto) => onPatch({ lohn_netto })}
             />
           </div>
-          <div className="rounded-lg border border-amber-200/80 bg-[#fdf8f0] p-3">
-            <p className="mb-2 text-xs font-medium text-amber-950">Material (netto / Einheit)</p>
-            <Input
-              label=""
-              type="number"
-              min={0}
-              step={10}
+          <div className="rounded-lg border border-bw-border bg-bw-hover/30 p-3">
+            <p className="mb-2 text-xs font-medium text-bw-text-mid">Material (netto / Einheit)</p>
+            <EuroNettoInput
               value={row.material_netto}
-              onChange={(e) => onPatch({ material_netto: Number(e.target.value) || 0 })}
-              className="border-amber-200/60 bg-white/90"
+              onChange={(material_netto) => onPatch({ material_netto })}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">

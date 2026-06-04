@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
+import { DetailHead } from '@/components/layout/DetailHead'
 import { toast } from '@/components/ui/app-toast'
 import {
   createBuergschaft,
@@ -13,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
+import { Textarea } from '@/components/ui/Textarea'
 import type {
   AuftragHandwerkerRow,
   Eingangsrechnung,
@@ -67,17 +69,23 @@ function einbehaltStatusBadge(s: Einbehalt['status']) {
 
 export function AuftragFinanzenClient({
   auftragId,
+  projektTitel,
+  kundeName,
   einbehalte,
   eingangsrechnungen,
   zuweisungen,
   defaultFreigabeDatum,
   metrics,
+  embedded = false,
 }: {
   auftragId: string
+  projektTitel?: string | null
+  kundeName?: string | null
   einbehalte: Einbehalt[]
   eingangsrechnungen: Eingangsrechnung[]
   zuweisungen: AuftragHandwerkerRow[]
   defaultFreigabeDatum: string
+  embedded?: boolean
   metrics: {
     kundenBrutto: number | null
     kostenGesamt: number
@@ -155,8 +163,19 @@ export function AuftragFinanzenClient({
     return { ein, buer, frei }
   }, [einbehalte])
 
+  const headSub = [kundeName?.trim(), projektTitel?.trim()].filter(Boolean).join(' · ')
+
   return (
-    <div className="space-y-10 pb-24">
+    <div className={embedded ? 'min-w-0 space-y-6' : 'space-y-6 pb-0'}>
+      {!embedded ? (
+        <DetailHead
+          backHref={`/auftraege/${auftragId}`}
+          backLabel="Zurück zum Auftrag"
+          title="Finanzen"
+          sub={headSub || undefined}
+        />
+      ) : null}
+
       <section>
         <h2 className="mb-3 text-lg font-semibold text-ink">Projektmarge</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -472,7 +491,7 @@ export function AuftragFinanzenClient({
               </label>
               <label className="block">
                 Beschreibung
-                <textarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} rows={2} className="mt-1 w-full rounded border border-border px-3 py-2" />
+                <Textarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} rows={2} label="Beschreibung" />
               </label>
               <label className="block">
                 Kategorie *
@@ -531,7 +550,7 @@ export function AuftragFinanzenClient({
               </label>
               <label className="block">
                 Notizen
-                <textarea value={erNotiz} onChange={(e) => setErNotiz(e.target.value)} rows={2} className="mt-1 w-full rounded border border-border px-3 py-2" />
+                <Textarea value={erNotiz} onChange={(e) => setErNotiz(e.target.value)} rows={2} label="Notizen" />
               </label>
             </div>
             <div className="mt-4 flex gap-2">
@@ -613,7 +632,7 @@ export function AuftragFinanzenClient({
               </label>
               <label className="block">
                 Notizen
-                <textarea value={ebNotiz} onChange={(e) => setEbNotiz(e.target.value)} rows={2} className="mt-1 w-full rounded border border-border px-3 py-2" />
+                <Textarea value={ebNotiz} onChange={(e) => setEbNotiz(e.target.value)} rows={2} label="Notizen" />
               </label>
             </div>
             <div className="mt-4 flex gap-2">

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from '@/components/ui/app-toast'
+import { Textarea } from '@/components/ui/Textarea'
 import {
   type BaustoppTyp,
   beendeBaustopp,
@@ -12,6 +13,17 @@ import {
   sendNachtragErinnerungAnKunde,
   updateNachtragHandwercherBestaetigt,
 } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
+import {
+  AlertTriangle,
+  Check,
+  Clock,
+  CloudRain,
+  Mail,
+  Send,
+  Smartphone,
+  X,
+} from 'lucide-react'
+import { IconText } from '@/components/ui/IconText'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
@@ -28,10 +40,10 @@ function nachtragPublicUrl(token: string) {
 }
 
 function baustoppTypLabel(typ: string) {
-  if (typ === 'witterung') return '🌧️ Witterung'
-  if (typ === 'material') return '📦 Material nicht geliefert'
-  if (typ === 'zugang') return '🚪 Kein Zugang zur Baustelle'
-  return '⚠️ Sonstiges'
+  if (typ === 'witterung') return 'Witterung'
+  if (typ === 'material') return 'Material nicht geliefert'
+  if (typ === 'zugang') return 'Kein Zugang zur Baustelle'
+  return 'Sonstiges'
 }
 
 function addDays(iso: string | null | undefined, days: number) {
@@ -127,7 +139,9 @@ export function AuftragNachtragBaustoppSection({
     <div className="space-y-6 border-b border-border pb-8">
       {hwWarn ? (
         <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-950">
-          <p className="font-semibold">⚠️ Kunden-Bestätigung liegt vor</p>
+          <p className="font-semibold">
+            <IconText icon={AlertTriangle}>Kunden-Bestätigung liegt vor</IconText>
+          </p>
           <p className="mt-1">
             Handwerker {ersteHw?.handwerker?.name ?? '(nicht zugeordnet)'} hat die Mehrkosten noch nicht bestätigt.
           </p>
@@ -210,12 +224,16 @@ export function AuftragNachtragBaustoppSection({
 
                   {n.status === 'abgelehnt' ? (
                     <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-                      <p className="font-medium">❌ Abgelehnt</p>
+                      <p className="font-medium">
+                        <IconText icon={X}>Abgelehnt</IconText>
+                      </p>
                       <p>{n.abgelehnt_grund ?? '—'}</p>
                     </div>
                   ) : n.status === 'akzeptiert' || n.kunde_bestaetigt_at ? (
                     <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
-                      <p className="font-medium">✅ Akzeptiert</p>
+                      <p className="font-medium">
+                        <IconText icon={Check}>Akzeptiert</IconText>
+                      </p>
                       <p>
                         Bestätigt am{' '}
                         {n.kunde_bestaetigt_at
@@ -228,7 +246,9 @@ export function AuftragNachtragBaustoppSection({
                     </div>
                   ) : n.status === 'gesendet' ? (
                     <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
-                      <p className="font-medium">📤 Gesendet</p>
+                      <p className="font-medium">
+                        <IconText icon={Send}>Gesendet</IconText>
+                      </p>
                       <p>Wartet auf Kunden-Bestätigung · seit {seitText(n.gesendet_at)}</p>
                       {link ? (
                         <div className="mt-2 space-y-2 rounded border border-border bg-surface p-2 text-ink">
@@ -252,7 +272,7 @@ export function AuftragNachtragBaustoppSection({
                                 })
                               }}
                             >
-                              ✉️ Per Mail senden
+                              <IconText icon={Mail}>Per Mail senden</IconText>
                             </Button>
                             <a
                               className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary"
@@ -262,7 +282,7 @@ export function AuftragNachtragBaustoppSection({
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              📱 WhatsApp
+                              <IconText icon={Smartphone}>WhatsApp</IconText>
                             </a>
                           </div>
                           <Button
@@ -288,7 +308,9 @@ export function AuftragNachtragBaustoppSection({
                     </div>
                   ) : (
                     <div className="rounded bg-canvas px-2 py-2 text-xs text-muted">
-                      <p className="font-medium text-ink">⏳ Entwurf</p>
+                      <p className="font-medium text-ink">
+                        <IconText icon={Clock}>Entwurf</IconText>
+                      </p>
                       <p>Noch nicht gesendet.</p>
                       <Button
                         type="button"
@@ -322,12 +344,14 @@ export function AuftragNachtragBaustoppSection({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-ink">Baustopps</h2>
             <Button type="button" variant="secondary" onClick={() => setBaustoppOpen(true)}>
-              🌧️ Baustopp melden
+              <IconText icon={CloudRain}>Baustopp melden</IconText>
             </Button>
           </div>
           {aktiv.length > 0 ? (
             <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-950">
-              <p className="font-semibold">🌧️ Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</p>
+              <p className="font-semibold">
+                <IconText icon={CloudRain}>Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</IconText>
+              </p>
               <p className="text-xs">{aktiv[0]!.grund}</p>
               {aktiv.map((b) => (
                 <Button
@@ -389,24 +413,18 @@ export function AuftragNachtragBaustoppSection({
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 />
               </label>
-              <label className="block">
-                <span className="font-medium">Beschreibung</span>
-                <textarea
-                  value={beschreibung}
-                  onChange={(e) => setBeschreibung(e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                />
-              </label>
-              <label className="block">
-                <span className="font-medium">Position (Beschreibung)</span>
-                <textarea
-                  value={posText}
-                  onChange={(e) => setPosText(e.target.value)}
-                  rows={2}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                />
-              </label>
+              <Textarea
+                label="Beschreibung"
+                value={beschreibung}
+                onChange={(e) => setBeschreibung(e.target.value)}
+                rows={3}
+              />
+              <Textarea
+                label="Position (Beschreibung)"
+                value={posText}
+                onChange={(e) => setPosText(e.target.value)}
+                rows={2}
+              />
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="font-medium">Preis min (€)</span>
@@ -491,22 +509,19 @@ export function AuftragNachtragBaustoppSection({
                   onChange={(e) => setBsTyp(e.target.value as BaustoppTyp)}
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 >
-                  <option value="witterung">🌧️ Witterung</option>
-                  <option value="material">📦 Material nicht geliefert</option>
-                  <option value="zugang">🚪 Kein Zugang zur Baustelle</option>
-                  <option value="sonstiges">⚠️ Sonstiges</option>
+                  <option value="witterung">Witterung</option>
+                  <option value="material">Material nicht geliefert</option>
+                  <option value="zugang">Kein Zugang zur Baustelle</option>
+                  <option value="sonstiges">Sonstiges</option>
                 </select>
               </label>
-              <label className="block">
-                <span className="font-medium">Grund</span>
-                <textarea
-                  value={bsGrund}
-                  onChange={(e) => setBsGrund(e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                  placeholder="Was genau verhindert die Arbeiten?"
-                />
-              </label>
+              <Textarea
+                label="Grund"
+                value={bsGrund}
+                onChange={(e) => setBsGrund(e.target.value)}
+                rows={3}
+                placeholder="Was genau verhindert die Arbeiten?"
+              />
               <label className="block">
                 <span className="font-medium">Beginn</span>
                 <input

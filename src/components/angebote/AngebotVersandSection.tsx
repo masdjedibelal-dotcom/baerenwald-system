@@ -8,12 +8,20 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
+import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import { betragAnzeige } from '@/lib/angebot-einfach'
+import {
+  normalizeAngebotPositionen,
+  summenAusPositionen,
+  summenKostenaufstellungAusPositionen,
+} from '@/lib/angebot-positionen'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
 import { mailAngebot } from '@/lib/mail-templates'
+import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { kundeBegruessungsVorname } from '@/lib/kunde-rechnungsempfaenger'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
@@ -48,12 +56,29 @@ export function AngebotVersandSection({
   const router = useRouter()
   const [kundeModal, setKundeModal] = useState(false)
   const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
+  const [hwModal, setHwModal] = useState<{
+    id: string
+    name: string
+    gewerk: string
+    betreff: string
+    html: string
+    to: string[]
+    cc: string[]
+  } | null>(null)
   const [pending, startTransition] = useTransition()
 
   const kunde = detail.kunden
+  const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, detail.leads?.kundentyp)
   const kundeEmail = kunde?.email?.trim() ?? ''
   const kundeName = kunde?.name?.trim() ?? 'Kundin'
-  const vorname = kundeName.split(/\s+/)[0] || kundeName
+  const vorname =
+    kundeBegruessungsVorname({
+      name: kundeName,
+      vorname: kunde?.vorname,
+      nachname: kunde?.nachname,
+      ansprechpartner: kunde?.ansprechpartner,
+      typ: kunde?.typ,
+    }) ?? (kundeName.split(/\s+/)[0] || kundeName)
 
   const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
 
@@ -73,13 +98,14 @@ export function AngebotVersandSection({
         positionen: posMail,
         gesamt_min: summenMail.nettoMin,
         gesamt_max: summenMail.nettoMax,
-        lohn_gesamt: summenMail.lohnZeileMin,
+        lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
         gueltig_bis: gueltigBis,
         statusLink,
+        kundeTyp,
       },
       b
     ).html
-  }, [vorname, positionen, gueltigBis, detail.lead_id])
+  }, [vorname, positionen, gueltigBis, detail.lead_id, kundeTyp])
 
   const allHandwerkerAngefragt = useMemo(() => {
     if (rows.length === 0) return false
@@ -127,17 +153,78 @@ export function AngebotVersandSection({
     }
     const name = z.handwerker?.name?.trim() ?? 'Handwerkerin'
     if (sendEmail && json.gesendet) {
-      toast.success(`Mail an ${name} gesendet`)
+      toast.success(`Partner-Mail an ${name} gesendet`)
     }
     if (!sendEmail && json.link) {
       try {
         await navigator.clipboard.writeText(json.link)
-        toast.success('Link kopiert — jetzt in WhatsApp einfügen')
+        toast.success('Partner-Login kopiert — in WhatsApp einfügen')
       } catch {
         toast.message('Link', { description: json.link })
       }
     }
     router.refresh()
+  }
+
+  function openHandwerkerModal(z: AngebotHandwerkerRow) {
+    startTransition(async () => {
+      const res = await fetch(`/api/angebote/${detail.id}/senden`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          typ: 'handwerker',
+          zuweisung_id: z.id,
+          send_email: false,
+          preview_only: true,
+        }),
+      })
+      const json = (await res.json()) as {
+        error?: string
+        html?: string
+        betreff?: string
+        defaultTo?: string[]
+        defaultCc?: string[]
+      }
+      if (!res.ok || !json.html) {
+        toast.error(json.error ?? 'Vorschau konnte nicht geladen werden')
+        return
+      }
+      setHwModal({
+        id: z.id,
+        name: z.handwerker?.name ?? 'Handwerker',
+        gewerk: z.gewerke?.name ?? 'Gewerk',
+        betreff: json.betreff ?? `Neue Anfrage: ${z.gewerke?.name ?? 'Gewerk'} — Bärenwald München`,
+        html: json.html,
+        to: (json.defaultTo ?? []).filter(Boolean),
+        cc: (json.defaultCc ?? []).filter(Boolean),
+      })
+    })
+  }
+
+  function sendHandwerkerAusModal() {
+    if (!hwModal) return
+    startTransition(async () => {
+      const res = await fetch(`/api/angebote/${detail.id}/senden`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          typ: 'handwerker',
+          zuweisung_id: hwModal.id,
+          send_email: true,
+          betreff: hwModal.betreff,
+          to: hwModal.to,
+          cc: hwModal.cc,
+        }),
+      })
+      const json = (await res.json()) as { error?: string; gesendet?: boolean }
+      if (!res.ok) {
+        toast.error(json.error ?? 'Versand fehlgeschlagen')
+        return
+      }
+      toast.success(`Partner-Mail an ${hwModal.name} gesendet`)
+      setHwModal(null)
+      router.refresh()
+    })
   }
 
   return (
@@ -195,16 +282,23 @@ export function AngebotVersandSection({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={!hwEmail || pending}
+                      disabled={pending}
                       title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
-                      onClick={() => void sendHandwerker(z, true)}
+                      onClick={() => openHandwerkerModal(z)}
                     >
                       <Mail className="mr-1 inline h-4 w-4" aria-hidden />
-                      Per Mail
+                      Partner-Mail
                     </Button>
-                    <Button type="button" variant="secondary" size="sm" onClick={() => void sendHandwerker(z, false)}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={pending}
+                      title="Partner-Login — Status wird auf „angefragt“ gesetzt"
+                      onClick={() => void sendHandwerker(z, false)}
+                    >
                       <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
-                      Link kopieren
+                      WhatsApp-Link
                     </Button>
                   </div>
                 </li>
@@ -243,11 +337,63 @@ export function AngebotVersandSection({
         />
         <p className="mb-3 text-sm text-bw-text">
           Gesamtbetrag (Brutto):{' '}
-          <strong>
-            {bruttoMin.toLocaleString('de-DE')} – {bruttoMax.toLocaleString('de-DE')} €
-          </strong>
+          <strong>{betragAnzeige(null, bruttoMin, bruttoMax)}</strong>
         </p>
         <p className="text-xs text-bw-text-muted">PDF wird angehängt.</p>
+      </Modal>
+
+      <Modal
+        open={!!hwModal}
+        onClose={() => setHwModal(null)}
+        title={hwModal ? `Partner-Mail an ${hwModal.name}` : 'Partner-Mail'}
+        size="lg"
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setHwModal(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={sendHandwerkerAusModal}>
+              Jetzt senden
+            </Button>
+          </div>
+        }
+      >
+        {hwModal ? (
+          <div className="space-y-3">
+            <p className="text-sm text-bw-text-muted">
+              Gewerk: <span className="font-medium text-bw-text">{hwModal.gewerk}</span>
+            </p>
+            <Input
+              label="Betreff"
+              value={hwModal.betreff}
+              onChange={(e) => setHwModal((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))}
+            />
+            <EmailPillsField
+              label="An"
+              required
+              emails={hwModal.to}
+              onChange={(emails) => setHwModal((prev) => (prev ? { ...prev, to: emails } : prev))}
+              placeholder="handwerker@beispiel.de"
+            />
+            <EmailPillsField
+              label="CC"
+              emails={hwModal.cc}
+              onChange={(emails) => setHwModal((prev) => (prev ? { ...prev, cc: emails } : prev))}
+              placeholder="weitere@beispiel.de"
+              hint="Optional — nur für zusätzliche Empfänger sichtbar."
+            />
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
+            <p className="text-xs text-bw-text-muted">
+              Versand über die Website (Partner-Portal), nicht über CRM-Resend.
+            </p>
+            <iframe
+              title="Partner-Mail Vorschau"
+              sandbox="allow-same-origin"
+              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              srcDoc={hwModal.html}
+            />
+          </div>
+        ) : null}
       </Modal>
     </section>
   )

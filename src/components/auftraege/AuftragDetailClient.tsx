@@ -2,87 +2,118 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { ArrowLeft, Eye, Receipt, Send } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
-import { ProgressBar } from '@/components/ui/ProgressBar'
-import { Accordion } from '@/components/ui/Accordion'
-import { Input } from '@/components/ui/Input'
-import { AuftragPositionenTab } from '@/components/auftraege/AuftragPositionenTab'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import {
+  ClipboardList,
+  FolderOpen,
+  History,
+  ListChecks,
+  Mail,
+  MoreHorizontal,
+  FileCheck,
+  Pencil,
+  Phone,
+  Receipt,
+  Wallet,
+} from 'lucide-react'
+import { DetailHead } from '@/components/layout/DetailHead'
+import { DetailScreenShell } from '@/components/layout/app'
+import { useCrmRefresh } from '@/hooks/useCrmRefresh'
+import { DetailTabBar } from '@/components/ui/DetailTabBar'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/ActionsMenu'
+import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { AuftragFinanzenClient } from '@/components/auftraege/AuftragFinanzenClient'
 import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
+import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
+import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
+import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
+import { AbnahmeprotokollModal } from '@/components/auftraege/AbnahmeprotokollModal'
+import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
+import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
+import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
+import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
+import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
+import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
+import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
+import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import {
   completeAuftragAbnahme,
   createFormularEintragUndEmail,
   startAuftragArbeit,
   setAuftragZurAbnahme,
-  updateAuftragFortschrittManual,
-  updateAuftragNotizen,
   updateAuftragProjektFelder,
-  updateAuftragStatusFromUi,
 } from '@/app/(dashboard)/auftraege/actions'
-import { ensureKundenTokenAction } from '@/app/(dashboard)/auftraege/kunden-status-actions'
-import { AuftragDokumentationPanel } from '@/components/auftraege/AuftragDokumentationPanel'
-import { projektUrlFromToken } from '@/lib/projekt/kunden-token'
-import { MailUebersicht } from '@/components/auftraege/MailUebersicht'
-import type { EmailLogRow } from '@/app/(dashboard)/auftraege/actions'
+import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
+import {
+  ensureKundenTokenAction,
+  sendKundenProjektLinkEmail,
+} from '@/app/(dashboard)/auftraege/kunden-status-actions'
+import { auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
+import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
+import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
   AuftragDetail,
-  AuftragStatus,
-  FormularEintrag,
-  FormularFeld,
   FormularTemplate,
+  Gewerk,
+  LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import { cn, formatDatum, formatDatumZeit, formatPreis, FORMULAR_PHASE_LABELS } from '@/lib/utils'
-import { StatusActions } from '@/components/funnel/StatusActions'
+import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { Modal } from '@/components/ui/Modal'
-
-function formatFeldwert(v: unknown): string {
-  if (v == null) return '—'
-  if (typeof v === 'boolean') return v ? 'Ja' : 'Nein'
-  if (Array.isArray(v)) return v.join(', ')
-  return String(v)
-}
-
-function PropRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex justify-between gap-3 border-b border-border py-2 text-sm last:border-0">
-      <span className="shrink-0 text-muted">{label}</span>
-      <div className="min-w-0 text-right font-medium text-ink">{children}</div>
-    </div>
-  )
-}
+import { ClientOnly } from '@/components/ui/ClientOnly'
+import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
+import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
+import {
+  loadRechnungWizardBootstrapFromAuftrag,
+  type RechnungWizardBootstrap,
+} from '@/app/(dashboard)/rechnungen/wizard-actions'
+import {
+  defaultZahlungszielTage,
+  type RechnungAuswahlZeile,
+} from '@/lib/rechnungen/rechnung-wizard-types'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
 
 type GewerkOpt = { id: string; name: string; slug: string }
+
+type AuftragDetailTab = 'schritte' | 'aktivitaet' | 'dokumente' | 'finanzen'
 
 export function AuftragDetailClient({
   detail: initial,
   templates,
-  emailLog = [],
-  finanzenPayload = null,
   gewerke = [],
   preislisten = [],
+  leadTimeline = [],
+  team = [],
+  rechnungenListe = [],
+  firm,
+  finanzenPayload,
 }: {
   detail: AuftragDetail
   templates: FormularTemplate[]
-  emailLog?: EmailLogRow[]
-  finanzenPayload?: AuftragFinanzenClientPayload | null
   gewerke?: GewerkOpt[]
   preislisten?: Preisliste[]
+  leadTimeline?: LeadTimelineRow[]
+  team?: CrmTeamMitglied[]
+  rechnungenListe?: RechnungAuswahlZeile[]
+  firm?: FirmenEinstellungen
+  finanzenPayload: AuftragFinanzenClientPayload | null
 }) {
   const router = useRouter()
+  const { refresh } = useCrmRefresh()
+  const isMobile = useIsMobile()
+  const mailCompose = useKundenMailCompose()
   const [detail, setDetail] = useState(initial)
-  const [notizen, setNotizen] = useState(initial.notizen ?? '')
   const [err, setErr] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [formModal, setFormModal] = useState<{
     gewerkId: string
@@ -91,68 +122,124 @@ export function AuftragDetailClient({
     templateId: string
     phase: 'vorab' | 'update' | 'abnahme'
   } | null>(null)
-  const [viewEintrag, setViewEintrag] = useState<FormularEintrag | null>(null)
-  const [rtab, setRtab] = useState<'uebersicht' | 'positionen' | 'dokumentation' | 'finanzen'>('uebersicht')
+  const [mainTab, setMainTab] = useState<AuftragDetailTab>('schritte')
   const [projektModal, setProjektModal] = useState(false)
   const [projektTitel, setProjektTitel] = useState('')
   const [projektStart, setProjektStart] = useState('')
   const [projektEnde, setProjektEnde] = useState('')
-  const [fortSlider, setFortSlider] = useState(initial.fortschritt ?? 0)
+  const [abnahmeModal, setAbnahmeModal] = useState(false)
+  const [abnahmeModalStep, setAbnahmeModalStep] = useState<1 | 2 | 3 | 4>(1)
+  const [abschlussModal, setAbschlussModal] = useState(false)
+  const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
+  const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
+  const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
+    useState<RechnungWizardBootstrap | null>(null)
+  const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
+  const [hwBewertungZiele, setHwBewertungZiele] = useState<HandwerkerBewertungZiel[] | null>(null)
+
+  const zahlungszielTage = useMemo(
+    () =>
+      Math.max(
+        1,
+        parseInt(firm?.zahlungsziel_tage ?? '', 10) ||
+          defaultZahlungszielTage(initial.kunden?.typ)
+      ),
+    [firm?.zahlungsziel_tage, initial.kunden?.typ]
+  )
+
+  const openRechnungWizard = useCallback((bootstrap: RechnungWizardBootstrap) => {
+    setRechnungWizardBootstrap(bootstrap)
+    setRechnungWizardKey((k) => k + 1)
+    setRechnungWizardOpen(true)
+  }, [])
+
+  const openAbnahme = useCallback(
+    (step: 1 | 2 | 3 | 4 = 1) => {
+      if (isMobile) router.push(`/auftraege/${detail.id}/abnahme`)
+      else {
+        setAbnahmeModalStep(step)
+        setAbnahmeModal(true)
+      }
+    },
+    [detail.id, isMobile, router]
+  )
+
+  const openAbschluss = useCallback(() => {
+    if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
+    else setAbschlussModal(true)
+  }, [detail.id, isMobile, router])
+
+  const openRechnungErstellen = useCallback(() => {
+    if (rechnungenListe.length === 0) {
+      startTransition(async () => {
+        const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        openRechnungWizard(res.bootstrap)
+      })
+      return
+    }
+    if (isMobile) {
+      router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
+      return
+    }
+    setRechnungAuswahlOpen(true)
+  }, [rechnungenListe.length, detail.id, isMobile, openRechnungWizard, router])
 
   useEffect(() => {
     setDetail(initial)
-    setNotizen(initial.notizen ?? '')
     setProjektTitel(initial.titel ?? '')
     setProjektStart(initial.start_datum?.slice(0, 10) ?? '')
     setProjektEnde(initial.end_datum?.slice(0, 10) ?? '')
-    setFortSlider(initial.fortschritt ?? 0)
   }, [initial])
 
   useEffect(() => {
-    setFortSlider(detail.fortschritt ?? 0)
-  }, [detail.fortschritt])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
-    if (window.location.hash === '#dokumentation') setRtab('dokumentation')
+    if (window.location.hash === '#dokumentation') setMainTab('dokumente')
   }, [])
 
-  const flushNotizen = useCallback(async () => {
-    const r = await updateAuftragNotizen(detail.id, notizen)
-    if (!r.ok) setErr(r.message)
-  }, [detail.id, notizen])
-
   useEffect(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      void flushNotizen()
-    }, 650)
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
+    const resetRechnungUi = () => {
+      setRechnungAuswahlOpen(false)
+      setRechnungWizardOpen(false)
+      setRechnungWizardBootstrap(null)
     }
-  }, [notizen, flushNotizen])
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) resetRechnungUi()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>) => {
     setErr(null)
     startTransition(async () => {
       const r = await fn()
       if (!r.ok) setErr('message' in r ? (r.message ?? 'Fehler') : 'Fehler')
-      else router.refresh()
+      else refresh()
     })
   }
 
   const kunde = detail.kunden
   const name = kunde?.name ?? 'Auftrag'
-  const angebotPos = useMemo(
-    () => normalizeAngebotPositionen(detail.angebote?.positionen ?? []),
-    [detail.angebote?.positionen]
-  )
-  const hasPos = (detail.auftrag_positionen?.length ?? 0) > 0 || angebotPos.length > 0
+  const posCount = detail.auftrag_positionen?.length ?? 0
 
-  const projektUrl = useMemo(() => {
-    const t = detail.kunden_token?.trim()
-    return t ? projektUrlFromToken(t) : ''
-  }, [detail.kunden_token])
+  const projektName = auftragTitel(detail)
+  const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
+  const metaLine = useMemo(() => {
+    const ort = detail.kunden?.ort?.trim() || detail.kunden?.plz?.trim() || ''
+    const parts: string[] = []
+    if (detail.kunden?.name) parts.push(detail.kunden.name)
+    if (ort) parts.push(ort)
+    if (detail.start_datum || detail.end_datum) {
+      const start = detail.start_datum ? formatDatum(detail.start_datum) : '—'
+      const end = detail.end_datum ? formatDatum(detail.end_datum) : '—'
+      parts.push(`Start ${start} → ${end}`)
+    }
+    return parts.join(' · ')
+  }, [detail])
 
   const filteredTemplates = formModal
     ? templates.filter(
@@ -170,19 +257,6 @@ export function AuftragDetailClient({
       phase: 'vorab',
     })
   }
-
-  const statusActionData = useMemo(() => {
-    const punches = detail.punch_list ?? []
-    const offen = punches.filter((p) => {
-      const s = String(p.status ?? '').toLowerCase()
-      return s !== 'behoben' && s !== 'akzeptiert'
-    })
-    const alle_maengel_behoben = punches.length === 0 || offen.length === 0
-    return {
-      abnahme_protokoll_url: detail.abnahme_protokoll_url ?? undefined,
-      alle_maengel_behoben,
-    }
-  }, [detail.punch_list, detail.abnahme_protokoll_url])
 
   const onStatusAction = useCallback(
     (action: string, payload?: unknown) => {
@@ -216,16 +290,16 @@ export function AuftragDetailClient({
         openFormModal(z.gewerk_id, z.handwerker_id, z.handwerker?.email ?? '')
         return
       }
-      if (action === 'auftrag.protokoll') {
-        window.open(`/api/auftraege/${detail.id}/protokoll`, '_blank', 'noopener,noreferrer')
-        return
-      }
       if (action === 'auftrag.nachtrag') {
-        setRtab('dokumentation')
+        setMainTab('dokumente')
         return
       }
       if (action === 'auftrag.mangel') {
-        setRtab('dokumentation')
+        setMainTab('dokumente')
+        return
+      }
+      if (action === 'auftrag.baustopp') {
+        setMainTab('dokumente')
         return
       }
       if (action === 'auftrag.mail_kunde' || action === 'auftrag.abnahme_mail' || action === 'auftrag.termin') {
@@ -238,29 +312,77 @@ export function AuftragDetailClient({
     [detail.id, detail.auftrag_handwerker, router]
   )
 
-  const copyKundenlink = useCallback(() => {
-    if (projektUrl) {
-      void navigator.clipboard.writeText(projektUrl).then(
-        () => toast.success('Link kopiert'),
-        () => toast.error('Kopieren nicht möglich')
-      )
-      return
+  const istAbgeschlossen = detail.status === 'abgeschlossen'
+
+  const aktionenMenuItems = useMemo((): ActionsMenuItem[] => {
+    const items: ActionsMenuItem[] = [
+      {
+        label: 'E-Mail schreiben',
+        icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
+        hint: detail.kunden?.email?.trim() ? undefined : 'Keine E-Mail-Adresse',
+        onClick: () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id)),
+      },
+    ]
+
+    if (kundeTelefon) {
+      items.push({
+        label: 'Anrufen',
+        icon: <Phone className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => {
+          window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+        },
+      })
     }
-    void (async () => {
-      const r = await ensureKundenTokenAction(detail.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+
+    items.push(
+      'sep',
+      {
+        label: 'Kundenportal-Link versenden',
+        icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
+        hint: detail.kunden?.email?.trim() ? undefined : 'Keine Kunden-E-Mail',
+        onClick: () => {
+          startTransition(async () => {
+            const r = await sendKundenProjektLinkEmail(detail.id)
+            if (!r.ok) toast.error(r.message)
+            else toast.success('E-Mail gesendet')
+          })
+        },
       }
-      try {
-        await navigator.clipboard.writeText(r.url)
-        toast.success('Link kopiert')
-        router.refresh()
-      } catch {
-        toast.error('Kopieren nicht möglich')
+    )
+
+    if (detail.angebot_id) {
+      items.push('sep', {
+        label: 'Zum Angebot',
+        icon: <Receipt className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => router.push(`/angebote/${detail.angebot_id}`),
+      })
+    }
+
+    items.push(
+      'sep',
+      {
+        label: 'Abnahmeprotokoll',
+        icon: <ClipboardList className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: openAbnahme,
+      },
+      {
+        label: 'Rechnung erstellen',
+        icon: <Receipt className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => openRechnungErstellen(),
       }
-    })()
-  }, [detail.id, projektUrl, router])
+    )
+
+    return items
+  }, [
+    detail.angebot_id,
+    detail.id,
+    detail.kunden?.email,
+    kundeTelefon,
+    mailCompose,
+    openAbnahme,
+    openRechnungErstellen,
+    router,
+  ])
 
   const submitFormular = () => {
     if (!formModal || !formModal.templateId || !formModal.email.trim()) {
@@ -280,27 +402,218 @@ export function AuftragDetailClient({
       if (!r.ok) setErr(r.message ?? 'Fehler')
       else {
         setFormModal(null)
-        router.refresh()
+        refresh()
       }
     })
   }
 
-  return (
-    <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
-      <PageHeader
-        title={
-          <span className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center md:gap-3">
-            <Link
-              href="/auftraege"
-              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              Zurück
-            </Link>
-            <span className="min-w-0 truncate text-xl font-semibold md:text-2xl">{name}</span>
-          </span>
+  const timelineCount = useMemo(() => {
+    const lead = leadTimeline.length
+    const auftrag = detail.auftrag_timeline?.length ?? 0
+    return (lead + auftrag) || 1
+  }, [leadTimeline.length, detail.auftrag_timeline])
+
+  const dokumenteCount = useMemo(
+    () => zaehleAuftragDokumente(detail, rechnungenListe),
+    [detail, rechnungenListe]
+  )
+
+  const handwerkerKontext = useMemo(
+    () => ({
+      kundeName: name,
+      adresse: detail.kunden?.adresse ?? null,
+      plz: detail.kunden?.plz ?? null,
+      ort: detail.kunden?.ort ?? null,
+      startDatum: detail.start_datum,
+      endDatum: detail.end_datum,
+      notizen: detail.notizen,
+    }),
+    [name, detail.kunden, detail.start_datum, detail.end_datum, detail.notizen]
+  )
+
+  const hatAbnahme =
+    Boolean(detail.abnahme_protokoll_url) ||
+    detail.status === 'abnahme' ||
+    detail.status === 'abgeschlossen'
+
+  const naechsteSchritte = useMemo(
+    () =>
+      buildAuftragNaechsteSchritte({
+        status: detail.status,
+        auftragId: detail.id,
+        hatAbnahme,
+        rechnungenCount: rechnungenListe.length,
+      }),
+    [detail.status, detail.id, hatAbnahme, rechnungenListe.length]
+  )
+
+  const offeneSchritteCount = useMemo(
+    () => naechsteSchritte.filter((s) => !s.done).length,
+    [naechsteSchritte]
+  )
+
+  const detailTabs = useMemo(
+    () => [
+      {
+        id: 'schritte' as const,
+        label: 'Nächste Schritte',
+        icon: ListChecks,
+        count: offeneSchritteCount || undefined,
+      },
+      {
+        id: 'aktivitaet' as const,
+        label: ACTIVITY_SECTIONS.verlauf,
+        icon: History,
+        count: timelineCount || undefined,
+      },
+      {
+        id: 'dokumente' as const,
+        label: ACTIVITY_SECTIONS.dokumente,
+        icon: FolderOpen,
+        count: dokumenteCount || undefined,
+      },
+      {
+        id: 'finanzen' as const,
+        label: 'Finanzen',
+        icon: Wallet,
+      },
+    ],
+    [offeneSchritteCount, timelineCount, dokumenteCount]
+  )
+
+  const fixedOverview = (
+    <div className="space-y-3">
+      <AuftragDetailTopCards detail={detail} team={team} />
+      <Card
+        title="Positionen"
+        bodyClassName="p-4"
+        action={
+          posCount > 0 ? (
+            <span className="text-[12px] font-medium tabular-nums text-bw-text-muted">
+              {posCount} {posCount === 1 ? 'Leistung' : 'Leistungen'}
+            </span>
+          ) : null
         }
-        action={<AuftragStatusBadge status={detail.status} />}
+      >
+        <AuftragPositionenSteuerungTab
+          auftragId={detail.id}
+          positionen={detail.auftrag_positionen ?? []}
+          gewerke={gewerke}
+          auftragStatus={detail.status}
+          handwerkerKontext={handwerkerKontext}
+          onChanged={() => refresh()}
+        />
+      </Card>
+      <Card
+        id="auftrag-bautagebuch"
+        title="Bautagebuch"
+        className="scroll-mt-24"
+        bodyClassName="p-4"
+      >
+        <AuftragBautagebuchCard
+          auftragId={detail.id}
+          eintraege={detail.auftrag_bautagebuch ?? []}
+          kundeName={name}
+          positionen={detail.auftrag_positionen ?? []}
+          gewerke={gewerke}
+          onChanged={() => refresh()}
+        />
+      </Card>
+      <AuftragAbnahmeprotokollCard
+        auftragId={detail.id}
+        kundeName={name}
+        positionen={detail.auftrag_positionen ?? []}
+        abnahmeProtokollUrl={detail.abnahme_protokoll_url}
+        abnahmeDatum={detail.abnahme_datum}
+        onChanged={() => refresh()}
+      />
+      <KommunikationCard
+        filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
+        reloadKey={mailCompose.reloadKey}
+      />
+    </div>
+  )
+
+  const tabContent =
+    mainTab === 'schritte' ? (
+      <NaechsteSchritteCard steps={naechsteSchritte} />
+    ) : mainTab === 'aktivitaet' ? (
+      <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
+    ) : mainTab === 'dokumente' ? (
+      <AuftragDokumenteTab
+        detail={detail}
+        rechnungen={rechnungenListe}
+        onChanged={() => refresh()}
+      />
+    ) : finanzenPayload ? (
+      <AuftragFinanzenClient
+        embedded
+        auftragId={detail.id}
+        projektTitel={detail.titel}
+        kundeName={detail.kunden?.name ?? null}
+        {...finanzenPayload}
+      />
+    ) : (
+      <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
+    )
+
+  return (
+    <div className="space-y-4 pb-0">
+      <DetailHead
+        backHref="/auftraege"
+        backLabel="Zurück zu Aufträge"
+        title={
+          <div className="detail-head-title-row">
+            <span>{projektName}</span>
+            <AuftragStatusBadge status={detail.status} />
+          </div>
+        }
+        sub={metaLine}
+        actions={
+          <div className="flex w-full flex-wrap items-center gap-2">
+            {istAbgeschlossen ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
+                onClick={() => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))}
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                E-Mail
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
+                onClick={openAbschluss}
+              >
+                <FileCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Auftrag abschließen
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5"
+              onClick={() => setProjektModal(true)}
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">Bearbeiten</span>
+            </button>
+            <ActionsMenu
+              trigger={
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
+                  aria-label="Weitere Aktionen"
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  <span className="sr-only sm:not-sr-only">Mehr</span>
+                </button>
+              }
+              items={aktionenMenuItems}
+              sheetTitle="Auftrag"
+            />
+          </div>
+        }
       />
 
       {err ? (
@@ -309,471 +622,19 @@ export function AuftragDetailClient({
         </p>
       ) : null}
 
-      {detail.status === 'offen' && !(detail.vor_baubeginn_protokolle?.length) ? (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950">
-          <p className="font-semibold">⚠️ Vor-Baubeginn Protokoll fehlt noch</p>
-          <p className="mt-1 text-xs">
-            Dokumentieren Sie den Zustand der Baustelle vor dem ersten Einsatz — schützt vor Haftung für Vorschäden.
-          </p>
-          <Link
-            href={`/auftraege/${detail.id}/vor-baubeginn`}
-            className="mt-2 inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-sm font-medium text-white"
-          >
-            Jetzt aufnehmen
-          </Link>
-        </div>
-      ) : null}
+      {fixedOverview}
 
-      {(detail.baustopps ?? []).some((b) => !b.ende_datum) ? (
-        <div className="mb-4 rounded-lg border border-orange-300 bg-orange-50 px-3 py-3 text-sm text-orange-950">
-          <p className="font-semibold">🌧️ Baustopp aktiv</p>
-          <p className="mt-1 text-xs">
-            {(detail.baustopps ?? []).find((b) => !b.ende_datum)?.grund ?? ''}
-          </p>
-          <button
-            type="button"
-            className="mt-2 text-sm font-medium text-primary underline"
-            onClick={() => setRtab('dokumentation')}
-          >
-            In der Dokumentation verwalten
-          </button>
-        </div>
-      ) : null}
-
-      <div className="lg:grid lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start lg:gap-8">
-        <aside className="mb-8 space-y-3 lg:mb-0">
-          <Accordion title="Fortschritt" defaultOpen>
-            <ProgressBar
-              value={detail.fortschritt ?? 0}
-              label={`Fortschritt: ${detail.fortschritt ?? 0}%`}
-            />
-            {detail.status === 'storniert' ? (
-              <p className="mt-3 text-sm text-muted">Status: storniert</p>
-            ) : (
-              <select
-                value={detail.status}
-                onChange={(e) => {
-                  const s = e.target.value as AuftragStatus
-                  run(() => updateAuftragStatusFromUi(detail.id, s))
-                }}
-                className="input mt-3 w-full"
-              >
-                <option value="offen">Offen</option>
-                <option value="in_arbeit">In Arbeit</option>
-                <option value="abnahme">Abnahme</option>
-                <option value="abgeschlossen">Abgeschlossen</option>
-              </select>
-            )}
-            <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-muted">Fortschritt manuell (0–100%)</label>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={fortSlider}
-                disabled={detail.status === 'storniert'}
-                onChange={(e) => setFortSlider(Number(e.target.value))}
-                onPointerUp={(e) => {
-                  const v = Number((e.target as HTMLInputElement).value)
-                  run(() => updateAuftragFortschrittManual(detail.id, v))
-                }}
-                className="w-full"
-              />
-            </div>
-            <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-              {detail.status === 'offen' ? (
-                <Button
-                  variant="primary"
-                  loading={pending}
-                  onClick={() => run(() => startAuftragArbeit(detail.id))}
-                >
-                  Arbeiten starten
-                </Button>
-              ) : null}
-              {detail.status === 'in_arbeit' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="border-orange-300 bg-orange-50 text-orange-950 hover:bg-orange-100"
-                    onClick={() => setRtab('dokumentation')}
-                  >
-                    🌧️ Baustopp melden
-                  </Button>
-                  <Button
-                    variant="primary"
-                    loading={pending}
-                    onClick={() => run(() => setAuftragZurAbnahme(detail.id))}
-                  >
-                    Zur Abnahme
-                  </Button>
-                </>
-              ) : null}
-              {detail.status === 'abnahme' ? (
-                <Button
-                  variant="primary"
-                  loading={pending}
-                  onClick={() => run(() => completeAuftragAbnahme(detail.id))}
-                >
-                  Abnahme abschließen
-                </Button>
-              ) : null}
-            </div>
-          </Accordion>
-
-          <Accordion title="Kunde" defaultOpen>
-            {kunde ? (
-              <div className="space-y-0">
-                <PropRow label="Name">
-                  {kunde.id ? (
-                    <Link href={`/kunden/${kunde.id}`} className="text-primary underline">
-                      {kunde.name}
-                    </Link>
-                  ) : (
-                    kunde.name
-                  )}
-                </PropRow>
-                <PropRow label="Telefon">
-                  {kunde.telefon ? (
-                    <a className="text-primary underline" href={`tel:${kunde.telefon}`}>
-                      {kunde.telefon}
-                    </a>
-                  ) : (
-                    '—'
-                  )}
-                </PropRow>
-                <PropRow label="E-Mail">
-                  {kunde.email ? (
-                    <a className="text-primary underline" href={`mailto:${kunde.email}`}>
-                      {kunde.email}
-                    </a>
-                  ) : (
-                    '—'
-                  )}
-                </PropRow>
-                <PropRow label="Adresse">
-                  {[kunde.adresse, kunde.plz, kunde.ort].filter(Boolean).join(', ') || '—'}
-                </PropRow>
-              </div>
-            ) : (
-              <p className="text-sm text-muted">Kein Kunde verknüpft.</p>
-            )}
-          </Accordion>
-
-          <Accordion title="Projekt">
-            <div className="space-y-0">
-              <PropRow label="Titel">{detail.titel?.trim() || '—'}</PropRow>
-              <PropRow label="Start">
-                {detail.start_datum ? formatDatum(detail.start_datum) : '—'}
-              </PropRow>
-              <PropRow label="Ende (geplant)">
-                {detail.end_datum ? formatDatum(detail.end_datum) : '—'}
-              </PropRow>
-              <PropRow label="Betreuer">
-                {detail.betreuer_id ? <span className="font-mono text-xs">{detail.betreuer_id.slice(0, 8)}…</span> : '—'}
-              </PropRow>
-            </div>
-            <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => setProjektModal(true)}>
-              Bearbeiten
-            </Button>
-          </Accordion>
-
-          {detail.angebote ? (
-            <Accordion title="Angebot">
-              <p className="text-sm font-semibold text-ink">
-                {formatPreis(
-                  detail.angebote.gesamt_fix,
-                  detail.angebote.gesamt_min,
-                  detail.angebote.gesamt_max
-                )}
-              </p>
-              <p className="mt-2 text-xs text-muted">Status: {detail.angebote.status}</p>
-              {detail.angebot_id ? (
-                <Link
-                  href={`/angebote/${detail.angebot_id}`}
-                  className="mt-3 inline-block text-sm font-medium text-primary underline"
-                >
-                  Zum Angebot →
-                </Link>
-              ) : null}
-            </Accordion>
-          ) : null}
-
-          <Accordion title="Kunden-Link">
-            <Button type="button" variant="secondary" className="w-full" onClick={copyKundenlink}>
-              Link kopieren
-            </Button>
-            <p className="mt-2 text-xs text-muted">
-              Aufrufe: {detail.kunden_seite_aufrufe ?? 0}
-              {projektUrl ? (
-                <>
-                  <br />
-                  <span className="break-all">{projektUrl}</span>
-                </>
-              ) : null}
-            </p>
-          </Accordion>
-        </aside>
-
-        <div className="min-w-0">
-          <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
-            {(
-              [
-                ['uebersicht', 'Übersicht'],
-                ['positionen', 'Positionen'],
-                ['dokumentation', 'Dokumentation'],
-                ['finanzen', 'Finanzen'],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setRtab(id)}
-                className={cn(
-                  'min-h-[40px] rounded-lg px-3 text-sm font-medium',
-                  rtab === id ? 'bg-primary text-white' : 'border border-border text-ink hover:bg-canvas'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {rtab === 'uebersicht' ? (
-            <>
-              <MailUebersicht detail={detail} emailLog={emailLog} onChanged={() => router.refresh()} />
-
-      {(detail.vor_baubeginn_protokolle ?? []).length > 0 ? (
-        <section className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
-          <h2 className="mb-2 text-lg font-semibold text-emerald-950">✓ Vor-Baubeginn Protokoll</h2>
-          {(() => {
-            const vb = [...(detail.vor_baubeginn_protokolle ?? [])].sort(
-              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0]
-            if (!vb) return null
-            const n = (vb.foto_urls ?? []).length
-            return (
-              <div className="text-sm text-ink">
-                <p>
-                  Datum {formatDatum(vb.datum)} · {n} Foto{n === 1 ? '' : 's'}
-                </p>
-                {vb.vorhandene_schaeden ? (
-                  <p className="mt-2 text-muted">Vorhandene Schäden: {vb.vorhandene_schaeden}</p>
-                ) : null}
-                {(vb.foto_urls ?? []).length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {(vb.foto_urls ?? []).map((url) => (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block h-16 w-16">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="h-16 w-16 rounded object-cover" />
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )
-          })()}
-        </section>
-      ) : null}
-
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Meilensteine</h2>
-        {(detail.auftrag_milestones ?? []).length === 0 ? (
-          <p className="text-sm text-muted">Keine Meilensteine.</p>
-        ) : (
-          <div className="space-y-2">
-            {(detail.auftrag_milestones ?? []).map((m) => (
-              <Card key={m.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-                <span className="font-medium text-ink">{m.titel}</span>
-                <span className="text-xs text-muted">
-                  {m.erledigt
-                    ? `Erledigt${m.erledigt_at ? ` · ${formatDatumZeit(m.erledigt_at)}` : ''}`
-                    : 'Offen'}
-                </span>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Timeline</h2>
-        <Card className="divide-y divide-border p-0">
-          {(detail.auftrag_timeline ?? []).length === 0 ? (
-            <p className="p-4 text-sm text-muted">Keine Einträge.</p>
-          ) : (
-            (detail.auftrag_timeline ?? []).slice(0, 25).map((ev) => (
-              <div key={ev.id} className="px-4 py-3 text-sm">
-                <p className="font-medium text-ink">{ev.titel}</p>
-                <p className="text-xs text-muted">{formatDatumZeit(ev.created_at)}</p>
-                {ev.beschreibung ? <p className="mt-1 text-muted">{ev.beschreibung}</p> : null}
-              </div>
-            ))
-          )}
-        </Card>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Gewerke &amp; Handwerker</h2>
-        <div className="space-y-3">
-          {(detail.auftrag_handwerker ?? []).length === 0 ? (
-            <p className="text-sm text-muted">Keine Zuordnungen.</p>
-          ) : (
-            (detail.auftrag_handwerker ?? []).map((z) => (
-              <Card key={z.id} className="flex flex-col gap-3 p-4 text-sm md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="font-medium text-ink">{z.gewerke?.name ?? 'Gewerk'}</p>
-                  <p className="text-ink">{z.handwerker?.name ?? '—'}</p>
-                  {z.handwerker?.telefon ? (
-                    <a className="text-primary underline" href={`tel:${z.handwerker.telefon}`}>
-                      {z.handwerker.telefon}
-                    </a>
-                  ) : null}
-                  <p className="mt-1 text-xs text-muted">Status: {z.status ?? '—'}</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() =>
-                    openFormModal(
-                      z.gewerk_id,
-                      z.handwerker_id,
-                      z.handwerker?.email ?? ''
-                    )
-                  }
-                >
-                  <Send className="mr-2 inline h-4 w-4" aria-hidden />
-                  Formular senden
-                </Button>
-              </Card>
-            ))
-          )}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-ink">Termine</h2>
-          <Link
-            href={`/kalender?auftrag_id=${detail.id}`}
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary hover:bg-canvas"
-          >
-            Termin hinzufügen
-          </Link>
-        </div>
-        <Card className="divide-y divide-border p-0">
-          {(detail.kalender_termine ?? []).length === 0 ? (
-            <p className="p-4 text-sm text-muted">Keine Termine.</p>
-          ) : (
-            (detail.kalender_termine ?? []).map((t) => (
-              <div key={t.id} className="px-4 py-3 text-sm">
-                <p className="font-medium text-ink">{t.titel}</p>
-                <p className="text-muted">
-                  {formatDatum(t.datum)}
-                  {t.uhrzeit_von ? ` · ${t.uhrzeit_von}` : ''}
-                </p>
-              </div>
-            ))
-          )}
-        </Card>
-      </section>
-
-      {detail.kunde_id && hasPos ? (
-        <div className="mb-6">
-          <Link
-            href={`/rechnungen/neu?auftrag_id=${detail.id}`}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white"
-          >
-            <Receipt className="h-4 w-4" aria-hidden />
-            Rechnung erstellen
-          </Link>
-        </div>
-      ) : null}
-
-      <section className="mb-8">
-        <h2 className="mb-2 text-lg font-semibold text-ink">Notizen</h2>
-        <Textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} rows={5} />
-      </section>
-            </>
-          ) : null}
-
-          {rtab === 'positionen' ? (
-            <AuftragPositionenTab
-              auftragId={detail.id}
-              positionen={detail.auftrag_positionen ?? []}
-              gewerke={gewerke}
-              preislisten={preislisten}
-              handwerkerRows={detail.auftrag_handwerker ?? []}
-              onChanged={() => router.refresh()}
-            />
-          ) : null}
-
-          {rtab === 'dokumentation' ? (
-            <div className="space-y-4 pb-8">
-              <Accordion title="Handwerker-Formulare" defaultOpen>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {(detail.formular_eintraege ?? []).length === 0 ? (
-                    <p className="text-sm text-muted">Noch keine Formular-Einträge.</p>
-                  ) : (
-                    (detail.formular_eintraege ?? []).map((e) => (
-                      <Card key={e.id} className="space-y-2 p-4 text-sm">
-                        <p className="font-medium text-ink">{e.formular_templates?.name ?? 'Formular'}</p>
-                        <p className="text-xs text-muted">
-                          {e.phase ? FORMULAR_PHASE_LABELS[e.phase] ?? e.phase : '—'} ·{' '}
-                          {e.handwerker?.name ?? '—'}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {e.submitted_at
-                            ? `Eingegangen: ${formatDatumZeit(e.submitted_at)}`
-                            : e.gespeichert_at
-                              ? `Zuletzt gespeichert: ${formatDatumZeit(e.gespeichert_at)}`
-                              : 'Entwurf'}
-                        </p>
-                        <Button type="button" variant="ghost" onClick={() => setViewEintrag(e)}>
-                          <Eye className="mr-2 inline h-4 w-4" aria-hidden />
-                          Anzeigen
-                        </Button>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </Accordion>
-
-              <Accordion title="Punch List">
-                {(detail.punch_list ?? []).length === 0 ? (
-                  <p className="text-sm text-muted">Keine Einträge.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {(detail.punch_list ?? []).map((p) => (
-                      <Card key={p.id} className="p-3 text-sm">
-                        <p className="font-medium">{p.gewerke?.name ?? 'Gewerk'}</p>
-                        <p className="text-muted">{p.beschreibung}</p>
-                        <p className="text-xs text-muted">Status: {p.status}</p>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </Accordion>
-
-              <AuftragDokumentationPanel detail={detail} onChanged={() => router.refresh()} />
-            </div>
-          ) : null}
-
-          {rtab === 'finanzen' ? (
-            <div className="pb-8">
-              {finanzenPayload ? (
-                <AuftragFinanzenClient auftragId={detail.id} {...finanzenPayload} />
-              ) : (
-                <p className="text-sm text-muted">
-                  <Link href={`/auftraege/${detail.id}/finanzen`} className="text-primary underline">
-                    Finanzen-Seite öffnen
-                  </Link>
-                </p>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <DetailScreenShell
+        tabs={
+          <DetailTabBar
+            tabs={detailTabs}
+            value={mainTab}
+            onChange={(id) => setMainTab(id as AuftragDetailTab)}
+          />
+        }
+      >
+        <div className="min-w-0 space-y-3">{tabContent}</div>
+      </DetailScreenShell>
 
       <Modal
         open={projektModal}
@@ -891,68 +752,77 @@ export function AuftragDetailClient({
         ) : null}
       </Modal>
 
-      <Modal
-        open={!!viewEintrag}
-        onClose={() => setViewEintrag(null)}
-        title={viewEintrag?.formular_templates?.name ?? 'Formular'}
-        size="lg"
-      >
-        {viewEintrag ? (
-          <>
-            <p className="-mt-1 mb-4 text-sm text-muted">
-              {viewEintrag.phase
-                ? FORMULAR_PHASE_LABELS[viewEintrag.phase] ?? viewEintrag.phase
-                : '—'}{' '}
-              · {viewEintrag.handwerker?.name ?? '—'}
-            </p>
-            <div className="max-h-[55vh] space-y-2 overflow-y-auto border-t border-border pt-4">
-              {(viewEintrag.formular_templates?.felder ?? []).map((f: FormularFeld) => (
-                <div key={f.id} className="text-sm">
-                  <p className="font-medium text-ink">
-                    {f.label}
-                    {f.pflicht ? ' *' : ''}
-                  </p>
-                  <p className="text-muted">{formatFeldwert(viewEintrag.daten?.[f.id])}</p>
-                </div>
-              ))}
-            </div>
-            {(viewEintrag.foto_urls ?? []).length > 0 ? (
-              <div className="mt-4">
-                <p className="mb-2 text-sm font-medium text-ink">Fotos</p>
-                <div className="flex flex-wrap gap-2">
-                  {(viewEintrag.foto_urls ?? []).map((url, i) => (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-[120px]"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-24 w-full rounded object-cover" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {viewEintrag.bemerkungen ? (
-              <div className="mt-4 text-sm">
-                <p className="font-medium text-ink">Zusätzliche Bemerkungen</p>
-                <p className="text-muted">{viewEintrag.bemerkungen}</p>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </Modal>
-
-      <StatusActions
-        typ="auftrag"
-        status={detail.status}
-        id={detail.id}
-        data={statusActionData}
-        onAction={onStatusAction}
-        disabled={pending}
+      <AbnahmeprotokollModal
+        open={abnahmeModal}
+        onClose={() => setAbnahmeModal(false)}
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        kundeName={name}
+        initialStep={abnahmeModalStep}
+        onDone={() => refresh()}
       />
+
+      <AbschlussdokumentationModal
+        open={abschlussModal}
+        onClose={() => setAbschlussModal(false)}
+        auftragId={detail.id}
+        kundeName={name}
+        onDone={() => refresh()}
+      />
+
+      <RechnungAuswahlModal
+        open={rechnungAuswahlOpen}
+        onClose={() => setRechnungAuswahlOpen(false)}
+        auftragId={detail.id}
+        rechnungen={rechnungenListe}
+        onNeueRechnung={() => {
+          setRechnungAuswahlOpen(false)
+          startTransition(async () => {
+            const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            openRechnungWizard(res.bootstrap)
+          })
+        }}
+        onWeiterbearbeiten={(bootstrap) => {
+          setRechnungAuswahlOpen(false)
+          openRechnungWizard(bootstrap)
+        }}
+      />
+
+      {rechnungWizardOpen && rechnungWizardBootstrap ? (
+        <ClientOnly>
+          <RechnungWizard
+            key={rechnungWizardKey}
+            bootstrap={rechnungWizardBootstrap}
+            gewerke={gewerke as Gewerk[]}
+            preislisten={preislisten}
+            firm={firm}
+            zahlungszielTage={zahlungszielTage}
+            onClose={() => {
+              setRechnungWizardOpen(false)
+              setRechnungWizardBootstrap(null)
+            }}
+            onDone={() => {
+              setRechnungWizardOpen(false)
+              setRechnungWizardBootstrap(null)
+              refresh()
+            }}
+          />
+        </ClientOnly>
+      ) : null}
+
+      <HandwerkerBewertungModal
+        open={hwBewertungZiele != null && hwBewertungZiele.length > 0}
+        onClose={() => setHwBewertungZiele(null)}
+        auftragId={detail.id}
+        ziele={hwBewertungZiele ?? []}
+        onSaved={() => refresh()}
+      />
+
+      {mailCompose.modal}
     </div>
   )
 }
