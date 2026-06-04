@@ -180,7 +180,7 @@ export async function acceptNachtragByToken(token: string): Promise<{ ok: true }
   if (internTo) {
     await sendEmailHtml({
       to: internTo,
-      subject: `✅ Nachtrag bestätigt: ${payload.kunde.name}`,
+      subject: `Nachtrag bestätigt: ${payload.kunde.name}`,
       html: `<p>Nachtrag akzeptiert für Auftrag <strong>${payload.auftragId.slice(0, 8)}</strong>.</p>
         <p>Kundin: ${payload.kunde.name}<br/>Summe: ${summeTxt}<br/>IP: ${ip}</p>`,
     })
@@ -326,7 +326,7 @@ export async function sendNachtragEmailAnKunde(
   const { data: n, error } = await supabaseAdmin
     .from('nachtraege')
     .select(
-      'token, grund, positionen, gesamt_min, gesamt_max, auftraege(kunden(email, name))'
+      'token, grund, positionen, gesamt_min, gesamt_max, auftraege(kunden(email, name, typ))'
     )
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
@@ -335,19 +335,22 @@ export async function sendNachtragEmailAnKunde(
   if (error || !n) return { ok: false, message: 'Nachtrag nicht gefunden' }
 
   const row = n as Record<string, unknown>
-  const auf = row.auftraege as { kunden?: { email?: string | null; name?: string } } | null
+  const auf = row.auftraege as {
+    kunden?: { email?: string | null; name?: string; typ?: string | null } | null
+  } | null
   const email = auf?.kunden?.email?.trim()
   if (!email) return { ok: false, message: 'Kunden-E-Mail fehlt' }
 
   const token = String(row.token)
   const link = absUrl(`/nachtrag/${token}`)
   const pos = normalizeAngebotPositionen(row.positionen ?? [])
-  const name = auf?.kunden?.name?.split(/\s+/)[0] ?? auf?.kunden?.name ?? 'Kundin'
+  const name = auf?.kunden?.name?.trim() || 'Kundin/Kunde'
 
   const branding = await getMailBranding(supabaseAdmin)
   const tpl = mailNachtrag(
     {
       name,
+      kundeTyp: auf?.kunden?.typ ?? null,
       grund: String(row.grund ?? ''),
       positionen: pos.map((p) => ({
         beschreibung: p.beschreibung,
@@ -395,25 +398,28 @@ export async function sendNachtragErinnerungAnKunde(
 
   const { data: n, error } = await supabaseAdmin
     .from('nachtraege')
-    .select('token, grund, positionen, gesamt_min, gesamt_max, auftraege(kunden(email, name))')
+    .select('token, grund, positionen, gesamt_min, gesamt_max, auftraege(kunden(email, name, typ))')
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
 
   if (error || !n) return { ok: false, message: 'Nachtrag nicht gefunden' }
   const row = n as Record<string, unknown>
-  const auf = row.auftraege as { kunden?: { email?: string | null; name?: string } } | null
+  const auf = row.auftraege as {
+    kunden?: { email?: string | null; name?: string; typ?: string | null } | null
+  } | null
   const email = auf?.kunden?.email?.trim()
   if (!email) return { ok: false, message: 'Kunden-E-Mail fehlt' }
 
   const link = absUrl(`/nachtrag/${String(row.token)}`)
   const pos = normalizeAngebotPositionen(row.positionen ?? [])
-  const name = auf?.kunden?.name?.split(/\s+/)[0] ?? auf?.kunden?.name ?? 'Kundin'
+  const name = auf?.kunden?.name?.trim() || 'Kundin/Kunde'
 
   const branding = await getMailBranding(supabaseAdmin)
   const tpl = mailNachtrag(
     {
       name,
+      kundeTyp: auf?.kunden?.typ ?? null,
       grund: `Erinnerung: ${String(row.grund ?? '')}`,
       positionen: pos.map((p) => ({
         beschreibung: p.beschreibung,
@@ -506,7 +512,7 @@ export async function createBaustopp(input: {
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
     typ: 'baustopp',
-    titel: `🌧️ Baustopp: ${typLabel}`,
+    titel: `Baustopp: ${typLabel}`,
     beschreibung: `${input.grund}\nVerzögerung ca. ${verzug} Tage\nNeues Enddatum: ${input.neues_enddatum}`,
     erstellt_von: uid,
     sichtbar_fuer_kunde: input.kunde_informiert,
@@ -576,44 +582,3 @@ export async function beendeBaustopp(
   return { ok: true }
 }
 
-export async function saveVorBaubeginnProtokoll(input: {
-  auftragId: string
-  adresse: string
-  datum: string
-  bereiche_dokumentiert: string[]
-  vorhandene_schaeden: string
-  besonderheiten: string
-  foto_urls: string[]
-  kunde_informiert: boolean
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const uid = (await createClient().auth.getUser()).data.user?.id ?? null
-  if (!uid) return { ok: false, message: 'Nicht angemeldet' }
-
-  const { error } = await supabaseAdmin.from('vor_baubeginn_protokolle').insert({
-    auftrag_id: input.auftragId,
-    erstellt_von: uid,
-    adresse: input.adresse.trim() || null,
-    datum: input.datum,
-    bereiche_dokumentiert: input.bereiche_dokumentiert,
-    vorhandene_schaeden: input.vorhandene_schaeden.trim() || null,
-    besonderheiten: input.besonderheiten.trim() || null,
-    foto_urls: input.foto_urls,
-    kunde_informiert: input.kunde_informiert,
-    abgeschlossen: true,
-  })
-
-  if (error) return { ok: false, message: error.message }
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: input.auftragId,
-    typ: 'vor_baubeginn_protokoll',
-    titel: 'Vor-Baubeginn Protokoll erstellt',
-    beschreibung: `${input.foto_urls.length} Foto(s) · ${input.datum}`,
-    foto_urls: input.foto_urls,
-    erstellt_von: uid,
-    sichtbar_fuer_kunde: false,
-  })
-
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true }
-}

@@ -2,7 +2,70 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import {
+  dedupeNeueLeistungInputs,
+  normLeistungKey,
+  preisFromVkNetto,
+  type NeueLeistungSyncInput,
+} from '@/lib/preislisten/sync-neue-leistungen'
 import { toSlug } from '@/lib/utils'
+
+/** Frei erfasste Leistungen in die Preisliste übernehmen (kein Duplikat pro Gewerk + Name). */
+export async function syncNeueLeistungenToPreisliste(
+  inputs: NeueLeistungSyncInput[]
+): Promise<{ ok: true; created: number } | { ok: false; message: string }> {
+  const pending = dedupeNeueLeistungInputs(inputs)
+  if (!pending.length) return { ok: true, created: 0 }
+
+  const supabase = createClient()
+  const gewerkIds = Array.from(new Set(pending.map((p) => p.gewerk_id.trim())))
+
+  const { data: existing, error: loadErr } = await supabase
+    .from('preislisten')
+    .select('gewerk_id, leistung')
+    .in('gewerk_id', gewerkIds)
+    .eq('aktiv', true)
+
+  if (loadErr) return { ok: false, message: loadErr.message }
+
+  const known = new Set(
+    (existing ?? []).map((r) =>
+      normLeistungKey(String(r.gewerk_id), String(r.leistung ?? ''))
+    )
+  )
+
+  let created = 0
+  for (const row of pending) {
+    const key = normLeistungKey(row.gewerk_id, row.leistung)
+    if (known.has(key)) continue
+
+    const preis_min = preisFromVkNetto(row.vkNetto)
+    const { error } = await supabase.from('preislisten').insert({
+      gewerk_id: row.gewerk_id.trim(),
+      kategorie: '',
+      leistung: row.leistung.trim(),
+      einheit: (row.einheit || 'Stk.').trim(),
+      preis_min,
+      aktiv: true,
+    })
+
+    if (error) {
+      console.warn('[syncNeueLeistungenToPreisliste]', error.message, row.leistung)
+      continue
+    }
+
+    known.add(key)
+    created += 1
+  }
+
+  if (created > 0) {
+    revalidatePath('/preislisten')
+    revalidatePath('/einstellungen/gewerke')
+    revalidatePath('/angebote/neu')
+  }
+
+  return { ok: true, created }
+}
 
 export async function updatePreisliste(
   id: string,
@@ -12,7 +75,6 @@ export async function updatePreisliste(
     leistung?: string
     einheit?: string
     preis_min?: number
-    preis_max?: number
     aktiv?: boolean
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -30,7 +92,6 @@ export async function createPreisliste(input: {
   leistung: string
   einheit: string
   preis_min: number
-  preis_max: number
   aktiv?: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -42,7 +103,6 @@ export async function createPreisliste(input: {
       leistung: input.leistung.trim(),
       einheit: input.einheit.trim(),
       preis_min: input.preis_min,
-      preis_max: input.preis_max,
       aktiv: input.aktiv ?? true,
     })
     .select('id')

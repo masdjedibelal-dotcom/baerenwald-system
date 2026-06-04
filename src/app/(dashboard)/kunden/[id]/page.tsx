@@ -1,35 +1,40 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { KundeDetailClient } from '@/components/kunden/KundeDetailClient'
 import { loadKundeDetail } from '@/lib/kunden/load-kunde-detail'
 import { getCustomFields, getCustomValues } from '@/lib/custom-fields'
+import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const kunde = await loadKundeDetail(id)
+  return { title: kunde?.name?.trim() ? kunde.name : 'Kunde' }
+}
 
 export default async function KundeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const kunde = await loadKundeDetail(id)
   if (!kunde) notFound()
 
-  const [customFieldDefs, customValues] = await Promise.all([
+  const [customFieldDefs, customValues, kundenObjekte] = await Promise.all([
     getCustomFields('kunde'),
     getCustomValues(id),
+    istKundeGewerbeTyp(kunde.typ) ? fetchKundenObjekte(id) : Promise.resolve([]),
   ])
 
   return (
     <div>
-      <PageHeader
-        title={kunde.name}
-        breadcrumbs={[
-          { label: 'Kunden', href: '/kunden' },
-          { label: kunde.kundennummer ?? kunde.name },
-        ]}
-        action={
-          <Link href="/kunden" className="btn btn-secondary btn-sm">
-            ← Zur Liste
-          </Link>
-        }
+      <KundeDetailClient
+        kunde={kunde}
+        customFieldDefs={customFieldDefs}
+        customValues={customValues}
+        kundenObjekte={kundenObjekte}
       />
-      <KundeDetailClient kunde={kunde} customFieldDefs={customFieldDefs} customValues={customValues} />
     </div>
   )
 }

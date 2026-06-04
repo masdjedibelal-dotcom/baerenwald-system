@@ -15,6 +15,7 @@ export async function saveKalenderTermin(input: {
   beschreibung: string | null
   lead_id: string | null
   auftrag_id: string | null
+  zugewiesen_an?: string | null
   erledigt?: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -28,6 +29,7 @@ export async function saveKalenderTermin(input: {
     beschreibung: input.beschreibung,
     lead_id: input.lead_id,
     auftrag_id: input.auftrag_id,
+    zugewiesen_an: input.zugewiesen_an?.trim() || null,
     erledigt: input.erledigt ?? false,
   }
 

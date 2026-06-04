@@ -2,11 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/mail-branding'
 import { mailUpdateHinweis } from '@/lib/mail-templates'
-import { sendMail } from '@/lib/mail-service'
-import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
+import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
+
+type ServerRuntime = typeof import('@/lib/server-runtime')
+
+async function serverRuntime(): Promise<ServerRuntime> {
+  return import('@/lib/server-runtime')
+}
 
 async function assertAuftragZugriff(auftragId: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -24,6 +28,7 @@ export async function ensureKundenTokenAction(
 ): Promise<{ ok: true; token: string; url: string } | { ok: false; message: string }> {
   const gate = await assertAuftragZugriff(auftragId)
   if (!gate.ok) return gate
+  const { ensureKundenTokenForAuftrag } = await serverRuntime()
   const token = await ensureKundenTokenForAuftrag(auftragId)
   if (!token) return { ok: false, message: 'Token konnte nicht erzeugt werden' }
   revalidatePath(`/auftraege/${auftragId}`)
@@ -38,6 +43,8 @@ export async function setTimelineKundenfreigabe(input: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await assertAuftragZugriff(input.auftragId)
   if (!gate.ok) return gate
+
+  const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag } = await serverRuntime()
 
   const supabase = createClient()
   const now = new Date().toISOString()
@@ -55,17 +62,23 @@ export async function setTimelineKundenfreigabe(input: {
   if (input.fuerKunde && input.kundeBenachrichtigen) {
     const { data: auf } = await supabaseAdmin
       .from('auftraege')
-      .select('kunden_token, kunde_id, kunden(name, email)')
+      .select('kunden_token, kunde_id, kunden(name, email, typ)')
       .eq('id', input.auftragId)
       .maybeSingle()
-    const kunden = auf?.kunden as { name?: string; email?: string | null } | null
+    const kunden = auf?.kunden as { name?: string; email?: string | null; typ?: string | null } | null
     const email = kunden?.email?.trim()
     const token = (auf?.kunden_token as string | null) ?? (await ensureKundenTokenForAuftrag(input.auftragId))
     if (email && token) {
-      const vorname = (kunden?.name ?? 'Guten Tag').trim().split(/\s+/)[0] || 'Guten Tag'
       const link = projektUrlFromToken(token)
       const branding = await getMailBranding(supabaseAdmin)
-      const tpl = mailUpdateHinweis({ name: vorname, statusLink: link }, branding)
+      const tpl = mailUpdateHinweis(
+        {
+          name: (kunden?.name ?? 'Kundin/Kunde').trim(),
+          statusLink: link,
+          kundeTyp: kunden?.typ ?? null,
+        },
+        branding
+      )
       await sendMail({
         typ: 'update_hinweis',
         an: email,
@@ -86,22 +99,30 @@ export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ o
   const gate = await assertAuftragZugriff(auftragId)
   if (!gate.ok) return gate
 
+  const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag } = await serverRuntime()
+
   const token = await ensureKundenTokenForAuftrag(auftragId)
   if (!token) return { ok: false, message: 'Kein Kunden-Link' }
 
   const { data: auf } = await supabaseAdmin
     .from('auftraege')
-    .select('kunde_id, kunden(name, email)')
+    .select('kunde_id, kunden(name, email, typ)')
     .eq('id', auftragId)
     .maybeSingle()
-  const kunden = auf?.kunden as { name?: string; email?: string | null } | null
+  const kunden = auf?.kunden as { name?: string; email?: string | null; typ?: string | null } | null
   const email = kunden?.email?.trim()
   if (!email) return { ok: false, message: 'Keine Kunden-E-Mail' }
 
-  const vorname = (kunden?.name ?? 'Guten Tag').trim().split(/\s+/)[0] || 'Guten Tag'
   const link = projektUrlFromToken(token)
   const branding = await getMailBranding(supabaseAdmin)
-  const tpl = mailUpdateHinweis({ name: vorname, statusLink: link }, branding)
+  const tpl = mailUpdateHinweis(
+    {
+      name: (kunden?.name ?? 'Kundin/Kunde').trim(),
+      statusLink: link,
+      kundeTyp: kunden?.typ ?? null,
+    },
+    branding
+  )
   const sent = await sendMail({
     typ: 'update_hinweis',
     an: email,

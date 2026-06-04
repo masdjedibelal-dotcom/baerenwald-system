@@ -26,7 +26,18 @@ export async function saveEinstellungen(
   }))
 
   const { error } = await supabase.from('einstellungen').upsert(payload, { onConflict: 'key' })
-  if (error) return { ok: false, message: error.message }
+  if (error) {
+    const raw = error.message
+    const fehltTabelle =
+      /einstellungen/i.test(raw) &&
+      (/schema cache|could not find|does not exist|relation/i.test(raw))
+    return {
+      ok: false,
+      message: fehltTabelle
+        ? 'Die Tabelle „einstellungen“ fehlt in Supabase. Im SQL Editor die Datei scripts/sql/einstellungen-setup.sql ausführen (oder Migration 20260217120000_rechnungen_einstellungen.sql), danach Seite neu laden.'
+        : raw,
+    }
+  }
   revalidatePath('/einstellungen')
   revalidatePath('/einstellungen/firma')
   revalidatePath('/angebote')

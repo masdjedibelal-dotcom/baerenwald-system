@@ -11,8 +11,12 @@ export default function DashboardError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Im Browser steht oft nur die generische RSC-Meldung; der echte Stack steht in den Server-Logs.
-    console.error('[Dashboard error]', error.digest ?? '(kein digest)', error.message)
+    // Im Browser steht oft nur die generische RSC-Meldung; der echte Stack steht in den Server-Logs (Terminal).
+    console.error('[Dashboard error]', {
+      digest: error.digest ?? null,
+      message: error.message,
+      stack: error.stack,
+    })
   }, [error])
 
   return (
@@ -21,6 +25,13 @@ export default function DashboardError({
       <p className="mt-2 text-sm text-muted">
         Bitte erneut versuchen oder zur Übersicht wechseln.
       </p>
+      {error.message?.includes('Loading chunk') ? (
+        <p className="mt-2 text-left text-xs text-muted">
+          Bei <strong>ChunkLoadError</strong>: Dev-Server stoppen, im Projektordner{' '}
+          <code className="rounded bg-canvas px-1">npm run dev:clean</code> ausführen, dann Hard-Reload (
+          <code className="rounded bg-canvas px-1">Cmd+Shift+R</code>).
+        </p>
+      ) : null}
       <p className="mt-3 text-left text-xs text-muted">
         Die Zeile mit <code className="rounded bg-canvas px-1">2117-….js</code> kommt vom gebündelten Next.js-Code im
         Browser. Sie ist <strong>kein</strong> Hinweis auf die Ursache — Server-Component-Fehler werden in Production

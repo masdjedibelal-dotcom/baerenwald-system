@@ -18,6 +18,7 @@ function normalizePreislistenRow(r: Record<string, unknown>): Preisliste {
   }
 }
 
+/** Editor — primärer Einstieg über Einstellungen → Preislisten. */
 export default async function PreislistenPage() {
   const supabase = createClient()
   const [{ data: rows, error }, { data: gewerke }] = await Promise.all([
@@ -34,11 +35,6 @@ export default async function PreislistenPage() {
       <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
         <p className="font-medium">Preislisten konnten nicht geladen werden.</p>
         <p className="mt-1 opacity-90">{error.message}</p>
-        <p className="mt-2 text-xs opacity-80">
-          Falls die Spalte <code className="rounded bg-canvas px-1">kategorie</code> fehlt: Migration{' '}
-          <code className="rounded bg-canvas px-1">20260217140000_preislisten_kategorie.sql</code>{' '}
-          ausführen.
-        </p>
       </div>
     )
   }
@@ -47,5 +43,9 @@ export default async function PreislistenPage() {
   const normalized = (rows ?? []).map((r) => normalizePreislistenRow(r as Record<string, unknown>))
   const sorted = sortPreislistenRows(normalized)
 
-  return <PreislistenClient initialRows={sorted} gewerkeAlle={gw} />
+  return (
+    <div className="rounded-xl bg-app-grouped p-4 md:p-6">
+      <PreislistenClient initialRows={sorted} gewerkeAlle={gw} />
+    </div>
+  )
 }

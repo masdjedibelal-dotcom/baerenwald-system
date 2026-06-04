@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,19 +13,27 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const devError = searchParams.get('dev_error')
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!cancelled && data.session?.user) {
+      try {
+        // getUser() validiert gegen Supabase-Server; bei DNS-/Netzwerkfehler wirft es,
+        // so dass wir KEIN Auto-Redirect machen → kein Loop mit der Middleware.
+        const { data, error } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (error || !data.user) return
         router.replace('/')
+      } catch {
+        // Supabase nicht erreichbar → User bleibt auf /login.
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [router, supabase.auth])
+  }, [router, supabase])
 
   const handleLogin = async () => {
     setLoading(true)
@@ -49,8 +58,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bw-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-bw-accent text-xl font-bold text-white">
-            B
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-bw-bg p-2">
+            <BrandLogo variant="green" height={40} priority />
           </div>
           <h1 className="text-xl font-semibold text-bw-text">Bärenwald CRM</h1>
           <p className="mt-1 text-sm text-bw-light">München</p>
@@ -84,6 +93,11 @@ export default function LoginPage() {
               />
             </div>
 
+            {devError ? (
+              <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
+                Dev-Auto-Login fehlgeschlagen: {decodeURIComponent(devError)}
+              </div>
+            ) : null}
             {error ? (
               <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">{error}</div>
             ) : null}

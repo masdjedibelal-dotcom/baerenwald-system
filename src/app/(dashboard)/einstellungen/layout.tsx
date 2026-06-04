@@ -1,10 +1,21 @@
-import { EinstellungenSettingsNav } from '@/components/einstellungen/EinstellungenSettingsNav'
+import { EinstellungenTabNav } from '@/components/einstellungen/EinstellungenTabNav'
+import { loadBenutzerListe } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 
-export default function EinstellungenLayout({ children }: { children: React.ReactNode }) {
+export default async function EinstellungenLayout({ children }: { children: React.ReactNode }) {
+  let teamCount = 0
+  try {
+    const team = await loadBenutzerListe()
+    teamCount = team.length
+  } catch {
+    teamCount = 0
+  }
+
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-      <EinstellungenSettingsNav />
-      <div className="min-w-0 flex-1">{children}</div>
+    <div className="mx-auto max-w-[1100px]">
+      <div className="-mx-4 md:mx-0">
+        <EinstellungenTabNav teamCount={teamCount} />
+      </div>
+      <div className="min-w-0 rounded-xl bg-app-grouped p-4 md:p-6">{children}</div>
     </div>
   )
 }

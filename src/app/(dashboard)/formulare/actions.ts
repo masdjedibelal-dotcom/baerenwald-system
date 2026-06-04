@@ -16,7 +16,6 @@ const STANDARD_NAMES = [
   'Bad & Sanitär — Vorab',
   'Heizung — Vorab',
   'Allgemein — Abnahme',
-  'Betreuer — Vor Ort',
 ] as const
 
 function standardFelderBad(): FormularFeld[] {
@@ -59,18 +58,6 @@ function standardFelderAbnahme(): FormularFeld[] {
     },
     { id: 'ab_fotos', label: 'Fotos Endzustand', typ: 'foto', pflicht: false },
     { id: 'ab_bem', label: 'Bemerkungen', typ: 'textarea', pflicht: false },
-  ]
-}
-
-function standardFelderBetreuer(): FormularFeld[] {
-  return [
-    { id: 'bt_adr', label: 'Adresse bestätigt', typ: 'checkbox', pflicht: true },
-    { id: 'bt_zugang', label: 'Zugang möglich', typ: 'checkbox', pflicht: true },
-    { id: 'bt_zugang_hin', label: 'Zugangshinweise', typ: 'textarea', pflicht: false },
-    { id: 'bt_bausubstanz', label: 'Besonderheiten Bausubstanz', typ: 'textarea', pflicht: false },
-    { id: 'bt_abw_check', label: 'Geschätzter Aufwand abweichend', typ: 'checkbox', pflicht: false },
-    { id: 'bt_abw_txt', label: 'Abweichung Beschreibung', typ: 'textarea', pflicht: false },
-    { id: 'bt_fotos', label: 'Fotos vor Ort', typ: 'foto', pflicht: false },
   ]
 }
 
@@ -127,17 +114,6 @@ export async function ensureStandardFormularTemplates(): Promise<void> {
       subtyp: 'abnahme',
       phase: 'abnahme',
       felder: standardFelderAbnahme(),
-      aktiv: true,
-    })
-  }
-  if (!have.has('Betreuer — Vor Ort')) {
-    candidates.push({
-      name: 'Betreuer — Vor Ort',
-      gewerk_id: null,
-      typ: 'betreuer',
-      subtyp: 'checkliste',
-      phase: 'vorab',
-      felder: standardFelderBetreuer(),
       aktiv: true,
     })
   }
@@ -202,33 +178,6 @@ export async function saveFormularTemplate(input: {
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Speichern fehlgeschlagen' }
   }
-}
-
-export async function loadBetreuerVorabTemplate(): Promise<FormularTemplate | null> {
-  const supabase = createClient()
-  const { data: exact } = await supabase
-    .from('formular_templates')
-    .select('*')
-    .eq('name', 'Betreuer — Vor Ort')
-    .eq('aktiv', true)
-    .maybeSingle()
-
-  let row = exact
-  if (!row) {
-    const { data: anyBetreuer } = await supabase
-      .from('formular_templates')
-      .select('*')
-      .eq('typ', 'betreuer')
-      .eq('aktiv', true)
-      .order('name', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    row = anyBetreuer
-  }
-
-  if (!row) return null
-  const t = row as FormularTemplate & { felder: unknown }
-  return { ...t, felder: parseFelder(t.felder) }
 }
 
 export async function deleteFormularTemplate(

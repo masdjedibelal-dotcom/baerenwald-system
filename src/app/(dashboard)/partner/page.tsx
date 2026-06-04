@@ -1,38 +1,10 @@
-import { createClient } from '@/lib/supabase-server'
-import {
-  PartnerNetzwerkClient,
-  type PartnerKategorie,
-  type PartnerRow,
-} from '@/components/partner/PartnerNetzwerkClient'
+import type { Metadata } from 'next'
 
-export default async function PartnerPage() {
-  const supabase = createClient()
-  const { data: partners, error: pErr } = await supabase
-    .from('partner')
-    .select('*, partner_kategorien(name, slug, sort_order)')
-    .order('name')
+export const metadata: Metadata = {
+  title: 'Partner',
+}
 
-  const { data: kategorien, error: kErr } = await supabase
-    .from('partner_kategorien')
-    .select('id, name, slug, sort_order')
-    .order('sort_order', { ascending: true })
-
-  if (pErr || kErr) {
-    return (
-      <div className="rounded-lg border border-status-cancel-bg bg-status-cancel-bg/30 p-4 text-sm text-status-cancel-text">
-        Partner konnten nicht geladen werden: {pErr?.message ?? kErr?.message}
-      </div>
-    )
-  }
-
-  const sorted = [...(partners ?? [])].sort((a, b) => {
-    const ao = (a as PartnerRow).partner_kategorien?.sort_order ?? 999
-    const bo = (b as PartnerRow).partner_kategorien?.sort_order ?? 999
-    if (ao !== bo) return ao - bo
-    return (a as PartnerRow).name.localeCompare((b as PartnerRow).name, 'de')
-  })
-
-  return (
-    <PartnerNetzwerkClient partners={sorted as PartnerRow[]} kategorien={(kategorien ?? []) as PartnerKategorie[]} />
-  )
+/** Listen-Inhalt kommt aus `partner/layout.tsx` (Master-Detail ab 900px). */
+export default function PartnerPage() {
+  return null
 }

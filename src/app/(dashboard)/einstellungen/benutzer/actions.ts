@@ -7,6 +7,7 @@ export type BenutzerZeile = {
   id: string
   email: string
   name: string
+  telefon: string
   rolle: 'admin' | 'manager'
   aktiv: boolean
 }
@@ -18,13 +19,28 @@ export async function loadBenutzerListe(): Promise<BenutzerZeile[]> {
       console.warn('loadBenutzerListe', error.message)
       return []
     }
+    const ids = (data.users ?? []).map((u) => u.id)
+    const telById = new Map<string, string>()
+    if (ids.length) {
+      const { data: profiles } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, telefon')
+        .in('id', ids)
+      for (const p of profiles ?? []) {
+        telById.set(p.id as string, (p.telefon as string)?.trim() || '')
+      }
+    }
+
     return (data.users ?? []).map((u) => {
-    const meta = u.user_metadata as { name?: string; role?: string } | null
+    const meta = u.user_metadata as { name?: string; role?: string; telefon?: string; handy?: string; phone?: string } | null
     const roleRaw = meta?.role === 'admin' ? 'admin' : 'manager'
+    const metaTel =
+      meta?.telefon?.trim() || meta?.handy?.trim() || meta?.phone?.trim() || ''
     return {
       id: u.id,
       email: u.email ?? '',
       name: meta?.name?.trim() || u.email?.split('@')[0] || '—',
+      telefon: telById.get(u.id) || metaTel,
       rolle: roleRaw,
       aktiv: !u.banned_until,
     }
@@ -54,20 +70,33 @@ export async function inviteBenutzer(
 
 export async function updateBenutzerProfil(
   id: string,
-  patch: { name: string; rolle: 'admin' | 'manager' }
+  patch: { name: string; rolle: 'admin' | 'manager'; telefon?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
   if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
   const prev = (user.user.user_metadata ?? {}) as Record<string, unknown>
+  const telefon = patch.telefon?.trim() ?? ''
   const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
     user_metadata: {
       ...prev,
       name: patch.name.trim(),
       role: patch.rolle,
+      telefon: telefon || undefined,
     },
   })
   if (error) return { ok: false, message: error.message }
+
+  const email = user.user.email?.trim() || null
+  await supabaseAdmin.from('user_profiles').upsert({
+    id,
+    name: patch.name.trim(),
+    telefon: telefon || null,
+    phone: telefon || null,
+    email,
+  })
+
   revalidatePath('/einstellungen/benutzer')
+  revalidatePath('/einstellungen/profil')
   return { ok: true }
 }
 

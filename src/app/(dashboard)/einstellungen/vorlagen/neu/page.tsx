@@ -8,7 +8,7 @@ export default async function VorlageNeuPage() {
     supabase.from('gewerke').select('id, name, slug, aktiv').eq('aktiv', true).order('name'),
     supabase
       .from('preislisten')
-      .select('id, gewerk_id, leistung, einheit, preis_min, preis_max, aktiv, gewerke(id,name,slug)')
+      .select('id, gewerk_id, leistung, einheit, preis_min, aktiv, gewerke(id,name,slug)')
       .eq('aktiv', true),
     supabase
       .from('handwerker')

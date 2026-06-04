@@ -3,205 +3,28 @@
 import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { buildAbnahmePdfZusatz } from '@/lib/auftraege/abnahme-protokoll-zusatz'
-import { renderAbnahmeProtokollPdfBuffer } from '@/lib/pdf/abnahme-protokoll-pdf'
 import { buildInternFormularSubmittedHtml, sendEmailHtml } from '@/lib/auftraege/emails'
 import { getMailBranding } from '@/lib/mail-branding'
 import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
 import {
-  mailAbnahme,
   mailAuftragsbestaetigung,
   mailHandwerkerFormular,
   mailUpdateHinweis,
 } from '@/lib/mail-templates'
-import { sendMail } from '@/lib/mail-service'
-import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
 import { AUFTRAG_STATUS_LABELS, FORMULAR_PHASE_LABELS, getPublicAppUrl } from '@/lib/utils'
 import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
-import type {
-  AngebotPosition,
-  AuftragDetail,
-  AuftragPosition,
-  AuftragStatus,
-  AuftragTimelineEvent,
-  FormularEintrag,
-  FormularTemplate,
-  Kunde,
-} from '@/lib/types'
-import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import type { AuftragDetail, AuftragPosition, AuftragStatus, FormularEintrag, Kunde } from '@/lib/types'
 
-function parsePositionen(raw: unknown): AngebotPosition[] {
-  return normalizeAngebotPositionen(raw)
+type ServerRuntime = typeof import('@/lib/server-runtime')
+
+async function serverRuntime(): Promise<ServerRuntime> {
+  return import('@/lib/server-runtime')
 }
 
-export async function loadAuftragDetail(id: string): Promise<AuftragDetail | null> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('auftraege')
-    .select(
-      `
-      *,
-      kunden(*),
-      angebote(*),
-      auftrag_handwerker(
-        *,
-        handwerker(id, name, email, telefon, firma),
-        gewerke(id, name, slug)
-      ),
-      formular_eintraege(
-        *,
-        formular_templates(id, name, phase, typ, subtyp, felder, gewerk_id, aktiv),
-        handwerker(name),
-        gewerke(name)
-      ),
-      kalender_termine(*),
-      auftrag_timeline(
-        id, auftrag_id, typ, titel, beschreibung, foto_urls,
-        erstellt_von, handwerker_id, sichtbar_fuer_kunde,
-        fuer_kunde_freigegeben, freigegeben_at, created_at
-      ),
-      punch_list(
-        id, auftrag_id, gewerk_id, beschreibung, status, prioritaet,
-        foto_urls, foto_nachher_urls, behoben_at, behoben_von, created_at,
-        gewerke(id, name, slug)
-      ),
-      nachtraege(
-        id, auftrag_id, token, grund, beschreibung, positionen, gesamt_min, gesamt_max,
-        status, gesendet_at, akzeptiert_at, abgelehnt_at,
-        kunde_bestaetigt_at, kunde_ip, handwercher_bestaetigt, handwercher_bestaetigt_at, abgelehnt_grund,
-        created_at
-      ),
-      vor_baubeginn_protokolle(*),
-      baustopps(*),
-      einbehalte(
-        *,
-        handwerker(id, name, firma),
-        buergschaften(*)
-      ),
-      eingangsrechnungen(*),
-      auftrag_milestones(*),
-      hw_formular_tabs(
-        *,
-        hw_formular_einreichungen(*)
-      ),
-      auftrag_positionen(
-        *,
-        handwerker(id, name)
-      )
-    `
-    )
-    .eq('id', id)
-    .maybeSingle()
-
-  if (error || !data) return null
-  const row = data as AuftragDetail & { angebote?: { positionen?: unknown } | null }
-  const ang = row.angebote
-  const tl = [...(row.auftrag_timeline ?? [])] as AuftragTimelineEvent[]
-  tl.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  const milestones = [...(row.auftrag_milestones ?? [])].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-  )
-  const positionenSorted = [...(row.auftrag_positionen ?? [])].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-  ) as AuftragPosition[]
-  return {
-    ...row,
-    auftrag_timeline: tl,
-    auftrag_milestones: milestones,
-    auftrag_positionen: positionenSorted,
-    angebote: ang
-      ? {
-          ...ang,
-          positionen: parsePositionen(ang.positionen),
-        }
-      : null,
-  }
-}
-
-async function loadAuftragDetailAdmin(id: string): Promise<AuftragDetail | null> {
-  const { data, error } = await supabaseAdmin
-    .from('auftraege')
-    .select(
-      `
-      *,
-      kunden(*),
-      angebote(*),
-      auftrag_handwerker(
-        *,
-        handwerker(id, name, email, telefon, firma),
-        gewerke(id, name, slug)
-      ),
-      formular_eintraege(
-        *,
-        formular_templates(id, name, phase, typ, subtyp, felder, gewerk_id, aktiv),
-        handwerker(name),
-        gewerke(name)
-      ),
-      kalender_termine(*),
-      auftrag_timeline(
-        id, auftrag_id, typ, titel, beschreibung, foto_urls,
-        erstellt_von, handwerker_id, sichtbar_fuer_kunde,
-        fuer_kunde_freigegeben, freigegeben_at, created_at
-      ),
-      punch_list(
-        id, auftrag_id, gewerk_id, beschreibung, status, prioritaet,
-        foto_urls, foto_nachher_urls, behoben_at, behoben_von, created_at,
-        gewerke(id, name, slug)
-      ),
-      nachtraege(
-        id, auftrag_id, token, grund, beschreibung, positionen, gesamt_min, gesamt_max,
-        status, gesendet_at, akzeptiert_at, abgelehnt_at,
-        kunde_bestaetigt_at, kunde_ip, handwercher_bestaetigt, handwercher_bestaetigt_at, abgelehnt_grund,
-        created_at
-      ),
-      vor_baubeginn_protokolle(*),
-      baustopps(*),
-      einbehalte(
-        *,
-        handwerker(id, name, firma),
-        buergschaften(*)
-      ),
-      eingangsrechnungen(*),
-      auftrag_milestones(*),
-      hw_formular_tabs(
-        *,
-        hw_formular_einreichungen(*)
-      ),
-      auftrag_positionen(
-        *,
-        handwerker(id, name)
-      )
-    `
-    )
-    .eq('id', id)
-    .maybeSingle()
-
-  if (error || !data) return null
-  const row = data as AuftragDetail & { angebote?: { positionen?: unknown } | null }
-  const ang = row.angebote
-  const tl = [...(row.auftrag_timeline ?? [])] as AuftragTimelineEvent[]
-  tl.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  const milestones = [...(row.auftrag_milestones ?? [])].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-  )
-  const positionenSorted = [...(row.auftrag_positionen ?? [])].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-  ) as AuftragPosition[]
-  return {
-    ...row,
-    auftrag_timeline: tl,
-    auftrag_milestones: milestones,
-    auftrag_positionen: positionenSorted,
-    angebote: ang
-      ? {
-          ...ang,
-          positionen: parsePositionen(ang.positionen),
-        }
-      : null,
-  }
+async function fetchAuftragDetail(id: string): Promise<AuftragDetail | null> {
+  const { loadAuftragDetail } = await import('@/app/(dashboard)/auftraege/auftraege-data')
+  return loadAuftragDetail(id)
 }
 
 export async function updateAuftragNotizen(
@@ -326,6 +149,27 @@ export async function updateAuftragFortschrittManual(
   return { ok: true }
 }
 
+export async function updateAuftragBetreuer(
+  auftragId: string,
+  betreuerId: string | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const id = betreuerId?.trim() || null
+  const { error } = await supabase
+    .from('auftraege')
+    .update({ betreuer_id: id, updated_at: new Date().toISOString() })
+    .eq('id', auftragId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+  return { ok: true }
+}
+
 export async function updateAuftragProjektFelder(
   auftragId: string,
   patch: { titel?: string | null; start_datum?: string | null; end_datum?: string | null }
@@ -347,6 +191,8 @@ export async function addAuftragPosition(
   data: {
     gewerk_slug?: string | null
     gewerk_name: string
+    gewerk_block_key?: string | null
+    projekt_phase?: string | null
     oberkategorie?: string | null
     unterkategorie?: string | null
     leistung_name: string
@@ -354,8 +200,11 @@ export async function addAuftragPosition(
     einheit?: string | null
     menge?: number | null
     preis_fix?: number | null
+    preis_partner?: number | null
     lohn_fix?: number | null
     material_fix?: number | null
+    start_datum?: string | null
+    end_datum?: string | null
     handwerker_id?: string | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -372,6 +221,8 @@ export async function addAuftragPosition(
     auftrag_id: auftragId,
     gewerk_slug: data.gewerk_slug?.trim() || null,
     gewerk_name: data.gewerk_name.trim(),
+    gewerk_block_key: data.gewerk_block_key?.trim() || null,
+    projekt_phase: data.projekt_phase?.trim() || null,
     oberkategorie: data.oberkategorie?.trim() || null,
     unterkategorie: data.unterkategorie?.trim() || null,
     leistung_name: data.leistung_name.trim(),
@@ -379,8 +230,11 @@ export async function addAuftragPosition(
     einheit: data.einheit?.trim() || 'pauschal',
     menge: data.menge ?? 1,
     preis_fix: data.preis_fix ?? null,
+    preis_partner: data.preis_partner ?? null,
     lohn_fix: data.lohn_fix ?? null,
     material_fix: data.material_fix ?? null,
+    start_datum: data.start_datum?.slice(0, 10) || null,
+    end_datum: data.end_datum?.slice(0, 10) || null,
     handwerker_id: data.handwerker_id?.trim() || null,
     sort_order: nextOrder,
   })
@@ -456,14 +310,17 @@ async function getAuthUserId(): Promise<string | null> {
 }
 
 async function logAuftragTimeline(
-  input: Parameters<typeof insertAuftragTimelineEvent>[0]
+  input: Parameters<ServerRuntime['insertAuftragTimelineEvent']>[0]
 ): Promise<void> {
+  const { insertAuftragTimelineEvent } = await serverRuntime()
   const r = await insertAuftragTimelineEvent(input)
   if (!r.ok) console.warn('[auftrag_timeline]', r.message)
 }
 
 export async function startAuftragArbeit(auftragId: string) {
-  const detail = await loadAuftragDetail(auftragId)
+  const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
+    await serverRuntime()
+  const detail = await fetchAuftragDetail(auftragId)
   if (!detail?.kunden) return { ok: false as const, message: 'Daten unvollständig' }
   if (detail.status !== 'offen') {
     return { ok: false as const, message: 'Nur bei Status „Offen“ möglich' }
@@ -483,11 +340,12 @@ export async function startAuftragArbeit(auftragId: string) {
     const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
     const tpl = mailAuftragsbestaetigung(
       {
-        name: vorname,
+        name: detail.kunden.name.trim(),
         gewerke: gewerkNamen.length ? gewerkNamen : ['Ihr Projekt'],
         startDatum: formatDatumDeFromIso(detail.start_datum) ?? '—',
         endDatum: detail.end_datum ? formatDatumDeFromIso(detail.end_datum) : null,
         statusLink: projektLink,
+        kundeTyp: detail.kunden.typ,
       },
       branding
     )
@@ -519,7 +377,9 @@ export async function startAuftragArbeit(auftragId: string) {
 }
 
 export async function setAuftragZurAbnahme(auftragId: string) {
-  const detail = await loadAuftragDetail(auftragId)
+  const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
+    await serverRuntime()
+  const detail = await fetchAuftragDetail(auftragId)
   if (!detail?.kunden) return { ok: false as const, message: 'Daten unvollständig' }
   if (detail.status !== 'in_arbeit') {
     return { ok: false as const, message: 'Nur bei Status „In Arbeit“ möglich' }
@@ -534,7 +394,14 @@ export async function setAuftragZurAbnahme(auftragId: string) {
     if (token) {
       const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
       const branding = await getMailBranding(supabaseAdmin)
-      const tpl = mailUpdateHinweis({ name: vorname, statusLink: projektUrlFromToken(token) }, branding)
+      const tpl = mailUpdateHinweis(
+        {
+          name: detail.kunden.name.trim(),
+          statusLink: projektUrlFromToken(token),
+          kundeTyp: detail.kunden.typ,
+        },
+        branding
+      )
       const sent = await sendMail({
         typ: 'update_hinweis',
         an: email,
@@ -563,149 +430,36 @@ export async function setAuftragZurAbnahme(auftragId: string) {
   return { ok: true as const }
 }
 
-export async function persistAbnahmeProtokollForAuftrag(auftragId: string): Promise<
-  { ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }
-> {
-  const detail = await loadAuftragDetailAdmin(auftragId)
-  if (!detail?.kunden) return { ok: false, message: 'Auftrag/Kunde nicht gefunden' }
-
-  const kunde = detail.kunden
-  const pos = parsePositionen(detail.angebote?.positionen ?? [])
-  const hwZeilen = (detail.auftrag_handwerker ?? []).map((r) => {
-    const n = r.handwerker?.name ?? '—'
-    const g = r.gewerke?.name ?? '—'
-    const f = r.handwerker?.firma ?? ''
-    return `${n} — ${g}${f ? ` (${f})` : ''}`
-  })
-
-  const abnahmeEintraege = (detail.formular_eintraege ?? []).filter(
-    (e) => e.phase === 'abnahme' && e.submitted_at
-  ) as FormularEintrag[]
-
-  const fotoUrls: string[] = []
-  for (const e of detail.formular_eintraege ?? []) {
-    for (const u of e.foto_urls ?? []) {
-      if (u && !fotoUrls.includes(u)) fotoUrls.push(u)
-    }
-  }
-  for (const vb of detail.vor_baubeginn_protokolle ?? []) {
-    for (const u of vb.foto_urls ?? []) {
-      if (u && !fotoUrls.includes(u)) fotoUrls.push(u)
-    }
-  }
-
-  const abnahmeDatum = new Date().toLocaleDateString('de-DE')
-  const shortId = auftragId.slice(0, 8)
-  const zusatz = buildAbnahmePdfZusatz(detail)
-
-  let buffer: Buffer
-  try {
-    buffer = Buffer.from(
-      await renderAbnahmeProtokollPdfBuffer({
-        kunde,
-        auftragIdShort: shortId,
-        abnahmeDatum,
-        positionen: pos,
-        handwerkerZeilen: hwZeilen,
-        abnahmeEintraege,
-        fotoUrls,
-        zusatz,
-      })
-    )
-  } catch {
-    try {
-      buffer = Buffer.from(
-        await renderAbnahmeProtokollPdfBuffer({
-          kunde,
-          auftragIdShort: shortId,
-          abnahmeDatum,
-          positionen: pos,
-          handwerkerZeilen: hwZeilen,
-          abnahmeEintraege,
-          fotoUrls: [],
-          zusatz,
-        })
-      )
-    } catch (e2) {
-      return {
-        ok: false,
-        message: e2 instanceof Error ? e2.message : 'PDF fehlgeschlagen',
-      }
-    }
-  }
-
-  const path = `${auftragId}/${Date.now()}.pdf`
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('protokolle')
-    .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
-
-  if (upErr) return { ok: false, message: upErr.message }
-
-  const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
-  const publicUrl = pub.publicUrl
-
-  const { error: dbErr } = await supabaseAdmin
-    .from('auftraege')
-    .update({ abnahme_protokoll_url: publicUrl, updated_at: new Date().toISOString() })
-    .eq('id', auftragId)
-
-  if (dbErr) return { ok: false, message: dbErr.message }
-
-  revalidatePath(`/auftraege/${auftragId}`)
-  return { ok: true, buffer, publicUrl }
-}
-
+/** Legacy-Aktion: setzt Auftrag auf abgeschlossen, wenn Abnahmeprotokoll aus dem Wizard existiert. */
 export async function completeAuftragAbnahme(auftragId: string) {
-  const detail = await loadAuftragDetail(auftragId)
-  if (!detail?.kunden?.email) {
-    return { ok: false as const, message: 'Kunden-E-Mail fehlt' }
+  const detail = await fetchAuftragDetail(auftragId)
+  if (!detail) {
+    return { ok: false as const, message: 'Auftrag nicht gefunden' }
   }
   if (detail.status !== 'abnahme') {
     return { ok: false as const, message: 'Nur bei Status „Abnahme“ möglich' }
   }
-
-  const pdf = await persistAbnahmeProtokollForAuftrag(auftragId)
-  if (!pdf.ok) return pdf
+  if (!detail.abnahme_protokoll_url) {
+    return {
+      ok: false as const,
+      message: 'Bitte zuerst ein Abnahmeprotokoll erstellen (Karte „Abnahmeprotokoll“ oder Menü).',
+    }
+  }
 
   const st = await setAuftragStatus(auftragId, 'abgeschlossen')
   if (!st.ok) return st
-
-  const branding = await getMailBranding(supabaseAdmin)
-  const gw = (detail.auftrag_handwerker ?? [])
-    .map((r) => r.gewerke?.name)
-    .filter((n): n is string => Boolean(n))
-  const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
-  const tpl = mailAbnahme(
-    {
-      name: vorname,
-      gewerke: gw.length ? gw : ['—'],
-      abnahmeDatum: new Date().toLocaleDateString('de-DE'),
-    },
-    branding
-  )
-  const mail = await sendMail({
-    typ: 'abnahme',
-    an: detail.kunden.email,
-    anName: detail.kunden.name,
-    betreff: tpl.betreff,
-    html: tpl.html,
-    pdfBuffer: pdf.buffer,
-    pdfName: `abnahme-${auftragId}.pdf`,
-    kundeId: detail.kunde_id ?? null,
-    auftragId,
-  })
-  if (!mail.success) return { ok: false as const, message: mail.error ?? 'E-Mail fehlgeschlagen' }
 
   const uid = await getAuthUserId()
   await logAuftragTimeline({
     auftrag_id: auftragId,
     typ: 'abnahme_abgeschlossen',
     titel: 'Abnahme abgeschlossen',
-    beschreibung: 'Auftrag abgeschlossen, Abnahmeprotokoll per E-Mail versendet.',
+    beschreibung: 'Auftrag abgeschlossen (Abnahmeprotokoll liegt vor).',
     erstellt_von: uid,
     sichtbar_fuer_kunde: true,
   })
 
+  revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true as const }
 }
 
@@ -719,6 +473,7 @@ export type CreateFormularEintragInput = {
 }
 
 export async function createFormularEintragUndEmail(input: CreateFormularEintragInput) {
+  const { supabaseAdmin, sendMail } = await serverRuntime()
   const token = randomUUID()
   const { data: row, error } = await supabaseAdmin
     .from('formular_eintraege')
@@ -747,7 +502,7 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     .eq('id', input.templateId)
     .maybeSingle()
 
-  const auftrag = await loadAuftragDetailAdmin(input.auftragId)
+  const auftrag = await fetchAuftragDetail(input.auftragId)
   const kunde = auftrag?.kunden
   const { data: gw } = await supabaseAdmin
     .from('gewerke')
@@ -817,16 +572,6 @@ export async function notifyInternFormularSubmitted(input: {
   })
 }
 
-export async function listFormularTemplates(): Promise<FormularTemplate[]> {
-  const supabase = createClient()
-  const { data } = await supabase
-    .from('formular_templates')
-    .select('*')
-    .eq('aktiv', true)
-    .order('name')
-  return (data ?? []) as FormularTemplate[]
-}
-
 export async function createNachtragEntwurfFromRegiebericht(
   auftragId: string,
   eintragId: string
@@ -837,6 +582,7 @@ export async function createNachtragEntwurfFromRegiebericht(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet' }
 
+  const { supabaseAdmin } = await serverRuntime()
   const { data: row, error } = await supabaseAdmin
     .from('formular_eintraege')
     .select(
@@ -915,30 +661,4 @@ export async function createNachtragEntwurfFromRegiebericht(
 
   revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
-}
-
-export type EmailLogRow = {
-  id: string
-  typ: string
-  an_email: string
-  an_name: string | null
-  betreff: string
-  status: string | null
-  fehler_nachricht: string | null
-  created_at: string
-}
-
-export async function loadEmailLogForAuftrag(auftragId: string): Promise<EmailLogRow[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('email_log')
-    .select('id, typ, an_email, an_name, betreff, status, fehler_nachricht, created_at')
-    .eq('auftrag_id', auftragId)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('[loadEmailLogForAuftrag]', error.message)
-    return []
-  }
-  return (data ?? []) as EmailLogRow[]
 }

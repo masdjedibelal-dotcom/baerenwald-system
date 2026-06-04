@@ -11,14 +11,7 @@ export default async function EinstellungenFirmaPage() {
   const initial = await loadEinstellungenForm()
   return (
     <div>
-      <PageHeader
-        title="Firma & Branding"
-        breadcrumbs={[
-          { label: 'Einstellungen', href: '/einstellungen/firma' },
-          { label: 'Firma & Branding' },
-        ]}
-        description="Erscheint auf PDFs und in der Kundenkommunikation."
-      />
+      <PageHeader description="Erscheint auf PDFs und in der Kundenkommunikation." />
       <FirmaBrandingForm initial={initial} />
     </div>
   )

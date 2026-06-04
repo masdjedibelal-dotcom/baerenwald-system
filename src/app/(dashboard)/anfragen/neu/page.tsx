@@ -1,33 +1,23 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { AnfrageNeuForm } from '@/components/anfragen/AnfrageNeuForm'
 
-function NeueAnfrageInhalt() {
+function RedirectNeueAnfrage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const kundeId = searchParams.get('kunde_id')
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    const kundeId = searchParams.get('kunde_id')
+    if (kundeId) params.set('kunde_id', kundeId)
+    params.set('neu', '1')
+    router.replace(`/anfragen?${params.toString()}`)
+  }, [router, searchParams])
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
-      <PageHeader
-        title="Neue Anfrage"
-        breadcrumbs={[
-          { label: 'Anfragen', href: '/anfragen' },
-          { label: 'Neue Anfrage' },
-        ]}
-      />
-      <div className="mt-6">
-        <AnfrageNeuForm
-          defaultKundeId={kundeId}
-          onSuccess={(id) => {
-            router.push(`/anfragen/${id}`)
-            router.refresh()
-          }}
-        />
-      </div>
+    <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+      Formular wird geöffnet…
     </div>
   )
 }
@@ -36,12 +26,12 @@ export default function NeueAnfragePage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-2xl px-4 py-6">
-          <p className="text-sm text-bw-text-muted">Lädt…</p>
+        <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Lädt…
         </div>
       }
     >
-      <NeueAnfrageInhalt />
+      <RedirectNeueAnfrage />
     </Suspense>
   )
 }

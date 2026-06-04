@@ -11,14 +11,7 @@ export default async function EinstellungenBenutzerPage() {
   const initial = await loadBenutzerListe()
   return (
     <div>
-      <PageHeader
-        title="Benutzer"
-        breadcrumbs={[
-          { label: 'Einstellungen', href: '/einstellungen/firma' },
-          { label: 'Benutzer' },
-        ]}
-        description="Team-Zugänge und Einladungen (Supabase Auth)."
-      />
+      <PageHeader description="Team-Zugänge einladen und verwalten. Dein eigenes Profil findest du unter Tab „Profil“." />
       <BenutzerEinstellungenClient initial={initial} />
     </div>
   )

@@ -7,7 +7,6 @@ import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { TopBar } from '@/components/layout/TopBar'
-import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { FloatingAction } from '@/components/layout/FloatingAction'
 import { DemoModeBanner } from '@/components/dashboard/DemoModeBanner'
 import { isDemoTestUserEmail } from '@/lib/is-demo-user'
@@ -41,21 +40,22 @@ export default async function DashboardLayout({
 
     return (
       <DashboardProviders>
-        <div className="flex h-screen overflow-hidden bg-bw-bg">
+        <div className="flex h-dvh max-h-dvh overflow-hidden bg-bw-bg">
           <Sidebar />
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:ml-0">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:ml-0">
             <TopBar user={user} />
 
-            <main className="flex-1 overflow-y-auto px-4 pb-24 pt-2 md:px-6 md:pb-6 md:pt-4">
+            <main className="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-app-grouped px-4 max-md:scroll-pb-mobile-nav max-md:pb-mobile-nav has-[[data-app-master-detail]]:min-[900px]:px-0 md:bg-bw-bg md:px-6 md:pb-6">
               {showDemoBanner ? <DemoModeBanner /> : null}
-              {children}
+              <div className="pt-2 md:pt-4 has-[[data-list-filter-sticky]]:pt-0">
+                {children}
+              </div>
             </main>
           </div>
 
           <BottomNav />
           <FloatingAction />
-          <GlobalSearch />
           <ToastProvider />
         </div>
       </DashboardProviders>

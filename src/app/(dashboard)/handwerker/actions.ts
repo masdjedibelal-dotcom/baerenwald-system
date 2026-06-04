@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { PARTNER_DOCS_BUCKET, partnerDokumentStoragePath } from '@/lib/partnerDocUtils'
-import type { ComplianceDokumentTyp, Handwerker, PartnerDokument } from '@/lib/types'
+import type { Handwerker, PartnerDokument } from '@/lib/types'
 
 export type HandwerkerFormInput = {
   name: string
@@ -129,7 +129,6 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
 export type HandwerkerDetailPayload = {
   handwerker: Handwerker | null
   dokumente: PartnerDokument[]
-  typen: ComplianceDokumentTyp[]
   auftraege: {
     id: string
     titel: string | null
@@ -144,31 +143,68 @@ export type HandwerkerDetailPayload = {
   stats: { gesamt: number; angenommen: number; abgelehnt: number; quote: number | null }
 }
 
+const HANDWERKER_DETAIL_SELECT_BASE = `
+  id, name, firma, email, telefon, whatsapp, webseite, gewerke, subkategorie,
+  ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
+  adresse, partner_kategorie_id,
+  partner_kategorien ( id, name, slug, sort_order ),
+  partner_dokumente (
+    id, handwerker_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am
+  )
+`
+
+const HANDWERKER_BEWERTUNG_SELECT = `
+  bewertung_gesamt, bewertung_qualitaet, bewertung_termintreue, bewertung_sauberkeit,
+  bewertung_kommunikation, bewertung_preis_leistung, bewertung_anzahl
+`
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  const msg = (error.message ?? '').toLowerCase()
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    msg.includes('does not exist') ||
+    (msg.includes('column') && msg.includes('bewertung'))
+  )
+}
+
+async function fetchHandwerkerDetailRow(
+  supabase: ReturnType<typeof createClient>,
+  id: string
+): Promise<{ data: Handwerker | null; error: { message: string } | null }> {
+  const fullSelect = `${HANDWERKER_DETAIL_SELECT_BASE}, ${HANDWERKER_BEWERTUNG_SELECT}`
+  const first = await supabase.from('handwerker').select(fullSelect).eq('id', id).maybeSingle()
+
+  if (!first.error) {
+    return { data: (first.data as Handwerker | null) ?? null, error: null }
+  }
+
+  if (isMissingColumnError(first.error)) {
+    console.warn(
+      '[loadHandwerkerDetail] Bewertungs-Spalten fehlen — Fallback ohne Ratings:',
+      first.error.message
+    )
+    const fallback = await supabase
+      .from('handwerker')
+      .select(HANDWERKER_DETAIL_SELECT_BASE)
+      .eq('id', id)
+      .maybeSingle()
+    return {
+      data: (fallback.data as Handwerker | null) ?? null,
+      error: fallback.error ? { message: fallback.error.message } : null,
+    }
+  }
+
+  console.error('[loadHandwerkerDetail]', first.error.message)
+  return { data: null, error: { message: first.error.message } }
+}
+
 export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetailPayload> {
   const supabase = createClient()
 
-  const [{ data: h }, { data: typenRaw }, { data: ahRaw }] = await Promise.all([
-    supabase
-      .from('handwerker')
-      .select(
-        `
-        id, name, firma, email, telefon, whatsapp, webseite, gewerke, subkategorie,
-        ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-        adresse, partner_kategorie_id,
-        partner_kategorien ( id, name, slug, sort_order ),
-        partner_dokumente (
-          id, handwerker_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am
-        )
-      `
-      )
-      .eq('id', id)
-      .maybeSingle(),
-    supabase
-      .from('compliance_dokument_typen')
-      .select(
-        'id, slug, bezeichnung, beschreibung, pflicht_fuer_fachbetriebe, erneuerung_monate, sort_order, kategorie, aktiv'
-      )
-      .order('sort_order', { ascending: true }),
+  const [{ data: h }, { data: ahRaw }] = await Promise.all([
+    fetchHandwerkerDetailRow(supabase, id),
     supabase
       .from('auftrag_handwerker')
       .select(
@@ -184,15 +220,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   ])
 
   const hw = (h as Handwerker | null) ?? null
-  const typen = (typenRaw ?? []).filter(
-    (t: { aktiv?: boolean }) => t.aktiv !== false
-  ) as ComplianceDokumentTyp[]
-
-  const dokumenteRaw = (hw?.partner_dokumente ?? []) as PartnerDokument[]
-  const dokumente = dokumenteRaw.map((d) => ({
-    ...d,
-    compliance_dokument_typen: typen.find((t) => t.slug === d.typ) ?? null,
-  }))
+  const dokumente = (hw?.partner_dokumente ?? []) as PartnerDokument[]
 
   const rows = ahRaw ?? []
   const auftraege = rows
@@ -233,7 +261,6 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   return {
     handwerker: hw ? { ...hw, partner_dokumente: dokumente } : null,
     dokumente,
-    typen,
     auftraege,
     stats: { gesamt, angenommen, abgelehnt, quote },
   }
