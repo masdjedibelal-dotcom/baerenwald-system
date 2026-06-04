@@ -71,8 +71,7 @@ export async function POST(req: Request) {
     'kategorie',
     'leistung',
     'einheit',
-    'preis_min',
-    'preis_max',
+    'preis',
   ]
   for (const k of requiredKeys) {
     if (!mapping[k]?.trim()) {
@@ -151,15 +150,15 @@ export async function POST(req: Request) {
 
     const kategorie = String(row[mapping.kategorie] ?? '').trim()
     const einheit = String(row[mapping.einheit] ?? '').trim()
-    const preis_min = parsePreis(String(row[mapping.preis_min] ?? ''))
-    const preis_max = parsePreis(String(row[mapping.preis_max] ?? ''))
+    const preisCol = mapping.preis?.trim() || mapping.preis_min?.trim() || ''
+    const preisRaw = parsePreis(String(row[preisCol] ?? ''))
 
     if (!einheit) {
       fehler.push({ zeile, grund: 'Einheit leer' })
       continue
     }
-    if (preis_min === null || preis_max === null) {
-      fehler.push({ zeile, grund: 'Preis Min/Max ungültig' })
+    if (preisRaw === null) {
+      fehler.push({ zeile, grund: 'Preis ungültig' })
       continue
     }
 
@@ -168,8 +167,7 @@ export async function POST(req: Request) {
       kategorie,
       leistung,
       einheit,
-      preis_min,
-      preis_max,
+      preis_min: preisRaw,
       aktiv: true,
     })
 

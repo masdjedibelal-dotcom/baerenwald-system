@@ -1,26 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/mail-service'
-
-const SAMPLE: Record<string, string> = {
-  kundenname: 'Maria Muster',
-  betrag: '12.450,00',
-  datum: '17.04.2026',
-  link: 'https://example.com/angebot/demo',
-  rechnungsnummer: 'RE-2026-0042',
-  handwerkername: 'Max Mustermann',
-  gewerk: 'Bad & Sanitär',
-  startdatum: '01.05.2026',
-  enddatum: '30.06.2026',
-}
-
-function applyVars(text: string) {
-  let out = text
-  for (const [k, v] of Object.entries(SAMPLE)) {
-    out = out.split(`{{${k}}}`).join(v)
-  }
-  return out
-}
+import { applyEmailTemplateVars, loadEmailPreviewVars } from '@/lib/email-template-preview-vars'
 
 export async function POST(req: Request) {
   const supabase = createClient()
@@ -50,8 +31,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error?.message ?? 'Template nicht gefunden' }, { status: 404 })
   }
 
-  const betreff = applyVars(String((row as { betreff: string }).betreff))
-  const html = applyVars(String((row as { body_html: string }).body_html))
+  const previewVars = await loadEmailPreviewVars(supabase)
+  const betreff = applyEmailTemplateVars(String((row as { betreff: string }).betreff), previewVars)
+  const html = applyEmailTemplateVars(String((row as { body_html: string }).body_html), previewVars)
 
   const mail = await sendMail({
     typ: 'sonstiges',

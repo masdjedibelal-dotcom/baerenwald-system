@@ -2,7 +2,7 @@ import QRCode from 'qrcode'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { projektUrlFromToken } from '@/lib/projekt/kunden-token'
+import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 
 export const dynamic = 'force-dynamic'
 

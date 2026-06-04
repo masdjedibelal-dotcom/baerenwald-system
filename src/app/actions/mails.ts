@@ -4,13 +4,24 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/mail-branding'
 import {
   mailAnfrageBestaetigung,
-  mailBesichtigungTermin,
+  mailHtmlBase,
   mailUpdateHinweis,
   mailZahlungserinnerung,
 } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
+import type { MailBranding } from '@/lib/mail-branding'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
-import { ensureKundenTokenForAuftrag, projektUrlFromToken } from '@/lib/projekt/kunden-token'
+import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
+import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
+import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
+import {
+  buildPortalButton,
+  buildPortalLoginLink,
+  defaultPortalInviteBetreff,
+  defaultPortalInviteText,
+} from '@/lib/portal-utils'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
 export async function sendAnfrageBestaetigung(
@@ -19,7 +30,9 @@ export async function sendAnfrageBestaetigung(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: lead, error } = await supabaseAdmin
     .from('leads')
-    .select('id, kanal, kontakt_email, kontakt_name, bereiche, kunde_id, kunden(name)')
+    .select(
+      'id, kanal, kontakt_email, kontakt_name, bereiche, situation, plz, preis_min, preis_max, kunde_id, kundentyp, kunden(name, typ)'
+    )
     .eq('id', leadId)
     .maybeSingle()
 
@@ -39,10 +52,26 @@ export async function sendAnfrageBestaetigung(
     String((lead as { kontakt_name?: string | null }).kontakt_name ?? '').trim() ||
     String(kunden?.name ?? 'Kundin/Kunde')
 
-  const statusLink = await projektOderStatusLink(leadId)
-
   const bereiche = (lead as { bereiche?: string[] | null }).bereiche ?? null
-  const tpl = mailAnfrageBestaetigung({ name, bereiche, statusLink }, branding)
+  const plz = String((lead as { plz?: string | null }).plz ?? '').trim()
+  const anfrageRef = plz || String(leadId).slice(0, 8).toUpperCase()
+  const kundeTyp = resolveAngebotKundeTyp(
+    (lead as { kunden?: { typ?: string | null } | null }).kunden?.typ,
+    (lead as { kundentyp?: string | null }).kundentyp
+  )
+  const tpl = mailAnfrageBestaetigung(
+    {
+      name,
+      anfrageRef,
+      situation: (lead as { situation?: string | null }).situation,
+      bereiche,
+      preis_min: (lead as { preis_min?: number | null }).preis_min,
+      preis_max: (lead as { preis_max?: number | null }).preis_max,
+      quelle: force || kanal !== 'website' ? 'crm' : 'website',
+      kundeTyp,
+    },
+    branding
+  )
   const r = await sendMail({
     typ: 'anfrage_bestaetigung',
     an: email,
@@ -63,16 +92,29 @@ function formatDeDate(isoDate: string): string {
   return `${d}.${m}.${y}`
 }
 
-function formatUhrzeitKurz(raw: string | null | undefined): string {
-  if (!raw?.trim()) return ''
-  const s = raw.trim()
-  return s.length >= 5 ? s.slice(0, 5) : s
+/** Vorschau der Termin-Bestätigungsmail (HTML + Betreff). */
+export async function previewBesichtigungTerminMail(
+  input: Parameters<typeof buildBesichtigungTerminMail>[0]
+): Promise<
+  | { ok: true; betreff: string; html: string; bodyText: string; defaultTo: string[] }
+  | { ok: false; message: string }
+> {
+  const built = await buildBesichtigungTerminMail(input)
+  if (!built.ok) return built
+  return {
+    ok: true,
+    betreff: built.betreff,
+    html: built.html,
+    bodyText: built.bodyText,
+    defaultTo: built.defaultTo,
+  }
 }
 
 /** E-Mail an Kund:in nach Besichtigung / Termin aus dem CRM (Resend). */
 export async function sendBesichtigungTerminBestaetigung(input: {
   leadId: string
-  to: string
+  to: string | string[]
+  cc?: string | string[]
   name: string
   terminTitel: string
   datum: string
@@ -80,51 +122,54 @@ export async function sendBesichtigungTerminBestaetigung(input: {
   uhrzeitBis: string | null
   adresse: string | null
   notiz: string | null
+  zugewiesenAn: string
+  betreff?: string
+  html?: string
+  bodyText?: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const email = input.to.trim()
-  if (!email) return { ok: false, message: 'Keine E-Mail-Adresse.' }
+  const toList = (Array.isArray(input.to) ? input.to : [input.to]).map((s) => s.trim()).filter(Boolean)
+  if (!toList.length) return { ok: false, message: 'Keine E-Mail-Adresse unter An.' }
 
-  const { data: lead, error } = await supabaseAdmin
-    .from('leads')
-    .select('id, kunde_id')
-    .eq('id', input.leadId)
-    .maybeSingle()
+  let betreff = input.betreff?.trim()
+  let html = input.html?.trim()
+  let kundeId: string | null = null
 
-  if (error) return { ok: false, message: error.message }
-  if (!lead) return { ok: false, message: 'Lead nicht gefunden oder keine Berechtigung.' }
-
-  const branding = await getMailBranding(supabaseAdmin)
-  const statusLink = await projektOderStatusLink(input.leadId)
-  const d = input.datum.trim().slice(0, 10)
-  const datumFmt = formatDeDate(d)
-  const v = formatUhrzeitKurz(input.uhrzeitVon)
-  const b = formatUhrzeitKurz(input.uhrzeitBis)
-  let zeitText = ''
-  if (v && b) zeitText = `${v} – ${b} Uhr`
-  else if (v) zeitText = `${v} Uhr`
-  else if (b) zeitText = `bis ${b} Uhr`
-
-  const tpl = mailBesichtigungTermin(
-    {
-      name: input.name.trim() || 'Kundin/Kunde',
-      terminTitel: input.terminTitel.trim() || 'Termin',
-      datumFmt,
-      zeitText,
-      adresse: (input.adresse ?? '').trim(),
-      notiz: (input.notiz ?? '').trim(),
-      statusLink,
-    },
-    branding
-  )
+  if (!betreff || !html) {
+    const built = await buildBesichtigungTerminMail({
+      leadId: input.leadId,
+      name: input.name,
+      terminTitel: input.terminTitel,
+      datum: input.datum,
+      uhrzeitVon: input.uhrzeitVon,
+      uhrzeitBis: input.uhrzeitBis,
+      adresse: input.adresse,
+      notiz: input.notiz,
+      zugewiesenAn: input.zugewiesenAn,
+      defaultTo: toList[0],
+      bodyText: input.bodyText,
+    })
+    if (!built.ok) return built
+    betreff = betreff || built.betreff
+    html = html || built.html
+    kundeId = built.kundeId
+  } else {
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('kunde_id')
+      .eq('id', input.leadId)
+      .maybeSingle()
+    kundeId = (lead as { kunde_id?: string | null } | null)?.kunde_id ?? null
+  }
 
   const r = await sendMail({
     typ: 'besichtigung_termin',
-    an: email,
+    an: toList.length === 1 ? toList[0] : toList,
+    cc: input.cc,
     anName: input.name.trim() || null,
-    betreff: tpl.betreff,
-    html: tpl.html,
+    betreff: betreff!,
+    html: html!,
     leadId: input.leadId,
-    kundeId: (lead as { kunde_id?: string | null }).kunde_id ?? null,
+    kundeId,
     from: process.env.RESEND_FROM_ANFRAGEN ?? process.env.RESEND_FROM_EMAIL,
   })
 
@@ -182,7 +227,7 @@ export async function sendZahlungserinnerungen(): Promise<{
   const { data: rows, error } = await supabaseAdmin
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, kunden(name, email)'
+      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, kunden(name, email, typ)'
     )
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
@@ -205,6 +250,7 @@ export async function sendZahlungserinnerungen(): Promise<{
     const kunde = normalizeKunde(r.kunden)
     const name = kunde?.name ?? 'Kundin/Kunde'
     const email = kunde?.email?.trim() ?? ''
+    const kundeTyp = (kunde as { typ?: string | null } | null)?.typ ?? null
     const brutto = r.brutto ?? 0
     const faelligFmt = formatDeDate(r.faellig_am)
 
@@ -218,6 +264,7 @@ export async function sendZahlungserinnerungen(): Promise<{
             faelligAm: faelligFmt,
             tageUeberfaellig: tage,
             iban,
+            kundeTyp,
           },
           branding
         )
@@ -248,6 +295,7 @@ export async function sendZahlungserinnerungen(): Promise<{
             faelligAm: faelligFmt,
             tageUeberfaellig: tage,
             iban,
+            kundeTyp,
           },
           branding
         )
@@ -306,7 +354,7 @@ export async function buildKundenUpdateVorschau(auftragId: string): Promise<{
 } | null> {
   const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
-    .select('kunden_token, kunden(name, email)')
+    .select('kunden_token, kunden(name, email, typ)')
     .eq('id', auftragId)
     .maybeSingle()
   if (error || !auf) return null
@@ -316,13 +364,14 @@ export async function buildKundenUpdateVorschau(auftragId: string): Promise<{
     token = t ?? undefined
   }
   if (!token) return null
-  const k = (auf as { kunden?: { name?: string; email?: string | null } | null }).kunden
+  const k = (auf as { kunden?: { name?: string; email?: string | null; typ?: string | null } | null })
+    .kunden
   const name = String(k?.name ?? 'Kundin/Kunde').trim()
   const an = String(k?.email ?? '').trim()
   if (!an) return null
   const url = projektUrlFromToken(token)
   const branding = await getMailBranding(supabaseAdmin)
-  const tpl = mailUpdateHinweis({ name, statusLink: url }, branding)
+  const tpl = mailUpdateHinweis({ name, statusLink: url, kundeTyp: k?.typ ?? null }, branding)
   return { betreff: tpl.betreff, html: tpl.html, an }
 }
 
@@ -348,4 +397,167 @@ export async function sendKundenUpdateMailFromAuftrag(input: {
   })
   if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }
   return { ok: true }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function kundenPortalMailHtml(input: {
+  name: string
+  portalLink: string
+  anrede: 'du' | 'sie'
+  text: string
+  branding: MailBranding
+}): string {
+  const greeting = input.anrede === 'sie'
+    ? `Guten Tag ${escapeHtml(input.name)},`
+    : `Hallo ${escapeHtml(input.name)},`
+  const body = escapeHtml(input.text)
+    .split(/\n\n+/)
+    .map((p) => p.replace(/\n/g, '<br/>'))
+    .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
+    .join('')
+  const portal = buildPortalButton(input.portalLink, input.anrede)
+  const disclaimer =
+    input.anrede === 'du'
+      ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
+      : 'Sie erhalten diese E-Mail mit Einladung zu MeinBärenwald.'
+  const content = `
+    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
+    ${body}
+    ${portal}
+    <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
+      ${
+        input.anrede === 'du'
+          ? 'Bei Fragen erreichst du uns jederzeit per Antwort auf diese E-Mail.'
+          : 'Bei Fragen erreichen Sie uns jederzeit per Antwort auf diese E-Mail.'
+      }
+    </p>
+  `
+  return mailHtmlBase(
+    content,
+    defaultPortalInviteBetreff(input.anrede),
+    input.branding,
+    disclaimer,
+    { skipMeinBaerenwaldPs: true, anrede: input.anrede }
+  )
+}
+
+export async function getKundenPortalMailDraft(
+  kundeId: string
+): Promise<
+  | {
+      ok: true
+      to: string
+      cc: string[]
+      betreff: string
+      text: string
+      html: string
+      portalLink: string
+      anrede: 'du' | 'sie'
+    }
+  | { ok: false; message: string }
+> {
+  const { data: kunde, error } = await supabaseAdmin
+    .from('kunden')
+    .select('id, name, email, typ')
+    .eq('id', kundeId)
+    .maybeSingle()
+  if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
+  const to = String((kunde as { email?: string | null }).email ?? '').trim()
+  if (!to) return { ok: false, message: 'Kunde hat keine E-Mail-Adresse.' }
+
+  const portalLink = buildPortalLoginLink()
+  const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
+  const branding = await getMailBranding(supabaseAdmin)
+  const anrede = mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
+  const betreff = defaultPortalInviteBetreff(anrede)
+  const text = defaultPortalInviteText(anrede)
+  const html = kundenPortalMailHtml({ name, portalLink, anrede, text, branding })
+  return {
+    ok: true,
+    to,
+    cc: [],
+    betreff,
+    text,
+    html,
+    portalLink,
+    anrede,
+  }
+}
+
+export async function sendKundenPortalLinkMail(input: {
+  kundeId: string
+  to: string
+  cc?: string[]
+  betreff: string
+  text: string
+  anrede?: 'du' | 'sie'
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
+  const { data: kunde, error } = await supabaseAdmin
+    .from('kunden')
+    .select('id, name, typ')
+    .eq('id', input.kundeId)
+    .maybeSingle()
+  if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
+
+  const portalLink = buildPortalLoginLink()
+  const branding = await getMailBranding(supabaseAdmin)
+  const anrede =
+    input.anrede === 'du' || input.anrede === 'sie'
+      ? input.anrede
+      : mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
+  const html = kundenPortalMailHtml({
+    name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
+    portalLink,
+    anrede,
+    text: input.text,
+    branding,
+  })
+
+  const r = await sendMail({
+    typ: 'update_hinweis',
+    an: input.to.trim(),
+    cc: input.cc ?? [],
+    anName: String((kunde as { name?: string | null }).name ?? '').trim() || null,
+    betreff: input.betreff.trim(),
+    html,
+    kundeId: input.kundeId,
+  })
+  if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }
+  return { ok: true }
+}
+
+export async function previewKundenPortalMail(input: {
+  kundeId: string
+  text: string
+  anrede?: 'du' | 'sie'
+}): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
+  const { data: kunde, error } = await supabaseAdmin
+    .from('kunden')
+    .select('id, name, typ')
+    .eq('id', input.kundeId)
+    .maybeSingle()
+  if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
+
+  const portalLink = buildPortalLoginLink()
+  const branding = await getMailBranding(supabaseAdmin)
+  const anrede =
+    input.anrede === 'du' || input.anrede === 'sie'
+      ? input.anrede
+      : mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
+  const html = kundenPortalMailHtml({
+    name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
+    portalLink,
+    anrede,
+    text: input.text,
+    branding,
+  })
+  return { ok: true, html }
 }

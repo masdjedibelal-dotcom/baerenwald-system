@@ -39,7 +39,15 @@ async function loadDetail(
 }
 
 type BodyKunde = { typ: 'kunde'; subject?: string }
-type BodyHandwerker = { typ: 'handwerker'; zuweisung_id: string; send_email: boolean }
+type BodyHandwerker = {
+  typ: 'handwerker'
+  zuweisung_id: string
+  send_email: boolean
+  betreff?: string
+  to?: string[]
+  cc?: string[]
+  preview_only?: boolean
+}
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -115,7 +123,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const sent = await sendHandwerkerAnfrageFuerZuweisung(
       detail,
       zu as Record<string, unknown>,
-      body.send_email
+      body.send_email,
+      {
+        betreff: body.betreff,
+        to: body.to,
+        cc: body.cc,
+        previewOnly: body.preview_only,
+      }
     )
     if (!sent.ok) {
       const status =
@@ -128,6 +142,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         { error: sent.message, link: 'link' in sent ? sent.link : undefined },
         { status }
       )
+    }
+
+    if (body.preview_only) {
+      return NextResponse.json({
+        link: sent.link,
+        gesendet: false,
+        html: sent.html,
+        betreff: sent.betreff,
+        defaultTo: sent.defaultTo,
+        defaultCc: sent.defaultCc,
+      })
     }
 
     revalidatePath(`/angebote/${angebotId}`)

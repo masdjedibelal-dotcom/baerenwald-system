@@ -2,19 +2,32 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAnfrageBestaetigung } from '@/app/actions/mails'
 import { tomorrowYmd } from '@/lib/kalender-auto-termine'
+import { collectGroessenFromFunnelDaten } from '@/lib/lead-funnel-daten'
+import { isEchterFreitext } from '@/lib/lead-display-helpers'
 import {
   bereicheMitLegacyGewerbeSituation,
   leadHatGewerbeKontext,
   situationOhneGewerbe,
 } from '@/lib/lead-gewerbe-storage'
+import { normalizeKundeNamen } from '@/lib/kunde-namen'
+import {
+  anfrageAdresseAusPayload,
+  hatAnfrageAdresse,
+  kundeAdresseDbFelder,
+} from '@/lib/anfrage-adresse'
 
 export const dynamic = 'force-dynamic'
 
 type Body = {
   name?: string
+  vorname?: string
+  nachname?: string
   email?: string
   telefon?: string
   plz?: string
+  strasse?: string
+  hausnummer?: string
+  ort?: string
   situation?: string
   bereiche?: string[]
   preis_min?: number | null
@@ -24,6 +37,10 @@ type Body = {
   funnel_daten?: Record<string, unknown>
   zeitraum?: string
   notizen?: string
+  /** Echter Freitext des Kunden (nicht funnel_daten-JSON). */
+  nachricht?: string
+  kontakt_nachricht?: string
+  message?: string
   kanal?: string
 }
 
@@ -72,18 +89,46 @@ export async function POST(req: Request) {
   const situationStored = situationOhneGewerbe(body.situation?.trim() ?? null)
   const istGewerbe = leadHatGewerbeKontext(bereicheMerged, body.situation)
 
+  const kontaktNachrichtRaw = [body.kontakt_nachricht, body.nachricht, body.message]
+    .map((s) => String(s ?? '').trim())
+    .find((s) => s.length > 0)
+  const kontaktNachricht =
+    kontaktNachrichtRaw && isEchterFreitext(kontaktNachrichtRaw) ? kontaktNachrichtRaw : null
+
+  const adresseFelder = anfrageAdresseAusPayload({
+    plz,
+    strasse: body.strasse,
+    hausnummer: body.hausnummer,
+    ort: body.ort,
+    funnel_daten: body.funnel_daten,
+  })
+  const adresseDb = kundeAdresseDbFelder(adresseFelder)
+  const plzFinal = plz || adresseDb.plz || null
+
   if (!kundeId) {
     const kundentyp = istGewerbe ? 'gewerbe' : 'privat'
+    const namen = normalizeKundeNamen({
+      typ: kundentyp,
+      name,
+      vorname: body.vorname,
+      nachname: body.nachname,
+      funnelDaten: body.funnel_daten,
+      kontaktName: name,
+    })
     const { data: kundeRow, error: kundeErr } = await supabaseAdmin
       .from('kunden')
       .insert({
-        name,
+        name: namen.name,
+        vorname: namen.vorname,
+        nachname: namen.nachname,
         email: email || null,
         telefon: telefon || null,
-        plz: plz || null,
+        plz: plzFinal,
         typ: kundentyp,
-        adresse: null,
-        ort: null,
+        strasse: adresseDb.strasse,
+        hausnummer: adresseDb.hausnummer,
+        ort: adresseDb.ort,
+        adresse: adresseDb.adresse,
         notizen: null,
       })
       .select('id')
@@ -92,6 +137,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: kundeErr?.message ?? 'Kunde' }, { status: 500 })
     }
     kundeId = kundeRow.id as string
+  } else if (hatAnfrageAdresse(adresseFelder)) {
+    await supabaseAdmin
+      .from('kunden')
+      .update({ ...adresseDb, plz: plzFinal, updated_at: new Date().toISOString() })
+      .eq('id', kundeId)
   }
 
   const { data: leadRow, error: leadErr } = await supabaseAdmin
@@ -105,18 +155,41 @@ export async function POST(req: Request) {
       preis_min: body.preis_min ?? null,
       preis_max: body.preis_max ?? null,
       budget_ca: body.budget_ca ?? null,
-      plz: plz || null,
+      plz: plzFinal,
       zeitraum: body.zeitraum?.trim() || null,
       kundentyp: istGewerbe ? 'gewerbe' : 'privat',
       kontakt_name: name,
       kontakt_email: email || null,
       kontakt_telefon: telefon || null,
-      kontakt_nachricht: null,
+      kontakt_nachricht: kontaktNachricht,
       notizen: body.notizen?.trim() || null,
-      funnel_daten:
-        body.funnel_daten && typeof body.funnel_daten === 'object' && !Array.isArray(body.funnel_daten)
-          ? body.funnel_daten
-          : {},
+      funnel_daten: (() => {
+        const raw =
+          body.funnel_daten && typeof body.funnel_daten === 'object' && !Array.isArray(body.funnel_daten)
+            ? body.funnel_daten
+            : {}
+        const fd = raw as Record<string, unknown>
+        const nested =
+          fd.funnel_daten && typeof fd.funnel_daten === 'object' && !Array.isArray(fd.funnel_daten)
+            ? (fd.funnel_daten as Record<string, unknown>)
+            : {}
+        const merged: Record<string, unknown> = {
+          ...raw,
+          ...nested,
+          fachdetails:
+            (fd.fachdetails as Record<string, unknown> | undefined) ??
+            (nested.fachdetails as Record<string, unknown> | undefined) ??
+            {},
+          kundentyp:
+            (typeof fd.kundentyp === 'string' ? fd.kundentyp : undefined) ??
+            (typeof nested.kundentyp === 'string' ? nested.kundentyp : undefined) ??
+            '',
+          quelle: 'website',
+        }
+        const groessenCollected = collectGroessenFromFunnelDaten(merged)
+        merged.groessen = groessenCollected
+        return merged
+      })(),
     })
     .select('id')
     .single()

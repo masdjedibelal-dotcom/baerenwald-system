@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     if (tage <= 7 && tage >= 0 && !r.freigabe_reminder_7_sent_at && intern) {
       await sendEmailHtml({
         to: intern,
-        subject: `⚠️ Einbehalt in ${tage} Tagen fällig — jetzt prüfen`,
+        subject: `Einbehalt in ${tage} Tagen fällig — jetzt prüfen`,
         html: `<p><strong>7-Tage-Hinweis:</strong> Einbehalt ${Number(r.einbehalt_betrag ?? 0).toLocaleString('de-DE')} € · ${hwName ?? '—'}</p>
           <p>Freigabe: ${fd} · Kundin: ${kunde}</p>
           <p><a href="${base}/auftraege/${r.auftrag_id}/finanzen">Finanzen öffnen</a></p>`,

@@ -107,8 +107,8 @@ export async function PATCH(req: Request, { params }: { params: { token: string 
 
   const subject =
     body.antwort === 'akzeptiert'
-      ? `✅ ${hwName} hat angenommen`
-      : `❌ ${hwName} hat abgelehnt — ${gwName}`
+      ? `${hwName} hat angenommen`
+      : `${hwName} hat abgelehnt — ${gwName}`
 
   const grundLabel =
     ablehnungGrundDb && isHandwerkerAblehnungGrund(ablehnungGrundDb)

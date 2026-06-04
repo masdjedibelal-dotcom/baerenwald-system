@@ -1,63 +1,92 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { saveCustomValue as persistCustomFieldValue } from '@/lib/custom-fields'
+import {
+  buildKundeStammDbPayload,
+  validateKundeStammPflicht,
+  type SaveKundeStammInput,
+} from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
 
-export type SaveKundeInput = {
-  name: string
-  typ: string
+export type SaveKundeInput = SaveKundeStammInput & {
   telefon?: string | null
   email?: string | null
-  plz?: string | null
-  ort?: string | null
-  adresse?: string | null
   webseite?: string | null
   ansprechpartner?: string | null
   geburtstag?: string | null
   quelle?: string | null
   notizen?: string | null
+  ust_id?: string | null
+  /** Wenn false: kein harter Pflichtcheck (z. B. schneller Entwurf) */
+  stammPflicht?: boolean
+}
+
+/** Optionale Spalten nur mitschicken wenn gesetzt — vermeidet API-Fehler wenn Migration noch fehlt. */
+function optionalKundeFeld(
+  payload: Record<string, unknown>,
+  key: string,
+  value: string | null | undefined
+) {
+  const t = value?.trim()
+  if (t) payload[key] = t
 }
 
 function sanitizeKundePayload(input: SaveKundeInput): Record<string, unknown> {
-  return {
-    name: input.name.trim(),
+  const stamm = buildKundeStammDbPayload(input)
+  const payload: Record<string, unknown> = {
+    ...stamm,
     typ: input.typ,
     telefon: input.telefon?.trim() || null,
     email: input.email?.trim() || null,
-    plz: input.plz?.trim() || null,
-    ort: input.ort?.trim() || null,
-    adresse: input.adresse?.trim() || null,
-    webseite: input.webseite?.trim() || null,
-    ansprechpartner: input.ansprechpartner?.trim() || null,
-    geburtstag: input.geburtstag?.trim() || null,
-    quelle: input.quelle?.trim() || null,
     notizen: input.notizen?.trim() || null,
-    updated_at: new Date().toISOString(),
   }
+  optionalKundeFeld(payload, 'webseite', input.webseite)
+  optionalKundeFeld(payload, 'ansprechpartner', input.ansprechpartner)
+  optionalKundeFeld(payload, 'geburtstag', input.geburtstag)
+  optionalKundeFeld(payload, 'quelle', input.quelle)
+  optionalKundeFeld(payload, 'ust_id', input.ust_id)
+  return payload
 }
 
 export async function saveKunde(
   data: SaveKundeInput,
-  kundeId?: string
+  kundeId?: string,
+  options?: { revalidateAnfrageIds?: string[] }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
+  if (data.stammPflicht !== false) {
+    const err = validateKundeStammPflicht(data)
+    if (err) return { ok: false, message: err }
+  }
   const payload = sanitizeKundePayload(data)
 
   if (kundeId) {
-    const { error } = await supabase.from('kunden').update(payload).eq('id', kundeId)
+    const { error } = await withCrmReadFallback(async (db) =>
+      db.from('kunden').update(payload).eq('id', kundeId)
+    )
     if (error) return { ok: false, message: error.message }
     revalidatePath('/kunden')
     revalidatePath(`/kunden/${kundeId}`)
+    for (const lid of options?.revalidateAnfrageIds ?? []) {
+      revalidatePath(`/anfragen/${lid}`)
+      revalidatePath('/anfragen')
+    }
     return { ok: true, id: kundeId }
   }
 
-  const { data: row, error } = await supabase.from('kunden').insert(payload).select('id').single()
+  const { data: row, error } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').insert(payload).select('id').single()
+  )
   if (error || !row) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  const id = row.id as string
+  const id = (row as { id: string }).id
   revalidatePath('/kunden')
   revalidatePath(`/kunden/${id}`)
+  for (const lid of options?.revalidateAnfrageIds ?? []) {
+    revalidatePath(`/anfragen/${lid}`)
+    revalidatePath('/anfragen')
+  }
   return { ok: true, id }
 }
 
@@ -80,10 +109,9 @@ export async function addKundenNotiz(
   })
   if (error) return { ok: false, message: error.message }
 
-  await supabase
-    .from('kunden')
-    .update({ letzte_aktivitaet: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', kundeId)
+  await withCrmReadFallback(async (db) =>
+    db.from('kunden').update({ letzte_aktivitaet: new Date().toISOString() }).eq('id', kundeId)
+  )
 
   revalidatePath(`/kunden/${kundeId}`)
   revalidatePath('/kunden')
@@ -115,10 +143,9 @@ export async function updateGesamtUmsatz(
 
   const summe = (data ?? []).reduce((s, r) => s + (Number(r.brutto) || 0), 0)
 
-  const { error: uErr } = await supabase
-    .from('kunden')
-    .update({ gesamt_umsatz: summe, updated_at: new Date().toISOString() })
-    .eq('id', kundeId)
+  const { error: uErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').update({ gesamt_umsatz: summe }).eq('id', kundeId)
+  )
 
   if (uErr) return { ok: false, message: uErr.message }
   revalidatePath(`/kunden/${kundeId}`)
@@ -142,7 +169,6 @@ export async function findKundenDuplikate(
   telefon: string | null,
   email: string | null
 ): Promise<Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>[]> {
-  const supabase = createClient()
   const tel = telefon?.trim()
   const em = email?.trim()
   if ((!tel || tel.length < 4) && (!em || em.length < 4)) return []
@@ -150,24 +176,64 @@ export async function findKundenDuplikate(
   const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>>()
 
   if (em && em.length >= 4) {
-    const { data, error } = await supabase
-      .from('kunden')
-      .select('id, name, telefon, email')
-      .ilike('email', `%${em}%`)
-      .limit(8)
+    const { data, error } = await withCrmReadFallback(async (db) =>
+      db.from('kunden').select('id, name, telefon, email').ilike('email', `%${em}%`).limit(8)
+    )
     if (error) console.warn('findKundenDuplikate email', error.message)
     for (const r of data ?? []) byId.set(r.id as string, r as Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>)
   }
 
   if (tel && tel.replace(/\s/g, '').length >= 6) {
     const digits = tel.replace(/\s/g, '')
-    const { data, error } = await supabase
-      .from('kunden')
-      .select('id, name, telefon, email')
-      .ilike('telefon', `%${digits}%`)
-      .limit(8)
+    const { data, error } = await withCrmReadFallback(async (db) =>
+      db.from('kunden').select('id, name, telefon, email').ilike('telefon', `%${digits}%`).limit(8)
+    )
     if (error) console.warn('findKundenDuplikate tel', error.message)
     for (const r of data ?? []) byId.set(r.id as string, r as Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>)
+  }
+
+  return Array.from(byId.values())
+}
+
+/** Portal-Zugang: Kunde registriert sich mit derselben E-Mail unter /portal/login */
+export async function getPortalLoginHint(
+  kundeId: string
+): Promise<
+  | { ok: true; loginLink: string; hasAuthAccount: boolean }
+  | { ok: false; message: string }
+> {
+  const { data: row, error } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('auth_user_id').eq('id', kundeId).maybeSingle()
+  )
+
+  if (error) return { ok: false, message: error.message }
+
+  const { buildPortalLoginLink } = await import('@/lib/portal-utils')
+  return {
+    ok: true,
+    loginLink: buildPortalLoginLink(),
+    hasAuthAccount: Boolean(
+      (row as { auth_user_id?: string | null } | null)?.auth_user_id
+    ),
+  }
+}
+
+/** Globale Suche (Cmd+K) — Server Action wegen RLS-Fallback auf kunden. */
+export async function searchKundenGlobal(
+  term: string
+): Promise<Pick<Kunde, 'id' | 'name' | 'email'>[]> {
+  const q = term.trim().slice(0, 80).replace(/[%]/g, '')
+  if (q.length < 2) return []
+  const pct = `%${q}%`
+  const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'email'>>()
+
+  for (const column of ['name', 'email'] as const) {
+    const { data } = await withCrmReadFallback(async (db) =>
+      db.from('kunden').select('id, name, email').ilike(column, pct).limit(4)
+    )
+    for (const row of data ?? []) {
+      if (row?.id) byId.set(row.id as string, row as Pick<Kunde, 'id' | 'name' | 'email'>)
+    }
   }
 
   return Array.from(byId.values())
