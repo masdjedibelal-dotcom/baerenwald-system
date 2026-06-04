@@ -10,11 +10,31 @@ export const RECHNUNG_STATUS_LABELS: Record<RechnungStatus, string> = {
   storniert: 'Storniert',
 }
 
+export const RECHNUNG_BELEG_TYPEN = ['rechnung', 'gutschrift'] as const
+export type RechnungBelegTyp = (typeof RECHNUNG_BELEG_TYPEN)[number]
+
+export const RECHNUNG_BELEG_TYP_LABELS: Record<RechnungBelegTyp, string> = {
+  rechnung: 'Rechnung',
+  gutschrift: 'Gutschrift',
+}
+
 export const DEFAULT_ZAHLUNGSZIEL_TAGE = 14
 
-/** Standard-MwSt.-Satz für Angebote & Rechnungen */
+/** Standard-MwSt.-Satz, wenn Zeile keinen eigenen Satz hat */
 export const DEFAULT_MWST_SATZ = 19
+
+export const EINSTELLUNG_KLEINUNTERNEHMER = 'kleinunternehmer'
+
+/** § 19 UStG — Pflichthinweis auf Rechnungen ohne USt */
+export const HINWEIS_KLEINUNTERNEHMER =
+  'Gemäß § 19 UStG wird keine USt. berechnet.'
+
+/** § 13b UStG — Reverse Charge Bauleistungen */
+export const HINWEIS_REVERSE_CHARGE_13B =
+  'Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG (Reverse Charge). Die USt. ist vom Leistungsempfänger zu entrichten.'
 
 /** § 35a EStG: Hinweistext (Platzhalter {lohnNetto} {abschlag20}) */
 export const HINWEIS_35A_TEMPLATE =
-  'Für Privatkunden: Der Lohnkostenanteil von {lohnNetto} € kann nach § 35a EStG steuerlich geltend gemacht werden (20 % = {abschlag20} €).'
+  'Für Privatkunden: Der Lohnkostenanteil von {lohnNetto} kann nach § 35a EStG steuerlich geltend gemacht werden (20 % = {abschlag20}).'
+
+export const MWST_SAETZE_RECHNUNG = [0, 7, 19] as const

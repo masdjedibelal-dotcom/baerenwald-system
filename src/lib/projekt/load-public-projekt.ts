@@ -87,7 +87,7 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
     .select('id, typ, titel, beschreibung, foto_urls, created_at')
     .eq('auftrag_id', auftragId)
     .eq('fuer_kunde_freigegeben', true)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
 
   const { data: msRows } = await supabaseAdmin
     .from('auftrag_milestones')

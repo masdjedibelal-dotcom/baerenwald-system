@@ -1,12 +1,7 @@
+import 'server-only'
+
 import { randomBytes } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-
-export function projektUrlFromToken(token: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
-  return `${base}/projekt/${token}`
-}
 
 /** Stellt sicher, dass der Auftrag einen `kunden_token` hat (Migration / Altbestände). */
 export async function ensureKundenTokenForAuftrag(auftragId: string): Promise<string | null> {

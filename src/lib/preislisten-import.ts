@@ -4,8 +4,10 @@ export type PreislistenImportMapping = {
   kategorie: string
   leistung: string
   einheit: string
-  preis_min: string
-  preis_max: string
+  /** Netto-Einzelpreis */
+  preis: string
+  /** Legacy-CSV */
+  preis_min?: string
 }
 
 export type PreislistenImportFehler = { zeile: number; grund: string }
