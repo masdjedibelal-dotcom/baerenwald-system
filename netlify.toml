@@ -1,8 +1,0 @@
-# Next.js 14 auf Netlify — ohne Plugin schlägt der Build bzw. das Routing oft fehl.
-# https://docs.netlify.com/integrations/frameworks/next-js/overview/
-
-[build]
-  command = "npm run build"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
