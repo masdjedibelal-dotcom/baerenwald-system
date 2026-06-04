@@ -1,0 +1,730 @@
+'use client'
+
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import {
+  ArrowRight,
+  Briefcase,
+  Calendar,
+  CircleX,
+  FileText,
+  HelpCircle,
+  History,
+  ListChecks,
+  MoreHorizontal,
+  StickyNote,
+  Mail,
+  PhoneOff,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
+import { DetailHead } from '@/components/layout/DetailHead'
+import { DetailScreenShell } from '@/components/layout/app'
+import { useCrmRefresh } from '@/hooks/useCrmRefresh'
+import { DetailTabBar } from '@/components/ui/detail-tab-bar'
+import { DetailProp } from '@/components/ui/detail-prop'
+import { LeadNaechsteSchritteCard, buildLeadNaechsteSchritte } from '@/components/anfragen/LeadNaechsteSchritteCard'
+import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
+import { Timeline } from '@/components/ui/timeline'
+import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
+import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+import { LeadStatusBadge } from '@/components/ui/Badge'
+import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
+import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
+import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
+import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
+import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
+import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
+import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
+import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
+import { kundentypLabel, resolveLeadKunde } from '@/lib/lead-display-helpers'
+import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
+import { istKundeFirmaPflichtTyp, istKundeGewerbeTyp, istKundeNurGewerbeTyp } from '@/lib/kunde-stammdaten'
+import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import { fetchKundenObjekte, setLeadKundeObjekt } from '@/app/actions/kunden-objekte'
+import type { KundenObjekt } from '@/lib/types'
+
+const AngebotWizard = dynamic(
+  () =>
+    import('@/components/angebote/AngebotWizard').then((mod) => ({
+      default: mod.AngebotWizard,
+    })),
+  { ssr: false }
+)
+
+const KundeModal = dynamic(
+  () =>
+    import('@/components/kunden/KundeModal').then((mod) => ({
+      default: mod.KundeModal,
+    })),
+  { ssr: false }
+)
+import { toast } from '@/components/ui/app-toast'
+import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
+import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
+import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import type { Gewerk, KalenderTermin, LeadDetail, LeadNotizRow, Preisliste } from '@/lib/types'
+import {
+  STATUS_LABELS,
+  formatDatum,
+  formatDatumZeit,
+  formatRelativeDate,
+} from '@/lib/utils'
+import { isEchterFreitext } from '@/lib/lead-display-helpers'
+
+type DetailTab = 'schritte' | 'timeline' | 'notizen' | 'dokumente'
+
+function kundenName(lead: LeadDetail) {
+  return leadKontaktAnzeigeName(lead)
+}
+
+type AngebotKurz = {
+  id: string
+  status: string
+  gesamt_fix?: number | null
+  gesamt_min: number | null
+  gesamt_max: number | null
+  created_at: string
+  angebotsnr?: string | null
+  pdf_url?: string | null
+}
+
+export function AnfrageDetailClient({
+  lead: initial,
+  angeboteListe = [],
+  wizardGewerke = [],
+  wizardPreislisten = [],
+  wizardFirm,
+  kundenObjekte = [],
+  angebotKopieVonQuelleId,
+}: {
+  lead: LeadDetail
+  angeboteListe?: AngebotKurz[]
+  wizardGewerke?: Gewerk[]
+  wizardPreislisten?: Preisliste[]
+  wizardFirm?: FirmenEinstellungen
+  kundenObjekte?: KundenObjekt[]
+  /** Server: beim Aufruf mit ?angebot_kopie_von= wird der Wizard als 1:1-Kopie geöffnet. */
+  angebotKopieVonQuelleId?: string
+}) {
+  const router = useRouter()
+  const { refresh } = useCrmRefresh()
+  const [lead, setLead] = useState(initial)
+  const [pending, startTransition] = useTransition()
+  const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [angebotWizardOpen, setAngebotWizardOpen] = useState(false)
+  const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
+    useState<AngebotWizardBootstrap | null>(null)
+  const [wizardSessionKey, setWizardSessionKey] = useState(0)
+  const kopieQueryHandledRef = useRef(false)
+  const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
+
+  const [tab, setTab] = useState<DetailTab>('schritte')
+  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
+  const [objekteListe, setObjekteListe] = useState<KundenObjekt[]>(kundenObjekte)
+
+  const kunde = useMemo(() => resolveLeadKunde(lead.kunden), [lead.kunden])
+  const kundeTypFuerObjekte = resolveAngebotKundeTyp(kunde?.typ, lead.kundentyp)
+  const kundeIdFuerObjekte = kunde?.id ?? lead.kunde_id ?? ''
+  const zeigeObjekteCard =
+    Boolean(kundeIdFuerObjekte) && istKundeGewerbeTyp(kundeTypFuerObjekte)
+
+  useEffect(() => {
+    setLead(initial)
+  }, [initial.id])
+
+  useEffect(() => {
+    if (!zeigeObjekteCard || !kundeIdFuerObjekte) {
+      setObjekteListe([])
+      return
+    }
+    let cancelled = false
+    void fetchKundenObjekte(kundeIdFuerObjekte).then((rows) => {
+      if (!cancelled) setObjekteListe(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [zeigeObjekteCard, kundeIdFuerObjekte])
+
+  function waehleLeadObjekt(objektId: string | null) {
+    setLead((l) => ({ ...l, kunde_objekt_id: objektId }))
+    startTransition(async () => {
+      const r = await setLeadKundeObjekt(lead.id, objektId)
+      if (!r.ok) toast.error(r.message)
+    })
+  }
+
+  const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
+
+  const history = sortTimelineByCreatedAtAsc(lead.leads_status_history ?? [])
+
+  const leadStatusData = useMemo(() => {
+    const fd = lead.funnel_daten
+    const rec = typeof fd === 'object' && fd !== null ? (fd as Record<string, unknown>) : {}
+    const funnelAngebotId = typeof rec.angebot_id === 'string' ? rec.angebot_id : undefined
+    const auftragId = typeof rec.auftrag_id === 'string' ? rec.auftrag_id : undefined
+    const angeboteQuelle =
+      angeboteListe.length > 0
+        ? angeboteListe
+        : Array.isArray(lead.angebote)
+          ? lead.angebote
+          : []
+    const funnel = leadAngebotFunnelFromListe(angeboteQuelle, funnelAngebotId)
+    return {
+      ...funnel,
+      auftrag_href: auftragId ? `/auftraege/${auftragId}` : undefined,
+      auftrag_id: auftragId,
+      abgeschlossen_datum: lead.status === 'abgeschlossen' ? formatDatum(lead.updated_at) : undefined,
+    }
+  }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote, angeboteListe])
+
+  const timelineSorted = useMemo(
+    () => sortTimelineByCreatedAtAsc(lead.lead_timeline ?? []),
+    [lead.lead_timeline]
+  )
+
+  const notizenRows = useMemo(() => {
+    const raw = lead.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_notizen])
+
+  const timelineItems = useMemo(() => {
+    const fromEvents = timelineSorted.map((ev) => ({
+      id: ev.id,
+      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
+      time: formatRelativeDate(ev.created_at),
+      state: 'done' as const,
+      ts: new Date(ev.created_at).getTime(),
+      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
+      onLinkClick: ev.email_log_id ? () => setEmailPreviewId(ev.email_log_id!) : undefined,
+    }))
+    const fromHistory = history.map((h) => ({
+      id: h.id,
+      text:
+        h.status_alt != null
+          ? `Status: ${STATUS_LABELS[h.status_alt]} → ${STATUS_LABELS[h.status_neu]}`
+          : `Status: ${STATUS_LABELS[h.status_neu]}`,
+      time: formatDatumZeit(h.created_at),
+      state: 'active' as const,
+      ts: new Date(h.created_at).getTime(),
+    }))
+    return [...fromEvents, ...fromHistory]
+      .sort((a, b) => a.ts - b.ts)
+      .map((item) => ({
+        text: item.text,
+        time: item.time,
+        state: item.state,
+        id: item.id,
+        linkLabel: 'linkLabel' in item ? item.linkLabel : undefined,
+        onLinkClick: 'onLinkClick' in item ? item.onLinkClick : undefined,
+      }))
+  }, [timelineSorted, history])
+
+  const dokumenteCount = useMemo(
+    () => angeboteListe.filter((a) => a.pdf_url?.trim()).length,
+    [angeboteListe]
+  )
+
+  const kundenStamm = useMemo(
+    () =>
+      kundeRechnungsempfaengerAusStammdaten(kunde, {
+        plz: lead.plz,
+        kontakt_name: lead.kontakt_name,
+        kontakt_email: lead.kontakt_email,
+        kontakt_telefon: lead.kontakt_telefon,
+        funnel_daten: lead.funnel_daten,
+      }),
+    [
+      kunde,
+      lead.plz,
+      lead.kontakt_name,
+      lead.kontakt_email,
+      lead.kontakt_telefon,
+      lead.funnel_daten,
+    ]
+  )
+
+  const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
+  const auftragId = leadStatusData.auftrag_id as string | undefined
+  const mailCompose = useKundenMailCompose()
+
+  const openAngebotWizard = useCallback((bootstrap: AngebotWizardBootstrap | null) => {
+    setAngebotWizardBootstrap(bootstrap)
+    setWizardSessionKey((k) => k + 1)
+    setAngebotWizardOpen(true)
+  }, [])
+
+  useEffect(() => {
+    const kopieId = angebotKopieVonQuelleId?.trim()
+    if (!kopieId) {
+      kopieQueryHandledRef.current = false
+      return
+    }
+    if (kopieQueryHandledRef.current) return
+    kopieQueryHandledRef.current = true
+    const lid = lead.id
+    let cancelled = false
+    void (async () => {
+      const res = await loadAngebotWizardBootstrapKopie(kopieId, lid)
+      if (cancelled) return
+      if (!res.ok) {
+        toast.error(res.message)
+        router.replace(`/anfragen/${lid}`, { scroll: false })
+        return
+      }
+      openAngebotWizard(res.bootstrap)
+      router.replace(`/anfragen/${lid}`, { scroll: false })
+      refresh()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [angebotKopieVonQuelleId, lead.id, openAngebotWizard, router])
+
+  const hasAngebote = angeboteListe.length > 0
+
+  const openAngebotErstellen = useCallback(() => {
+    if (angeboteListe.length === 0) {
+      openAngebotWizard(null)
+      return
+    }
+    router.push(`/anfragen/${lead.id}/angebote`)
+  }, [angeboteListe.length, lead.id, openAngebotWizard, router])
+
+  const closeAngebotWizard = useCallback(() => {
+    setAngebotWizardOpen(false)
+    setAngebotWizardBootstrap(null)
+  }, [])
+
+  const naechsteSchritte = useMemo(
+    () =>
+      buildLeadNaechsteSchritte(lead.status, {
+        angeboteCount: angeboteListe.length,
+        hatAngenommenesAngebot: Boolean(leadStatusData.angebot_angenommen),
+        angenommenAngebotHref: leadStatusData.angebot_href,
+        auftragId,
+        leadId: lead.id,
+        onAngebotClick: openAngebotErstellen,
+      }),
+    [
+      lead.status,
+      lead.id,
+      angeboteListe.length,
+      auftragId,
+      openAngebotErstellen,
+      leadStatusData.angebot_angenommen,
+      leadStatusData.angebot_href,
+    ]
+  )
+
+  const offeneSchritteCount = useMemo(
+    () => naechsteSchritte.filter((s) => !s.done).length,
+    [naechsteSchritte]
+  )
+
+  const detailTabs = useMemo(
+    () => [
+      {
+        id: 'schritte',
+        label: 'Nächste Schritte',
+        icon: ListChecks,
+        count: offeneSchritteCount || undefined,
+      },
+      {
+        id: 'timeline',
+        label: ACTIVITY_SECTIONS.verlauf,
+        icon: History,
+        count: timelineItems.length || undefined,
+      },
+      {
+        id: 'notizen',
+        label: ACTIVITY_SECTIONS.notizen,
+        icon: StickyNote,
+        count: notizenRows.length || undefined,
+      },
+      {
+        id: 'dokumente',
+        label: ACTIVITY_SECTIONS.dokumente,
+        icon: FileText,
+        count: dokumenteCount || undefined,
+      },
+    ],
+    [offeneSchritteCount, timelineItems.length, notizenRows.length, dokumenteCount]
+  )
+
+  const detailHeadMenuItems = useMemo((): ActionsMenuItem[] => {
+    return [
+      {
+        label: 'Bearbeiten',
+        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => setBearbeitenOpen(true),
+      },
+      {
+        label: 'E-Mail schreiben',
+        icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
+        hint: leadEmail?.trim() ? undefined : 'E-Mail im Modal eintragen',
+        onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
+      },
+      'sep',
+      {
+        label: 'Termin vereinbart',
+        icon: <Calendar className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => setStatusModalKind('termin'),
+      },
+      {
+        label: 'Warte auf Antwort',
+        icon: <HelpCircle className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => setStatusModalKind('rueckfrage'),
+      },
+      {
+        label: 'Nicht erreichbar',
+        icon: <PhoneOff className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => setStatusModalKind('nicht_erreichbar'),
+      },
+      {
+        label: 'Abgelehnt',
+        icon: <CircleX className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => setStatusModalKind('verloren'),
+      },
+      'sep',
+      {
+        label: 'Anfrage löschen',
+        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+        danger: true,
+        onClick: () => setDeleteConfirmOpen(true),
+      },
+    ]
+  }, [lead.id, leadEmail, mailCompose])
+
+  function fuehreAnfrageLoeschen() {
+    startTransition(async () => {
+      const r = await deleteAnfrage(lead.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Anfrage gelöscht')
+      setDeleteConfirmOpen(false)
+      router.push('/anfragen')
+      refresh()
+    })
+  }
+
+  const headSub =
+    [
+      lead.created_at ? `Anfrage vom ${formatDatum(lead.created_at)}` : null,
+      lead.plz?.trim() || null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Anfrage'
+
+  const stammdatenCard = (
+    <Card
+      collapsible
+      title="Stammdaten"
+      action={
+        kunde ? (
+          <button
+            type="button"
+            onClick={() => setStammdatenModalOpen(true)}
+            className="btn btn-ghost btn-sm"
+            aria-label="Stammdaten bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        ) : null
+      }
+    >
+      {!kunde ? (
+        <p className="text-[13px] text-bw-text-muted">Kein Kunden-Stammdatensatz verknüpft.</p>
+      ) : (
+        <>
+          {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
+            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+              Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
+            </p>
+          ) : null}
+          <div className="props">
+            {kundenStamm.kundennummer ? (
+              <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
+            ) : null}
+            {kunde && istKundeFirmaPflichtTyp(kunde.typ) ? (
+              <>
+                <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
+                {kundenStamm.vorname ? (
+                  <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
+                ) : null}
+                {kundenStamm.nachname ? (
+                  <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {kundenStamm.vorname ? (
+                  <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp>
+                ) : null}
+                <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
+              </>
+            )}
+            {kundenStamm.ansprechpartner && kunde && istKundeNurGewerbeTyp(kunde.typ) ? (
+              <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
+            ) : null}
+            <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
+            <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
+            <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
+            <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
+            <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
+            <DetailProp label="Telefon">
+              {kundenStamm.telefon ? (
+                <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
+              ) : (
+                '—'
+              )}
+            </DetailProp>
+            <DetailProp label="E-Mail">
+              {kundenStamm.email ? (
+                <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
+              ) : (
+                '—'
+              )}
+            </DetailProp>
+            {kundenStamm.ust_id ? (
+              <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp>
+            ) : null}
+          </div>
+        </>
+      )}
+    </Card>
+  )
+
+  const objekteCard =
+    zeigeObjekteCard && kundeIdFuerObjekte ? (
+      <KundenObjekteCard
+        key={kundeIdFuerObjekte}
+        kundeId={kundeIdFuerObjekte}
+        objekte={objekteListe}
+        selectedId={lead.kunde_objekt_id}
+        onSelect={waehleLeadObjekt}
+        onChanged={() => refresh()}
+      />
+    ) : null
+
+  const timelineTab = (
+    <>
+      <Timeline items={timelineItems} />
+      <EmailLogPreviewModal
+        emailLogId={emailPreviewId}
+        open={Boolean(emailPreviewId)}
+        onClose={() => setEmailPreviewId(null)}
+      />
+    </>
+  )
+
+  const projektuebersichtCards = (
+    <>
+      <LeadFunnelProjektAnzeige
+        lead={lead}
+        gewerke={wizardGewerke}
+        preislisten={wizardPreislisten}
+        onSaved={() => refresh()}
+      />
+      {objekteCard}
+      {isEchterFreitext(lead.kontakt_nachricht) ? (
+        <Card title="Nachricht vom Kunden">
+          <p className="text-[13px] leading-relaxed text-bw-text-muted">{lead.kontakt_nachricht}</p>
+        </Card>
+      ) : null}
+    </>
+  )
+
+  const fixedOverview = (
+    <div className="space-y-3">
+      {stammdatenCard}
+      {projektuebersichtCards}
+      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey} />
+      <LeadTermineCard
+        leadId={lead.id}
+        termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
+        notizen={notizenRows}
+        onReload={() => refresh()}
+      />
+    </div>
+  )
+
+  const tabContent =
+    tab === 'schritte' ? (
+      <LeadNaechsteSchritteCard steps={naechsteSchritte} onQuickAngebot={openAngebotErstellen} />
+    ) : tab === 'timeline' ? (
+      timelineTab
+    ) : tab === 'notizen' ? (
+      <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
+    ) : (
+      <AnfrageDokumenteTab angebote={angeboteListe} />
+    )
+
+  const kiAnalyseCard =
+    lead.ki_zusammenfassung?.trim() ? (
+      <details className="group rounded-lg border border-[#2E7D52] bg-[#EAF3DE]">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-[#2E7D52] marker:content-none [&::-webkit-details-marker]:hidden">
+          <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          KI Vertriebs-Analyse
+        </summary>
+        <p className="whitespace-pre-wrap border-t border-[#2E7D52]/25 px-4 pb-3.5 pt-2 text-[13px] leading-relaxed text-[#1A3D2B]">
+          {lead.ki_zusammenfassung.trim()}
+        </p>
+      </details>
+    ) : null
+
+  const main = (
+    <>
+      {fixedOverview}
+      <DetailScreenShell
+        tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />}
+      >
+        <div className="min-w-0 space-y-3">{tabContent}</div>
+      </DetailScreenShell>
+    </>
+  )
+
+  return (
+    <div className="space-y-4 pb-6">
+      <DetailHead
+        backHref="/anfragen"
+        backLabel="Zurück zu Anfragen"
+        title={
+          <div className="detail-head-title-row">
+            <span>{kundenName(lead)}</span>
+            <LeadStatusBadge status={lead.status} />
+          </div>
+        }
+        sub={headSub}
+        actions={
+          <>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none md:flex-none"
+              onClick={openAngebotErstellen}
+            >
+              {hasAngebote ? CTA.angeboteOeffnen : CTA.angebotErstellen}
+              <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            </button>
+            {auftragId ? (
+              <Link
+                href={`/auftraege/${auftragId}`}
+                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 md:btn-ghost"
+              >
+                <Briefcase className="h-3.5 w-3.5" aria-hidden />
+                <span className="hidden sm:inline">Auftrag</span>
+              </Link>
+            ) : null}
+            <ActionsMenu
+              trigger={
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
+                  aria-label="Weitere Aktionen"
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  <span className="sr-only sm:not-sr-only">Mehr</span>
+                </button>
+              }
+              items={detailHeadMenuItems}
+              sheetTitle="Anfrage"
+            />
+          </>
+        }
+      />
+
+      {kiAnalyseCard}
+
+      {main}
+
+      {angebotWizardOpen ? (
+        <AngebotWizard
+          key={wizardSessionKey}
+          lead={lead}
+          gewerke={wizardGewerke}
+          preislisten={wizardPreislisten}
+          firm={wizardFirm}
+          kundenObjekte={objekteListe}
+          bootstrap={angebotWizardBootstrap}
+          onClose={closeAngebotWizard}
+          onDone={() => {
+            closeAngebotWizard()
+            refresh()
+          }}
+        />
+      ) : null}
+
+      <AnfrageNeuSheet
+        open={bearbeitenOpen}
+        onClose={() => setBearbeitenOpen(false)}
+        bearbeitenLead={lead}
+        onSuccess={() => {
+          setBearbeitenOpen(false)
+          refresh()
+        }}
+      />
+
+      <StatusModal
+        kind={statusModalKind}
+        open={statusModalKind != null}
+        lead={lead}
+        onClose={() => setStatusModalKind(null)}
+        onSaved={() => {
+          setStatusModalKind(null)
+          refresh()
+        }}
+      />
+
+      <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Anfrage löschen">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-bw-text-muted">
+            Die Anfrage wird dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden — zugehörige Einträge zu
+            diesem Lead (z.&nbsp;B. Notizen, Termine) werden mit entfernt, soweit in der Datenbank vorgesehen.
+          </p>
+          <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setDeleteConfirmOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="danger" loading={pending} onClick={fuehreAnfrageLoeschen}>
+              Endgültig löschen
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {kunde ? (
+        <KundeModal
+          open={stammdatenModalOpen}
+          onClose={() => setStammdatenModalOpen(false)}
+          editKunde={kunde}
+          leadFunnelDaten={lead.funnel_daten}
+          stayOnPage
+          revalidateAnfrageId={lead.id}
+          onSaved={() => {
+            toast.success('Stammdaten gespeichert')
+            refresh()
+          }}
+        />
+      ) : null}
+
+      {mailCompose.modal}
+    </div>
+  )
+}
