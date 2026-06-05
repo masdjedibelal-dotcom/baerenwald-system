@@ -9,7 +9,7 @@ import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
 import { sendMail } from '@/lib/mail-service'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   mailAngebot,
   mailAngebotAnnahmeBestaetigung,
