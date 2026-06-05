@@ -9,7 +9,7 @@
     "dev": "WATCHPACK_POLLING=true next dev",
     "dev:skip-auth": "CRM_DEV_SKIP_AUTH=true WATCHPACK_POLLING=true next dev -p 3001",
     "dev:clean": "rm -rf .next && WATCHPACK_POLLING=true next dev",
-    "build": "node scripts/remove-deploy-blockers.mjs && node scripts/check-import-paths.mjs && next build",
+    "build": "node scripts/remove-deploy-blockers.mjs && node scripts/check-import-paths.mjs && node scripts/check-client-imports.mjs && next build",
     "build:check-imports": "node scripts/check-import-paths.mjs",
     "start": "next start",
     "lint": "next lint",
