@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailBesichtigungTermin } from '@/lib/mail-templates'
 import {
   anfrageAdresseAusPayload,

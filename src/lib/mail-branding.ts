@@ -1,7 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { resolveBrandLogoUrl } from '@/lib/brand'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { FESTNETZ_TELEFON_DEFAULT, telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
 
 export type MailBranding = {
@@ -26,12 +24,6 @@ export function envMailBranding(): MailBranding {
     logoUrl: resolveBrandLogoUrl('white'),
     logoUrlOnLight: resolveBrandLogoUrl('green'),
   }
-}
-
-/** Firmen-Branding aus Supabase (Server Actions, API-Routen, Mail-Versand). */
-export async function getMailBranding(supabase: SupabaseClient): Promise<MailBranding> {
-  const f = await fetchFirmenEinstellungen(supabase)
-  return firmenEinstellungenToMailBranding(f)
 }
 
 /** Für Client-Vorschauen mit `defaultFirmenEinstellungen()` o. Ä. */
