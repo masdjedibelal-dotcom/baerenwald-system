@@ -1,4 +1,5 @@
 import type { AngebotPosition } from '@/lib/types'
+import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { zeilenNettoMinMax } from '@/lib/angebot-positionen'
 
 export type AuftragPositionInsert = {
@@ -35,7 +36,9 @@ export function angebotPositionenToAuftragRows(
   opts?: { gewerkEkByGewerkId?: Map<string, number> }
 ): AuftragPositionInsert[] {
   const ekMap = opts?.gewerkEkByGewerkId
-  return positionen.map((p, i) => {
+  return positionen
+    .filter((p) => !istGewerkBeschreibungPosition(p))
+    .map((p, i) => {
     const m = p.menge || 1
     const preis = preisZeileNetto(p)
     const beschreibung = [p.beschreibung, p.notiz_extern].filter(Boolean).join('\n').trim() || null

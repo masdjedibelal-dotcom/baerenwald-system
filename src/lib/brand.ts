@@ -32,7 +32,10 @@ function websiteLogoPath(variant: BrandLogoVariant): string {
   return variant === 'white' ? '/logo-mark-white.png' : '/logo-mark-green.png'
 }
 
-/** Absolute URL für E-Mails (Resend braucht https://…). */
+/**
+ * Absolute Logo-URL für E-Mails — wie auf der Webseite:
+ * https://baerenwaldmuenchen.de/logo-mark-green.png (bzw. -white)
+ */
 export function resolveBrandLogoUrl(
   variant: BrandLogoVariant = 'white',
   explicitOverride?: string | null
@@ -40,16 +43,11 @@ export function resolveBrandLogoUrl(
   const custom = explicitOverride?.trim()
   if (custom) {
     if (/^https?:\/\//i.test(custom)) return custom
-    const fromApp = resolvePublicAppUrl(custom)
-    if (/^https?:\/\//i.test(fromApp)) return fromApp
     return `${emailLogoHostFallback()}${custom.startsWith('/') ? custom : `/${custom}`}`
   }
 
   const envLogo = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL?.trim()
   if (envLogo) return envLogo
-
-  const fromApp = resolvePublicAppUrl(brandLogoPath(variant))
-  if (/^https?:\/\//i.test(fromApp)) return fromApp
 
   return `${emailLogoHostFallback()}${websiteLogoPath(variant)}`
 }
