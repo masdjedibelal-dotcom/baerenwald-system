@@ -10,9 +10,9 @@ import { fileURLToPath } from 'url'
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const paths = [
-  'app',
   'vercel.json',
   'StatusActions.tsx',
+  /** Legacy-Duplikate im Repo-Root (nicht src/components/ui). */
   'ui',
   'rechnungen',
   'projekt',
@@ -20,14 +20,6 @@ const paths = [
   'src/app/(dashboard)/anfragen/[id]/vorab',
   'src/app/(dashboard)/auftraege/[id]/vor-baubeginn',
   'src/app/api/auftraege/[id]/protokoll',
-  'src/components/anfragen/VorOrtAufnahmeClient.tsx',
-  'src/components/anfragen/VorabAnfrageClient.tsx',
-  'src/components/anfragen/AnfrageSidePanel.tsx',
-  'src/components/angebote/AngebotDetailClient.tsx',
-  'src/components/dashboard/DashboardHomeClient.tsx',
-  'src/components/auftraege/AuftragKundenstatusSection.tsx',
-  'src/components/auftraege/VorBaubeginnForm.tsx',
-  'src/components/rechnungen/RechnungEntwurfForm.tsx',
   'src/lib/vorab-angebot-from-vorab.ts',
   'src/lib/vorab-vorort-initial.ts',
 ]

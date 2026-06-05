@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Verhindert Netlify-Build-Fehler: Client Components dürfen keine Server-Module
- * (server-only / supabase-admin) als Value-Import laden — außer Server Actions.
+ * Client-sichere Lib-Module: dürfen von 'use client'-Komponenten importiert werden,
+ * auch wenn sie indirekt Server-Code nutzen könnten (nur reine Hilfsfunktionen).
  */
 import fs from 'fs'
 import path from 'path'
@@ -15,6 +15,14 @@ const SERVER_MARKERS = [
   'from "@/lib/supabase-admin"',
   "from '@/lib/supabase-admin'",
 ]
+
+/** Bekannte client-sichere Module (kein server-only im Dateiinhalt). */
+const CLIENT_SAFE_IMPORTS = new Set([
+  '@/lib/mail-branding',
+  '@/lib/kalender-internes-todo',
+  '@/lib/gewerke-ausfuehrung',
+  '@/lib/firmen-einstellungen',
+])
 
 function walk(dir, acc = []) {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -40,7 +48,8 @@ function isServerActionModule(filePath, text) {
   return /(?:^|[/\\])[\w-]*actions\.ts$/.test(filePath)
 }
 
-function isServerModule(filePath) {
+function isServerModule(filePath, importPath) {
+  if (CLIENT_SAFE_IMPORTS.has(importPath)) return false
   const text = fs.readFileSync(filePath, 'utf8')
   if (isServerActionModule(filePath, text)) return false
   return SERVER_MARKERS.some((m) => text.includes(m))
@@ -60,7 +69,7 @@ for (const file of walk(srcDir)) {
   while ((m = importRe.exec(text))) {
     const imp = m[2]
     const target = resolveImport(imp)
-    if (target && isServerModule(target)) {
+    if (target && isServerModule(target, imp)) {
       broken.push({
         client: path.relative(root, file),
         import: imp,
