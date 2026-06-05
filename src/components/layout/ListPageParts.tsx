@@ -1,28 +1,71 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { createContext, useContext, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { FilterChips, type FilterOption } from '@/components/ui/FilterChips'
+
+export type ListFilterChipGroup = {
+  label?: string
+  options: FilterOption[]
+  selected: string[]
+  onChange: (values: string[]) => void
+  multiple?: boolean
+}
+
+const ListFilterChipGroupsContext = createContext<ListFilterChipGroup[]>([])
+
+export function useListFilterChipGroups(): ListFilterChipGroup[] {
+  return useContext(ListFilterChipGroupsContext)
+}
 
 type ListFilterSectionProps = {
-  /** Status-/Typ-Chips in eigener Zeile unter Suche & Filtern */
+  /** Status-/Typ-Chips — Desktop sichtbar, Mobil im Filter-Sheet */
+  chipGroups?: ListFilterChipGroup[]
+  /** Legacy: freie Chip-Zeile (nur Desktop) */
   chips?: ReactNode
-  /** ListFilterBar (Suche links, Filter rechts) */
   children: ReactNode
   className?: string
 }
 
 /**
- * Einheitliches Listen-Filter-Layout (Mobil + Desktop):
- * Zeile 1: Suche | Divider | Filter
- * Zeile 2: Filter-Chips
+ * Einheitliches Listen-Filter-Layout:
+ * Desktop — Zeile 1: Suche | Filter; Zeile 2: Chips
+ * Mobil — Suche + Filter-Button; Chips nur im Sheet
  */
-export function ListFilterSection({ chips, children, className }: ListFilterSectionProps) {
+export function ListFilterSection({ chipGroups, chips, children, className }: ListFilterSectionProps) {
+  const desktopChips =
+    chipGroups && chipGroups.length > 0 ? (
+      <div className="flex min-w-0 flex-col gap-2">
+        {chipGroups.map((group, index) => (
+          <div key={group.label ?? `chip-group-${index}`} className="min-w-0">
+            {group.label ? (
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+                {group.label}
+              </p>
+            ) : null}
+            <FilterChips
+              options={group.options}
+              selected={group.selected}
+              onChange={group.onChange}
+              multiple={group.multiple}
+            />
+          </div>
+        ))}
+      </div>
+    ) : (
+      chips
+    )
+
   return (
-    <div
-      data-list-filter-sticky
-      className={cn('list-filter-section list-filter-sticky mb-4 flex flex-col gap-2.5', className)}
-    >
-      {children}
-      {chips ? <div className="list-filter-chips-row min-w-0">{chips}</div> : null}
-    </div>
+    <ListFilterChipGroupsContext.Provider value={chipGroups ?? []}>
+      <div
+        data-list-filter-sticky
+        className={cn('list-filter-section list-filter-sticky mb-4 flex flex-col gap-2.5', className)}
+      >
+        {children}
+        {desktopChips ? <div className="list-filter-chips-row hidden min-w-0 md:block">{desktopChips}</div> : null}
+      </div>
+    </ListFilterChipGroupsContext.Provider>
   )
 }
 
@@ -77,7 +120,7 @@ export function ListMobileStack({ children, className }: { children: ReactNode; 
   return <ul className={cn('list-mobile-stack', className)}>{children}</ul>
 }
 
-/** Zeile für MobileSortSelect o. Ä. */
+/** Zeile für MobileSortSelect o. Ä. — nur Desktop sichtbar (Sortierung mobil im Filter-Sheet). */
 export function ListSortRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('list-sort-row', className)}>{children}</div>
+  return <div className={cn('list-sort-row hidden md:block', className)}>{children}</div>
 }

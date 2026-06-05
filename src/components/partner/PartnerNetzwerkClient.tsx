@@ -10,13 +10,11 @@ import {
   ListMobileStack,
   ListGridShell,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { FilterChips } from '@/components/ui/FilterChips'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { SortableHeader } from '@/components/ui/SortableHeader'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useSort } from '@/hooks/useSort'
@@ -250,16 +248,6 @@ export function PartnerNetzwerkClient({
     { field: 'kategorie', label: 'Kategorie' },
   ]
 
-  const sortSelect = (
-    <MobileSortSelect
-      variant="pill"
-      options={sortOptions}
-      currentField={field}
-      currentDir={dir}
-      onSort={(f) => (f ? handleSort(f) : resetSort())}
-    />
-  )
-
   const typChipOptions = useMemo(
     () => [
       { label: 'Alle', value: 'alle', count: typCounts.alle },
@@ -286,26 +274,25 @@ export function PartnerNetzwerkClient({
       mode={mode}
       filters={
       <ListFilterSection
-        chips={
-          <div className="flex min-w-0 flex-col gap-2">
-            <FilterChips
-              options={typChipOptions}
-              selected={[typFilter]}
-              onChange={(vals) => {
-                setTypFilter((vals[0] as TypListenFilter) || 'alle')
-                setBrancheFilter('alle')
-              }}
-            />
-            <FilterChips
-              options={brancheChipOptions}
-              selected={[brancheFilter]}
-              onChange={(vals) => setBrancheFilter(vals[0] || 'alle')}
-            />
-          </div>
-        }
+        chipGroups={[
+          {
+            label: 'Typ',
+            options: typChipOptions,
+            selected: [typFilter],
+            onChange: (vals) => {
+              setTypFilter((vals[0] as TypListenFilter) || 'alle')
+              setBrancheFilter('alle')
+            },
+          },
+          {
+            label: 'Branche',
+            options: brancheChipOptions,
+            selected: [brancheFilter],
+            onChange: (vals) => setBrancheFilter(vals[0] || 'alle'),
+          },
+        ]}
       >
         <ListFilterBar
-          hideToolbarOnMobile
           hideStatusFilter
           statusLabel="—"
           statusOptions={[{ value: '', label: '—' }]}
@@ -325,28 +312,13 @@ export function PartnerNetzwerkClient({
           hasActiveFilters={hasActiveFilters}
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
-          mobileRail={
-            <AppListFilterRail
-              sort={
-                <MobileSortSelect
-                  variant="pill"
-                  options={sortOptions}
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={(f) => (f ? handleSort(f) : resetSort())}
-                />
-              }
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-              secondaryFilter={{
-                label: 'Branche',
-                options: brancheChipOptions.map((o) => ({ value: o.value, label: o.label })),
-                value: brancheFilter,
-                onChange: setBrancheFilter,
-              }}
-              onExportClick={() => setExportOpen(true)}
-            />
-          }
+          resultCount={filtered.length}
+          sort={{
+            options: sortOptions,
+            currentField: field,
+            currentDir: dir,
+            onSort: (f) => (f ? handleSort(f) : resetSort()),
+          }}
         />
       </ListFilterSection>
       }
