@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mail-service'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/get-mail-branding'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { buildAngebotNachfassMail } from '@/lib/mail/angebot-nachfass-mail'

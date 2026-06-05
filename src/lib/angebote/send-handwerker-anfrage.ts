@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerAnfrage } from '@/lib/mail-templates'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail } from '@/lib/types'
