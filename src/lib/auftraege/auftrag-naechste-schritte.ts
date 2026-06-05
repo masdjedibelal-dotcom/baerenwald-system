@@ -32,8 +32,8 @@ export function buildAuftragNaechsteSchritte(
   const hwDone = handwerkerSchrittErledigt(detail)
   const baustartDone = status !== 'offen' && status !== 'storniert'
   const inAusfuehrung = status === 'in_arbeit' || status === 'abnahme' || status === 'abgeschlossen'
-  const abnahmeDone = status === 'abgeschlossen'
-  const zurAbnahmeDone = status === 'abnahme' || status === 'abgeschlossen'
+  const zurAbnahmeDone = Boolean(detail.abnahme_protokoll_url) || status === 'abgeschlossen'
+  const abnahmeDone = Boolean(detail.abnahme_protokoll_url) || status === 'abgeschlossen'
 
   const steps: LeadSchritt[] = [
     {
@@ -82,9 +82,12 @@ export function buildAuftragNaechsteSchritte(
       label: 'Rechnung erstellen',
       dateLabel: abnahmeDone && opts.hatPositionen ? 'Bereit' : '—',
       done: false,
-      onClick: abnahmeDone && opts.hatPositionen ? opts.onRechnung : undefined,
+      onClick:
+        abnahmeDone && opts.hatPositionen && status !== 'abgeschlossen'
+          ? opts.onRechnung
+          : undefined,
       href:
-        abnahmeDone && opts.hatPositionen
+        abnahmeDone && opts.hatPositionen && status !== 'abgeschlossen'
           ? `/rechnungen/neu?auftrag_id=${detail.id}`
           : undefined,
     },

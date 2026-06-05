@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { enrichLeadDetailUserNames } from '@/lib/anfragen/enrich-lead-user-names'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
-import type { LeadDetail, LeadTimelineRow } from '@/lib/types'
+import type { LeadDetail, LeadDokumentRow, LeadTimelineRow } from '@/lib/types'
 
 const SELECT_FULL = `
   *,
@@ -54,6 +54,25 @@ async function loadLeadTimelineOptional(
   return (data ?? []) as LeadTimelineRow[]
 }
 
+async function loadLeadDokumenteOptional(
+  supabase: SupabaseClient,
+  leadId: string
+): Promise<LeadDokumentRow[]> {
+  const { data, error } = await supabase
+    .from('lead_dokumente')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[load-anfrage-detail] lead_dokumente:', error.message)
+    }
+    return []
+  }
+  return (data ?? []) as LeadDokumentRow[]
+}
+
 /** Lädt eine Anfrage für die Detailseite; fehlende Relationen (z. B. lead_timeline) brechen nicht ab. */
 export async function loadAnfrageDetail(
   supabase: SupabaseClient,
@@ -79,8 +98,11 @@ export async function loadAnfrageDetail(
     let lead = data as unknown as LeadDetail
     const kunde = resolveLeadKunde(lead.kunden as LeadDetail['kunden'])
     if (kunde) lead = { ...lead, kunden: kunde }
-    const timeline = await loadLeadTimelineOptional(supabase, leadId)
-    lead = { ...lead, lead_timeline: timeline }
+    const [timeline, dokumente] = await Promise.all([
+      loadLeadTimelineOptional(supabase, leadId),
+      loadLeadDokumenteOptional(supabase, leadId),
+    ])
+    lead = { ...lead, lead_timeline: timeline, lead_dokumente: dokumente }
     return enrichLeadDetailUserNames(supabase, lead)
   }
 

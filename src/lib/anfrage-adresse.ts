@@ -61,6 +61,18 @@ export function hatAnfrageAdresse(addr: AnfrageAdresseFelder): boolean {
 /** Kurztexte für fehlende Angaben in der Termin-Bestätigungsmail (du / Sie). */
 export type VorOrtRueckfrage = { du: string; sie: string }
 
+const ADRESS_RUECKFRAGE_LABELS = new Set([
+  'Straße / Anschrift des Objekts',
+  'Hausnummer (bzw. Gebäudeteil / Hinterhaus)',
+  'Postleitzahl',
+  'Ort',
+])
+
+/** Nur fehlende Adress-Felder — für die grüne Hinweis-Box in der Termin-Mail. */
+export function filterAdressRueckfragen(items: VorOrtRueckfrage[]): VorOrtRueckfrage[] {
+  return items.filter((item) => ADRESS_RUECKFRAGE_LABELS.has(item.du))
+}
+
 function istNurPlz(text: string): boolean {
   return /^\d{5}$/.test(text.trim())
 }

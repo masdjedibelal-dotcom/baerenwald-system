@@ -9,6 +9,7 @@ import { notifyPartnerHandwerkerAnfrage } from '@/lib/partner/notify-partner-anf
 type ZuRow = {
   id: string
   gewerk_id: string
+  aufgabe_notiz?: string | null
   handwerker: { name: string; email: string | null } | null
   gewerke: { name: string } | null
 }
@@ -21,6 +22,7 @@ function normalizeZuRow(zu: Record<string, unknown>): ZuRow {
   return {
     id: String(zu.id),
     gewerk_id: String(zu.gewerk_id),
+    aufgabe_notiz: (zu as { aufgabe_notiz?: string | null }).aufgabe_notiz ?? null,
     handwerker: hwOne as { name: string; email: string | null } | null,
     gewerke: gwOne as { name: string } | null,
   }
@@ -74,6 +76,7 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
         beschreibung: p.beschreibung || p.leistung,
       })),
       link,
+      notiz: row.aufgabe_notiz?.trim() || undefined,
     },
     branding
   )

@@ -1,5 +1,12 @@
-import { neuePositionsId } from '@/lib/angebot-positionen'
-import type { AuftragPosition } from '@/lib/types'
+import { normalizeAngebotPositionen, neuePositionsId } from '@/lib/angebot-positionen'
+import {
+  groupAngebotPositionenByBlock,
+  resolveBlockTitelFromGroup,
+} from '@/lib/angebote/angebot-position-blocks'
+import { istGesamtrabattPosition, istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen'
+import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import { richTextToChecklistLines, richTextToPlain } from '@/lib/rich-text'
+import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 
 export type AbnahmePunktStatus = 'offen' | 'ok' | 'mangel'
 
@@ -54,6 +61,34 @@ function leistungName(p: AbnahmePunkt): string {
   return p.leistung_name?.trim() || p.beschreibung?.trim() || 'Leistung'
 }
 
+function abnahmeCheckpunkt(
+  gewerk: string,
+  leistung_id: string,
+  leistung_name: string,
+  beschreibung: string
+): AbnahmePunkt {
+  return {
+    id: neuePositionsId(),
+    gewerk,
+    leistung_id,
+    leistung_name,
+    beschreibung,
+    status: 'offen',
+    notiz: null,
+    foto_urls: [],
+  }
+}
+
+function checklistAusPosition(p: AngebotPosition): string[] {
+  const leistung = (p.leistung || p.leistung_name || 'Leistung').trim()
+  const raw = (p.beschreibung ?? '').trim()
+  if (!raw) return [leistung]
+  const plain = richTextToPlain(raw)
+  if (!plain || plain === leistung) return [leistung]
+  const lines = richTextToChecklistLines(raw)
+  return lines.length > 0 ? lines : [leistung]
+}
+
 /** Gewerk → Leistung → Checklistenpunkte (Reihenfolge aus Auftragspositionen). */
 export function gruppiereAbnahmePunkte(punkte: AbnahmePunkt[]): AbnahmeGewerkBlock[] {
   const gewerkOrder: string[] = []
@@ -83,23 +118,55 @@ export function gruppiereAbnahmePunkte(punkte: AbnahmePunkt[]): AbnahmeGewerkBlo
   }))
 }
 
-/** Ein Checklistenpunkt pro Auftragsposition (Gewerk + Leistung vom Auftrag). */
-export function punkteAusAuftragPositionen(positionen: AuftragPosition[]): AbnahmePunkt[] {
-  return [...positionen]
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    .map((p) => ({
-      id: neuePositionsId(),
-      gewerk: p.gewerk_name?.trim() || '—',
-      leistung_id: p.id,
-      leistung_name: p.leistung_name?.trim() || 'Leistung',
-      beschreibung:
-        p.beschreibung?.trim() ||
-        p.leistung_name?.trim() ||
-        'Abnahmepunkt',
-      status: 'offen' as const,
-      notiz: null,
-      foto_urls: [],
-    }))
+/** Checkliste 1:1 aus Angebot (Gewerk-Abschnitte, Beschreibung, Leistungs-Bullets). */
+export function punkteAusAngebotPositionen(
+  positionen: AngebotPosition[],
+  gewerke: Pick<Gewerk, 'id' | 'name' | 'slug'>[] = []
+): AbnahmePunkt[] {
+  const pos = normalizeAngebotPositionen(positionen)
+  if (!pos.length) return []
+
+  const groups = groupAngebotPositionenByBlock(pos, gewerke as Gewerk[])
+  const punkte: AbnahmePunkt[] = []
+
+  for (const group of groups) {
+    const gewerk = resolveBlockTitelFromGroup(group, gewerke as Gewerk[])
+
+    for (const entry of group.entries) {
+      if (entry.kind === 'freitext') {
+        const { titel, text } = entry.freitext
+        const isGewerkBeschreibung = istGewerkBeschreibungLeistungName(titel)
+        const leistungName = isGewerkBeschreibung ? 'Leistungsumfang' : titel.trim() || 'Zusatz'
+        const leistungId = `${group.key}|${isGewerkBeschreibung ? 'gewerk-beschreibung' : titel || 'freitext'}`
+        const bullets = richTextToChecklistLines(text)
+        if (bullets.length === 0) continue
+        for (const bullet of bullets) {
+          punkte.push(abnahmeCheckpunkt(gewerk, leistungId, leistungName, bullet))
+        }
+        continue
+      }
+
+      const p = entry.position
+      if (istGesamtrabattPosition(p)) continue
+
+      const leistungName = (p.leistung || p.leistung_name || 'Leistung').trim()
+      const leistungId = p.id?.trim() || `${group.key}|${leistungName}`
+      for (const bullet of checklistAusPosition(p)) {
+        punkte.push(abnahmeCheckpunkt(gewerk, leistungId, leistungName, bullet))
+      }
+    }
+  }
+
+  return punkte
+}
+
+/** Fallback ohne Angebot-JSON: Auftragspositionen → Angebotsformat → gleiche Struktur. */
+export function punkteAusAuftragPositionen(
+  positionen: AuftragPosition[],
+  gewerke: Pick<Gewerk, 'id' | 'name' | 'slug'>[] = []
+): AbnahmePunkt[] {
+  if (!positionen.length) return []
+  return punkteAusAngebotPositionen(auftragPositionenToAngebotPositionen(positionen), gewerke)
 }
 
 export function neuerBulletUnterLeistung(
@@ -159,4 +226,17 @@ export function abnahmePunkteStatistik(punkte: AbnahmePunkt[]): {
     else offen++
   }
   return { ok, mangel, offen, gesamt: punkte.length }
+}
+
+export function buildAbnahmePunkteInitial(
+  opts: {
+    positionen: AuftragPosition[]
+    angebotPositionen?: AngebotPosition[] | null
+    gewerke?: Pick<Gewerk, 'id' | 'name' | 'slug'>[]
+  }
+): AbnahmePunkt[] {
+  if (opts.angebotPositionen?.length) {
+    return punkteAusAngebotPositionen(opts.angebotPositionen, opts.gewerke ?? [])
+  }
+  return punkteAusAuftragPositionen(opts.positionen, opts.gewerke ?? [])
 }

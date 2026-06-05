@@ -1,4 +1,5 @@
 import type { AuftragPosition } from '@/lib/types'
+import { istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen'
 
 export type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -8,6 +9,11 @@ export type AuftragGewerkBlock = {
   gewerkName: string
   gewerkSlug: string | null
   positionen: AuftragPosition[]
+}
+
+/** Interne Gewerk-Beschreibung aus Angebot (nicht in UI-Listen). */
+export function istInterneAuftragGewerkBeschreibung(p: AuftragPosition): boolean {
+  return istGewerkBeschreibungLeistungName(p.leistung_name)
 }
 
 /** Auftragspositionen in Gewerk-Abschnitte (Reihenfolge der ersten Position pro Gewerk). */
@@ -43,6 +49,17 @@ export function groupAuftragPositionenByGewerk(
   }
 
   return blocks
+}
+
+/** Wie groupAuftragPositionenByGewerk, ohne interne Gewerk-Beschreibungs-Zeilen. */
+export function groupAuftragPositionenByGewerkForAnzeige(
+  positionen: AuftragPosition[],
+  gewerke: GewerkOpt[]
+): AuftragGewerkBlock[] {
+  return groupAuftragPositionenByGewerk(
+    positionen.filter((p) => !istInterneAuftragGewerkBeschreibung(p)),
+    gewerke
+  ).filter((b) => b.positionen.length > 0)
 }
 
 /** Gewerke aus Auftragspositionen (für Bautagebuch-Phase). */

@@ -288,7 +288,8 @@ export function mergeHandwerkerQueuesIntoPositionen(
 }
 
 export function handwerkerZuweisungenFromPositionen(
-  positionen: AngebotPosition[]
+  positionen: AngebotPosition[],
+  aufgabeNotizenByGewerk?: Record<string, string | null | undefined>
 ): AngebotHandwerkerZuweisungInput[] {
   const out: AngebotHandwerkerZuweisungInput[] = []
   const seen = new Set<string>()
@@ -303,6 +304,7 @@ export function handwerkerZuweisungenFromPositionen(
       gewerk_id: gid,
       handwerker_id: hid,
       status: 'ausstehend',
+      aufgabe_notiz: aufgabeNotizenByGewerk?.[gid]?.trim() || null,
     })
   }
   return out

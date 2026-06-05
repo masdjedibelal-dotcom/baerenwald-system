@@ -3,6 +3,7 @@ import {
   angebotGewerkNameAnzeige,
   GEWERK_BESCHREIBUNG_TITEL,
   istFreitextPosition,
+  istGewerkBeschreibungLeistungName,
   istGewerkBeschreibungPosition,
 } from '@/lib/dokument-zeilen'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
@@ -131,4 +132,20 @@ export function positionenAusBlock(group: AngebotPositionBlockGroup): AngebotPos
 
 export function positionenFuerSummen(block: AngebotPositionBlockGroup): AngebotPosition[] {
   return positionenAusBlock(block).filter((p) => !istFreitextPosition(p))
+}
+
+/** Interne Gewerk-Notiz aus dem Wizard — nicht in Positions-Listen anzeigen. */
+export function istInterneGewerkBeschreibungEntry(entry: AngebotBlockPdfEntry): boolean {
+  return entry.kind === 'freitext' && istGewerkBeschreibungLeistungName(entry.freitext.titel)
+}
+
+/** Positions-Tab / Detail-Ansicht ohne interne Gewerk-Beschreibungen. */
+export function groupAngebotPositionenByBlockForAnzeige(
+  positionen: AngebotPosition[],
+  gewerke: Gewerk[]
+): AngebotPositionBlockGroup[] {
+  return groupAngebotPositionenByBlock(positionen, gewerke).map((group) => ({
+    ...group,
+    entries: group.entries.filter((entry) => !istInterneGewerkBeschreibungEntry(entry)),
+  }))
 }

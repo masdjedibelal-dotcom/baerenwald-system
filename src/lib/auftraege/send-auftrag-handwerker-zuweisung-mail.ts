@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/mail-branding'
 import { mailHandwerkerLeistungZuweisung } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
-import { buildPartnerLoginForAuftragUrl } from '@/lib/portal-utils'
+import { buildPartnerLoginLink } from '@/lib/portal-utils'
 import { formatDatum } from '@/lib/utils'
 
 function one<T>(x: T | T[] | null | undefined): T | null {
@@ -112,7 +112,7 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
 
   const plz = kunde?.plz?.trim() || ''
 
-  const portalLink = buildPartnerLoginForAuftragUrl(auftragId)
+  const portalLink = buildPartnerLoginLink()
   const branding = await getMailBranding(supabaseAdmin)
   const tpl = mailHandwerkerLeistungZuweisung(
     {
