@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
-import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo'
+import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo-server'
 
 export async function extendAngebotGueltigkeit(input: {
   angebotId: string

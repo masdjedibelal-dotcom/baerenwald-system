@@ -12,7 +12,7 @@ import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leis
 import { formatAuftragsNr, auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/mail-branding-server'
 import {
   buildAbschlussdokumentationMail,
   defaultAbschlussdokumentationNachricht,

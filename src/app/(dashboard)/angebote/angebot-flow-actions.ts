@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAngebotToKunde, createAuftragFromAngebot, sendAngebotNachfassManuell } from '@/app/(dashboard)/angebote/actions'
-import { erledigeInterneNachfassTodos } from '@/lib/kalender-internes-todo'
+import { erledigeInterneNachfassTodos } from '@/lib/kalender-internes-todo-server'
 import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
 import { isKundeAblehnungGrund, KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
 

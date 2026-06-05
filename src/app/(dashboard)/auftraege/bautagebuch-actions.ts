@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/mail-branding-server'
 import {
   buildBautagebuchKundenMail as renderBautagebuchKundenMail,
   defaultBautagebuchKundenNachricht,

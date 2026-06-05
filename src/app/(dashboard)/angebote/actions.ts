@@ -6,10 +6,11 @@ import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
-import { loadGewerkeAusfuehrung, loadGewerkeAusfuehrungAdmin } from '@/lib/gewerke-ausfuehrung'
+import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
+import { loadGewerkeAusfuehrungAdmin } from '@/lib/gewerke-ausfuehrung-server'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
 import { sendMail } from '@/lib/mail-service'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/mail-branding-server'
 import {
   mailAngebot,
   mailAngebotAnnahmeBestaetigung,
@@ -77,9 +78,10 @@ import {
 } from '@/lib/angebot-positionen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { addDaysYmd, insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
-import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo'
+import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo-server'
 import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
-import { fetchFirmenEinstellungen, fetchFirmenEinstellungenAdmin } from '@/lib/firmen-einstellungen'
+import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { fetchFirmenEinstellungenAdmin } from '@/lib/firmen-einstellungen-server'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {

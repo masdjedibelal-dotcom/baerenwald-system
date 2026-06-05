@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/mail-branding-server'
 import { mailUpdateHinweis } from '@/lib/mail-templates'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 
