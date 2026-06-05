@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getMailBranding } from '@/lib/mail-branding'
+import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   mailAnfrageBestaetigung,
   mailHtmlBase,
