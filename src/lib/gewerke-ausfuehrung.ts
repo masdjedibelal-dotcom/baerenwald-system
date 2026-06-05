@@ -1,4 +1,7 @@
+import { cache } from 'react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'
 
@@ -116,12 +119,13 @@ export function gewerkById(gewerke: Gewerk[], gewerkId: string | undefined): Gew
 }
 
 /** Für Angebots-PDF: alle Gewerke inkl. inaktiver (alte Positionen). */
-export async function loadGewerkeAusfuehrung(
-  supabase: import('@supabase/supabase-js').SupabaseClient
-): Promise<Gewerk[]> {
+export async function loadGewerkeAusfuehrung(supabase: SupabaseClient): Promise<Gewerk[]> {
   const { data } = await supabase
     .from('gewerke')
     .select('id, name, slug, aktiv, ausfuehrung, fachbetrieb_hinweis')
     .order('name', { ascending: true })
   return (data ?? []) as Gewerk[]
 }
+
+/** Pro Request gecacht — PDF-Render lädt Gewerke oft mehrfach. */
+export const loadGewerkeAusfuehrungAdmin = cache(() => loadGewerkeAusfuehrung(supabaseAdmin))

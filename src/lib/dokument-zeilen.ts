@@ -13,8 +13,12 @@ import type { WizardPosition } from '@/lib/angebote/angebot-wizard-types'
 export const ZEILE_SLUG_FREITEXT = '__freitext__'
 export const ZEILE_SLUG_GESAMTRABATT = '__gesamtrabatt__'
 
-/** Interner Marker für Gewerk-Beschreibung (Wizard/PDF, kein sichtbarer Freitext-Titel). */
+/** Interner Marker für Gewerk-Beschreibung (nur Wizard-Editor, nicht in Positions-Listen). */
 export const GEWERK_BESCHREIBUNG_TITEL = '__gewerk_beschreibung__'
+
+export function istGewerkBeschreibungLeistungName(name?: string | null): boolean {
+  return (name ?? '').trim().toLowerCase() === GEWERK_BESCHREIBUNG_TITEL
+}
 
 /** Gewerk-Label für Freitext-Positionen im Angebot (PDF, Detail, E-Mail). */
 export const GEWERK_NAME_ALLGEMEIN = 'Allgemein'
@@ -128,9 +132,7 @@ export function istFreitextPosition(p: AngebotPosition): boolean {
 }
 
 export function istGewerkBeschreibungPosition(p: AngebotPosition): boolean {
-  return (
-    istFreitextPosition(p) && (p.leistung ?? '').trim() === GEWERK_BESCHREIBUNG_TITEL
-  )
+  return istFreitextPosition(p) && istGewerkBeschreibungLeistungName(p.leistung)
 }
 
 export function istGesamtrabattPosition(p: AngebotPosition): boolean {
