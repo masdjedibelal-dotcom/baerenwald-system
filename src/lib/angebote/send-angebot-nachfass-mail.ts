@@ -9,7 +9,7 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { erledigeInterneNachfassTodos } from '@/lib/kalender-internes-todo'
+import { erledigeInterneNachfassTodos } from '@/lib/kalender-auto-termine'
 
 type NachfassAngebotRow = {
   id: string
