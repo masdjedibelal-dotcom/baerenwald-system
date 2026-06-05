@@ -111,11 +111,25 @@ export type LeadNotizRow = {
   lead_id: string
   inhalt: string
   datei_url: string | null
+  /** Mehrere Bild-URLs (Termin-Notizen, max. 15). */
+  datei_urls?: string[] | null
+  /** Spiegel einer Termin-Notiz im Tab Anfrage-Notizen. */
+  quelle_notiz_id?: string | null
   kalender_termin_id?: string | null
   titel?: string | null
   erstellt_von: string | null
   created_at: string
   user_profiles?: { name: string } | null
+}
+
+export type LeadDokumentRow = {
+  id: string
+  lead_id: string
+  name: string
+  datei_url: string
+  groesse_bytes: number | null
+  erstellt_von: string | null
+  created_at: string
 }
 
 export type Lead = {
@@ -192,6 +206,7 @@ export type LeadDetail = Lead & {
     created_at: string
   }> | null
   lead_notizen?: LeadNotizRow[] | null
+  lead_dokumente?: LeadDokumentRow[] | null
 }
 
 export type AngebotStatus =
@@ -832,7 +847,7 @@ export type KalenderTermin = {
   auftrag_id: string | null
   titel: string
   beschreibung: string | null
-  typ: 'besichtigung' | 'beginn' | 'abnahme' | 'sonstiges'
+  typ: 'besichtigung' | 'beginn' | 'abnahme' | 'sonstiges' | 'intern'
   datum: string
   uhrzeit_von: string | null
   uhrzeit_bis: string | null

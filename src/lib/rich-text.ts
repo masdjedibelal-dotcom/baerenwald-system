@@ -116,3 +116,67 @@ export function richTextToPlain(html: string | null | undefined): string {
   const doc = new DOMParser().parseFromString(raw, 'text/html')
   return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
+
+function decodeBasicEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+}
+
+/** HTML oder Plain-Text → einzelne Checklisten-Zeilen (Listen, Absätze, Zeilenumbrüche). */
+export function richTextToChecklistLines(html: string | null | undefined): string[] {
+  const raw = (html ?? '').trim()
+  if (!raw) return []
+
+  if (!looksLikeHtml(raw)) {
+    return raw
+      .split(/\n+/)
+      .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+      .filter((t) => t.length > 0)
+  }
+
+  if (typeof document !== 'undefined') {
+    const doc = new DOMParser().parseFromString(raw, 'text/html')
+    const lines: string[] = []
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element
+        const tag = el.tagName.toLowerCase()
+        if (tag === 'li') {
+          const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+          if (t) lines.push(t)
+          return
+        }
+        if (tag === 'br') {
+          lines.push('')
+        }
+      }
+      node.childNodes.forEach(walk)
+    }
+    walk(doc.body)
+    if (lines.length === 0) {
+      const plain = (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim()
+      return plain ? [plain] : []
+    }
+    return lines
+      .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+      .filter((t) => t.length > 0)
+  }
+
+  const normalized = decodeBasicEntities(
+    raw
+      .replace(/<\/li>\s*/gi, '\n')
+      .replace(/<li[^>]*>/gi, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>\s*/gi, '\n')
+      .replace(/<\/div>\s*/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
+  return normalized
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+    .filter((t) => t.length > 0)
+}
