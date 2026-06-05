@@ -81,8 +81,8 @@ export function buildPortalButton(
     ? 'Zu MeinBärenwald →'
     : 'Zu MeinBärenwald →'
   const sub = anrede === 'du'
-    ? 'Melde dich mit deiner E-Mail an — Anfragen, Angebote und Dokumente im Blick.'
-    : 'Melden Sie sich mit Ihrer E-Mail an — Anfragen, Angebote und Dokumente im Blick.'
+    ? 'Melde dich mit deiner E-Mail an oder registriere dich — Anfragen, Angebote und Dokumente im Blick.'
+    : 'Melden Sie sich mit Ihrer E-Mail an oder registrieren Sie sich — Anfragen, Angebote und Dokumente im Blick.'
 
   return `
 <div style="margin:20px 0 8px;">

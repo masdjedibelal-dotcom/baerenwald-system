@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { cache } from 'react'
 import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
 import { mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
 import {
@@ -9,6 +10,7 @@ import { createClient } from '@/lib/supabase-server'
 import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -59,6 +61,8 @@ export interface SendMailOptions {
   from?: string
   pdfBuffer?: Buffer
   pdfName?: string
+  /** Weitere PDF-Anhänge vor dem Haupt-PDF (Reihenfolge bleibt erhalten). */
+  extraPdfAttachments?: { filename: string; content: Buffer }[]
   kundeId?: string | null
   leadId?: string | null
   angebotId?: string | null
@@ -88,6 +92,10 @@ function resolveBcc(opts: SendMailOptions): string[] | undefined {
 }
 
 async function resolveGesendetVon(): Promise<string | null> {
+  return getAuthUserIdCached()
+}
+
+const getAuthUserIdCached = cache(async (): Promise<string | null> => {
   try {
     const supabase = createClient()
     const {
@@ -97,11 +105,12 @@ async function resolveGesendetVon(): Promise<string | null> {
   } catch {
     return null
   }
-}
+})
 
 function mergeAttachments(
   pdf?: { filename: string; content: Buffer },
-  inlineLogos?: MailInlineLogoAttachment[]
+  inlineLogos?: MailInlineLogoAttachment[],
+  extraPdfs?: { filename: string; content: Buffer }[]
 ) {
   const list: Array<{
     filename: string
@@ -116,6 +125,9 @@ function mergeAttachments(
       contentId: logo.contentId,
       contentType: logo.contentType,
     })
+  }
+  for (const extra of extraPdfs ?? []) {
+    list.push({ filename: extra.filename, content: extra.content })
   }
   if (pdf) {
     list.push({ filename: pdf.filename, content: pdf.content })
@@ -133,7 +145,8 @@ export async function sendMail(
     opts.pdfBuffer
       ? { filename: opts.pdfName ?? 'dokument.pdf', content: opts.pdfBuffer }
       : undefined,
-    inlineLogos
+    inlineLogos,
+    opts.extraPdfAttachments
   )
 
   const resend = getResend()
@@ -195,17 +208,9 @@ export async function sendMail(
     }
     if (opts.emailLogId) insertRow.id = opts.emailLogId
 
-    const { data: inserted, error: insErr } = await supabaseAdmin
-      .from('email_log')
-      .insert(insertRow)
-      .select('id')
-      .single()
+    const { id: loggedId } = await insertEmailLogRow(insertRow)
 
-    if (insErr) {
-      console.warn('[mail-service] email_log insert:', insErr.message)
-    }
-
-    return { success: true, resendId, emailLogId: inserted?.id ?? null }
+    return { success: true, resendId, emailLogId: loggedId ?? opts.emailLogId ?? null }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     await logMailError(opts, msg)
@@ -239,6 +244,5 @@ async function logMailError(opts: SendMailOptions, message: string) {
     in_reply_to_log_id: opts.inReplyToLogId ?? null,
   }
   if (opts.emailLogId) errRow.id = opts.emailLogId
-  const { error } = await supabaseAdmin.from('email_log').insert(errRow)
-  if (error) console.warn('[mail-service] email_log fehler-insert:', error.message)
+  await insertEmailLogRow(errRow)
 }

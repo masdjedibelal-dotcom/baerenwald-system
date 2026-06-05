@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { cache } from 'react'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { fetchFirmenEinstellungen, fetchFirmenEinstellungenAdmin } from '@/lib/firmen-einstellungen'
 import { resolveBrandLogoUrl } from '@/lib/brand'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { FESTNETZ_TELEFON_DEFAULT, telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export type MailBranding = {
   firmenname: string
@@ -29,9 +31,15 @@ export function envMailBranding(): MailBranding {
 }
 
 export async function getMailBranding(supabase: SupabaseClient): Promise<MailBranding> {
+  if (supabase === supabaseAdmin) return getMailBrandingAdmin()
   const f = await fetchFirmenEinstellungen(supabase)
   return firmenEinstellungenToMailBranding(f)
 }
+
+const getMailBrandingAdmin = cache(async (): Promise<MailBranding> => {
+  const f = await fetchFirmenEinstellungenAdmin()
+  return firmenEinstellungenToMailBranding(f)
+})
 
 /** Für Client-Vorschauen mit `defaultFirmenEinstellungen()` o. Ä. */
 export function firmenEinstellungenToMailBranding(f: FirmenEinstellungen): MailBranding {

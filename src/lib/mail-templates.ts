@@ -12,7 +12,7 @@ import {
   type MailAnrede,
 } from '@/lib/mail/anrede'
 import { BEREICH_LABELS } from '@/lib/utils'
-import type { VorOrtRueckfrage } from '@/lib/anfrage-adresse'
+import { filterAdressRueckfragen, type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
 
 function esc(s: string): string {
   return s
@@ -85,7 +85,7 @@ export type MailHtmlBaseOptions = {
   /** Kunden-Mails: P.S. MeinBärenwald (Standard: an) */
   skipMeinBaerenwaldPs?: boolean
   anrede?: 'du' | 'sie'
-  /** Optional: Link zur öffentlichen Projekt-/Status-Seite unter dem Portal-Button */
+  /** @deprecated Wird nicht mehr in Mails angezeigt (nur Portal-Login). */
   statusLink?: string | null
 }
 
@@ -93,7 +93,6 @@ export type MailHtmlBaseOptions = {
 export function mailMeinBaerenwaldPsFooter(opts: {
   anrede: 'du' | 'sie'
   portalLink?: string
-  statusLink?: string | null
 }): string {
   const portal = opts.portalLink?.trim() || buildPortalLoginLink()
   const anrede = opts.anrede
@@ -101,18 +100,10 @@ export function mailMeinBaerenwaldPsFooter(opts: {
     anrede === 'du'
       ? 'In <strong>MeinBärenwald</strong> siehst du dein Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
       : 'In <strong>MeinBärenwald</strong> sehen Sie Ihr Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
-  const statusLine = opts.statusLink?.trim()
-    ? `<p style="font-size:12px;color:#9CA3AF;margin:10px 0 0;line-height:1.5;">${
-        anrede === 'du'
-          ? 'Alternativ ohne Login:'
-          : 'Alternativ ohne Anmeldung:'
-      } <a href="${esc(opts.statusLink.trim())}" style="color:#2E7D52;text-decoration:underline;">Projektstatus online</a></p>`
-    : ''
   return `<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid #E5E7EB;">
     <p style="font-size:13px;font-weight:700;color:#6B7280;margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
     <p style="font-size:14px;color:#374151;line-height:1.55;margin:0 0 12px;">${text}</p>
     ${buildPortalButton(portal, anrede)}
-    ${statusLine}
   </div>`
 }
 
@@ -137,7 +128,6 @@ export function mailHtmlBase(
       ? ''
       : mailMeinBaerenwaldPsFooter({
           anrede: options?.anrede ?? 'du',
-          statusLink: options?.statusLink ?? null,
         })
 
   return `<!DOCTYPE html>
@@ -196,58 +186,6 @@ function detailRow(label: string, value: string): string {
   return `<tr><td style="color:#6B7280;padding:5px 0;width:36%;vertical-align:top;font-size:14px;">${esc(label)}:</td><td style="font-weight:600;color:#1F2937;font-size:14px;padding:5px 0;">${value}</td></tr>`
 }
 
-function mailAblaufSchritteVertikal(anrede: MailAnrede): string {
-  const steps = [
-    {
-      n: 1,
-      title: 'Termin vor Ort',
-      text: mailText(
-        anrede,
-        'Wir schauen uns alles vor Ort an und besprechen deine Wünsche und den Ist-Zustand.',
-        'Wir schauen uns alles vor Ort an und besprechen Ihre Wünsche und den Ist-Zustand.'
-      ),
-    },
-    {
-      n: 2,
-      title: 'Unverbindliches Angebot',
-      text: mailText(
-        anrede,
-        'Auf Basis des Vor-Ort-Termins erhältst du ein transparentes, unverbindliches Angebot von uns.',
-        'Auf Basis des Vor-Ort-Termins erhalten Sie ein transparentes, unverbindliches Angebot von uns.'
-      ),
-    },
-    {
-      n: 3,
-      title: 'Auftrag & Begleitung',
-      text: mailText(
-        anrede,
-        'Bei Beauftragung begleiten wir dich bis zum Abschluss — inkl. Dokumentation, Updates und klarer Kommunikation.',
-        'Bei Beauftragung begleiten wir Sie bis zum Abschluss — inkl. Dokumentation, Updates und klarer Kommunikation.'
-      ),
-    },
-  ]
-  const rows = steps
-    .map((s, i) => {
-      const line =
-        i < steps.length - 1
-          ? `<div style="width:2px;height:20px;background:#D1D5DB;margin:6px auto 0;"></div>`
-          : ''
-      return `<tr>
-      <td valign="top" width="44" style="padding:0 0 ${i < steps.length - 1 ? '4px' : '0'} 0;text-align:center;">
-        <div style="width:30px;height:30px;border-radius:50%;background:#2E7D52;color:#ffffff;font-size:14px;font-weight:700;line-height:30px;text-align:center;margin:0 auto;">${s.n}</div>
-        ${line}
-      </td>
-      <td valign="top" style="padding:0 0 ${i < steps.length - 1 ? '20px' : '0'} 12px;">
-        <p style="margin:2px 0 0;font-size:15px;font-weight:700;color:#111111;line-height:1.35;">${esc(s.title)}</p>
-        <p style="margin:6px 0 0;font-size:14px;color:#6B7280;line-height:1.55;">${esc(s.text)}</p>
-      </td>
-    </tr>`
-    })
-    .join('')
-  return `<p style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.08em;margin:28px 0 14px;">So geht es weiter</p>
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>`
-}
-
 function mailTerminDetailsInline(datumFmt: string, zeitText: string, ort: string): string {
   const zeit = esc(zeitText.trim() || '—')
   return `<p style="margin:0 0 18px;font-size:15px;color:#374151;line-height:1.7;">
@@ -255,15 +193,6 @@ function mailTerminDetailsInline(datumFmt: string, zeitText: string, ort: string
     <strong>Uhrzeit:</strong> ${zeit}<br/>
     <strong>Ort:</strong> ${esc(ort.trim() || '—')}
   </p>`
-}
-
-function mailTerminAblaufKompakt(anrede: MailAnrede): string {
-  const line = mailText(
-    anrede,
-    'So geht es weiter: <strong>1)</strong> Vor-Ort · <strong>2)</strong> Angebot · <strong>3)</strong> Auftrag &amp; Begleitung',
-    'So geht es weiter: <strong>1)</strong> Vor-Ort · <strong>2)</strong> Angebot · <strong>3)</strong> Auftrag &amp; Begleitung'
-  )
-  return `<p style="margin:20px 0 0;font-size:13px;color:#6B7280;line-height:1.55;">${line}</p>`
 }
 
 function mailObjektbetreuerTelLink(telefon: string): string {
@@ -288,13 +217,14 @@ function mailKollegeVorOrtBlock(
 }
 
 function mailVorOrtRueckfragenBlock(anrede: MailAnrede, items: VorOrtRueckfrage[]): string {
-  if (!items.length) return ''
+  const adressItems = filterAdressRueckfragen(items)
+  if (!adressItems.length) return ''
   const intro = mailText(
     anrede,
     'Für den Termin fehlen uns noch — bitte kurz per Antwort auf diese E-Mail:',
     'Für den Termin fehlen uns noch — bitte kurz per Antwort auf diese E-Mail:'
   )
-  const lis = items
+  const lis = adressItems
     .map((item) => {
       const label = anrede === 'du' ? item.du : item.sie
       return `<li style="margin:0 0 4px;font-size:14px;color:#1A3D2B;line-height:1.45;">${esc(label)}</li>`
@@ -352,7 +282,6 @@ export function mailBesichtigungTermin(
       ${mailVorOrtRueckfragenBlock(anrede, data.fehlendeRueckfragen ?? [])}
       ${data.kollege?.name?.trim() ? mailKollegeVorOrtBlock(anrede, data.kollege) : ''}
       ${notizBlock}
-      ${mailTerminAblaufKompakt(anrede)}
       <p style="font-size:15px;color:#374151;margin:20px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>
     `,
       `Termin am ${data.datumFmt}, ${ort}`,
@@ -1052,6 +981,7 @@ export function mailHandwerkerAnfrage(
     zeitraum?: string | null
     positionen: { beschreibung?: string | null }[]
     link: string
+    notiz?: string | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
@@ -1060,6 +990,9 @@ export function mailHandwerkerAnfrage(
   const plz = esc(data.plz)
   const zt = data.zeitraum?.trim() || 'Nach Absprache'
   const lis = data.positionen.map((p) => `<li>${esc(String(p.beschreibung ?? '').trim())}</li>`).join('')
+  const notizBlock = data.notiz?.trim()
+    ? `<p style="font-size:14px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
+    : ''
   return {
     betreff: `Neue Anfrage: ${data.gewerk} — Bärenwald München`,
     html: mailHtmlBase(
@@ -1075,6 +1008,7 @@ export function mailHandwerkerAnfrage(
         </table>
       `)}
       <ul style="font-size:14px;line-height:1.8;padding-left:20px;margin:16px 0;">${lis}</ul>
+      ${notizBlock}
       ${btn('Anfrage ansehen & antworten →', data.link)}
       <p style="font-size:13px;color:#6B7280;">Link:<br/><a href="${esc(data.link)}" style="color:#2E7D52;word-break:break-all;">${esc(data.link)}</a></p>
     `,

@@ -1,24 +1,85 @@
 import type { AngebotStatusEinfach } from '@/lib/angebot-einfach'
 import type { NaechsterSchritt } from '@/components/crm/NaechsteSchritteCard'
+import type { AngebotHandwerkerRow } from '@/lib/types'
+import {
+  darfAngebotAnKundeSenden,
+  handwerkerAnfrageErledigt,
+  handwerkerEinreichungErledigt,
+  handwerkerFreigabeErledigt,
+  hatAngebotHandwerker,
+} from '@/lib/angebote/angebot-handwerker-flow'
 
 export function buildAngebotNaechsteSchritte(opts: {
   status: AngebotStatusEinfach
   angebotId: string
+  angebotStatusRaw?: string | null
+  handwerkerRows?: AngebotHandwerkerRow[]
   leadId?: string | null
   auftragId?: string | null
+  onHandwerkerAnfragen?: () => void
+  onHandwerkerBestaetigen?: () => void
   onSenden?: () => void
   onAnnehmen?: () => void
 }): NaechsterSchritt[] {
-  const { status, angebotId, leadId, auftragId, onSenden, onAnnehmen } = opts
+  const {
+    status,
+    angebotId,
+    angebotStatusRaw,
+    handwerkerRows = [],
+    leadId,
+    auftragId,
+    onHandwerkerAnfragen,
+    onHandwerkerBestaetigen,
+    onSenden,
+    onAnnehmen,
+  } = opts
   const steps: NaechsterSchritt[] = []
+  const hatHw = hatAngebotHandwerker(handwerkerRows)
+  const hwAnfrageDone = !hatHw || handwerkerAnfrageErledigt(handwerkerRows)
+  const hwEinreichungDone = !hatHw || handwerkerEinreichungErledigt(handwerkerRows)
+  const hwFreigabeDone = !hatHw || handwerkerFreigabeErledigt(handwerkerRows)
+  const darfKunde = darfAngebotAnKundeSenden(handwerkerRows, angebotStatusRaw)
+
+  if (hatHw) {
+    steps.push({
+      id: 'hw_anfragen',
+      label: 'Handwerker anfragen',
+      dateLabel: hwAnfrageDone ? 'Erledigt' : 'Als Nächstes',
+      done: hwAnfrageDone,
+      onClick: hwAnfrageDone ? undefined : onHandwerkerAnfragen,
+    })
+    steps.push({
+      id: 'hw_einreichung',
+      label: 'Partner-Angebot / Rechnung einholen',
+      dateLabel: hwEinreichungDone ? 'Erledigt' : hwAnfrageDone ? 'Als Nächstes' : '—',
+      done: hwEinreichungDone,
+      href: !hwEinreichungDone && hwAnfrageDone ? `#handwerker-partner` : undefined,
+    })
+    steps.push({
+      id: 'hw_freigabe',
+      label: 'Partner-Einreichung bestätigen',
+      dateLabel: hwFreigabeDone ? 'Erledigt' : hwEinreichungDone ? 'Als Nächstes' : '—',
+      done: hwFreigabeDone,
+      onClick: hwFreigabeDone || !hwEinreichungDone ? undefined : onHandwerkerBestaetigen,
+      href: !hwFreigabeDone && hwEinreichungDone ? `#handwerker-partner` : undefined,
+    })
+  } else {
+    steps.push({
+      id: 'hw_zuweisen',
+      label: 'Handwerker zuweisen & anfragen',
+      dateLabel: 'Als Nächstes',
+      done: false,
+      onClick: onHandwerkerAnfragen,
+    })
+  }
 
   const gesendet = status === 'gesendet' || status === 'angenommen' || status === 'abgelehnt'
   steps.push({
     id: 'senden',
-    label: 'Angebot senden',
-    dateLabel: gesendet ? 'Erledigt' : 'Als Nächstes',
+    label: 'Angebot an Kunden senden',
+    dateLabel: gesendet ? 'Erledigt' : darfKunde ? 'Als Nächstes' : '—',
     done: gesendet,
-    onClick: gesendet ? undefined : onSenden,
+    onClick: gesendet || !darfKunde ? undefined : onSenden,
   })
 
   steps.push({
@@ -59,28 +120,35 @@ export function buildAuftragNaechsteSchritte(opts: {
 }): NaechsterSchritt[] {
   const { status, auftragId, hatAbnahme, rechnungenCount } = opts
   const abgeschlossen = status === 'abgeschlossen'
+  const hatRechnung = rechnungenCount > 0
 
   return [
     {
       id: 'abnahme',
-      label: 'Abnahme durchführen',
-      dateLabel: hatAbnahme || abgeschlossen ? 'Erledigt' : '—',
+      label: '1. Abnahmeprotokoll',
+      dateLabel: hatAbnahme || abgeschlossen ? 'Erledigt' : 'Als Nächstes',
       done: hatAbnahme || abgeschlossen,
       href: hatAbnahme || abgeschlossen ? undefined : `/auftraege/${auftragId}/abnahme`,
     },
     {
       id: 'rechnung',
-      label: 'Rechnung erstellen',
-      dateLabel: rechnungenCount > 0 ? 'Erledigt' : '—',
-      done: rechnungenCount > 0,
-      href: rechnungenCount > 0 ? undefined : `/auftraege/${auftragId}/rechnungen-auswahl`,
+      label: '2. Rechnung erstellen',
+      dateLabel: hatRechnung ? 'Erledigt' : hatAbnahme ? 'Als Nächstes' : '—',
+      done: hatRechnung,
+      href:
+        hatRechnung || !hatAbnahme
+          ? undefined
+          : `/auftraege/${auftragId}/rechnungen-auswahl`,
     },
     {
       id: 'abschluss',
-      label: 'Auftrag abschließen',
-      dateLabel: abgeschlossen ? 'Erledigt' : '—',
+      label: '3. Auftrag abschließen',
+      dateLabel: abgeschlossen ? 'Erledigt' : hatAbnahme && hatRechnung ? 'Als Nächstes' : '—',
       done: abgeschlossen,
-      href: abgeschlossen ? undefined : `/auftraege/${auftragId}/abschluss`,
+      href:
+        abgeschlossen || !hatAbnahme || !hatRechnung
+          ? undefined
+          : `/auftraege/${auftragId}/abschluss`,
     },
   ]
 }
@@ -100,7 +168,7 @@ export function buildRechnungNaechsteSchritte(opts: {
     {
       id: 'senden',
       label: 'Rechnung senden',
-      dateLabel: gesendet ? 'Erledigt' : 'Als Nächstes',
+      dateLabel: gesendet ? 'Erledigt' : 'Optional',
       done: gesendet,
       onClick: gesendet ? undefined : onSenden,
     },
