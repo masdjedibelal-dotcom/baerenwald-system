@@ -23,6 +23,7 @@ import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWi
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import {
+  finalizeRechnungWizardWithoutMail,
   saveRechnungWizardDraft,
   sendRechnungWizard,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
@@ -321,6 +322,26 @@ export function RechnungWizard({
     router.refresh()
   }
 
+  async function handleSaveWithoutMail() {
+    const id = await persistDraft()
+    if (!id) return
+    setSaving(true)
+    const res = await finalizeRechnungWizardWithoutMail(id)
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success(
+      res.rechnungsnummer
+        ? `Rechnung ${res.rechnungsnummer} gespeichert (ohne Versand)`
+        : 'Rechnung gespeichert (ohne Versand)'
+    )
+    onDone?.(id)
+    onClose()
+    router.refresh()
+  }
+
   const previewSrc = rechnungId
     ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(rechnungId)}&preview=html`
     : null
@@ -356,10 +377,15 @@ export function RechnungWizard({
             <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button disabled={saving} className="flex-[2] gap-1.5" onClick={() => void handleSend()}>
-            <Send className="h-4 w-4" />
-            Versenden
-          </Button>
+          <>
+            <Button disabled={saving} variant="secondary" className="flex-1" onClick={() => void handleSaveWithoutMail()}>
+              Ohne E-Mail
+            </Button>
+            <Button disabled={saving} className="flex-[2] gap-1.5" onClick={() => void handleSend()}>
+              <Send className="h-4 w-4" />
+              Senden
+            </Button>
+          </>
         )}
       </div>
     </div>
@@ -411,10 +437,21 @@ export function RechnungWizard({
             </Button>
           </>
         ) : (
-          <Button disabled={saving} onClick={() => void handleSend()} className="gap-1.5">
-            <Send className="h-4 w-4" aria-hidden />
-            Rechnung versenden
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              disabled={saving}
+              onClick={() => void handleSaveWithoutMail()}
+              className="gap-1.5"
+            >
+              <Save className="h-4 w-4" aria-hidden />
+              Ohne E-Mail speichern
+            </Button>
+            <Button disabled={saving} onClick={() => void handleSend()} className="gap-1.5">
+              <Send className="h-4 w-4" aria-hidden />
+              An Kunden senden
+            </Button>
+          </>
         )}
         {lastSavedAt ? (
           <span className={cn('text-xs text-bw-text-muted', draftDirty && 'wizard-save-status--dirty')}>
@@ -548,6 +585,10 @@ export function RechnungWizard({
 
           {step === 3 ? (
             <div>
+              <p className="mb-4 rounded-lg border border-bw-border bg-bw-hover/50 px-3 py-2 text-[13px] text-bw-text-muted">
+                Optional: Rechnung ohne E-Mail speichern — der Versand an den Kunden erfolgt gesammelt
+                in der Abschlussdokumentation (Abnahmeprotokoll → Rechnung → Abschluss-PDF).
+              </p>
               <Card
                 title="Rechnungsempfänger"
                 action={

@@ -13,6 +13,8 @@ export interface FilterChipsProps {
   selected: string[]
   onChange: (values: string[]) => void
   multiple?: boolean
+  /** `grid` — große Touch-Ziele im Mobil-Filter-Sheet */
+  variant?: 'row' | 'grid'
   className?: string
 }
 
@@ -21,6 +23,7 @@ export function FilterChips({
   selected,
   onChange,
   multiple = false,
+  variant = 'row',
   className = '',
 }: FilterChipsProps) {
   const toggle = (value: string) => {
@@ -38,7 +41,9 @@ export function FilterChips({
   return (
     <div
       className={cn(
-        'chiprow flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        variant === 'grid'
+          ? 'grid grid-cols-2 gap-2'
+          : 'chiprow flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >
@@ -49,7 +54,11 @@ export function FilterChips({
             key={opt.value}
             type="button"
             onClick={() => toggle(opt.value)}
-            className={cn('chip shrink-0', isOn && 'chip-active')}
+            className={cn(
+              'chip shrink-0',
+              variant === 'grid' && 'chip-grid min-h-[44px] justify-center px-3 py-2.5 text-[13px]',
+              isOn && 'chip-active'
+            )}
           >
             {opt.label}
             {opt.count !== undefined ? <span className="chip-count">{opt.count}</span> : null}

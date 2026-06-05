@@ -117,7 +117,7 @@ export function RechnungDetailClient({
   firm?: FirmenEinstellungen
 }) {
   const router = useRouter()
-  const { refresh } = useCrmRefresh()
+  const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
@@ -599,7 +599,7 @@ export function RechnungDetailClient({
                   content: (
                     <KommunikationCard
                       filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
-                      reloadKey={mailCompose.reloadKey}
+                      reloadKey={mailCompose.reloadKey + generation}
                     />
                   ),
                 },

@@ -9,17 +9,15 @@ import {
   ListGridShell,
   ListMobileStack,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { useSort } from '@/hooks/useSort'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import type { RechnungListeZeile, RechnungStatus } from '@/lib/types'
-import { FilterChips } from '@/components/ui/FilterChips'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDatum, formatPreis, cn } from '@/lib/utils'
 import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
@@ -262,23 +260,23 @@ export function RechnungenListeClient({
       mode={mode}
       filters={
       <ListFilterSection
-        chips={
-          <FilterChips
-            options={[
+        chipGroups={[
+          {
+            label: 'Status',
+            options: [
               { label: 'Alle', value: 'alle', count: statusCounts.alle },
               { label: 'Entwurf', value: 'entwurf', count: statusCounts.entwurf },
               { label: 'Gesendet', value: 'gesendet', count: statusCounts.gesendet },
               { label: 'Bezahlt', value: 'bezahlt', count: statusCounts.bezahlt },
               { label: 'Überfällig', value: 'ueberfaellig', count: statusCounts.ueberfaellig },
               { label: 'Storniert', value: 'storniert', count: statusCounts.storniert },
-            ]}
-            selected={[chip]}
-            onChange={(vals) => setChip((vals[0] as RechnungChip) || 'alle')}
-          />
-        }
+            ],
+            selected: [chip],
+            onChange: (vals) => setChip((vals[0] as RechnungChip) || 'alle'),
+          },
+        ]}
       >
         <ListFilterBar
-          hideToolbarOnMobile
           hideStatusFilter
           statusLabel="—"
           statusOptions={[{ value: '', label: '—' }]}
@@ -298,50 +296,25 @@ export function RechnungenListeClient({
           hasActiveFilters={hasFilters}
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
-          mobileRail={
-            <AppListFilterRail
-              sort={
-                <MobileSortSelect
-                  variant="pill"
-                  options={[
-                    { field: 'rechnungsnummer', label: 'Nummer' },
-                    { field: 'kunde', label: 'Kunde' },
-                    { field: 'brutto', label: 'Betrag' },
-                    { field: 'status', label: 'Status' },
-                    { field: 'rechnungsdatum', label: 'Datum' },
-                    { field: 'faellig_am', label: 'Fällig' },
-                  ]}
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={(f) => (f ? handleSort(f) : resetSort())}
-                />
-              }
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-              onExportClick={() => setExportOpen(true)}
-            />
-          }
+          resultCount={filtered.length}
+          sort={{
+            options: [
+              { field: 'rechnungsnummer', label: 'Nummer' },
+              { field: 'kunde', label: 'Kunde' },
+              { field: 'brutto', label: 'Betrag' },
+              { field: 'status', label: 'Status' },
+              { field: 'rechnungsdatum', label: 'Datum' },
+              { field: 'faellig_am', label: 'Fällig' },
+            ],
+            currentField: field,
+            currentDir: dir,
+            onSort: (f) => (f ? handleSort(f) : resetSort()),
+          }}
         />
       </ListFilterSection>
       }
     >
       <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
-        <MobileSortSelect
-          options={[
-            { field: 'rechnungsnummer', label: 'Nummer' },
-            { field: 'kunde', label: 'Kunde' },
-            { field: 'brutto', label: 'Betrag' },
-            { field: 'status', label: 'Status' },
-            { field: 'rechnungsdatum', label: 'Datum' },
-            { field: 'faellig_am', label: 'Fällig' },
-          ]}
-          currentField={field}
-          currentDir={dir}
-          onSort={(f) => (f ? handleSort(f) : resetSort())}
-        />
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyState
