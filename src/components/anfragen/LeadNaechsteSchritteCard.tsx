@@ -18,33 +18,74 @@ export function buildLeadNaechsteSchritte(
   status: LeadStatus,
   opts: {
     angeboteCount: number
+    hatTermin?: boolean
     hatAngenommenesAngebot?: boolean
     angenommenAngebotHref?: string
     auftragId?: string
-    leadId: string
-    onAngebotClick?: () => void
+    /** Letztes Angebot: Partner-Pipeline abgeschlossen */
+    handwerkerErledigt?: boolean
+    /** Angebot an Kunden versendet */
+    angebotAnKundeGesendet?: boolean
+    angebotHref?: string
+    onTerminClick?: () => void
+    onAngebotVorbereiten?: () => void
+    onHandwerkerEinholen?: () => void
+    onAngebotAnKunde?: () => void
   }
 ): LeadSchritt[] {
   const {
     angeboteCount,
+    hatTermin = false,
     hatAngenommenesAngebot = false,
     angenommenAngebotHref,
     auftragId,
-    leadId,
-    onAngebotClick,
+    handwerkerErledigt = false,
+    angebotAnKundeGesendet = false,
+    angebotHref,
+    onTerminClick,
+    onAngebotVorbereiten,
+    onHandwerkerEinholen,
+    onAngebotAnKunde,
   } = opts
-  const hasAngebot =
-    angeboteCount > 0 || status === 'angebot' || status === 'auftrag' || status === 'abgeschlossen'
+  const hasEntwurf = angeboteCount > 0 || status === 'angebot' || status === 'auftrag' || status === 'abgeschlossen'
   const auftragDone = status === 'auftrag' || status === 'abgeschlossen'
 
   return [
     {
-      id: 'angebot',
-      label: 'Angebot erstellen',
-      dateLabel: hasAngebot ? 'Erledigt' : 'Heute',
-      done: hasAngebot,
-      href: hasAngebot ? undefined : onAngebotClick ? undefined : `/angebote/neu?lead_id=${leadId}`,
-      onClick: hasAngebot ? undefined : onAngebotClick,
+      id: 'termin',
+      label: 'Termin vereinbaren',
+      dateLabel: hatTermin ? 'Erledigt' : 'Heute',
+      done: hatTermin,
+      onClick: hatTermin ? undefined : onTerminClick,
+    },
+    {
+      id: 'angebot_vorbereiten',
+      label: 'Angebot vorbereiten',
+      dateLabel: hasEntwurf ? 'Erledigt' : 'Heute',
+      done: hasEntwurf,
+      onClick: hasEntwurf ? undefined : onAngebotVorbereiten,
+    },
+    {
+      id: 'handwerker_angebot',
+      label: 'Handwerker-Angebot / Rechnung einholen',
+      dateLabel: handwerkerErledigt ? 'Erledigt' : hasEntwurf ? 'Als Nächstes' : '—',
+      done: handwerkerErledigt,
+      onClick: handwerkerErledigt || !hasEntwurf ? undefined : onHandwerkerEinholen,
+      href: handwerkerErledigt || !hasEntwurf ? undefined : angebotHref ? `${angebotHref}#handwerker-partner` : undefined,
+    },
+    {
+      id: 'angebot_kunde',
+      label: 'Angebot an Kunden senden',
+      dateLabel: angebotAnKundeGesendet ? 'Erledigt' : handwerkerErledigt ? 'Als Nächstes' : '—',
+      done: angebotAnKundeGesendet,
+      onClick:
+        angebotAnKundeGesendet || !handwerkerErledigt ? undefined : onAngebotAnKunde,
+      href:
+        angebotAnKundeGesendet || !handwerkerErledigt
+          ? undefined
+          : angebotHref
+            ? `${angebotHref}#angebot-versand-kunde`
+            : undefined,
     },
     {
       id: 'angebot_angenommen',
@@ -72,14 +113,15 @@ export function LeadNaechsteSchritteCard({
   onStepClick?: (step: LeadSchritt) => void
   onQuickAngebot?: () => void
 }) {
-  const angebotStep = steps.find((s) => s.id === 'angebot')
-  /** Kein zweiter Vollbreiten-Button, wenn der Schritt „Angebot erstellen“ schon klickbar ist. */
+  const angebotStep = steps.find((s) => s.id === 'angebot_vorbereiten')
+  const handwerkerStep = steps.find((s) => s.id === 'handwerker_angebot')
+  const kundeStep = steps.find((s) => s.id === 'angebot_kunde')
+  /** Kein zweiter Vollbreiten-Button, wenn ein offener Schritt schon klickbar ist. */
   const showQuick =
     onQuickAngebot &&
-    angebotStep &&
-    !angebotStep.done &&
-    !angebotStep.onClick &&
-    !angebotStep.href
+    ((angebotStep && !angebotStep.done && !angebotStep.onClick && !angebotStep.href) ||
+      (handwerkerStep && !handwerkerStep.done && !handwerkerStep.onClick && !handwerkerStep.href) ||
+      (kundeStep && !kundeStep.done && !kundeStep.onClick && !kundeStep.href))
 
   return (
     <Card
@@ -149,7 +191,7 @@ export function LeadNaechsteSchritteCard({
             onClick={onQuickAngebot}
           >
             <FileText className="h-3.5 w-3.5" aria-hidden />
-            Angebot erstellen
+            Angebot vorbereiten
           </button>
         ) : null}
       </div>

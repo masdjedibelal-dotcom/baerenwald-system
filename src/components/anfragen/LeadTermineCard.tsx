@@ -32,6 +32,12 @@ import {
   formatTerminUhrzeitKurz,
   normalizeKalenderTermineList,
 } from '@/lib/anfragen/normalize-kalender-termine'
+import { istLeadTerminAnzeige } from '@/lib/kalender-internes-todo'
+import {
+  leadNotizFotoUrls,
+  TERMIN_NOTIZ_MAX_FOTOS,
+  uploadLeadNotizFotos,
+} from '@/lib/anfragen/lead-notiz-fotos'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { KalenderTermin, LeadNotizRow } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
@@ -66,6 +72,40 @@ function istBildAnhangUrl(url: string): boolean {
   return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(u)
 }
 
+type PendingNotizFoto = { file: File; url: string }
+
+function TerminNotizFotoVorschau({
+  items,
+  onRemove,
+}: {
+  items: { key: string; url: string }[]
+  onRemove: (key: string) => void
+}) {
+  if (!items.length) return null
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.key} className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.url}
+            alt=""
+            className="aspect-square w-full rounded-md border border-bw-border object-cover"
+          />
+          <button
+            type="button"
+            className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
+            onClick={() => onRemove(item.key)}
+            aria-label="Foto entfernen"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TerminNotizFormModal({
   open,
   onClose,
@@ -87,38 +127,82 @@ function TerminNotizFormModal({
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
-  const [pendingFoto, setPendingFoto] = useState<{ file: File; url: string } | null>(null)
+  const [existingUrls, setExistingUrls] = useState<string[]>([])
+  const [pendingFotos, setPendingFotos] = useState<PendingNotizFoto[]>([])
   const fileGalleryRef = useRef<HTMLInputElement>(null)
   const fileCameraRef = useRef<HTMLInputElement>(null)
+  const pendingFotosRef = useRef(pendingFotos)
+  pendingFotosRef.current = pendingFotos
+
+  const fotoCount = existingUrls.length + pendingFotos.length
+  const canAddFotos = fotoCount < TERMIN_NOTIZ_MAX_FOTOS
 
   useEffect(() => {
     if (!open) return
     if (mode === 'edit' && notiz) {
       setTitel(notiz.titel?.trim() ?? '')
       setBeschreibung((notiz.inhalt ?? '').trim())
+      setExistingUrls(leadNotizFotoUrls(notiz))
     } else {
       setTitel('')
       setBeschreibung('')
+      setExistingUrls([])
     }
-    setPendingFoto(null)
+    setPendingFotos((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.url))
+      return []
+    })
   }, [open, mode, notiz])
 
-  function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setPendingFoto((prev) => {
-      if (prev) URL.revokeObjectURL(prev.url)
-      return { file: f, url: URL.createObjectURL(f) }
-    })
-  }
+  useEffect(() => {
+    return () => {
+      pendingFotosRef.current.forEach((p) => URL.revokeObjectURL(p.url))
+    }
+  }, [])
 
-  function clearPendingFoto() {
-    setPendingFoto((prev) => {
-      if (prev) URL.revokeObjectURL(prev.url)
-      return null
+  function appendFiles(files: FileList | File[]) {
+    const list = Array.from(files)
+    if (!list.length) return
+    setPendingFotos((prev) => {
+      const slots = TERMIN_NOTIZ_MAX_FOTOS - existingUrls.length - prev.length
+      if (slots <= 0) {
+        toast.error(`Maximal ${TERMIN_NOTIZ_MAX_FOTOS} Fotos pro Notiz.`)
+        return prev
+      }
+      const next = [...prev]
+      for (const file of list.slice(0, slots)) {
+        next.push({ file, url: URL.createObjectURL(file) })
+      }
+      if (list.length > slots) {
+        toast.error(`Nur ${slots} weitere Foto(s) möglich (max. ${TERMIN_NOTIZ_MAX_FOTOS}).`)
+      }
+      return next
     })
     if (fileGalleryRef.current) fileGalleryRef.current.value = ''
     if (fileCameraRef.current) fileCameraRef.current.value = ''
+  }
+
+  function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files?.length) return
+    appendFiles(files)
+  }
+
+  function removeFoto(key: string) {
+    if (key.startsWith('existing:')) {
+      const url = key.slice('existing:'.length)
+      setExistingUrls((prev) => prev.filter((u) => u !== url))
+      return
+    }
+    if (key.startsWith('pending:')) {
+      const idx = Number(key.slice('pending:'.length))
+      setPendingFotos((prev) => {
+        const copy = [...prev]
+        const removed = copy.splice(idx, 1)[0]
+        if (removed) URL.revokeObjectURL(removed.url)
+        return copy
+      })
+    }
   }
 
   async function speichern() {
@@ -128,37 +212,41 @@ function TerminNotizFormModal({
       toast.error('Bitte einen Titel eingeben.')
       return
     }
-    if (!text && (mode === 'edit' || !pendingFoto)) {
+    if (!text && fotoCount === 0) {
       toast.error('Bitte Beschreibung oder Foto hinzufügen.')
       return
     }
     startTransition(async () => {
+      let uploadedUrls: string[] = []
+      if (pendingFotos.length) {
+        const up = await uploadLeadNotizFotos(
+          leadId,
+          pendingFotos.map((p) => p.file)
+        )
+        if (!up.ok) {
+          toast.error(up.message)
+          return
+        }
+        uploadedUrls = up.urls
+      }
+
+      const allUrls = [...existingUrls, ...uploadedUrls]
+
       if (mode === 'edit' && notiz) {
-        const r = await updateLeadNotizRow(notiz.id, leadId, { titel: titelTrim, inhalt: text })
+        const r = await updateLeadNotizRow(notiz.id, leadId, {
+          titel: titelTrim,
+          inhalt: text,
+          datei_urls: allUrls,
+        })
         if (!r.ok) {
           toast.error(r.message)
           return
         }
       } else {
-        let fotoUrl: string | null = null
-        if (pendingFoto) {
-          const fd = new FormData()
-          fd.append('file', pendingFoto.file)
-          const res = await fetch(`/api/anfragen/${leadId}/notiz-foto`, { method: 'POST', body: fd })
-          const js: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}))
-          if (!res.ok) {
-            toast.error(typeof js.error === 'string' ? js.error : 'Foto-Upload fehlgeschlagen.')
-            return
-          }
-          fotoUrl = typeof js.url === 'string' ? js.url : null
-          if (!fotoUrl) {
-            toast.error('Keine Bild-URL erhalten.')
-            return
-          }
-        }
-        const r = await addLeadNotizRow(leadId, text, fotoUrl, {
+        const r = await addLeadNotizRow(leadId, text, allUrls[0] ?? null, {
           kalender_termin_id: terminId,
           titel: titelTrim,
+          datei_urls: allUrls.length ? allUrls : null,
         })
         if (!r.ok) {
           toast.error(r.message)
@@ -172,8 +260,12 @@ function TerminNotizFormModal({
     })
   }
 
-  const canSave =
-    !!titel.trim() && !!(beschreibung.trim() || (mode === 'add' && pendingFoto)) && !pending
+  const canSave = !!titel.trim() && !!(beschreibung.trim() || fotoCount > 0) && !pending
+
+  const vorschauItems = [
+    ...existingUrls.map((url) => ({ key: `existing:${url}`, url })),
+    ...pendingFotos.map((p, i) => ({ key: `pending:${i}`, url: p.url })),
+  ]
 
   return (
     <Modal
@@ -197,63 +289,48 @@ function TerminNotizFormModal({
           onChange={(e) => setBeschreibung(e.target.value)}
         />
       </div>
-      {mode === 'add' ? (
-        <>
-          <input
-            ref={fileGalleryRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={onFileChosen}
-          />
-          <input
-            ref={fileCameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={onFileChosen}
-          />
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => fileGalleryRef.current?.click()}
-              className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
-            >
-              <ImagePlus className="h-4 w-4" aria-hidden />
-              Foto
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => fileCameraRef.current?.click()}
-              className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
-            >
-              <Camera className="h-4 w-4" aria-hidden />
-              Aufnehmen
-            </button>
-          </div>
-          {pendingFoto ? (
-            <div className="relative mt-3 inline-block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={pendingFoto.url}
-                alt=""
-                className="max-h-32 rounded-md border border-bw-border object-contain"
-              />
-              <button
-                type="button"
-                className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
-                onClick={clearPendingFoto}
-                aria-label="Foto entfernen"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            </div>
-          ) : null}
-        </>
-      ) : null}
+      <>
+        <input
+          ref={fileGalleryRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={onFileChosen}
+        />
+        <input
+          ref={fileCameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={onFileChosen}
+        />
+        <div className={cn('lead-notiz-compose__media', mode === 'edit' ? 'mt-3' : 'mt-2')}>
+          <button
+            type="button"
+            disabled={pending || !canAddFotos}
+            onClick={() => fileGalleryRef.current?.click()}
+            className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+          >
+            <ImagePlus className="h-4 w-4" aria-hidden />
+            {mode === 'add' ? 'Fotos' : 'Fotos hinzufügen'}
+          </button>
+          <button
+            type="button"
+            disabled={pending || !canAddFotos}
+            onClick={() => fileCameraRef.current?.click()}
+            className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+          >
+            <Camera className="h-4 w-4" aria-hidden />
+            Aufnehmen
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-bw-text-muted">
+          Bis zu {TERMIN_NOTIZ_MAX_FOTOS} Fotos · {fotoCount}/{TERMIN_NOTIZ_MAX_FOTOS}
+        </p>
+        <TerminNotizFotoVorschau items={vorschauItems} onRemove={removeFoto} />
+      </>
       <ModalFormFooter
         onCancel={onClose}
         onSubmit={() => void speichern()}
@@ -293,6 +370,7 @@ function TerminNotizZeile({
   }
 
   const titel = notiz.titel?.trim() || 'Notiz'
+  const fotos = leadNotizFotoUrls(notiz).filter(istBildAnhangUrl)
 
   return (
     <li className="lead-notiz-row">
@@ -332,19 +410,24 @@ function TerminNotizZeile({
           {(notiz.inhalt ?? '').trim() ? (
             <RichTextContent html={notiz.inhalt ?? ''} className="text-sm text-bw-text-mid" />
           ) : null}
-          {notiz.datei_url && istBildAnhangUrl(notiz.datei_url) ? (
-            <button
-              type="button"
-              className="mt-2 block max-w-full text-left"
-              onClick={() => setLightboxUrl(notiz.datei_url!)}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={notiz.datei_url}
-                alt=""
-                className="max-h-40 max-w-full rounded-md border border-bw-border object-contain"
-              />
-            </button>
+          {fotos.length ? (
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {fotos.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  className="block overflow-hidden rounded-md border border-bw-border text-left"
+                  onClick={() => setLightboxUrl(url)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt=""
+                    className="aspect-square w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -435,24 +518,24 @@ function LeadTerminZeile({
   const wo = termin.adresse?.trim() || '—'
 
   return (
-    <div className="detail-section-card lead-termin-row">
-      <div className="detail-section-card__header">
+    <div className="lead-termin-row">
+      <div className="lead-termin-row__header">
         <button
           type="button"
-          className="detail-section-card__trigger"
+          className="lead-termin-row__trigger"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
-          <span className="detail-section-card__title">{terminZeileKurz(termin)}</span>
+          <span className="lead-termin-row__title">{terminZeileKurz(termin)}</span>
           <ChevronDown
-            className={cn('detail-section-card__chevron', open && 'is-open')}
+            className={cn('lead-termin-row__chevron', open && 'is-open')}
             aria-hidden
           />
         </button>
-        <div className="detail-section-card__action">
+        <div className="lead-termin-row__actions">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
+            className="lead-termin-row__icon-btn"
             onClick={() => setEditOpen(true)}
             aria-label="Termin bearbeiten"
           >
@@ -461,8 +544,8 @@ function LeadTerminZeile({
         </div>
       </div>
       {open ? (
-        <div className="detail-section-card__body">
-          <div className="detail-section-card__body-inner space-y-2 text-sm">
+        <div className="lead-termin-row__body">
+          <div className="space-y-2 text-sm">
             <dl className="lead-termin-facts grid gap-2">
               <div className="lead-termin-facts__row">
                 <dt className="lead-termin-facts__label">Wer</dt>
@@ -520,7 +603,9 @@ export function LeadTermineCard({
   }, [])
 
   const sorted = useMemo(() => {
-    const unique = dedupeKalenderTermineAnzeige(normalizeKalenderTermineList(termine))
+    const unique = dedupeKalenderTermineAnzeige(normalizeKalenderTermineList(termine)).filter(
+      istLeadTerminAnzeige
+    )
     return unique.sort((a, b) => {
       const da = new Date(a.datum).getTime()
       const db = new Date(b.datum).getTime()
@@ -551,7 +636,7 @@ export function LeadTermineCard({
 
   const body =
     sorted.length === 0 ? (
-      <div className="py-6 text-center">
+      <div className="px-4 py-6 text-center">
         <Calendar className="mx-auto h-8 w-8 text-bw-text-muted" aria-hidden />
         <p className="mt-2 text-sm font-medium text-bw-text">Noch kein Termin</p>
         <p className="mt-1 text-xs text-bw-text-muted">
@@ -560,7 +645,7 @@ export function LeadTermineCard({
         </p>
       </div>
     ) : (
-      <div className="lead-termin-list space-y-2">
+      <div className="lead-termin-list">
         {sorted.map((t) => (
           <LeadTerminZeile
             key={t.id}
@@ -576,5 +661,9 @@ export function LeadTermineCard({
 
   if (variant === 'plain') return <div>{body}</div>
 
-  return <Card collapsible title="Termine">{body}</Card>
+  return (
+    <Card collapsible title="Termine" flush bodyClassName="p-0">
+      {body}
+    </Card>
+  )
 }

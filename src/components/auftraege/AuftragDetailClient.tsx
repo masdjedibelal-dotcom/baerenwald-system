@@ -108,7 +108,7 @@ export function AuftragDetailClient({
   finanzenPayload: AuftragFinanzenClientPayload | null
 }) {
   const router = useRouter()
-  const { refresh } = useCrmRefresh()
+  const { refresh, generation } = useCrmRefresh()
   const isMobile = useIsMobile()
   const mailCompose = useKundenMailCompose()
   const [detail, setDetail] = useState(initial)
@@ -431,10 +431,7 @@ export function AuftragDetailClient({
     [name, detail.kunden, detail.start_datum, detail.end_datum, detail.notizen]
   )
 
-  const hatAbnahme =
-    Boolean(detail.abnahme_protokoll_url) ||
-    detail.status === 'abnahme' ||
-    detail.status === 'abgeschlossen'
+  const hatAbnahme = Boolean(detail.abnahme_protokoll_url)
 
   const naechsteSchritte = useMemo(
     () =>
@@ -523,13 +520,15 @@ export function AuftragDetailClient({
         auftragId={detail.id}
         kundeName={name}
         positionen={detail.auftrag_positionen ?? []}
+        angebotPositionen={detail.angebote?.positionen ?? []}
+        gewerke={gewerke}
         abnahmeProtokollUrl={detail.abnahme_protokoll_url}
         abnahmeDatum={detail.abnahme_datum}
         onChanged={() => refresh()}
       />
       <KommunikationCard
         filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
-        reloadKey={mailCompose.reloadKey}
+        reloadKey={mailCompose.reloadKey + generation}
       />
     </div>
   )
@@ -757,6 +756,8 @@ export function AuftragDetailClient({
         onClose={() => setAbnahmeModal(false)}
         auftragId={detail.id}
         positionen={detail.auftrag_positionen ?? []}
+        angebotPositionen={detail.angebote?.positionen ?? []}
+        gewerke={gewerke}
         kundeName={name}
         initialStep={abnahmeModalStep}
         onDone={() => refresh()}

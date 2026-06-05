@@ -21,7 +21,7 @@ import {
   HandwerkerZuweisungMailModal,
   type HandwerkerZuweisungMailTarget,
 } from '@/components/auftraege/HandwerkerZuweisungMailModal'
-import { buildPartnerLoginForAuftragUrl } from '@/lib/portal-utils'
+import { buildPartnerLoginLink } from '@/lib/portal-utils'
 import type { HandwerkerZuweisenKontext } from '@/components/auftraege/HandwerkerZuweisenModal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -42,7 +42,7 @@ import {
   updateAuftragPositionSteuerung,
 } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import {
-  groupAuftragPositionenByGewerk,
+  groupAuftragPositionenByGewerkForAnzeige,
   type AuftragGewerkBlock,
 } from '@/lib/auftraege/auftrag-position-blocks'
 import {
@@ -196,7 +196,7 @@ export function AuftragPositionenSteuerungTab({
   )
 
   const gewerkeBlocks = useMemo(
-    () => groupAuftragPositionenByGewerk(sorted, gewerke),
+    () => groupAuftragPositionenByGewerkForAnzeige(sorted, gewerke),
     [sorted, gewerke]
   )
 
@@ -460,7 +460,6 @@ function GewerkBlock({
             pending={pending || pendingLocal}
             handwerkerKontext={handwerkerKontext}
             auftragId={auftragId}
-            auftragIdForPortal={auftragId}
             onToggle={() => onToggleLeistung(pos.id)}
             onSave={(patch) => onSavePosition(pos, patch)}
             onMove={onMovePosition}
@@ -567,7 +566,6 @@ function LeistungRow({
   pending,
   handwerkerKontext,
   auftragId,
-  auftragIdForPortal,
   onToggle,
   onSave,
   onMove,
@@ -584,7 +582,6 @@ function LeistungRow({
   pending: boolean
   handwerkerKontext: HandwerkerZuweisenKontext
   auftragId: string
-  auftragIdForPortal: string
   auftragAbgeschlossen: boolean
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
   onToggle: () => void
@@ -617,9 +614,9 @@ function LeistungRow({
       leistungen: [`${pos.leistung_name} (${qty})`],
       startDatum: pos.start_datum ?? handwerkerKontext.startDatum,
       endDatum: pos.end_datum ?? handwerkerKontext.endDatum,
-      portalLink: buildPartnerLoginForAuftragUrl(auftragIdForPortal),
+      portalLink: buildPartnerLoginLink(),
     }
-  }, [hw?.name, pos, block.gewerkName, handwerkerKontext, auftragIdForPortal])
+  }, [hw?.name, pos, block.gewerkName, handwerkerKontext])
 
   function changeLeistungStatus(st: AuftragLeistungStatus) {
     startTransition(async () => {

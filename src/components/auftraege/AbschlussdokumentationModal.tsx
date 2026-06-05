@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import {
   downloadAbschlussdokumentationPdf,
+  finalizeAbschlussdokumentationOhneMail,
   getAbschlussdokumentationMailDefaults,
   getAbschlussdokuVorschau,
   previewAbschlussdokumentationMail,
@@ -47,6 +48,8 @@ export function AbschlussdokumentationModal({
     bautagebuchCount: 0,
     fotoCount: 0,
     hasAbnahme: false,
+    hasRechnung: false,
+    rechnungsnummer: null as string | null,
     handwerkerCount: 0,
   })
   const [optionen, setOptionen] = useState<AbschlussdokuOptionen>({
@@ -127,7 +130,15 @@ export function AbschlussdokumentationModal({
     })
   }
 
+  function abschlussBereit(): boolean {
+    return vorschau.hasAbnahme && vorschau.hasRechnung
+  }
+
   function senden() {
+    if (!abschlussBereit()) {
+      toast.error('Bitte zuerst Abnahmeprotokoll und Rechnung erstellen (jeweils ohne E-Mail möglich).')
+      return
+    }
     if (!betreff.trim() || !nachricht.trim()) {
       toast.error('Bitte Betreff und Nachricht ausfüllen.')
       return
@@ -146,7 +157,23 @@ export function AbschlussdokumentationModal({
       })
       if (!r.ok) toast.error(r.message)
       else {
-        toast.success('Abschlussdokumentation gesendet — Auftrag abgeschlossen')
+        toast.success('Gesendet — Auftrag abgeschlossen')
+        onDone()
+        onClose()
+      }
+    })
+  }
+
+  function abschliessenOhneMail() {
+    if (!abschlussBereit()) {
+      toast.error('Bitte zuerst Abnahmeprotokoll und Rechnung erstellen.')
+      return
+    }
+    startTransition(async () => {
+      const r = await finalizeAbschlussdokumentationOhneMail(auftragId, optionen)
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Auftrag abgeschlossen (ohne E-Mail)')
         onDone()
         onClose()
       }
@@ -154,22 +181,37 @@ export function AbschlussdokumentationModal({
   }
 
   const checklist = [
-    { ok: true, label: 'Projektübersicht' },
-    { ok: vorschau.positionenCount > 0, label: `Alle Positionen (${vorschau.positionenCount})` },
+    {
+      ok: vorschau.hasAbnahme,
+      label: '1. Abnahmeprotokoll',
+      hint: vorschau.hasAbnahme ? undefined : 'In Schritt Abnahme erstellen (ohne E-Mail speichern)',
+    },
+    {
+      ok: vorschau.hasRechnung,
+      label: vorschau.rechnungsnummer
+        ? `2. Rechnung (${vorschau.rechnungsnummer})`
+        : '2. Rechnung',
+      hint: vorschau.hasRechnung ? undefined : 'Rechnung anlegen (ohne E-Mail speichern)',
+    },
+    {
+      ok: abschlussBereit(),
+      label: '3. Abschlussdokumentation + Versand',
+      hint: 'E-Mail mit 3 PDFs: Abnahme → Rechnung → Abschluss',
+    },
+    { ok: true, label: 'Projektübersicht im Abschluss-PDF' },
     {
       ok: optionen.mitBautagebuch && vorschau.bautagebuchCount > 0,
       label: `${ABSCHLUSS_PROTOKOLL_TITEL} (${vorschau.bautagebuchCount} Einträge)`,
       muted: !optionen.mitBautagebuch,
     },
     {
+      ok: vorschau.positionenCount > 0,
+      label: `Alle Positionen (${vorschau.positionenCount})`,
+    },
+    {
       ok: optionen.mitFotos && vorschau.fotoCount > 0,
       label: `Fotos (${vorschau.fotoCount})`,
       muted: !optionen.mitFotos,
-    },
-    {
-      ok: vorschau.hasAbnahme,
-      label: 'Abnahmeprotokoll',
-      muted: !vorschau.hasAbnahme,
     },
     {
       ok: optionen.mitHandwerker && vorschau.handwerkerCount > 0,
@@ -184,16 +226,30 @@ export function AbschlussdokumentationModal({
       onSubmit={senden}
       submitLabel="Senden & abschließen"
       loading={pending}
+      submitDisabled={!abschlussBereit()}
       extra={
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full md:w-auto"
-          loading={pending}
-          onClick={downloadPdf}
-        >
-          PDF herunterladen
-        </Button>
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full md:w-auto"
+            loading={pending}
+            disabled={!abschlussBereit()}
+            onClick={downloadPdf}
+          >
+            PDF herunterladen
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full md:w-auto"
+            loading={pending}
+            disabled={!abschlussBereit()}
+            onClick={abschliessenOhneMail}
+          >
+            Ohne E-Mail abschließen
+          </Button>
+        </>
       }
     />
   )
@@ -201,28 +257,40 @@ export function AbschlussdokumentationModal({
   const body = (
     <>
       <p className="mb-3 text-sm text-bw-text-muted">
-        Abschlussdokumentation für <strong>{kundeName}</strong> — PDF-Anhang und E-Mail an den Kunden.
+        Abschluss für <strong>{kundeName}</strong> — Reihenfolge: Abnahmeprotokoll → Rechnung →
+        Abschlussdokumentation. Der Kundenversand erfolgt hier gesammelt in einer E-Mail (3 PDF-Anhänge).
       </p>
 
-      <p className="mb-3 text-sm font-semibold text-bw-text">Enthalten im PDF</p>
+      {!abschlussBereit() ? (
+        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+          Vor dem Abschluss: Abnahmeprotokoll und Rechnung müssen existieren — jeweils auch ohne
+          E-Mail-Versand möglich.
+        </p>
+      ) : null}
+
+      <p className="mb-3 text-sm font-semibold text-bw-text">Ablauf & Inhalt</p>
       <ul className="mb-4 space-y-1.5">
         {checklist.map((c) => (
           <li
             key={c.label}
             className={cn(
-              'flex items-center gap-2 text-[13px]',
-              c.muted ? 'text-bw-text-muted' : 'text-bw-text'
+              'flex flex-col gap-0.5 text-[13px]',
+              'muted' in c && c.muted ? 'text-bw-text-muted' : 'text-bw-text'
             )}
           >
-            <Check
-              className={cn(
-                'h-4 w-4 shrink-0',
-                c.ok ? 'text-emerald-600' : c.muted ? 'text-bw-border' : 'text-bw-text-muted'
-              )}
-              aria-hidden
-            />
-            {c.label}
-            {c.muted && !c.ok ? <span className="text-[11px]">(nicht vorhanden)</span> : null}
+            <span className="flex items-center gap-2">
+              <Check
+                className={cn(
+                  'h-4 w-4 shrink-0',
+                  c.ok ? 'text-emerald-600' : 'text-bw-border'
+                )}
+                aria-hidden
+              />
+              {c.label}
+            </span>
+            {'hint' in c && c.hint && !c.ok ? (
+              <span className="pl-6 text-[11px] text-bw-text-muted">{c.hint}</span>
+            ) : null}
           </li>
         ))}
       </ul>

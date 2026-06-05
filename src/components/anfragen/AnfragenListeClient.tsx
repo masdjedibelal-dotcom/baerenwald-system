@@ -12,7 +12,6 @@ import {
 import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { LeadStatusBadge } from '@/components/ui/Badge'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -20,7 +19,6 @@ import { useSort } from '@/hooks/useSort'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { ListAvatar } from '@/components/ui/ListAvatar'
-import { FilterChips } from '@/components/ui/FilterChips'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
@@ -295,17 +293,18 @@ export function AnfragenListeClient({
       mode={mode}
       filters={
         <ListFilterSection
-          chips={
-            <FilterChips
-              options={STATUS_ORDER.map((st) => ({
+          chipGroups={[
+            {
+              label: 'Status',
+              options: STATUS_ORDER.map((st) => ({
                 label: st === '' ? 'Alle' : STATUS_LABELS[st],
                 value: st,
                 count: st === '' ? leads.length : statusCounts[st] ?? 0,
-              }))}
-              selected={[statusFilter]}
-              onChange={(v) => setStatusFilter((v[0] ?? '') as '' | LeadStatus)}
-            />
-          }
+              })),
+              selected: [statusFilter],
+              onChange: (v) => setStatusFilter((v[0] ?? '') as '' | LeadStatus),
+            },
+          ]}
         >
           <ListFilterBar
             hideStatusFilter
@@ -333,26 +332,23 @@ export function AnfragenListeClient({
             hasActiveFilters={hasFilters}
             tags={filterTags}
             onExportClick={() => setExportOpen(true)}
+            resultCount={filtered.length}
+            sort={{
+              options: [
+                { field: 'name', label: 'Name' },
+                { field: 'created_at', label: 'Datum' },
+                { field: 'preis_min', label: anfragenPreisSpaltenLabel() },
+                { field: 'status', label: 'Status' },
+              ],
+              currentField: field,
+              currentDir: dir,
+              onSort: (f) => (f ? handleSort(f) : resetSort()),
+            }}
           />
         </ListFilterSection>
       }
     >
       <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
-            <MobileSortSelect
-              variant="pill"
-              options={[
-                { field: 'name', label: 'Name' },
-                { field: 'created_at', label: 'Datum' },
-                { field: 'preis_min', label: anfragenPreisSpaltenLabel() },
-                { field: 'status', label: 'Status' },
-              ]}
-              currentField={field}
-              currentDir={dir}
-              onSort={(f) => (f ? handleSort(f) : resetSort())}
-            />
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyState

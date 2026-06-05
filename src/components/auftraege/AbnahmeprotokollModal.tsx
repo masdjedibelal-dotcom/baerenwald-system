@@ -17,23 +17,34 @@ import {
   saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import {
+  buildAbnahmePunkteInitial,
   maengelAusPunkten,
-  punkteAusAuftragPositionen,
   type AbnahmeMangel,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { downloadPdfFromBase64 } from '@/lib/download-pdf-base64'
-import type { AuftragPosition } from '@/lib/types'
+import { looksLikeHtml, richTextToPlain } from '@/lib/rich-text'
+import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
 
 const STEPS = ['Checkliste', 'Vor Ort', 'Mängel', 'Abschluss'] as const
+
+function sanitizeGeladenePunkte(punkte: AbnahmePunkt[]): AbnahmePunkt[] {
+  return punkte.map((p) => {
+    const raw = p.beschreibung ?? ''
+    if (!raw || !looksLikeHtml(raw)) return p
+    return { ...p, beschreibung: richTextToPlain(raw) }
+  })
+}
 
 export function AbnahmeprotokollModal({
   open,
   onClose,
   auftragId,
   positionen,
+  angebotPositionen,
+  gewerke = [],
   kundeName,
   onDone,
   presentation = 'modal',
@@ -43,6 +54,8 @@ export function AbnahmeprotokollModal({
   onClose: () => void
   auftragId: string
   positionen: AuftragPosition[]
+  angebotPositionen?: AngebotPosition[] | null
+  gewerke?: Pick<Gewerk, 'id' | 'name' | 'slug'>[]
   kundeName: string
   onDone: () => void
   presentation?: 'modal' | 'flow'
@@ -75,12 +88,18 @@ export function AbnahmeprotokollModal({
     void (async () => {
       const saved = await loadAbnahmeprotokollSummary(auftragId)
       if (saved?.punkte.length) {
-        setPunkte(saved.punkte)
+        setPunkte(sanitizeGeladenePunkte(saved.punkte))
         setMaengel(saved.maengel)
         setAbnahmeDatum(saved.abnahme_datum?.slice(0, 10) || heuteYmd())
         setNotizen(saved.notizen ?? '')
       } else {
-        setPunkte(punkteAusAuftragPositionen(positionen))
+        setPunkte(
+          buildAbnahmePunkteInitial({
+            positionen,
+            angebotPositionen,
+            gewerke,
+          })
+        )
         setMaengel([])
         setAbnahmeDatum(heuteYmd())
         setNotizen('')
@@ -93,7 +112,7 @@ export function AbnahmeprotokollModal({
       }
       setLoading(false)
     })()
-  }, [active, positionen, auftragId, initialStep])
+  }, [active, positionen, angebotPositionen, gewerke, auftragId, initialStep])
 
   useEffect(() => {
     if (step === 3 && prevStepRef.current !== 3) {
@@ -264,7 +283,7 @@ export function AbnahmeprotokollModal({
               loading={pending}
               onClick={() => speichernDraft(() => onClose())}
             >
-              Nur speichern
+              Ohne E-Mail speichern
             </Button>
             <Button type="button" variant="primary" size="sm" loading={pending} onClick={senden}>
               An Kunden senden
@@ -382,6 +401,10 @@ export function AbnahmeprotokollModal({
 
       {step === 4 ? (
         <div className="space-y-3">
+          <p className="rounded-lg border border-bw-border bg-bw-hover/50 px-3 py-2 text-[13px] text-bw-text-muted">
+            Tipp: „Ohne E-Mail speichern“ — der Versand an den Kunden erfolgt gesammelt in der
+            Abschlussdokumentation (zusammen mit Rechnung).
+          </p>
           <Input
             label="Datum der Abnahme"
             type="date"

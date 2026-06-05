@@ -2,15 +2,19 @@
 
 import { useRouter } from 'next/navigation'
 import { AbnahmeprotokollModal } from '@/components/auftraege/AbnahmeprotokollModal'
-import type { AuftragPosition } from '@/lib/types'
+import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 
 export function AuftragAbnahmeFlowClient({
   auftragId,
   positionen,
+  angebotPositionen,
+  gewerke = [],
   kundeName,
 }: {
   auftragId: string
   positionen: AuftragPosition[]
+  angebotPositionen?: AngebotPosition[] | null
+  gewerke?: Pick<Gewerk, 'id' | 'name' | 'slug'>[]
   kundeName: string
 }) {
   const router = useRouter()
@@ -21,6 +25,8 @@ export function AuftragAbnahmeFlowClient({
       open
       auftragId={auftragId}
       positionen={positionen}
+      angebotPositionen={angebotPositionen}
+      gewerke={gewerke}
       kundeName={kundeName}
       onClose={() => router.push(`/auftraege/${auftragId}`)}
       onDone={() => {

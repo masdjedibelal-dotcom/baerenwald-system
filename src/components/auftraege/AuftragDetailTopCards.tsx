@@ -62,7 +62,7 @@ export function AuftragDetailTopCards({
         <DetailProp label="Projektleitung">
           <div className="space-y-1">
             <select
-              className="input max-w-full py-1.5 text-sm"
+              className="input max-w-full"
               value={betreuerId}
               onChange={(e) => onBetreuerChange(e.target.value)}
               disabled={pending}
@@ -75,7 +75,7 @@ export function AuftragDetailTopCards({
                 </option>
               ))}
             </select>
-            <p className="text-[11px] text-bw-text-muted">
+            <p className="prop-form-hint">
               Ansprechpartner im Kundenportal (Name, E-Mail, Telefon aus Team-Profil).
             </p>
           </div>

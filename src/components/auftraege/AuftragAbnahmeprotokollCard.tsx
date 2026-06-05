@@ -6,13 +6,15 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { AbnahmeprotokollModal } from '@/components/auftraege/AbnahmeprotokollModal'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
-import type { AuftragPosition } from '@/lib/types'
+import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 
 export function AuftragAbnahmeprotokollCard({
   auftragId,
   kundeName,
   positionen,
+  angebotPositionen,
+  gewerke = [],
   abnahmeProtokollUrl,
   abnahmeDatum,
   onChanged,
@@ -20,6 +22,8 @@ export function AuftragAbnahmeprotokollCard({
   auftragId: string
   kundeName: string
   positionen: AuftragPosition[]
+  angebotPositionen?: AngebotPosition[] | null
+  gewerke?: Pick<Gewerk, 'id' | 'name' | 'slug'>[]
   abnahmeProtokollUrl: string | null
   abnahmeDatum: string | null
   onChanged: () => void
@@ -124,6 +128,8 @@ export function AuftragAbnahmeprotokollCard({
         onClose={() => setModalOpen(false)}
         auftragId={auftragId}
         positionen={positionen}
+        angebotPositionen={angebotPositionen}
+        gewerke={gewerke}
         kundeName={kundeName}
         initialStep={initialStep}
         onDone={() => {

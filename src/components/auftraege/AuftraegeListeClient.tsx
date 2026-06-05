@@ -10,14 +10,12 @@ import {
   ListGridShell,
   ListMobileStack,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
-import { FilterChips } from '@/components/ui/FilterChips'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useSort } from '@/hooks/useSort'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -218,18 +216,20 @@ export function AuftraegeListeClient({
       mode={mode}
       filters={
       <ListFilterSection
-        chips={
-          !statusList?.length ? (
-            <FilterChips
-              options={phaseChipOptions}
-              selected={[phase]}
-              onChange={(v) => setPhase((v[0] ?? '') as AuftragListenPhase)}
-            />
-          ) : null
+        chipGroups={
+          !statusList?.length
+            ? [
+                {
+                  label: 'Phase',
+                  options: phaseChipOptions,
+                  selected: [phase],
+                  onChange: (v) => setPhase((v[0] ?? '') as AuftragListenPhase),
+                },
+              ]
+            : []
         }
       >
         <ListFilterBar
-          hideToolbarOnMobile
           hideStatusFilter
           statusLabel="Status"
           statusOptions={[{ value: '', label: '—' }]}
@@ -249,48 +249,24 @@ export function AuftraegeListeClient({
           hasActiveFilters={hasActiveFilters}
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
-          mobileRail={
-            <AppListFilterRail
-              sort={
-                <MobileSortSelect
-                  variant="pill"
-                  options={[
-                    { field: 'auftrag_titel', label: 'Auftrag' },
-                    { field: 'kunde', label: 'Kunde' },
-                    { field: 'wert', label: 'Wert' },
-                    { field: 'end_datum', label: 'Lieferdatum' },
-                    { field: 'status', label: 'Status' },
-                  ]}
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={(f) => (f ? handleSort(f) : resetSort())}
-                />
-              }
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-              onExportClick={() => setExportOpen(true)}
-            />
-          }
+          resultCount={filtered.length}
+          sort={{
+            options: [
+              { field: 'auftrag_titel', label: 'Auftrag' },
+              { field: 'kunde', label: 'Kunde' },
+              { field: 'wert', label: 'Wert' },
+              { field: 'end_datum', label: 'Lieferdatum' },
+              { field: 'status', label: 'Status' },
+            ],
+            currentField: field,
+            currentDir: dir,
+            onSort: (f) => (f ? handleSort(f) : resetSort()),
+          }}
         />
       </ListFilterSection>
       }
     >
       <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
-        <MobileSortSelect
-          options={[
-            { field: 'auftrag_titel', label: 'Auftrag' },
-            { field: 'kunde', label: 'Kunde' },
-            { field: 'wert', label: 'Wert' },
-            { field: 'end_datum', label: 'Lieferdatum' },
-            { field: 'status', label: 'Status' },
-          ]}
-          currentField={field}
-          currentDir={dir}
-          onSort={(f) => (f ? handleSort(f) : resetSort())}
-        />
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyState
@@ -312,10 +288,10 @@ export function AuftraegeListeClient({
                   onClick={isPane ? undefined : () => openDetail(a.id)}
                   className={cn(selectedId === a.id && 'ring-2 ring-bw-primary/40')}
                   avatar={<ListAvatar name={auftragKundenName(a)} />}
-                  title={auftragTitel(a)}
-                  line2={auftragOrt(a)}
-                  line3={auftragKundenName(a)}
-                  line4={`${auftragWertAnzeige(a)} · ${lieferdatumAnzeige(a)}`}
+                  title={auftragKundenName(a)}
+                  line2={a.titel?.trim() || '—'}
+                  line3={lieferdatumAnzeige(a)}
+                  line4={auftragWertAnzeige(a)}
                   badge={<AuftragStatusBadge status={a.status} />}
                 />
             ))}

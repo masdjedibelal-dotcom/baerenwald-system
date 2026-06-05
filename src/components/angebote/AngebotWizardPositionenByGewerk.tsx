@@ -357,17 +357,16 @@ export function AngebotWizardPositionenByGewerk({
 
   const setBlockBeschreibung = useCallback(
     (blockKey: string, text: string) => {
-      const trimmed = text.trim()
       const nextBlocks = displayBlocks.map((b) => {
         if (b.key !== blockKey) return b
         const rest = b.zeilen.filter((z) => !isGewerkBeschreibungZeile(z))
-        if (!trimmed) return { ...b, zeilen: rest }
+        if (!text.trim()) return { ...b, zeilen: rest }
         const existing = b.zeilen.find(isGewerkBeschreibungZeile)
         const beschreibung = existing
-          ? { ...existing, text: trimmed, gewerk_block_key: existing.gewerk_block_key ?? blockKey }
+          ? { ...existing, text, gewerk_block_key: existing.gewerk_block_key ?? blockKey }
           : neueFreitextZeile({
               titel: GEWERK_BESCHREIBUNG_TITEL,
-              text: trimmed,
+              text,
               gewerk_block_key: blockKey,
             })
         return { ...b, zeilen: [beschreibung, ...rest] }

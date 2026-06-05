@@ -71,7 +71,7 @@ import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWi
 import { AngebotWizardMailTexteCard } from '@/components/angebote/AngebotWizardMailTexteCard'
 import { AngebotWizardAngebotstitelCard } from '@/components/angebote/AngebotWizardAngebotstitelCard'
 import { AngebotWizardProjektBeschreibungCard } from '@/components/angebote/AngebotWizardProjektBeschreibungCard'
-import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
+import { AngebotWizardHandwerkerStep, buildGewerkHandwerkerZuweisungen, gewerkHandwerkerZuweisungenToMaps, type GewerkHandwerkerZuweisung } from '@/components/angebote/AngebotWizardHandwerkerStep'
 import { isValidEmail } from '@/lib/email-recipients'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
@@ -97,7 +97,7 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
-import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
+import type { Gewerk, Handwerker, LeadDetail, Preisliste } from '@/lib/types'
 
 function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
@@ -109,6 +109,12 @@ function WizardProjektDivider() {
 
 function WizardProjektSection({ children }: { children: ReactNode }) {
   return <section className="wizard-projekt-section">{children}</section>
+}
+
+const WIZARD_STEP_LABELS = ['Leistungen', 'Finalisieren', 'Handwerker'] as const
+
+function WizardSection({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('wizard-section-gap', className)}>{children}</div>
 }
 
 function projektLabel(lead: LeadDetail) {
@@ -143,6 +149,7 @@ export function AngebotWizard({
   preislisten,
   firm: firmProp,
   kundenObjekte = [],
+  handwerker = [],
   bootstrap = null,
   onClose,
   onDone,
@@ -150,6 +157,7 @@ export function AngebotWizard({
   lead: LeadDetail
   gewerke: Gewerk[]
   preislisten: Preisliste[]
+  handwerker?: Handwerker[]
   firm?: FirmenEinstellungen
   kundenObjekte?: KundenObjekt[]
   /** Vorbefüllung beim Weiterbearbeiten eines Entwurfs (kein neues Angebot anlegen). */
@@ -265,6 +273,7 @@ export function AngebotWizard({
   )
   const [wichtigeHinweisePersist] = useState(() => bootstrap?.wichtige_hinweise?.trim() ?? '')
   const [projektUploading, setProjektUploading] = useState(false)
+  const [hwZuweisungen, setHwZuweisungen] = useState<GewerkHandwerkerZuweisung[]>([])
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const [angebotsnr, setAngebotsnr] = useState(bootstrap?.angebotsnr?.trim() || 'Entwurf')
 
@@ -410,8 +419,14 @@ export function AngebotWizard({
     }
   }
 
+  useEffect(() => {
+    if (step === 3) {
+      setHwZuweisungen((prev) => buildGewerkHandwerkerZuweisungen(zeilen, prev))
+    }
+  }, [step, zeilen])
+
   const persistDraft = useCallback(
-    async (opts?: { notify?: boolean }): Promise<string | null> => {
+    async (opts?: { notify?: boolean; withHandwerker?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
@@ -431,6 +446,10 @@ export function AngebotWizard({
       }
 
       setSaving(true)
+      const hwMaps =
+        opts?.withHandwerker && hwZuweisungen.length
+          ? gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
+          : { positionQueues: [], notizenByGewerk: {} as Record<string, string> }
       const res = await saveAngebotWizardDraft({
         angebotId,
         lead_id: lead.id,
@@ -444,6 +463,8 @@ export function AngebotWizard({
         wichtige_hinweise:
           dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
         varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
+        handwerker_zuweisungen: hwMaps.positionQueues,
+        handwerker_aufgabe_notizen: hwMaps.notizenByGewerk,
       })
       setSaving(false)
       if (!res.ok) {
@@ -477,6 +498,7 @@ export function AngebotWizard({
       projektFotos,
       variantenPersist,
       wichtigeHinweisePersist,
+      hwZuweisungen,
     ]
   )
 
@@ -540,33 +562,33 @@ export function AngebotWizard({
     }
   }
 
-  async function handleSend() {
-    if (!mailTo.length) {
-      toast.error('Bitte mindestens eine E-Mail-Adresse unter „An“ angeben.')
+  async function handleHandwerkerFertig() {
+    const blocks = buildGewerkHandwerkerZuweisungen(zeilen, hwZuweisungen)
+    if (!blocks.length) {
+      toast.error('Bitte zuerst Leistungen mit Gewerk anlegen.')
       return
     }
-    if (!kundeId) {
-      toast.error('Kein Kunde verknüpft.')
+    if (blocks.some((b) => !b.handwerker_id.trim())) {
+      toast.error('Bitte für jedes Gewerk einen Handwerker auswählen.')
       return
     }
-    const id = await persistDraft()
-    if (!id) return
     setSaving(true)
-    const res = await sendAngebotWizard({
-      angebotId: id,
-      lead_id: lead.id,
-      meta,
-      mailTo,
-      mailCc,
-    })
+    const id = await persistDraft({ withHandwerker: true })
+    if (!id) {
+      setSaving(false)
+      return
+    }
+    const res = await sendAngebotWizard({ angebotId: id, lead_id: lead.id })
     setSaving(false)
     if (!res.ok) {
       toast.error(res.message)
       return
     }
-    toast.success('Angebot gesendet.')
+    toast.success('Entwurf gespeichert — jetzt Handwerker anfragen.')
     onDone?.(id)
     onClose()
+    router.push(`/angebote/${id}#angebot-versand-handwerker`)
+    router.refresh()
   }
 
   const leistungsumfangMail =
@@ -653,7 +675,7 @@ export function AngebotWizard({
   const wizardFooter = (
     <div className="wizard-mobile-footer">
       <AppFlowStepDots total={3} current={step} />
-      <div className="flex items-center gap-2 px-1">
+      <div className="wizard-mobile-footer__actions">
         {step > 1 ? (
           <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={() => setStep((s) => s - 1)}>
             Zurück
@@ -662,17 +684,31 @@ export function AngebotWizard({
           <div className="flex-1" />
         )}
         {step < 3 ? (
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            className="flex-[2] gap-1.5"
-            loading={saving}
-            onClick={() => void handleWeiter()}
-          >
-            Weiter
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="wizard-mobile-footer__save shrink-0 px-2.5"
+              loading={saving}
+              onClick={() => void handleEntwurfSpeichern()}
+              aria-label="Entwurf speichern"
+              title="Entwurf speichern"
+            >
+              <Save className="h-4 w-4" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              className="flex-[2] gap-1.5"
+              loading={saving}
+              onClick={() => void handleWeiter()}
+            >
+              Weiter
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </>
         ) : (
           <Button
             type="button"
@@ -680,10 +716,10 @@ export function AngebotWizard({
             size="sm"
             className="flex-[2] gap-1.5"
             loading={saving}
-            onClick={() => void handleSend()}
+            onClick={() => void handleHandwerkerFertig()}
           >
             <Send className="h-4 w-4" />
-            Versenden
+            Speichern & Handwerker einholen
           </Button>
         )}
       </div>
@@ -696,7 +732,7 @@ export function AngebotWizard({
         <X className="h-4 w-4" />
       </button>
       <div className="h-6 w-px bg-bw-border" aria-hidden />
-      <div className="title-block min-w-0">
+      <div className="title-block min-w-0 flex-1">
         <div className="ttl">Angebot erstellen</div>
         <div className="sub">
           Für Anfrage {lead.id.slice(0, 8).toUpperCase()} · {name}
@@ -714,13 +750,16 @@ export function AngebotWizard({
           ) : null}
         </div>
       </div>
+      <p className="wizard-mobile-step-pill md:hidden" aria-current="step">
+        Schritt {step} · {WIZARD_STEP_LABELS[step - 1]}
+      </p>
       <div className="flex-1" />
       <nav className="stepper" aria-label="Fortschritt">
         <Step n={1} label="Leistungen" active={step === 1} done={step > 1} />
         <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
         <Step n={2} label="Finalisieren" active={step === 2} done={step > 2} />
         <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={3} label="Versenden" active={step === 3} done={false} />
+        <Step n={3} label="Handwerker" active={step === 3} done={false} />
       </nav>
       <div className="flex-1" />
       {step > 1 ? (
@@ -754,10 +793,10 @@ export function AngebotWizard({
           size="sm"
           className="gap-1.5"
           loading={saving}
-          onClick={() => void handleSend()}
+          onClick={() => void handleHandwerkerFertig()}
         >
           <Send className="h-4 w-4" />
-          Angebot versenden
+          Speichern & Handwerker einholen
         </Button>
       )}
     </>
@@ -765,14 +804,14 @@ export function AngebotWizard({
 
   const wizard = (
     <AppFlowScreen
-      className="wizard-flow"
+      className="wizard-flow wizard-flow--footer-in-body"
       header={wizardHeader}
-      footer={wizardFooter}
     >
       <div className="wizard-inner">
           {step === 1 ? (
             <>
-              <Card title="Anfrage-Daten" className="mb-8">
+              <WizardSection>
+              <Card title="Anfrage-Daten">
                 <div className="form-grid-2 grid gap-3 md:grid-cols-2">
                   <Detail label="Kunde" value={name} />
                   <Detail label="Projekt" value={projekt} />
@@ -790,11 +829,12 @@ export function AngebotWizard({
                   />
                 </div>
               </Card>
+              </WizardSection>
 
               {zeigeObjektAuswahl && kundeId ? (
+                <WizardSection>
                 <KundenObjekteCard
                   key={kundeId}
-                  className="mb-8"
                   variant="select"
                   kundeId={kundeId}
                   objekte={objekteListe}
@@ -804,12 +844,11 @@ export function AngebotWizard({
                     router.refresh()
                   }}
                 />
+                </WizardSection>
               ) : null}
 
-              <div className="mb-8">
-                <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-bw-text-muted">
-                  Schritt 1 — Dokumenttyp
-                </h2>
+              <WizardSection>
+                <h2 className="wizard-step-heading">Dokumenttyp</h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label
                     className={cn(
@@ -863,7 +902,7 @@ export function AngebotWizard({
                     </p>
                   </label>
                 </div>
-              </div>
+              </WizardSection>
 
               {dokumentTyp === 'projekt' ? (
                 <div className="wizard-projekt-flow">
@@ -1083,130 +1122,23 @@ export function AngebotWizard({
           ) : null}
 
           {step === 3 ? (
-            <>
-              <div className="wizard-projekt-flow">
-                <AngebotWizardVersandEmpfaengerCard
-                  mailTo={mailTo}
-                  onMailToChange={setMailTo}
-                  mailCc={mailCc}
-                  onMailCcChange={setMailCc}
-                  disabled={saving}
-                />
-
-                <WizardProjektDivider />
-
-                <AngebotWizardAngebotstitelCard
-                  titel={meta.titel}
-                  onTitelChange={(titel) => setMeta((m) => ({ ...m, titel }))}
-                  disabled={saving}
-                />
-
-                <WizardProjektDivider />
-
-                <Card
-                  title="Rechnungsempfänger (Stammdaten)"
-                  action={
-                    leadState.kunden ? (
-                      <button
-                        type="button"
-                        onClick={() => setStammdatenModalOpen(true)}
-                        className="btn btn-ghost btn-sm"
-                        aria-label="Stammdaten bearbeiten"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null
-                  }
-                >
-                  {!kundeId ? (
-                    <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-950">
-                      Kein Kunden-Stammdatensatz verknüpft — Adresse und Pflichtangaben für Rechnungen fehlen
-                      möglicherweise.
-                    </p>
-                  ) : null}
-                  {rechnungsempfaenger.fehlendeRechnungsfelder.length > 0 ? (
-                    <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-950">
-                      Für Rechnungen fehlen in den Stammdaten:{' '}
-                      {rechnungsempfaenger.fehlendeRechnungsfelder.join(', ')}.
-                    </p>
-                  ) : null}
-                  <div className="props">
-                    {rechnungsempfaenger.kundennummer ? (
-                      <PropRow label="Kundennr." value={rechnungsempfaenger.kundennummer} />
-                    ) : null}
-                    {rechnungsempfaenger.typ && istKundeGewerbeTyp(rechnungsempfaenger.typ) ? (
-                      <PropRow label="Firma" value={rechnungsempfaenger.name} bold />
-                    ) : (
-                      <>
-                        {rechnungsempfaenger.vorname ? (
-                          <PropRow label="Vorname" value={rechnungsempfaenger.vorname} />
-                        ) : null}
-                        <PropRow
-                          label="Nachname"
-                          value={rechnungsempfaenger.nachname || '—'}
-                          bold
-                        />
-                      </>
-                    )}
-                    {rechnungsempfaenger.ansprechpartner ? (
-                      <PropRow label="Ansprechpartner" value={rechnungsempfaenger.ansprechpartner} />
-                    ) : null}
-                    <PropRow label="Straße" value={rechnungsempfaenger.strasse || '—'} />
-                    <PropRow label="Hausnummer" value={rechnungsempfaenger.hausnummer || '—'} />
-                    <PropRow label="Postleitzahl" value={rechnungsempfaenger.plz || '—'} />
-                    <PropRow label="Ort" value={rechnungsempfaenger.ort || '—'} />
-                    <PropRow label="Kundentyp" value={rechnungsempfaenger.typLabel} />
-                    {rechnungsempfaenger.ust_id ? (
-                      <PropRow label="USt-IdNr." value={rechnungsempfaenger.ust_id} />
-                    ) : null}
-                    <PropRow
-                      label="E-Mail"
-                      value={rechnungsempfaenger.email || '—'}
-                      link={Boolean(rechnungsempfaenger.email)}
-                    />
-                    <PropRow
-                      label="Telefon"
-                      value={rechnungsempfaenger.telefon || '—'}
-                      link={Boolean(rechnungsempfaenger.telefon)}
-                    />
-                    <PropRow label="Betreff (Versand)" value={`Ihr Angebot von Bärenwald — ${meta.titel}`} />
-                    <PropRow label="Anhang" value={pdfName} />
-                  </div>
-                </Card>
-
-                <WizardProjektDivider />
-
-                <Card
-                  title="Angebots-Vorschau"
-                  flush
-                  bodyClassName="p-0"
-                  action={
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={!angebotId || saving}
-                      onClick={() => void handlePdf()}
-                    >
-                      <Download className="h-4 w-4" />
-                      PDF
-                    </Button>
-                  }
-                >
-                  {angebotPreviewSrc ? (
-                    <iframe
-                      src={angebotPreviewSrc}
-                      title="Angebots-Vorschau"
-                      className="wizard-angebot-preview rounded-none border-0"
-                    />
-                  ) : (
-                    <p className="px-4 py-8 text-center text-[13px] text-bw-text-muted">
-                      Entwurf wird vorbereitet…
-                    </p>
-                  )}
-                </Card>
-              </div>
-            </>
+            <div className="wizard-projekt-flow">
+              <AngebotWizardHandwerkerStep
+                zeilen={zeilen}
+                gewerke={gewerke}
+                handwerker={handwerker}
+                zuweisungen={hwZuweisungen}
+                onChange={setHwZuweisungen}
+                disabled={saving}
+              />
+              <Card className="mt-4">
+                <p className="text-sm text-bw-text-muted">
+                  Nach dem Speichern öffnet sich das Angebot im CRM. Dort senden Sie die Partner-Anfrage
+                  (E-Mail oder WhatsApp-Link) und warten auf Angebot/Rechnung. Erst danach ist der Versand
+                  an den Kunden freigeschaltet.
+                </p>
+              </Card>
+            </div>
           ) : null}
         </div>
 
@@ -1225,6 +1157,7 @@ export function AngebotWizard({
           }}
         />
       ) : null}
+      <div className="wizard-mobile-footer wizard-mobile-footer--in-flow md:hidden">{wizardFooter}</div>
     </AppFlowScreen>
   )
 

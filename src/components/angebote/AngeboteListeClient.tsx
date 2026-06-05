@@ -10,13 +10,11 @@ import {
   ListGridShell,
   ListMobileStack,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
-import { FilterChips } from '@/components/ui/FilterChips'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { useSort } from '@/hooks/useSort'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -195,20 +193,20 @@ export function AngeboteListeClient({
       mode={mode}
       filters={
       <ListFilterSection
-        chips={
-          <FilterChips
-            options={FILTER_ORDER.map((key) => ({
+        chipGroups={[
+          {
+            label: 'Status',
+            options: FILTER_ORDER.map((key) => ({
               value: key,
               label: FILTER_LABELS[key],
               count: statusCounts[key],
-            }))}
-            selected={[statusFilter]}
-            onChange={(v) => setStatusFilter((v[0] ?? '') as FilterKey)}
-          />
-        }
+            })),
+            selected: [statusFilter],
+            onChange: (v) => setStatusFilter((v[0] ?? '') as FilterKey),
+          },
+        ]}
       >
         <ListFilterBar
-          hideToolbarOnMobile
           hideStatusFilter
           statusLabel="Status"
           statusOptions={[{ value: '', label: '—' }]}
@@ -227,45 +225,23 @@ export function AngeboteListeClient({
           onReset={resetAllFilters}
           hasActiveFilters={hasFilters}
           tags={filterTags}
-          mobileRail={
-            <AppListFilterRail
-              sort={
-                <MobileSortSelect
-                  variant="pill"
-                  options={[
-                    { field: 'kunde', label: 'Name' },
-                    { field: 'created_at', label: 'Erstellt' },
-                    { field: 'betrag', label: 'Betrag' },
-                    { field: 'status', label: 'Status' },
-                  ]}
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={(f) => (f ? handleSort(f) : resetSort())}
-                />
-              }
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-            />
-          }
+          resultCount={filtered.length}
+          sort={{
+            options: [
+              { field: 'kunde', label: 'Name' },
+              { field: 'created_at', label: 'Erstellt' },
+              { field: 'betrag', label: 'Betrag' },
+              { field: 'status', label: 'Status' },
+            ],
+            currentField: field,
+            currentDir: dir,
+            onSort: (f) => (f ? handleSort(f) : resetSort()),
+          }}
         />
       </ListFilterSection>
       }
     >
       <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
-        <MobileSortSelect
-          options={[
-            { field: 'kunde', label: 'Name' },
-            { field: 'created_at', label: 'Erstellt' },
-            { field: 'betrag', label: 'Betrag' },
-            { field: 'status', label: 'Status' },
-          ]}
-          currentField={field}
-          currentDir={dir}
-          onSort={(f) => (f ? handleSort(f) : resetSort())}
-        />
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyState

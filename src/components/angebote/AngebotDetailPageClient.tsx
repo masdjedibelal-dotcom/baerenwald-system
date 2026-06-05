@@ -26,7 +26,7 @@ import { DetailProp } from '@/components/ui/detail-prop'
 import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { Card } from '@/components/ui/Card'
 import { RichTextContent } from '@/components/ui/RichTextContent'
-import { angebotGewerkNameAnzeige, istFreitextPosition } from '@/lib/dokument-zeilen'
+import { angebotGewerkNameAnzeige, istFreitextPosition, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
@@ -45,6 +45,7 @@ import {
   markAngebotAbgelehntEinfach,
   resendAngebotEinfach,
   sendAngebotEinfach,
+  sendAngebotNachfassManuellAction,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { extendAngebotGueltigkeit } from '@/app/(dashboard)/angebote/extend-gueltigkeit-action'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
@@ -69,7 +70,8 @@ import {
 } from '@/lib/angebot-einfach'
 import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import {
-  groupAngebotPositionenByBlock,
+  groupAngebotPositionenByBlockForAnzeige,
+  istInterneGewerkBeschreibungEntry,
   type AngebotBlockPdfEntry,
   type AngebotPositionBlockGroup,
 } from '@/lib/angebote/angebot-position-blocks'
@@ -82,6 +84,9 @@ import {
   KUNDE_ABLEHNUNG_GRUND_OPTIONS,
 } from '@/lib/angebote/ablehnung-labels'
 import { buildAngebotNaechsteSchritte } from '@/lib/naechste-schritte'
+import {
+  darfAngebotAnKundeSenden,
+} from '@/lib/angebote/angebot-handwerker-flow'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 function positionNetto(p: AngebotPosition): number {
@@ -101,6 +106,7 @@ function positionAnzeigeTitel(p: AngebotPosition): string {
 }
 
 function PositionenMobileEntry({ entry, indexKey }: { entry: AngebotBlockPdfEntry; indexKey: string }) {
+  if (istInterneGewerkBeschreibungEntry(entry)) return null
   if (entry.kind === 'freitext') {
     return (
       <div key={indexKey} className="border-b border-bw-border px-4 py-3 text-sm last:border-b-0">
@@ -215,7 +221,7 @@ export function AngebotDetailPageClient({
   lead: LeadDetail | null
 }) {
   const router = useRouter()
-  const { refresh } = useCrmRefresh()
+  const { refresh, generation } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
   const [tab, setTab] = useState<Tab>('schritte')
   const [acceptOpen, setAcceptOpen] = useState(false)
@@ -243,8 +249,12 @@ export function AngebotDetailPageClient({
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
   const positionBlocks = useMemo(
-    () => groupAngebotPositionenByBlock(detail.positionen ?? [], gewerke),
+    () => groupAngebotPositionenByBlockForAnzeige(detail.positionen ?? [], gewerke),
     [detail.positionen, gewerke]
+  )
+  const positionenAnzeigeCount = useMemo(
+    () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)).length,
+    [detail.positionen]
   )
   const mehrereGewerke = positionBlocks.length > 1
 
@@ -376,6 +386,15 @@ export function AngebotDetailPageClient({
       })
     }
     if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
+      if (!detail.nachgefasst_am && statusEinfach === 'gesendet') {
+        workflow.push({
+          label: 'Nachfassen',
+          icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
+          hint: 'Erinnerungs-Mail an Kunden',
+          onClick: () =>
+            run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet'),
+        })
+      }
       workflow.push({
         label: 'Erneut senden',
         icon: <Send className="h-[15px] w-[15px]" aria-hidden />,
@@ -403,13 +422,26 @@ export function AngebotDetailPageClient({
     kannBearbeiten,
     kundeEmail,
     detail.id,
+    detail.nachgefasst_am,
     kannVerlaengern,
     statusEinfach,
     mailCompose,
   ])
 
   const primaryAction = (() => {
+    const hwRows = detail.angebot_handwerker ?? []
     if (statusEinfach === 'entwurf') {
+      if (!darfAngebotAnKundeSenden(hwRows, detail.status)) {
+        return (
+          <Link
+            href="#angebot-versand-handwerker"
+            className="btn btn-primary btn-sm inline-flex gap-1.5"
+          >
+            Handwerker einholen
+            <Send className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        )
+      }
       return (
         <button
           type="button"
@@ -417,7 +449,7 @@ export function AngebotDetailPageClient({
           disabled={pending}
           onClick={() => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')}
         >
-          Angebot senden
+          An Kunden senden
           <Send className="h-3.5 w-3.5" aria-hidden />
         </button>
       )
@@ -474,10 +506,18 @@ export function AngebotDetailPageClient({
       buildAngebotNaechsteSchritte({
         status: statusEinfach,
         angebotId: detail.id,
+        angebotStatusRaw: detail.status,
+        handwerkerRows: detail.angebot_handwerker ?? [],
         leadId: detail.lead_id,
         auftragId,
+        onHandwerkerAnfragen: () => {
+          document.getElementById('angebot-versand-handwerker')?.scrollIntoView({ behavior: 'smooth' })
+        },
+        onHandwerkerBestaetigen: () => {
+          document.getElementById('handwerker-partner')?.scrollIntoView({ behavior: 'smooth' })
+        },
         onSenden:
-          statusEinfach === 'entwurf'
+          statusEinfach === 'entwurf' && darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)
             ? () => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')
             : undefined,
         onAnnehmen:
@@ -491,7 +531,7 @@ export function AngebotDetailPageClient({
               }
             : undefined,
       }),
-    [statusEinfach, detail.id, detail.lead_id, auftragId]
+    [statusEinfach, detail.id, detail.status, detail.lead_id, detail.angebot_handwerker, auftragId]
   )
 
   const offeneSchritteCount = useMemo(
@@ -511,7 +551,7 @@ export function AngebotDetailPageClient({
         id: 'positionen',
         label: 'Positionen',
         icon: List,
-        count: (detail.positionen?.length ?? 0) || undefined,
+        count: positionenAnzeigeCount || undefined,
       },
       {
         id: 'aktivitaet',
@@ -526,7 +566,7 @@ export function AngebotDetailPageClient({
         count: anhaengeCount || undefined,
       },
     ],
-    [offeneSchritteCount, detail.positionen?.length, timelineCount, anhaengeCount]
+    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount]
   )
 
   const formatEur = (n: number) =>
@@ -649,7 +689,9 @@ export function AngebotDetailPageClient({
                     </td>
                   </tr>
                 ) : null}
-                {block.entries.map((entry, idx) =>
+                {block.entries
+                  .filter((entry) => !istInterneGewerkBeschreibungEntry(entry))
+                  .map((entry, idx) =>
                   entry.kind === 'freitext' ? (
                     <tr key={`${block.key}-ft-${idx}`} className="border-b border-bw-border align-top">
                       <td colSpan={4} className="px-4 py-3">
@@ -693,7 +735,7 @@ export function AngebotDetailPageClient({
       {angebotsdatenCard}
       <KommunikationCard
         filter={{ angebotId: detail.id, kundeId: detail.kunde_id ?? undefined }}
-        reloadKey={mailCompose.reloadKey}
+        reloadKey={mailCompose.reloadKey + generation}
       />
     </div>
   )

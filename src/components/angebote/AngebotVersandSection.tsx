@@ -11,6 +11,10 @@ import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
+import {
+  darfAngebotAnKundeSenden,
+  handwerkerSendenBlockierHinweis,
+} from '@/lib/angebote/angebot-handwerker-flow'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import {
   normalizeAngebotPositionen,
@@ -116,7 +120,9 @@ export function AngebotVersandSection({
   }, [rows])
 
   const kannAnKunde =
-    (detail.status === 'entwurf' || detail.status === 'handwerker_akzeptiert') && Boolean(kundeEmail)
+    darfAngebotAnKundeSenden(rows, detail.status) &&
+    (detail.status === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
+    Boolean(kundeEmail)
 
   function sendKunde() {
     startTransition(async () => {
@@ -247,7 +253,9 @@ export function AngebotVersandSection({
           <p className="text-sm text-muted">
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
-              : 'Nur bei Status „Entwurf“ oder „Handwerker akzeptiert“ versendbar.'}
+              : !darfAngebotAnKundeSenden(rows, detail.status)
+                ? handwerkerSendenBlockierHinweis(rows)
+                : 'Nur bei Status „Entwurf“ oder „Handwerker akzeptiert“ versendbar.'}
           </p>
         )}
       </Card>

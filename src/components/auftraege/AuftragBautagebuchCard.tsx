@@ -19,6 +19,10 @@ import {
   deleteAuftragBautagebuchEintrag,
   updateAuftragBautagebuchEintrag,
 } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
+import {
+  BAUTAGEBUCH_MAX_FOTOS,
+  mergeBautagebuchFotoUrls,
+} from '@/lib/auftraege/bautagebuch-fotos'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
@@ -69,7 +73,7 @@ export function AuftragBautagebuchCard({
       return [{ value: gewerkOptionen[0]!.id, label: gewerkOptionen[0]!.name }]
     }
     return [
-      { value: '', label: 'Gewerk wählen…' },
+      { value: '', label: 'Keine Angabe (automatisch)' },
       ...gewerkOptionen.map((g) => ({ value: g.id, label: g.name })),
     ]
   }, [gewerkOptionen])
@@ -107,7 +111,14 @@ export function AuftragBautagebuchCard({
   }
 
   async function uploadFiles(files: FileList | File[], target: 'neu' | 'edit') {
-    const list = Array.from(files).slice(0, 5)
+    const current = target === 'neu' ? neuFotos : editFotos
+    const slots = BAUTAGEBUCH_MAX_FOTOS - current.length
+    if (slots <= 0) {
+      toast.error(`Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos pro Eintrag.`)
+      return
+    }
+
+    const list = Array.from(files).slice(0, slots)
     if (!list.length) return
     setUploading(true)
     try {
@@ -124,8 +135,11 @@ export function AuftragBautagebuchCard({
         if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
         urls.push(json.url)
       }
-      if (target === 'neu') setNeuFotos((prev) => [...prev, ...urls].slice(0, 12))
-      else setEditFotos((prev) => [...prev, ...urls].slice(0, 12))
+      if (target === 'neu') {
+        setNeuFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
+      } else {
+        setEditFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
     } finally {
@@ -138,11 +152,8 @@ export function AuftragBautagebuchCard({
       toast.error('Bitte einen Titel eingeben.')
       return
     }
-    if (gewerkOptionen.length > 1 && !neuGewerk) {
-      toast.error('Bitte ein Gewerk für die Phase wählen.')
-      return
-    }
-    const gewerkPhase = neuGewerk || gewerkOptionen[0]?.id || null
+    const gewerkPhase =
+      neuGewerk.trim() || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : null) || null
     startTransition(async () => {
       const r = await createAuftragBautagebuchEintrag({
         auftragId,
@@ -169,7 +180,9 @@ export function AuftragBautagebuchCard({
     setEditId(e.id)
     setEditTitel(e.titel)
     setEditDatum(e.datum.slice(0, 10))
-    setEditGewerk(gewerkSelectionFromEintrag(e) || gewerkOptionen[0]?.id || '')
+    setEditGewerk(
+      gewerkSelectionFromEintrag(e) || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')
+    )
     setEditBeschreibung(e.beschreibung ?? '')
     setEditFotos([...(e.foto_urls ?? [])])
     setOpenIds((prev) => new Set(prev).add(e.id))
@@ -177,10 +190,8 @@ export function AuftragBautagebuchCard({
 
   function saveEdit() {
     if (!editId || !editTitel.trim()) return
-    if (gewerkOptionen.length > 1 && !editGewerk) {
-      toast.error('Bitte ein Gewerk für die Phase wählen.')
-      return
-    }
+    const gewerkPhase =
+      editGewerk.trim() || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : null) || null
     startTransition(async () => {
       const r = await updateAuftragBautagebuchEintrag({
         auftragId,
@@ -188,7 +199,7 @@ export function AuftragBautagebuchCard({
         titel: editTitel,
         beschreibung: editBeschreibung,
         datum: editDatum,
-        gewerk_phase: editGewerk || gewerkOptionen[0]?.id || null,
+        gewerk_phase: gewerkPhase,
         foto_urls: editFotos,
       })
       if (!r.ok) toast.error(r.message)
@@ -234,14 +245,13 @@ export function AuftragBautagebuchCard({
           <Input label="Datum" type="date" value={neuDatum} onChange={(e) => setNeuDatum(e.target.value)} />
           {gewerkOptionen.length > 0 ? (
             <Select
-              label="Gewerk (Phase in der Mail)"
+              label="Gewerk (optional, Phase in der Mail)"
               value={neuGewerk || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')}
               onChange={(e) => setNeuGewerk(e.target.value)}
               options={gewerkSelectOptions}
-              required={gewerkOptionen.length > 1}
               hint={
                 gewerkOptionen.length > 1
-                  ? 'Wird in der Kunden-Mail als aktuelle Phase grün markiert.'
+                  ? 'Optional — ohne Auswahl wird in der Kunden-Mail die aktuelle Bauphase automatisch hervorgehoben.'
                   : undefined
               }
             />
@@ -294,11 +304,20 @@ export function AuftragBautagebuchCard({
           </div>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={uploading || neuFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
+            onClick={() => fileRef.current?.click()}
+          >
             <Upload className="mr-1 h-3 w-3" aria-hidden />
             Fotos
           </Button>
+          <span className="text-[11px] text-bw-text-muted">
+            Bis zu {BAUTAGEBUCH_MAX_FOTOS} Fotos · {neuFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
+          </span>
           <Button type="button" variant="primary" size="sm" loading={pending} onClick={createEintrag}>
             Eintrag speichern
           </Button>
@@ -351,11 +370,10 @@ export function AuftragBautagebuchCard({
                         <Input label="Datum" type="date" value={editDatum} onChange={(ev) => setEditDatum(ev.target.value)} />
                         {gewerkOptionen.length > 0 ? (
                           <Select
-                            label="Gewerk (Phase in der Mail)"
+                            label="Gewerk (optional, Phase in der Mail)"
                             value={editGewerk}
                             onChange={(ev) => setEditGewerk(ev.target.value)}
                             options={gewerkSelectOptions}
-                            required={gewerkOptionen.length > 1}
                           />
                         ) : null}
                         <Textarea label="Beschreibung" value={editBeschreibung} onChange={(ev) => setEditBeschreibung(ev.target.value)} rows={5} />
@@ -376,17 +394,20 @@ export function AuftragBautagebuchCard({
                             ))}
                           </div>
                         ) : null}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button
                             type="button"
                             variant="secondary"
                             size="sm"
-                            disabled={uploading}
+                            disabled={uploading || editFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
                             onClick={() => editFileRef.current?.click()}
                           >
                             <Upload className="mr-1 h-3 w-3" aria-hidden />
                             Fotos hinzufügen
                           </Button>
+                          <span className="text-[11px] text-bw-text-muted">
+                            {editFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
+                          </span>
                           <Button type="button" variant="primary" size="sm" loading={pending} onClick={saveEdit}>
                             Speichern
                           </Button>

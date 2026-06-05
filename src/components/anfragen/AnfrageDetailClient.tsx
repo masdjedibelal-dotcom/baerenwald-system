@@ -27,6 +27,11 @@ import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { LeadNaechsteSchritteCard, buildLeadNaechsteSchritte } from '@/components/anfragen/LeadNaechsteSchritteCard'
+import {
+  dedupeKalenderTermineAnzeige,
+  normalizeKalenderTermineList,
+} from '@/lib/anfragen/normalize-kalender-termine'
+import { istLeadTerminAnzeige } from '@/lib/kalender-internes-todo'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { Timeline } from '@/components/ui/timeline'
@@ -75,7 +80,7 @@ import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import type { Gewerk, KalenderTermin, LeadDetail, LeadNotizRow, Preisliste } from '@/lib/types'
+import type { Gewerk, Handwerker, KalenderTermin, LeadDetail, LeadNotizRow, Preisliste } from '@/lib/types'
 import {
   STATUS_LABELS,
   formatDatum,
@@ -101,26 +106,37 @@ type AngebotKurz = {
   pdf_url?: string | null
 }
 
+type AnfrageAngebotFlowSnapshot = {
+  angebotId: string
+  angebotHref: string
+  handwerkerErledigt: boolean
+  angebotAnKundeGesendet: boolean
+}
+
 export function AnfrageDetailClient({
   lead: initial,
   angeboteListe = [],
   wizardGewerke = [],
   wizardPreislisten = [],
   wizardFirm,
+  wizardHandwerker = [],
   kundenObjekte = [],
   angebotKopieVonQuelleId,
+  angebotFlowSnapshot = null,
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
   wizardGewerke?: Gewerk[]
   wizardPreislisten?: Preisliste[]
   wizardFirm?: FirmenEinstellungen
+  wizardHandwerker?: Handwerker[]
   kundenObjekte?: KundenObjekt[]
   /** Server: beim Aufruf mit ?angebot_kopie_von= wird der Wizard als 1:1-Kopie geöffnet. */
   angebotKopieVonQuelleId?: string
+  angebotFlowSnapshot?: AnfrageAngebotFlowSnapshot | null
 }) {
   const router = useRouter()
-  const { refresh } = useCrmRefresh()
+  const { refresh, generation } = useCrmRefresh()
   const [lead, setLead] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
@@ -235,9 +251,15 @@ export function AnfrageDetailClient({
       }))
   }, [timelineSorted, history])
 
+  const dokumenteRows = useMemo(() => {
+    const raw = lead.lead_dokumente
+    if (!Array.isArray(raw)) return []
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_dokumente])
+
   const dokumenteCount = useMemo(
-    () => angeboteListe.filter((a) => a.pdf_url?.trim()).length,
-    [angeboteListe]
+    () => dokumenteRows.length + angeboteListe.length,
+    [dokumenteRows.length, angeboteListe.length]
   )
 
   const kundenStamm = useMemo(
@@ -261,7 +283,7 @@ export function AnfrageDetailClient({
 
   const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
   const auftragId = leadStatusData.auftrag_id as string | undefined
-  const mailCompose = useKundenMailCompose()
+  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
 
   const openAngebotWizard = useCallback((bootstrap: AngebotWizardBootstrap | null) => {
     setAngebotWizardBootstrap(bootstrap)
@@ -306,29 +328,88 @@ export function AnfrageDetailClient({
     router.push(`/anfragen/${lead.id}/angebote`)
   }, [angeboteListe.length, lead.id, openAngebotWizard, router])
 
+  const openHandwerkerEinholen = useCallback(() => {
+    const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
+    if (href) router.push(`${href}#angebot-versand-handwerker`)
+    else openAngebotWizard(null)
+  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, openAngebotWizard, router])
+
+  const openAngebotAnKunde = useCallback(() => {
+    const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
+    if (href) router.push(`${href}#angebot-versand-kunde`)
+  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
+
+  const primaryCtaLabel = useMemo(() => {
+    if (!hasAngebote) return CTA.angebotErstellen
+    if (!angebotFlowSnapshot?.handwerkerErledigt) return 'Handwerker einholen'
+    if (!angebotFlowSnapshot?.angebotAnKundeGesendet) return 'An Kunden senden'
+    return CTA.angeboteOeffnen
+  }, [hasAngebote, angebotFlowSnapshot])
+
+  const primaryCtaAction = useCallback(() => {
+    if (!hasAngebote) {
+      openAngebotErstellen()
+      return
+    }
+    if (!angebotFlowSnapshot?.handwerkerErledigt) {
+      openHandwerkerEinholen()
+      return
+    }
+    if (!angebotFlowSnapshot?.angebotAnKundeGesendet) {
+      openAngebotAnKunde()
+      return
+    }
+    openAngebotErstellen()
+  }, [
+    hasAngebote,
+    angebotFlowSnapshot,
+    openAngebotErstellen,
+    openHandwerkerEinholen,
+    openAngebotAnKunde,
+  ])
+
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
     setAngebotWizardBootstrap(null)
   }, [])
 
+  const hatTermin = useMemo(() => {
+    const unique = dedupeKalenderTermineAnzeige(
+      normalizeKalenderTermineList(lead.kalender_termine as KalenderTermin[] | null | undefined)
+    ).filter(istLeadTerminAnzeige)
+    return unique.length > 0
+  }, [lead.kalender_termine])
+
   const naechsteSchritte = useMemo(
     () =>
       buildLeadNaechsteSchritte(lead.status, {
         angeboteCount: angeboteListe.length,
+        hatTermin,
         hatAngenommenesAngebot: Boolean(leadStatusData.angebot_angenommen),
         angenommenAngebotHref: leadStatusData.angebot_href,
         auftragId,
-        leadId: lead.id,
-        onAngebotClick: openAngebotErstellen,
+        handwerkerErledigt: angebotFlowSnapshot?.handwerkerErledigt ?? false,
+        angebotAnKundeGesendet: angebotFlowSnapshot?.angebotAnKundeGesendet ?? false,
+        angebotHref:
+          angebotFlowSnapshot?.angebotHref ??
+          (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : undefined),
+        onTerminClick: () => setStatusModalKind('termin'),
+        onAngebotVorbereiten: openAngebotErstellen,
+        onHandwerkerEinholen: openHandwerkerEinholen,
+        onAngebotAnKunde: openAngebotAnKunde,
       }),
     [
       lead.status,
-      lead.id,
       angeboteListe.length,
+      angeboteListe,
       auftragId,
-      openAngebotErstellen,
+      hatTermin,
       leadStatusData.angebot_angenommen,
       leadStatusData.angebot_href,
+      angebotFlowSnapshot,
+      openAngebotErstellen,
+      openHandwerkerEinholen,
+      openAngebotAnKunde,
     ]
   )
 
@@ -556,7 +637,7 @@ export function AnfrageDetailClient({
     <div className="space-y-3">
       {stammdatenCard}
       {projektuebersichtCards}
-      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey} />
+      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
       <LeadTermineCard
         leadId={lead.id}
         termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
@@ -574,7 +655,12 @@ export function AnfrageDetailClient({
     ) : tab === 'notizen' ? (
       <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
     ) : (
-      <AnfrageDokumenteTab angebote={angeboteListe} />
+      <AnfrageDokumenteTab
+        leadId={lead.id}
+        dokumente={dokumenteRows}
+        angebote={angeboteListe}
+        onReload={() => refresh()}
+      />
     )
 
   const kiAnalyseCard =
@@ -618,9 +704,9 @@ export function AnfrageDetailClient({
             <button
               type="button"
               className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none md:flex-none"
-              onClick={openAngebotErstellen}
+              onClick={primaryCtaAction}
             >
-              {hasAngebote ? CTA.angeboteOeffnen : CTA.angebotErstellen}
+              {primaryCtaLabel}
               <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
             </button>
             {auftragId ? (
@@ -660,6 +746,7 @@ export function AnfrageDetailClient({
           lead={lead}
           gewerke={wizardGewerke}
           preislisten={wizardPreislisten}
+          handwerker={wizardHandwerker}
           firm={wizardFirm}
           kundenObjekte={objekteListe}
           bootstrap={angebotWizardBootstrap}

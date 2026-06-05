@@ -103,6 +103,13 @@ function ZuweisungCard({
         </span>
       </div>
 
+      {z.aufgabe_notiz?.trim() ? (
+        <p className="text-xs text-bw-text-muted whitespace-pre-wrap">
+          <span className="font-medium text-bw-text">Notiz: </span>
+          {z.aufgabe_notiz.trim()}
+        </p>
+      ) : null}
+
       {abgelehnt ? (
         <p className="text-xs font-medium text-danger">
           Ablehnung: {labelHandwerkerAblehnung(z.ablehnung_grund ?? null)}

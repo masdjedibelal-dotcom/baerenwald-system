@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { addLeadNotizRow, deleteLeadNotizRow } from '@/app/(dashboard)/anfragen/actions'
+import { leadNotizFotoUrls } from '@/lib/anfragen/lead-notiz-fotos'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadNotizRow } from '@/lib/types'
 import { betragAnzeige } from '@/lib/angebot-einfach'
@@ -39,6 +40,59 @@ function LeadNotizFotoLightbox({ url, onClose }: { url: string | null; onClose: 
         <img src={url} alt="Notiz-Foto" className="max-h-full max-w-full object-contain" />
       </div>
     </Modal>
+  )
+}
+
+function LeadNotizFotoToolbar({
+  pending,
+  canSave,
+  onGalleryClick,
+  onCameraClick,
+  onSave,
+  galleryLabel = 'Foto auswählen',
+  cameraLabel = 'Aufnehmen',
+  saveLabel = 'Speichern',
+}: {
+  pending: boolean
+  canSave: boolean
+  onGalleryClick: () => void
+  onCameraClick: () => void
+  onSave: () => void
+  galleryLabel?: string
+  cameraLabel?: string
+  saveLabel?: string
+}) {
+  return (
+    <div className="lead-notiz-compose__actions">
+      <div className="lead-notiz-compose__media">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onGalleryClick}
+          className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+        >
+          <ImagePlus className="h-4 w-4 shrink-0" aria-hidden />
+          {galleryLabel}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onCameraClick}
+          className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+        >
+          <Camera className="h-4 w-4 shrink-0" aria-hidden />
+          {cameraLabel}
+        </button>
+      </div>
+      <button
+        type="button"
+        disabled={!canSave}
+        onClick={onSave}
+        className="btn btn-primary btn-sm lead-notiz-compose__save"
+      >
+        {saveLabel}
+      </button>
+    </div>
   )
 }
 
@@ -139,13 +193,13 @@ export function LeadNotizenListeTab({
   const canSave = !!(richTextToPlain(neue).trim() || pendingFoto) && !pending
 
   return (
-    <div className="p-4">
+    <div className="lead-notiz-tab min-w-0 px-3 py-3 md:p-4">
       <LeadNotizFotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
 
-      <div className="mb-4">
+      <div className="lead-notiz-compose">
         <Textarea
           rows={3}
-          placeholder="Notiz hinzufügen… (optional wenn ein Foto dabei ist)"
+          placeholder="Notiz hinzufügen…"
           value={neue}
           onChange={(e) => setNeue(e.target.value)}
         />
@@ -170,32 +224,16 @@ export function LeadNotizenListeTab({
           onChange={onFileChosen}
         />
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => fileGalleryRef.current?.click()}
-            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
-          >
-            <ImagePlus className="h-4 w-4 shrink-0" aria-hidden />
-            Foto auswählen
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => fileCameraRef.current?.click()}
-            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
-          >
-            <Camera className="h-4 w-4 shrink-0" aria-hidden />
-            Aufnehmen
-          </button>
-          <button type="button" disabled={!canSave} onClick={() => void speichern()} className="btn btn-primary btn-sm ml-auto">
-            Speichern
-          </button>
-        </div>
+        <LeadNotizFotoToolbar
+          pending={pending}
+          canSave={canSave}
+          onGalleryClick={() => fileGalleryRef.current?.click()}
+          onCameraClick={() => fileCameraRef.current?.click()}
+          onSave={() => void speichern()}
+        />
 
         {pendingFoto ? (
-          <div className="relative mt-3 inline-block">
+          <div className="relative mt-3 inline-block max-w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={pendingFoto.url}
@@ -204,7 +242,7 @@ export function LeadNotizenListeTab({
             />
             <button
               type="button"
-              className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white hover:bg-black/75"
+              className="absolute right-1 top-1 rounded-full bg-black/55 p-1.5 text-white hover:bg-black/75"
               onClick={() => clearPendingFoto()}
               aria-label="Foto entfernen"
             >
@@ -213,14 +251,16 @@ export function LeadNotizenListeTab({
           </div>
         ) : null}
 
-        <p className="mt-2 text-xs text-bw-text-muted">Bis 5 MB · JPEG, PNG, WebP, GIF, HEIC</p>
+        <p className="lead-notiz-compose__hint">Optional mit Foto · bis 5 MB · JPEG, PNG, WebP, GIF, HEIC</p>
       </div>
 
       {allgemeineNotizen.length === 0 ? (
-        <div className="py-8 text-center text-sm text-bw-text-muted">Noch keine Notizen</div>
+        <div className="py-10 text-center text-sm text-bw-text-muted">Noch keine Notizen</div>
       ) : (
-        <div className="space-y-3">
-          {allgemeineNotizen.map((n) => (
+        <div className="lead-notiz-liste mt-4 space-y-3">
+          {allgemeineNotizen.map((n) => {
+            const fotos = leadNotizFotoUrls(n).filter(istBildAnhangUrl)
+            return (
             <div key={n.id} className="relative">
               <Note
                 variant="plain"
@@ -236,19 +276,24 @@ export function LeadNotizenListeTab({
                 {n.inhalt.trim() ? (
                   <RichTextContent html={n.inhalt} className="text-bw-text-mid" />
                 ) : null}
-                {n.datei_url && istBildAnhangUrl(n.datei_url) ? (
-                  <button
-                    type="button"
-                    className="mt-2 block max-w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-ring"
-                    onClick={() => setLightboxUrl(n.datei_url!)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={n.datei_url}
-                      alt="Notiz-Anhang"
-                      className="max-h-48 max-w-full rounded-md border border-bw-border object-contain"
-                    />
-                  </button>
+                {fotos.length ? (
+                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {fotos.map((url) => (
+                      <button
+                        key={url}
+                        type="button"
+                        className="block overflow-hidden rounded-md border border-bw-border text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-ring"
+                        onClick={() => setLightboxUrl(url)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt="Notiz-Anhang"
+                          className="aspect-square w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 ) : n.datei_url ? (
                   <a
                     href={n.datei_url}
@@ -269,7 +314,8 @@ export function LeadNotizenListeTab({
                 ×
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

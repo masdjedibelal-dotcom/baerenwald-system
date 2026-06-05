@@ -30,7 +30,7 @@ import { toast } from '@/components/ui/app-toast'
 import { updateAuftragPositionHandwerkerStatus } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import {
   blockSummeVk,
-  groupAuftragPositionenByGewerk,
+  groupAuftragPositionenByGewerkForAnzeige,
   type GewerkOpt,
 } from '@/lib/auftraege/auftrag-position-blocks'
 import {
@@ -117,7 +117,7 @@ export function AuftragPositionenGewerkView({
   )
 
   const blocks = useMemo(
-    () => groupAuftragPositionenByGewerk(positionen, gewerke),
+    () => groupAuftragPositionenByGewerkForAnzeige(positionen, gewerke),
     [positionen, gewerke]
   )
 
