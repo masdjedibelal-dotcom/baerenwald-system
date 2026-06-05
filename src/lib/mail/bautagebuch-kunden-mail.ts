@@ -10,6 +10,7 @@ import { richTextToSafePdfHtml } from '@/lib/rich-text'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
+import { BAUTAGEBUCH_MAX_FOTOS } from '@/lib/auftraege/bautagebuch-fotos'
 import { formatDatum } from '@/lib/utils'
 
 function esc(s: string): string {
@@ -106,7 +107,7 @@ function updateBlock(
     : ''
   const fotos = (eintrag.foto_urls ?? []).filter(Boolean)
   const fotoRows: string[] = []
-  for (let i = 0; i < Math.min(fotos.length, 4); i += 2) {
+  for (let i = 0; i < Math.min(fotos.length, BAUTAGEBUCH_MAX_FOTOS); i += 2) {
     const u1 = esc(fotos[i]!)
     const u2Cell = fotos[i + 1]
       ? `<td width="50%" style="padding:2px;"><img src="${esc(fotos[i + 1]!)}" alt="" width="100%" style="display:block;width:100%;height:88px;object-fit:cover;border-radius:6px;border:0;"/></td>`

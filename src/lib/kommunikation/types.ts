@@ -78,12 +78,15 @@ export function freitextMailTypLabel(typ: string, kontextTyp?: string | null): s
     angebot_nachfass: 'Angebot-Erinnerung',
     auftragsbestaetigung: 'Auftragsbestätigung',
     update_hinweis: 'Update',
+    projekt_update: 'Bautagebuch / Update',
     rechnung: 'Rechnung',
     zahlungsbestaetigung: 'Zahlungsbestätigung',
     zahlungserinnerung: 'Zahlungserinnerung',
     bautagebuch: 'Bautagebuch',
     nachtrag: 'Nachtrag',
     abnahmeprotokoll: 'Abnahme',
+    abschlussdokumentation: 'Abschluss',
+    besichtigung_termin: 'Besichtigungstermin',
   }
   return map[typ] ?? typ
 }

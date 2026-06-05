@@ -4,8 +4,9 @@ import type { BrandLogoVariant } from '@/lib/brand'
 export const MAIL_LOGO_CID_GREEN = 'baerenwald-logo-green'
 export const MAIL_LOGO_CID_WHITE = 'baerenwald-logo-white'
 
+/** Standard: feste HTTPS-URL (wie Webseite). Nur bei MAIL_LOGO_INLINE=true CID-Anhang. */
 export function mailLogoInlineEnabled(): boolean {
-  return process.env.MAIL_LOGO_INLINE !== 'false'
+  return process.env.MAIL_LOGO_INLINE === 'true'
 }
 
 export function mailLogoCid(variant: BrandLogoVariant): string {

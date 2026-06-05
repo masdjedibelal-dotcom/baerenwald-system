@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin } from '@/lib/types'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -17,16 +17,16 @@ export function tomorrowYmd(): string {
   return addDaysYmd(new Date().toISOString().slice(0, 10), 1)
 }
 
-/** Automatische Kalendereinträge (ohne neue Migration). Fehler nur loggen. */
-export async function insertKalenderAutoTermin(input: {
+type KalenderAutoTerminInput = {
   titel: string
   datum: string
   typ: KalenderTermin['typ']
   lead_id?: string | null
   auftrag_id?: string | null
-}): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase.from('kalender_termine').insert({
+}
+
+function mapKalenderRow(input: KalenderAutoTerminInput) {
+  return {
     titel: input.titel,
     datum: input.datum,
     typ: input.typ,
@@ -37,10 +37,27 @@ export async function insertKalenderAutoTermin(input: {
     adresse: null,
     beschreibung: null,
     erledigt: false,
-  })
+  }
+}
+
+/** Automatische Kalendereinträge. Fehler nur loggen. */
+export async function insertKalenderAutoTermin(
+  input: KalenderAutoTerminInput,
+  opts?: { skipRevalidate?: boolean }
+): Promise<void> {
+  await insertKalenderAutoTermine([input], opts)
+}
+
+/** Mehrere Termine in einem Insert (schneller als einzelne Aufrufe). */
+export async function insertKalenderAutoTermine(
+  inputs: KalenderAutoTerminInput[],
+  opts?: { skipRevalidate?: boolean }
+): Promise<void> {
+  if (!inputs.length) return
+  const { error } = await supabaseAdmin.from('kalender_termine').insert(inputs.map(mapKalenderRow))
   if (error) {
     console.warn('[kalender-auto]', error.message)
     return
   }
-  revalidatePath('/kalender')
+  if (!opts?.skipRevalidate) revalidatePath('/kalender')
 }

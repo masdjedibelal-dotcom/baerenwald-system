@@ -9,6 +9,7 @@ export const KALENDER_TYP_MARKER: Record<KalenderTermin['typ'], string> = {
   beginn: '#2E7D52',
   abnahme: '#0091AE',
   sonstiges: '#6B7280',
+  intern: '#9333EA',
 }
 
 export const KALENDER_TYP_LABEL: Record<KalenderTermin['typ'], string> = {
@@ -16,6 +17,7 @@ export const KALENDER_TYP_LABEL: Record<KalenderTermin['typ'], string> = {
   beginn: 'Beginn',
   abnahme: 'Abnahme',
   sonstiges: 'Sonstiges',
+  intern: 'Internes To-do',
 }
 
 export function kalenderTypMarkerClass(typ: KalenderTermin['typ']): string {

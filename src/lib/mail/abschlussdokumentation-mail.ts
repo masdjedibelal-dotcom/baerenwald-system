@@ -30,13 +30,13 @@ export function defaultAbschlussdokumentationNachricht(
 ): string {
   const projekt = projektTitel?.trim() || (anrede === 'du' ? 'Dein Projekt' : 'Ihr Projekt')
   if (anrede === 'du') {
-    return `${projekt} ist abgeschlossen. Im Anhang findest du die vollständige Abschlussdokumentation mit allen relevanten Unterlagen.
+    return `${projekt} ist abgeschlossen. Im Anhang findest du — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.
 
 Wir freuen uns auf die weitere Zusammenarbeit mit dir und würden uns über dein Feedback freuen — sowohl über positive Erfahrungen als auch über Hinweise, wo wir noch besser werden können.
 
 Vielen Dank für dein Vertrauen!`
   }
-  return `${projekt} ist abgeschlossen. Anbei erhalten Sie die vollständige Abschlussdokumentation mit allen relevanten Unterlagen.
+  return `${projekt} ist abgeschlossen. Anbei erhalten Sie — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.
 
 Wir freuen uns auf die weitere Zusammenarbeit mit Ihnen und würden uns über Ihr Feedback freuen — sowohl über positive Erfahrungen als auch über Hinweise, wo wir noch besser werden können.
 
