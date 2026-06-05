@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const paths = [
+  'app',
   'vercel.json',
   'StatusActions.tsx',
   'ui',
