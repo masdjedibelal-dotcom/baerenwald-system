@@ -1,7 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { cache } from 'react'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function fetchFirmenEinstellungen(
   supabase: SupabaseClient
@@ -15,6 +13,3 @@ export async function fetchFirmenEinstellungen(
   }
   return merged
 }
-
-/** Pro Server-Request gecacht — vermeidet wiederholte Einstellungen-Queries bei Mail/PDF. */
-export const fetchFirmenEinstellungenAdmin = cache(() => fetchFirmenEinstellungen(supabaseAdmin))
