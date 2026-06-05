@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { getClaudeApiKey } from '@/lib/copilot/claude-api-key'
+import { describeClaudeKeyForDebug, getClaudeApiKey } from '@/lib/copilot/claude-api-key'
 import { sendTelegram, sendTelegramTyping } from '@/lib/copilot/telegram'
 import { COPILOT_CLAUDE_TOOLS, COPILOT_MODEL } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
@@ -14,12 +14,13 @@ function anthropicClient(): Anthropic {
 }
 
 function formatCopilotError(e: unknown): string {
+  const hint = describeClaudeKeyForDebug()
   if (e instanceof Anthropic.AuthenticationError) {
-    return 'Claude API-Key ungültig (CLAUDE_API_KEY in Netlify prüfen: Production-Scope, kein Leerzeichen, Key von console.anthropic.com).'
+    return `Claude API-Key von Anthropic abgelehnt (401). ${hint}. Neuen Key auf console.anthropic.com erzeugen, in Netlify unter CLAUDE_API_KEY eintragen (Production), alte/leere Variable löschen, redeployen.`
   }
   const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
   if (/401.*no body/i.test(msg)) {
-    return 'Claude API-Key ungültig (CLAUDE_API_KEY in Netlify prüfen).'
+    return `Claude API-Key abgelehnt (401). ${hint}.`
   }
   return msg
 }

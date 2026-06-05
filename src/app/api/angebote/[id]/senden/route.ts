@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
+import {
+  darfAngebotAnKundeSenden,
+  handwerkerSendenBlockierHinweis,
+} from '@/lib/angebote/angebot-handwerker-flow'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail, AngebotPosition, AngebotStatus } from '@/lib/types'
 
@@ -72,6 +76,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   if (body.typ === 'kunde') {
+    if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
+      return NextResponse.json(
+        { error: handwerkerSendenBlockierHinweis(detail.angebot_handwerker) },
+        { status: 400 }
+      )
+    }
     const allowed: AngebotStatus[] = ['entwurf', 'handwerker_akzeptiert']
     if (!allowed.includes(detail.status)) {
       return NextResponse.json(
@@ -108,6 +118,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         gewerk_id,
         token,
         status,
+        aufgabe_notiz,
         handwerker(id, name, email, telefon),
         gewerke(name)
       `

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 import { parseEmailLogIdFromHtml } from '@/lib/kommunikation/types'
+import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 
 type ResendInboundPayload = {
   type?: string
@@ -89,7 +92,7 @@ export async function POST(req: Request) {
       ? `<pre style="font-family:sans-serif;white-space:pre-wrap">${data.text.replace(/</g, '&lt;')}</pre>`
       : '')
 
-  const { error } = await supabaseAdmin.from('email_log').insert({
+  const { id: insertedId, error } = await insertEmailLogRow({
     typ: parent.kontext_typ ? `antwort_${parent.kontext_typ}` : 'antwort',
     kontext_typ: parent.kontext_typ,
     richtung: 'empfangen',
@@ -108,8 +111,19 @@ export async function POST(req: Request) {
   })
 
   if (error) {
-    console.error('[resend-webhook]', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[resend-webhook]', error)
+    return NextResponse.json({ error }, { status: 500 })
+  }
+
+  const leadId = parent.lead_id as string | null
+  if (leadId && insertedId) {
+    await logLeadEmailTimelineEvent({
+      leadId,
+      emailLogId: insertedId,
+      titel: 'Antwort vom Kunden',
+      beschreibung: (data.subject ?? '').trim() || from || '(Kein Betreff)',
+    })
+    revalidatePath(`/anfragen/${leadId}`)
   }
 
   return NextResponse.json({ ok: true })

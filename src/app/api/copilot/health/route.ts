@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   claudeApiKeyLooksValid,
   getClaudeApiKey,
+  getClaudeApiKeySource,
   normalizeClaudeApiKey,
 } from '@/lib/copilot/claude-api-key'
 import { COPILOT_MODEL } from '@/lib/copilot/claude-tools'
@@ -30,11 +31,7 @@ export async function GET(req: NextRequest) {
     env: {
       CLAUDE_API_KEY_set: !!normalizeClaudeApiKey(claudeRaw),
       ANTHROPIC_API_KEY_set: !!normalizeClaudeApiKey(anthropicRaw),
-      resolved_from: normalizeClaudeApiKey(claudeRaw)
-        ? 'CLAUDE_API_KEY'
-        : normalizeClaudeApiKey(anthropicRaw)
-          ? 'ANTHROPIC_API_KEY'
-          : 'none',
+      resolved_from: getClaudeApiKeySource(),
       resolved_key_length: resolved.length,
       resolved_key_prefix: resolved ? `${resolved.slice(0, 12)}…` : null,
       resolved_key_format_ok: claudeApiKeyLooksValid(resolved),

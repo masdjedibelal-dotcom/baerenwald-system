@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/mail-branding'
 import {
@@ -9,6 +10,8 @@ import {
   mailZahlungserinnerung,
 } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
+import { emailLogHtmlMarker } from '@/lib/kommunikation/types'
+import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 import type { MailBranding } from '@/lib/mail-branding'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
@@ -126,10 +129,11 @@ export async function sendBesichtigungTerminBestaetigung(input: {
   betreff?: string
   html?: string
   bodyText?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+}): Promise<{ ok: true; emailLogId: string } | { ok: false; message: string }> {
   const toList = (Array.isArray(input.to) ? input.to : [input.to]).map((s) => s.trim()).filter(Boolean)
   if (!toList.length) return { ok: false, message: 'Keine E-Mail-Adresse unter An.' }
 
+  const emailLogId = randomUUID()
   let betreff = input.betreff?.trim()
   let html = input.html?.trim()
   let kundeId: string | null = null
@@ -161,6 +165,8 @@ export async function sendBesichtigungTerminBestaetigung(input: {
     kundeId = (lead as { kunde_id?: string | null } | null)?.kunde_id ?? null
   }
 
+  html = `${emailLogHtmlMarker(emailLogId)}${html!}`
+
   const r = await sendMail({
     typ: 'besichtigung_termin',
     an: toList.length === 1 ? toList[0] : toList,
@@ -170,6 +176,8 @@ export async function sendBesichtigungTerminBestaetigung(input: {
     html: html!,
     leadId: input.leadId,
     kundeId,
+    kontextTyp: 'anfrage',
+    emailLogId,
     from: process.env.RESEND_FROM_ANFRAGEN ?? process.env.RESEND_FROM_EMAIL,
   })
 
@@ -180,7 +188,15 @@ export async function sendBesichtigungTerminBestaetigung(input: {
         : (r.error ?? 'Versand fehlgeschlagen')
     return { ok: false, message: hint }
   }
-  return { ok: true }
+
+  await logLeadEmailTimelineEvent({
+    leadId: input.leadId,
+    emailLogId: r.emailLogId ?? emailLogId,
+    titel: 'Terminbestätigung gesendet',
+    beschreibung: `${betreff!} · An ${toList.join(', ')}`,
+  })
+
+  return { ok: true, emailLogId: r.emailLogId ?? emailLogId }
 }
 
 function tageUeberfaellig(faelligAm: string): number {
