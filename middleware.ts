@@ -83,6 +83,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/formular/') ||
     path.startsWith('/api/handwerker/anfrage/') ||
     path.startsWith('/api/telegram') ||
+    path.startsWith('/api/copilot/') ||
     path.startsWith('/api/cron/') ||
     path.startsWith('/api/dev/auto-login')
 
