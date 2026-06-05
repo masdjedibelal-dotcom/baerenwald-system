@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getMailBranding } from '@/lib/mail-branding-server'
+import { getMailBranding } from '@/lib/mail-branding'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
   buildFreitextKundenMailHtml,

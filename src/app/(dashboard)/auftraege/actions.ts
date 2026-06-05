@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { buildInternFormularSubmittedHtml, sendEmailHtml } from '@/lib/auftraege/emails'
-import { getMailBranding } from '@/lib/mail-branding-server'
+import { getMailBranding } from '@/lib/mail-branding'
 import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
 import {
   mailAuftragsbestaetigung,

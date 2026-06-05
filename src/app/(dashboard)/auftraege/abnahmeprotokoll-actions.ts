@@ -8,7 +8,7 @@ import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protok
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { getMailBranding } from '@/lib/mail-branding-server'
+import { getMailBranding } from '@/lib/mail-branding'
 import { mailText, type MailAnrede } from '@/lib/mail/anrede'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import { renderAbnahmeProtokollPdfBuffer } from '@/lib/auftraege/render-abnahme-protokoll-pdf'
