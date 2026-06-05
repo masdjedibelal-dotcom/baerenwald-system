@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { listAuftragBautagebuch } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import { loadLetztesAbnahmeprotokoll } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
+import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 import type { AuftragDetail } from '@/lib/types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { formatAuftragsNr, auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -100,6 +101,130 @@ async function collectFotoUrls(
   return urls
 }
 
+export type AbschlussVoraussetzungen = {
+  hasAbnahme: boolean
+  hasRechnung: boolean
+  rechnungId: string | null
+  rechnungsnummer: string | null
+}
+
+export async function loadAbschlussVoraussetzungen(
+  auftragId: string
+): Promise<AbschlussVoraussetzungen> {
+  const detail = await loadAuftragDetail(auftragId)
+  const { data: rechnungen } = await supabaseAdmin
+    .from('rechnungen')
+    .select('id, rechnungsnummer, status')
+    .eq('auftrag_id', auftragId)
+    .neq('status', 'storniert')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const rechnung = rechnungen?.[0] as
+    | { id: string; rechnungsnummer: string | null; status: string | null }
+    | undefined
+
+  return {
+    hasAbnahme: Boolean(detail?.abnahme_protokoll_url),
+    hasRechnung: Boolean(rechnung?.id),
+    rechnungId: rechnung?.id ?? null,
+    rechnungsnummer: rechnung?.rechnungsnummer?.trim() || null,
+  }
+}
+
+function validateAbschlussVoraussetzungen(v: AbschlussVoraussetzungen): { ok: false; message: string } | null {
+  if (!v.hasAbnahme) {
+    return {
+      ok: false,
+      message:
+        'Bitte zuerst das Abnahmeprotokoll erstellen (ohne E-Mail speichern reicht).',
+    }
+  }
+  if (!v.hasRechnung || !v.rechnungId) {
+    return {
+      ok: false,
+      message: 'Bitte zuerst eine Rechnung erstellen (ohne E-Mail speichern reicht).',
+    }
+  }
+  return null
+}
+
+async function pdfBufferFromUrl(url: string): Promise<Buffer | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) return null
+    return Buffer.from(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
+async function buildAbschlussMailAnhaenge(
+  auftragId: string,
+  detail: AuftragDetail
+): Promise<
+  | {
+      ok: true
+      extraPdfAttachments: { filename: string; content: Buffer }[]
+    }
+  | { ok: false; message: string }
+> {
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
+  const block = validateAbschlussVoraussetzungen(voraus)
+  if (block) return block
+
+  const extraPdfAttachments: { filename: string; content: Buffer }[] = []
+
+  const abnahmeUrl = detail.abnahme_protokoll_url?.trim()
+  if (abnahmeUrl) {
+    const abnahmeBuf = await pdfBufferFromUrl(abnahmeUrl)
+    if (!abnahmeBuf) {
+      return { ok: false, message: 'Abnahmeprotokoll-PDF konnte nicht geladen werden.' }
+    }
+    extraPdfAttachments.push({
+      filename: `Abnahmeprotokoll-${formatAuftragsNr(detail)}.pdf`,
+      content: abnahmeBuf,
+    })
+  }
+
+  const rechnungPdf = await persistPdfForRechnung(voraus.rechnungId!)
+  if (!rechnungPdf.ok) return rechnungPdf
+  extraPdfAttachments.push({
+    filename: `Rechnung-${voraus.rechnungsnummer || voraus.rechnungId}.pdf`,
+    content: rechnungPdf.buffer,
+  })
+
+  return { ok: true, extraPdfAttachments }
+}
+
+async function markAuftragAbgeschlossen(auftragId: string, beschreibung: string, perMail: boolean) {
+  const detail = await loadAuftragDetail(auftragId)
+  await supabaseAdmin
+    .from('auftraege')
+    .update({
+      status: 'abgeschlossen',
+      fortschritt: 100,
+      abnahme_datum: detail?.abnahme_datum ?? new Date().toISOString().slice(0, 10),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', auftragId)
+
+  const uid = await getAuthUserId()
+  await insertAuftragTimelineEvent({
+    auftrag_id: auftragId,
+    typ: 'abschlussdoku_versendet',
+    titel: perMail ? 'Abschlussdokumentation versendet' : 'Auftrag abgeschlossen',
+    beschreibung,
+    erstellt_von: uid,
+    sichtbar_fuer_kunde: perMail,
+    fuer_kunde_freigegeben: perMail,
+    freigegeben_at: perMail ? new Date().toISOString() : null,
+  })
+
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+}
+
 async function buildAbschlussPdf(
   auftragId: string,
   optionen: AbschlussdokuOptionen
@@ -154,6 +279,8 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   bautagebuchCount: number
   fotoCount: number
   hasAbnahme: boolean
+  hasRechnung: boolean
+  rechnungsnummer: string | null
   handwerkerCount: number
 }> {
   const detail = await loadAuftragDetail(auftragId)
@@ -161,11 +288,14 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   const fotos = detail
     ? await collectFotoUrls(detail, bautagebuch)
     : []
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
   return {
     positionenCount: detail?.auftrag_positionen?.length ?? 0,
     bautagebuchCount: bautagebuch.length,
     fotoCount: fotos.length,
-    hasAbnahme: Boolean(detail?.abnahme_protokoll_url),
+    hasAbnahme: voraus.hasAbnahme,
+    hasRechnung: voraus.hasRechnung,
+    rechnungsnummer: voraus.rechnungsnummer,
     handwerkerCount: detail?.auftrag_handwerker?.length ?? 0,
   }
 }
@@ -292,6 +422,9 @@ export async function sendAbschlussdokumentationAnKunde(
   const built = await buildAbschlussPdf(auftragId, optionen)
   if (!built.ok) return built
 
+  const anhaenge = await buildAbschlussMailAnhaenge(auftragId, built.detail)
+  if (!anhaenge.ok) return anhaenge
+
   const sent = await sendMail({
     typ: 'abschlussdokumentation',
     an: toList,
@@ -299,36 +432,40 @@ export async function sendAbschlussdokumentationAnKunde(
     cc: mail.cc?.length ? mail.cc : undefined,
     betreff: mailBuilt.betreff,
     html: mailBuilt.html,
+    extraPdfAttachments: anhaenge.extraPdfAttachments,
     pdfBuffer: built.buffer,
     pdfName: `Abschlussdokumentation-${formatAuftragsNr(built.detail)}.pdf`,
     kundeId: built.detail.kunde_id ?? null,
+    leadId: built.detail.lead_id ?? null,
     auftragId,
+    kontextTyp: 'auftrag',
   })
   if (!sent.success) return { ok: false, message: sent.error ?? 'E-Mail fehlgeschlagen' }
 
-  await supabaseAdmin
-    .from('auftraege')
-    .update({
-      status: 'abgeschlossen',
-      fortschritt: 100,
-      abnahme_datum: built.detail.abnahme_datum ?? new Date().toISOString().slice(0, 10),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', auftragId)
+  await markAuftragAbgeschlossen(
+    auftragId,
+    'Abschlussdokumentation mit Abnahmeprotokoll und Rechnung per E-Mail an den Kunden gesendet.',
+    true
+  )
+  return { ok: true }
+}
 
-  const uid = await getAuthUserId()
-  await insertAuftragTimelineEvent({
-    auftrag_id: auftragId,
-    typ: 'abschlussdoku_versendet',
-    titel: 'Abschlussdokumentation versendet',
-    beschreibung: 'Abschlussdokumentation per E-Mail an den Kunden gesendet.',
-    erstellt_von: uid,
-    sichtbar_fuer_kunde: true,
-    fuer_kunde_freigegeben: true,
-    freigegeben_at: new Date().toISOString(),
-  })
+/** Auftrag abschließen ohne E-Mail — PDF nur lokal / für späteren Versand. */
+export async function finalizeAbschlussdokumentationOhneMail(
+  auftragId: string,
+  optionen: AbschlussdokuOptionen
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
+  const block = validateAbschlussVoraussetzungen(voraus)
+  if (block) return block
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  const built = await buildAbschlussPdf(auftragId, optionen)
+  if (!built.ok) return built
+
+  await markAuftragAbgeschlossen(
+    auftragId,
+    'Auftrag abgeschlossen — Abschlussdokumentation erstellt (ohne E-Mail-Versand).',
+    false
+  )
   return { ok: true }
 }

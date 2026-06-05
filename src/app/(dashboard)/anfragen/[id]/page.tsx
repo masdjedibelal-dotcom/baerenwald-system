@@ -7,7 +7,8 @@ import { loadWizardContext } from '@/lib/wizard-context'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
-import type { KundenObjekt, LeadDetail } from '@/lib/types'
+import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
+import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
 /** Schwere Client-Bundle (Wizard, PDF) aus Page-Chunk auslagern — verhindert ChunkLoadError bei HMR. */
 const AnfrageDetailClient = dynamic(
@@ -52,7 +53,50 @@ export default async function AnfrageDetailPage({
     | null
     | undefined
 
-  const [{ gewerke, preislisten, firm }] = await Promise.all([loadWizardContext(supabase)])
+  const [{ gewerke, preislisten, firm }, { data: hwRows }, latestAngebotRes] = await Promise.all([
+    loadWizardContext(supabase),
+    supabase
+      .from('handwerker')
+      .select('id, name, email, telefon, gewerke')
+      .eq('aktiv', true)
+      .order('name'),
+    supabase
+      .from('angebote')
+      .select(
+        `
+        id,
+        status,
+        gesendet_kunde_at,
+        angebot_handwerker(id, status, hw_status, hw_eingereicht_at)
+      `
+      )
+      .eq('lead_id', params.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const latestAngebot = latestAngebotRes.data as {
+    id: string
+    status: string
+    gesendet_kunde_at?: string | null
+    angebot_handwerker?: AngebotHandwerkerRow[] | null
+  } | null
+
+  const angebotFlowSnapshot = latestAngebot
+    ? {
+        angebotId: latestAngebot.id,
+        angebotHref: `/angebote/${latestAngebot.id}`,
+        handwerkerErledigt: handwerkerPipelineErledigt(latestAngebot.angebot_handwerker),
+        angebotAnKundeGesendet: Boolean(
+          latestAngebot.gesendet_kunde_at ||
+            latestAngebot.status === 'gesendet_kunde' ||
+            latestAngebot.status === 'kunde_akzeptiert'
+        ),
+      }
+    : null
+
+  const wizardHandwerker = (hwRows ?? []) as Handwerker[]
 
   const kunde = resolveLeadKunde(lead.kunden)
   const kundeId = kunde?.id ?? lead.kunde_id
@@ -79,6 +123,8 @@ export default async function AnfrageDetailPage({
         wizardFirm={firm}
         kundenObjekte={kundenObjekte}
         angebotKopieVonQuelleId={angebotKopieVon}
+        wizardHandwerker={wizardHandwerker}
+        angebotFlowSnapshot={angebotFlowSnapshot}
       />
     )
   }
@@ -103,6 +149,8 @@ export default async function AnfrageDetailPage({
       wizardFirm={firm}
       kundenObjekte={kundenObjekte}
       angebotKopieVonQuelleId={angebotKopieVon}
+      wizardHandwerker={wizardHandwerker}
+      angebotFlowSnapshot={angebotFlowSnapshot}
     />
   )
 }

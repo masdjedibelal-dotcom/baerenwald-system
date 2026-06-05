@@ -18,16 +18,27 @@ import {
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragPosition, Kunde } from '@/lib/types'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { groupAuftragPositionenByGewerk } from '@/lib/auftraege/auftrag-position-blocks'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { auftragBautagebuchEintragUrl, projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { sendMail } from '@/lib/mail-service'
+import { BAUTAGEBUCH_MAX_FOTOS, bautagebuchFotoUrls } from '@/lib/auftraege/bautagebuch-fotos'
 import { normalizeUrlList } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
 
 const GEWERK_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function bautagebuchDbErrorMessage(message: string): string {
+  if (/gewerk_id.*schema cache/i.test(message) || /gewerk_phase_key.*schema cache/i.test(message)) {
+    return (
+      'Datenbank-Migration fehlt (Gewerk-Spalten). ' +
+      'Bitte `npm run db:bautagebuch-gewerk` ausführen oder die Migration ' +
+      '`20260601140000_bautagebuch_gewerk_id.sql` im Supabase SQL Editor anwenden.'
+    )
+  }
+  return message
+}
 
 function gewerkPhaseFromSelection(selected: string | null | undefined): {
   gewerk_id: string | null
@@ -50,6 +61,16 @@ async function assertAuftrag(auftragId: string) {
   return { ok: true as const, userId: user.id }
 }
 
+function normalizeBautagebuchFotoInput(
+  urls: string[] | null | undefined
+): string[] | { ok: false; message: string } {
+  const list = bautagebuchFotoUrls(normalizeUrlList(urls))
+  if (list.length > BAUTAGEBUCH_MAX_FOTOS) {
+    return { ok: false, message: `Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos pro Bautagebuch-Eintrag.` }
+  }
+  return list
+}
+
 function mapEintrag(row: Record<string, unknown>): AuftragBautagebuchEintrag {
   const hwRaw = row.handwerker
   const hwOne = Array.isArray(hwRaw) ? hwRaw[0] : hwRaw
@@ -64,7 +85,7 @@ function mapEintrag(row: Record<string, unknown>): AuftragBautagebuchEintrag {
     gewerk_phase_key: row.gewerk_phase_key ? String(row.gewerk_phase_key) : null,
     handwerker_id: row.handwerker_id ? String(row.handwerker_id) : null,
     handwerker: hwOne as AuftragBautagebuchEintrag['handwerker'],
-    foto_urls: normalizeUrlList(row.foto_urls),
+    foto_urls: bautagebuchFotoUrls(normalizeUrlList(row.foto_urls)),
     fuer_kunde_freigegeben: Boolean(row.fuer_kunde_freigegeben),
     freigegeben_at: row.freigegeben_at ? String(row.freigegeben_at) : null,
     an_kunde_gesendet_at: row.an_kunde_gesendet_at ? String(row.an_kunde_gesendet_at) : null,
@@ -115,7 +136,7 @@ async function syncTimelineFromEintrag(
       .update(payload)
       .eq('id', eintrag.timeline_id)
       .eq('auftrag_id', eintrag.auftrag_id)
-    if (error) return { ok: false, message: error.message }
+    if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
     return { ok: true, timelineId: eintrag.timeline_id }
   }
 
@@ -152,6 +173,8 @@ export async function createAuftragBautagebuchEintrag(input: {
   const titel = input.titel.trim()
   if (!titel) return { ok: false, message: 'Titel fehlt' }
   const phase = gewerkPhaseFromSelection(input.gewerk_phase)
+  const fotos = normalizeBautagebuchFotoInput(input.foto_urls)
+  if (!Array.isArray(fotos)) return fotos
 
   const supabase = createClient()
   const { data, error } = await supabase
@@ -163,12 +186,14 @@ export async function createAuftragBautagebuchEintrag(input: {
       datum: input.datum.slice(0, 10),
       gewerk_id: phase.gewerk_id,
       gewerk_phase_key: phase.gewerk_phase_key,
-      foto_urls: normalizeUrlList(input.foto_urls),
+      foto_urls: fotos,
     })
     .select('id')
     .single()
 
-  if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
+  if (error || !data) {
+    return { ok: false, message: bautagebuchDbErrorMessage(error?.message ?? 'Speichern fehlgeschlagen') }
+  }
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true, id: data.id as string }
 }
@@ -194,7 +219,11 @@ export async function updateAuftragBautagebuchEintrag(input: {
     patch.gewerk_id = phase.gewerk_id
     patch.gewerk_phase_key = phase.gewerk_phase_key
   }
-  if (input.foto_urls !== undefined) patch.foto_urls = normalizeUrlList(input.foto_urls)
+  if (input.foto_urls !== undefined) {
+    const fotos = normalizeBautagebuchFotoInput(input.foto_urls)
+    if (!Array.isArray(fotos)) return fotos
+    patch.foto_urls = fotos
+  }
 
   const supabase = createClient()
   const { error } = await supabase
@@ -203,7 +232,7 @@ export async function updateAuftragBautagebuchEintrag(input: {
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
 
-  if (error) return { ok: false, message: error.message }
+  if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
 
   const { data: row } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
@@ -240,7 +269,7 @@ export async function deleteAuftragBautagebuchEintrag(input: {
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
 
-  if (error) return { ok: false, message: error.message }
+  if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
 
   const tlId = (row as { timeline_id?: string } | null)?.timeline_id
   if (tlId) {
@@ -254,7 +283,7 @@ export async function deleteAuftragBautagebuchEintrag(input: {
 async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: AngebotMailAnrede) {
   const { data: auf } = await supabaseAdmin
     .from('auftraege')
-    .select('id, titel, kunden(name, email, typ, vorname, nachname, ansprechpartner), angebote(leistungsumfang, notizen)')
+    .select('id, titel, kunde_id, lead_id, kunden(name, email, typ, vorname, nachname, ansprechpartner), angebote(leistungsumfang, notizen)')
     .eq('id', auftragId)
     .maybeSingle()
   if (!auf) return { ok: false as const, message: 'Auftrag nicht gefunden' }
@@ -289,6 +318,8 @@ async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: An
     begruessung,
     kundeEmail: empfaenger.email!.trim(),
     kundeName: empfaenger.name,
+    kundeId: (auf.kunde_id as string | null) ?? null,
+    leadId: (auf.lead_id as string | null) ?? null,
     projektTitel,
     positionen: (posRows ?? []) as AuftragPosition[],
     gewerke: (gwRows ?? []) as { id: string; name: string; slug: string }[],
@@ -374,7 +405,15 @@ async function buildBautagebuchKundenMail(input: {
   nachricht: string
   anrede: AngebotMailAnrede
 }): Promise<
-  | { ok: true; html: string; betreff: string; kundeEmail: string; kundeName: string }
+  | {
+      ok: true
+      html: string
+      betreff: string
+      kundeEmail: string
+      kundeName: string
+      kundeId: string | null
+      leadId: string | null
+    }
   | { ok: false; message: string }
 > {
   const ctx = await loadBautagebuchMailKontext(input.auftragId, input.anrede)
@@ -389,11 +428,6 @@ async function buildBautagebuchKundenMail(input: {
   if (!eintragRow) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   const eintrag = mapEintrag(eintragRow as Record<string, unknown>)
-  const blocks = groupAuftragPositionenByGewerk(ctx.positionen, ctx.gewerke)
-  if (blocks.length > 1 && !eintrag.gewerk_id && !eintrag.gewerk_phase_key) {
-    return { ok: false, message: 'Bitte im Bautagebuch-Eintrag ein Gewerk für die Phase wählen.' }
-  }
-
   const token = await ensureKundenTokenForAuftrag(input.auftragId)
   const updateId = eintrag.timeline_id?.trim() || null
   const statusLink = token ? projektUrlFromToken(token, { updateId }) : ''
@@ -420,6 +454,8 @@ async function buildBautagebuchKundenMail(input: {
     betreff: input.betreff.trim() || tpl.betreff,
     kundeEmail: ctx.kundeEmail,
     kundeName: ctx.kundeName,
+    kundeId: ctx.kundeId,
+    leadId: ctx.leadId,
   }
 }
 
@@ -473,7 +509,10 @@ export async function sendBautagebuchAnKunde(input: {
     cc: ccList?.length ? ccList : undefined,
     betreff: built.betreff,
     html: built.html,
+    kundeId: built.kundeId,
+    leadId: built.leadId,
     auftragId: input.auftragId,
+    kontextTyp: 'auftrag',
   })
 
   await insertAuftragTimelineEvent({

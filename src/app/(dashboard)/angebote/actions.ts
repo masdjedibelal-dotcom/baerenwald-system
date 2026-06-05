@@ -6,7 +6,7 @@ import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
-import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
+import { loadGewerkeAusfuehrung, loadGewerkeAusfuehrungAdmin } from '@/lib/gewerke-ausfuehrung'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
 import { sendMail } from '@/lib/mail-service'
 import { getMailBranding } from '@/lib/mail-branding'
@@ -32,7 +32,6 @@ import { getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
@@ -44,6 +43,10 @@ import {
   hasHwEinreichung,
 } from '@/lib/partner/handwerker-einreichung'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+import {
+  darfAngebotAnKundeSenden,
+  handwerkerSendenBlockierHinweis,
+} from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import {
   parseHwPreisEuro,
@@ -73,8 +76,10 @@ import {
   summenKostenaufstellungAusPositionen,
 } from '@/lib/angebot-positionen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
-import { addDaysYmd, insertKalenderAutoTermin } from '@/lib/kalender-auto-termine'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { addDaysYmd, insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
+import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo'
+import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
+import { fetchFirmenEinstellungen, fetchFirmenEinstellungenAdmin } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
@@ -205,6 +210,8 @@ export type CreateAngebotInput = {
   varianten?: AngebotVariantenPersistJson | null
   wichtige_hinweise?: string | null
   kunde_objekt_id?: string | null
+  /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
+  handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
 }
 
 async function zahlungsbedingungenFuerSpeichern(
@@ -289,7 +296,7 @@ export async function createAngebot(
     if (bNorm.length) return [...positionen, ...bNorm]
     return positionen
   }
-  const hwZu = handwerkerZuweisungenFromPositionen(hwQuelle())
+  const hwZu = handwerkerZuweisungenFromPositionen(hwQuelle(), input.handwerker_aufgabe_notizen)
   for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
     await supabase.from('angebot_handwerker').insert({
@@ -463,7 +470,7 @@ export async function updateAngebot(
     if (bNorm.length) return [...positionen, ...bNorm]
     return positionen
   }
-  const hwZu = handwerkerZuweisungenFromPositionen(hwPosMerged())
+  const hwZu = handwerkerZuweisungenFromPositionen(hwPosMerged(), input.handwerker_aufgabe_notizen)
   for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
     const key = `${z.gewerk_id}|${z.handwerker_id}`
@@ -473,7 +480,10 @@ export async function updateAngebot(
       gewerk_id: z.gewerk_id,
       handwerker_id: z.handwerker_id,
       status: (prev?.status as AngebotHandwerkerZuweisungInput['status']) ?? z.status ?? 'ausstehend',
-      aufgabe_notiz: prev?.aufgabe_notiz ?? z.aufgabe_notiz?.trim() ?? null,
+      aufgabe_notiz:
+        z.aufgabe_notiz?.trim() ||
+        prev?.aufgabe_notiz?.trim() ||
+        null,
     })
   }
 
@@ -523,13 +533,16 @@ export async function setAngebotStatus(
 }
 
 export async function persistPdfForAngebot(
-  angebotId: string
+  angebotId: string,
+  opts?: { detail?: AngebotDetail | null; skipRevalidate?: boolean }
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
-  const detail = await loadAngebotDetailAdmin(angebotId)
+  const detail = opts?.detail ?? (await loadAngebotDetailAdmin(angebotId))
   if (!detail?.kunden) return { ok: false, message: 'Angebot/Kunde nicht gefunden' }
 
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-  const gewerke = await loadGewerkeAusfuehrung(supabaseAdmin)
+  const [firm, gewerke] = await Promise.all([
+    fetchFirmenEinstellungenAdmin(),
+    loadGewerkeAusfuehrungAdmin(),
+  ])
 
   let buffer: Buffer
   try {
@@ -568,7 +581,7 @@ export async function persistPdfForAngebot(
 
   if (dbErr) return { ok: false, message: dbErr.message }
 
-  revalidatePath(`/angebote/${angebotId}`)
+  if (!opts?.skipRevalidate) revalidatePath(`/angebote/${angebotId}`)
   return { ok: true, buffer, publicUrl }
 }
 
@@ -852,9 +865,15 @@ export async function sendAngebotToKunde(
   options?: { to?: string[]; cc?: string[]; betreff?: string; skipTimeline?: boolean }
 ) {
   const supabase = createClient()
-  const detail = await loadAngebotDetail(angebotId)
+  const detail = await loadAngebotDetailAdmin(angebotId)
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
+  }
+  if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
+    return {
+      ok: false as const,
+      message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker),
+    }
   }
   const istKorrektur = Boolean(detail.gesendet_kunde_at)
   const kundenMail = detail.kunden?.email?.trim() ?? ''
@@ -865,10 +884,11 @@ export async function sendAngebotToKunde(
     return { ok: false as const, message: 'Keine Empfänger-Adresse (An)' }
   }
 
-  const pdf = await persistPdfForAngebot(angebotId)
+  const [pdf, st] = await Promise.all([
+    persistPdfForAngebot(angebotId, { detail, skipRevalidate: true }),
+    setAngebotStatus(angebotId, 'gesendet_kunde'),
+  ])
   if (!pdf.ok) return pdf
-
-  const st = await setAngebotStatus(angebotId, 'gesendet_kunde')
   if (!st.ok) return st
 
   const now = new Date().toISOString()
@@ -884,7 +904,11 @@ export async function sendAngebotToKunde(
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
   const summenMail = summenAusPositionen(posMail, 19)
-  const firmMail = await fetchFirmenEinstellungen(supabase)
+  const [firmMail, branding, statusLink] = await Promise.all([
+    fetchFirmenEinstellungenAdmin(),
+    getMailBranding(supabaseAdmin),
+    projektOderStatusLink(detail.lead_id),
+  ])
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
@@ -899,8 +923,6 @@ export async function sendAngebotToKunde(
       })()
     : gueltigFallback
 
-  const branding = await getMailBranding(supabaseAdmin)
-  const statusLink = await projektOderStatusLink(detail.lead_id)
   const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
     plz: detail.leads?.plz ?? null,
     kontakt_name: detail.leads?.kontakt_name ?? null,
@@ -990,12 +1012,13 @@ export async function sendAngebotToKunde(
     revalidatePath(`/anfragen/${detail.lead_id}`)
   }
 
-  const nachfassenDatum = addDaysYmd(new Date().toISOString().slice(0, 10), 3)
-  await insertKalenderAutoTermin({
-    titel: `Nachfassen: ${detail.kunden?.name?.trim() || 'Kunde'}`,
-    datum: nachfassenDatum,
-    typ: 'sonstiges',
-    lead_id: detail.lead_id ?? null,
+  const angebotRef = detail.angebotsnr?.trim() || angebotId.slice(0, 8).toUpperCase()
+  const nachfassDatum = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
+  await planeInternesNachfassTodo({
+    leadId: detail.lead_id,
+    datum: nachfassDatum,
+    kundeName: detail.kunden?.name?.trim() || 'Kunde',
+    angebotRef,
   })
 
   return { ok: true as const }
@@ -1072,29 +1095,40 @@ export async function schliesseLeadNachAngebotVerlust(
   return { ok: true }
 }
 
+export async function sendAngebotNachfassManuell(
+  angebotId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const detail = await loadAngebotDetail(angebotId)
+  if (!detail) return { ok: false, message: 'Angebot nicht gefunden.' }
+  if (detail.nachgefasst_am) {
+    return { ok: false, message: 'Nachfass wurde bereits gesendet.' }
+  }
+  const st = detail.status_einfach ?? detail.status
+  if (st !== 'gesendet' && detail.status !== 'gesendet_kunde') {
+    return { ok: false, message: 'Nachfassen nur bei gesendeten Angeboten möglich.' }
+  }
+
+  const mail = await sendAngebotNachfassMailById(angebotId)
+  if (!mail.ok) return mail
+  if ('skipped' in mail && mail.skipped) {
+    return { ok: false, message: 'Nachfass wurde bereits gesendet.' }
+  }
+
+  revalidatePath(`/angebote/${angebotId}`)
+  revalidatePath('/angebote')
+  revalidatePath('/kalender')
+  revalidatePath('/')
+  if (detail.lead_id) revalidatePath(`/anfragen/${detail.lead_id}`)
+  return { ok: true }
+}
+
+/** @deprecated Nutze sendAngebotNachfassManuell — kein Kalender-Termin mehr. */
 export async function planNachfassenTerminFuerAngebot(input: {
   angebotId: string
   datum: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const detail = await loadAngebotDetail(input.angebotId)
-  if (!detail?.lead_id) return { ok: false, message: 'Kein Lead verknüpft.' }
-  const kunde = detail.kunden?.name?.trim() || 'Kunde'
-  const r = await saveKalenderTermin({
-    titel: `Nachfassen: ${kunde}`,
-    typ: 'sonstiges',
-    datum: input.datum,
-    uhrzeit_von: null,
-    uhrzeit_bis: null,
-    adresse: null,
-    beschreibung: `Angebot ${input.angebotId} — Kunde hat abgelehnt, erneut kontaktieren.`,
-    lead_id: detail.lead_id,
-    auftrag_id: null,
-  })
-  if (!r.ok) return r
-  revalidatePath(`/angebote/${input.angebotId}`)
-  revalidatePath('/kalender')
-  return { ok: true }
+  void input.datum
+  return sendAngebotNachfassManuell(input.angebotId)
 }
 
 export type HandwerkerGewerkListeEintrag = {
@@ -1328,58 +1362,94 @@ export async function createAuftragFromAngebot(
   const auftragId = auftrag.id as string
   const projektLink = projektUrlFromToken((auftrag as { kunden_token?: string }).kunden_token ?? kundenToken)
 
+  const postInsertTasks: Array<PromiseLike<unknown>> = []
+
   if (hwRows.length) {
-    const { error: hErr } = await supabaseAdmin.from('auftrag_handwerker').insert(
-      hwRows.map((h) => ({
-        auftrag_id: auftragId,
-        handwerker_id: h.handwerker_id,
-        gewerk_id: h.gewerk_id,
-        status: 'zugewiesen',
-      }))
+    postInsertTasks.push(
+      supabaseAdmin
+        .from('auftrag_handwerker')
+        .insert(
+          hwRows.map((h) => ({
+            auftrag_id: auftragId,
+            handwerker_id: h.handwerker_id,
+            gewerk_id: h.gewerk_id,
+            status: 'zugewiesen',
+          }))
+        )
+        .then(({ error: hErr }) => {
+          if (hErr) throw new Error(hErr.message)
+        })
     )
-    if (hErr) return { ok: false, message: hErr.message }
   }
 
   const gewerkEk = buildGewerkEkMap(angebot.angebot_handwerker ?? [])
   const posRows = angebotPositionenToAuftragRows(auftragId, pos, { gewerkEkByGewerkId: gewerkEk })
   if (posRows.length) {
-    const { error: posErr } = await supabaseAdmin.from('auftrag_positionen').insert(posRows)
-    if (posErr) console.warn('[auftrag_positionen]', posErr.message)
+    postInsertTasks.push(
+      supabaseAdmin.from('auftrag_positionen').insert(posRows).then(({ error: posErr }) => {
+        if (posErr) console.warn('[auftrag_positionen]', posErr.message)
+      })
+    )
   }
 
   const eingereichtIds = (angebot.angebot_handwerker ?? [])
     .filter((h) => hasHwEinreichung(h) && gewerkEk.has(h.gewerk_id))
     .map((h) => h.id)
   if (eingereichtIds.length) {
-    await supabaseAdmin
-      .from('angebot_handwerker')
-      .update({ hw_status: 'uebernommen' })
-      .in('id', eingereichtIds)
+    postInsertTasks.push(
+      supabaseAdmin
+        .from('angebot_handwerker')
+        .update({ hw_status: 'uebernommen' })
+        .in('id', eingereichtIds)
+        .then(({ error }) => {
+          if (error) throw new Error(error.message)
+        })
+    )
   }
 
-  await insertKalenderAutoTermin({
-    titel: `Start: ${titel}`,
-    datum: start,
-    typ: 'beginn',
-    lead_id: angebot.lead_id ?? null,
-    auftrag_id: auftragId,
-  })
-  await insertKalenderAutoTermin({
-    titel: `Abnahme: ${titel}`,
-    datum: end,
-    typ: 'abnahme',
-    lead_id: angebot.lead_id ?? null,
-    auftrag_id: auftragId,
-  })
+  postInsertTasks.push(
+    insertKalenderAutoTermine(
+      [
+        {
+          titel: `Start: ${titel}`,
+          datum: start,
+          typ: 'beginn',
+          lead_id: angebot.lead_id ?? null,
+          auftrag_id: auftragId,
+        },
+        {
+          titel: `Abnahme: ${titel}`,
+          datum: end,
+          typ: 'abnahme',
+          lead_id: angebot.lead_id ?? null,
+          auftrag_id: auftragId,
+        },
+      ],
+      { skipRevalidate: true }
+    )
+  )
 
   if (angebot.lead_id) {
-    await supabaseAdmin
-      .from('leads')
-      .update({ status: 'auftrag', updated_at: new Date().toISOString() })
-      .eq('id', angebot.lead_id)
+    postInsertTasks.push(
+      supabaseAdmin
+        .from('leads')
+        .update({ status: 'auftrag', updated_at: new Date().toISOString() })
+        .eq('id', angebot.lead_id)
+        .then(({ error }) => {
+          if (error) throw new Error(error.message)
+        })
+    )
   }
 
-  const branding = await getMailBranding(supabaseAdmin)
+  const brandingPromise = getMailBranding(supabaseAdmin)
+
+  try {
+    await Promise.all(postInsertTasks)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Auftrag-Anlage fehlgeschlagen' }
+  }
+
+  const branding = await brandingPromise
   const kunde = angebot.kunden
   const plzKunde = kunde.plz?.trim() || angebot.leads?.plz?.trim() || '—'
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde, {
@@ -1453,87 +1523,101 @@ export async function createAuftragFromAngebot(
 
   if (sendHw) {
     const partnerLink = buildPartnerLoginLink()
-    for (const z of hwRows) {
-      const email = z.handwerker?.email?.trim()
-      if (!email) continue
-      const gewerkName = z.gewerke?.name ?? 'Gewerk'
-      const posFiltered = pos.filter((p) => p.gewerk_id === z.gewerk_id)
-      const zeitraum =
-        notizenAuftrag?.trim() != null && notizenAuftrag.trim() !== ''
-          ? `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)} · ${notizenAuftrag.trim()}`
-          : `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)}`
-      const tplH = mailHandwerkerAnfrage(
-        {
-          name: z.handwerker?.name ?? 'Guten Tag',
-          gewerk: gewerkName,
-          plz: plzKunde,
-          zeitraum,
-          positionen: (posFiltered.length ? posFiltered : pos).map((p) => ({
-            beschreibung: [p.beschreibung || p.leistung, `${p.menge} ${p.einheit}`].filter(Boolean).join(' · '),
-          })),
-          link: partnerLink,
-        },
-        branding
-      )
-      await sendMail({
-        typ: 'handwerker_anfrage',
-        an: email,
-        anName: z.handwerker?.name ?? null,
-        betreff: tplH.betreff,
-        html: tplH.html,
-        kundeId: angebot.kunde_id,
-        leadId: angebot.lead_id,
-        angebotId,
-        auftragId,
+    await Promise.all(
+      hwRows.map(async (z) => {
+        const email = z.handwerker?.email?.trim()
+        if (!email) return
+        const gewerkName = z.gewerke?.name ?? 'Gewerk'
+        const posFiltered = pos.filter((p) => p.gewerk_id === z.gewerk_id)
+        const zeitraum =
+          notizenAuftrag?.trim() != null && notizenAuftrag.trim() !== ''
+            ? `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)} · ${notizenAuftrag.trim()}`
+            : `${formatDatumDeFromIso(start)} – ${formatDatumDeFromIso(end)}`
+        const tplH = mailHandwerkerAnfrage(
+          {
+            name: z.handwerker?.name ?? 'Guten Tag',
+            gewerk: gewerkName,
+            plz: plzKunde,
+            zeitraum,
+            positionen: (posFiltered.length ? posFiltered : pos).map((p) => ({
+              beschreibung: [p.beschreibung || p.leistung, `${p.menge} ${p.einheit}`].filter(Boolean).join(' · '),
+            })),
+            link: partnerLink,
+          },
+          branding
+        )
+        await sendMail({
+          typ: 'handwerker_anfrage',
+          an: email,
+          anName: z.handwerker?.name ?? null,
+          betreff: tplH.betreff,
+          html: tplH.html,
+          kundeId: angebot.kunde_id,
+          leadId: angebot.lead_id,
+          angebotId,
+          auftragId,
+        })
       })
-    }
+    )
   }
 
-  await insertAuftragTimelineEvent({
-    auftrag_id: auftragId,
-    typ: 'auftrag_erstellt',
-    titel: 'Auftrag erstellt',
-    beschreibung: `Aus Angebot ${angebotId.slice(0, 8).toUpperCase()} · ${titel}`,
-  })
-
-  await supabaseAdmin.from('auftrag_milestones').insert({
-    auftrag_id: auftragId,
-    titel: 'Auftrag erstellt',
-    erledigt: true,
-    erledigt_at: new Date().toISOString(),
-    fuer_kunden_sichtbar: true,
-    ist_system: true,
-    sort_order: 0,
-  })
-  if (sendKunde && kunde.email?.trim()) {
-    await insertAuftragTimelineEvent({
+  const timelineTasks: Array<PromiseLike<unknown>> = [
+    insertAuftragTimelineEvent({
       auftrag_id: auftragId,
-      typ: 'mail_kunde',
-      titel: 'E-Mail an Kundin (Auftragsbestätigung)',
-      beschreibung: `An ${kunde.email.trim()}`,
-      sichtbar_fuer_kunde: true,
-    })
+      typ: 'auftrag_erstellt',
+      titel: 'Auftrag erstellt',
+      beschreibung: `Aus Angebot ${angebotId.slice(0, 8).toUpperCase()} · ${titel}`,
+    }),
+    supabaseAdmin
+      .from('auftrag_milestones')
+      .insert({
+        auftrag_id: auftragId,
+        titel: 'Auftrag erstellt',
+        erledigt: true,
+        erledigt_at: new Date().toISOString(),
+        fuer_kunden_sichtbar: true,
+        ist_system: true,
+        sort_order: 0,
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[auftrag_milestones]', error.message)
+      }),
+  ]
+
+  if (sendKunde && kunde.email?.trim()) {
+    timelineTasks.push(
+      insertAuftragTimelineEvent({
+        auftrag_id: auftragId,
+        typ: 'mail_kunde',
+        titel: 'E-Mail an Kundin (Auftragsbestätigung)',
+        beschreibung: `An ${kunde.email.trim()}`,
+        sichtbar_fuer_kunde: true,
+      })
+    )
   }
+
   if (sendHw) {
     for (const z of hwRows) {
       const email = z.handwerker?.email?.trim()
       if (!email) continue
-      await insertAuftragTimelineEvent({
-        auftrag_id: auftragId,
-        typ: 'mail_handwerker',
-        titel: `E-Mail an Handwerker: ${z.handwerker?.name ?? '—'}`,
-        beschreibung: `An ${email}`,
-        handwerker_id: z.handwerker_id,
-      })
+      timelineTasks.push(
+        insertAuftragTimelineEvent({
+          auftrag_id: auftragId,
+          typ: 'mail_handwerker',
+          titel: `E-Mail an Handwerker: ${z.handwerker?.name ?? '—'}`,
+          beschreibung: `An ${email}`,
+          handwerker_id: z.handwerker_id,
+        })
+      )
     }
   }
 
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/auftraege')
+  await Promise.all(timelineTasks)
+
   revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/')
+  revalidatePath(`/angebote/${angebotId}`)
+  if (angebot.lead_id) revalidatePath(`/anfragen/${angebot.lead_id}`)
+  revalidatePath('/kalender')
 
   return { ok: true, auftragId }
 }

@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase-server'
 import type { AngebotPosition } from '@/lib/types'
 import {
   createAngebot,
-  sendAngebotToKunde,
   updateAngebot,
 } from '@/app/(dashboard)/angebote/actions'
 import type {
@@ -30,8 +29,8 @@ import {
   repairAngebotPositionen,
   summenAusPositionen,
 } from '@/lib/angebot-positionen'
-import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { rebindLooseAnfahrtPositionen } from '@/lib/anfahrt-angebot'
+import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import {
   syncInputsFromAngebotPositionen,
@@ -57,6 +56,9 @@ export type SaveAngebotWizardDraftPayload = {
   varianten?: AngebotVariantenPersistJson | null
   /** Artikel-Zeilen für Übernahme freier Leistungen in preislisten */
   artikelFuerPreislisteSync?: DokumentArtikelZeile[]
+  /** Handwerker-Zuordnung pro Gewerk (Schritt 3) */
+  handwerker_zuweisungen?: { gewerk_id: string; handwerker_id: string }[]
+  handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
 }
 
 export async function saveAngebotWizardDraft(
@@ -65,9 +67,12 @@ export async function saveAngebotWizardDraft(
   { ok: true; angebotId: string; angebotsnr: string | null } | { ok: false; message: string }
 > {
   const dokumentTyp = input.dokument_typ ?? 'einfach'
-  const positionen = repairAngebotPositionen(
+  let positionen = repairAngebotPositionen(
     rebindLooseAnfahrtPositionen(normalizeAngebotPositionen(input.positionen))
   )
+  if (input.handwerker_zuweisungen?.length) {
+    positionen = mergeHandwerkerQueuesIntoPositionen(positionen, input.handwerker_zuweisungen)
+  }
   if (!positionen.length) {
     return { ok: false, message: 'Mindestens eine Position erforderlich.' }
   }
@@ -144,6 +149,7 @@ export async function saveAngebotWizardDraft(
       fotos_urls: projektFelder.fotos_urls,
       wichtige_hinweise: projektFelder.wichtige_hinweise,
       varianten: projektFelder.varianten,
+      handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
     })
     if (!upd.ok) return upd
     const supabase = createClient()
@@ -174,6 +180,7 @@ export async function saveAngebotWizardDraft(
     fotos_urls: projektFelder.fotos_urls,
     wichtige_hinweise: projektFelder.wichtige_hinweise,
     varianten: projektFelder.varianten,
+    handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
   })
   if (!created.ok) return created
   const supabase = createClient()
@@ -188,16 +195,7 @@ export async function saveAngebotWizardDraft(
 export async function sendAngebotWizard(input: {
   angebotId: string
   lead_id: string
-  meta: AngebotWizardMeta
-  mailTo: string[]
-  mailCc?: string[]
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const sent = await sendAngebotToKunde(input.angebotId, {
-    to: input.mailTo,
-    cc: input.mailCc,
-  })
-  if (!sent.ok) return sent
-
   revalidatePath(`/anfragen/${input.lead_id}`)
   revalidatePath('/anfragen')
   revalidatePath('/angebote')

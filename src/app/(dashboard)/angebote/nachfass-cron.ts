@@ -1,16 +1,7 @@
 'use server'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendMail } from '@/lib/mail-service'
-import { getMailBranding } from '@/lib/mail-branding'
-import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
-import { buildAngebotNachfassMail } from '@/lib/mail/angebot-nachfass-mail'
-import {
-  kundeAngebotBegruessung,
-  kundeAnredeKontextFromEmpfaenger,
-  kundeRechnungsempfaengerAusStammdaten,
-} from '@/lib/kunde-rechnungsempfaenger'
+import { sendAngebotNachfassMailForRow } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { erinnerungReferenzAm } from '@/lib/angebot-einfach'
 
 const NACHFASS_TAGE = 7
@@ -50,7 +41,6 @@ export async function runAngebotNachfassCron(): Promise<{
 
   if (error) return { ok: true, bearbeitet: 0, details: [error.message] }
 
-  const branding = await getMailBranding(supabaseAdmin)
   let bearbeitet = 0
 
   for (const row of rows ?? []) {
@@ -67,97 +57,15 @@ export async function runAngebotNachfassCron(): Promise<{
       continue
     }
 
-    const kundeRaw = row.kunden as
-      | {
-          name?: string
-          email?: string | null
-          typ?: string | null
-          vorname?: string | null
-          nachname?: string | null
-          firma?: string | null
-        }
-      | {
-          name?: string
-          email?: string | null
-          typ?: string | null
-          vorname?: string | null
-          nachname?: string | null
-          firma?: string | null
-        }[]
-      | null
-    const kunde = Array.isArray(kundeRaw) ? kundeRaw[0] : kundeRaw
-    const leadRaw = row.leads as
-      | { plz?: string | null; kontakt_name?: string | null; kundentyp?: string | null }
-      | { plz?: string | null; kontakt_name?: string | null; kundentyp?: string | null }[]
-      | null
-    const leadRow = Array.isArray(leadRaw) ? leadRaw[0] : leadRaw
-
-    const email = kunde?.email?.trim()
-    if (!email) {
-      details.push(`${row.id}: keine E-Mail`)
+    const mail = await sendAngebotNachfassMailForRow(row, { skipIfAlreadySent: true })
+    if (!mail.ok) {
+      details.push(`${row.id}: ${mail.message}`)
       continue
     }
-
-    const empfaenger = kundeRechnungsempfaengerAusStammdaten(
-      kunde as Parameters<typeof kundeRechnungsempfaengerAusStammdaten>[0],
-      {
-        plz: leadRow?.plz ?? null,
-        kontakt_name: leadRow?.kontakt_name ?? null,
-      }
-    )
-    const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, leadRow?.kundentyp)
-    const anrede =
-      row.anrede === 'sie' || row.anrede === 'du'
-        ? row.anrede
-        : parseAngebotAnrede(row.notizen, kundeTyp)
-    const nr = (row.angebotsnr as string | null)?.trim() || row.id.slice(0, 8).toUpperCase()
-    const projektTitel =
-      (row.leistungsumfang as string | null)?.trim() ||
-      leadRow?.kontakt_name?.trim() ||
-      kunde?.name?.trim() ||
-      'Ihr Projekt'
-
-    const tpl = buildAngebotNachfassMail(
-      {
-        anrede,
-        begruessung: kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger)),
-        angebotsnummer: nr,
-        projektTitel,
-      },
-      branding
-    )
-
-    const mail = await sendMail({
-      typ: 'angebot_nachfass',
-      an: email,
-      anName: empfaenger.name,
-      betreff: tpl.betreff,
-      html: tpl.html,
-      angebotId: row.id as string,
-      leadId: (row.lead_id as string | null) ?? undefined,
-    })
-
-    if (!mail.success) {
-      details.push(`${nr}: Versand fehlgeschlagen — ${mail.error ?? 'unbekannt'}`)
-      continue
-    }
-
-    const ts = new Date().toISOString()
-    await supabaseAdmin.from('angebote').update({ nachgefasst_am: ts }).eq('id', row.id)
-
-    const leadId = (row as { lead_id?: string }).lead_id
-    if (leadId) {
-      await supabaseAdmin.from('lead_timeline').insert({
-        lead_id: leadId,
-        angebot_id: row.id,
-        typ: 'angebot_nachfass',
-        titel: 'Nachfass: Rückfrage zum Angebot',
-        beschreibung: `${nr} · ${email}`,
-      })
-    }
+    if ('skipped' in mail) continue
 
     bearbeitet++
-    details.push(`${nr}: Nachfass an ${email}`)
+    details.push(`${mail.nr}: Nachfass an ${mail.email}`)
   }
 
   return { ok: true, bearbeitet, details }

@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendAngebotToKunde, createAuftragFromAngebot } from '@/app/(dashboard)/angebote/actions'
+import { sendAngebotToKunde, createAuftragFromAngebot, sendAngebotNachfassManuell } from '@/app/(dashboard)/angebote/actions'
+import { erledigeInterneNachfassTodos } from '@/lib/kalender-internes-todo'
 import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
 import { isKundeAblehnungGrund, KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
 
@@ -62,6 +63,12 @@ export async function sendAngebotEinfach(
   return { ok: true }
 }
 
+export async function sendAngebotNachfassManuellAction(
+  angebotId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return sendAngebotNachfassManuell(angebotId)
+}
+
 export async function resendAngebotEinfach(
   angebotId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -84,6 +91,7 @@ export async function resendAngebotEinfach(
       gesendet_am: now,
       gesendet_kunde_at: now,
       gueltig_bis: gueltig,
+      nachgefasst_am: null,
       updated_at: now,
     })
     .eq('id', angebotId)
@@ -91,6 +99,7 @@ export async function resendAngebotEinfach(
 
   revalidatePath('/angebote')
   revalidatePath(`/angebote/${angebotId}`)
+  if (row?.lead_id) revalidatePath(`/anfragen/${row.lead_id}`)
   return { ok: true }
 }
 
@@ -126,6 +135,7 @@ export async function markAngebotAbgelehntEinfach(input: {
   if (error) return { ok: false, message: error.message }
 
   if (row.lead_id) {
+    await erledigeInterneNachfassTodos(row.lead_id)
     await supabaseAdmin
       .from('leads')
       .update({ status: 'abgebrochen', updated_at: now })
@@ -187,6 +197,7 @@ export async function acceptAngebotAndCreateAuftrag(
   if (!res.ok) return res
 
   if (ang.lead_id) {
+    await erledigeInterneNachfassTodos(ang.lead_id)
     await insertAngebotTimeline(
       ang.lead_id,
       angebotId,

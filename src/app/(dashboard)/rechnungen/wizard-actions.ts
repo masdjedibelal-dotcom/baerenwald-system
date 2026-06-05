@@ -8,6 +8,7 @@ import {
   sendRechnung,
   updateRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/actions'
+import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
@@ -336,6 +337,29 @@ export async function sendRechnungWizard(input: {
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${input.rechnungId}`)
   return { ok: true }
+}
+
+/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation). */
+export async function finalizeRechnungWizardWithoutMail(
+  rechnungId: string
+): Promise<{ ok: true; rechnungsnummer: string } | { ok: false; message: string }> {
+  const pdf = await persistPdfForRechnung(rechnungId)
+  if (!pdf.ok) return pdf
+
+  const { data: rec } = await supabaseAdmin
+    .from('rechnungen')
+    .select('rechnungsnummer, auftrag_id')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (rec?.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${rechnungId}`)
+
+  return {
+    ok: true,
+    rechnungsnummer: String(rec?.rechnungsnummer ?? ''),
+  }
 }
 
 export async function deleteRechnungEntwurf(

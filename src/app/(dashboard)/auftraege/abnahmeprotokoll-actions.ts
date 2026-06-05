@@ -254,7 +254,9 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     pdfBuffer: built.buffer,
     pdfName: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
     kundeId: built.detail.kunde_id ?? null,
+    leadId: built.detail.lead_id ?? null,
     auftragId: input.auftragId,
+    kontextTyp: 'auftrag',
   })
   if (!mail.success) return { ok: false, message: mail.error ?? 'E-Mail fehlgeschlagen' }
 

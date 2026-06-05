@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { heuteYmd } from '@/lib/angebot-einfach'
+import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
+import { planeInternesNachfassTodo } from '@/lib/kalender-internes-todo'
 
 export async function extendAngebotGueltigkeit(input: {
   angebotId: string
@@ -24,7 +25,7 @@ export async function extendAngebotGueltigkeit(input: {
 
   const { data: row, error: loadErr } = await supabase
     .from('angebote')
-    .select('id, status_einfach, lead_id')
+    .select('id, status_einfach, lead_id, angebotsnr, kunden(name)')
     .eq('id', input.angebotId)
     .maybeSingle()
 
@@ -63,6 +64,17 @@ export async function extendAngebotGueltigkeit(input: {
       titel: 'Gültigkeit verlängert',
       beschreibung: `Gültig bis ${formatDatum(gueltig)} · Erinnerung in 7 Tagen`,
       erstellt_von: user?.id ?? null,
+    })
+
+    const kundeRaw = row.kunden as { name?: string | null } | { name?: string | null }[] | null
+    const kunde = Array.isArray(kundeRaw) ? kundeRaw[0] : kundeRaw
+    const angebotRef =
+      (row.angebotsnr as string | null)?.trim() || input.angebotId.slice(0, 8).toUpperCase()
+    await planeInternesNachfassTodo({
+      leadId,
+      datum: addDaysYmd(heuteYmd(), 7),
+      kundeName: kunde?.name?.trim() || 'Kunde',
+      angebotRef,
     })
   }
 

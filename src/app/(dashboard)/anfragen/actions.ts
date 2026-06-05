@@ -13,6 +13,8 @@ import {
   leadHatGewerbeKontext,
   situationOhneGewerbe,
 } from '@/lib/lead-gewerbe-storage'
+import { TERMIN_NOTIZ_MAX_FOTOS, leadNotizFotoUrls } from '@/lib/anfragen/lead-notiz-fotos'
+import { syncTerminNotizSpiegel } from '@/lib/anfragen/termin-notiz-spiegel'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
 import type { LeadFunnelPosition } from '@/lib/lead-funnel-positionen'
 import { persistWasZeilenInFunnel, type ProjektWasZeile } from '@/lib/lead-projekt-was'
@@ -744,17 +746,29 @@ export async function addLeadNotizRow(
   leadId: string,
   inhalt: string,
   datei_url?: string | null,
-  opts?: { kalender_termin_id?: string | null; titel?: string | null }
+  opts?: {
+    kalender_termin_id?: string | null
+    titel?: string | null
+    datei_urls?: string[] | null
+  }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   const text = inhalt.trim()
-  const url = datei_url?.trim() || null
-  const titel = opts?.titel?.trim() || null
   const terminId = opts?.kalender_termin_id?.trim() || null
-  if (!text && !url) return { ok: false, message: 'Text oder Foto erforderlich.' }
+  const titel = opts?.titel?.trim() || null
+  const urls = (opts?.datei_urls ?? [])
+    .map((u) => u.trim())
+    .filter(Boolean)
+  const legacyUrl = datei_url?.trim() || urls[0] || null
+  const allUrls = urls.length ? urls : legacyUrl ? [legacyUrl] : []
+
+  if (terminId && allUrls.length > TERMIN_NOTIZ_MAX_FOTOS) {
+    return { ok: false, message: `Maximal ${TERMIN_NOTIZ_MAX_FOTOS} Fotos pro Termin-Notiz.` }
+  }
+  if (!text && allUrls.length === 0) return { ok: false, message: 'Text oder Foto erforderlich.' }
 
   if (terminId) {
     const { data: termin } = await supabase
@@ -771,7 +785,8 @@ export async function addLeadNotizRow(
     .insert({
       lead_id: leadId,
       inhalt: text,
-      datei_url: url,
+      datei_url: legacyUrl,
+      datei_urls: allUrls.length ? allUrls : null,
       titel,
       kalender_termin_id: terminId,
       erstellt_von: user?.id ?? null,
@@ -780,6 +795,24 @@ export async function addLeadNotizRow(
     .single()
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen.' }
+
+  if (terminId) {
+    const sync = await syncTerminNotizSpiegel(supabase, {
+      leadId,
+      terminNotizId: data.id as string,
+      terminId,
+      titel,
+      inhalt: text,
+      datei_url: legacyUrl,
+      datei_urls: allUrls.length ? allUrls : null,
+      erstellt_von: user?.id ?? null,
+    })
+    if (!sync.ok) {
+      await supabase.from('lead_notizen').delete().eq('id', data.id)
+      return { ok: false, message: sync.message }
+    }
+  }
+
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
   return { ok: true, id: data.id as string }
@@ -788,20 +821,65 @@ export async function addLeadNotizRow(
 export async function updateLeadNotizRow(
   notizId: string,
   leadId: string,
-  input: { titel: string; inhalt: string }
+  input: { titel: string; inhalt: string; datei_urls?: string[] | null }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const titel = input.titel.trim()
   const text = input.inhalt.trim()
+  const urls =
+    input.datei_urls === undefined
+      ? undefined
+      : (input.datei_urls ?? []).map((u) => u.trim()).filter(Boolean)
   if (!titel) return { ok: false, message: 'Titel fehlt.' }
-  if (!text) return { ok: false, message: 'Beschreibung fehlt.' }
+  if (!text && (!urls || urls.length === 0)) {
+    return { ok: false, message: 'Beschreibung oder Foto erforderlich.' }
+  }
+  if (urls && urls.length > TERMIN_NOTIZ_MAX_FOTOS) {
+    return { ok: false, message: `Maximal ${TERMIN_NOTIZ_MAX_FOTOS} Fotos pro Termin-Notiz.` }
+  }
+
+  const patch: Record<string, unknown> = { titel, inhalt: text }
+  if (urls !== undefined) {
+    patch.datei_urls = urls.length ? urls : null
+    patch.datei_url = urls[0] ?? null
+  }
 
   const supabase = createClient()
+  const { data: row } = await supabase
+    .from('lead_notizen')
+    .select('kalender_termin_id, datei_url, datei_urls')
+    .eq('id', notizId)
+    .eq('lead_id', leadId)
+    .maybeSingle()
+
+  if (!row) return { ok: false, message: 'Notiz nicht gefunden.' }
+
   const { error } = await supabase
     .from('lead_notizen')
-    .update({ titel, inhalt: text })
+    .update(patch)
     .eq('id', notizId)
     .eq('lead_id', leadId)
   if (error) return { ok: false, message: error.message }
+
+  const terminId = (row as { kalender_termin_id?: string | null }).kalender_termin_id?.trim()
+  if (terminId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const fotoUrls =
+      urls !== undefined ? urls : leadNotizFotoUrls(row as { datei_url: string | null; datei_urls?: string[] | null })
+    const sync = await syncTerminNotizSpiegel(supabase, {
+      leadId,
+      terminNotizId: notizId,
+      terminId,
+      titel,
+      inhalt: text,
+      datei_url: fotoUrls[0] ?? null,
+      datei_urls: fotoUrls.length ? fotoUrls : null,
+      erstellt_von: user?.id ?? null,
+    })
+    if (!sync.ok) return { ok: false, message: sync.message }
+  }
+
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
   return { ok: true }
@@ -812,7 +890,19 @@ export async function deleteLeadNotizRow(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { error } = await supabase.from('lead_notizen').delete().eq('id', notizId).eq('lead_id', leadId)
+  const { data: row } = await supabase
+    .from('lead_notizen')
+    .select('id, quelle_notiz_id, kalender_termin_id')
+    .eq('id', notizId)
+    .eq('lead_id', leadId)
+    .maybeSingle()
+
+  if (!row) return { ok: false, message: 'Notiz nicht gefunden.' }
+
+  const quelleId = (row as { quelle_notiz_id?: string | null }).quelle_notiz_id?.trim()
+  const deleteId = quelleId || notizId
+
+  const { error } = await supabase.from('lead_notizen').delete().eq('id', deleteId).eq('lead_id', leadId)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/anfragen/${leadId}`)
   return { ok: true }
