@@ -1,6 +1,6 @@
 'use client'
 
-import { Camera } from 'lucide-react'
+import { Camera, X } from 'lucide-react'
 import type { FormularFeld } from '@/lib/types'
 import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -62,6 +62,7 @@ export function FormularFelderRenderer({
   /** Öffentliches Formular: Datei wählen / Kamera (speichern extern) */
   oeffentlicherFotoUpload,
   onFotoDatei,
+  maxFotos,
 }: {
   felder: FormularFeld[]
   daten: Record<string, unknown>
@@ -71,10 +72,12 @@ export function FormularFelderRenderer({
   vorschauModus?: boolean
   oeffentlicherFotoUpload?: boolean
   onFotoDatei?: (feldId: string, file: File) => void | Promise<void>
+  maxFotos?: number
 }) {
   const prev = Boolean(vorschauModus)
   const ro = readonly && !prev
   const dis = disabled || prev
+  const fotoLimit = maxFotos ?? 5
 
   function set(id: string, value: unknown) {
     onChange?.(id, value)
@@ -195,42 +198,88 @@ export function FormularFelderRenderer({
               <div className="text-sm text-bw-light">
                 {ro ? (
                   Array.isArray(v) && v.length > 0 ? (
-                    <ul className="flex flex-wrap gap-2">
+                    <div className="bt-foto-grid">
                       {(v as string[]).map((url) => (
-                        <li key={url} className="max-w-[120px] truncate text-xs">
-                          {url}
-                        </li>
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bt-foto-thumb block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" />
+                        </a>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     '—'
                   )
                 ) : oeffentlicherFotoUpload && onFotoDatei ? (
-                  <div className="space-y-2">
-                    <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover">
-                      <Camera className="h-4 w-4" aria-hidden /> Foto aufnehmen / wählen
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="sr-only"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (file) await onFotoDatei(f.id, file)
-                          e.target.value = ''
-                        }}
-                      />
-                    </label>
-                    {Array.isArray(v) && (v as string[]).length > 0 ? (
-                      <ul className="flex flex-wrap gap-2">
-                        {(v as string[]).map((url) => (
-                          <li key={url} className="text-xs text-bw-mid">
-                            Foto gespeichert
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
+                  (() => {
+                    const urls = Array.isArray(v) ? (v as string[]) : []
+                    const canAdd = urls.length < fotoLimit
+                    return (
+                      <div className="space-y-2">
+                        {urls.length > 0 ? (
+                          <div className="bt-foto-grid">
+                            {urls.map((url) => (
+                              <div key={url} className="bt-foto-thumb">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt="" />
+                                {!dis ? (
+                                  <button
+                                    type="button"
+                                    className="bt-foto-remove"
+                                    aria-label="Foto entfernen"
+                                    onClick={() =>
+                                      set(
+                                        f.id,
+                                        urls.filter((u) => u !== url)
+                                      )
+                                    }
+                                  >
+                                    <X className="h-3 w-3" aria-hidden />
+                                  </button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        <label
+                          className={
+                            canAdd && !dis
+                              ? 'inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover'
+                              : 'inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text-muted opacity-60'
+                          }
+                        >
+                          <Camera className="h-4 w-4" aria-hidden />
+                          {canAdd ? 'Fotos wählen' : 'Maximum erreicht'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            multiple
+                            className="sr-only"
+                            disabled={!canAdd || dis}
+                            onChange={async (e) => {
+                              const picked = Array.from(e.target.files ?? [])
+                              e.target.value = ''
+                              if (!picked.length) return
+                              const slots = fotoLimit - urls.length
+                              if (slots <= 0) return
+                              for (const file of picked.slice(0, slots)) {
+                                await onFotoDatei(f.id, file)
+                              }
+                            }}
+                          />
+                        </label>
+                        <p className="text-[11px] text-bw-text-muted">
+                          Bis zu {fotoLimit} Fotos · {urls.length}/{fotoLimit}
+                        </p>
+                      </div>
+                    )
+                  })()
                 ) : (
                   <button
                     type="button"

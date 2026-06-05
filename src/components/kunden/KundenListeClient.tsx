@@ -10,14 +10,13 @@ import {
   ListMobileStack,
   ListGridShell,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useSort } from '@/hooks/useSort'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -200,21 +199,21 @@ export function KundenListeClient({
       mode={mode}
       filters={
       <ListFilterSection
-        chips={
-          <FilterChips
-            options={[
+        chipGroups={[
+          {
+            label: 'Kundentyp',
+            options: [
               { label: 'Alle', value: 'alle', count: typCounts.alle },
               { label: 'Privat', value: 'privat', count: typCounts.privat },
               { label: 'Gewerbe', value: 'gewerbe', count: typCounts.gewerbe },
               { label: 'Hausverwaltung', value: 'hausverwaltung', count: typCounts.hausverwaltung },
-            ]}
-            selected={[typFilter]}
-            onChange={(vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle')}
-          />
-        }
+            ],
+            selected: [typFilter],
+            onChange: (vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle'),
+          },
+        ]}
       >
         <ListFilterBar
-          hideToolbarOnMobile
           hideStatusFilter
           statusLabel="—"
           statusOptions={[{ value: '', label: '—' }]}
@@ -234,44 +233,22 @@ export function KundenListeClient({
           hasActiveFilters={hasFilters}
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
-          mobileRail={
-            <AppListFilterRail
-              sort={
-                <MobileSortSelect
-                  variant="pill"
-                  options={[
-                    { field: 'name', label: 'Kunde' },
-                    { field: 'projekte', label: 'Aufträge' },
-                    { field: 'umsatz', label: 'Umsatz' },
-                  ]}
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={(f) => (f ? handleSort(f) : resetSort())}
-                />
-              }
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-              onExportClick={() => setExportOpen(true)}
-            />
-          }
+          resultCount={filtered.length}
+          sort={{
+            options: [
+              { field: 'name', label: 'Kunde' },
+              { field: 'projekte', label: 'Aufträge' },
+              { field: 'umsatz', label: 'Umsatz' },
+            ],
+            currentField: field,
+            currentDir: dir,
+            onSort: (f) => (f ? handleSort(f) : resetSort()),
+          }}
         />
       </ListFilterSection>
       }
     >
       <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      <div className={cn('mb-4 hidden md:block', isPane && 'md:hidden')}>
-        <MobileSortSelect
-          options={[
-            { field: 'name', label: 'Kunde' },
-            { field: 'projekte', label: 'Aufträge' },
-            { field: 'umsatz', label: 'Umsatz' },
-          ]}
-          currentField={field}
-          currentDir={dir}
-          onSort={(f) => (f ? handleSort(f) : resetSort())}
-        />
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyState

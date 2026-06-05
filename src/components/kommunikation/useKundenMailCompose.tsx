@@ -6,11 +6,12 @@ import { toast } from '@/components/ui/app-toast'
 import { KundenMailComposeModal } from '@/components/kommunikation/KundenMailComposeModal'
 import type { MailComposeContext } from '@/lib/kommunikation/types'
 
-export function useKundenMailCompose() {
+export function useKundenMailCompose(opts?: { onSent?: () => void }) {
   const [pending, startTransition] = useTransition()
   const [open, setOpen] = useState(false)
   const [ctx, setCtx] = useState<MailComposeContext | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const onSentRef = opts?.onSent
 
   function openCompose(
     loader: () => Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }>
@@ -36,7 +37,10 @@ export function useKundenMailCompose() {
       open={open}
       onClose={() => setOpen(false)}
       ctx={ctx}
-      onSent={() => setReloadKey((k) => k + 1)}
+      onSent={() => {
+        setReloadKey((k) => k + 1)
+        onSentRef?.()
+      }}
     />
   )
 

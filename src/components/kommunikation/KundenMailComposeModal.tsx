@@ -156,7 +156,7 @@ export function KundenMailComposeModal({
         }
       >
         {ctx ? (
-          <div className="mail-compose-form space-y-3 rounded-lg border border-bw-border bg-white p-4">
+          <div className="space-y-3">
             <EmailPillsField label="An" emails={to} onChange={setTo} placeholder="kunde@beispiel.de" />
             <EmailPillsField label="CC (optional)" emails={cc} onChange={setCc} placeholder="team@baerenwald.de" />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -195,7 +195,6 @@ export function KundenMailComposeModal({
               rows={8}
               value={bodyHtml}
               onChange={(e) => setBodyHtml(e.target.value)}
-              className="!bg-white [&_.rich-text-toolbar]:!bg-white [&_.rich-text-body]:!bg-white"
             />
             <CollapsibleMailPreview previewHtml={previewHtml} />
             <p className="text-xs text-bw-text-muted">

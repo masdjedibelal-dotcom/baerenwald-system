@@ -5,11 +5,9 @@ import { useMemo, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterSection, ListSortRow } from '@/components/layout/ListPageParts'
+import { ListFilterSection } from '@/components/layout/ListPageParts'
 import { AppListScreen, AppEntityListRow } from '@/components/layout/app'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { ListFilterBar } from '@/components/ui/ListFilterBar'
-import { FilterChips } from '@/components/ui/FilterChips'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
@@ -114,17 +112,18 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
     <AppListScreen
       filters={
         <ListFilterSection
-          chips={
-            <FilterChips
-              options={filterOptionen}
-              selected={[filter]}
-              onChange={(vals) => setFilter((vals[0] as FilterKey) || 'alle')}
-            />
-          }
+          chipGroups={[
+            {
+              label: 'Typ',
+              options: filterOptionen,
+              selected: [filter],
+              onChange: (vals) => setFilter((vals[0] as FilterKey) || 'alle'),
+            },
+          ]}
         >
           <ListFilterBar
-            hideToolbarOnMobile
             hideStatusFilter
+            hideZeitraumFilter
             statusLabel="—"
             statusOptions={[{ value: '', label: '—' }]}
             statusValue=""
@@ -144,24 +143,21 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
               setQ('')
             }}
             hasActiveFilters={filter !== 'alle' || !!q.trim()}
+            resultCount={sorted.length}
+            sort={{
+              options: [
+                { field: 'neueste', label: 'Neueste zuerst' },
+                { field: 'name', label: 'Name A–Z' },
+                { field: 'felder', label: 'Meiste Felder' },
+              ],
+              currentField: sortierung,
+              currentDir: null,
+              onSort: (f) => setSortierung((f || 'neueste') as SortKey),
+            }}
           />
         </ListFilterSection>
       }
     >
-      <ListSortRow>
-        <MobileSortSelect
-          variant="pill"
-          options={[
-            { field: 'neueste', label: 'Neueste zuerst' },
-            { field: 'name', label: 'Name A–Z' },
-            { field: 'felder', label: 'Meiste Felder' },
-          ]}
-          currentField={sortierung}
-          currentDir={null}
-          onSort={(f) => setSortierung(((f || 'neueste') as SortKey) || 'neueste')}
-        />
-      </ListSortRow>
-
       <PageHeader
         action={
           <Link

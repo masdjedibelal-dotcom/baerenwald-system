@@ -163,7 +163,7 @@ export function KundeDetailClient({
   kundenObjekte?: KundenObjekt[]
 }) {
   const router = useRouter()
-  const { refresh } = useCrmRefresh()
+  const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   type DetailTab = 'vorgaenge' | 'aktivitaet' | 'dokumente'
@@ -656,7 +656,7 @@ export function KundeDetailClient({
       {istKundeGewerbeTyp(kunde.typ) ? (
         <KundenObjekteCard kundeId={kunde.id} objekte={kundenObjekte} onChanged={() => refresh()} />
       ) : null}
-      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey} />
+      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
     </div>
   )
 

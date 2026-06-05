@@ -13,6 +13,7 @@ import {
   flattenFotoUrlsAusWerten,
   type OeffentlichesFormularInitial,
 } from '@/lib/hw-formular-oeffentlich'
+import { BAUTAGEBUCH_MAX_FOTOS, mergeBautagebuchFotoUrls } from '@/lib/auftraege/bautagebuch-fotos'
 import { cn } from '@/lib/utils'
 
 function zaehleBeantwortet(felder: FormularFeld[], daten: Record<string, unknown>): number {
@@ -62,7 +63,11 @@ export function FormularOeffentlichClient({
     }
     setDaten((d) => {
       const prev = (d[feldId] as string[] | undefined) ?? []
-      return { ...d, [feldId]: [...prev, json.url!] }
+      if (prev.length >= BAUTAGEBUCH_MAX_FOTOS) {
+        setErr(`Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos.`)
+        return d
+      }
+      return { ...d, [feldId]: mergeBautagebuchFotoUrls(prev, [json.url!]) }
     })
   }
 
@@ -151,6 +156,7 @@ export function FormularOeffentlichClient({
           onChange={setField}
           oeffentlicherFotoUpload
           onFotoDatei={handleFoto}
+          maxFotos={BAUTAGEBUCH_MAX_FOTOS}
         />
       </Card>
 

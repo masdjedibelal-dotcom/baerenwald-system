@@ -105,7 +105,7 @@ function buildModel(
         { id: 'lead.termin_anlegen', label: 'Termin vereinbaren', icon: Calendar, tier: 'secondary' },
         {
           id: 'navigate',
-          label: 'Angebot erstellen',
+          label: 'Angebot vorbereiten',
           icon: FileText,
           tier: 'secondary',
           href: `/angebote/neu?lead_id=${id}`,
@@ -117,7 +117,7 @@ function buildModel(
     if (status === 'kontaktiert') {
       primary = {
         id: 'navigate',
-        label: 'Angebot erstellen',
+        label: 'Angebot vorbereiten',
         icon: FileText,
         tier: 'primary',
         href: `/angebote/neu?lead_id=${id}`,
@@ -226,7 +226,7 @@ function buildModel(
     }
     if (status === 'gesendet_kunde') {
       primary = { id: 'angebot.mark_kunde_akzeptiert', label: 'Kunde hat angenommen', icon: Check, tier: 'primary' }
-      secondary.push({ id: 'angebot.nachfassen', label: 'Nachfassen', icon: Phone, tier: 'secondary' })
+      secondary.push({ id: 'angebot.nachfassen', label: 'Nachfassen', icon: Mail, tier: 'secondary' })
       destructive.push({
         id: 'angebot.kunde_abgelehnt',
         label: 'Kunde hat abgelehnt',

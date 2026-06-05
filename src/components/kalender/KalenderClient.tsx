@@ -34,6 +34,7 @@ export const TYP_FARBEN: Record<KalenderTermin['typ'], string> = {
   beginn: '#2E7D52',
   abnahme: '#0091AE',
   sonstiges: '#6B7280',
+  intern: '#9333EA',
 }
 
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [

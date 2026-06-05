@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { ArrowDownLeft, ArrowUpRight, Mail } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
@@ -28,12 +28,23 @@ export function KommunikationCard({
   const [rows, setRows] = useState<KommunikationListeZeile[]>([])
   const [previewId, setPreviewId] = useState<string | null>(null)
 
+  const filterKey = [
+    filter.kundeId ?? '',
+    filter.leadId ?? '',
+    filter.angebotId ?? '',
+    filter.auftragId ?? '',
+    filter.rechnungId ?? '',
+  ].join('|')
+
+  const filterRef = useRef(filter)
+  filterRef.current = filter
+
   const load = useCallback(() => {
     startTransition(async () => {
-      const list = await loadKommunikationListe(filter)
+      const list = await loadKommunikationListe(filterRef.current)
       setRows(list)
     })
-  }, [filter])
+  }, [filterKey])
 
   useEffect(() => {
     load()

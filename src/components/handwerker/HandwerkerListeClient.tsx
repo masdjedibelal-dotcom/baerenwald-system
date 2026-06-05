@@ -10,12 +10,10 @@ import {
   ListMobileStack,
   ListGridShell,
 } from '@/components/layout/ListPageParts'
-import { EntityListShell, AppListFilterRail, AppEntityListRow } from '@/components/layout/app'
+import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
-import { FilterChips } from '@/components/ui/FilterChips'
-import { MobileSortSelect } from '@/components/ui/MobileSortSelect'
 import { SortableHeader } from '@/components/ui/SortableHeader'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -222,16 +220,6 @@ export function HandwerkerListeClient({
     { field: 'compliance', label: 'Compliance' },
   ]
 
-  const sortSelect = (
-    <MobileSortSelect
-      variant="pill"
-      options={sortOptions}
-      currentField={field}
-      currentDir={dir}
-      onSort={(f) => (f ? handleSort(f) : resetSort())}
-    />
-  )
-
   return (
     <EntityListShell
       mode={mode}
@@ -250,16 +238,16 @@ export function HandwerkerListeClient({
           ) : null}
 
           <ListFilterSection
-            chips={
-              <FilterChips
-                options={gewerkChipOptions}
-                selected={gewerkChip === 'alle' ? [] : [gewerkChip]}
-                onChange={(v) => setGewerkChip(v[0] ?? 'alle')}
-              />
-            }
+            chipGroups={[
+              {
+                label: 'Gewerk',
+                options: gewerkChipOptions,
+                selected: [gewerkChip],
+                onChange: (v) => setGewerkChip(v[0] ?? 'alle'),
+              },
+            ]}
           >
             <ListFilterBar
-              hideToolbarOnMobile
               hideStatusFilter
               statusLabel="—"
               statusOptions={[{ value: '', label: '—' }]}
@@ -279,14 +267,27 @@ export function HandwerkerListeClient({
               hasActiveFilters={hasActiveFilters}
               tags={filterTags}
               onExportClick={() => setExportOpen(true)}
-              toolbarEnd={sortSelect}
-              mobileRail={
-                <AppListFilterRail
-                  sort={sortSelect}
-                  zeitraumValue={zeitraum}
-                  onZeitraumChange={setZeitraum}
-                  onExportClick={() => setExportOpen(true)}
-                />
+              resultCount={filtered.length}
+              sort={{
+                options: sortOptions,
+                currentField: field,
+                currentDir: dir,
+                onSort: (f) => (f ? handleSort(f) : resetSort()),
+              }}
+              toolbarEnd={
+                <select
+                  aria-label="Sortieren"
+                  value={field ?? ''}
+                  onChange={(e) => (e.target.value ? handleSort(e.target.value) : resetSort())}
+                  className="list-filter-select hidden md:block"
+                >
+                  <option value="">Sortieren</option>
+                  {sortOptions.map((o) => (
+                    <option key={o.field} value={o.field}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               }
             />
           </ListFilterSection>
