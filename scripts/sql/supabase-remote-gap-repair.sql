@@ -1,5 +1,0 @@
--- DEPRECATED: Bitte stattdessen ausführen:
---   supabase/migrations/20260607120000_angebot_handwerker_schema_gaps.sql
--- oder: npm run db:angebot-handwerker-gaps  (mit SUPABASE_DB_URL in .env.local)
---
--- Inhalt ist identisch zur Migration 20260607120000_angebot_handwerker_schema_gaps.sql
