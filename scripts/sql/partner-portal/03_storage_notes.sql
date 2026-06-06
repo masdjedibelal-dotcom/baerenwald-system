@@ -1,0 +1,16 @@
+-- Storage für Partner-Portal (manuell im Supabase Dashboard)
+--
+-- 1) Bucket anlegen: handwerker-uploads (PRIVATE)
+-- 2) Policies (Beispiel — Pfade anpassen):
+--
+-- INSERT: authenticated user, Ordner = handwerker_id aus JWT
+--   bucket_id = 'handwerker-uploads'
+--   AND (storage.foldername(name))[1] = portal_handwerker_id()::text
+--
+-- SELECT: gleiche Bedingung
+--
+-- Dateistruktur-Vorschlag:
+--   {handwerker_id}/angebote/{angebot_handwerker_id}/angebot.pdf
+--   {handwerker_id}/bautagebuch/{auftrag_id}/{uuid}.jpg
+--
+-- Bis Policies stehen: Uploads über service_role (Website Server Actions mit supabaseAdmin).
