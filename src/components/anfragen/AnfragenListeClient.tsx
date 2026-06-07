@@ -21,6 +21,7 @@ import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
+import { leadInAnfragenPipeline } from '@/lib/crm/pipeline-liste-filter'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import {
   BEREICH_LABELS,
@@ -191,6 +192,7 @@ export function AnfragenListeClient({
   }, [searchParams])
 
   const [statusFilter, setStatusFilter] = useState<'' | LeadStatus>('')
+  const [pipelineOnly, setPipelineOnly] = useState(true)
   const [kanal, setKanal] = useState<'' | LeadKanal>('')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
@@ -207,13 +209,16 @@ export function AnfragenListeClient({
     if (z === 'dieser_monat') setZeitraum('dieser_monat')
   }, [searchParams])
 
+  const pipelineLeads = useMemo(() => leads.filter(leadInAnfragenPipeline), [leads])
+  const baseLeads = pipelineOnly ? pipelineLeads : leads
+
   const statusCounts = useMemo(() => {
-    const c: Record<string, number> = { '': leads.length }
-    for (const l of leads) {
+    const c: Record<string, number> = { '': baseLeads.length }
+    for (const l of baseLeads) {
       c[l.status] = (c[l.status] ?? 0) + 1
     }
     return c
-  }, [leads])
+  }, [baseLeads])
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
@@ -222,7 +227,7 @@ export function AnfragenListeClient({
 
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
-    return leads.filter((l) => {
+    return baseLeads.filter((l) => {
       if (statusFilter && l.status !== statusFilter) return false
       if (kanal && l.kanal !== kanal) return false
       if (dateRange && !datumInZeitraum(l.created_at, dateRange)) return false
@@ -232,7 +237,7 @@ export function AnfragenListeClient({
       const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
       return name.includes(needle) || mail.includes(needle) || tel.includes(needle)
     })
-  }, [leads, statusFilter, kanal, debouncedQ, dateRange])
+  }, [baseLeads, statusFilter, kanal, debouncedQ, dateRange])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -248,10 +253,11 @@ export function AnfragenListeClient({
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim())
+  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim() || !pipelineOnly)
 
   function resetAllFilters() {
     setStatusFilter('')
+    setPipelineOnly(true)
     setKanal('')
     setQ('')
     setZeitraum('alle')
@@ -295,11 +301,20 @@ export function AnfragenListeClient({
         <ListFilterSection
           chipGroups={[
             {
+              label: 'Ansicht',
+              options: [
+                { label: 'Pipeline', value: 'pipeline', count: pipelineLeads.length },
+                { label: 'Alle', value: 'all', count: leads.length },
+              ],
+              selected: [pipelineOnly ? 'pipeline' : 'all'],
+              onChange: (v) => setPipelineOnly((v[0] ?? 'pipeline') === 'pipeline'),
+            },
+            {
               label: 'Status',
               options: STATUS_ORDER.map((st) => ({
                 label: st === '' ? 'Alle' : STATUS_LABELS[st],
                 value: st,
-                count: st === '' ? leads.length : statusCounts[st] ?? 0,
+                count: st === '' ? baseLeads.length : statusCounts[st] ?? 0,
               })),
               selected: [statusFilter],
               onChange: (v) => setStatusFilter((v[0] ?? '') as '' | LeadStatus),
@@ -353,11 +368,19 @@ export function AnfragenListeClient({
       {sorted.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title={leads.length === 0 ? 'Noch keine Anfragen' : 'Keine Treffer'}
+          title={
+            leads.length === 0
+              ? 'Noch keine Anfragen'
+              : pipelineOnly && pipelineLeads.length === 0
+                ? 'Keine Anfragen in der Pipeline'
+                : 'Keine Treffer'
+          }
           description={
             leads.length === 0
               ? 'Anfragen kommen automatisch über die Website oder du legst sie manuell an.'
-              : 'Passe Filter oder Suche an.'
+              : pipelineOnly && pipelineLeads.length === 0
+                ? 'Sobald ein Angebot erstellt wird, erscheint der Vorgang unter Angebote.'
+                : 'Passe Filter oder Suche an.'
           }
           action={
             leads.length === 0 ? (

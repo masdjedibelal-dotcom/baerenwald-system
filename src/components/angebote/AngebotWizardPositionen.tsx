@@ -13,8 +13,11 @@ import {
   Trash2,
 } from 'lucide-react'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
+import { Button } from '@/components/ui/Button'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
+import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
 import { Textarea } from '@/components/ui/Textarea'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 import {
@@ -206,6 +209,7 @@ function PositionAccordionItem({
   canMoveUp = false,
   canMoveDown = false,
   lockGewerk = false,
+  display = 'full',
 }: {
   index: number
   z: DokumentZeile
@@ -223,6 +227,8 @@ function PositionAccordionItem({
   canMoveUp?: boolean
   canMoveDown?: boolean
   lockGewerk?: boolean
+  /** full = Desktop-Accordion; browse = Mobile-Zeile; editor = nur Formular (Sheet) */
+  display?: 'full' | 'browse' | 'editor'
 }) {
   const kind = zeileKind(z)
   const posNr = artikelPositionsNummer(zeilen, index)
@@ -305,15 +311,338 @@ function PositionAccordionItem({
     } as Partial<DokumentArtikelZeile>)
   }
 
+  const editPanel = (
+    <>
+      <div className="pos-edit-body">
+        {z.typ === 'freitext' ? (
+          <>
+            <WizardField label="Überschrift" required full>
+              <input
+                className="input w-full"
+                value={z.titel}
+                onChange={(e) => onPatch({ titel: e.target.value })}
+                placeholder="z. B. Wichtiger Hinweis"
+                autoFocus={display === 'editor'}
+              />
+            </WizardField>
+            <WizardField label="Beschreibung" full hint="Erscheint unter der Überschrift auf dem Angebot">
+              <Textarea
+                rows={3}
+                value={z.text}
+                onChange={(e) => onPatch({ text: e.target.value })}
+                placeholder="z. B. Hinweis zu Ablauf oder Garantie"
+              />
+            </WizardField>
+          </>
+        ) : z.typ === 'gesamtrabatt' ? (
+          <>
+            <WizardField label="Bezeichnung" required full>
+              <input
+                className="input w-full"
+                value={z.bezeichnung}
+                onChange={(e) => onPatch({ bezeichnung: e.target.value })}
+                autoFocus={display === 'editor'}
+              />
+            </WizardField>
+            <WizardField label="Art des Nachlasses">
+              <select
+                className="input w-full"
+                value={z.modus}
+                onChange={(e) =>
+                  onPatch({ modus: e.target.value as DokumentGesamtrabattZeile['modus'] })
+                }
+              >
+                <option value="prozent">Prozent vom Netto</option>
+                <option value="betrag">Fester Betrag</option>
+              </select>
+            </WizardField>
+            <WizardField label={z.modus === 'prozent' ? 'Prozent' : 'Betrag netto'}>
+              <div className="txt-prefix">
+                <span className="prefix">{z.modus === 'prozent' ? '%' : '€'}</span>
+                <input
+                  className="input"
+                  type="number"
+                  step={z.modus === 'prozent' ? '0.5' : '0.01'}
+                  min={0}
+                  value={z.wert}
+                  onChange={(e) => onPatch({ wert: Number(e.target.value) || 0 })}
+                />
+              </div>
+            </WizardField>
+            <WizardField label="Abzug (netto)">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums text-amber-800">
+                {formatEurBetrag(total)}
+              </div>
+            </WizardField>
+          </>
+        ) : preislisteMode ? (
+          <>
+            {!lockGewerk ? (
+              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
+                <select
+                  className="input w-full"
+                  value={z.gewerk_id ?? ''}
+                  onChange={(e) => {
+                    const gid = e.target.value
+                    const g = gewerkById(gewerke, gid)
+                    onPatch({
+                      gewerk_id: gid,
+                      gewerkName: g?.name,
+                      gewerk_slug: g?.slug,
+                      bezeichnung: '',
+                      preisliste_id: null,
+                    } as Partial<DokumentArtikelZeile>)
+                  }}
+                >
+                  <option value="">Gewerk wählen…</option>
+                  {gewerke
+                    .filter((g) => g.aktiv !== false)
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                </select>
+              </WizardField>
+            ) : null}
+            <WizardField label="Leistung aus Liste" required>
+              <select
+                className="input w-full"
+                value={z.preisliste_id ?? ''}
+                onChange={(e) => applyPreisliste(e.target.value)}
+                disabled={!z.gewerk_id}
+              >
+                <option value="">
+                  {z.gewerk_id ? 'Leistung wählen…' : 'Zuerst Gewerk wählen…'}
+                </option>
+                {leistungenForGewerk(z.gewerk_id ?? '').map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.leistung}
+                  </option>
+                ))}
+              </select>
+            </WizardField>
+            {!istAnfahrt ? (
+              <KostenverteilungField
+                value={kostenverteilung}
+                onChange={(next) =>
+                  onPatch({ kostenverteilung: next } as Partial<DokumentArtikelZeile>)
+                }
+              />
+            ) : null}
+            <WizardField label="Menge">
+              <div className="lead-leistung-menge">
+                <input
+                  className="input min-w-0 flex-1"
+                  type="number"
+                  step="0.5"
+                  min={0.01}
+                  value={z.menge}
+                  onChange={(e) =>
+                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
+                  }
+                />
+                <select
+                  className="input"
+                  value={z.einheit}
+                  onChange={(e) => onPatch({ einheit: e.target.value })}
+                >
+                  {EINHEITEN.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </WizardField>
+            <WizardField
+              label="Einzelpreis netto"
+              hint={
+                z.preisliste_id
+                  ? 'Abweichung von der Liste wird als eigene Leistung gespeichert'
+                  : undefined
+              }
+            >
+              <EuroNettoInput value={z.vkNetto} onChange={patchVkNetto} />
+            </WizardField>
+            <WizardField label="Zeilensumme">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
+                {formatEurBetrag(total)}
+              </div>
+            </WizardField>
+            {fachbetriebHinweisAktiv ? (
+              <FachbetriebHinweisCheckbox
+                gewerkId={z.gewerk_id}
+                gewerke={gewerke}
+                hinweisAnzeigen={z.fachbetriebHinweisAnzeigen}
+                positionBeschreibung={z.positionBeschreibung}
+                hinweisText={fachbetriebHinweisText}
+                onPatch={onPatch}
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            <WizardField label="Leistung" required full>
+              <input
+                className="input w-full"
+                value={z.bezeichnung}
+                onChange={(e) => onPatch({ bezeichnung: e.target.value })}
+                placeholder="z. B. Wände streichen"
+                autoFocus={display === 'editor'}
+              />
+            </WizardField>
+            {!lockGewerk ? (
+              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
+                <select
+                  className="input w-full"
+                  value={z.gewerk_id ?? ''}
+                  onChange={(e) => {
+                    const gid = e.target.value
+                    const g = gewerkById(gewerke, gid)
+                    const hinweis = g ? getHinweisForPosition(g.id, gewerke) : ''
+                    const fachbetrieb = positionKannFachbetriebHinweis(gid, gewerke)
+                    onPatch({
+                      gewerk_id: gid || undefined,
+                      gewerkName: g?.name ?? (gid ? 'Gewerk' : 'Freie Leistung'),
+                      gewerk_slug: g?.slug ?? (gid ? '' : 'frei'),
+                      positionBeschreibung: hinweis || undefined,
+                      fachbetriebHinweisAnzeigen: fachbetrieb ? true : undefined,
+                    } as Partial<DokumentArtikelZeile>)
+                  }}
+                >
+                  <option value="">Gewerk wählen…</option>
+                  {gewerke
+                    .filter((g) => g.aktiv !== false)
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                </select>
+              </WizardField>
+            ) : null}
+            {fachbetriebHinweisAktiv ? (
+              <FachbetriebHinweisCheckbox
+                gewerkId={z.gewerk_id}
+                gewerke={gewerke}
+                hinweisAnzeigen={z.fachbetriebHinweisAnzeigen}
+                positionBeschreibung={z.positionBeschreibung}
+                hinweisText={fachbetriebHinweisText}
+                onPatch={onPatch}
+              />
+            ) : null}
+            <WizardField label="Beschreibung" full hint="Details für Kunden & spätere Rechnung">
+              <Textarea
+                rows={3}
+                value={z.positionBeschreibung ?? ''}
+                onChange={(e) => onPatch({ positionBeschreibung: e.target.value })}
+                placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung"
+              />
+            </WizardField>
+            <WizardField label="Menge">
+              <div className="lead-leistung-menge">
+                <input
+                  className="input min-w-0 flex-1"
+                  type="number"
+                  step="0.5"
+                  min={0.01}
+                  value={z.menge}
+                  onChange={(e) =>
+                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
+                  }
+                />
+                <select
+                  className="input"
+                  value={z.einheit}
+                  onChange={(e) => onPatch({ einheit: e.target.value })}
+                >
+                  {EINHEITEN.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </WizardField>
+            <WizardField label="Einzelpreis netto">
+              <EuroNettoInput value={z.vkNetto} onChange={(vkNetto) => onPatch({ vkNetto })} />
+            </WizardField>
+            {!istAnfahrt ? (
+              <KostenverteilungField
+                value={kostenverteilung}
+                onChange={(next) =>
+                  onPatch({ kostenverteilung: next } as Partial<DokumentArtikelZeile>)
+                }
+              />
+            ) : null}
+            <WizardField label="Steuersatz">
+              <select
+                className="input w-full"
+                value={String(z.mwstSatz)}
+                onChange={(e) =>
+                  onPatch({ mwstSatz: Number(e.target.value) as MwstSatzOption })
+                }
+              >
+                {MWST_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </WizardField>
+            <WizardField label="Zeilensumme">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
+                {formatEurBetrag(total)}
+              </div>
+            </WizardField>
+          </>
+        )}
+      </div>
+      <div className="pos-edit-foot">
+        <button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={onRemove}>
+          <Trash2 className="h-3.5 w-3.5" />
+          Entfernen
+        </button>
+        <div className="flex-1" />
+        {kind !== 'freitext' ? (
+          <span className="pos-sub-total">
+            Zeilensumme<b>{formatEurBetrag(total)}</b>
+          </span>
+        ) : null}
+        {display !== 'editor' ? (
+          <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={onClose}>
+            <Check className="h-3.5 w-3.5" />
+            Fertig
+          </button>
+        ) : null}
+      </div>
+    </>
+  )
+
+  if (display === 'editor') {
+    return <div className="pos-acc-editor">{editPanel}</div>
+  }
+
+  const browseMode = display === 'browse'
+  const inlineOpen = open && display === 'full'
+
   return (
-    <div className={cn('pos-acc', `kind-${kind}`, open && 'open')}>
+    <div
+      className={cn(
+        'pos-acc',
+        `kind-${kind}`,
+        inlineOpen && 'open',
+        browseMode && open && 'is-sheet-open'
+      )}
+    >
       <div
         className="pos-row"
         role="button"
         tabIndex={0}
-        onClick={open ? undefined : onToggle}
+        onClick={inlineOpen ? undefined : onToggle}
         onKeyDown={(e) => {
-          if (!open && (e.key === 'Enter' || e.key === ' ')) {
+          if (!inlineOpen && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault()
             onToggle()
           }
@@ -359,45 +688,49 @@ function PositionAccordionItem({
         <div className="pos-actions">
           {canMoveUp || canMoveDown ? (
             <div className="pos-reorder" aria-label="Reihenfolge">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm pos-reorder-btn"
-              title="Nach oben"
-              aria-label="Position nach oben verschieben"
-              disabled={!canMoveUp}
-              onClick={(e) => {
-                e.stopPropagation()
-                onMoveUp?.()
-              }}
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm pos-reorder-btn"
-              title="Nach unten"
-              aria-label="Position nach unten verschieben"
-              disabled={!canMoveDown}
-              onClick={(e) => {
-                e.stopPropagation()
-                onMoveDown?.()
-              }}
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm pos-reorder-btn"
+                title="Nach oben"
+                aria-label="Position nach oben verschieben"
+                disabled={!canMoveUp}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMoveUp?.()
+                }}
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm pos-reorder-btn"
+                title="Nach unten"
+                aria-label="Position nach unten verschieben"
+                disabled={!canMoveDown}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMoveDown?.()
+                }}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : null}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            title={open ? 'Schließen' : 'Bearbeiten'}
+            title={browseMode ? 'Bearbeiten' : inlineOpen ? 'Schließen' : 'Bearbeiten'}
             onClick={(e) => {
               e.stopPropagation()
-              if (open) onClose()
-              else onToggle()
+              if (browseMode || !inlineOpen) onToggle()
+              else onClose()
             }}
           >
-            {open ? <ChevronUp className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+            {browseMode || !inlineOpen ? (
+              <Pencil className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronUp className="h-3.5 w-3.5" />
+            )}
           </button>
           <button
             type="button"
@@ -413,315 +746,7 @@ function PositionAccordionItem({
         </div>
       </div>
 
-      {open ? (
-        <>
-          <div className="pos-edit-body">
-            {z.typ === 'freitext' ? (
-              <>
-                <WizardField label="Überschrift" required full>
-                  <input
-                    className="input w-full"
-                    value={z.titel}
-                    onChange={(e) => onPatch({ titel: e.target.value })}
-                    placeholder="z. B. Wichtiger Hinweis"
-                    autoFocus
-                  />
-                </WizardField>
-                <WizardField label="Beschreibung" full hint="Erscheint unter der Überschrift auf dem Angebot">
-                  <Textarea
-                    rows={3}
-                    value={z.text}
-                    onChange={(e) => onPatch({ text: e.target.value })}
-                    placeholder="z. B. Hinweis zu Ablauf oder Garantie"
-                  />
-                </WizardField>
-              </>
-            ) : z.typ === 'gesamtrabatt' ? (
-              <>
-                <WizardField label="Bezeichnung" required full>
-                  <input
-                    className="input w-full"
-                    value={z.bezeichnung}
-                    onChange={(e) => onPatch({ bezeichnung: e.target.value })}
-                    autoFocus
-                  />
-                </WizardField>
-                <WizardField label="Art des Nachlasses">
-                  <select
-                    className="input w-full"
-                    value={z.modus}
-                    onChange={(e) =>
-                      onPatch({ modus: e.target.value as DokumentGesamtrabattZeile['modus'] })
-                    }
-                  >
-                    <option value="prozent">Prozent vom Netto</option>
-                    <option value="betrag">Fester Betrag</option>
-                  </select>
-                </WizardField>
-                <WizardField label={z.modus === 'prozent' ? 'Prozent' : 'Betrag netto'}>
-                  <div className="txt-prefix">
-                    <span className="prefix">{z.modus === 'prozent' ? '%' : '€'}</span>
-                    <input
-                      className="input"
-                      type="number"
-                      step={z.modus === 'prozent' ? '0.5' : '0.01'}
-                      min={0}
-                      value={z.wert}
-                      onChange={(e) => onPatch({ wert: Number(e.target.value) || 0 })}
-                    />
-                  </div>
-                </WizardField>
-                <WizardField label="Abzug (netto)">
-                  <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums text-amber-800">
-                    {formatEurBetrag(total)}
-                  </div>
-                </WizardField>
-              </>
-            ) : preislisteMode ? (
-              <>
-                {!lockGewerk ? (
-                  <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
-                    <select
-                      className="input w-full"
-                      value={z.gewerk_id ?? ''}
-                      onChange={(e) => {
-                        const gid = e.target.value
-                        const g = gewerkById(gewerke, gid)
-                        onPatch({
-                          gewerk_id: gid,
-                          gewerkName: g?.name,
-                          gewerk_slug: g?.slug,
-                          bezeichnung: '',
-                          preisliste_id: null,
-                        } as Partial<DokumentArtikelZeile>)
-                      }}
-                    >
-                      <option value="">Gewerk wählen…</option>
-                      {gewerke
-                        .filter((g) => g.aktiv !== false)
-                        .map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                    </select>
-                  </WizardField>
-                ) : null}
-                <WizardField label="Leistung aus Liste" required>
-                  <select
-                    className="input w-full"
-                    value={z.preisliste_id ?? ''}
-                    onChange={(e) => applyPreisliste(e.target.value)}
-                    disabled={!z.gewerk_id}
-                  >
-                    <option value="">
-                      {z.gewerk_id ? 'Leistung wählen…' : 'Zuerst Gewerk wählen…'}
-                    </option>
-                    {leistungenForGewerk(z.gewerk_id ?? '').map((pl) => (
-                      <option key={pl.id} value={pl.id}>
-                        {pl.leistung}
-                      </option>
-                    ))}
-                  </select>
-                </WizardField>
-                {!istAnfahrt ? (
-                  <KostenverteilungField
-                    value={kostenverteilung}
-                    onChange={(next) =>
-                      onPatch({ kostenverteilung: next } as Partial<DokumentArtikelZeile>)
-                    }
-                  />
-                ) : null}
-                <WizardField label="Menge">
-                  <div className="lead-leistung-menge">
-                    <input
-                      className="input min-w-0 flex-1"
-                      type="number"
-                      step="0.5"
-                      min={0.01}
-                      value={z.menge}
-                      onChange={(e) =>
-                        onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
-                      }
-                    />
-                    <select
-                      className="input"
-                      value={z.einheit}
-                      onChange={(e) => onPatch({ einheit: e.target.value })}
-                    >
-                      {EINHEITEN.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </WizardField>
-                <WizardField
-                  label="Einzelpreis netto"
-                  hint={
-                    z.preisliste_id
-                      ? 'Abweichung von der Liste wird als eigene Leistung gespeichert'
-                      : undefined
-                  }
-                >
-                  <EuroNettoInput value={z.vkNetto} onChange={patchVkNetto} />
-                </WizardField>
-                <WizardField label="Zeilensumme">
-                  <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
-                    {formatEurBetrag(total)}
-                  </div>
-                </WizardField>
-                {fachbetriebHinweisAktiv ? (
-                  <FachbetriebHinweisCheckbox
-                    gewerkId={z.gewerk_id}
-                    gewerke={gewerke}
-                    hinweisAnzeigen={z.fachbetriebHinweisAnzeigen}
-                    positionBeschreibung={z.positionBeschreibung}
-                    hinweisText={fachbetriebHinweisText}
-                    onPatch={onPatch}
-                  />
-                ) : null}
-              </>
-            ) : (
-              <>
-                <WizardField label="Leistung" required full>
-                  <input
-                    className="input w-full"
-                    value={z.bezeichnung}
-                    onChange={(e) => onPatch({ bezeichnung: e.target.value })}
-                    placeholder="z. B. Wände streichen"
-                    autoFocus
-                  />
-                </WizardField>
-                {!lockGewerk ? (
-                  <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
-                    <select
-                      className="input w-full"
-                      value={z.gewerk_id ?? ''}
-                      onChange={(e) => {
-                        const gid = e.target.value
-                        const g = gewerkById(gewerke, gid)
-                        const hinweis = g ? getHinweisForPosition(g.id, gewerke) : ''
-                        const fachbetrieb = positionKannFachbetriebHinweis(gid, gewerke)
-                        onPatch({
-                          gewerk_id: gid || undefined,
-                          gewerkName: g?.name ?? (gid ? 'Gewerk' : 'Freie Leistung'),
-                          gewerk_slug: g?.slug ?? (gid ? '' : 'frei'),
-                          positionBeschreibung: hinweis || undefined,
-                          fachbetriebHinweisAnzeigen: fachbetrieb ? true : undefined,
-                        } as Partial<DokumentArtikelZeile>)
-                      }}
-                    >
-                      <option value="">Gewerk wählen…</option>
-                      {gewerke
-                        .filter((g) => g.aktiv !== false)
-                        .map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                    </select>
-                  </WizardField>
-                ) : null}
-                {fachbetriebHinweisAktiv ? (
-                  <FachbetriebHinweisCheckbox
-                    gewerkId={z.gewerk_id}
-                    gewerke={gewerke}
-                    hinweisAnzeigen={z.fachbetriebHinweisAnzeigen}
-                    positionBeschreibung={z.positionBeschreibung}
-                    hinweisText={fachbetriebHinweisText}
-                    onPatch={onPatch}
-                  />
-                ) : null}
-                <WizardField label="Beschreibung" full hint="Details für Kunden & spätere Rechnung">
-                  <Textarea
-                    rows={3}
-                    value={z.positionBeschreibung ?? ''}
-                    onChange={(e) => onPatch({ positionBeschreibung: e.target.value })}
-                    placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung"
-                  />
-                </WizardField>
-                <WizardField label="Menge">
-                  <div className="lead-leistung-menge">
-                    <input
-                      className="input min-w-0 flex-1"
-                      type="number"
-                      step="0.5"
-                      min={0.01}
-                      value={z.menge}
-                      onChange={(e) =>
-                        onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
-                      }
-                    />
-                    <select
-                      className="input"
-                      value={z.einheit}
-                      onChange={(e) => onPatch({ einheit: e.target.value })}
-                    >
-                      {EINHEITEN.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </WizardField>
-                <WizardField label="Einzelpreis netto">
-                  <EuroNettoInput
-                    value={z.vkNetto}
-                    onChange={(vkNetto) => onPatch({ vkNetto })}
-                  />
-                </WizardField>
-                {!istAnfahrt ? (
-                  <KostenverteilungField
-                    value={kostenverteilung}
-                    onChange={(next) =>
-                      onPatch({ kostenverteilung: next } as Partial<DokumentArtikelZeile>)
-                    }
-                  />
-                ) : null}
-                <WizardField label="Steuersatz">
-                  <select
-                    className="input w-full"
-                    value={String(z.mwstSatz)}
-                    onChange={(e) =>
-                      onPatch({ mwstSatz: Number(e.target.value) as MwstSatzOption })
-                    }
-                  >
-                    {MWST_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </WizardField>
-                <WizardField label="Zeilensumme">
-                  <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
-                    {formatEurBetrag(total)}
-                  </div>
-                </WizardField>
-              </>
-            )}
-          </div>
-          <div className="pos-edit-foot">
-            <button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={onRemove}>
-              <Trash2 className="h-3.5 w-3.5" />
-              Entfernen
-            </button>
-            <div className="flex-1" />
-            {kind !== 'freitext' ? (
-              <span className="pos-sub-total">
-                Zeilensumme<b>{formatEurBetrag(total)}</b>
-              </span>
-            ) : null}
-            <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={onClose}>
-              <Check className="h-3.5 w-3.5" />
-              Fertig
-            </button>
-          </div>
-        </>
-      ) : null}
+      {inlineOpen ? editPanel : null}
     </div>
   )
 }
@@ -763,6 +788,7 @@ export function AngebotWizardPositionen({
   }
   lockGewerk?: boolean
 }) {
+  const isMobile = useIsMobile()
   const [openId, setOpenId] = useState<string | null>(null)
   const [preislisteIds, setPreislisteIds] = useState<Set<string>>(() => {
     const ids = zeilen
@@ -855,7 +881,33 @@ export function AngebotWizardPositionen({
 
   const caption =
     untertitel ??
-    `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · klicke auf eine Zeile zum Bearbeiten`
+    (isMobile
+      ? `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · tippen zum Bearbeiten`
+      : `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · klicke auf eine Zeile zum Bearbeiten`)
+
+  const openIndex = openId ? listenZeilen.findIndex((z) => z.id === openId) : -1
+  const openZeile = openIndex >= 0 ? listenZeilen[openIndex] : null
+
+  function closeOpenZeile() {
+    if (!openId) return
+    const z = listenZeilen.find((row) => row.id === openId)
+    setOpenId(null)
+    if (z && (z.typ !== 'artikel' || !z.preisliste_id)) {
+      setPreislisteIds((prev) => {
+        const next = new Set(prev)
+        next.delete(openId)
+        return next
+      })
+    }
+  }
+
+  function sheetTitleFor(z: DokumentZeile): string {
+    if (z.typ === 'freitext') return z.titel?.trim() || 'Freitext'
+    if (z.typ === 'gesamtrabatt') return z.bezeichnung?.trim() || 'Rabatt'
+    return z.bezeichnung?.trim() || 'Position bearbeiten'
+  }
+
+  const rowDisplay = isMobile ? 'browse' : 'full'
 
   return (
     <>
@@ -923,6 +975,10 @@ export function AngebotWizardPositionen({
               preislisten={preislisten}
               onToggle={() => setOpenId(openId === z.id ? null : z.id)}
               onClose={() => {
+                if (isMobile) {
+                  closeOpenZeile()
+                  return
+                }
                 setOpenId(null)
                 if (z.typ !== 'artikel' || !z.preisliste_id) {
                   setPreislisteIds((prev) => {
@@ -939,10 +995,40 @@ export function AngebotWizardPositionen({
               onMoveUp={() => moveZeile(z.id, 'up')}
               onMoveDown={() => moveZeile(z.id, 'down')}
               lockGewerk={lockGewerk}
+              display={rowDisplay}
             />
           ))
         )}
       </div>
+
+      {isMobile && openZeile ? (
+        <MobileEditSheet
+          open
+          onClose={closeOpenZeile}
+          title={sheetTitleFor(openZeile)}
+        >
+          <PositionAccordionItem
+            key={`${openZeile.id}-editor`}
+            index={openIndex}
+            z={openZeile}
+            zeilen={listenZeilen}
+            open
+            preislisteMode={preislisteIds.has(openZeile.id)}
+            gewerke={gewerke}
+            preislisten={preislisten}
+            onToggle={() => {}}
+            onClose={closeOpenZeile}
+            onPatch={(patch) => patchZeile(openZeile.id, patch)}
+            onRemove={() => removeZeile(openZeile.id)}
+            canMoveUp={openIndex > 0}
+            canMoveDown={openIndex < listenZeilen.length - 1}
+            onMoveUp={() => moveZeile(openZeile.id, 'up')}
+            onMoveDown={() => moveZeile(openZeile.id, 'down')}
+            lockGewerk={lockGewerk}
+            display="editor"
+          />
+        </MobileEditSheet>
+      ) : null}
 
       {betweenListAndAddRow ? (
         <div className="border-t border-hairline border-bw-border">{betweenListAndAddRow}</div>

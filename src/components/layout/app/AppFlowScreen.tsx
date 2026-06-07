@@ -31,18 +31,30 @@ export function AppFlowScreen({
 export function AppFlowStepDots({
   total,
   current,
+  compact = false,
+  className,
 }: {
   total: number
   current: number
+  compact?: boolean
+  className?: string
 }) {
   return (
-    <div className="flex items-center justify-center gap-1.5 py-1" aria-label={`Schritt ${current} von ${total}`}>
+    <div
+      className={cn(
+        'flex items-center justify-center',
+        compact ? 'gap-1' : 'gap-1.5 py-1',
+        className
+      )}
+      aria-label={`Schritt ${current} von ${total}`}
+    >
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
           className={cn(
-            'h-1.5 rounded-full transition-all',
-            i + 1 === current ? 'w-5 bg-bw-primary' : 'w-1.5 bg-bw-border',
+            'rounded-full transition-all',
+            compact ? 'h-1' : 'h-1.5',
+            i + 1 === current ? (compact ? 'w-4 bg-bw-primary' : 'w-5 bg-bw-primary') : compact ? 'w-1 bg-bw-border' : 'w-1.5 bg-bw-border',
             i + 1 < current && 'bg-bw-primary/40'
           )}
           aria-hidden

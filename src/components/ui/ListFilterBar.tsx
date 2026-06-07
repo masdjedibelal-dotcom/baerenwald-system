@@ -316,7 +316,7 @@ export function ListFilterBar({
 
   return (
     <>
-      <div className={cn('list-filter-bar space-y-2.5', className)}>
+      <div className={cn('list-filter-bar space-y-2.5 max-md:space-y-2', className)}>
         <div className="list-filter-toolbar-row">
           <div className="list-filter-toolbar-search min-w-0 flex-1">
             <SearchInput
@@ -327,23 +327,15 @@ export function ListFilterBar({
             />
           </div>
           <div className="list-filter-toolbar-divider hidden md:block" aria-hidden />
-          <div className="list-filter-toolbar-controls hidden md:flex">{controls}</div>
-          <div className="list-filter-toolbar-mobile flex shrink-0 items-center gap-2 md:hidden">
-            {onExportClick ? (
-              <ExportCsvButton
-                variant="ghost"
-                onClick={onExportClick}
-                iconOnly
-                className={LIST_FILTER_ICON_BTN_CLASS}
-              />
-            ) : null}
+          <div className="list-filter-toolbar-controls">{controls}</div>
+          <div className="list-filter-toolbar-mobile shrink-0 md:hidden">
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
               className="mobile-filter-trigger-btn"
               aria-label="Filter öffnen"
             >
-              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <span>Filter</span>
               {mobileFilterCount > 0 ? (
                 <span className="mobile-filter-trigger-btn__badge">{mobileFilterCount}</span>
@@ -373,7 +365,7 @@ export function ListFilterBar({
         ) : null}
 
         {tags && tags.length > 0 ? (
-          <div className="list-filter-active-tags flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
+          <div className="list-filter-active-tags hidden gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:flex md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
             {tags.map((t) => (
               <button key={t.id} type="button" onClick={t.onRemove} className="chip shrink-0">
                 {t.label}

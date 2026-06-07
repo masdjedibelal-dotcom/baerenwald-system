@@ -12,9 +12,11 @@ import type { AngebotListeEintrag } from '@/lib/types'
 
 export function AngeboteMasterDetailShell({
   angebote,
+  angebotIdsMitAuftrag,
   children,
 }: {
   angebote: AngebotListeEintrag[]
+  angebotIdsMitAuftrag: string[]
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -35,7 +37,12 @@ export function AngeboteMasterDetailShell({
             </div>
           }
         >
-          <AngeboteListeClient angebote={angebote} mode="pane" selectedId={selectedId} />
+          <AngeboteListeClient
+            angebote={angebote}
+            angebotIdsMitAuftrag={angebotIdsMitAuftrag}
+            mode="pane"
+            selectedId={selectedId}
+          />
         </Suspense>
       }
     >

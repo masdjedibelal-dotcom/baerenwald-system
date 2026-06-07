@@ -12,6 +12,8 @@ import {
   FileText,
   HelpCircle,
   History,
+  LayoutGrid,
+  Layers,
   ListChecks,
   MoreHorizontal,
   StickyNote,
@@ -22,7 +24,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailScreenShell } from '@/components/layout/app'
+import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailProp } from '@/components/ui/detail-prop'
@@ -89,7 +91,17 @@ import {
 } from '@/lib/utils'
 import { isEchterFreitext } from '@/lib/lead-display-helpers'
 
-type DetailTab = 'schritte' | 'timeline' | 'notizen' | 'dokumente'
+type DetailTab = 'stammdaten' | 'projekt' | 'schritte' | 'timeline' | 'notizen' | 'dokumente'
+
+const DESKTOP_DETAIL_TABS: DetailTab[] = ['schritte', 'timeline', 'notizen', 'dokumente']
+const MOBILE_DETAIL_TABS: DetailTab[] = [
+  'stammdaten',
+  'projekt',
+  'schritte',
+  'timeline',
+  'notizen',
+  'dokumente',
+]
 
 function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
@@ -418,8 +430,40 @@ export function AnfrageDetailClient({
     [naechsteSchritte]
   )
 
-  const detailTabs = useMemo(
+  const desktopDetailTabs = useMemo(
     () => [
+      {
+        id: 'schritte',
+        label: 'Nächste Schritte',
+        icon: ListChecks,
+        count: offeneSchritteCount || undefined,
+      },
+      {
+        id: 'timeline',
+        label: ACTIVITY_SECTIONS.verlauf,
+        icon: History,
+        count: timelineItems.length || undefined,
+      },
+      {
+        id: 'notizen',
+        label: ACTIVITY_SECTIONS.notizen,
+        icon: StickyNote,
+        count: notizenRows.length || undefined,
+      },
+      {
+        id: 'dokumente',
+        label: ACTIVITY_SECTIONS.dokumente,
+        icon: FileText,
+        count: dokumenteCount || undefined,
+      },
+    ],
+    [offeneSchritteCount, timelineItems.length, notizenRows.length, dokumenteCount]
+  )
+
+  const mobileDetailTabs = useMemo(
+    () => [
+      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
+      { id: 'projekt', label: 'Projekt', icon: Layers },
       {
         id: 'schritte',
         label: 'Nächste Schritte',
@@ -633,6 +677,19 @@ export function AnfrageDetailClient({
     </>
   )
 
+  const stammdatenInhalt = (
+    <div className="space-y-3">
+      {stammdatenCard}
+      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
+      <LeadTermineCard
+        leadId={lead.id}
+        termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
+        notizen={notizenRows}
+        onReload={() => refresh()}
+      />
+    </div>
+  )
+
   const fixedOverview = (
     <div className="space-y-3">
       {stammdatenCard}
@@ -647,21 +704,45 @@ export function AnfrageDetailClient({
     </div>
   )
 
-  const tabContent =
+  const schritteInhalt = (
+    <LeadNaechsteSchritteCard steps={naechsteSchritte} onQuickAngebot={openAngebotErstellen} />
+  )
+
+  const desktopTabContent =
     tab === 'schritte' ? (
-      <LeadNaechsteSchritteCard steps={naechsteSchritte} onQuickAngebot={openAngebotErstellen} />
+      schritteInhalt
     ) : tab === 'timeline' ? (
       timelineTab
     ) : tab === 'notizen' ? (
       <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
-    ) : (
+    ) : tab === 'dokumente' ? (
       <AnfrageDokumenteTab
         leadId={lead.id}
         dokumente={dokumenteRows}
         angebote={angeboteListe}
         onReload={() => refresh()}
       />
-    )
+    ) : null
+
+  const mobileTabContent =
+    tab === 'stammdaten' ? (
+      stammdatenInhalt
+    ) : tab === 'projekt' ? (
+      <div className="space-y-3">{projektuebersichtCards}</div>
+    ) : tab === 'schritte' ? (
+      schritteInhalt
+    ) : tab === 'timeline' ? (
+      timelineTab
+    ) : tab === 'notizen' ? (
+      <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
+    ) : tab === 'dokumente' ? (
+      <AnfrageDokumenteTab
+        leadId={lead.id}
+        dokumente={dokumenteRows}
+        angebote={angeboteListe}
+        onReload={() => refresh()}
+      />
+    ) : null
 
   const kiAnalyseCard =
     lead.ki_zusammenfassung?.trim() ? (
@@ -677,14 +758,23 @@ export function AnfrageDetailClient({
     ) : null
 
   const main = (
-    <>
-      {fixedOverview}
-      <DetailScreenShell
-        tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />}
-      >
-        <div className="min-w-0 space-y-3">{tabContent}</div>
-      </DetailScreenShell>
-    </>
+    <DetailResponsiveTabs
+      tab={tab}
+      onTabChange={setTab}
+      desktopOverview={fixedOverview}
+      desktopTabs={
+        <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
+      }
+      mobileTabs={
+        <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
+      }
+      desktopTabContent={desktopTabContent}
+      mobileTabContent={mobileTabContent}
+      mobileDefaultTab="stammdaten"
+      desktopDefaultTab="schritte"
+      mobileTabIds={MOBILE_DETAIL_TABS}
+      desktopTabIds={DESKTOP_DETAIL_TABS}
+    />
   )
 
   return (

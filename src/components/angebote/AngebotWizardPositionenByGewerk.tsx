@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { AngebotWizardPositionen } from '@/components/angebote/AngebotWizardPositionen'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
+import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   GEWERK_BLOCK_ANFAHRT,
   GEWERK_BLOCK_SONST,
@@ -95,9 +97,11 @@ function defaultPendingGewerkSection(
 function GewerkBlockTitle({
   title,
   onRename,
+  readOnly,
 }: {
   title: string
   onRename: (name: string) => void
+  readOnly?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
@@ -144,16 +148,115 @@ function GewerkBlockTitle({
   return (
     <div className="flex min-w-0 items-center gap-1">
       <span className="truncate text-[13px] font-semibold text-bw-text">{title}</span>
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm shrink-0 p-1 text-bw-text-muted hover:text-bw-text"
-        title="Gewerk-Titel bearbeiten"
-        aria-label="Gewerk-Titel bearbeiten"
-        onClick={() => setEditing(true)}
-      >
-        <Pencil className="h-3.5 w-3.5" aria-hidden />
-      </button>
+      {!readOnly ? (
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm shrink-0 p-1 text-bw-text-muted hover:text-bw-text"
+          title="Gewerk-Titel bearbeiten"
+          aria-label="Gewerk-Titel bearbeiten"
+          onClick={() => setEditing(true)}
+        >
+          <Pencil className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : null}
     </div>
+  )
+}
+
+function GewerkBlockMeta({
+  displayTitle,
+  blockBeschreibung,
+  onRename,
+  onBeschreibungChange,
+}: {
+  displayTitle: string
+  blockBeschreibung: string
+  onRename: (name: string) => void
+  onBeschreibungChange: (value: string) => void
+}) {
+  const isMobile = useIsMobile()
+  const [titleDraft, setTitleDraft] = useState(displayTitle)
+
+  useEffect(() => {
+    setTitleDraft(displayTitle)
+  }, [displayTitle])
+
+  function commitTitleDraft() {
+    const next = titleDraft.trim()
+    if (!next) {
+      toast.error('Gewerk-Titel darf nicht leer sein.')
+      setTitleDraft(displayTitle)
+      return
+    }
+    if (next !== displayTitle) onRename(next)
+  }
+
+  const editFields = (
+    <div className="space-y-3">
+      <label>
+        <span className="input-label">Gewerk-Titel</span>
+        <input
+          className="input h-8 text-[13px] font-semibold"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onBlur={commitTitleDraft}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commitTitleDraft()
+            }
+          }}
+          aria-label="Gewerk-Titel bearbeiten"
+        />
+      </label>
+      <label>
+        <span className="input-label">Beschreibung (optional)</span>
+        <textarea
+          className="input min-h-[72px] w-full resize-y text-[12px] leading-relaxed"
+          value={blockBeschreibung}
+          onChange={(e) => onBeschreibungChange(e.target.value)}
+          placeholder="Beschreibung für dieses Gewerk (optional)"
+          aria-label={`Beschreibung für ${displayTitle}`}
+        />
+      </label>
+    </div>
+  )
+
+  const overview = (
+    <dl className="space-y-2">
+      <MobileOverviewField label="Gewerk" value={displayTitle} />
+      <MobileOverviewField
+        label="Beschreibung"
+        value={
+          <span className="whitespace-pre-wrap text-bw-text-muted">
+            {blockBeschreibung.trim() || '—'}
+          </span>
+        }
+      />
+    </dl>
+  )
+
+  if (!isMobile) {
+    return (
+      <>
+        <GewerkBlockTitle title={displayTitle} onRename={onRename} />
+        <div className="mt-2">
+          <textarea
+            className="input min-h-[58px] w-full resize-y text-[12px] leading-relaxed"
+            value={blockBeschreibung}
+            onChange={(e) => onBeschreibungChange(e.target.value)}
+            placeholder="Beschreibung für dieses Gewerk (optional)"
+            aria-label={`Beschreibung für ${displayTitle}`}
+          />
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <MobileEditableBlock sheetTitle="Gewerk bearbeiten" overview={overview} editLabel="Gewerk bearbeiten">
+      {editFields}
+    </MobileEditableBlock>
   )
 }
 
@@ -557,19 +660,12 @@ export function AngebotWizardPositionenByGewerk({
                       </div>
                     ) : null}
                     <div className="min-w-0 flex-1">
-                      <GewerkBlockTitle
-                        title={displayTitle}
+                      <GewerkBlockMeta
+                        displayTitle={displayTitle}
+                        blockBeschreibung={blockBeschreibung}
                         onRename={(name) => renameBlockTitle(block.key, name)}
+                        onBeschreibungChange={(value) => setBlockBeschreibung(block.key, value)}
                       />
-                      <div className="mt-2">
-                        <textarea
-                          className="input min-h-[58px] w-full resize-y text-[12px] leading-relaxed"
-                          value={blockBeschreibung}
-                          onChange={(e) => setBlockBeschreibung(block.key, e.target.value)}
-                          placeholder="Beschreibung für dieses Gewerk (optional)"
-                          aria-label={`Beschreibung für ${displayTitle}`}
-                        />
-                      </div>
                       <div className="mt-0.5 text-[11px] text-bw-text-muted">
                         {posCount} Position{posCount === 1 ? '' : 'en'}
                         {blockZeilenOhneBeschreibung.some((z) => z.typ === 'freitext')

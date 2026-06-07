@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
-import { ChevronDown, Eye, Mail, Pencil, Send, Trash2, Upload, X } from 'lucide-react'
+import { ChevronDown, Eye, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -62,6 +63,7 @@ export function AuftragBautagebuchCard({
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editFotos, setEditFotos] = useState<string[]>([])
   const [filterPartner, setFilterPartner] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   const gewerkOptionen = useMemo(
     () => gewerkOptionenAusPositionen(positionen, gewerke),
@@ -147,6 +149,23 @@ export function AuftragBautagebuchCard({
     }
   }
 
+  function resetAddForm() {
+    setNeuTitel('')
+    setNeuBeschreibung('')
+    setNeuFotos([])
+    setNeuGewerk(gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')
+    setNeuDatum(heuteYmd())
+  }
+
+  function openAdd() {
+    resetAddForm()
+    setAddOpen(true)
+  }
+
+  function closeAdd() {
+    setAddOpen(false)
+  }
+
   function createEintrag() {
     if (!neuTitel.trim()) {
       toast.error('Bitte einen Titel eingeben.')
@@ -165,11 +184,8 @@ export function AuftragBautagebuchCard({
       })
       if (!r.ok) toast.error(r.message)
       else {
-        setNeuTitel('')
-        setNeuBeschreibung('')
-        setNeuFotos([])
-        setNeuGewerk(gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')
-        setNeuDatum(heuteYmd())
+        resetAddForm()
+        setAddOpen(false)
         toast.success('Eintrag gespeichert')
         onChanged()
       }
@@ -220,112 +236,137 @@ export function AuftragBautagebuchCard({
     })
   }
 
-  return (
-    <div className="auftrag-bautagebuch auftrag-pos-compact">
-      {partnerCount > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-              filterPartner
-                ? 'bg-bw-primary text-white'
-                : 'bg-bw-bg-soft text-bw-text-muted hover:text-bw-text'
-            )}
-            onClick={() => setFilterPartner((v) => !v)}
-          >
-            Nur Partner ({partnerCount})
-          </button>
-        </div>
-      ) : null}
-      <div className="bt-add-card">
-        <p className="bt-add-title">Neuer Eintrag</p>
-        <div className="bt-add-fields">
-          <Input label="Titel" value={neuTitel} onChange={(e) => setNeuTitel(e.target.value)} placeholder="z. B. Rohbau abgeschlossen" />
-          <Input label="Datum" type="date" value={neuDatum} onChange={(e) => setNeuDatum(e.target.value)} />
-          {gewerkOptionen.length > 0 ? (
-            <Select
-              label="Gewerk (optional, Phase in der Mail)"
-              value={neuGewerk || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')}
-              onChange={(e) => setNeuGewerk(e.target.value)}
-              options={gewerkSelectOptions}
-              hint={
-                gewerkOptionen.length > 1
-                  ? 'Optional — ohne Auswahl wird in der Kunden-Mail die aktuelle Bauphase automatisch hervorgehoben.'
-                  : undefined
-              }
-            />
-          ) : null}
-          <div className="field-full">
-            <Textarea
-              label="Beschreibung"
-              value={neuBeschreibung}
-              onChange={(e) => setNeuBeschreibung(e.target.value)}
-              placeholder="Was ist passiert? Was ist als Nächstes geplant?"
-              rows={4}
-            />
-          </div>
-        </div>
+  const addTrigger = (
+    <button
+      type="button"
+      className="bt-add-trigger"
+      aria-label="Eintrag hinzufügen"
+      onClick={openAdd}
+    >
+      <Plus className="h-4 w-4" aria-hidden />
+    </button>
+  )
 
-        <input
-          ref={fileRef}
-          type="file"
-          className="hidden"
-          accept=".jpg,.jpeg,.png,.webp"
-          multiple
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files, 'neu')
-            e.target.value = ''
-          }}
-        />
-        <input
-          ref={editFileRef}
-          type="file"
-          className="hidden"
-          accept=".jpg,.jpeg,.png,.webp"
-          multiple
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files, 'edit')
-            e.target.value = ''
-          }}
-        />
-
-        {neuFotos.length > 0 ? (
-          <div className="bt-foto-grid">
-            {neuFotos.map((url) => (
-              <div key={url} className="bt-foto-thumb">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" />
-                <button type="button" className="bt-foto-remove" onClick={() => setNeuFotos((p) => p.filter((u) => u !== url))}>
-                  <X className="h-3 w-3" aria-hidden />
-                </button>
-              </div>
-            ))}
-          </div>
+  const addFormFields = (
+    <>
+      <div className="bt-add-fields">
+        <Input label="Titel" value={neuTitel} onChange={(e) => setNeuTitel(e.target.value)} placeholder="z. B. Rohbau abgeschlossen" />
+        <Input label="Datum" type="date" value={neuDatum} onChange={(e) => setNeuDatum(e.target.value)} />
+        {gewerkOptionen.length > 0 ? (
+          <Select
+            label="Gewerk (optional, Phase in der Mail)"
+            value={neuGewerk || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')}
+            onChange={(e) => setNeuGewerk(e.target.value)}
+            options={gewerkSelectOptions}
+            hint={
+              gewerkOptionen.length > 1
+                ? 'Optional — ohne Auswahl wird in der Kunden-Mail die aktuelle Bauphase automatisch hervorgehoben.'
+                : undefined
+            }
+          />
         ) : null}
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={uploading || neuFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="mr-1 h-3 w-3" aria-hidden />
-            Fotos
-          </Button>
-          <span className="text-[11px] text-bw-text-muted">
-            Bis zu {BAUTAGEBUCH_MAX_FOTOS} Fotos · {neuFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
-          </span>
-          <Button type="button" variant="primary" size="sm" loading={pending} onClick={createEintrag}>
-            Eintrag speichern
-          </Button>
+        <div className="field-full">
+          <Textarea
+            label="Beschreibung"
+            value={neuBeschreibung}
+            onChange={(e) => setNeuBeschreibung(e.target.value)}
+            placeholder="Was ist passiert? Was ist als Nächstes geplant?"
+            rows={4}
+          />
         </div>
       </div>
 
+      {neuFotos.length > 0 ? (
+        <div className="bt-foto-grid">
+          {neuFotos.map((url) => (
+            <div key={url} className="bt-foto-thumb">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" />
+              <button type="button" className="bt-foto-remove" onClick={() => setNeuFotos((p) => p.filter((u) => u !== url))}>
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={uploading || neuFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
+          onClick={() => fileRef.current?.click()}
+        >
+          <Upload className="mr-1 h-3 w-3" aria-hidden />
+          Fotos
+        </Button>
+        <span className="text-[11px] text-bw-text-muted">
+          Bis zu {BAUTAGEBUCH_MAX_FOTOS} Fotos · {neuFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
+        </span>
+        <Button type="button" variant="primary" size="sm" loading={pending} onClick={createEintrag}>
+          Eintrag speichern
+        </Button>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="auftrag-bautagebuch auftrag-pos-compact">
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.webp"
+        multiple
+        onChange={(e) => {
+          if (e.target.files?.length) void uploadFiles(e.target.files, 'neu')
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={editFileRef}
+        type="file"
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.webp"
+        multiple
+        onChange={(e) => {
+          if (e.target.files?.length) void uploadFiles(e.target.files, 'edit')
+          e.target.value = ''
+        }}
+      />
+
+      {(partnerCount > 0 || sorted.length > 0) ? (
+        <div className="bt-list-toolbar">
+          {partnerCount > 0 ? (
+            <button
+              type="button"
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                filterPartner
+                  ? 'bg-bw-primary text-white'
+                  : 'bg-bw-bg-soft text-bw-text-muted hover:text-bw-text'
+              )}
+              onClick={() => setFilterPartner((v) => !v)}
+            >
+              Nur Partner ({partnerCount})
+            </button>
+          ) : (
+            <span />
+          )}
+          {addTrigger}
+        </div>
+      ) : null}
+
       {sorted.length === 0 ? (
-        <p className="py-6 text-center text-sm text-bw-text-muted">Noch keine Bautagebuch-Einträge.</p>
+        eintraege.length === 0 ? (
+          <div className="bt-empty-row">
+            <p className="text-sm text-bw-text-muted">Noch keine Einträge</p>
+            {addTrigger}
+          </div>
+        ) : (
+          <p className="py-4 text-center text-sm text-bw-text-muted">Keine Einträge für diesen Filter.</p>
+        )
       ) : (
         <div className="bt-list divide-y divide-bw-border rounded-md border border-bw-border bg-bw-card">
           {sorted.map((e) => {
@@ -466,6 +507,22 @@ export function AuftragBautagebuchCard({
           })}
         </div>
       )}
+
+      {addOpen ? (
+        <div className="bt-add-card hidden md:block">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="bt-add-title mb-0">Neuer Eintrag</p>
+            <button type="button" className="bt-add-close" aria-label="Schließen" onClick={closeAdd}>
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+          {addFormFields}
+        </div>
+      ) : null}
+
+      <MobileListFilterSheet open={addOpen} onClose={closeAdd} title="Neuer Eintrag">
+        {addFormFields}
+      </MobileListFilterSheet>
 
       <BautagebuchKundeSendModal
         open={!!sendEintrag}

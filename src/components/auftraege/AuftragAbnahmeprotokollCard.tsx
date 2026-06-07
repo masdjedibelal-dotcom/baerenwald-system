@@ -94,30 +94,38 @@ export function AuftragAbnahmeprotokollCard({
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="primary" size="sm" onClick={() => openWizard(2)}>
+            <div className="abnahme-card-actions">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="abnahme-card-actions__primary"
+                onClick={() => openWizard(2)}
+              >
                 <Smartphone className="mr-1.5 h-4 w-4" aria-hidden />
                 Vor Ort (Abhaken)
               </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(1)}>
-                <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
-                Checkliste bearbeiten
-              </Button>
-              {pdfUrl ? (
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-secondary btn-sm inline-flex items-center"
-                >
-                  <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-                  PDF
-                </a>
-              ) : (
-                <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(4)}>
-                  PDF erstellen
+              <div className="abnahme-card-actions__secondary">
+                <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(1)}>
+                  <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
+                  Checkliste bearbeiten
                 </Button>
-              )}
+                {pdfUrl ? (
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary btn-sm abnahme-card-actions__link"
+                  >
+                    <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
+                    PDF
+                  </a>
+                ) : (
+                  <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(4)}>
+                    PDF erstellen
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}

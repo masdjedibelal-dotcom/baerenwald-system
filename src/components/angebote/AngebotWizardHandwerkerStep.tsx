@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { gewerkById } from '@/lib/gewerke-ausfuehrung'
 import type { DokumentZeile } from '@/lib/dokument-zeilen'
 import type { Gewerk, Handwerker } from '@/lib/types'
@@ -70,6 +71,83 @@ export function gewerkHandwerkerZuweisungenToMaps(zuweisungen: GewerkHandwerkerZ
   return { positionQueues, notizenByGewerk }
 }
 
+function GewerkHandwerkerBlock({
+  block,
+  gewerke,
+  handwerker,
+  disabled,
+  onPatch,
+}: {
+  block: GewerkHandwerkerZuweisung
+  gewerke: Gewerk[]
+  handwerker: Handwerker[]
+  disabled?: boolean
+  onPatch: (patch: Partial<GewerkHandwerkerZuweisung>) => void
+}) {
+  const opts = handwerkerFuerGewerk(handwerker, gewerke, block.gewerk_id)
+  const selected =
+    opts.find((h) => h.id === block.handwerker_id) ??
+    handwerker.find((h) => h.id === block.handwerker_id) ??
+    null
+  const selectOptions = [
+    { value: '', label: 'Handwerker wählen…' },
+    ...(selected && !opts.some((h) => h.id === selected.id)
+      ? [{ value: selected.id, label: selected.name }]
+      : []),
+    ...opts.map((h) => ({ value: h.id, label: h.name })),
+  ]
+  const handwerkerLabel = selected?.name ?? '—'
+
+  const form = (
+    <div className="space-y-3">
+      <Select
+        label="Handwerker"
+        name={`hw-${block.gewerk_id}`}
+        value={block.handwerker_id}
+        disabled={disabled}
+        onChange={(e) => onPatch({ handwerker_id: e.target.value })}
+        options={selectOptions}
+      />
+      <Textarea
+        label="Notiz für Handwerker"
+        rows={3}
+        value={block.aufgabe_notiz}
+        disabled={disabled}
+        placeholder="z. B. Zugang über Hausmeister, Terminwunsch, Besonderheiten…"
+        onChange={(e) => onPatch({ aufgabe_notiz: e.target.value })}
+      />
+    </div>
+  )
+
+  const overview = (
+    <dl className="space-y-2.5">
+      <MobileOverviewField label="Handwerker" value={handwerkerLabel} />
+      <MobileOverviewField
+        label="Notiz"
+        value={
+          <span className="whitespace-pre-wrap text-bw-text-muted">
+            {block.aufgabe_notiz.trim() || '—'}
+          </span>
+        }
+      />
+    </dl>
+  )
+
+  return (
+    <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-4">
+      <p className="mb-3 text-[13px] font-semibold text-bw-text">{block.gewerk_name}</p>
+      <MobileEditableBlock
+        sheetTitle={block.gewerk_name}
+        overview={overview}
+        disabled={disabled}
+        editLabel="Zuweisung bearbeiten"
+      >
+        {form}
+      </MobileEditableBlock>
+    </div>
+  )
+}
+
 export function AngebotWizardHandwerkerStep({
   zeilen,
   gewerke,
@@ -108,44 +186,16 @@ export function AngebotWizardHandwerkerStep({
         Partner-Einreichung und Bestätigung senden Sie das Angebot an den Kunden.
       </p>
       <div className="space-y-4">
-        {blocks.map((b) => {
-          const opts = handwerkerFuerGewerk(handwerker, gewerke, b.gewerk_id)
-          const selected =
-            opts.find((h) => h.id === b.handwerker_id) ??
-            handwerker.find((h) => h.id === b.handwerker_id) ??
-            null
-          const selectOptions = [
-            { value: '', label: 'Handwerker wählen…' },
-            ...(selected && !opts.some((h) => h.id === selected.id)
-              ? [{ value: selected.id, label: selected.name }]
-              : []),
-            ...opts.map((h) => ({ value: h.id, label: h.name })),
-          ]
-          return (
-            <div
-              key={b.gewerk_id}
-              className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-4 space-y-3"
-            >
-              <p className="text-[13px] font-semibold text-bw-text">{b.gewerk_name}</p>
-              <Select
-                label="Handwerker"
-                name={`hw-${b.gewerk_id}`}
-                value={b.handwerker_id}
-                disabled={disabled}
-                onChange={(e) => patch(b.gewerk_id, { handwerker_id: e.target.value })}
-                options={selectOptions}
-              />
-              <Textarea
-                label="Notiz für Handwerker"
-                rows={2}
-                value={b.aufgabe_notiz}
-                disabled={disabled}
-                placeholder="z. B. Zugang über Hausmeister, Terminwunsch, Besonderheiten…"
-                onChange={(e) => patch(b.gewerk_id, { aufgabe_notiz: e.target.value })}
-              />
-            </div>
-          )
-        })}
+        {blocks.map((b) => (
+          <GewerkHandwerkerBlock
+            key={b.gewerk_id}
+            block={b}
+            gewerke={gewerke}
+            handwerker={handwerker}
+            disabled={disabled}
+            onPatch={(patchData) => patch(b.gewerk_id, patchData)}
+          />
+        ))}
       </div>
     </Card>
   )

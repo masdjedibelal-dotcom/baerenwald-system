@@ -35,6 +35,7 @@ import {
 } from '@/lib/listZeitraum'
 import { BEREICH_LABELS, cn, formatDatumZeit } from '@/lib/utils'
 import { formatRegionFromKunde } from '@/lib/list-display-helpers'
+import { angebotInAngebotePipeline } from '@/lib/crm/pipeline-liste-filter'
 import type { AngebotListeEintrag } from '@/lib/types'
 
 type FilterKey = '' | AngebotStatusEinfach
@@ -88,31 +89,45 @@ function angebotRegion(a: AngebotListeEintrag): string {
 
 export function AngeboteListeClient({
   angebote,
+  angebotIdsMitAuftrag = [],
   mode = 'page',
   selectedId = null,
 }: {
   angebote: AngebotListeEintrag[]
+  angebotIdsMitAuftrag?: string[]
   mode?: 'page' | 'pane'
   selectedId?: string | null
 }) {
   const router = useRouter()
   const [statusFilter, setStatusFilter] = useState<FilterKey>('')
+  const [pipelineOnly, setPipelineOnly] = useState(true)
   const [q, setQ] = useState('')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
 
+  const angebotIdsMitAuftragSet = useMemo(
+    () => new Set(angebotIdsMitAuftrag),
+    [angebotIdsMitAuftrag]
+  )
+
+  const pipelineAngebote = useMemo(
+    () => angebote.filter((a) => angebotInAngebotePipeline(a, angebotIdsMitAuftragSet)),
+    [angebote, angebotIdsMitAuftragSet]
+  )
+  const baseAngebote = pipelineOnly ? pipelineAngebote : angebote
+
   const statusCounts = useMemo(() => {
-    const c: Partial<Record<FilterKey, number>> = { '': angebote.length }
-    for (const a of angebote) {
+    const c: Partial<Record<FilterKey, number>> = { '': baseAngebote.length }
+    for (const a of baseAngebote) {
       for (const key of FILTER_ORDER) {
         if (!key) continue
         if (matchesEinfachFilter(a, key)) c[key] = (c[key] ?? 0) + 1
       }
     }
     return c
-  }, [angebote])
+  }, [baseAngebote])
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
@@ -121,7 +136,7 @@ export function AngeboteListeClient({
 
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
-    return angebote.filter((a) => {
+    return baseAngebote.filter((a) => {
       if (!matchesEinfachFilter(a, statusFilter)) return false
       if (dateRange && !datumInZeitraum(a.created_at, dateRange)) return false
       if (!needle) return true
@@ -136,7 +151,7 @@ export function AngeboteListeClient({
         bereiche.includes(needle)
       )
     })
-  }, [angebote, statusFilter, debouncedQ, dateRange])
+  }, [baseAngebote, statusFilter, debouncedQ, dateRange])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -152,10 +167,11 @@ export function AngeboteListeClient({
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(statusFilter || zeitraum !== 'alle' || q.trim())
+  const hasFilters = !!(statusFilter || zeitraum !== 'alle' || q.trim() || !pipelineOnly)
 
   function resetAllFilters() {
     setStatusFilter('')
+    setPipelineOnly(true)
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -194,6 +210,15 @@ export function AngeboteListeClient({
       filters={
       <ListFilterSection
         chipGroups={[
+          {
+            label: 'Ansicht',
+            options: [
+              { label: 'Pipeline', value: 'pipeline', count: pipelineAngebote.length },
+              { label: 'Alle', value: 'all', count: angebote.length },
+            ],
+            selected: [pipelineOnly ? 'pipeline' : 'all'],
+            onChange: (v) => setPipelineOnly((v[0] ?? 'pipeline') === 'pipeline'),
+          },
           {
             label: 'Status',
             options: FILTER_ORDER.map((key) => ({
@@ -246,11 +271,19 @@ export function AngeboteListeClient({
       {sorted.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title={angebote.length === 0 ? 'Noch keine Angebote' : 'Keine Treffer'}
+          title={
+            angebote.length === 0
+              ? 'Noch keine Angebote'
+              : pipelineOnly && pipelineAngebote.length === 0
+                ? 'Keine Angebote in der Pipeline'
+                : 'Keine Treffer'
+          }
           description={
             angebote.length === 0
               ? 'Erstelle ein Angebot aus einer Anfrage.'
-              : 'Passe Filter oder Suche an.'
+              : pipelineOnly && pipelineAngebote.length === 0
+                ? 'Angenommene oder abgeschlossene Angebote findest du unter „Alle“.'
+                : 'Passe Filter oder Suche an.'
           }
           action={
             angebote.length === 0 && !isPane ? (

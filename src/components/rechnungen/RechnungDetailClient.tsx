@@ -11,6 +11,8 @@ import {
   FileText,
   History,
   LayoutGrid,
+  List,
+  ListChecks,
   Mail,
   MoreHorizontal,
   Paperclip,
@@ -20,7 +22,7 @@ import {
   User,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailScreenShell } from '@/components/layout/app'
+import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailAccordion } from '@/components/ui/DetailAccordion'
@@ -103,6 +105,11 @@ function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
   return <StatusBadge status="done" label="Entwurf" />
 }
 
+type RechnungDetailTab = 'stammdaten' | 'leistung' | 'schritte' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
+
+const DESKTOP_RECHNUNG_TABS: RechnungDetailTab[] = ['uebersicht', 'positionen', 'aktivitaet', 'dokumente']
+const MOBILE_RECHNUNG_TABS: RechnungDetailTab[] = ['stammdaten', 'leistung', 'schritte', 'aktivitaet', 'dokumente']
+
 export function RechnungDetailClient({
   detail: initial,
   kleinunternehmerFirma,
@@ -125,7 +132,7 @@ export function RechnungDetailClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [tab, setTab] = useState<'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'>('uebersicht')
+  const [tab, setTab] = useState<RechnungDetailTab>('uebersicht')
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
   const berechnung = useMemo(
@@ -519,6 +526,85 @@ export function RechnungDetailClient({
     [detail.status, detail.id, detail.auftrag_id]
   )
 
+  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
+
+  const aktivitaetInhalt = (
+    <DetailAccordion
+      mobileOnly
+      sections={[
+        {
+          id: 'kommunikation',
+          title: ACTIVITY_SECTIONS.kommunikation,
+          defaultOpen: true,
+          content: (
+            <KommunikationCard
+              filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
+              reloadKey={mailCompose.reloadKey + generation}
+            />
+          ),
+        },
+      ]}
+    />
+  )
+
+  const dokumenteInhalt = (
+    <div className="space-y-6">
+      <CrmDokumenteTabelle
+        zeilen={
+          [
+            {
+              id: 'rechnung-pdf',
+              datum: detail.rechnungsdatum,
+              name: detail.rechnungsnummer?.trim()
+                ? `Rechnung ${detail.rechnungsnummer.trim()}`
+                : 'Rechnung PDF',
+              href: pdfHref,
+            },
+          ] satisfies CrmDokumentZeile[]
+        }
+        emptyTitle="Noch kein PDF"
+        emptyDescription="PDF wird nach Freigabe der Rechnung erzeugt."
+      />
+      <p className="text-xs text-bw-text-muted">
+        Vor dem PDF werden Pflichtangaben (Adressen, Leistungszeitraum, Steuer-ID) geprüft.
+      </p>
+    </div>
+  )
+
+  const desktopDetailTabs = [
+    { id: 'uebersicht', label: 'Übersicht', icon: LayoutGrid },
+    { id: 'positionen', label: 'Positionen', icon: FileText, count: pos.length || undefined },
+    { id: 'aktivitaet', label: 'Aktivität', icon: History },
+    { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
+  ]
+
+  const mobileDetailTabs = [
+    { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
+    { id: 'leistung', label: 'Leistungsübersicht', icon: List, count: pos.length || undefined },
+    { id: 'schritte', label: 'Nächste Schritte', icon: ListChecks },
+    { id: 'aktivitaet', label: 'Aktivität', icon: History },
+    { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
+  ]
+
+  const desktopTabContent = (
+    <>
+      {tab === 'uebersicht' ? schritteInhalt : null}
+      {tab === 'positionen' ? positionenTab : null}
+      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
+      {tab === 'dokumente' ? dokumenteInhalt : null}
+    </>
+  )
+
+  const mobileTabContent = (
+    <>
+      {tab === 'stammdaten' ? fixedOverview : null}
+      {tab === 'leistung' ? positionenTab : null}
+      {tab === 'schritte' ? schritteInhalt : null}
+      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
+      {tab === 'dokumente' ? dokumenteInhalt : null}
+    </>
+  )
+
   return (
     <div className="space-y-4 pb-6">
       <DetailHead
@@ -567,71 +653,31 @@ export function RechnungDetailClient({
         </p>
       ) : null}
 
-      {fixedOverview}
-
-      <DetailScreenShell
-        tabs={
+      <DetailResponsiveTabs
+        tab={tab}
+        onTabChange={setTab}
+        desktopOverview={fixedOverview}
+        desktopTabs={
           <DetailTabBar
-            tabs={[
-              { id: 'uebersicht', label: 'Übersicht', icon: LayoutGrid },
-              { id: 'positionen', label: 'Positionen', icon: FileText, count: pos.length || undefined },
-              { id: 'aktivitaet', label: 'Aktivität', icon: History },
-              { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
-            ]}
+            tabs={desktopDetailTabs}
             value={tab}
-            onChange={(id) => setTab(id as typeof tab)}
+            onChange={(id) => setTab(id as RechnungDetailTab)}
           />
         }
-      >
-        <div className="min-w-0 space-y-3">
-          {tab === 'uebersicht' ? <NaechsteSchritteCard steps={naechsteSchritte} /> : null}
-
-          {tab === 'positionen' ? positionenTab : null}
-
-          {tab === 'aktivitaet' ? (
-            <DetailAccordion
-              mobileOnly
-              sections={[
-                {
-                  id: 'kommunikation',
-                  title: ACTIVITY_SECTIONS.kommunikation,
-                  defaultOpen: true,
-                  content: (
-                    <KommunikationCard
-                      filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
-                      reloadKey={mailCompose.reloadKey + generation}
-                    />
-                  ),
-                },
-              ]}
-            />
-          ) : null}
-
-          {tab === 'dokumente' ? (
-            <div className="space-y-6">
-              <CrmDokumenteTabelle
-                zeilen={
-                  [
-                    {
-                      id: 'rechnung-pdf',
-                      datum: detail.rechnungsdatum,
-                      name: detail.rechnungsnummer?.trim()
-                        ? `Rechnung ${detail.rechnungsnummer.trim()}`
-                        : 'Rechnung PDF',
-                      href: pdfHref,
-                    },
-                  ] satisfies CrmDokumentZeile[]
-                }
-                emptyTitle="Noch kein PDF"
-                emptyDescription="PDF wird nach Freigabe der Rechnung erzeugt."
-              />
-              <p className="text-xs text-bw-text-muted">
-                Vor dem PDF werden Pflichtangaben (Adressen, Leistungszeitraum, Steuer-ID) geprüft.
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </DetailScreenShell>
+        mobileTabs={
+          <DetailTabBar
+            tabs={mobileDetailTabs}
+            value={tab}
+            onChange={(id) => setTab(id as RechnungDetailTab)}
+          />
+        }
+        desktopTabContent={desktopTabContent}
+        mobileTabContent={mobileTabContent}
+        mobileDefaultTab="stammdaten"
+        desktopDefaultTab="uebersicht"
+        mobileTabIds={MOBILE_RECHNUNG_TABS}
+        desktopTabIds={DESKTOP_RECHNUNG_TABS}
+      />
 
       {wizardOpen && wizardBootstrap && firm ? (
         <ClientOnly>

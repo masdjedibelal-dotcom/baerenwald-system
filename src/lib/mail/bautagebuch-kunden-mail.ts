@@ -7,6 +7,7 @@ import {
 import { normalizeLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
@@ -196,7 +197,7 @@ export function buildBautagebuchKundenMail(
       : 'Der Link führt direkt zu diesem Eintrag — weitere Updates und Fotos finden Sie im Projekttagebuch.'
   const ctaHtml =
     link && !data.previewMode
-      ? `<p style="margin:4px 0 16px;"><a href="${esc(link)}" style="display:inline-block;background:#2E7D52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px;">${ctaLabel} →</a></p>
+      ? `<p style="margin:4px 0 16px;">${mailPrimaryButtonHtml(`${ctaLabel} →`, link, { margin: '0', size: 'sm' })}</p>
          <p style="font-size:12px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${esc(ctaHint)}</p>`
       : data.previewMode && !link
         ? `<p style="font-size:12px;color:#6B7280;margin:16px 0 0;font-style:italic;line-height:1.5;">${

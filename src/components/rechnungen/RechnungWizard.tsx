@@ -13,14 +13,13 @@ import {
   Send,
   X,
 } from 'lucide-react'
-import { AppFlowScreen, AppFlowStepDots } from '@/components/layout/app'
+import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
+import { RechnungWizardDetailsCard } from '@/components/rechnungen/RechnungWizardDetailsCard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import {
   finalizeRechnungWizardWithoutMail,
@@ -360,39 +359,74 @@ export function RechnungWizard({
 
   if (!mounted || typeof document === 'undefined') return null
 
-  const wizardFooter = (
-    <div className="wizard-mobile-footer">
-      <AppFlowStepDots total={3} current={step} />
-      <div className="flex items-center gap-2 px-1">
+  const wizardMobileActions =
+    step < 3 ? (
+      <>
         {step > 1 ? (
-          <Button variant="ghost" size="sm" className="flex-1" onClick={() => setStep((s) => s - 1)}>
-            Zurück
+          <Button
+            variant="ghost"
+            size="sm"
+            className="wizard-mobile-toolbar__back shrink-0 px-2"
+            onClick={() => setStep((s) => s - 1)}
+            aria-label="Zurück"
+          >
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        ) : (
-          <div className="flex-1" />
-        )}
-        {step < 3 ? (
-          <Button disabled={saving} className="flex-[2] gap-1.5" onClick={() => void handleWeiter()}>
-            Weiter
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        ) : (
-          <>
-            <Button disabled={saving} variant="secondary" className="flex-1" onClick={() => void handleSaveWithoutMail()}>
-              Ohne E-Mail
-            </Button>
-            <Button disabled={saving} className="flex-[2] gap-1.5" onClick={() => void handleSend()}>
-              <Send className="h-4 w-4" />
-              Senden
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
-  )
+        ) : null}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
+          disabled={saving}
+          onClick={() => void persistDraft({ notify: true })}
+          aria-label="Speichern"
+        >
+          <Save className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          size="sm"
+          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+          disabled={saving}
+          onClick={() => void handleWeiter()}
+        >
+          Weiter
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </>
+    ) : (
+      <>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="wizard-mobile-toolbar__save shrink-0 px-2"
+          disabled={saving}
+          onClick={() => void handleSaveWithoutMail()}
+          aria-label="Ohne E-Mail speichern"
+        >
+          <Save className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          size="sm"
+          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+          disabled={saving}
+          onClick={() => void handleSend()}
+        >
+          <Send className="h-4 w-4" />
+          Senden
+        </Button>
+      </>
+    )
 
   const wizardHeader = (
     <>
+      <WizardMobileToolbar
+        onClose={onClose}
+        totalSteps={3}
+        currentStep={step}
+        stepLabel={`Schritt ${step}`}
+        actions={wizardMobileActions}
+      />
+      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
       <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Schließen">
         <X className="h-4 w-4" />
       </button>
@@ -461,11 +495,12 @@ export function RechnungWizard({
           <span className="text-xs wizard-save-status--saving">Speichere…</span>
         ) : null}
       </div>
+      </div>
     </>
   )
 
   const wizard = (
-    <AppFlowScreen className="wizard-flow" header={wizardHeader} footer={wizardFooter}>
+    <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner">
           {step === 1 ? (
             <div>
@@ -498,81 +533,18 @@ export function RechnungWizard({
 
           {step === 2 ? (
             <div className="max-w-2xl">
-              <Card title="Rechnungsdetails">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="field">
-                    <span className="field-l">Rechnungsdatum</span>
-                    <Input
-                      type="date"
-                      value={meta.rechnungsdatum}
-                      onChange={(e) =>
-                        setMeta((m) => ({
-                          ...m,
-                          rechnungsdatum: e.target.value,
-                          faellig_am: addDaysIso(e.target.value, zahlungszielTage),
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="field-l">Fällig am</span>
-                    <Input
-                      type="date"
-                      value={meta.faellig_am}
-                      onChange={(e) => setMeta((m) => ({ ...m, faellig_am: e.target.value }))}
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="field-l">Leistungszeitraum von</span>
-                    <Input
-                      type="date"
-                      value={meta.leistungszeitraum_von}
-                      onChange={(e) =>
-                        setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="field-l">Leistungszeitraum bis</span>
-                    <Input
-                      type="date"
-                      value={meta.leistungszeitraum_bis}
-                      onChange={(e) =>
-                        setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-                      }
-                    />
-                  </label>
-                </div>
-                {zeigt13b ? (
-                  <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={meta.reverse_charge_13b}
-                      onChange={(e) =>
-                        setMeta((m) => ({ ...m, reverse_charge_13b: e.target.checked }))
-                      }
-                    />
-                    <span>§ 13b UStG Reverse Charge (Steuerschuldnerschaft Leistungsempfänger)</span>
-                  </label>
-                ) : null}
-                <label className="field mt-4">
-                  <span className="field-l">Einleitung (PDF)</span>
-                  <Textarea
-                    rows={3}
-                    value={meta.einleitung}
-                    onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
-                  />
-                </label>
-                <label className="field mt-4">
-                  <span className="field-l">Zusätzliche Hinweise (PDF)</span>
-                  <Textarea
-                    rows={2}
-                    value={meta.hinweise}
-                    onChange={(e) => setMeta((m) => ({ ...m, hinweise: e.target.value }))}
-                  />
-                </label>
-              </Card>
+              <RechnungWizardDetailsCard
+                meta={meta}
+                onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+                onRechnungsdatumChange={(value) =>
+                  setMeta((m) => ({
+                    ...m,
+                    rechnungsdatum: value,
+                    faellig_am: addDaysIso(value, zahlungszielTage),
+                  }))
+                }
+                zeigt13b={zeigt13b}
+              />
               <Card title="Rechtliche Hinweise (automatisch)" className="mt-4">
                 <ul className="list-disc space-y-1 pl-5 text-sm text-bw-text-muted">
                   {kleinunternehmer ? <li>{HINWEIS_KLEINUNTERNEHMER}</li> : null}

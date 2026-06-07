@@ -5,6 +5,7 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
   type KundeRechnungsempfaenger,
 } from '@/lib/kunde-rechnungsempfaenger'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
@@ -94,7 +95,7 @@ export function buildAuftragsbestaetigungMail(
       : 'Über diesen Link erreichen Sie jederzeit Ihr Projekttagebuch. Neue Meilensteine und Gewerk-Updates senden wir Ihnen zusätzlich per E-Mail.'
   const ctaHtml =
     link && !data.previewMode
-      ? `<p style="margin:20px 0 8px;"><a href="${esc(link)}" style="display:inline-block;background:#2E7D52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px;">${ctaLabel} →</a></p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${esc(ctaHint)}</p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;"><a href="${esc(link)}" style="color:#2E7D52;text-decoration:underline;word-break:break-all;">Link zum Projekttagebuch</a></p>`
+      ? `<p style="margin:20px 0 8px;">${mailPrimaryButtonHtml(`${ctaLabel} →`, link, { margin: '0', size: 'sm' })}</p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${esc(ctaHint)}</p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;"><a href="${esc(link)}" style="color:#2E7D52;text-decoration:underline;word-break:break-all;">Link zum Projekttagebuch</a></p>`
       : data.previewMode
         ? `<p style="font-size:13px;color:#6B7280;margin:16px 0 0;font-style:italic;line-height:1.5;">${
             anrede === 'du'

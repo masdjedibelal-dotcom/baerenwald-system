@@ -1,6 +1,7 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
 import { resolveBrandLogoUrl, type BrandLogoVariant } from '@/lib/brand'
+import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPortalButton, buildPortalLoginLink } from '@/lib/portal-utils'
 import { buildAuftragsbestaetigungMail } from '@/lib/mail/auftragsbestaetigung-mail'
 import { buildRechnungMail, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
@@ -167,7 +168,11 @@ ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` :
 }
 
 function btn(text: string, url: string): string {
-  return `<a href="${esc(url)}" style="display:inline-block;background:#2E7D52;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;margin:20px 0;">${esc(text)}</a>`
+  return mailPrimaryButtonHtml(text, url)
+}
+
+function btnSecondary(text: string, url: string): string {
+  return mailSecondaryButtonHtml(text, url)
 }
 
 function greenBox(html: string): string {
@@ -537,9 +542,7 @@ export function mailAngebotPdfUebersicht(
     <p style="color:#374151;line-height:1.7;">Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
     <br/>
     <div style="text-align:center;margin:24px 0;">
-      <a href="tel:${telHref}" style="background:#2E7D52;color:white;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold;font-size:14px;">
-        Jetzt anrufen →
-      </a>
+      ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
     </div>
     <p style="color:#374151;line-height:1.7;">
       Mit freundlichen Grüßen<br/>
@@ -963,7 +966,7 @@ export function mailHandwerkerLeistungZuweisung(
       <h2 style="color:#2E7D52;margin:0 0 16px;">Neue Leistungsanfrage</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
       ${cards}
-      ${btn('Zum Partner-Portal →', data.portalLink)}
+      ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
     `,
       `Leistungsanfrage: ${subjectLeistung}`,
       b,

@@ -22,11 +22,9 @@ import {
   Send,
   X,
 } from 'lucide-react'
-import { AppFlowScreen, AppFlowStepDots } from '@/components/layout/app'
+import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
   saveAngebotWizardDraft,
@@ -49,7 +47,6 @@ import {
   type AngebotWizardBootstrap,
   type AngebotWizardMeta,
   type WizardPosition,
-  ZAHLUNGSBEDINGUNGEN_LABELS,
 } from '@/lib/angebote/angebot-wizard-types'
 import { summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
@@ -68,8 +65,9 @@ import {
 } from '@/lib/templates/angebot-mail'
 import { AngebotWizardFotodokumentation } from '@/components/angebote/AngebotWizardFotodokumentation'
 import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
+import { AngebotWizardAngebotDetailsCard } from '@/components/angebote/AngebotWizardAngebotDetailsCard'
 import { AngebotWizardMailTexteCard } from '@/components/angebote/AngebotWizardMailTexteCard'
-import { AngebotWizardAngebotstitelCard } from '@/components/angebote/AngebotWizardAngebotstitelCard'
+import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
 import { AngebotWizardProjektBeschreibungCard } from '@/components/angebote/AngebotWizardProjektBeschreibungCard'
 import { AngebotWizardHandwerkerStep, buildGewerkHandwerkerZuweisungen, gewerkHandwerkerZuweisungenToMaps, type GewerkHandwerkerZuweisung } from '@/components/angebote/AngebotWizardHandwerkerStep'
 import { isValidEmail } from '@/lib/email-recipients'
@@ -672,62 +670,69 @@ export function AngebotWizard({
 
   if (!mounted) return null
 
-  const wizardFooter = (
-    <div className="wizard-mobile-footer">
-      <AppFlowStepDots total={3} current={step} />
-      <div className="wizard-mobile-footer__actions">
+  const wizardMobileActions =
+    step < 3 ? (
+      <>
         {step > 1 ? (
-          <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={() => setStep((s) => s - 1)}>
-            Zurück
-          </Button>
-        ) : (
-          <div className="flex-1" />
-        )}
-        {step < 3 ? (
-          <>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="wizard-mobile-footer__save shrink-0 px-2.5"
-              loading={saving}
-              onClick={() => void handleEntwurfSpeichern()}
-              aria-label="Entwurf speichern"
-              title="Entwurf speichern"
-            >
-              <Save className="h-4 w-4" aria-hidden />
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              className="flex-[2] gap-1.5"
-              loading={saving}
-              onClick={() => void handleWeiter()}
-            >
-              Weiter
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </>
-        ) : (
           <Button
             type="button"
-            variant="primary"
+            variant="ghost"
             size="sm"
-            className="flex-[2] gap-1.5"
-            loading={saving}
-            onClick={() => void handleHandwerkerFertig()}
+            className="wizard-mobile-toolbar__back shrink-0 px-2"
+            onClick={() => setStep((s) => s - 1)}
+            aria-label="Zurück"
           >
-            <Send className="h-4 w-4" />
-            Speichern & Handwerker einholen
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        )}
-      </div>
-    </div>
-  )
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
+          loading={saving}
+          onClick={() => void handleEntwurfSpeichern()}
+          aria-label="Entwurf speichern"
+          title="Entwurf speichern"
+        >
+          <Save className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+          loading={saving}
+          onClick={() => void handleWeiter()}
+        >
+          Weiter
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </>
+    ) : (
+      <Button
+        type="button"
+        variant="primary"
+        size="sm"
+        className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+        loading={saving}
+        onClick={() => void handleHandwerkerFertig()}
+      >
+        <Send className="h-4 w-4" />
+        Fertig
+      </Button>
+    )
 
   const wizardHeader = (
     <>
+      <WizardMobileToolbar
+        onClose={onClose}
+        totalSteps={3}
+        currentStep={step}
+        stepLabel={`Schritt ${step}: ${WIZARD_STEP_LABELS[step - 1]}`}
+        actions={wizardMobileActions}
+      />
+      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
       <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Schließen">
         <X className="h-4 w-4" />
       </button>
@@ -750,9 +755,6 @@ export function AngebotWizard({
           ) : null}
         </div>
       </div>
-      <p className="wizard-mobile-step-pill md:hidden" aria-current="step">
-        Schritt {step} · {WIZARD_STEP_LABELS[step - 1]}
-      </p>
       <div className="flex-1" />
       <nav className="stepper" aria-label="Fortschritt">
         <Step n={1} label="Leistungen" active={step === 1} done={step > 1} />
@@ -799,12 +801,13 @@ export function AngebotWizard({
           Speichern & Handwerker einholen
         </Button>
       )}
+      </div>
     </>
   )
 
   const wizard = (
     <AppFlowScreen
-      className="wizard-flow wizard-flow--footer-in-body"
+      className="wizard-flow"
       header={wizardHeader}
     >
       <div className="wizard-inner">
@@ -975,59 +978,12 @@ export function AngebotWizard({
           {step === 2 ? (
             <>
               <div className="wizard-projekt-flow">
-                <Card title="Angebot-Details">
-                  <div className="space-y-2.5">
-                    <p className="wizard-inline-hint">
-                      Änderungen aus Schritt 1 werden beim Klick auf <strong>Weiter</strong> oder{' '}
-                      <strong>Speichern</strong> in der Kopfzeile als Entwurf übernommen. Der Status
-                      steht oben neben der Anfrage-Nummer.
-                    </p>
-                    <label>
-                      <span className="input-label">Angebots-Titel *</span>
-                      <input
-                        className="input"
-                        value={meta.titel}
-                        onChange={(e) => setMeta((m) => ({ ...m, titel: e.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      <span className="input-label">Gültig bis *</span>
-                      <input
-                        type="date"
-                        className="input"
-                        min={todayYmd}
-                        value={meta.gueltig_bis}
-                        onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
-                      />
-                    </label>
-                    <Select
-                      label="Zahlungsbedingungen"
-                      name="zahlung"
-                      value={meta.zahlungsbedingungen}
-                      onChange={(e) =>
-                        setMeta((m) => ({
-                          ...m,
-                          zahlungsbedingungen: e.target.value as AngebotWizardMeta['zahlungsbedingungen'],
-                        }))
-                      }
-                      options={Object.entries(ZAHLUNGSBEDINGUNGEN_LABELS).map(([value, label]) => ({
-                        value,
-                        label,
-                      }))}
-                    />
-                    {dokumentTyp === 'einfach' ? (
-                      <label>
-                        <span className="input-label">Hinweise (optional)</span>
-                        <Textarea
-                          rows={2}
-                          value={meta.hinweise}
-                          onChange={(e) => setMeta((m) => ({ ...m, hinweise: e.target.value }))}
-                          placeholder="z. B. Fundamentarbeiten nicht enthalten"
-                        />
-                      </label>
-                    ) : null}
-                  </div>
-                </Card>
+                <AngebotWizardAngebotDetailsCard
+                  meta={meta}
+                  onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+                  dokumentTyp={dokumentTyp}
+                  todayYmd={todayYmd}
+                />
 
                 <WizardProjektDivider />
 
@@ -1044,79 +1000,15 @@ export function AngebotWizard({
 
                 <WizardProjektDivider />
 
-              <Card title="Rechtliche Hinweise im Angebots-PDF">
-                <p className="wizard-inline-hint mb-2.5">
-                  Steuer- und Bankdaten kommen aus den{' '}
-                  <a href="/einstellungen" className="text-bw-primary underline">
-                    Firmeneinstellungen
-                  </a>{' '}
-                  (USt-IdNr., Steuernummer, IBAN, BIC). Hinweise optional ein- oder ausblenden.
-                </p>
-                <div className="space-y-2.5">
-                  <label
-                    className={cn(
-                      'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]',
-                      hinweis35aErlaubt ? 'border-bw-border bg-bw-hover/30' : 'cursor-not-allowed border-bw-border/60 opacity-50'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(meta.hinweis_35a)}
-                      disabled={!hinweis35aErlaubt}
-                      onChange={(e) => setMeta((m) => ({ ...m, hinweis_35a: e.target.checked }))}
-                    />
-                    <span>
-                      <span className="font-medium">§ 35a EStG</span>
-                      <span className="mt-0.5 block text-[11px] text-bw-text-muted">
-                        Lohnkosten-Hinweis für Privatkunden
-                        {lohnNettoPdf > 0 ? ` (${formatEurBetrag(lohnNettoPdf)} netto)` : ''}
-                        {!hinweis35aErlaubt ? ' — nur bei Privatkunden und Lohnanteil > 0' : ''}
-                      </span>
-                    </span>
-                  </label>
-                  <label
-                    className={cn(
-                      'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]',
-                      hinweis19Erlaubt ? 'border-bw-border bg-bw-hover/30' : 'cursor-not-allowed border-bw-border/60 opacity-50'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(meta.hinweis_19)}
-                      disabled={!hinweis19Erlaubt}
-                      onChange={(e) => setMeta((m) => ({ ...m, hinweis_19: e.target.checked }))}
-                    />
-                    <span>
-                      <span className="font-medium">§ 19 UStG (Kleinunternehmer)</span>
-                      <span className="mt-0.5 block text-[11px] text-bw-text-muted">
-                        {kleinunternehmer
-                          ? 'Keine Umsatzsteuer im Angebot ausweisen'
-                          : 'Nur wenn Kleinunternehmer in den Firmeneinstellungen aktiv ist'}
-                      </span>
-                    </span>
-                  </label>
-                  <label
-                    className={cn(
-                      'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]',
-                      hinweis13bErlaubt ? 'border-bw-border bg-bw-hover/30' : 'cursor-not-allowed border-bw-border/60 opacity-50'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(meta.hinweis_13b)}
-                      disabled={!hinweis13bErlaubt}
-                      onChange={(e) => setMeta((m) => ({ ...m, hinweis_13b: e.target.checked }))}
-                    />
-                    <span>
-                      <span className="font-medium">§ 13b UStG (Reverse Charge)</span>
-                      <span className="mt-0.5 block text-[11px] text-bw-text-muted">
-                        Für Gewerbe / Hausverwaltung bei Bauleistungen — standardmäßig aus
-                        {!hinweis13bErlaubt ? ' — nur für Gewerbe- oder Hausverwaltungs-Kunden' : ''}
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </Card>
+                <AngebotWizardRechtlicheHinweiseCard
+                  meta={meta}
+                  onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+                  hinweis35aErlaubt={hinweis35aErlaubt}
+                  hinweis19Erlaubt={hinweis19Erlaubt}
+                  hinweis13bErlaubt={hinweis13bErlaubt}
+                  kleinunternehmer={kleinunternehmer}
+                  lohnNettoPdf={lohnNettoPdf}
+                />
               </div>
             </>
           ) : null}
@@ -1157,7 +1049,7 @@ export function AngebotWizard({
           }}
         />
       ) : null}
-      <div className="wizard-mobile-footer wizard-mobile-footer--in-flow md:hidden">{wizardFooter}</div>
+
     </AppFlowScreen>
   )
 

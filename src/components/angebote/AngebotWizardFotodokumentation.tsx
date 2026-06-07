@@ -4,8 +4,10 @@ import { Fragment, useEffect, useRef, useState, type DragEvent } from 'react'
 import { ImagePlus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
+import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import { cn } from '@/lib/utils'
@@ -33,13 +35,14 @@ function FotoBeschreibungField({
   onChange: (text: string) => void
   onEndEdit: () => void
 }) {
+  const isMobile = useIsMobile()
   const ref = useRef<HTMLDivElement>(null)
   const hasText = richTextToPlain(foto.beschreibung).length > 0
   /** Nur-Lese-Ansicht nur mit Inhalt und ohne aktiven Bearbeitungsmodus */
   const showReadOnly = hasText && !editing
 
   useEffect(() => {
-    if (!showReadOnly && editing && ref.current) {
+    if (!isMobile && !showReadOnly && editing && ref.current) {
       ref.current.focus()
       const sel = window.getSelection()
       const range = document.createRange()
@@ -48,31 +51,61 @@ function FotoBeschreibungField({
       sel?.removeAllRanges()
       sel?.addRange(range)
     }
-  }, [showReadOnly, editing])
+  }, [isMobile, showReadOnly, editing])
 
   function ensureEditing() {
     if (!editing) onStartEdit()
   }
 
-  if (!showReadOnly) {
+  const editor = (
+    <label className="wizard-projekt-field min-w-0 flex-1">
+      <span className="wizard-projekt-field-label">Beschreibung (optional)</span>
+      <RichTextEditor
+        ref={ref}
+        minHeight={72}
+        placeholder="z. B. Istzustand Dusche…"
+        value={foto.beschreibung}
+        onFocus={ensureEditing}
+        onChange={(v) => {
+          ensureEditing()
+          onChange(v)
+        }}
+        onBlur={onEndEdit}
+        disabled={disabled}
+      />
+    </label>
+  )
+
+  const overview = (
+    <MobileOverviewField
+      label="Beschreibung"
+      value={
+        hasText ? (
+          <RichTextContent html={foto.beschreibung} className="text-sm" />
+        ) : (
+          <span className="text-bw-text-muted">Keine Beschreibung</span>
+        )
+      }
+    />
+  )
+
+  if (isMobile) {
     return (
-      <label className="wizard-projekt-field min-w-0 flex-1">
-        <span className="wizard-projekt-field-label">Beschreibung (optional)</span>
-        <RichTextEditor
-          ref={ref}
-          minHeight={72}
-          placeholder="z. B. Istzustand Dusche…"
-          value={foto.beschreibung}
-          onFocus={ensureEditing}
-          onChange={(v) => {
-            ensureEditing()
-            onChange(v)
-          }}
-          onBlur={onEndEdit}
+      <div className="wizard-projekt-field min-w-0 flex-1">
+        <MobileEditableBlock
+          sheetTitle="Foto-Beschreibung"
+          overview={overview}
           disabled={disabled}
-        />
-      </label>
+          editLabel={hasText ? 'Beschreibung bearbeiten' : 'Beschreibung hinzufügen'}
+        >
+          {editor}
+        </MobileEditableBlock>
+      </div>
     )
+  }
+
+  if (!showReadOnly) {
+    return editor
   }
 
   return (

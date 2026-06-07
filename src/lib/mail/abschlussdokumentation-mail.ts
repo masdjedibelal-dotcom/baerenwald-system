@@ -1,4 +1,5 @@
 import type { MailBranding } from '@/lib/mail-branding'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
@@ -93,9 +94,8 @@ export function buildAbschlussdokumentationMail(
       ? 'Du erhältst diese Mail, weil dein Projekt bei uns abgeschlossen wurde.'
       : 'Sie erhalten diese Mail, weil Ihr Projekt bei uns abgeschlossen wurde.'
 
-  const googleUrl = esc(BAERENWALD_GOOGLE_BEWERTUNG_URL)
   const googleCta = `<p style="font-size:14px;color:#374151;margin:0 0 8px;line-height:1.6;">${esc(googleIntro)}</p>
-      <p style="margin:0 0 20px;"><a href="${googleUrl}" style="display:inline-block;background:#2E7D52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px;">${esc(googleBtnLabel)} →</a></p>`
+      <p style="margin:0 0 20px;">${mailPrimaryButtonHtml(`${googleBtnLabel} →`, BAERENWALD_GOOGLE_BEWERTUNG_URL, { margin: '0', size: 'sm' })}</p>`
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>

@@ -104,7 +104,7 @@ export function AuftraegeListeClient({
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
-  const [phase, setPhase] = useState<AuftragListenPhase>('')
+  const [phase, setPhase] = useState<AuftragListenPhase>('aktiv')
   const [statusList, setStatusList] = useState<AuftragStatus[] | null>(null)
   const [q, setQ] = useState('')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
@@ -173,9 +173,9 @@ export function AuftraegeListeClient({
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
-    if (!statusList?.length && phase) {
+    if (!statusList?.length && phase && phase !== 'aktiv') {
       const label = PHASE_FILTERS.find((p) => p.value === phase)?.label
-      if (label) t.push({ id: 'phase', label, onRemove: () => setPhase('') })
+      if (label) t.push({ id: 'phase', label, onRemove: () => setPhase('aktiv') })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -194,10 +194,10 @@ export function AuftraegeListeClient({
     return t
   }, [phase, statusList, zeitraum, q])
 
-  const hasActiveFilters = !!((!statusList?.length && phase) || zeitraum !== 'alle' || q.trim())
+  const hasActiveFilters = !!((!statusList?.length && phase && phase !== 'aktiv') || zeitraum !== 'alle' || q.trim())
 
   function resetFilters() {
-    setPhase('')
+    setPhase('aktiv')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -271,11 +271,19 @@ export function AuftraegeListeClient({
       {sorted.length === 0 ? (
         <EmptyState
           icon={Wrench}
-          title={auftraege.length === 0 ? 'Keine Aufträge' : 'Keine Treffer'}
+          title={
+            auftraege.length === 0
+              ? 'Keine Aufträge'
+              : phase === 'aktiv' && countAuftragPhase(auftraege, 'aktiv') === 0
+                ? 'Keine aktiven Aufträge'
+                : 'Keine Treffer'
+          }
           description={
             auftraege.length === 0
               ? 'Aufträge aus angenommenen Angeboten erscheinen hier.'
-              : 'Filter anpassen.'
+              : phase === 'aktiv' && countAuftragPhase(auftraege, 'aktiv') === 0
+                ? 'Abgeschlossene Aufträge findest du unter Phase „Fertig“ oder „Alle“.'
+                : 'Filter anpassen.'
           }
         />
       ) : (

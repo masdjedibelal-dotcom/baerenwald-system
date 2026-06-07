@@ -32,6 +32,7 @@ import {
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import type { KundenObjekt } from '@/lib/types'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
@@ -41,6 +42,7 @@ import {
   AlertTriangle,
   Briefcase,
   FileText,
+  LayoutGrid,
   Mail,
   MoreHorizontal,
   Pencil,
@@ -151,6 +153,11 @@ function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) 
   return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
 }
 
+type KundeDetailTab = 'stammdaten' | 'vorgaenge' | 'aktivitaet' | 'dokumente'
+
+const DESKTOP_KUNDE_TABS: KundeDetailTab[] = ['vorgaenge', 'aktivitaet', 'dokumente']
+const MOBILE_KUNDE_TABS: KundeDetailTab[] = ['stammdaten', 'vorgaenge', 'aktivitaet', 'dokumente']
+
 export function KundeDetailClient({
   kunde: initialKunde,
   customFieldDefs,
@@ -166,8 +173,7 @@ export function KundeDetailClient({
   const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
-  type DetailTab = 'vorgaenge' | 'aktivitaet' | 'dokumente'
-  const [tab, setTab] = useState<DetailTab>('vorgaenge')
+  const [tab, setTab] = useState<KundeDetailTab>('vorgaenge')
   const [interneNotiz, setInterneNotiz] = useState(initialKunde.notizen ?? '')
   const [pending, startTransition] = useTransition()
   const [customValues, setCustomValues] = useState(initialValues)
@@ -418,8 +424,28 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const detailTabs = useMemo(
+  const desktopDetailTabs = useMemo(
     () => [
+      {
+        id: 'vorgaenge',
+        label: 'Vorgänge',
+        icon: Briefcase,
+        count: vorgaengeCount || undefined,
+      },
+      { id: 'aktivitaet', label: 'Aktivität', icon: Mail },
+      {
+        id: 'dokumente',
+        label: 'Dokumente',
+        icon: FileText,
+        count: dokumenteCount || undefined,
+      },
+    ],
+    [dokumenteCount, vorgaengeCount]
+  )
+
+  const mobileDetailTabs = useMemo(
+    () => [
+      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
       {
         id: 'vorgaenge',
         label: 'Vorgänge',
@@ -649,17 +675,6 @@ export function KundeDetailClient({
     </Card>
   )
 
-  const fixedOverview = (
-    <div className="space-y-3">
-      {stammdatenCard}
-      {zusatzfelderCard}
-      {istKundeGewerbeTyp(kunde.typ) ? (
-        <KundenObjekteCard kundeId={kunde.id} objekte={kundenObjekte} onChanged={() => refresh()} />
-      ) : null}
-      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
-    </div>
-  )
-
   const kpiRow = (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {[
@@ -675,6 +690,18 @@ export function KundeDetailClient({
           <div className="mt-0.5 text-base font-semibold tabular-nums text-bw-text">{value}</div>
         </div>
       ))}
+    </div>
+  )
+
+  const fixedOverview = (
+    <div className="space-y-3">
+      {stammdatenCard}
+      {zusatzfelderCard}
+      {istKundeGewerbeTyp(kunde.typ) ? (
+        <KundenObjekteCard kundeId={kunde.id} objekte={kundenObjekte} onChanged={() => refresh()} />
+      ) : null}
+      {kpiRow}
+      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
     </div>
   )
 
@@ -786,10 +813,6 @@ export function KundeDetailClient({
         <h3 className="border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
           Sonstige Dokumente
         </h3>
-        <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg-soft px-4 py-8 text-center text-sm text-bw-text-muted">
-          Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
-          <div className="mt-2 text-xs">PDF, JPG, PNG · max 10MB (Upload folgt)</div>
-        </div>
         <CrmDokumenteTabelle
           zeilen={(kunde.kunden_dokumente ?? [])
             .filter((d) => d.datei_url?.trim())
@@ -801,6 +824,10 @@ export function KundeDetailClient({
             }))}
           emptyDescription="Noch keine sonstigen Dokumente."
         />
+        <div className="kunde-dok-upload">
+          Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
+          <div className="kunde-dok-upload__hint">PDF, JPG, PNG · max 10MB (Upload folgt)</div>
+        </div>
       </section>
     </div>
   )
@@ -1118,8 +1145,19 @@ export function KundeDetailClient({
     ]
   }, [kunde.email])
 
-  const tabContent =
+  const stammdatenInhalt = fixedOverview
+
+  const desktopTabContent =
     tab === 'vorgaenge' ? tabVorgaenge : tab === 'aktivitaet' ? tabAktivitaet : tabDokumenteInhalt
+
+  const mobileTabContent =
+    tab === 'stammdaten'
+      ? stammdatenInhalt
+      : tab === 'vorgaenge'
+        ? tabVorgaenge
+        : tab === 'aktivitaet'
+          ? tabAktivitaet
+          : tabDokumenteInhalt
 
   return (
     <div className="space-y-4 pb-6">
@@ -1166,15 +1204,23 @@ export function KundeDetailClient({
         }
       />
 
-      {fixedOverview}
-
-      <div className="app-detail-screen space-y-3 pb-6">
-        <div className="app-detail-tabs sticky top-0 z-[2] bg-app-grouped py-1">
-          <DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
-        </div>
-        {kpiRow}
-        <div className="app-detail-body min-w-0 space-y-3">{tabContent}</div>
-      </div>
+      <DetailResponsiveTabs
+        tab={tab}
+        onTabChange={setTab}
+        desktopOverview={fixedOverview}
+        desktopTabs={
+          <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
+        }
+        mobileTabs={
+          <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
+        }
+        desktopTabContent={desktopTabContent}
+        mobileTabContent={mobileTabContent}
+        mobileDefaultTab="stammdaten"
+        desktopDefaultTab="vorgaenge"
+        mobileTabIds={MOBILE_KUNDE_TABS}
+        desktopTabIds={DESKTOP_KUNDE_TABS}
+      />
 
       <Modal
         open={portalModalOpen}

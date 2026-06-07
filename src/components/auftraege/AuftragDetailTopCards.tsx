@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useTransition } from 'react'
-import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { Card } from '@/components/ui/Card'
 import { updateAuftragBetreuer } from '@/app/(dashboard)/auftraege/actions'
 import { formatAuftragsNr, auftragWertAnzeige } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -40,7 +39,7 @@ export function AuftragDetailTopCards({
   }
 
   return (
-    <Card title="Auftragsdaten" action={<AuftragStatusBadge status={detail.status} />}>
+    <Card title="Auftragsdaten">
       <div className="props">
         <DetailProp label="Auftrag">{nr}</DetailProp>
         <DetailProp label="Kunde">

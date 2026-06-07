@@ -6,6 +6,7 @@
 import { resolveBrandLogoUrl } from '@/lib/brand'
 import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
 import { telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPortalLoginLink, buildPortalButton } from '@/lib/portal-utils'
 
 export type EmailBranding = {
@@ -123,11 +124,7 @@ export function infoRow(label: string, value: string): string {
 }
 
 export function primaryButton(text: string, url: string): string {
-  return `
-  <a href="${escapeHtml(url)}"
-    style="display:inline-block;background:#2E7D52;color:#FFFFFF;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;margin:20px 0;">
-    ${escapeHtml(text)}
-  </a>`
+  return mailPrimaryButtonHtml(text, url)
 }
 
 export function emailLeadBestaetigung(
@@ -295,10 +292,7 @@ export function emailAuftragsbestaetigung(
   const linkBlock =
     projektLink && projektLink.trim()
       ? `
-    <a href="${escapeHtml(projektLink.trim())}"
-      style="display:block;background:#2E7D52;color:#FFFFFF;text-decoration:none;padding:16px 28px;border-radius:8px;font-weight:600;font-size:16px;text-align:center;margin:20px 0;">
-      Projekt-Status ansehen
-    </a>
+    ${mailPrimaryButtonHtml('Projekt-Status ansehen', projektLink.trim(), { block: true, margin: '20px 0' })}
     <p style="font-size:13px;color:#6B6B6B;">Hier verfolgen Sie den Fortschritt — ohne Passwort.</p>`
       : ''
 
@@ -331,10 +325,7 @@ export function emailUpdateHinweis(
     `
     <p>Guten Tag ${escapeHtml(name)},</p>
     <p>es gibt ein neues Update zu Ihrem Projekt.</p>
-    <a href="${escapeHtml(link)}"
-      style="display:block;background:#2E7D52;color:#FFFFFF;text-decoration:none;padding:16px 28px;border-radius:8px;font-weight:600;font-size:16px;text-align:center;margin:20px 0;">
-      Projekt-Status ansehen
-    </a>
+    ${mailPrimaryButtonHtml('Projekt-Status ansehen', link, { block: true, margin: '20px 0' })}
     <p style="font-size:13px;color:#6B6B6B;">
       Bei Fragen:<br/>
       <a href="tel:[TEL]" style="color:#2E7D52;">[TEL]</a>
@@ -544,10 +535,7 @@ export function emailNachtrag(
         + ${gesamt_min.toLocaleString('de-DE')} – ${gesamt_max.toLocaleString('de-DE')} €
       </p>
     </div>
-    <a href="${escapeHtml(link)}"
-      style="display:block;background:#2E7D52;color:#FFFFFF;text-decoration:none;padding:16px 28px;border-radius:8px;font-weight:600;font-size:16px;text-align:center;margin:20px 0;">
-      Nachtrag bestätigen
-    </a>
+    ${mailPrimaryButtonHtml('Nachtrag bestätigen', link, { block: true, margin: '20px 0' })}
     <p style="font-size:13px;color:#6B6B6B;text-align:center;">
       Bei Fragen rufen Sie uns an:<br/>
       <a href="tel:[TEL]" style="color:#2E7D52;font-weight:600;">[TEL]</a>

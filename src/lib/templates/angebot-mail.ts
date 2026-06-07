@@ -3,7 +3,7 @@ import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
-import { buildPortalButton } from '@/lib/portal-utils'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 
 export type AngebotMailAnrede = 'du' | 'sie'
 
@@ -398,7 +398,7 @@ export function buildAngebotGueltigReminderMail(
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
       <p style="font-size:14px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
       <p style="margin:0 0 20px;">
-        <a href="tel:${telHref}" style="display:inline-block;background:#2E7D52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">Jetzt anrufen →</a>
+        ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
       </p>`
 
   const betreff = gueltigReminderMailBetreff(anrede, angebotsnr, gueltig_bis)

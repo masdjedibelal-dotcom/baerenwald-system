@@ -7,6 +7,8 @@ import {
   ClipboardList,
   FolderOpen,
   History,
+  LayoutGrid,
+  List,
   ListChecks,
   Mail,
   MoreHorizontal,
@@ -17,7 +19,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailScreenShell } from '@/components/layout/app'
+import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -84,7 +86,17 @@ import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
-type AuftragDetailTab = 'schritte' | 'aktivitaet' | 'dokumente' | 'finanzen'
+type AuftragDetailTab = 'stammdaten' | 'leistung' | 'schritte' | 'aktivitaet' | 'dokumente' | 'finanzen'
+
+const DESKTOP_AUFTRAG_TABS: AuftragDetailTab[] = ['schritte', 'aktivitaet', 'dokumente', 'finanzen']
+const MOBILE_AUFTRAG_TABS: AuftragDetailTab[] = [
+  'stammdaten',
+  'leistung',
+  'schritte',
+  'aktivitaet',
+  'dokumente',
+  'finanzen',
+]
 
 export function AuftragDetailClient({
   detail: initial,
@@ -233,11 +245,6 @@ export function AuftragDetailClient({
     const parts: string[] = []
     if (detail.kunden?.name) parts.push(detail.kunden.name)
     if (ort) parts.push(ort)
-    if (detail.start_datum || detail.end_datum) {
-      const start = detail.start_datum ? formatDatum(detail.start_datum) : '—'
-      const end = detail.end_datum ? formatDatum(detail.end_datum) : '—'
-      parts.push(`Start ${start} → ${end}`)
-    }
     return parts.join(' · ')
   }, [detail])
 
@@ -449,7 +456,7 @@ export function AuftragDetailClient({
     [naechsteSchritte]
   )
 
-  const detailTabs = useMemo(
+  const desktopDetailTabs = useMemo(
     () => [
       {
         id: 'schritte' as const,
@@ -478,9 +485,49 @@ export function AuftragDetailClient({
     [offeneSchritteCount, timelineCount, dokumenteCount]
   )
 
-  const fixedOverview = (
+  const mobileDetailTabs = useMemo(
+    () => [
+      { id: 'stammdaten' as const, label: 'Stammdaten', icon: LayoutGrid },
+      { id: 'leistung' as const, label: 'Leistungsübersicht', icon: List },
+      {
+        id: 'schritte' as const,
+        label: 'Nächste Schritte',
+        icon: ListChecks,
+        count: offeneSchritteCount || undefined,
+      },
+      {
+        id: 'aktivitaet' as const,
+        label: ACTIVITY_SECTIONS.verlauf,
+        icon: History,
+        count: timelineCount || undefined,
+      },
+      {
+        id: 'dokumente' as const,
+        label: ACTIVITY_SECTIONS.dokumente,
+        icon: FolderOpen,
+        count: dokumenteCount || undefined,
+      },
+      {
+        id: 'finanzen' as const,
+        label: 'Finanzen',
+        icon: Wallet,
+      },
+    ],
+    [offeneSchritteCount, timelineCount, dokumenteCount]
+  )
+
+  const stammdatenInhalt = (
     <div className="space-y-3">
       <AuftragDetailTopCards detail={detail} team={team} />
+      <KommunikationCard
+        filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
+        reloadKey={mailCompose.reloadKey + generation}
+      />
+    </div>
+  )
+
+  const leistungInhalt = (
+    <div className="space-y-3">
       <Card
         title="Positionen"
         bodyClassName="p-4"
@@ -526,16 +573,33 @@ export function AuftragDetailClient({
         abnahmeDatum={detail.abnahme_datum}
         onChanged={() => refresh()}
       />
-      <KommunikationCard
-        filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
-        reloadKey={mailCompose.reloadKey + generation}
-      />
     </div>
   )
 
-  const tabContent =
+  const fixedOverview = (
+    <div className="space-y-3">
+      {stammdatenInhalt}
+      {leistungInhalt}
+    </div>
+  )
+
+  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
+
+  const finanzenInhalt = finanzenPayload ? (
+    <AuftragFinanzenClient
+      embedded
+      auftragId={detail.id}
+      projektTitel={detail.titel}
+      kundeName={detail.kunden?.name ?? null}
+      {...finanzenPayload}
+    />
+  ) : (
+    <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
+  )
+
+  const desktopTabContent =
     mainTab === 'schritte' ? (
-      <NaechsteSchritteCard steps={naechsteSchritte} />
+      schritteInhalt
     ) : mainTab === 'aktivitaet' ? (
       <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
     ) : mainTab === 'dokumente' ? (
@@ -544,17 +608,28 @@ export function AuftragDetailClient({
         rechnungen={rechnungenListe}
         onChanged={() => refresh()}
       />
-    ) : finanzenPayload ? (
-      <AuftragFinanzenClient
-        embedded
-        auftragId={detail.id}
-        projektTitel={detail.titel}
-        kundeName={detail.kunden?.name ?? null}
-        {...finanzenPayload}
+    ) : mainTab === 'finanzen' ? (
+      finanzenInhalt
+    ) : null
+
+  const mobileTabContent =
+    mainTab === 'stammdaten' ? (
+      stammdatenInhalt
+    ) : mainTab === 'leistung' ? (
+      leistungInhalt
+    ) : mainTab === 'schritte' ? (
+      schritteInhalt
+    ) : mainTab === 'aktivitaet' ? (
+      <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
+    ) : mainTab === 'dokumente' ? (
+      <AuftragDokumenteTab
+        detail={detail}
+        rechnungen={rechnungenListe}
+        onChanged={() => refresh()}
       />
-    ) : (
-      <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
-    )
+    ) : mainTab === 'finanzen' ? (
+      finanzenInhalt
+    ) : null
 
   return (
     <div className="space-y-4 pb-0">
@@ -562,12 +637,14 @@ export function AuftragDetailClient({
         backHref="/auftraege"
         backLabel="Zurück zu Aufträge"
         title={
-          <div className="detail-head-title-row">
+          <>
             <span>{projektName}</span>
-            <AuftragStatusBadge status={detail.status} />
-          </div>
+            <div className="detail-head-status">
+              <AuftragStatusBadge status={detail.status} />
+            </div>
+          </>
         }
-        sub={metaLine}
+        sub={metaLine || undefined}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">
             {istAbgeschlossen ? (
@@ -621,19 +698,31 @@ export function AuftragDetailClient({
         </p>
       ) : null}
 
-      {fixedOverview}
-
-      <DetailScreenShell
-        tabs={
+      <DetailResponsiveTabs
+        tab={mainTab}
+        onTabChange={setMainTab}
+        desktopOverview={fixedOverview}
+        desktopTabs={
           <DetailTabBar
-            tabs={detailTabs}
+            tabs={desktopDetailTabs}
             value={mainTab}
             onChange={(id) => setMainTab(id as AuftragDetailTab)}
           />
         }
-      >
-        <div className="min-w-0 space-y-3">{tabContent}</div>
-      </DetailScreenShell>
+        mobileTabs={
+          <DetailTabBar
+            tabs={mobileDetailTabs}
+            value={mainTab}
+            onChange={(id) => setMainTab(id as AuftragDetailTab)}
+          />
+        }
+        desktopTabContent={desktopTabContent}
+        mobileTabContent={mobileTabContent}
+        mobileDefaultTab="stammdaten"
+        desktopDefaultTab="schritte"
+        mobileTabIds={MOBILE_AUFTRAG_TABS}
+        desktopTabIds={DESKTOP_AUFTRAG_TABS}
+      />
 
       <Modal
         open={projektModal}

@@ -22,7 +22,9 @@ export function leadAngebotFunnelFromListe(
   }
 }
 
-const VOR_ANGEBOT: LeadStatus[] = ['neu', 'kontaktiert', 'termin']
+export const LEAD_STATUS_VOR_ANGEBOT: LeadStatus[] = ['neu', 'kontaktiert', 'termin']
+
+const VOR_ANGEBOT = LEAD_STATUS_VOR_ANGEBOT
 
 export function leadStatusVorAngebot(status: LeadStatus): boolean {
   return VOR_ANGEBOT.includes(status)

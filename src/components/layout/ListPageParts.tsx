@@ -30,7 +30,7 @@ type ListFilterSectionProps = {
 /**
  * Einheitliches Listen-Filter-Layout:
  * Desktop — Zeile 1: Suche | Filter; Zeile 2: Chips
- * Mobil — Suche + Filter-Button; Chips nur im Sheet
+ * Mobil — eine Zeile: kompakte Suche links, Filter-Button rechts (Sheet); Chips nur im Sheet
  */
 export function ListFilterSection({ chipGroups, chips, children, className }: ListFilterSectionProps) {
   const desktopChips =

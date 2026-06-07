@@ -9,6 +9,7 @@ import {
   Download,
   ExternalLink,
   History,
+  LayoutGrid,
   List,
   ListChecks,
   Mail,
@@ -19,7 +20,7 @@ import {
   Send,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailScreenShell } from '@/components/layout/app'
+import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailProp } from '@/components/ui/detail-prop'
@@ -201,7 +202,10 @@ function PositionenZeile({ p }: { p: AngebotPosition }) {
   )
 }
 
-type Tab = 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente'
+type Tab = 'stammdaten' | 'leistung' | 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente'
+
+const DESKTOP_ANGEBOT_TABS: Tab[] = ['schritte', 'positionen', 'aktivitaet', 'dokumente']
+const MOBILE_ANGEBOT_TABS: Tab[] = ['stammdaten', 'leistung', 'schritte', 'aktivitaet', 'dokumente']
 
 export function AngebotDetailPageClient({
   detail,
@@ -428,6 +432,9 @@ export function AngebotDetailPageClient({
     mailCompose,
   ])
 
+  const detailPrimaryBtnClass =
+    'btn btn-primary btn-sm inline-flex flex-1 justify-center gap-1.5 sm:flex-none md:flex-none'
+
   const primaryAction = (() => {
     const hwRows = detail.angebot_handwerker ?? []
     if (statusEinfach === 'entwurf') {
@@ -435,22 +442,22 @@ export function AngebotDetailPageClient({
         return (
           <Link
             href="#angebot-versand-handwerker"
-            className="btn btn-primary btn-sm inline-flex gap-1.5"
+            className={detailPrimaryBtnClass}
           >
             Handwerker einholen
-            <Send className="h-3.5 w-3.5" aria-hidden />
+            <Send className="h-3.5 w-3.5 shrink-0" aria-hidden />
           </Link>
         )
       }
       return (
         <button
           type="button"
-          className="btn btn-primary btn-sm inline-flex gap-1.5"
+          className={detailPrimaryBtnClass}
           disabled={pending}
           onClick={() => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')}
         >
           An Kunden senden
-          <Send className="h-3.5 w-3.5" aria-hidden />
+          <Send className="h-3.5 w-3.5 shrink-0" aria-hidden />
         </button>
       )
     }
@@ -458,7 +465,7 @@ export function AngebotDetailPageClient({
       return (
         <button
           type="button"
-          className="btn btn-primary btn-sm inline-flex gap-1.5"
+          className={detailPrimaryBtnClass}
           disabled={pending}
           onClick={() => {
             setAufBetreff('')
@@ -468,16 +475,16 @@ export function AngebotDetailPageClient({
             setAcceptOpen(true)
           }}
         >
-          <Check className="h-3.5 w-3.5" aria-hidden />
+          <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Angebot annehmen
         </button>
       )
     }
     if (statusEinfach === 'angenommen' && auftragId) {
       return (
-        <Link href={`/auftraege/${auftragId}`} className="btn btn-primary btn-sm inline-flex gap-1.5">
+        <Link href={`/auftraege/${auftragId}`} className={detailPrimaryBtnClass}>
           Zum Auftrag
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
         </Link>
       )
     }
@@ -539,7 +546,7 @@ export function AngebotDetailPageClient({
     [naechsteSchritte]
   )
 
-  const detailTabs = useMemo(
+  const desktopDetailTabs = useMemo(
     () => [
       {
         id: 'schritte',
@@ -552,6 +559,37 @@ export function AngebotDetailPageClient({
         label: 'Positionen',
         icon: List,
         count: positionenAnzeigeCount || undefined,
+      },
+      {
+        id: 'aktivitaet',
+        label: ACTIVITY_SECTIONS.verlauf,
+        icon: History,
+        count: timelineCount || undefined,
+      },
+      {
+        id: 'dokumente',
+        label: ACTIVITY_SECTIONS.dokumente,
+        icon: Paperclip,
+        count: anhaengeCount || undefined,
+      },
+    ],
+    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount]
+  )
+
+  const mobileDetailTabs = useMemo(
+    () => [
+      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
+      {
+        id: 'leistung',
+        label: 'Leistungsübersicht',
+        icon: List,
+        count: positionenAnzeigeCount || undefined,
+      },
+      {
+        id: 'schritte',
+        label: 'Nächste Schritte',
+        icon: ListChecks,
+        count: offeneSchritteCount || undefined,
       },
       {
         id: 'aktivitaet',
@@ -627,7 +665,7 @@ export function AngebotDetailPageClient({
             </span>
           ) : null}
         </DetailProp>
-        <DetailProp label="Zahlungsbedingungen">{zahlungLabel}</DetailProp>
+        <DetailProp label="Zahlung">{zahlungLabel}</DetailProp>
         {detail.kunden_objekte ? (
           <DetailProp label="Objekt (Ausführungsort)">
             {kundenObjektKurzlabel(detail.kunden_objekte)}
@@ -729,7 +767,7 @@ export function AngebotDetailPageClient({
     </div>
   )
 
-  const fixedOverview = (
+  const stammdatenInhalt = (
     <div className="space-y-3">
       {kundeCard}
       {angebotsdatenCard}
@@ -740,20 +778,43 @@ export function AngebotDetailPageClient({
     </div>
   )
 
-  const tabContent =
+  const fixedOverview = stammdatenInhalt
+
+  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
+
+  const aktivitaetInhalt = (
+    <LeadTimelineList
+      events={timelineInitial}
+      fallbackCreatedAt={detail.created_at}
+      fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
+    />
+  )
+
+  const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
+
+  const desktopTabContent =
     tab === 'schritte' ? (
-      <NaechsteSchritteCard steps={naechsteSchritte} />
+      schritteInhalt
     ) : tab === 'positionen' ? (
       positionenTab
     ) : tab === 'aktivitaet' ? (
-      <LeadTimelineList
-        events={timelineInitial}
-        fallbackCreatedAt={detail.created_at}
-        fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
-      />
-    ) : (
-      <AngebotAnhaengeTab detail={detail} />
-    )
+      aktivitaetInhalt
+    ) : tab === 'dokumente' ? (
+      dokumenteInhalt
+    ) : null
+
+  const mobileTabContent =
+    tab === 'stammdaten' ? (
+      stammdatenInhalt
+    ) : tab === 'leistung' ? (
+      positionenTab
+    ) : tab === 'schritte' ? (
+      schritteInhalt
+    ) : tab === 'aktivitaet' ? (
+      aktivitaetInhalt
+    ) : tab === 'dokumente' ? (
+      dokumenteInhalt
+    ) : null
 
   return (
     <div className="space-y-4 pb-6">
@@ -768,7 +829,7 @@ export function AngebotDetailPageClient({
         }
         sub={headSub}
         actions={
-          <>
+          <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}
             <ActionsMenu
               trigger={
@@ -784,7 +845,7 @@ export function AngebotDetailPageClient({
               items={detailHeadMenuItems}
               sheetTitle="Angebot"
             />
-          </>
+          </div>
         }
       />
 
@@ -796,11 +857,23 @@ export function AngebotDetailPageClient({
         </p>
       ) : null}
 
-      {fixedOverview}
-
-      <DetailScreenShell tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as Tab)} />}>
-        <div className="min-w-0 space-y-3">{tabContent}</div>
-      </DetailScreenShell>
+      <DetailResponsiveTabs
+        tab={tab}
+        onTabChange={setTab}
+        desktopOverview={fixedOverview}
+        desktopTabs={
+          <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as Tab)} />
+        }
+        mobileTabs={
+          <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as Tab)} />
+        }
+        desktopTabContent={desktopTabContent}
+        mobileTabContent={mobileTabContent}
+        mobileDefaultTab="stammdaten"
+        desktopDefaultTab="schritte"
+        mobileTabIds={MOBILE_ANGEBOT_TABS}
+        desktopTabIds={DESKTOP_ANGEBOT_TABS}
+      />
 
       {wizardOpen && lead ? (
         <AngebotWizard

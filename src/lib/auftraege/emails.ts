@@ -1,3 +1,4 @@
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { sendMail } from '@/lib/mail-service'
 import type { AuftragStatus } from '@/lib/types'
 import { AUFTRAG_STATUS_LABELS, getPublicAppUrl } from '@/lib/utils'
@@ -46,7 +47,7 @@ export function buildInternFormularSubmittedHtml(input: {
   <p><strong>Template:</strong> ${input.templateName}<br/>
   <strong>Kunde:</strong> ${input.kunde}<br/>
   <strong>Auftrag:</strong> ${input.auftragId}${hw}</p>
-  <p><a href="${url}" style="display:inline-block;margin-top:12px;padding:10px 18px;background:#2E7D52;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Jetzt ansehen</a></p>
+  <p style="margin-top:12px;">${mailPrimaryButtonHtml('Jetzt ansehen', url, { margin: '0', size: 'sm' })}</p>
   `
 }
 

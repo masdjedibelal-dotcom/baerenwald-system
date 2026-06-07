@@ -1,3 +1,5 @@
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -17,7 +19,6 @@ export function buildInternHandwerkerAntwortMail(input: {
   dashboardUrl: string
 }): string {
   const status = input.angenommen ? 'angenommen' : 'abgelehnt'
-  const link = esc(input.dashboardUrl)
   const grund =
     !input.angenommen && input.ablehnungGrund?.trim()
       ? `<p><strong>Grund:</strong> ${esc(input.ablehnungGrund.trim())}</p>`
@@ -35,6 +36,6 @@ export function buildInternHandwerkerAntwortMail(input: {
   ${grund}
   ${notiz}
   ${hinweis}
-  <p><a href="${link}" style="display:inline-block;margin-top:12px;padding:10px 18px;background:#2E7D52;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Im Dashboard öffnen</a></p>
+  <p style="margin-top:12px;">${mailPrimaryButtonHtml('Im Dashboard öffnen', input.dashboardUrl, { margin: '0', size: 'sm' })}</p>
   `
 }

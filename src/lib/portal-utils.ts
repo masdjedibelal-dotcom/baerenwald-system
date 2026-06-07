@@ -1,3 +1,5 @@
+import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
+
 export function defaultPortalInviteBetreff(anrede: 'du' | 'sie'): string {
   return anrede === 'du' ? 'Dein Zugang zu MeinBärenwald' : 'Ihr Zugang zu MeinBärenwald'
 }
@@ -51,18 +53,7 @@ export function buildPartnerLoginForAuftragUrl(auftragId: string): string {
 export function buildPartnerPortalButton(portalLink: string): string {
   return `
 <div style="margin:20px 0 8px;">
-  <a href="${portalLink}"
-    style="display:inline-block;
-    background:#2E7D52;
-    color:#ffffff;
-    text-decoration:none;
-    padding:14px 28px;
-    border-radius:8px;
-    font-size:15px;
-    font-weight:600;
-    font-family:Arial,Helvetica,sans-serif;">
-    Zum Partner-Portal →
-  </a>
+  ${mailSecondaryButtonHtml('Zum Partner-Portal →', portalLink, { margin: '0' })}
 </div>
 <p style="font-size:13px;
   color:#6B7280;
@@ -86,18 +77,7 @@ export function buildPortalButton(
 
   return `
 <div style="margin:20px 0 8px;">
-  <a href="${portalLink}"
-    style="display:inline-block;
-    background:#2E7D52;
-    color:#ffffff;
-    text-decoration:none;
-    padding:14px 28px;
-    border-radius:8px;
-    font-size:15px;
-    font-weight:600;
-    font-family:Arial,Helvetica,sans-serif;">
-    ${text}
-  </a>
+  ${mailSecondaryButtonHtml(text, portalLink, { margin: '0' })}
 </div>
 <p style="font-size:13px;
   color:#6B7280;

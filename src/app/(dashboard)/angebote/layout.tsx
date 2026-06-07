@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AngeboteLayout({ children }: { children: React.ReactNode }) {
-  const { angebote, error } = await loadAngeboteListe()
+  const { angebote, angebotIdsMitAuftrag, error } = await loadAngeboteListe()
 
   if (error) {
     return (
@@ -18,5 +18,9 @@ export default async function AngeboteLayout({ children }: { children: React.Rea
     )
   }
 
-  return <AngeboteMasterDetailShell angebote={angebote}>{children}</AngeboteMasterDetailShell>
+  return (
+    <AngeboteMasterDetailShell angebote={angebote} angebotIdsMitAuftrag={angebotIdsMitAuftrag}>
+      {children}
+    </AngeboteMasterDetailShell>
+  )
 }

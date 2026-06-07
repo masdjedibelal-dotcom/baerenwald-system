@@ -461,6 +461,14 @@
     @apply flex flex-wrap items-center gap-2.5;
   }
 
+  .detail-head-status {
+    @apply mt-2;
+  }
+
+  .detail-head-status .badge {
+    @apply px-2.5 py-1 text-[15px] font-semibold leading-snug;
+  }
+
   .detail-head-sub {
     @apply mt-0.5 text-[12.5px] text-bw-text-muted;
   }
@@ -2119,6 +2127,14 @@
     @apply border-bw-link bg-blue-50;
   }
 
+  .kunde-dok-upload {
+    @apply cursor-pointer rounded-lg border border-dashed border-bw-border bg-bw-bg-soft/80 px-3 py-3 text-center text-[13px] leading-snug text-bw-text-muted transition-colors hover:border-bw-link/60 hover:bg-bw-hover/40;
+  }
+
+  .kunde-dok-upload__hint {
+    @apply mt-1 text-[11px] text-bw-text-subtle;
+  }
+
   .progress-bar {
     @apply h-2 w-full rounded-full bg-bw-border;
   }
@@ -2886,6 +2902,105 @@
     @apply h-7 w-7;
   }
 
+  /* Positionen — Mobile Browse + Sheets */
+  .pos-mobile {
+    @apply space-y-4;
+  }
+
+  .pos-mobile-blocks {
+    @apply space-y-2;
+  }
+
+  .pos-mobile-gewerk {
+    @apply overflow-hidden rounded-lg border border-bw-border bg-bw-card;
+  }
+
+  .pos-mobile-gewerk__head {
+    @apply flex items-stretch gap-1 border-b border-transparent;
+  }
+
+  .pos-mobile-gewerk.open .pos-mobile-gewerk__head {
+    @apply border-bw-border;
+  }
+
+  .pos-mobile-gewerk__toggle {
+    @apply flex min-w-0 flex-1 items-start gap-2 px-3 py-3 text-left transition-colors active:bg-bw-hover/60;
+  }
+
+  .pos-mobile-gewerk__chevron {
+    @apply mt-0.5 shrink-0 text-bw-text-muted transition-transform;
+  }
+
+  .pos-mobile-gewerk__title {
+    @apply text-[14px] font-semibold leading-snug text-bw-text;
+  }
+
+  .pos-mobile-gewerk__meta {
+    @apply mt-0.5 text-[11.5px] leading-snug text-bw-text-muted;
+  }
+
+  .pos-mobile-gewerk__edit {
+    @apply inline-flex w-11 shrink-0 items-center justify-center border-l border-bw-border text-bw-primary active:bg-bw-hover;
+  }
+
+  .pos-mobile-gewerk__body {
+    @apply divide-y divide-bw-border bg-surface;
+  }
+
+  .pos-mobile-leistung-row {
+    @apply grid w-full items-center gap-2 px-3 py-2.5 text-left;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .pos-mobile-leistung-row--tappable {
+    @apply transition-colors active:bg-bw-hover/60;
+  }
+
+  .pos-mobile-sheet-leistungen .pos-mobile-leistung-row {
+    grid-template-columns: minmax(0, 1fr) auto auto 16px;
+  }
+
+  .pos-mobile-leistung-row__name {
+    @apply truncate text-[13px] font-medium text-bw-text;
+  }
+
+  .pos-mobile-leistung-row__price {
+    @apply text-[13px] font-semibold tabular-nums text-bw-text;
+  }
+
+  .pos-mobile-leistung-row__chevron {
+    @apply shrink-0 text-bw-text-muted;
+  }
+
+  .pos-mobile-actions {
+    @apply pt-1;
+  }
+
+  .pos-mobile-totals {
+    @apply rounded-lg border border-bw-border bg-bw-bg-soft/80 px-3 py-3;
+  }
+
+  .pos-mobile-totals__row {
+    @apply flex items-baseline justify-between gap-3 py-1 text-[13px];
+  }
+
+  .pos-mobile-totals__row span:first-child {
+    @apply text-bw-text-muted;
+  }
+
+  .pos-mobile-totals__row span:last-child {
+    @apply font-medium tabular-nums text-bw-text;
+  }
+
+  .pos-mobile-totals__row--grand {
+    @apply mt-1 border-t border-bw-border pt-2 text-[15px] font-bold;
+  }
+
+  .pos-mobile-totals__row--grand span:first-child,
+  .pos-mobile-totals__row--grand span:last-child {
+    @apply text-bw-text;
+  }
+
   .hw-avatar {
     @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bw-green-bg text-[9px] font-bold text-bw-primary;
   }
@@ -3062,6 +3177,26 @@
   }
 
   /* Abnahmeprotokoll-Modal */
+  .abnahme-card-actions {
+    @apply flex flex-col gap-2 sm:flex-row sm:flex-wrap;
+  }
+
+  .abnahme-card-actions__primary {
+    @apply w-full justify-center sm:w-auto sm:justify-start;
+  }
+
+  .abnahme-card-actions__secondary {
+    @apply grid grid-cols-2 gap-2 sm:contents;
+  }
+
+  .abnahme-card-actions__secondary .btn {
+    @apply w-full justify-center sm:w-auto sm:justify-start;
+  }
+
+  .abnahme-card-actions__link {
+    @apply inline-flex items-center;
+  }
+
   .abnahme-steps {
     @apply flex flex-wrap;
   }
@@ -3097,6 +3232,22 @@
   /* Bautagebuch (Auftrag-Detail) */
   .auftrag-bautagebuch {
     @apply space-y-4;
+  }
+
+  .bt-list-toolbar {
+    @apply mb-1 flex items-center justify-between gap-2;
+  }
+
+  .bt-empty-row {
+    @apply flex items-center justify-between rounded-md border border-dashed border-bw-border px-3 py-4;
+  }
+
+  .bt-add-trigger {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-bw-border bg-bw-card text-bw-primary transition-colors hover:bg-bw-hover active:bg-bw-hover;
+  }
+
+  .bt-add-close {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text;
   }
 
   .bt-add-card {
@@ -3241,11 +3392,11 @@
   }
 
   .list-filter-toolbar-row {
-    @apply flex min-w-0 flex-wrap items-center gap-2 md:gap-3;
+    @apply flex min-w-0 flex-nowrap items-center gap-2 md:flex-wrap md:gap-3;
   }
 
   .list-filter-toolbar-search {
-    @apply min-w-0 w-full flex-1 basis-full md:basis-auto md:w-auto;
+    @apply min-w-0 flex-1 md:w-auto;
   }
 
   .list-filter-toolbar-divider {
@@ -3253,7 +3404,7 @@
   }
 
   .list-filter-toolbar-controls {
-    @apply flex flex-wrap items-center justify-end gap-2;
+    @apply hidden flex-wrap items-center justify-end gap-2 md:flex;
   }
 
   .list-filter-toolbar-controls .list-filter-select {
@@ -3261,7 +3412,7 @@
   }
 
   .list-filter-toolbar-mobile {
-    @apply flex w-full shrink-0 items-center gap-2 md:hidden;
+    @apply flex shrink-0 items-center;
   }
 
   .list-filter-toolbar-mobile .app-filter-rail {
@@ -3454,6 +3605,14 @@
     .wizard-flow .app-flow-footer {
       @apply hidden;
     }
+
+    .wizard-header-desktop {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      align-items: center;
+      gap: 1rem;
+    }
   }
 
   .list-mobile-stack {
@@ -3472,8 +3631,39 @@
 
     .wizard-top,
     .wizard-flow .app-flow-header {
-      flex-wrap: wrap;
-      @apply gap-2 px-3 py-2.5;
+      flex-wrap: nowrap;
+      @apply gap-0 px-0 py-0;
+    }
+
+    .wizard-header-desktop {
+      @apply hidden;
+    }
+
+    .wizard-mobile-toolbar {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 0.375rem;
+      @apply px-2.5 py-2;
+    }
+
+    .wizard-mobile-toolbar__center {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wizard-mobile-toolbar__actions {
+      display: flex;
+      flex-shrink: 0;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .wizard-mobile-toolbar__next {
+      @apply whitespace-nowrap;
     }
 
     .wizard-top .stepper,
@@ -3481,44 +3671,13 @@
       @apply hidden;
     }
 
-    .wizard-top .flex-1,
-    .wizard-flow .app-flow-header .flex-1 {
-      @apply hidden;
-    }
-
-    .wizard-top .btn:not([aria-label='Schließen']),
-    .wizard-flow .app-flow-header .btn:not([aria-label='Schließen']) {
-      @apply hidden;
-    }
-
     .wizard-body,
     .wizard-flow .app-flow-body {
-      @apply p-4 pb-2;
+      @apply p-4 pb-[max(1rem,env(safe-area-inset-bottom))];
     }
 
     .wizard-mobile-footer {
-      display: flex;
-      width: 100%;
-      flex-direction: column;
-      @apply gap-2 border-t border-bw-border bg-bw-card px-0 py-0;
-    }
-
-    .wizard-flow--footer-in-body {
-      @apply grid-rows-[auto_minmax(0,1fr)];
-    }
-
-    .wizard-flow--footer-in-body .app-flow-body {
-      @apply pb-[max(1rem,env(safe-area-inset-bottom))];
-    }
-
-    .wizard-mobile-footer--in-flow {
-      @apply mt-4 border-t-0 bg-transparent px-1;
-    }
-
-    .wizard-mobile-footer__actions {
-      display: flex;
-      align-items: center;
-      @apply gap-2 px-1;
+      display: none;
     }
 
     .wizard-section-gap {
@@ -3527,43 +3686,6 @@
 
     .wizard-step-heading {
       @apply mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted;
-    }
-
-    .wizard-mobile-step-pill {
-      @apply m-0 w-full rounded-lg bg-bw-bg-soft px-3 py-1.5 text-center text-[11px] font-medium text-bw-text-mid;
-    }
-
-    .wizard-flow .app-flow-header {
-      @apply grid gap-x-2 gap-y-1.5 px-3 py-2.5;
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas:
-        'close title'
-        'step step';
-    }
-
-    .wizard-flow .app-flow-header > .btn[aria-label='Schließen'] {
-      grid-area: close;
-      align-self: start;
-    }
-
-    .wizard-flow .app-flow-header > .h-6.w-px {
-      @apply hidden;
-    }
-
-    .wizard-flow .app-flow-header .title-block {
-      grid-area: title;
-    }
-
-    .wizard-flow .app-flow-header .title-block .ttl {
-      @apply text-[15px] leading-tight;
-    }
-
-    .wizard-flow .app-flow-header .title-block .sub {
-      @apply truncate text-[11px];
-    }
-
-    .wizard-flow .wizard-mobile-step-pill {
-      grid-area: step;
     }
 
     .wizard-flow .wizard-inner {
@@ -3743,6 +3865,18 @@
       flex: 1 1 0%;
     }
 
+    .wizard-flow .pos-acc.is-sheet-open .pos-row {
+      @apply border-bw-primary/40 bg-bw-primary/5;
+    }
+
+    .wizard-flow .pos-acc-editor .pos-edit-foot {
+      @apply border-t border-bw-border pt-3;
+    }
+
+    .wizard-projekt-beschreibung-overview dd {
+      @apply break-words;
+    }
+
     .wizard-flow .wizard-mail-preview,
     .wizard-flow .wizard-angebot-preview {
       @apply -mx-1 max-w-full overflow-x-auto;
@@ -3779,7 +3913,7 @@
   }
 
   .mobile-filter-trigger-btn {
-    @apply relative inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--app-separator)] bg-[var(--app-card)] px-3 text-[13px] font-medium text-bw-text shadow-sm active:bg-bw-hover;
+    @apply relative inline-flex h-[30px] shrink-0 items-center gap-1 rounded-md border border-[var(--app-separator)] bg-[var(--app-card)] px-2.5 text-[12px] font-medium text-bw-text shadow-sm active:bg-bw-hover;
   }
 
   .mobile-filter-trigger-btn__badge {
