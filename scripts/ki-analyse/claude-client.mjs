@@ -1,6 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-export const KI_CLAUDE_MODEL = 'claude-sonnet-4-20250514'
+const ANTHROPIC_DIRECT_BASE_URL = 'https://api.anthropic.com'
+
+export const KI_CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-6'
+
+export function getClaudeModel() {
+  return process.env.CLAUDE_MODEL?.trim() || KI_CLAUDE_MODEL_PRIMARY
+}
 
 function normalizeKey(raw) {
   if (!raw) return ''
@@ -20,9 +26,9 @@ export async function claudeText({ system, user, maxTokens = 900 }) {
     throw new Error('CLAUDE_API_KEY oder ANTHROPIC_API_KEY in .env.local fehlt')
   }
 
-  const client = new Anthropic({ apiKey })
+  const client = new Anthropic({ apiKey, baseURL: ANTHROPIC_DIRECT_BASE_URL })
   const res = await client.messages.create({
-    model: KI_CLAUDE_MODEL,
+    model: getClaudeModel(),
     max_tokens: maxTokens,
     system,
     messages: [{ role: 'user', content: user }],

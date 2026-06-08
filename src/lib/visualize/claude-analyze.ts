@@ -6,8 +6,8 @@ import {
   claudeApiKeyLooksValid,
   createAnthropicClient,
   getClaudeApiKey,
+  getClaudeModel,
 } from '@/lib/copilot/claude-api-key'
-import { COPILOT_MODEL } from '@/lib/copilot/claude-tools'
 import { loadVizImageBase64ForClaude } from '@/lib/visualize/storage'
 
 const SYSTEM = `Du schreibst englische Stable-Diffusion-Prompts für Interior-Design-INPAINTING auf einem BESTEHENDEN Raumfoto.
@@ -57,7 +57,7 @@ export async function analyzeZielBildForPrompt(input: {
     ])
 
     const response = await client.messages.create({
-      model: COPILOT_MODEL,
+      model: getClaudeModel(),
       max_tokens: 700,
       system: SYSTEM,
       messages: [

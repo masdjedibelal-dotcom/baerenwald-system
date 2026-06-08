@@ -5,6 +5,15 @@ import Anthropic from '@anthropic-ai/sdk'
 /** Direkt zu Anthropic — nicht über Netlify AI Gateway (/.netlify/ai/…). */
 export const ANTHROPIC_DIRECT_BASE_URL = 'https://api.anthropic.com'
 
+/** Bekanntes Claude-Modell (Stand 2026). */
+export const COPILOT_MODEL_PRIMARY = 'claude-sonnet-4-6'
+
+/** Optional überschreibbar via Netlify `CLAUDE_MODEL`. */
+export function getClaudeModel(): string {
+  const custom = process.env.CLAUDE_MODEL?.trim()
+  return custom || COPILOT_MODEL_PRIMARY
+}
+
 /** Entfernt BOM, Anführungszeichen und Leerzeichen (häufig bei Copy/Paste in Netlify). */
 export function normalizeClaudeApiKey(raw: string | undefined): string {
   if (!raw) return ''

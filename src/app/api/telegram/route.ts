@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey } from '@/lib/copilot/claude-api-key'
+import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey, getClaudeModel } from '@/lib/copilot/claude-api-key'
 import { sendTelegram, sendTelegramTyping } from '@/lib/copilot/telegram'
-import { COPILOT_CLAUDE_TOOLS, COPILOT_MODEL } from '@/lib/copilot/claude-tools'
+import { COPILOT_CLAUDE_TOOLS } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
 import { loadHistory, saveMessage } from '@/lib/copilot/memory'
 import { COPILOT_SYSTEM } from '@/lib/copilot/system-prompt'
@@ -51,7 +51,7 @@ async function runClaudeChat(userText: string): Promise<string> {
 
   const anthropic = anthropicClient()
   let response = await anthropic.messages.create({
-    model: COPILOT_MODEL,
+    model: getClaudeModel(),
     max_tokens: 1024,
     system: COPILOT_SYSTEM,
     tools: COPILOT_CLAUDE_TOOLS,
@@ -76,7 +76,7 @@ async function runClaudeChat(userText: string): Promise<string> {
     messages.push({ role: 'user', content: toolResults })
 
     response = await anthropic.messages.create({
-      model: COPILOT_MODEL,
+      model: getClaudeModel(),
       max_tokens: 1024,
       system: COPILOT_SYSTEM,
       tools: COPILOT_CLAUDE_TOOLS,

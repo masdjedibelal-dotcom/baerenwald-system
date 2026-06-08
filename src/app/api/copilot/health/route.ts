@@ -5,10 +5,10 @@ import {
   createAnthropicClient,
   getClaudeApiKey,
   getClaudeApiKeySource,
+  getClaudeModel,
   isNetlifyAiGatewayBaseUrl,
   normalizeClaudeApiKey,
 } from '@/lib/copilot/claude-api-key'
-import { COPILOT_MODEL } from '@/lib/copilot/claude-tools'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     try {
       const client = createAnthropicClient(resolved)
       await client.messages.create({
-        model: COPILOT_MODEL,
+        model: getClaudeModel(),
         max_tokens: 8,
         messages: [{ role: 'user', content: 'ping' }],
       })

@@ -129,4 +129,4 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-export const COPILOT_MODEL = 'claude-sonnet-4-20250514' as const
+export { COPILOT_MODEL_PRIMARY, getClaudeModel } from './claude-api-key'
