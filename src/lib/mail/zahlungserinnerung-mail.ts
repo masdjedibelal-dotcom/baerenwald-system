@@ -1,4 +1,4 @@
-import { addDaysYmd } from '@/lib/kalender-auto-termine'
+import { addDaysYmd } from '@/lib/angebot-einfach'
 
 export type ZahlungserinnerungStufe = 1 | 2
 
