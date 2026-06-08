@@ -285,6 +285,7 @@ export function AngebotVisualisierungClient({
       const res = await fetch('/api/visualize/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           angebot_id: detail.id,
           session_id: sid,
@@ -292,8 +293,15 @@ export function AngebotVisualisierungClient({
           ziel_bild_url: zielUrl,
         }),
       })
-      const data = (await res.json()) as { prompt?: string; error?: string }
-      if (!res.ok || !data.prompt) throw new Error(data.error ?? 'Analyse fehlgeschlagen')
+      let data: { prompt?: string; error?: string }
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        throw new Error(`Analyse fehlgeschlagen (HTTP ${res.status})`)
+      }
+      if (!res.ok || !data.prompt) {
+        throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${res.status})`)
+      }
       setPrompt(data.prompt)
       toast.success('Prompt erstellt — bitte prüfen')
     } catch (e) {

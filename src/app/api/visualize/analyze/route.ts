@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { analyzeZielBildForPrompt } from '@/lib/visualize/claude-analyze'
 import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
 import { loadKiVisualisierung, updateKiVisualisierung } from '@/lib/visualize/queries'
+import { claudeApiKeyLooksValid, getClaudeApiKey } from '@/lib/copilot/claude-api-key'
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   let body: {
@@ -25,6 +29,17 @@ export async function POST(req: Request) {
 
   if (!angebotId || !sessionId || !istUrl || !zielUrl) {
     return NextResponse.json({ error: 'Pflichtfelder fehlen' }, { status: 400 })
+  }
+
+  const claudeKey = getClaudeApiKey()
+  if (!claudeKey || !claudeApiKeyLooksValid(claudeKey)) {
+    return NextResponse.json(
+      {
+        error:
+          'Claude API nicht konfiguriert — CLAUDE_API_KEY in Netlify setzen (sk-ant-… von console.anthropic.com).',
+      },
+      { status: 503 }
+    )
   }
 
   const auth = await requireCrmAngebotAccess(angebotId)
