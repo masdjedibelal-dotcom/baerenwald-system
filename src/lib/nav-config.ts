@@ -10,6 +10,7 @@ import {
   Building2,
   Calendar,
   Settings,
+  Sparkles,
 } from 'lucide-react'
 
 export type NavItemDef = {
@@ -34,6 +35,7 @@ export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = [
   { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
   { href: '/partner', icon: Building2, label: 'Partner' },
   { href: '/kalender', icon: Calendar, label: 'Kalender' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics' },
 ]
 
 /** Mobile BottomNav (5 Slots + Mehr). */
@@ -51,6 +53,7 @@ export const MORE_SHEET_NAV: NavItemDef[] = [
   { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
   { href: '/partner', icon: Building2, label: 'Partner' },
   { href: '/kalender', icon: Calendar, label: 'Kalender' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen' },
 ]
 
@@ -73,6 +76,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/kalender': { title: 'Kalender' },
   '/angebote': { title: 'Angebote' },
   '/einstellungen': { title: 'Einstellungen' },
+  '/ki-analytics': { title: 'KI Analytics' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -85,6 +89,7 @@ export const SECTION_LABELS: Record<string, string> = {
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
+  'ki-analytics': 'KI Analytics',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

@@ -25,7 +25,18 @@
     "db:storage-buckets": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/storage-buckets-crm-setup.sql",
     "db:hw-rechnung-einreichung": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260603120500_portal_handwerker_rechnung_einreichung.sql",
     "db:angebot-handwerker-gaps": "node --env-file=.env.local scripts/apply-gap-repair.mjs",
-    "db:bautagebuch-gewerk": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260601140000_bautagebuch_gewerk_id.sql"
+    "docs:screenshots": "node --env-file=.env.local scripts/docs-screenshots/capture.mjs",
+    "docs:pdf": "node --env-file=.env.local scripts/docs-screenshots/build-pdf.mjs",
+    "docs:ui": "node --env-file=.env.local scripts/docs-screenshots/capture.mjs && node --env-file=.env.local scripts/docs-screenshots/build-pdf.mjs",
+    "db:bautagebuch-gewerk": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260601140000_bautagebuch_gewerk_id.sql",
+    "db:ki-analysen": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260612120000_ki_cluster_analysen.sql",
+    "ki:analyse:preise": "node --env-file=.env.local scripts/ki-analyse/preise-margen.mjs",
+    "ki:analyse:handwerker": "node --env-file=.env.local scripts/ki-analyse/handwerker.mjs",
+    "ki:analyse:gewerke": "node --env-file=.env.local scripts/ki-analyse/gewerke.mjs",
+    "ki:analyse:produkte": "node --env-file=.env.local scripts/ki-analyse/produkte.mjs",
+    "ki:analyse:all": "node --env-file=.env.local scripts/ki-analyse/preise-margen.mjs && node --env-file=.env.local scripts/ki-analyse/handwerker.mjs && node --env-file=.env.local scripts/ki-analyse/gewerke.mjs && node --env-file=.env.local scripts/ki-analyse/produkte.mjs",
+    "ki:analyse:claude": "node --env-file=.env.local scripts/ki-analyse/claude-auswertung.mjs",
+    "ki:analyse:full": "npm run ki:analyse:all && npm run ki:analyse:claude"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

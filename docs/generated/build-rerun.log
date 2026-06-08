@@ -1,0 +1,6 @@
+
+> baerenwald-crm-dashboard@0.1.0 docs:ui
+> node --env-file=.env.local scripts/docs-screenshots/capture.mjs && node --env-file=.env.local scripts/docs-screenshots/build-pdf.mjs
+
+Server http://127.0.0.1:3001 erreichbar, aber ohne Auth-Skip (Login-Umleitung).
+sh: line 1: 31671 Terminated: 15          node --env-file=.env.local scripts/docs-screenshots/capture.mjs

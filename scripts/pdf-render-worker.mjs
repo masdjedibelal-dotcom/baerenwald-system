@@ -102,20 +102,23 @@ async function runPuppeteer() {
 
     const page = await browser.newPage()
     await page.setViewport({ width: 794, height: 1123 })
-    await page.setContent(html, { waitUntil: 'load', timeout: 90_000 })
+    const fileUrl = pathToFileURL(htmlPath).href
+    await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 120_000 })
     await page.evaluate(() => document.fonts?.ready).catch(() => undefined)
     await page
       .evaluate(async () => {
-        const imgs = Array.from(document.images)
+        for (const img of document.images) {
+          img.loading = 'eager'
+        }
         await Promise.all(
-          imgs.map(
+          Array.from(document.images).map(
             (img) =>
               new Promise((resolve) => {
-                if (img.complete) resolve(undefined)
+                if (img.complete && img.naturalWidth > 0) resolve(undefined)
                 else {
                   img.addEventListener('load', () => resolve(undefined), { once: true })
                   img.addEventListener('error', () => resolve(undefined), { once: true })
-                  setTimeout(resolve, 12_000)
+                  setTimeout(resolve, 15_000)
                 }
               })
           )
