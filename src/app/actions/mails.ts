@@ -17,7 +17,7 @@ import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
-import { addDaysYmd } from '@/lib/kalender-auto-termine'
+import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
@@ -273,7 +273,7 @@ export async function sendZahlungserinnerungen(): Promise<{
 
     try {
       if (tage >= 7 && !r.erinnerung_7_sent_at && email) {
-        const zahlbarBisIso = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
+        const zahlbarBisIso = zahlungserinnerungZahlbarBis(r.faellig_am)
         const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
           {
@@ -312,7 +312,7 @@ export async function sendZahlungserinnerungen(): Promise<{
       }
 
       if (tage >= 21 && !r.erinnerung_21_sent_at && email) {
-        const zahlbarBisIso = addDaysYmd(new Date().toISOString().slice(0, 10), 14)
+        const zahlbarBisIso = zahlungserinnerungZahlbarBis(r.faellig_am)
         const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
           {

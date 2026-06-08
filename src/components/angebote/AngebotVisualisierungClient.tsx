@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react'
 import { ImageIcon, Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -20,6 +20,80 @@ type Modus = 'prompt' | 'zielbild'
 
 function versionenAusSession(session: KiVisualisierung | null): KiVizPromptHistoryEntry[] {
   return session?.prompt_history ?? []
+}
+
+function VizImageDropzone({
+  inputId,
+  disabled,
+  uploading,
+  isDragging,
+  onDragState,
+  onFile,
+  className,
+  children,
+}: {
+  inputId: string
+  disabled?: boolean
+  uploading?: boolean
+  isDragging?: boolean
+  onDragState: (dragging: boolean) => void
+  onFile: (file: File) => void
+  className?: string
+  children: ReactNode
+}) {
+  const blocked = disabled || uploading
+
+  function handleDragOver(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!blocked) onDragState(true)
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    const rel = e.relatedTarget as Node | null
+    if (!rel || !e.currentTarget.contains(rel)) onDragState(false)
+  }
+
+  function handleDrop(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    onDragState(false)
+    if (blocked) return
+    const f = e.dataTransfer.files?.[0]
+    if (f) onFile(f)
+  }
+
+  return (
+    <label
+      htmlFor={inputId}
+      className={cn(
+        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-bw-border p-4 text-center transition-colors',
+        isDragging && 'border-bw-primary bg-bw-hover/40',
+        blocked && 'pointer-events-none opacity-60',
+        className
+      )}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {children}
+      <input
+        id={inputId}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/*"
+        className="sr-only"
+        disabled={blocked}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) onFile(f)
+          e.target.value = ''
+        }}
+      />
+    </label>
+  )
 }
 
 export function AngebotVisualisierungClient({
@@ -41,8 +115,11 @@ export function AngebotVisualisierungClient({
   const [insAngebotOpen, setInsAngebotOpen] = useState(false)
   const [insAngebotPdf, setInsAngebotPdf] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const istInputRef = useRef<HTMLInputElement>(null)
-  const zielInputRef = useRef<HTMLInputElement>(null)
+  const [sessionLoading, setSessionLoading] = useState(!initialSession)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const [istDragging, setIstDragging] = useState(false)
+  const istInputId = `viz-ist-upload-${detail.id}`
+  const zielInputId = `viz-ziel-upload-${detail.id}`
 
   const istBilderUrls = session?.ist_bilder_urls ?? []
   const zielBildUrl = session?.ziel_bild_url ?? null
@@ -52,19 +129,40 @@ export function AngebotVisualisierungClient({
 
   const ensureSession = useCallback(async (): Promise<string | null> => {
     if (sessionId) return sessionId
-    const res = await fetch('/api/visualize/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ angebot_id: detail.id }),
-    })
-    const data = (await res.json()) as { session?: KiVisualisierung; error?: string }
-    if (!res.ok || !data.session) {
-      toast.error(data.error ?? 'Session fehlgeschlagen')
+    setSessionLoading(true)
+    try {
+      const res = await fetch('/api/visualize/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ angebot_id: detail.id }),
+      })
+      let data: { session?: KiVisualisierung; error?: string }
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        const msg = 'Session fehlgeschlagen — Server-Antwort ungültig'
+        setSessionError(msg)
+        toast.error(msg)
+        return null
+      }
+      if (!res.ok || !data.session) {
+        const msg = data.error ?? 'Session fehlgeschlagen'
+        setSessionError(msg)
+        toast.error(msg)
+        return null
+      }
+      setSessionError(null)
+      setSession(data.session)
+      setSessionId(data.session.id)
+      return data.session.id
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Session fehlgeschlagen'
+      setSessionError(msg)
+      toast.error(msg)
       return null
+    } finally {
+      setSessionLoading(false)
     }
-    setSession(data.session)
-    setSessionId(data.session.id)
-    return data.session.id
   }, [detail.id, sessionId])
 
   useEffect(() => {
@@ -90,11 +188,16 @@ export function AngebotVisualisierungClient({
   }, [versionen.length, aktiveVersion])
 
   async function uploadFile(file: File, kind: 'ist' | 'ziel') {
-    const sid = await ensureSession()
-    if (!sid) return
+    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      toast.error('Bitte ein Bild (JPEG, PNG oder WebP) wählen')
+      return
+    }
 
     setUploading(true)
     try {
+      const sid = await ensureSession()
+      if (!sid) return
+
       const fd = new FormData()
       fd.set('angebot_id', detail.id)
       fd.set('session_id', sid)
@@ -102,7 +205,12 @@ export function AngebotVisualisierungClient({
       fd.set('file', file)
 
       const res = await fetch('/api/visualize/upload', { method: 'POST', body: fd })
-      const data = (await res.json()) as { session?: KiVisualisierung; error?: string }
+      let data: { session?: KiVisualisierung; error?: string }
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        throw new Error('Upload fehlgeschlagen — Server-Antwort ungültig')
+      }
       if (!res.ok || !data.session) throw new Error(data.error ?? 'Upload fehlgeschlagen')
       setSession(data.session)
       toast.success(kind === 'ziel' ? 'Ziel-Bild hochgeladen' : 'Ist-Bild hochgeladen')
@@ -291,6 +399,21 @@ export function AngebotVisualisierungClient({
         </Link>
       </div>
 
+      {sessionError ? (
+        <div className="rounded-lg border border-status-cancel-bg bg-red-50 px-4 py-3 text-sm text-status-cancel-text">
+          <p className="font-medium">Visualisierung nicht bereit</p>
+          <p className="mt-1">{sessionError}</p>
+          <p className="mt-2 text-xs opacity-90">
+            Falls die Tabelle fehlt: Migration{' '}
+            <code className="rounded bg-white/80 px-1">20260620120000_ki_visualisierungen.sql</code> in Supabase
+            ausführen.
+          </p>
+          <Button type="button" variant="secondary" className="mt-3" onClick={() => void ensureSession()}>
+            Erneut versuchen
+          </Button>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Linke Spalte */}
         <div className="space-y-5 rounded-xl border border-bw-border bg-white p-4 md:p-5">
@@ -298,33 +421,28 @@ export function AngebotVisualisierungClient({
             <h2 className="text-sm font-semibold text-bw-text">Ist-Zustand (Pflicht)</h2>
             <p className="mb-2 text-xs text-bw-text-muted">Max. {VIZ_MAX_IST_BILDER} Fotos — pro Render wird das aktive Bild genutzt</p>
 
-            <div
-              className={cn(
-                'flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-bw-border p-4 text-center transition-colors',
-                uploading && 'opacity-60'
-              )}
-              onClick={() => istInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                const f = e.dataTransfer.files?.[0]
-                if (f) void uploadFile(f, 'ist')
-              }}
+            <VizImageDropzone
+              inputId={istInputId}
+              uploading={uploading}
+              disabled={sessionLoading && !sessionId}
+              isDragging={istDragging}
+              onDragState={setIstDragging}
+              onFile={(f) => void uploadFile(f, 'ist')}
+              className="min-h-[100px]"
             >
-              <ImageIcon className="mb-2 h-8 w-8 text-bw-text-muted" aria-hidden />
-              <p className="text-sm text-bw-text-muted">Drag & Drop oder klicken</p>
-              <input
-                ref={istInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) void uploadFile(f, 'ist')
-                  e.target.value = ''
-                }}
-              />
-            </div>
+              {uploading ? (
+                <Loader2 className="mb-2 h-8 w-8 animate-spin text-bw-text-muted" aria-hidden />
+              ) : (
+                <ImageIcon className="mb-2 h-8 w-8 text-bw-text-muted" aria-hidden />
+              )}
+              <p className="text-sm text-bw-text-muted">
+                {uploading
+                  ? 'Wird hochgeladen…'
+                  : istDragging
+                    ? 'Bild hier ablegen'
+                    : 'Drag & Drop oder klicken'}
+              </p>
+            </VizImageDropzone>
 
             {leadFotos.length > 0 ? (
               <Button type="button" variant="secondary" className="mt-2 w-full text-sm" onClick={uebernehmeLeadFotos}>
@@ -412,23 +530,16 @@ export function AngebotVisualisierungClient({
               </>
             ) : (
               <div className="mt-3 space-y-2">
-                <div
-                  className="flex min-h-[80px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-bw-border p-3 text-sm text-bw-text-muted"
-                  onClick={() => zielInputRef.current?.click()}
+                <VizImageDropzone
+                  inputId={zielInputId}
+                  uploading={uploading}
+                  disabled={sessionLoading && !sessionId}
+                  onDragState={() => {}}
+                  onFile={(f) => void uploadFile(f, 'ziel')}
+                  className="min-h-[80px] flex-row gap-2 p-3 text-sm text-bw-text-muted"
                 >
                   {zielBildUrl ? 'Ziel-Bild ersetzen' : 'Ziel-Bild hochladen'}
-                  <input
-                    ref={zielInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) void uploadFile(f, 'ziel')
-                      e.target.value = ''
-                    }}
-                  />
-                </div>
+                </VizImageDropzone>
                 {zielBildUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-lg border border-bw-border object-cover" />

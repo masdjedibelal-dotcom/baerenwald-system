@@ -13,13 +13,21 @@ type KiAnalyseModule = {
 
 let cachedModule: KiAnalyseModule | null = null
 
+function kiAnalyseIndexCandidates(): string[] {
+  const cwd = process.cwd()
+  return [join(cwd, 'scripts/ki-analyse/index.mjs')]
+}
+
 async function loadKiAnalyseModule(): Promise<KiAnalyseModule> {
   if (cachedModule) return cachedModule
 
-  const indexPath = join(process.cwd(), 'scripts/ki-analyse/index.mjs')
-  if (!existsSync(indexPath)) {
+  const candidates = kiAnalyseIndexCandidates()
+  const indexPath = candidates.find((p) => existsSync(p))
+
+  if (!indexPath) {
     throw new Error(
-      `KI-Analyse-Modul nicht gefunden (${indexPath}). Auf Netlify: scripts/ki-analyse muss im Deploy enthalten sein.`
+      `KI-Analyse-Modul nicht gefunden (${candidates[0]}). ` +
+        'Ordner scripts/ki-analyse/ fehlt im Deploy — bitte ins Git-Repo committen und pushen.'
     )
   }
 

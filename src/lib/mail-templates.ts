@@ -974,6 +974,7 @@ export function mailZahlungserinnerung(
     nummer: string
     brutto: number
     faelligAm: string
+    faelligAmIso?: string | null
     zahlbarBis?: string
     tageUeberfaellig: number
     stufe?: ZahlungserinnerungStufe
@@ -988,7 +989,7 @@ export function mailZahlungserinnerung(
     {
       ...data,
       stufe,
-      zahlbarBis: data.zahlbarBis ?? zahlungserinnerungZahlbarBis(stufe),
+      zahlbarBis: data.zahlbarBis ?? zahlungserinnerungZahlbarBis(data.faelligAmIso),
     },
     b
   )

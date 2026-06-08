@@ -667,7 +667,7 @@ function buildZahlungserinnerungVorschau(
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
   const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
-  const zahlbarBisIso = zahlungserinnerungZahlbarBis(stufe)
+  const zahlbarBisIso = zahlungserinnerungZahlbarBis(rec.faellig_am)
   const iban = branding.iban || process.env.EMAIL_FIRMEN_IBAN || ''
 
   const tpl = buildZahlungserinnerungMail(

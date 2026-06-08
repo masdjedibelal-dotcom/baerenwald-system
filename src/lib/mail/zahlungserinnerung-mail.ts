@@ -2,12 +2,22 @@ import { addDaysYmd } from '@/lib/angebot-einfach'
 
 export type ZahlungserinnerungStufe = 1 | 2
 
+/** Verlängerung der Zahlungsfrist pro Erinnerung (Stufe 1 und 2). */
+export const ZAHLUNGSERINNERUNG_FRIST_TAGE = 7
+
+/**
+ * Neue Fälligkeit nach Zahlungserinnerung:
+ * bisherige Fälligkeit + 7 Tage (bei fehlender Fälligkeit: Absendedatum + 7).
+ */
 export function zahlungserinnerungZahlbarBis(
-  stufe: ZahlungserinnerungStufe,
-  vonYmd?: string
+  bisherigeFaelligAmIso: string | null | undefined,
+  absendeYmd?: string
 ): string {
-  const basis = vonYmd ?? new Date().toISOString().slice(0, 10)
-  return addDaysYmd(basis, stufe === 1 ? 7 : 14)
+  const basis =
+    bisherigeFaelligAmIso?.trim()?.slice(0, 10) ||
+    absendeYmd?.trim()?.slice(0, 10) ||
+    new Date().toISOString().slice(0, 10)
+  return addDaysYmd(basis, ZAHLUNGSERINNERUNG_FRIST_TAGE)
 }
 
 export function zahlungserinnerungBetreff(stufe: ZahlungserinnerungStufe, nummer: string): string {

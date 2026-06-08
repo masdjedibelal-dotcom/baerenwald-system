@@ -21,6 +21,8 @@ const required = [
   'src/components/brand/BrandLogo.tsx',
   'src/components/kalender/KalenderClient.tsx',
   'middleware.ts',
+  'scripts/ki-analyse/index.mjs',
+  'scripts/ki-analyse/lib.mjs',
 ]
 
 const missing = required.filter((rel) => !fs.existsSync(path.join(root, rel)))

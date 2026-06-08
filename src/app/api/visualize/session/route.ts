@@ -33,8 +33,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ session: row })
   }
 
-  const session = await createKiVisualisierung(angebotId)
-  return NextResponse.json({ session })
+  try {
+    const session = await createKiVisualisierung(angebotId)
+    return NextResponse.json({ session })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Session anlegen fehlgeschlagen'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 export async function PATCH(req: Request) {

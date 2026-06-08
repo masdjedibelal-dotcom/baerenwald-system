@@ -6,7 +6,20 @@ import { loadKiVisualisierung, updateKiVisualisierung } from '@/lib/visualize/qu
 import { visualisierungPublicUrl } from '@/lib/visualize/storage'
 
 const MAX_BYTES = 8 * 1024 * 1024
-const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
+const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function resolveImageMime(file: File): string | null {
+  const fromType = file.type?.split(';')[0]?.trim().toLowerCase()
+  if (fromType === 'image/heic' || fromType === 'image/heif') return null
+  if (fromType && ALLOWED.has(fromType)) return fromType
+
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'heic' || ext === 'heif') return null
+  return null
+}
 
 export async function POST(req: Request) {
   const formData = await req.formData()
@@ -36,9 +49,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Datei zu groß (max. 8 MB)' }, { status: 400 })
   }
 
-  const type = (file as File).type || 'image/jpeg'
-  if (!ALLOWED.has(type)) {
-    return NextResponse.json({ error: 'Nur JPEG, PNG oder WebP' }, { status: 400 })
+  const type = resolveImageMime(file as File)
+  if (!type) {
+    return NextResponse.json(
+      { error: 'Nur JPEG, PNG oder WebP (iPhone: Foto als JPEG speichern oder HEIC in den Einstellungen deaktivieren)' },
+      { status: 400 }
+    )
   }
 
   if (kind === 'ist' && session.ist_bilder_urls.length >= VIZ_MAX_IST_BILDER) {
