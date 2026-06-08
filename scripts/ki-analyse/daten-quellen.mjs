@@ -208,6 +208,9 @@ export async function loadKiAnalyseDaten(supabase, helpers) {
     }
   }
 
+  const historik = await loadHistorikBlocks(supabase, { num })
+  blocks.push(...historik.blocks)
+
   const positionenGesamt = blocks.reduce((s, b) => s + b.positionen.length, 0)
 
   const quellen = {
@@ -217,9 +220,143 @@ export async function loadKiAnalyseDaten(supabase, helpers) {
     positionen: positionenGesamt,
     gewerk_bloecke: blocks.length,
     leads: leadsCount ?? leadMap.size,
+    historisch_vorgaenge: historik.vorgaenge,
+    historisch_positionen: historik.positionen,
+    historisch_gebucht: historik.gebucht,
   }
 
   return { blocks, quellen, gewerkeMap }
+}
+
+function historikStatus(raw) {
+  const s = String(raw ?? '').toLowerCase()
+  if (s === 'gebucht') return 'abgeschlossen'
+  if (s.includes('angebot')) return 'angebot'
+  return raw ?? 'historisch'
+}
+
+function plzFromAdresse(adresse) {
+  const m = String(adresse ?? '').match(/\b(\d{5})\b/)
+  return m?.[1] ?? null
+}
+
+/**
+ * Excel-Historie aus ki_historische_* → gleiches Block-Format wie CRM-Daten.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+async function loadHistorikBlocks(supabase, { num }) {
+  const [{ data: vorgaenge, error: vErr }, { data: positionen, error: pErr }] = await Promise.all([
+    supabase.from('ki_historische_vorgaenge').select('*'),
+    supabase.from('ki_historische_positionen').select('*'),
+  ])
+
+  if (vErr?.code === '42P01') {
+    return { blocks: [], vorgaenge: 0, positionen: 0, gebucht: 0 }
+  }
+  if (vErr) throw new Error(`ki_historische_vorgaenge: ${vErr.message}`)
+  if (pErr) throw new Error(`ki_historische_positionen: ${pErr.message}`)
+
+  const vorgRows = vorgaenge ?? []
+  if (!vorgRows.length) {
+    return { blocks: [], vorgaenge: 0, positionen: 0, gebucht: 0 }
+  }
+
+  const posByDok = new Map()
+  for (const p of positionen ?? []) {
+    const list = posByDok.get(p.dokument_nr) ?? []
+    list.push({
+      leistung_name: normName(p.leistung) || 'Leistung',
+      gewerk_name: normName(p.gewerk) || 'Sonstiges',
+      preis_fix: num(p.gesamt_netto) || num(p.einzelpreis_netto) * Math.max(num(p.menge), 1),
+      preis_partner: 0,
+      lohn_fix: 0,
+      material_fix: 0,
+      menge: num(p.menge) || 1,
+      handwerker_id: null,
+      projekt_phase: p.crm_modul ? String(p.crm_modul) : null,
+      start_datum: null,
+      end_datum: null,
+      sort_order: list.length,
+    })
+    posByDok.set(p.dokument_nr, list)
+  }
+
+  /** @type {import('./daten-quellen.types').KiGewerkBlock[]} */
+  const blocks = []
+
+  for (const v of vorgRows) {
+    const allPos = posByDok.get(v.dokument_nr) ?? []
+    const plz = plzFromAdresse(v.objekt_adresse)
+    const plz_region = plz ? `${plz.slice(0, 2)}xxx` : 'historik'
+
+    if (!allPos.length) {
+      blocks.push({
+        quelle: 'historisch',
+        quelle_id: v.dokument_nr,
+        lead_id: null,
+        gewerk: normName(v.gewerk) || 'Sonstiges',
+        status: historikStatus(v.status),
+        plz,
+        bereiche: [],
+        plz_region,
+        kanal: 'historik',
+        positionen: [
+          {
+            leistung_name: normName(v.taetigkeit) || 'Vorgang',
+            gewerk_name: normName(v.gewerk) || 'Sonstiges',
+            preis_fix: num(v.netto) || 0,
+            preis_partner: 0,
+            lohn_fix: 0,
+            material_fix: 0,
+            menge: 1,
+            handwerker_id: null,
+            projekt_phase: null,
+            start_datum: null,
+            end_datum: null,
+            sort_order: 0,
+          },
+        ],
+        start_datum: null,
+        end_datum: null,
+        gesamt_fix: num(v.netto) || null,
+      })
+      continue
+    }
+
+    const byGewerk = new Map()
+    for (const p of allPos) {
+      const g = p.gewerk_name
+      if (!byGewerk.has(g)) byGewerk.set(g, [])
+      byGewerk.get(g).push(p)
+    }
+
+    for (const [gewerk, positionenList] of byGewerk) {
+      blocks.push({
+        quelle: 'historisch',
+        quelle_id: v.dokument_nr,
+        lead_id: null,
+        gewerk,
+        status: historikStatus(v.status),
+        plz,
+        bereiche: [],
+        plz_region,
+        kanal: 'historik',
+        positionen: positionenList,
+        start_datum: null,
+        end_datum: null,
+        gesamt_fix: num(v.netto) || null,
+      })
+    }
+  }
+
+  const gebucht = vorgRows.filter((v) => String(v.status).toLowerCase() === 'gebucht').length
+
+  return {
+    blocks,
+    vorgaenge: vorgRows.length,
+    positionen: (positionen ?? []).length,
+    gebucht,
+  }
 }
 
 export function blockVkEk(positionen, num) {
@@ -243,5 +380,9 @@ export function blockVkEk(positionen, num) {
 }
 
 export function quellenHinweis(quellen) {
-  return `Daten aus Supabase: ${quellen.auftraege} Aufträge, ${quellen.angebote} Angebote (${quellen.positionen} Positionen in ${quellen.gewerk_bloecke} Gewerk-Blöcken), ${quellen.leads} Leads.`
+  let s = `Daten aus Supabase: ${quellen.auftraege} Aufträge, ${quellen.angebote} Angebote (${quellen.positionen} Positionen in ${quellen.gewerk_bloecke} Gewerk-Blöcken), ${quellen.leads} Leads.`
+  if (quellen.historisch_vorgaenge > 0) {
+    s += ` Inkl. Historik: ${quellen.historisch_vorgaenge} Rechnungen/Angebote (${quellen.historisch_gebucht} gebucht, ${quellen.historisch_positionen} Positionen) aus Excel-Import.`
+  }
+  return s
 }

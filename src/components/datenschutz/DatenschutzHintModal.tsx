@@ -3,39 +3,73 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import {
+  dismissDatenschutzHint,
+  loadDatenschutzHintDismissed,
+} from '@/app/(dashboard)/datenschutz-hint/actions'
+import {
+  datenschutzHintDismissedOnClient,
+  markDatenschutzHintClient,
+} from '@/lib/datenschutz/hint-storage'
 
-const STORAGE_KEY = 'baerenwald_datenschutz_hint_v1'
-
-export function DatenschutzHintModal() {
+export function DatenschutzHintModal({
+  dismissedOnServer = false,
+}: {
+  dismissedOnServer?: boolean
+}) {
   const [open, setOpen] = useState(false)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && !window.localStorage.getItem(STORAGE_KEY)) {
+    let cancelled = false
+
+    async function resolve() {
+      if (dismissedOnServer || datenschutzHintDismissedOnClient()) {
+        markDatenschutzHintClient()
+        if (!dismissedOnServer) {
+          void dismissDatenschutzHint()
+        }
+        if (!cancelled) {
+          setOpen(false)
+          setChecked(true)
+        }
+        return
+      }
+
+      const serverDismissed = await loadDatenschutzHintDismissed()
+      if (cancelled) return
+
+      if (serverDismissed) {
+        markDatenschutzHintClient()
+        setOpen(false)
+      } else {
         setOpen(true)
       }
-    } catch {
-      setOpen(true)
+      setChecked(true)
     }
-  }, [])
 
-  function dismiss() {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, '1')
-    } catch {
-      /* ignore */
+    void resolve()
+    return () => {
+      cancelled = true
     }
+  }, [dismissedOnServer])
+
+  async function dismiss() {
+    markDatenschutzHintClient()
     setOpen(false)
+    await dismissDatenschutzHint()
   }
+
+  if (!checked || !open) return null
 
   return (
     <Modal
       open={open}
-      onClose={dismiss}
+      onClose={() => void dismiss()}
       title="Datenschutz-Erinnerung"
       size="md"
       footer={
-        <Button type="button" variant="primary" onClick={dismiss}>
+        <Button type="button" variant="primary" onClick={() => void dismiss()}>
           Verstanden
         </Button>
       }

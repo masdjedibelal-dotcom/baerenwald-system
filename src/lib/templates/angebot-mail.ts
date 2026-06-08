@@ -4,6 +4,7 @@ import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 
 export type AngebotMailAnrede = 'du' | 'sie'
 
@@ -71,6 +72,8 @@ export type AngebotMailInput = KundeAnredeKontext & {
   istKorrektur?: boolean
   /** Link zu /portal/login (MeinBärenwald) */
   portalLink?: string
+  /** Vorschau-Bild KI-Visualisierung (wenn ins Angebot) */
+  visualisierung_vorschau_url?: string | null
 }
 
 /** Platzhalter / Standard, wenn Felder in Schritt 2 leer bleiben */
@@ -334,10 +337,15 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     metaHtml: `<p style="font-size:12px;color:#6B7280;margin:8px 0 0;">Gültig bis: <strong style="color:#374151;">${esc(gueltig_bis)}</strong></p>`,
   })
 
+  const vizHtml = data.visualisierung_vorschau_url
+    ? mailKiVisualisierungBlock(anrede, data.visualisierung_vorschau_url)
+    : ''
+
   const content = `
       <p style="font-size:15px;color:#374151;margin:0 0 8px;line-height:1.6;">${anredeText}</p>
       ${einleitungHtml}
       ${summaryHtml}
+      ${vizHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
         ${anrede === 'du' ? ctaDu : ctaSie}
       </p>

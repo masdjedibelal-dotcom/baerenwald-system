@@ -13,6 +13,7 @@ import {
   Mail,
   MoreHorizontal,
   FileCheck,
+  FileSignature,
   Pencil,
   Phone,
   Receipt,
@@ -71,10 +72,16 @@ import { Modal } from '@/components/ui/Modal'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
+import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
 import {
   loadRechnungWizardBootstrapFromAuftrag,
   type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import {
+  loadProjektVertragBootstrap,
+  type ProjektVertragWizardBootstrap,
+} from '@/app/(dashboard)/vertraege/wizard-actions'
+import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -83,6 +90,7 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
+import { auftragHandwerkerComplianceZeilen } from '@/lib/handwerker/compliance-vertrag-status'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -106,8 +114,12 @@ export function AuftragDetailClient({
   leadTimeline = [],
   team = [],
   rechnungenListe = [],
+  vertraegeListe = [],
   firm,
   finanzenPayload,
+  complianceTypen = [],
+  partnerDokumente = [],
+  rahmenVertraegeByHandwerker = {},
 }: {
   detail: AuftragDetail
   templates: FormularTemplate[]
@@ -116,8 +128,12 @@ export function AuftragDetailClient({
   leadTimeline?: LeadTimelineRow[]
   team?: CrmTeamMitglied[]
   rechnungenListe?: RechnungAuswahlZeile[]
+  vertraegeListe?: HandwerkerVertragRow[]
   firm?: FirmenEinstellungen
   finanzenPayload: AuftragFinanzenClientPayload | null
+  complianceTypen?: import('@/lib/types').ComplianceDokumentTyp[]
+  partnerDokumente?: import('@/lib/types').PartnerDokument[]
+  rahmenVertraegeByHandwerker?: Record<string, HandwerkerVertragRow>
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -147,6 +163,10 @@ export function AuftragDetailClient({
   const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
     useState<RechnungWizardBootstrap | null>(null)
   const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
+  const [vertragWizardOpen, setVertragWizardOpen] = useState(false)
+  const [vertragWizardBootstrap, setVertragWizardBootstrap] =
+    useState<ProjektVertragWizardBootstrap | null>(null)
+  const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [hwBewertungZiele, setHwBewertungZiele] = useState<HandwerkerBewertungZiel[] | null>(null)
 
   const zahlungszielTage = useMemo(
@@ -180,6 +200,23 @@ export function AuftragDetailClient({
     if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
     else setAbschlussModal(true)
   }, [detail.id, isMobile, router])
+
+  const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
+    setVertragWizardBootstrap(bootstrap)
+    setVertragWizardKey((k) => k + 1)
+    setVertragWizardOpen(true)
+  }, [])
+
+  const openNachunternehmervertrag = useCallback(() => {
+    startTransition(async () => {
+      const res = await loadProjektVertragBootstrap(detail.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      openVertragWizard(res.bootstrap)
+    })
+  }, [detail.id, openVertragWizard])
 
   const openRechnungErstellen = useCallback(() => {
     if (rechnungenListe.length === 0) {
@@ -373,6 +410,11 @@ export function AuftragDetailClient({
         onClick: openAbnahme,
       },
       {
+        label: 'Nachunternehmervertrag',
+        icon: <FileSignature className="h-[15px] w-[15px]" aria-hidden />,
+        onClick: () => openNachunternehmervertrag(),
+      },
+      {
         label: 'Rechnung erstellen',
         icon: <Receipt className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => openRechnungErstellen(),
@@ -387,6 +429,7 @@ export function AuftragDetailClient({
     kundeTelefon,
     mailCompose,
     openAbnahme,
+    openNachunternehmervertrag,
     openRechnungErstellen,
     router,
   ])
@@ -421,8 +464,8 @@ export function AuftragDetailClient({
   }, [leadTimeline.length, detail.auftrag_timeline])
 
   const dokumenteCount = useMemo(
-    () => zaehleAuftragDokumente(detail, rechnungenListe),
-    [detail, rechnungenListe]
+    () => zaehleAuftragDokumente(detail, rechnungenListe, vertraegeListe),
+    [detail, rechnungenListe, vertraegeListe]
   )
 
   const handwerkerKontext = useMemo(
@@ -440,6 +483,38 @@ export function AuftragDetailClient({
 
   const hatAbnahme = Boolean(detail.abnahme_protokoll_url)
 
+  const complianceZeilen = useMemo(() => {
+    const rows = detail.auftrag_handwerker ?? []
+    const seen = new Set<string>()
+    const handwerker = rows
+      .filter((z) => {
+        if (!z.handwerker_id || seen.has(z.handwerker_id)) return false
+        seen.add(z.handwerker_id)
+        return true
+      })
+      .map((z) => ({
+        handwerker_id: z.handwerker_id,
+        name: z.handwerker?.name ?? z.handwerker?.firma ?? 'Handwerker',
+        projektvertrag_bestaetigt_am: z.projektvertrag_bestaetigt_am ?? null,
+      }))
+    const rahmenMap = new Map(Object.entries(rahmenVertraegeByHandwerker))
+    return auftragHandwerkerComplianceZeilen({
+      auftragId: detail.id,
+      handwerker,
+      complianceTypen,
+      partnerDokumente,
+      vertraege: vertraegeListe,
+      rahmenVertraegeByHandwerker: rahmenMap,
+    })
+  }, [
+    detail.auftrag_handwerker,
+    detail.id,
+    complianceTypen,
+    partnerDokumente,
+    vertraegeListe,
+    rahmenVertraegeByHandwerker,
+  ])
+
   const naechsteSchritte = useMemo(
     () =>
       buildAuftragNaechsteSchritte({
@@ -447,8 +522,17 @@ export function AuftragDetailClient({
         auftragId: detail.id,
         hatAbnahme,
         rechnungenCount: rechnungenListe.length,
+        complianceZeilen,
+        onProjektVertragWizard: () => void openNachunternehmervertrag(),
       }),
-    [detail.status, detail.id, hatAbnahme, rechnungenListe.length]
+    [
+      detail.status,
+      detail.id,
+      hatAbnahme,
+      rechnungenListe.length,
+      complianceZeilen,
+      openNachunternehmervertrag,
+    ]
   )
 
   const offeneSchritteCount = useMemo(
@@ -606,6 +690,9 @@ export function AuftragDetailClient({
       <AuftragDokumenteTab
         detail={detail}
         rechnungen={rechnungenListe}
+        vertraege={vertraegeListe}
+        complianceTypen={complianceTypen}
+        partnerDokumente={partnerDokumente}
         onChanged={() => refresh()}
       />
     ) : mainTab === 'finanzen' ? (
@@ -625,6 +712,9 @@ export function AuftragDetailClient({
       <AuftragDokumenteTab
         detail={detail}
         rechnungen={rechnungenListe}
+        vertraege={vertraegeListe}
+        complianceTypen={complianceTypen}
+        partnerDokumente={partnerDokumente}
         onChanged={() => refresh()}
       />
     ) : mainTab === 'finanzen' ? (
@@ -900,6 +990,20 @@ export function AuftragDetailClient({
               setRechnungWizardBootstrap(null)
               refresh()
             }}
+          />
+        </ClientOnly>
+      ) : null}
+
+      {vertragWizardOpen && vertragWizardBootstrap ? (
+        <ClientOnly>
+          <ProjektVertragWizard
+            key={vertragWizardKey}
+            bootstrap={vertragWizardBootstrap}
+            onClose={() => {
+              setVertragWizardOpen(false)
+              setVertragWizardBootstrap(null)
+            }}
+            onDone={() => refresh()}
           />
         </ClientOnly>
       ) : null}

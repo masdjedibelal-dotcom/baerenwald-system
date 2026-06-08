@@ -15,6 +15,7 @@
   included_files = [
     "node_modules/@sparticuz/chromium/bin/**",
     "node_modules/@sparticuz/chromium/build/**",
+    "scripts/ki-analyse/**",
   ]
 
 # Cron-Jobs (ersetzt ehem. vercel.json) — CRON_SECRET in Netlify setzen

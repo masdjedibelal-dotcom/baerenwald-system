@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadAngebotDetailAdmin } from '@/app/(dashboard)/angebote/actions'
-import { buildAngebotHtmlAusDetail } from '@/lib/angebote/angebot-html-payload'
+import { buildAngebotHtmlAusDetailAsync } from '@/lib/angebote/angebot-html-payload'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
 
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const gewerke = await loadGewerkeAusfuehrung(supabaseAdmin)
 
   if (wantPreview) {
-    const html = buildAngebotHtmlAusDetail(detail, firm, gewerke, { previewFooter: true })
+    const html = await buildAngebotHtmlAusDetailAsync(detail, firm, gewerke, { previewFooter: true })
     return new NextResponse(html, {
       status: 200,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },

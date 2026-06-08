@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
-import { FileText, Pencil, Trash2, Upload } from 'lucide-react'
+import { FileText, Pencil, Shield, Trash2, Upload } from 'lucide-react'
+import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
+import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
@@ -18,9 +20,11 @@ import {
   angebotAusAuftragDetail,
   rechnungDokumentZeilen,
   timelineDokumentZeilen,
+  vertragDokumentZeilen,
   type AuftragDokumentZeile,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
+import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { AuftragDetail, AuftragTimelineEvent } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 
@@ -30,10 +34,16 @@ export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helper
 export function AuftragDokumenteTab({
   detail,
   rechnungen = [],
+  vertraege = [],
+  complianceTypen = [],
+  partnerDokumente = [],
   onChanged,
 }: {
   detail: AuftragDetail
   rechnungen?: RechnungAuswahlZeile[]
+  vertraege?: HandwerkerVertragRow[]
+  complianceTypen?: ComplianceDokumentTyp[]
+  partnerDokumente?: PartnerDokument[]
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -45,7 +55,11 @@ export function AuftragDokumenteTab({
   const fileRef = useRef<HTMLInputElement>(null)
 
   const zeilen = useMemo(() => {
-    const rows = [...timelineDokumentZeilen(detail), ...rechnungDokumentZeilen(rechnungen)]
+    const rows = [
+      ...timelineDokumentZeilen(detail),
+      ...rechnungDokumentZeilen(rechnungen),
+      ...vertragDokumentZeilen(vertraege),
+    ]
     const ang = angebotAusAuftragDetail(detail)
     if (ang?.pdf_url) {
       rows.unshift({
@@ -72,7 +86,7 @@ export function AuftragDokumenteTab({
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
     return rows.sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
-  }, [detail, rechnungen])
+  }, [detail, rechnungen, vertraege])
 
   async function uploadFiles(files: FileList | File[]) {
     const list = Array.from(files).slice(0, 5)
@@ -164,8 +178,52 @@ export function AuftragDokumenteTab({
     return m
   }, [detail.auftrag_timeline])
 
+  const handwerkerZeilen = useMemo(() => {
+    const rows = detail.auftrag_handwerker ?? []
+    const seen = new Set<string>()
+    return rows.filter((z) => {
+      if (!z.handwerker_id || seen.has(z.handwerker_id)) return false
+      seen.add(z.handwerker_id)
+      return true
+    })
+  }, [detail.auftrag_handwerker])
+
   return (
-    <div className="auftrag-dok-panel pb-4">
+    <div className="auftrag-dok-panel space-y-8 pb-4">
+      {handwerkerZeilen.length > 0 && complianceTypen.length > 0 ? (
+        <section id="compliance-checkliste" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-bw-primary" aria-hidden />
+            <div>
+              <h2 className="text-base font-semibold text-bw-text">Compliance-Nachweise</h2>
+              <p className="text-sm text-bw-text-muted">
+                Projektbezogene Unterlagen je Handwerker — Uploads sind mit dem Handwerker-Profil
+                verknüpft.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-6">
+            {handwerkerZeilen.map((z) => (
+              <div
+                key={z.handwerker_id}
+                className="rounded-xl border border-bw-border bg-bw-card p-4"
+              >
+                <ProjektComplianceCheckliste
+                  handwerkerId={z.handwerker_id}
+                  handwerkerName={z.handwerker?.name ?? z.handwerker?.firma ?? 'Handwerker'}
+                  auftragId={detail.id}
+                  auftragTitel={detail.titel}
+                  dokumente={partnerDokumente}
+                  complianceTypen={complianceTypen}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-bw-text">Projekt-Dokumente</h2>
       <input
         ref={fileRef}
         type="file"
@@ -338,6 +396,7 @@ export function AuftragDokumenteTab({
           </Button>
         </div>
       </Modal>
+      </section>
     </div>
   )
 }

@@ -149,7 +149,8 @@ const HANDWERKER_DETAIL_SELECT_BASE = `
   adresse, partner_kategorie_id,
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
-    id, handwerker_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am
+    id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
+    status, freigegeben_am, ablehnung_grund
   )
 `
 
@@ -266,8 +267,33 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   }
 }
 
+function revalidatePartnerDokumentPfade(handwerkerId: string, auftragId?: string | null) {
+  revalidatePath(`/handwerker/${handwerkerId}`)
+  revalidatePath('/handwerker')
+  if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
+}
+
+export async function loadPartnerDokumenteForAuftrag(
+  auftragId: string
+): Promise<PartnerDokument[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('partner_dokumente')
+    .select(
+      'id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am, status, freigegeben_am, ablehnung_grund'
+    )
+    .eq('auftrag_id', auftragId)
+    .order('hochgeladen_am', { ascending: false })
+  if (error) {
+    console.warn('loadPartnerDokumenteForAuftrag', error.message)
+    return []
+  }
+  return (data ?? []) as PartnerDokument[]
+}
+
 export async function insertPartnerDokument(input: {
   handwerker_id: string
+  auftrag_id?: string | null
   typ: string
   bezeichnung: string
   gueltig_bis: string | null
@@ -275,22 +301,83 @@ export async function insertPartnerDokument(input: {
   notizen: string | null
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('partner_dokumente')
     .insert({
       handwerker_id: input.handwerker_id,
+      auftrag_id: input.auftrag_id ?? null,
       typ: input.typ.trim(),
       bezeichnung: input.bezeichnung.trim(),
       gueltig_bis: input.gueltig_bis || null,
       datei_url: input.datei_url,
       notizen: input.notizen?.trim() || null,
+      status: 'freigegeben',
+      freigegeben_am: now,
     })
     .select('id')
     .single()
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath(`/handwerker/${input.handwerker_id}`)
-  revalidatePath('/handwerker')
+  revalidatePartnerDokumentPfade(input.handwerker_id, input.auftrag_id)
   return { ok: true, id: data.id as string }
+}
+
+/** Ersetzt vorhandenes Dokument desselben Typs (ein Nachweis pro Typ/Kontext). */
+export async function replacePartnerDokumentForTyp(input: {
+  handwerker_id: string
+  auftrag_id?: string | null
+  typ: string
+  bezeichnung: string
+  gueltig_bis: string | null
+  datei_url: string
+  notizen?: string | null
+  mehrfach?: boolean
+}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  if (input.mehrfach) {
+    return insertPartnerDokument({
+      handwerker_id: input.handwerker_id,
+      auftrag_id: input.auftrag_id ?? null,
+      typ: input.typ.trim(),
+      bezeichnung: input.bezeichnung,
+      gueltig_bis: input.gueltig_bis,
+      datei_url: input.datei_url,
+      notizen: input.notizen ?? null,
+    })
+  }
+
+  const supabase = createClient()
+  const typ = input.typ.trim()
+  let q = supabase
+    .from('partner_dokumente')
+    .select('id, datei_url')
+    .eq('handwerker_id', input.handwerker_id)
+    .eq('typ', typ)
+
+  if (input.auftrag_id) {
+    q = q.eq('auftrag_id', input.auftrag_id)
+  } else {
+    q = q.is('auftrag_id', null)
+  }
+
+  const { data: existing } = await q
+
+  for (const row of existing ?? []) {
+    const path = partnerDokumentStoragePath((row as { datei_url?: string | null }).datei_url)
+    if (path) {
+      await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
+    }
+    await supabase.from('partner_dokumente').delete().eq('id', (row as { id: string }).id)
+  }
+
+  return insertPartnerDokument({
+    handwerker_id: input.handwerker_id,
+    auftrag_id: input.auftrag_id ?? null,
+    typ,
+    bezeichnung: input.bezeichnung,
+    gueltig_bis: input.gueltig_bis,
+    datei_url: input.datei_url,
+    notizen: input.notizen ?? null,
+  })
 }
 
 export async function updatePartnerDokument(
@@ -310,8 +397,15 @@ export async function updatePartnerDokument(
   if (Object.keys(row).length === 0) return { ok: true }
   const { error } = await supabase.from('partner_dokumente').update(row).eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/handwerker/${handwerker_id}`)
-  revalidatePath('/handwerker')
+  const { data: doc } = await supabase
+    .from('partner_dokumente')
+    .select('auftrag_id')
+    .eq('id', id)
+    .maybeSingle()
+  revalidatePartnerDokumentPfade(
+    handwerker_id,
+    (doc as { auftrag_id?: string | null } | null)?.auftrag_id
+  )
   return { ok: true }
 }
 
@@ -319,7 +413,12 @@ export async function updatePartnerDokument(
 export async function signPartnerDokumentUrl(
   stored: string | null | undefined
 ): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
-  const path = partnerDokumentStoragePath(stored)
+  const s = stored?.trim() ?? ''
+  if (!s) return { ok: false, message: 'Keine Datei hinterlegt.' }
+  if (s.startsWith('http')) {
+    return { ok: true, url: s }
+  }
+  const path = partnerDokumentStoragePath(s)
   if (!path) return { ok: false, message: 'Keine Datei hinterlegt.' }
   const supabase = createClient()
   const { data, error } = await supabase.storage
@@ -338,7 +437,7 @@ export async function deletePartnerDokument(
   const supabase = createClient()
   const { data: row } = await supabase
     .from('partner_dokumente')
-    .select('datei_url')
+    .select('datei_url, auftrag_id')
     .eq('id', id)
     .maybeSingle()
   const path = partnerDokumentStoragePath((row as { datei_url?: string | null } | null)?.datei_url)
@@ -347,7 +446,74 @@ export async function deletePartnerDokument(
   }
   const { error } = await supabase.from('partner_dokumente').delete().eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/handwerker/${handwerker_id}`)
-  revalidatePath('/handwerker')
+  revalidatePartnerDokumentPfade(
+    handwerker_id,
+    (row as { auftrag_id?: string | null } | null)?.auftrag_id
+  )
+  return { ok: true }
+}
+
+/** CRM: Partner-Upload freigeben (Portal-Workflow). */
+export async function freigebenPartnerDokument(
+  id: string,
+  handwerkerId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const now = new Date().toISOString()
+  const { data: doc, error } = await supabase
+    .from('partner_dokumente')
+    .update({
+      status: 'freigegeben',
+      freigegeben_am: now,
+      ablehnung_grund: null,
+    })
+    .eq('id', id)
+    .eq('handwerker_id', handwerkerId)
+    .select('auftrag_id')
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!doc) return { ok: false, message: 'Dokument nicht gefunden' }
+
+  revalidatePartnerDokumentPfade(handwerkerId, (doc as { auftrag_id?: string | null }).auftrag_id)
+  return { ok: true }
+}
+
+/** CRM: Partner-Upload ablehnen (Portal-Workflow). */
+export async function ablehnenPartnerDokument(
+  id: string,
+  handwerkerId: string,
+  grund: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const reason = grund.trim()
+  if (!reason) return { ok: false, message: 'Bitte einen Ablehnungsgrund angeben.' }
+
+  const { data: doc, error } = await supabase
+    .from('partner_dokumente')
+    .update({
+      status: 'abgelehnt',
+      ablehnung_grund: reason,
+      freigegeben_am: null,
+    })
+    .eq('id', id)
+    .eq('handwerker_id', handwerkerId)
+    .select('auftrag_id')
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!doc) return { ok: false, message: 'Dokument nicht gefunden' }
+
+  revalidatePartnerDokumentPfade(handwerkerId, (doc as { auftrag_id?: string | null }).auftrag_id)
   return { ok: true }
 }

@@ -3,11 +3,17 @@
 import { DatenschutzHintModal } from '@/components/datenschutz/DatenschutzHintModal'
 import { ChunkLoadRecovery } from '@/components/layout/ChunkLoadRecovery'
 
-export function DashboardProviders({ children }: { children: React.ReactNode }) {
+export function DashboardProviders({
+  children,
+  datenschutzHintDismissed = false,
+}: {
+  children: React.ReactNode
+  datenschutzHintDismissed?: boolean
+}) {
   return (
     <>
       {children}
-      <DatenschutzHintModal />
+      <DatenschutzHintModal dismissedOnServer={datenschutzHintDismissed} />
       <ChunkLoadRecovery />
     </>
   )

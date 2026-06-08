@@ -14,6 +14,11 @@ export type ComplianceTypRow = {
   sort_order: number
   aktiv: boolean
   kategorie: string | null
+  scope: 'standard' | 'bauprojekt' | 'gewerk'
+  gewerk_slugs: string[] | null
+  pflicht_bauprojekt: boolean
+  vertrag_referenz: string | null
+  mehrfach_erlaubt: boolean
 }
 
 export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
@@ -32,14 +37,35 @@ export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
 export async function updateComplianceTyp(
   id: string,
   patch: Partial<
-    Pick<ComplianceTypRow, 'pflicht_fuer_fachbetriebe' | 'erneuerung_monate' | 'aktiv' | 'kategorie'>
+    Pick<
+      ComplianceTypRow,
+      | 'bezeichnung'
+      | 'beschreibung'
+      | 'pflicht_fuer_fachbetriebe'
+      | 'pflicht_bauprojekt'
+      | 'erneuerung_monate'
+      | 'aktiv'
+      | 'kategorie'
+      | 'scope'
+      | 'mehrfach_erlaubt'
+    >
   >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { error } = await supabase.from('compliance_dokument_typen').update(patch).eq('id', id)
+  const row: Record<string, unknown> = { ...patch }
+  if (typeof row.bezeichnung === 'string') {
+    const b = row.bezeichnung.trim()
+    if (!b) return { ok: false, message: 'Bezeichnung erforderlich' }
+    row.bezeichnung = b
+  }
+  if (typeof row.beschreibung === 'string') {
+    row.beschreibung = row.beschreibung.trim() || null
+  }
+  const { error } = await supabase.from('compliance_dokument_typen').update(row).eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath('/einstellungen/compliance')
   revalidatePath('/handwerker')
+  revalidatePath('/auftraege')
   return { ok: true }
 }
 
@@ -48,7 +74,10 @@ export async function createComplianceTyp(input: {
   beschreibung: string | null
   erneuerung_monate: number | null
   pflicht_fuer_fachbetriebe: boolean
+  pflicht_bauprojekt?: boolean
   kategorie?: string | null
+  scope?: 'standard' | 'bauprojekt' | 'gewerk'
+  mehrfach_erlaubt?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const name = input.bezeichnung.trim()
@@ -65,10 +94,13 @@ export async function createComplianceTyp(input: {
       bezeichnung: name,
       beschreibung: input.beschreibung?.trim() || null,
       pflicht_fuer_fachbetriebe: input.pflicht_fuer_fachbetriebe,
+      pflicht_bauprojekt: input.pflicht_bauprojekt ?? false,
       erneuerung_monate: input.erneuerung_monate,
       sort_order: 900 + i,
       aktiv: true,
       kategorie: input.kategorie?.trim() || null,
+      scope: input.scope ?? 'bauprojekt',
+      mehrfach_erlaubt: input.mehrfach_erlaubt ?? false,
     })
     if (error) return { ok: false, message: error.message }
     revalidatePath('/einstellungen/compliance')

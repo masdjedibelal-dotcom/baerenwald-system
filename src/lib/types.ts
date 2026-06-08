@@ -316,6 +316,8 @@ export type Angebot = {
   projektbeschreibung?: string | null
   /** Öffentliche Bild-URLs (JSON-Array in DB) */
   fotos_urls?: string[] | unknown | null
+  /** Verknüpfte KI-Visualisierungs-Sessions */
+  visualisierung_ids?: string[] | null
   /** Optionale zweite Variante inkl. Positionen */
   varianten?: unknown | null
   /** Ausführliche Hinweise (v. a. Projekt-PDF) */
@@ -459,6 +461,8 @@ export type AuftragHandwerkerRow = {
   vereinbarter_preis?: number | null
   absprachen?: string | null
   notizen?: string | null
+  projektvertrag_bestaetigt_am?: string | null
+  projektvertrag_quelle?: 'crm_wizard' | 'portal_bestaetigung' | null
   handwerker?: {
     id?: string
     name: string
@@ -750,17 +754,26 @@ export type ComplianceDokumentTyp = {
   /** Optional: Gruppen-Titel in der Handwerker-Compliance-Liste */
   kategorie?: string | null
   aktiv?: boolean
+  scope?: 'standard' | 'stamm' | 'bauprojekt' | 'gewerk' | null
+  gewerk_slugs?: string[] | null
+  pflicht_bauprojekt?: boolean
+  vertrag_referenz?: string | null
+  mehrfach_erlaubt?: boolean
 }
 
 export type PartnerDokument = {
   id: string
   handwerker_id: string
+  auftrag_id?: string | null
   typ: string
   bezeichnung: string
   gueltig_bis: string | null
   datei_url: string | null
   notizen: string | null
   hochgeladen_am: string
+  status?: string | null
+  freigegeben_am?: string | null
+  ablehnung_grund?: string | null
   compliance_dokument_typen?: ComplianceDokumentTyp | null
 }
 

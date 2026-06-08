@@ -1,45 +1,45 @@
 import 'server-only'
 
-import { spawn } from 'child_process'
+import { existsSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
+import { KI_BEREICH_ORDER } from '@/lib/ki/constants'
 
-const CRM_ROOT = process.cwd()
+export const KI_ANALYSE_SCRIPT_KEYS = KI_BEREICH_ORDER
 
-const SCRIPT_MAP: Record<string, string> = {
-  preise_margen: 'scripts/ki-analyse/preise-margen.mjs',
-  handwerker: 'scripts/ki-analyse/handwerker.mjs',
-  gewerke: 'scripts/ki-analyse/gewerke.mjs',
-  produkte: 'scripts/ki-analyse/produkte.mjs',
-  claude: 'scripts/ki-analyse/claude-auswertung.mjs',
+type KiAnalyseModule = {
+  runKiBereich: (bereich: string) => Promise<unknown>
 }
 
-export async function runKiAnalyseScript(bereich: string): Promise<{ ok: true } | { ok: false; message: string }> {
-  const rel = SCRIPT_MAP[bereich]
-  if (!rel) {
+let cachedModule: KiAnalyseModule | null = null
+
+async function loadKiAnalyseModule(): Promise<KiAnalyseModule> {
+  if (cachedModule) return cachedModule
+
+  const indexPath = join(process.cwd(), 'scripts/ki-analyse/index.mjs')
+  if (!existsSync(indexPath)) {
+    throw new Error(
+      `KI-Analyse-Modul nicht gefunden (${indexPath}). Auf Netlify: scripts/ki-analyse muss im Deploy enthalten sein.`
+    )
+  }
+
+  cachedModule = (await import(pathToFileURL(indexPath).href)) as KiAnalyseModule
+  return cachedModule
+}
+
+export async function runKiAnalyseScript(
+  bereich: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (bereich !== 'claude' && !KI_ANALYSE_SCRIPT_KEYS.includes(bereich as (typeof KI_ANALYSE_SCRIPT_KEYS)[number])) {
     return { ok: false, message: `Unbekannter Bereich: ${bereich}` }
   }
 
-  const scriptPath = join(CRM_ROOT, rel)
-
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [scriptPath], {
-      cwd: CRM_ROOT,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-
-    let stderr = ''
-    child.stderr?.on('data', (chunk) => {
-      stderr += String(chunk)
-    })
-
-    child.on('close', (code) => {
-      if (code === 0) resolve({ ok: true })
-      else resolve({ ok: false, message: stderr.trim() || `Script beendet mit Code ${code}` })
-    })
-
-    child.on('error', (err) => {
-      resolve({ ok: false, message: err.message })
-    })
-  })
+  try {
+    const mod = await loadKiAnalyseModule()
+    await mod.runKiBereich(bereich)
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, message }
+  }
 }

@@ -16,9 +16,30 @@ import { Textarea } from '@/components/ui/Textarea'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
+import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
+import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { AppDetailScreen } from '@/components/layout/app'
-import { Briefcase, LayoutGrid, Phone, Mail, Pencil, Shield, MessageSquare, Star, User } from 'lucide-react'
+import {
+  Briefcase,
+  FileSignature,
+  LayoutGrid,
+  Phone,
+  Mail,
+  Pencil,
+  Shield,
+  MessageSquare,
+  Star,
+  User,
+} from 'lucide-react'
+import { ClientOnly } from '@/components/ui/ClientOnly'
+import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
+import {
+  loadRahmenVertragBootstrap,
+  type RahmenVertragWizardBootstrap,
+} from '@/app/(dashboard)/vertraege/wizard-actions'
+import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
+import { toast } from '@/components/ui/app-toast'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   formatHandwerkerBewertung,
@@ -29,30 +50,31 @@ import {
   updateHandwerkerNotizen,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
-import type { Handwerker } from '@/lib/types'
+import type { ComplianceDokumentTyp, Handwerker } from '@/lib/types'
 
-function gewerkTagsFromSlugs(
-  gewerke: unknown,
-  slugToName: Map<string, string>
-): string[] {
+function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
   if (Array.isArray(gewerke)) {
     return gewerke
-      .map((x) => {
-        if (typeof x === 'string') return slugToName.get(x.toLowerCase()) ?? x
-        return ''
-      })
+      .map((x) => (typeof x === 'string' ? x.trim().toLowerCase() : ''))
       .filter(Boolean)
   }
   if (typeof gewerke === 'string') {
     try {
       const p = JSON.parse(gewerke) as unknown
-      return gewerkTagsFromSlugs(p, slugToName)
+      return gewerkSlugsFromField(p)
     } catch {
-      return gewerke.trim() ? [gewerke] : []
+      return gewerke.trim() ? [gewerke.trim().toLowerCase()] : []
     }
   }
   return []
+}
+
+function gewerkTagsFromSlugs(
+  gewerke: unknown,
+  slugToName: Map<string, string>
+): string[] {
+  return gewerkSlugsFromField(gewerke).map((slug) => slugToName.get(slug) ?? slug)
 }
 
 function isAuftragAbgeschlossen(auftragStatus: string): boolean {
@@ -62,9 +84,13 @@ function isAuftragAbgeschlossen(auftragStatus: string): boolean {
 export function HandwerkerDetailClient({
   payload,
   gewerkeSlugs,
+  complianceTypen,
+  rahmenVertrag = null,
 }: {
   payload: HandwerkerDetailPayload
   gewerkeSlugs: { slug: string; name: string }[]
+  complianceTypen: ComplianceDokumentTyp[]
+  rahmenVertrag?: HandwerkerVertragRow | null
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -75,7 +101,7 @@ export function HandwerkerDetailClient({
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
   const dokumenteAnzahl = useMemo(
-    () => payload.dokumente.filter((d) => d.datei_url?.trim()).length,
+    () => standardDokumente(payload.dokumente).length,
     [payload.dokumente]
   )
 
@@ -84,6 +110,10 @@ export function HandwerkerDetailClient({
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [rahmenWizardOpen, setRahmenWizardOpen] = useState(false)
+  const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
+    useState<RahmenVertragWizardBootstrap | null>(null)
+  const [rahmenWizardKey, setRahmenWizardKey] = useState(0)
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
 
@@ -134,6 +164,19 @@ export function HandwerkerDetailClient({
     }
     return { aktiv, fertig }
   }, [payload.auftraege])
+
+  const openRahmenvertrag = useCallback(() => {
+    startTransition(async () => {
+      const res = await loadRahmenVertragBootstrap(hw.id, rahmenVertrag?.id ?? null)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      setRahmenWizardBootstrap(res.bootstrap)
+      setRahmenWizardKey((k) => k + 1)
+      setRahmenWizardOpen(true)
+    })
+  }, [hw.id, rahmenVertrag?.id])
 
   const saveKontaktModal = useCallback(() => {
     if (!formName.trim() || !formTelefon.trim()) {
@@ -242,6 +285,18 @@ export function HandwerkerDetailClient({
           {' '}
           {dokumenteAnzahl === 1 ? 'Dokument' : 'Dokumente'} hochgeladen
         </p>
+        {rahmenVertrag?.pdf_url ? (
+          <p className="mt-2 text-sm">
+            <a
+              href={rahmenVertrag.pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-bw-link hover:underline"
+            >
+              Rahmenvertrag {rahmenVertrag.vertrags_nr}
+            </a>
+          </p>
+        ) : null}
         <p className="mt-2 text-sm text-bw-text-muted">
           Unter Tab „Compliance“ Dateien hochladen, ansehen und löschen.
         </p>
@@ -326,7 +381,7 @@ export function HandwerkerDetailClient({
           <ul className="space-y-3">
             {aktivAuftraege.map((a) => (
               <li key={a.id}>
-                <Card className="p-4">
+                <Card className="p-4 space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
@@ -338,6 +393,20 @@ export function HandwerkerDetailClient({
                     <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
                       Zum Auftrag
                     </Link>
+                  </div>
+                  <div className="border-t border-bw-border pt-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+                      Projekt-Compliance
+                    </p>
+                    <ProjektComplianceCheckliste
+                      handwerkerId={hw.id}
+                      auftragId={a.id}
+                      auftragTitel={a.titel}
+                      dokumente={payload.dokumente}
+                      complianceTypen={complianceTypen}
+                      compact
+                      showAuftragLink
+                    />
                   </div>
                 </Card>
               </li>
@@ -353,7 +422,7 @@ export function HandwerkerDetailClient({
           <ul className="space-y-3 pt-1">
             {fertigeAuftraege.map((a) => (
               <li key={a.id}>
-                <Card className="p-4">
+                <Card className="p-4 space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
@@ -365,6 +434,20 @@ export function HandwerkerDetailClient({
                     <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
                       Zum Auftrag
                     </Link>
+                  </div>
+                  <div className="border-t border-bw-border pt-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+                      Projekt-Compliance
+                    </p>
+                    <ProjektComplianceCheckliste
+                      handwerkerId={hw.id}
+                      auftragId={a.id}
+                      auftragTitel={a.titel}
+                      dokumente={payload.dokumente}
+                      complianceTypen={complianceTypen}
+                      compact
+                      showAuftragLink
+                    />
                   </div>
                 </Card>
               </li>
@@ -396,7 +479,12 @@ export function HandwerkerDetailClient({
   )
 
   const tabCompliance = (
-    <HandwerkerComplianceTab handwerkerId={hw.id} dokumente={payload.dokumente} />
+    <HandwerkerComplianceTab
+      handwerkerId={hw.id}
+      dokumente={payload.dokumente}
+      complianceTypen={complianceTypen}
+      rahmenVertrag={rahmenVertrag}
+    />
   )
 
   return (
@@ -415,10 +503,16 @@ export function HandwerkerDetailClient({
         }
         badges={<ComplianceBadge status={hw.compliance_status} />}
         actions={
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
-            <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Bearbeiten
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={openRahmenvertrag}>
+              <FileSignature className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Rahmenvertrag
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
+              <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Bearbeiten
+            </button>
+          </div>
         }
       />
 
@@ -474,6 +568,20 @@ export function HandwerkerDetailClient({
           </Modal>
         )
       })()}
+
+      {rahmenWizardOpen && rahmenWizardBootstrap ? (
+        <ClientOnly>
+          <RahmenvertragWizard
+            key={rahmenWizardKey}
+            bootstrap={rahmenWizardBootstrap}
+            onClose={() => {
+              setRahmenWizardOpen(false)
+              setRahmenWizardBootstrap(null)
+            }}
+            onDone={() => router.refresh()}
+          />
+        </ClientOnly>
+      ) : null}
     </>
   )
 }

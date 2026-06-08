@@ -15,6 +15,11 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import { buildRechnungMail } from '@/lib/mail/rechnung-mail'
+import { buildZahlungserinnerungMail } from '@/lib/mail-templates'
+import {
+  zahlungserinnerungZahlbarBis,
+  type ZahlungserinnerungStufe,
+} from '@/lib/mail/zahlungserinnerung-mail'
 import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-mail'
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -580,9 +585,239 @@ export async function sendRechnung(
   return { ok: true }
 }
 
-export async function sendRechnungErinnerung(
+function tageSeitFaelligkeitYmd(faelligAm: string | null): number {
+  if (!faelligAm) return 0
+  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
+  const [y, m, d] = parts
+  const due = new Date(y, m - 1, d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  due.setHours(0, 0, 0, 0)
+  return Math.floor((today.getTime() - due.getTime()) / 86400000)
+}
+
+type ZahlungserinnerungRechnungRow = {
+  rechnungsnummer: string | null
+  status: string | null
+  beleg_typ: string | null
+  auftrag_id: string | null
+  kunde_id: string | null
+  faellig_am: string | null
+  brutto: number | null
+  erinnerung_7_sent_at: string | null
+  erinnerung_21_sent_at: string | null
+  kunden: Kunde | Kunde[] | null
+}
+
+async function loadRechnungFuerZahlungserinnerung(
   rechnungId: string
+): Promise<
+  | { ok: true; rec: ZahlungserinnerungRechnungRow; rechnungsnummer: string }
+  | { ok: false; message: string }
+> {
+  const { data: rec, error: loadErr } = await withCrmReadFallback<ZahlungserinnerungRechnungRow>(
+    async (db) =>
+      db
+        .from('rechnungen')
+        .select(
+          `
+      rechnungsnummer,
+      status,
+      beleg_typ,
+      auftrag_id,
+      kunde_id,
+      faellig_am,
+      brutto,
+      erinnerung_7_sent_at,
+      erinnerung_21_sent_at,
+      kunden(name, email, typ, vorname, nachname)
+    `
+        )
+        .eq('id', rechnungId)
+        .maybeSingle()
+  )
+
+  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
+  if (rec.status !== 'gesendet') {
+    return { ok: false, message: 'Zahlungserinnerung nur für versendete Rechnungen möglich.' }
+  }
+  if (rec.beleg_typ === 'gutschrift') {
+    return { ok: false, message: 'Für Gutschriften keine Zahlungserinnerung.' }
+  }
+
+  const supabase = createClient()
+  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+    supabase,
+    rechnungId,
+    rec.rechnungsnummer as string,
+    String(rec.status ?? 'gesendet'),
+    (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
+  )
+
+  return { ok: true, rec: { ...rec, rechnungsnummer }, rechnungsnummer }
+}
+
+function buildZahlungserinnerungVorschau(
+  rec: ZahlungserinnerungRechnungRow,
+  rechnungsnummer: string,
+  stufe: ZahlungserinnerungStufe,
+  branding: Awaited<ReturnType<typeof getMailBranding>>
+) {
+  const kRaw = rec.kunden as Kunde | Kunde[] | null
+  const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
+  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const zahlbarBisIso = zahlungserinnerungZahlbarBis(stufe)
+  const iban = branding.iban || process.env.EMAIL_FIRMEN_IBAN || ''
+
+  const tpl = buildZahlungserinnerungMail(
+    {
+      name: kunde?.name?.trim() || 'Kundin/Kunde',
+      nummer: rechnungsnummer,
+      brutto: Number(rec.brutto ?? 0),
+      faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
+      zahlbarBis: formatDatumDeFromIso(zahlbarBisIso),
+      tageUeberfaellig: Math.max(0, tageSeitFaelligkeitYmd(rec.faellig_am)),
+      stufe,
+      iban,
+      anrede,
+      kundeTyp: kunde?.typ ?? null,
+    },
+    branding
+  )
+
+  const email = kunde?.email?.trim() ?? ''
+  return {
+    tpl,
+    zahlbarBisIso,
+    defaultTo: email ? [email] : [],
+    defaultCc: [] as string[],
+    kunde,
+    pdfName: `Rechnung-${rechnungsnummer}.pdf`,
+  }
+}
+
+export async function previewZahlungserinnerungMail(
+  rechnungId: string,
+  stufe: ZahlungserinnerungStufe
+): Promise<
+  | {
+      ok: true
+      betreff: string
+      html: string
+      defaultTo: string[]
+      defaultCc: string[]
+      pdfName: string
+      zahlbarBis: string
+      zahlbarBisLabel: string
+      stufe: ZahlungserinnerungStufe
+      stufe1Gesendet: boolean
+      stufe2Gesendet: boolean
+    }
+  | { ok: false; message: string }
+> {
+  const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
+  if (!loaded.ok) return loaded
+
+  const branding = await getMailBranding(supabaseAdmin)
+  const preview = buildZahlungserinnerungVorschau(
+    loaded.rec,
+    loaded.rechnungsnummer,
+    stufe,
+    branding
+  )
+
+  return {
+    ok: true,
+    betreff: preview.tpl.betreff,
+    html: preview.tpl.html,
+    defaultTo: preview.defaultTo,
+    defaultCc: preview.defaultCc,
+    pdfName: preview.pdfName,
+    zahlbarBis: preview.zahlbarBisIso,
+    zahlbarBisLabel: formatDatumDeFromIso(preview.zahlbarBisIso),
+    stufe,
+    stufe1Gesendet: Boolean(loaded.rec.erinnerung_7_sent_at),
+    stufe2Gesendet: Boolean(loaded.rec.erinnerung_21_sent_at),
+  }
+}
+
+export async function sendZahlungserinnerungMail(
+  rechnungId: string,
+  options: {
+    stufe: ZahlungserinnerungStufe
+    to: string[]
+    cc?: string[]
+    betreff?: string
+    html?: string
+  }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  void rechnungId
+  const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
+  if (!loaded.ok) return loaded
+
+  const toList = options.to.map((v) => v.trim()).filter(Boolean)
+  if (!toList.length) return { ok: false, message: 'Bitte mindestens eine Empfänger-Adresse angeben.' }
+
+  const branding = await getMailBranding(supabaseAdmin)
+  const preview = buildZahlungserinnerungVorschau(
+    loaded.rec,
+    loaded.rechnungsnummer,
+    options.stufe,
+    branding
+  )
+
+  const pdf = await persistPdfForRechnung(rechnungId)
+  if (!pdf.ok) return pdf
+
+  const kRaw = loaded.rec.kunden as Kunde | Kunde[] | null
+  const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
+
+  const mail = await sendMail({
+    typ: 'zahlungserinnerung',
+    an: toList,
+    cc: options.cc?.map((v) => v.trim()).filter(Boolean),
+    anName: kunde?.name ?? null,
+    betreff: options.betreff?.trim() || preview.tpl.betreff,
+    html: options.html?.trim() || preview.tpl.html,
+    pdfBuffer: pdf.buffer,
+    pdfName: preview.pdfName,
+    kundeId: loaded.rec.kunde_id as string | null,
+    auftragId: loaded.rec.auftrag_id as string | null,
+    rechnungId,
+  })
+  if (!mail.success) return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen' }
+
+  const now = new Date().toISOString()
+  const supabase = createClient()
+  const patch: Record<string, unknown> = {
+    faellig_am: preview.zahlbarBisIso,
+    updated_at: now,
+  }
+  if (options.stufe === 1) patch.erinnerung_7_sent_at = now
+  if (options.stufe === 2) patch.erinnerung_21_sent_at = now
+
+  const { error } = await supabase.from('rechnungen').update(patch).eq('id', rechnungId)
+  if (error) return { ok: false, message: error.message }
+
+  const auftragId = (loaded.rec.auftrag_id as string | null) ?? null
+  if (auftragId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    await insertAuftragTimelineEvent({
+      auftrag_id: auftragId,
+      typ: 'rechnung_erinnerung',
+      titel: `${options.stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung'} ${loaded.rechnungsnummer}`,
+      beschreibung: `An ${toList.join(', ')} · Zahlbar bis ${formatDatumDeFromIso(preview.zahlbarBisIso)}`,
+      erstellt_von: user?.id ?? null,
+      sichtbar_fuer_kunde: true,
+      fuer_kunde_freigegeben: true,
+      freigegeben_at: now,
+    })
+  }
+
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${rechnungId}`)
+  if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
 }

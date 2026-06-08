@@ -32,6 +32,7 @@ import { formatKundenObjektDurchfuehrung } from '@/lib/kunden-objekte'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveAngebotLeistungsumfang } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import type { AngebotDetail, AngebotPosition, Gewerk } from '@/lib/types'
+import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
 
 function parseVariantenPersist(raw: unknown): AngebotVariantenPersistJson | null {
   if (!raw || typeof raw !== 'object') return null
@@ -109,7 +110,8 @@ function mapZuTemplateZeilen(anPos: AngebotPosition[], gewerke: Gewerk[]): Angeb
 export function buildAngebotHtmlInputAusDetail(
   detail: AngebotDetail,
   firm: FirmenEinstellungen,
-  gewerke: Gewerk[] = []
+  gewerke: Gewerk[] = [],
+  extras?: { ki_visualisierungen?: KiVizPdfPage[] }
 ): AngebotHtmlInput {
   const kunde = detail.kunden
   if (!kunde) {
@@ -276,6 +278,9 @@ export function buildAngebotHtmlInputAusDetail(
     projekt_hat_varianten: hatZweiVarianten,
     pdf_gewerke: gewerke,
     pdf_roh_positionen: pos,
+    ki_visualisierungen: extras?.ki_visualisierungen?.length
+      ? extras.ki_visualisierungen
+      : undefined,
   }
 
   return payload
@@ -296,4 +301,19 @@ export function buildAngebotHtmlAusDetail(
   return buildAngebotHtml(buildAngebotHtmlInputAusDetail(detail, firm, gewerke), {
     includeBodyFooter: options?.previewFooter ?? false,
   })
+}
+
+/** Wie buildAngebotHtmlAusDetail, inkl. KI-Visualisierungen aus der DB. */
+export async function buildAngebotHtmlAusDetailAsync(
+  detail: AngebotDetail,
+  firm: FirmenEinstellungen,
+  gewerke: Gewerk[] = [],
+  options?: BuildAngebotHtmlOptions
+): Promise<string> {
+  const { loadKiVizPdfPagesForAngebot } = await import('@/lib/visualize/pdf-data')
+  const kiViz = await loadKiVizPdfPagesForAngebot(detail.id)
+  return buildAngebotHtml(
+    buildAngebotHtmlInputAusDetail(detail, firm, gewerke, { ki_visualisierungen: kiViz }),
+    { includeBodyFooter: options?.previewFooter ?? false }
+  )
 }

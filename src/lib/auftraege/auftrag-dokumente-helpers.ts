@@ -1,4 +1,5 @@
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
+import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { Angebot, AuftragDetail } from '@/lib/types'
 import { normalizeUrlList } from '@/lib/utils'
 
@@ -9,7 +10,7 @@ export type AuftragDokumentZeile = {
   datum: string
   fuerKunde: boolean
   href: string
-  quelle: 'timeline' | 'rechnung' | 'protokoll' | 'angebot'
+  quelle: 'timeline' | 'rechnung' | 'protokoll' | 'angebot' | 'vertrag'
   timelineId?: string
 }
 
@@ -66,6 +67,22 @@ export function rechnungDokumentZeilen(rechnungen: RechnungAuswahlZeile[]): Auft
     }))
 }
 
+export function vertragDokumentZeilen(vertraege: HandwerkerVertragRow[]): AuftragDokumentZeile[] {
+  return vertraege
+    .filter((v) => v.typ === 'projekt' && v.pdf_url?.trim())
+    .map((v) => ({
+      id: `vertrag-${v.id}`,
+      name: v.vertrags_nr?.trim() || 'Nachunternehmervertrag',
+      beschreibung: [v.gewerk_name, v.status === 'unterschrieben' ? 'unterschrieben' : 'PDF']
+        .filter(Boolean)
+        .join(' · '),
+      datum: v.updated_at ?? v.created_at,
+      fuerKunde: false,
+      href: v.pdf_url!.trim(),
+      quelle: 'vertrag',
+    }))
+}
+
 export function abschlussdokumentZeile(detail: AuftragDetail): AuftragDokumentZeile | null {
   const versendet = (detail.auftrag_timeline ?? []).some(
     (ev) => ev?.typ === 'abschlussdoku_versendet'
@@ -85,10 +102,12 @@ export function abschlussdokumentZeile(detail: AuftragDetail): AuftragDokumentZe
 
 export function zaehleAuftragDokumente(
   detail: AuftragDetail,
-  rechnungen: RechnungAuswahlZeile[] = []
+  rechnungen: RechnungAuswahlZeile[] = [],
+  vertraege: HandwerkerVertragRow[] = []
 ): number {
   let n = timelineDokumentZeilen(detail).length
   n += rechnungDokumentZeilen(rechnungen).length
+  n += vertragDokumentZeilen(vertraege).length
   const ang = angebotAusAuftragDetail(detail)
   if (ang?.pdf_url) n += 1
   if (detail.abnahme_protokoll_url) n += 1

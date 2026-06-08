@@ -8,6 +8,7 @@ import {
   handwerkerFreigabeErledigt,
   hatAngebotHandwerker,
 } from '@/lib/angebote/angebot-handwerker-flow'
+import type { AuftragHandwerkerComplianceZeile } from '@/lib/handwerker/compliance-vertrag-status'
 
 export function buildAngebotNaechsteSchritte(opts: {
   status: AngebotStatusEinfach
@@ -112,27 +113,88 @@ export function buildAngebotNaechsteSchritte(opts: {
   return steps.filter((s) => s.id !== 'anfrage' || leadId)
 }
 
+export function buildAuftragComplianceSchritte(
+  zeilen: AuftragHandwerkerComplianceZeile[],
+  auftragId: string,
+  onProjektVertragWizard?: () => void
+): NaechsterSchritt[] {
+  const steps: NaechsterSchritt[] = []
+  for (const z of zeilen) {
+    steps.push({
+      id: `rv-${z.handwerker_id}`,
+      label: `Rahmenvertrag: ${z.handwerker_name}`,
+      dateLabel: z.rahmenvertrag_ok ? 'Erledigt' : 'Pflicht',
+      done: z.rahmenvertrag_ok,
+      href: z.rahmenvertrag_ok
+        ? undefined
+        : `/handwerker/${z.handwerker_id}?tab=compliance`,
+    })
+    steps.push({
+      id: `nu-${z.handwerker_id}`,
+      label: `Projektvertrag: ${z.handwerker_name}`,
+      dateLabel: z.projektvertrag_ok
+        ? 'Erledigt'
+        : 'CRM-Wizard oder Portal-Bestätigung',
+      done: z.projektvertrag_ok,
+      onClick: z.projektvertrag_ok ? undefined : onProjektVertragWizard,
+      href: z.projektvertrag_ok ? undefined : `#compliance-checkliste`,
+    })
+    if (z.fehlende_unterlagen > 0) {
+      steps.push({
+        id: `comp-${z.handwerker_id}`,
+        label: `Unterlagen ${z.handwerker_name} (${z.fehlende_unterlagen} fehlen)`,
+        dateLabel: z.fehlende_unterlagen_labels.slice(0, 2).join(', '),
+        done: false,
+        href: `#compliance-checkliste`,
+      })
+    } else if (z.projektvertrag_ok) {
+      steps.push({
+        id: `comp-${z.handwerker_id}`,
+        label: `Unterlagen ${z.handwerker_name}`,
+        dateLabel: 'Vollständig',
+        done: true,
+      })
+    }
+  }
+  void auftragId
+  return steps
+}
+
 export function buildAuftragNaechsteSchritte(opts: {
   status: string
   auftragId: string
   hatAbnahme: boolean
   rechnungenCount: number
+  complianceZeilen?: AuftragHandwerkerComplianceZeile[]
+  onProjektVertragWizard?: () => void
 }): NaechsterSchritt[] {
-  const { status, auftragId, hatAbnahme, rechnungenCount } = opts
+  const {
+    status,
+    auftragId,
+    hatAbnahme,
+    rechnungenCount,
+    complianceZeilen = [],
+    onProjektVertragWizard,
+  } = opts
   const abgeschlossen = status === 'abgeschlossen'
   const hatRechnung = rechnungenCount > 0
 
-  return [
+  const complianceSteps =
+    !abgeschlossen && complianceZeilen.length > 0
+      ? buildAuftragComplianceSchritte(complianceZeilen, auftragId, onProjektVertragWizard)
+      : []
+
+  const abschlussSteps: NaechsterSchritt[] = [
     {
       id: 'abnahme',
-      label: '1. Abnahmeprotokoll',
+      label: 'Abnahmeprotokoll',
       dateLabel: hatAbnahme || abgeschlossen ? 'Erledigt' : 'Als Nächstes',
       done: hatAbnahme || abgeschlossen,
       href: hatAbnahme || abgeschlossen ? undefined : `/auftraege/${auftragId}/abnahme`,
     },
     {
       id: 'rechnung',
-      label: '2. Rechnung erstellen',
+      label: 'Rechnung erstellen',
       dateLabel: hatRechnung ? 'Erledigt' : hatAbnahme ? 'Als Nächstes' : '—',
       done: hatRechnung,
       href:
@@ -142,7 +204,7 @@ export function buildAuftragNaechsteSchritte(opts: {
     },
     {
       id: 'abschluss',
-      label: '3. Auftrag abschließen',
+      label: 'Auftrag abschließen',
       dateLabel: abgeschlossen ? 'Erledigt' : hatAbnahme && hatRechnung ? 'Als Nächstes' : '—',
       done: abgeschlossen,
       href:
@@ -151,6 +213,8 @@ export function buildAuftragNaechsteSchritte(opts: {
           : `/auftraege/${auftragId}/abschluss`,
     },
   ]
+
+  return [...complianceSteps, ...abschlussSteps]
 }
 
 export function buildRechnungNaechsteSchritte(opts: {

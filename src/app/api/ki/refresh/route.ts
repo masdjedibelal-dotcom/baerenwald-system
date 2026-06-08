@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runKiAnalyseScript } from '@/lib/ki/run-analyse'
+import { KI_ANALYSE_SCRIPT_KEYS, runKiAnalyseScript } from '@/lib/ki/run-analyse'
 import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
+/** Mehrere Analysen + Claude können >10s dauern (Netlify Pro). */
+export const maxDuration = 300
 
-const ALLOWED = new Set(['preise_margen', 'handwerker', 'gewerke', 'produkte', 'claude', 'all', 'all_claude'])
+const ALLOWED = new Set([
+  ...KI_ANALYSE_SCRIPT_KEYS,
+  'claude',
+  'all',
+  'all_claude',
+])
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -30,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   if (bereich === 'all' || bereich === 'all_claude') {
     const errors: string[] = []
-    for (const key of ['preise_margen', 'handwerker', 'gewerke', 'produkte']) {
+    for (const key of KI_ANALYSE_SCRIPT_KEYS) {
       const result = await runKiAnalyseScript(key)
       if (!result.ok) errors.push(`${key}: ${result.message}`)
     }

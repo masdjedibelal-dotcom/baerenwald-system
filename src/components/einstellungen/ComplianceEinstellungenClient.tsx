@@ -78,19 +78,47 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
             <li key={t.id} className="space-y-3 py-3 first:pt-0 last:pb-0">
               <div>
                 <p className="text-[13.5px] font-medium text-bw-text">{t.bezeichnung}</p>
-                <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
+                <EinstellungenListMeta>
+                  {[t.scope === 'bauprojekt' ? 'Bauprojekt' : t.scope === 'gewerk' ? 'Gewerk' : 'Standard', t.beschreibung]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
+                </EinstellungenListMeta>
               </div>
-            <div className="mb-3 max-w-md">
+            <div className="mb-3 grid gap-3 sm:grid-cols-2">
               <Input
-                label="Kategorie (Gruppe in Handwerker-Compliance)"
+                label="Bezeichnung"
+                defaultValue={t.bezeichnung}
+                key={`bez-${t.id}-${t.bezeichnung}`}
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  if (!v || v === t.bezeichnung.trim()) return
+                  void patchRow(t.id, { bezeichnung: v })
+                }}
+              />
+              <Input
+                label="Kategorie (Gruppe)"
                 defaultValue={t.kategorie ?? ''}
                 key={`kat-${t.id}-${t.kategorie ?? ''}`}
-                placeholder="z. B. Sicherheit, Versicherung…"
+                placeholder="z. B. Bauprojekt, Individuell…"
                 onBlur={(e) => {
                   const v = e.target.value.trim()
                   const cur = (t.kategorie ?? '').trim()
                   if (v === cur) return
                   void patchRow(t.id, { kategorie: v || null })
+                }}
+              />
+            </div>
+            <div className="mb-3 max-w-2xl">
+              <Textarea
+                label="Beschreibung"
+                defaultValue={t.beschreibung ?? ''}
+                key={`besch-${t.id}-${t.beschreibung ?? ''}`}
+                rows={2}
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  const cur = (t.beschreibung ?? '').trim()
+                  if (v === cur) return
+                  void patchRow(t.id, { beschreibung: v || null })
                 }}
               />
             </div>
@@ -101,7 +129,23 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
                   checked={t.pflicht_fuer_fachbetriebe}
                   onChange={(e) => void patchRow(t.id, { pflicht_fuer_fachbetriebe: e.target.checked })}
                 />
-                Pflicht
+                Pflicht (Partner)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={t.pflicht_bauprojekt}
+                  onChange={(e) => void patchRow(t.id, { pflicht_bauprojekt: e.target.checked })}
+                />
+                Pflicht (Bauprojekt)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={t.mehrfach_erlaubt}
+                  onChange={(e) => void patchRow(t.id, { mehrfach_erlaubt: e.target.checked })}
+                />
+                Mehrfach
               </label>
               <label className="flex items-center gap-2">
                 <input

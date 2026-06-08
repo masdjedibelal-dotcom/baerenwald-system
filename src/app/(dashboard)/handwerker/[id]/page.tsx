@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { HandwerkerDetailClient } from '@/components/handwerker/HandwerkerDetailClient'
 import { loadHandwerkerDetail } from '@/app/(dashboard)/handwerker/actions'
+import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
+import { loadRahmenVertragForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
 
 export async function generateMetadata({
   params,
@@ -19,9 +21,11 @@ export default async function HandwerkerDetailPage({ params }: { params: Promise
   const { id } = await params
   const supabase = createClient()
 
-  const [detail, { data: gewData }] = await Promise.all([
+  const [detail, { data: gewData }, rahmenVertrag, complianceTypen] = await Promise.all([
     loadHandwerkerDetail(id),
     supabase.from('gewerke').select('slug, name').eq('aktiv', true).order('name'),
+    loadRahmenVertragForHandwerker(id),
+    loadComplianceTypen(),
   ])
 
   if (!detail.handwerker) notFound()
@@ -33,7 +37,12 @@ export default async function HandwerkerDetailPage({ params }: { params: Promise
 
   return (
     <div>
-      <HandwerkerDetailClient payload={detail} gewerkeSlugs={gewerkeSlugs} />
+      <HandwerkerDetailClient
+        payload={detail}
+        gewerkeSlugs={gewerkeSlugs}
+        complianceTypen={complianceTypen}
+        rahmenVertrag={rahmenVertrag}
+      />
     </div>
   )
 }

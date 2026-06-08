@@ -48,6 +48,8 @@ import {
   handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
+import { provisionProjektVertragFuerHandwerker } from '@/lib/vertraege/provision-projektvertrag'
+import { loadKiVizMailPreviewUrl } from '@/lib/visualize/pdf-data'
 import {
   parseHwPreisEuro,
   uploadHwAngebotPdfFromCrm,
@@ -853,6 +855,25 @@ export async function bestaetigeHandwerkerEinreichung(input: {
   const mailGesendet = mail.ok
   const mailHinweis = mail.ok ? undefined : mail.error
 
+  if (auftrag?.id) {
+    const { data: zuHw } = await supabaseAdmin
+      .from('angebot_handwerker')
+      .select('handwerker_id')
+      .eq('id', zuweisungId)
+      .maybeSingle()
+    if (zuHw?.handwerker_id) {
+      const pv = await provisionProjektVertragFuerHandwerker(
+        auftrag.id as string,
+        zuHw.handwerker_id as string
+      )
+      if (!pv.ok) {
+        console.warn('[bestaetigeHandwerkerEinreichung] projektvertrag:', pv.message)
+      } else if (pv.created) {
+        revalidatePath(`/auftraege/${auftrag.id}`)
+      }
+    }
+  }
+
   return { ok: true, aktualisiert, mailGesendet, mailHinweis }
 }
 
@@ -904,10 +925,11 @@ export async function sendAngebotToKunde(
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
   const summenMail = summenAusPositionen(posMail, 19)
-  const [firmMail, branding, statusLink] = await Promise.all([
+  const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
     fetchFirmenEinstellungen(supabaseAdmin),
     getMailBranding(supabaseAdmin),
     projektOderStatusLink(detail.lead_id),
+    loadKiVizMailPreviewUrl(angebotId),
   ])
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
@@ -957,6 +979,7 @@ export async function sendAngebotToKunde(
             schluss: wizardMeta?.schluss,
             istKorrektur,
             portalLink: portalLink ?? undefined,
+            visualisierung_vorschau_url: vizPreviewUrl,
           },
           branding
         ),
@@ -971,6 +994,7 @@ export async function sendAngebotToKunde(
           gueltig_bis: gueltig,
           statusLink,
           kundeTyp,
+          visualisierung_vorschau_url: vizPreviewUrl,
         },
         branding
       )
@@ -1447,6 +1471,14 @@ export async function createAuftragFromAngebot(
     await Promise.all(postInsertTasks)
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Auftrag-Anlage fehlgeschlagen' }
+  }
+
+  for (const h of angebot.angebot_handwerker ?? []) {
+    if (!eingereichtIds.includes(h.id)) continue
+    const pv = await provisionProjektVertragFuerHandwerker(auftragId, h.handwerker_id)
+    if (!pv.ok) {
+      console.warn('[createAuftragFromAngebot] projektvertrag:', pv.message)
+    }
   }
 
   const branding = await brandingPromise

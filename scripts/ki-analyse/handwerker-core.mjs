@@ -70,7 +70,10 @@ export async function computeAndSaveHandwerkerRanking(supabase, helpers) {
     return buckets.get(key)
   }
 
-  for (const block of blocks) {
+  const auftragBlocks = blocks.filter((b) => b.quelle === 'auftrag')
+  const positionBlocks = auftragBlocks.length ? auftragBlocks : blocks
+
+  for (const block of positionBlocks) {
     for (const p of block.positionen) {
       if (!p.handwerker_id) continue
       const b = bucket(p.handwerker_id, block.gewerk)
@@ -151,6 +154,9 @@ export async function computeAndSaveHandwerkerRanking(supabase, helpers) {
   const warnungen = zeilen.filter((z) => z.warnung && z.verlaesslich).length
 
   let hinweis = `${quellenHinweis(quellen)} Ranking aus ${zeilen.length} Handwerker-Gewerk-Kombinationen.`
+  hinweis += auftragBlocks.length
+    ? ' Positionsdaten aus echten Aufträgen.'
+    : ' Noch keine Auftragspositionen — Fallback auf Angebots-Positionen.'
   hinweis += ` Score = Bewertung 40 % + Termintreue 30 % + Marge 30 %.`
   if (warnungen > 0) {
     hinweis += ` ${warnungen} Kombination(en) unter Score ${SCORE_WARNUNG}.`

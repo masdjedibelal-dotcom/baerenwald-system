@@ -1,5 +1,96 @@
 import type { KiBereich } from '@/lib/ki/constants'
 
+export type KiCountRow = { name: string; count: number }
+
+export type KiZyklusStat = {
+  anzahl: number
+  median_tage: number | null
+}
+
+export type FunnelOverviewErgebnis = {
+  hinweis: string
+  stufen?: {
+    key: string
+    label: string
+    count: number
+    rate_von_vorher: number | null
+  }[]
+  zyklen?: {
+    anfrage_zu_angebot: KiZyklusStat
+    angebot_zu_auftrag: KiZyklusStat
+    anfrage_zu_auftrag: KiZyklusStat
+    anfrage_zu_abschluss: KiZyklusStat
+  }
+  kennzahlen: {
+    leads_gesamt: number
+    leads_mit_angebot: number
+    leads_mit_auftrag?: number
+    leads_abgeschlossen?: number
+    angebote_gesamt: number
+    angebote_angenommen?: number
+    auftraege_gesamt: number
+    auftraege_abgeschlossen: number
+    conversion_anfrage_zu_angebot: number | null
+    conversion_angebot_zu_auftrag: number | null
+  }
+}
+
+export type KommunikationErgebnis = {
+  hinweis: string
+  zusammenfassung: {
+    emails_gesamt: number
+    timeline_gesamt: number
+    leads_mit_kommunikation: number
+    leads_gesamt?: number | null
+    events_pro_lead_median: number | null
+  }
+  email_nach_typ: KiCountRow[]
+  email_nach_kontext: KiCountRow[]
+  email_nach_richtung: KiCountRow[]
+  timeline_nach_typ: KiCountRow[]
+}
+
+export type NachfrageErgebnis = {
+  hinweis: string
+  plz_regionen: KiCountRow[]
+  bereiche: KiCountRow[]
+  situationen: KiCountRow[]
+  kanaele: KiCountRow[]
+  kundentypen?: KiCountRow[]
+  rechner_leistungen: KiCountRow[]
+  budgets: {
+    anzahl: number
+    median: number
+    min: number
+    max: number
+  } | null
+  anteil_mit_rechner?: number
+}
+
+export type AngebotAbgleichErgebnis = {
+  hinweis: string
+  funnel: {
+    leads_gesamt: number
+    leads_mit_angebot: number
+    angebote_gesamt: number
+    conversion_prozent: number | null
+  }
+  abweichungen: {
+    gewerke_hinzugefuegt: KiCountRow[]
+    gewerke_entfernt: KiCountRow[]
+    leistungen_hinzugefuegt: KiCountRow[]
+    leistungen_entfernt: KiCountRow[]
+  }
+  preis_abgleich: {
+    anzahl: number
+    median_delta_prozent: number | null
+    ueber_budget: number
+    unter_budget: number
+  } | null
+  verglichen: number
+  mit_angebotspositionen?: number
+}
+
 export type PreiseMargenZeile = {
   gewerk: string
   plz_region: string
@@ -17,6 +108,108 @@ export type PreiseMargenErgebnis = {
   hinweis: string
   region_label: string
   zeilen: PreiseMargenZeile[]
+}
+
+export type AusfuehrungErgebnis = {
+  hinweis: string
+  quelle: string
+  zusammenfassung: {
+    positionen_gesamt: number
+    eigen_positionen: number
+    fremd_positionen: number
+    eigen_anteil_prozent: number | null
+    vk_gesamt: number
+    marge_eigen_prozent: number | null
+    marge_fremd_prozent: number | null
+  } | null
+  je_gewerk: {
+    gewerk: string
+    eigen_positionen: number
+    fremd_positionen: number
+    eigen_anteil_prozent: number | null
+    eigen_marge_prozent: number | null
+    fremd_marge_prozent: number | null
+  }[]
+  eigen_leistungen?: KiCountRow[]
+  fremd_handwerker?: {
+    handwerker: string
+    leistungen: number
+    vk: number
+    marge_prozent: number | null
+  }[]
+}
+
+export type BaustelleSnippet = {
+  quelle: string
+  datum: string
+  gewerk: string
+  titel: string
+  text: string
+}
+
+export type DauerBautagebuchErgebnis = {
+  hinweis: string
+  projekt: {
+    auftraege: number
+    mit_dauer: number
+    dauer_tage_median: number | null
+  }
+  je_gewerk: { gewerk: string; anzahl: number; dauer_tage_median: number | null }[]
+  je_leistung?: {
+    gewerk: string
+    leistung: string
+    anzahl: number
+    dauer_tage_median: number | null
+  }[]
+  bautagebuch: {
+    eintraege: number
+    auftraege_mit_eintraegen: number
+    haeufige_titel: KiCountRow[]
+    je_gewerk: KiCountRow[]
+    snippets: BaustelleSnippet[]
+  }
+  positions_notizen?: {
+    eintraege: number
+    je_gewerk: KiCountRow[]
+    snippets: BaustelleSnippet[]
+  }
+  abnahme?: {
+    protokolle: number
+    auftraege_mit_abnahme: number
+    checkliste_punkte: number
+    checkliste_maengel: number
+    maengel_eintraege: number
+    haeufige_maengel: KiCountRow[]
+    je_gewerk: KiCountRow[]
+    snippets: BaustelleSnippet[]
+  }
+  kontext_snippets?: BaustelleSnippet[]
+}
+
+export type BewertungenZeile = {
+  handwerker_id: string
+  handwerker_name: string
+  gewerk: string
+  anzahl: number
+  gesamt: number | null
+  qualitaet: number | null
+  termintreue: number | null
+  sauberkeit?: number | null
+  kommunikation?: number | null
+  preis_leistung?: number | null
+  quelle?: string
+}
+
+export type BewertungenErgebnis = {
+  hinweis: string
+  zeilen: BewertungenZeile[]
+  kategorien_durchschnitt: {
+    qualitaet: number | null
+    termintreue: number | null
+    sauberkeit: number | null
+    kommunikation: number | null
+    preis_leistung: number | null
+  } | null
 }
 
 export type HandwerkerRankingZeile = {
@@ -116,9 +309,16 @@ export type KiClusterAnalyseRow = {
   analyse_key: string
   titel: string
   ergebnis:
+    | FunnelOverviewErgebnis
+    | NachfrageErgebnis
+    | KommunikationErgebnis
+    | AngebotAbgleichErgebnis
     | PreiseMargenErgebnis
     | HandwerkerRankingErgebnis
     | GewerkeAblaufErgebnis
+    | AusfuehrungErgebnis
+    | DauerBautagebuchErgebnis
+    | BewertungenErgebnis
     | ProduktePaketeErgebnis
     | Record<string, unknown>
   narrative: string | null

@@ -43,9 +43,9 @@ import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
   createGutschriftFromRechnung,
   sendRechnung,
-  sendRechnungErinnerung,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
+import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
 import { loadRechnungWizardBootstrap } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Preisliste, Rechnung, RechnungBelegTyp, RechnungStatus } from '@/lib/types'
@@ -133,6 +133,7 @@ export function RechnungDetailClient({
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
   const [tab, setTab] = useState<RechnungDetailTab>('uebersicht')
+  const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
   const berechnung = useMemo(
@@ -282,13 +283,7 @@ export function RechnungDetailClient({
         {
           label: 'Zahlungserinnerung senden',
           icon: <AlertTriangle className="h-[15px] w-[15px]" aria-hidden />,
-          onClick: () => {
-            startTransition(async () => {
-              const r = await sendRechnungErinnerung(detail.id)
-              if (!r.ok) toast.error(r.message)
-              else toast.message('Erinnerung', { description: 'Versand wird vorbereitet.' })
-            })
-          },
+          onClick: () => setErinnerungModalOpen(true),
         }
       )
     }
@@ -353,15 +348,28 @@ export function RechnungDetailClient({
     }
     if (detail.status === 'gesendet') {
       return (
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          loading={pending}
-          onClick={() => void setStatus('bezahlt')}
-        >
-          Als bezahlt markieren
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {ueberfaellig && belegTyp === 'rechnung' ? (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => setErinnerungModalOpen(true)}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+              Zahlungserinnerung
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant={ueberfaellig ? 'secondary' : 'primary'}
+            size="sm"
+            loading={pending}
+            onClick={() => void setStatus('bezahlt')}
+          >
+            Als bezahlt markieren
+          </Button>
+        </div>
       )
     }
     return (
@@ -375,7 +383,7 @@ export function RechnungDetailClient({
         PDF öffnen
       </a>
     )
-  }, [detail.status, pending, pdfHref])
+  }, [detail.status, pending, pdfHref, ueberfaellig, belegTyp])
 
   const summenFooter = (
     <div className="border-t border-bw-border px-4 py-3 text-sm">
@@ -700,6 +708,18 @@ export function RechnungDetailClient({
           />
         </ClientOnly>
       ) : null}
+
+      <ZahlungserinnerungMailModal
+        open={erinnerungModalOpen}
+        onClose={() => setErinnerungModalOpen(false)}
+        rechnungId={detail.id}
+        rechnungsnummer={detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)}
+        erinnerung7SentAt={detail.erinnerung_7_sent_at}
+        erinnerung21SentAt={detail.erinnerung_21_sent_at}
+        onSent={() => {
+          refresh()
+        }}
+      />
 
       {mailCompose.modal}
     </div>

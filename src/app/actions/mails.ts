@@ -17,6 +17,7 @@ import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import { addDaysYmd } from '@/lib/kalender-auto-termine'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
@@ -272,13 +273,17 @@ export async function sendZahlungserinnerungen(): Promise<{
 
     try {
       if (tage >= 7 && !r.erinnerung_7_sent_at && email) {
+        const zahlbarBisIso = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
+        const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
           {
             name,
             nummer: r.rechnungsnummer,
             brutto,
             faelligAm: faelligFmt,
+            zahlbarBis: zahlbarBisFmt,
             tageUeberfaellig: tage,
+            stufe: 1,
             iban,
             kundeTyp,
           },
@@ -296,20 +301,28 @@ export async function sendZahlungserinnerungen(): Promise<{
         if (send.success) {
           await supabaseAdmin
             .from('rechnungen')
-            .update({ erinnerung_7_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .update({
+              erinnerung_7_sent_at: new Date().toISOString(),
+              faellig_am: zahlbarBisIso,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', r.id)
           ergebnis.push({ id: r.id, aktion: 'erinnerung_7' })
         }
       }
 
       if (tage >= 21 && !r.erinnerung_21_sent_at && email) {
+        const zahlbarBisIso = addDaysYmd(new Date().toISOString().slice(0, 10), 14)
+        const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
           {
             name,
             nummer: r.rechnungsnummer,
             brutto,
             faelligAm: faelligFmt,
+            zahlbarBis: zahlbarBisFmt,
             tageUeberfaellig: tage,
+            stufe: 2,
             iban,
             kundeTyp,
           },
@@ -327,7 +340,11 @@ export async function sendZahlungserinnerungen(): Promise<{
         if (send.success) {
           await supabaseAdmin
             .from('rechnungen')
-            .update({ erinnerung_21_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .update({
+              erinnerung_21_sent_at: new Date().toISOString(),
+              faellig_am: zahlbarBisIso,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', r.id)
           ergebnis.push({ id: r.id, aktion: 'erinnerung_21' })
         }

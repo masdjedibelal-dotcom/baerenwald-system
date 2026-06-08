@@ -29,6 +29,7 @@ const nextConfig = {
       '/**': [
         './node_modules/@sparticuz/chromium/bin/**',
         './node_modules/@sparticuz/chromium/build/**',
+        './scripts/ki-analyse/**/*',
       ],
     },
   },

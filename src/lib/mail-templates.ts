@@ -4,7 +4,14 @@ import { resolveBrandLogoUrl, type BrandLogoVariant } from '@/lib/brand'
 import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPortalButton, buildPortalLoginLink } from '@/lib/portal-utils'
 import { buildAuftragsbestaetigungMail } from '@/lib/mail/auftragsbestaetigung-mail'
+import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import { buildRechnungMail, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
+import {
+  zahlungserinnerungBetreff,
+  zahlungserinnerungZahlbarBis,
+  type ZahlungserinnerungMailInput,
+  type ZahlungserinnerungStufe,
+} from '@/lib/mail/zahlungserinnerung-mail'
 import {
   mailBegruessungZeile,
   mailTeamGruss,
@@ -419,6 +426,7 @@ export function mailAngebot(
     statusLink: string
     anrede?: MailAnrede
     kundeTyp?: string | null
+    visualisierung_vorschau_url?: string | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
@@ -480,6 +488,7 @@ export function mailAngebot(
       `)}
       <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:16px 0;">${rows}</table>
       ${hint35a}
+      ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anrede, data.visualisierung_vorschau_url) : ''}
       <p style="font-size:13px;color:#6B7280;">${gueltig}</p>
       ${btn(mailText(anrede, 'Projektstatus ansehen →', 'Projektstatus ansehen →'), data.statusLink)}
       <p>${fragen}</p>
@@ -875,55 +884,114 @@ export function mailRechnung(data: RechnungMailInput, b: MailBranding) {
   return buildRechnungMail(data, b)
 }
 
-export function mailZahlungserinnerung(
-  data: {
-    name: string
-    nummer: string
-    brutto: number
-    faelligAm: string
-    tageUeberfaellig: number
-    iban: string
-    anrede?: MailAnrede
-    kundeTyp?: string | null
-  },
+export {
+  zahlungserinnerungBetreff,
+  zahlungserinnerungZahlbarBis,
+  type ZahlungserinnerungMailInput,
+  type ZahlungserinnerungStufe,
+} from '@/lib/mail/zahlungserinnerung-mail'
+
+export function buildZahlungserinnerungMail(
+  data: ZahlungserinnerungMailInput,
   b: MailBranding
 ): { betreff: string; html: string } {
   const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const iban = data.iban || b.iban
   const tel = esc(b.telefon)
-  const body = mailText(
-    anrede,
-    `unsere Rechnung <strong>${esc(data.nummer)}</strong> ist seit <strong>${data.tageUeberfaellig} Tagen</strong> offen.`,
-    `unsere Rechnung <strong>${esc(data.nummer)}</strong> ist seit <strong>${data.tageUeberfaellig} Tagen</strong> offen.`
-  )
+  const telHref = tel.replace(/\s/g, '')
+  const nr = esc(data.nummer)
+  const faellig = esc(data.faelligAm)
+  const zahlbarBis = esc(data.zahlbarBis)
+  const bruttoFmt = data.brutto.toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
+  const stufeTitel = data.stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung'
+
+  const einleitung =
+    data.stufe === 1
+      ? mailText(
+          anrede,
+          `unsere Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`,
+          `unsere Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`
+        )
+      : mailText(
+          anrede,
+          `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> noch offen.`,
+          `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> noch offen.`
+        )
+
+  const bitte =
+    data.stufe === 1
+      ? mailText(
+          anrede,
+          `Bitte überweise den offenen Betrag bis zum <strong>${zahlbarBis}</strong>. Die Rechnung findest du erneut im PDF-Anhang.`,
+          `Bitte überweisen Sie den offenen Betrag bis zum <strong>${zahlbarBis}</strong>. Die Rechnung finden Sie erneut im PDF-Anhang.`
+        )
+      : mailText(
+          anrede,
+          `Wir bitten dich, den Betrag bis spätestens <strong>${zahlbarBis}</strong> zu überweisen. Die Rechnung liegt erneut als PDF bei.`,
+          `Wir bitten Sie, den Betrag bis spätestens <strong>${zahlbarBis}</strong> zu überweisen. Die Rechnung liegt erneut als PDF bei.`
+        )
+
   const bereits = mailText(
     anrede,
-    `Falls du bereits überwiesen hast: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a>`,
-    `Falls Sie bereits überwiesen haben: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a>`
+    `Falls du bereits überwiesen hast, melde dich bitte unter <a href="tel:${telHref}" style="color:#2E7D52;">${tel}</a>.`,
+    `Falls Sie bereits überwiesen haben, melden Sie sich bitte unter <a href="tel:${telHref}" style="color:#2E7D52;">${tel}</a>.`
   )
+
   return {
-    betreff: `Zahlungserinnerung ${data.nummer}`,
+    betreff: zahlungserinnerungBetreff(data.stufe, data.nummer),
     html: mailHtmlBase(
       `
-      <h2 style="color:#C4922A;margin:0 0 16px;">Zahlungserinnerung</h2>
+      <h2 style="color:#C4922A;margin:0 0 16px;">${stufeTitel}</h2>
       <p>${begruessung}</p>
-      <p>${body}</p>
+      <p>${einleitung}</p>
+      <p>${bitte}</p>
       <div style="background:#FEF3E3;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px;">
         <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="color:#C4922A;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;">${data.brutto.toLocaleString('de-DE')} €</td></tr>
+        <tr><td style="color:#C4922A;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;">${bruttoFmt} €</td></tr>
+        <tr><td style="color:#C4922A;padding:4px 0;">Zahlbar bis:</td><td><strong>${zahlbarBis}</strong></td></tr>
         <tr><td style="color:#C4922A;padding:4px 0;">IBAN:</td><td>${esc(iban)}</td></tr>
-        <tr><td style="color:#C4922A;padding:4px 0;">Verwendungszweck:</td><td>${esc(data.nummer)}</td></tr>
+        <tr><td style="color:#C4922A;padding:4px 0;">Verwendungszweck:</td><td>${nr}</td></tr>
         </table>
       </div>
       <p style="font-size:13px;color:#6B7280;">${bereits}</p>
     `,
-      `Zahlungserinnerung: ${data.brutto.toLocaleString('de-DE')} € offen`,
+      `${stufeTitel}: ${bruttoFmt} € offen`,
       b,
       undefined,
       { anrede }
     ),
   }
+}
+
+export function mailZahlungserinnerung(
+  data: {
+    name: string
+    nummer: string
+    brutto: number
+    faelligAm: string
+    zahlbarBis?: string
+    tageUeberfaellig: number
+    stufe?: ZahlungserinnerungStufe
+    iban: string
+    anrede?: MailAnrede
+    kundeTyp?: string | null
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const stufe = data.stufe ?? (data.tageUeberfaellig >= 21 ? 2 : 1)
+  return buildZahlungserinnerungMail(
+    {
+      ...data,
+      stufe,
+      zahlbarBis: data.zahlbarBis ?? zahlungserinnerungZahlbarBis(stufe),
+    },
+    b
+  )
 }
 
 export function mailHandwerkerLeistungZuweisung(
@@ -969,6 +1037,60 @@ export function mailHandwerkerLeistungZuweisung(
       ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
     `,
       `Leistungsanfrage: ${subjectLeistung}`,
+      b,
+      undefined,
+      { skipMeinBaerenwaldPs: true }
+    ),
+  }
+}
+
+export function mailHandwerkerProjektvertragBereit(
+  data: {
+    name: string
+    auftragTitel: string
+    gewerkName: string
+    vertragsNr: string
+    portalLink: string
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const name = esc(data.name)
+  const titel = esc(data.auftragTitel.trim() || 'Ihr Auftrag')
+  const gewerk = esc(data.gewerkName.trim() || '—')
+  const nr = esc(data.vertragsNr.trim() || '—')
+
+  return {
+    betreff: `Projektvertrag bereit — bitte bestätigen · Bärenwald Partner`,
+    html: mailHtmlBase(
+      `
+      <h2 style="color:#2E7D52;margin:0 0 16px;">Projektvertrag liegt bereit</h2>
+      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
+      <p style="margin:0 0 16px;line-height:1.6;">
+        Ihr Angebot wurde übernommen. Der <strong>Projekt-Nachunternehmervertrag</strong> steht im Partner-Portal bereit —
+        bitte prüfen Sie die Unterlagen-Checkliste und bestätigen Sie den Vertrag verbindlich.
+      </p>
+      ${greenBox(`
+        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+        ${detailRow('Auftrag', titel)}
+        ${detailRow('Gewerk', gewerk)}
+        ${detailRow('Vertrags-Nr.', nr)}
+        </table>
+      `)}
+      <p style="margin:16px 0 8px;font-size:14px;font-weight:600;color:#1A3D2B;">Nächste Schritte im Portal:</p>
+      <ol style="font-size:14px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:#374151;">
+        <li>Projektvertrag lesen und prüfen</li>
+        <li>Pflicht-Unterlagen laut Checkliste hochladen (falls noch offen)</li>
+        <li>Vertrag verbindlich bestätigen</li>
+      </ol>
+      <p style="font-size:13px;color:#6B7280;margin:0 0 16px;line-height:1.6;">
+        Erst nach Ihrer Bestätigung wird der Auftrag für Sie freigeschaltet.
+      </p>
+      ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
+      <p style="font-size:13px;color:#6B7280;margin:16px 0 0;">Link:<br/>
+        <a href="${esc(data.portalLink)}" style="color:#2E7D52;word-break:break-all;">${esc(data.portalLink)}</a>
+      </p>
+    `,
+      `Projektvertrag bereit — ${data.gewerkName || 'Auftrag'}`,
       b,
       undefined,
       { skipMeinBaerenwaldPs: true }

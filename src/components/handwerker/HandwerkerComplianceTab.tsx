@@ -2,52 +2,79 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
-import type { PartnerDokument } from '@/lib/types'
+import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
+import { RAHMENVERTRAG_TYP_SLUG, rahmenvertragErfuellt } from '@/lib/handwerker/compliance-vertrag-status'
 import {
   deletePartnerDokument,
-  insertPartnerDokument,
+  replacePartnerDokumentForTyp,
   signPartnerDokumentUrl,
+  updatePartnerDokument,
 } from '@/app/(dashboard)/handwerker/actions'
 import { createClient } from '@/lib/supabase'
-import { cn, formatDatum } from '@/lib/utils'
+import {
+  complianceDokumentStatus,
+  dokumentFuerTyp,
+  filterStandardComplianceTypen,
+  gruppeComplianceTypen,
+  istPflichtTyp,
+  standardDokumente,
+  type ComplianceDokumentStatus,
+} from '@/lib/handwerker/compliance-katalog'
+import { cn } from '@/lib/utils'
 
 const BUCKET = 'partner-dokumente'
-/** Einheitlicher Typ für frei hochgeladene Nachweise (kein Katalog). */
-const DOKUMENT_TYP = 'dokument'
 
 function safeFileName(name: string): string {
   return name.replace(/[^\w.\-äöüÄÖÜß]+/gi, '_').slice(0, 120) || 'datei'
 }
 
-function titelAusDateiname(name: string): string {
-  const base = name.replace(/\.[^.]+$/, '').trim()
-  return base || name
+function statusLabel(s: ComplianceDokumentStatus): string {
+  if (s === 'ok') return 'Vorhanden'
+  if (s === 'warnung') return 'Läuft bald ab'
+  if (s === 'abgelaufen') return 'Abgelaufen'
+  return 'Fehlt'
+}
+
+function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
+  if (status === 'ok') {
+    return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+  }
+  return (
+    <AlertCircle
+      className={cn(
+        'h-4 w-4 shrink-0',
+        status === 'warnung' ? 'text-amber-600' : 'text-status-cancel-text'
+      )}
+      aria-hidden
+    />
+  )
 }
 
 export function HandwerkerComplianceTab({
   handwerkerId,
   dokumente,
+  complianceTypen,
+  rahmenVertrag = null,
 }: {
   handwerkerId: string
   dokumente: PartnerDokument[]
+  complianceTypen: ComplianceDokumentTyp[]
+  rahmenVertrag?: HandwerkerVertragRow | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [uploading, setUploading] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
-  const [naechsterTitel, setNaechsterTitel] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploadingTyp, setUploadingTyp] = useState<string | null>(null)
+  const typRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const zeilen = useMemo(() => {
-    return [...dokumente]
-      .filter((d) => d.datei_url?.trim())
-      .sort(
-        (a, b) =>
-          new Date(b.hochgeladen_am ?? 0).getTime() - new Date(a.hochgeladen_am ?? 0).getTime()
-      )
-  }, [dokumente])
+  const standardTypen = useMemo(
+    () => filterStandardComplianceTypen(complianceTypen),
+    [complianceTypen]
+  )
+  const gruppen = useMemo(() => gruppeComplianceTypen(standardTypen), [standardTypen])
+  const standardDocs = useMemo(() => standardDokumente(dokumente), [dokumente])
 
   async function openDatei(stored: string | null | undefined) {
     const r = await signPartnerDokumentUrl(stored)
@@ -58,177 +85,209 @@ export function HandwerkerComplianceTab({
     window.open(r.url, '_blank', 'noopener,noreferrer')
   }
 
-  async function uploadFiles(files: FileList | File[]) {
-    const list = Array.from(files).slice(0, 10)
-    if (!list.length) return
-    setUploading(true)
+  async function uploadForTyp(typ: ComplianceDokumentTyp, file: File) {
+    setUploadingTyp(typ.slug)
     const supabase = createClient()
     try {
-      for (const file of list) {
-        const path = `${handwerkerId}/${Date.now()}-${safeFileName(file.name)}`
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-          upsert: false,
-          contentType: file.type || undefined,
-        })
-        if (upErr) throw new Error(upErr.message)
+      const path = `${handwerkerId}/${typ.slug}-${Date.now()}-${safeFileName(file.name)}`
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      })
+      if (upErr) throw new Error(upErr.message)
 
-        const titel =
-          (list.length === 1 ? naechsterTitel.trim() : '') ||
-          titelAusDateiname(file.name)
-
-        const ins = await insertPartnerDokument({
-          handwerker_id: handwerkerId,
-          typ: DOKUMENT_TYP,
-          bezeichnung: titel,
-          gueltig_bis: null,
-          datei_url: path,
-          notizen: null,
-        })
-        if (!ins.ok) {
-          await supabase.storage.from(BUCKET).remove([path])
-          throw new Error(ins.message)
-        }
+      const existing = dokumentFuerTyp(standardDocs, typ.slug)
+      let gueltigBis: string | null = existing?.gueltig_bis ?? null
+      if (typ.erneuerung_monate && typ.erneuerung_monate > 0) {
+        const d = new Date()
+        d.setMonth(d.getMonth() + typ.erneuerung_monate)
+        gueltigBis = d.toISOString().slice(0, 10)
       }
-      setNaechsterTitel('')
-      toast.success(list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`)
+
+      const ins = await replacePartnerDokumentForTyp({
+        handwerker_id: handwerkerId,
+        auftrag_id: null,
+        typ: typ.slug,
+        bezeichnung: typ.bezeichnung,
+        gueltig_bis: gueltigBis,
+        datei_url: path,
+      })
+      if (!ins.ok) {
+        await supabase.storage.from(BUCKET).remove([path])
+        throw new Error(ins.message)
+      }
+      toast.success(`${typ.bezeichnung} hochgeladen`)
       router.refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
     } finally {
-      setUploading(false)
+      setUploadingTyp(null)
     }
+  }
+
+  function saveGueltigBis(docId: string, value: string) {
+    startTransition(async () => {
+      const r = await updatePartnerDokument(docId, handwerkerId, {
+        gueltig_bis: value.trim() || null,
+      })
+      if (!r.ok) toast.error(r.message)
+      else router.refresh()
+    })
   }
 
   function removeDoc(docId: string, titel: string) {
     if (!confirm(`„${titel}" wirklich löschen?`)) return
     startTransition(async () => {
       const r = await deletePartnerDokument(docId, handwerkerId)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Gelöscht')
+        router.refresh()
       }
-      toast.success('Gelöscht')
-      router.refresh()
     })
   }
 
-  const busy = pending || uploading
+  const busy = pending || uploadingTyp != null
 
   return (
-    <div className="pb-4">
-      <input
-        ref={fileRef}
-        type="file"
-        className="sr-only"
-        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-        multiple
-        onChange={(e) => {
-          if (e.target.files?.length) void uploadFiles(e.target.files)
-          e.target.value = ''
-        }}
-      />
+    <div className="space-y-6 pb-4">
+      <p className="text-sm text-bw-text-muted">
+        Allgemeine Partnerunterlagen für alle Gewerke — unabhängig von einzelnen Bauprojekten.
+        Projektbezogene Nachweise finden Sie unter Tab „Aufträge“ bzw. im jeweiligen Auftrag unter
+        Dokumente.
+      </p>
 
-      <div className="mb-4 max-w-md">
-        <label className="input-label" htmlFor="hw-dok-titel">
-          Titel (optional, für die nächste Datei)
-        </label>
-        <input
-          id="hw-dok-titel"
-          type="text"
-          className="input w-full"
-          value={naechsterTitel}
-          onChange={(e) => setNaechsterTitel(e.target.value)}
-          placeholder="z. B. Betriebshaftpflicht, Gewerbeanmeldung…"
-          disabled={busy}
-        />
-      </div>
+      {gruppen.map((gruppe) => (
+        <section key={gruppe.kategorie} className="space-y-2">
+          <h3 className="text-sm font-semibold text-bw-text">{gruppe.kategorie}</h3>
+          <div className="overflow-hidden rounded-xl border border-bw-border">
+            <ul className="divide-y divide-bw-border">
+              {gruppe.typen.map((typ) => {
+                const doc = dokumentFuerTyp(standardDocs, typ.slug)
+                const rvOk =
+                  typ.slug === RAHMENVERTRAG_TYP_SLUG &&
+                  rahmenvertragErfuellt(standardDocs, rahmenVertrag)
+                const status = rvOk ? 'ok' : complianceDokumentStatus(typ, doc)
+                const rvPdf = rahmenVertrag?.pdf_url?.trim()
+                const pflicht = istPflichtTyp(typ)
+                const uploading = uploadingTyp === typ.slug
 
-      <div
-        className={cn(
-          'dok-upload-zone',
-          dragOver && 'dok-upload-zone-active',
-          busy && 'pointer-events-none opacity-60'
-        )}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragOver(false)
-          if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
-        }}
-        onClick={() => fileRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click()
-        }}
-      >
-        <Upload className="mx-auto h-6 w-6 text-bw-text-muted" aria-hidden />
-        <p className="mt-2 text-sm text-bw-text">
-          {uploading
-            ? 'Wird hochgeladen…'
-            : (
-                <>
-                  Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
-                </>
-              )}
-        </p>
-        <p className="mt-1 text-xs text-bw-text-muted">PDF, JPG, PNG, DOC · mehrere Dateien möglich</p>
-      </div>
+                return (
+                  <li
+                    key={typ.id}
+                    className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <StatusIcon status={status} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-bw-text">
+                            {typ.bezeichnung}
+                            {pflicht ? (
+                              <span className="ml-2 rounded bg-bw-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-bw-primary">
+                                Pflicht
+                              </span>
+                            ) : null}
+                          </p>
+                          {typ.beschreibung ? (
+                            <p className="mt-0.5 text-xs text-bw-text-muted line-clamp-2">
+                              {typ.beschreibung}
+                            </p>
+                          ) : null}
+                          {typ.vertrag_referenz ? (
+                            <p className="mt-0.5 text-[11px] text-bw-text-muted">
+                              Vertrag: {typ.vertrag_referenz}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 text-[11px] text-bw-text-muted">{statusLabel(status)}</p>
+                        </div>
+                      </div>
+                    </div>
 
-      {zeilen.length === 0 ? (
-        <p className="py-6 text-center text-sm text-bw-text-muted">Noch keine Dokumente.</p>
-      ) : (
-        <div className="dok-table-wrap mt-4">
-          <table className="dok-table">
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Titel</th>
-                <th className="text-right w-14" aria-label="Vorschau" />
-                <th className="text-right">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zeilen.map((d) => (
-                <tr key={d.id}>
-                  <td className="tabular-nums whitespace-nowrap text-bw-text-muted">
-                    {d.hochgeladen_am ? formatDatum(d.hochgeladen_am) : '—'}
-                  </td>
-                  <td className="max-w-[min(100%,24rem)] font-medium text-bw-text">
-                    <span className="line-clamp-2">{d.bezeichnung?.trim() || '—'}</span>
-                  </td>
-                  <td className="text-right">
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50 disabled:opacity-50"
-                      aria-label={`${d.bezeichnung} öffnen`}
-                      disabled={busy}
-                      onClick={() => void openDatei(d.datei_url)}
-                    >
-                      <FileText className="h-4 w-4" aria-hidden />
-                    </button>
-                  </td>
-                  <td className="text-right">
-                    <button
-                      type="button"
-                      className="icon-btn text-status-cancel-text hover:bg-red-500/10"
-                      title="Löschen"
-                      disabled={busy}
-                      onClick={() => removeDoc(d.id, d.bezeichnung?.trim() || 'Dokument')}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                      {rvOk && rvPdf && !doc ? (
+                        <a
+                          href={rvPdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-bw-link hover:underline"
+                        >
+                          RV-PDF öffnen
+                        </a>
+                      ) : null}
+                      {doc ? (
+                        <>
+                          <label className="flex items-center gap-1.5 text-xs text-bw-text-muted">
+                            Gültig bis
+                            <input
+                              type="date"
+                              className="input py-1 text-xs"
+                              defaultValue={
+                                doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''
+                              }
+                              key={`${doc.id}-${doc.gueltig_bis ?? ''}`}
+                              disabled={busy}
+                              onBlur={(e) => {
+                                const v = e.target.value
+                                const cur = doc.gueltig_bis
+                                  ? String(doc.gueltig_bis).slice(0, 10)
+                                  : ''
+                                if (v === cur) return
+                                saveGueltigBis(doc.id, v)
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828]"
+                            title="Öffnen"
+                            disabled={busy}
+                            onClick={() => void openDatei(doc.datei_url)}
+                          >
+                            <FileText className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn text-status-cancel-text hover:bg-red-500/10"
+                            title="Löschen"
+                            disabled={busy}
+                            onClick={() => removeDoc(doc.id, typ.bezeichnung)}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </button>
+                        </>
+                      ) : null}
+
+                      <input
+                        ref={(el) => {
+                          typRefs.current[typ.slug] = el
+                        }}
+                        type="file"
+                        className="sr-only"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) void uploadForTyp(typ, f)
+                          e.target.value = ''
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary inline-flex items-center gap-1.5"
+                        disabled={busy}
+                        onClick={() => typRefs.current[typ.slug]?.click()}
+                      >
+                        <Upload className="h-3.5 w-3.5" aria-hidden />
+                        {uploading ? 'Lädt…' : doc ? 'Ersetzen' : 'Hochladen'}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

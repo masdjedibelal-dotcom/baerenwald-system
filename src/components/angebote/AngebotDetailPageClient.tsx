@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Paperclip,
   Pencil,
+  Sparkles,
   CircleX,
   Send,
 } from 'lucide-react'
@@ -53,6 +54,7 @@ import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-ac
 import { previewAuftragsbestaetigungMail } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
 import {
@@ -79,6 +81,7 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import type { AngebotDetail, AngebotPosition, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
+import type { KiVisualisierung } from '@/lib/visualize/types'
 import { cn, formatDatum, formatDatumZeit } from '@/lib/utils'
 import {
   KUNDE_ABLEHNUNG_GRUND_LABELS,
@@ -202,10 +205,10 @@ function PositionenZeile({ p }: { p: AngebotPosition }) {
   )
 }
 
-type Tab = 'stammdaten' | 'leistung' | 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente'
+type Tab = 'stammdaten' | 'leistung' | 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente' | 'visualisierungen'
 
-const DESKTOP_ANGEBOT_TABS: Tab[] = ['schritte', 'positionen', 'aktivitaet', 'dokumente']
-const MOBILE_ANGEBOT_TABS: Tab[] = ['stammdaten', 'leistung', 'schritte', 'aktivitaet', 'dokumente']
+const DESKTOP_ANGEBOT_TABS: Tab[] = ['schritte', 'positionen', 'visualisierungen', 'aktivitaet', 'dokumente']
+const MOBILE_ANGEBOT_TABS: Tab[] = ['stammdaten', 'leistung', 'schritte', 'visualisierungen', 'aktivitaet', 'dokumente']
 
 export function AngebotDetailPageClient({
   detail,
@@ -215,6 +218,7 @@ export function AngebotDetailPageClient({
   wizardPreislisten,
   wizardFirm,
   lead,
+  kiVisualisierungen = [],
 }: {
   detail: AngebotDetail
   timeline: LeadTimelineRow[]
@@ -223,6 +227,7 @@ export function AngebotDetailPageClient({
   wizardPreislisten: Preisliste[]
   wizardFirm: FirmenEinstellungen
   lead: LeadDetail | null
+  kiVisualisierungen?: KiVisualisierung[]
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -567,13 +572,19 @@ export function AngebotDetailPageClient({
         count: timelineCount || undefined,
       },
       {
+        id: 'visualisierungen',
+        label: 'Visualisierungen',
+        icon: Sparkles,
+        count: kiVisualisierungen.length || undefined,
+      },
+      {
         id: 'dokumente',
         label: ACTIVITY_SECTIONS.dokumente,
         icon: Paperclip,
         count: anhaengeCount || undefined,
       },
     ],
-    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount]
+    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount, kiVisualisierungen.length]
   )
 
   const mobileDetailTabs = useMemo(
@@ -598,13 +609,19 @@ export function AngebotDetailPageClient({
         count: timelineCount || undefined,
       },
       {
+        id: 'visualisierungen',
+        label: 'Visualisierungen',
+        icon: Sparkles,
+        count: kiVisualisierungen.length || undefined,
+      },
+      {
         id: 'dokumente',
         label: ACTIVITY_SECTIONS.dokumente,
         icon: Paperclip,
         count: anhaengeCount || undefined,
       },
     ],
-    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount]
+    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount, kiVisualisierungen.length]
   )
 
   const formatEur = (n: number) =>
@@ -791,12 +808,17 @@ export function AngebotDetailPageClient({
   )
 
   const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
+  const visualisierungenInhalt = (
+    <AngebotVisualisierungenTab angebotId={detail.id} sessions={kiVisualisierungen} />
+  )
 
   const desktopTabContent =
     tab === 'schritte' ? (
       schritteInhalt
     ) : tab === 'positionen' ? (
       positionenTab
+    ) : tab === 'visualisierungen' ? (
+      visualisierungenInhalt
     ) : tab === 'aktivitaet' ? (
       aktivitaetInhalt
     ) : tab === 'dokumente' ? (
@@ -810,6 +832,8 @@ export function AngebotDetailPageClient({
       positionenTab
     ) : tab === 'schritte' ? (
       schritteInhalt
+    ) : tab === 'visualisierungen' ? (
+      visualisierungenInhalt
     ) : tab === 'aktivitaet' ? (
       aktivitaetInhalt
     ) : tab === 'dokumente' ? (

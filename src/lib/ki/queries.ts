@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase-server'
+import { KI_BEREICH_ORDER } from '@/lib/ki/constants'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
 
 export async function loadKiClusterAnalysen(): Promise<KiClusterAnalyseRow[]> {
@@ -16,7 +17,19 @@ export async function loadKiClusterAnalysen(): Promise<KiClusterAnalyseRow[]> {
     return []
   }
 
-  return (data ?? []) as KiClusterAnalyseRow[]
+  return latestAnalysenPerBereich((data ?? []) as KiClusterAnalyseRow[])
+}
+
+/** Pro Bereich nur die neueste Zeile (keine Doppel-Cards). */
+export function latestAnalysenPerBereich(rows: KiClusterAnalyseRow[]): KiClusterAnalyseRow[] {
+  const byBereich = new Map<string, KiClusterAnalyseRow>()
+  for (const row of rows) {
+    const existing = byBereich.get(row.bereich)
+    if (!existing || new Date(row.generiert_am) > new Date(existing.generiert_am)) {
+      byBereich.set(row.bereich, row)
+    }
+  }
+  return KI_BEREICH_ORDER.filter((b) => byBereich.has(b)).map((b) => byBereich.get(b)!)
 }
 
 export function groupAnalysenByBereich(

@@ -50,6 +50,17 @@ export function buildPartnerLoginForAuftragUrl(auftragId: string): string {
   return `${buildPartnerLoginLink()}?next=${encodeURIComponent(next)}`
 }
 
+/** Angebote-Tab im Partner-Portal (Vertrag + Checkliste nach Übernahme). */
+export function buildPartnerAngebotPortalUrl(anfrageId: string): string {
+  const id = anfrageId.trim()
+  return `${publicWebsiteBaseUrl()}/partner?section=angebote&id=${encodeURIComponent(id)}`
+}
+
+export function buildPartnerLoginForAngebotUrl(anfrageId: string): string {
+  const next = buildPartnerAngebotPortalUrl(anfrageId)
+  return `${buildPartnerLoginLink()}?next=${encodeURIComponent(next)}`
+}
+
 export function buildPartnerPortalButton(portalLink: string): string {
   return `
 <div style="margin:20px 0 8px;">

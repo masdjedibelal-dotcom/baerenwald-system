@@ -18,6 +18,8 @@ import type { AngebotProjektPdfBlock } from '@/lib/angebote/angebot-projekt-pdf-
 import type { AngebotPosition } from '@/lib/types'
 import { RECHNUNG_SCHLUSS_STANDARD } from '@/lib/rechnungen/rechnung-texte'
 import { looksLikeHtml, richTextToPlain, richTextToSafePdfHtml } from '@/lib/rich-text'
+import { kiVisualisierungPdfHtml } from '@/lib/visualize/pdf-html'
+import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
 
 const PROJEKT_ACCENT = '#1A3D2B'
 const PROJEKT_TINT = '#F3F7F4'
@@ -130,6 +132,8 @@ export type AngebotHtmlInput = {
   pdf_roh_positionen?: AngebotPosition[]
   /** true = zwei Alternativ-Angebote, keine Gesamtübersicht */
   projekt_hat_varianten?: boolean
+  /** KI-Visualisierung (ins Angebot übernommen) */
+  ki_visualisierungen?: KiVizPdfPage[] | null
 }
 
 function esc(s: string): string {
@@ -958,6 +962,7 @@ function buildAngebotProjektHtml(
 
   ${beschreibung}
   ${fotos}
+  ${props.ki_visualisierungen?.length ? kiVisualisierungPdfHtml(props.ki_visualisierungen) : ''}
   ${bloeckeHtml}
   ${gesamtSumme}
   ${abschlussKostenRecht}
@@ -987,6 +992,8 @@ export function buildAngebotHtml(
 
   const einl = richTextToSafePdfHtml(props.einleitung?.trim() || '')
   const begr = esc(props.begruessung.trim() || 'Guten Tag,')
+  const kiViz =
+    props.ki_visualisierungen?.length ? kiVisualisierungPdfHtml(props.ki_visualisierungen) : ''
 
   const posTables =
     props.pdf_roh_positionen?.length && props.pdf_gewerke?.length
@@ -1023,6 +1030,7 @@ export function buildAngebotHtml(
     ${begr}<br/><br/>
     ${einl}
   </p>
+  ${kiViz}
   ${erstePosUeberschrift}
   ${posTables}
   ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise)}

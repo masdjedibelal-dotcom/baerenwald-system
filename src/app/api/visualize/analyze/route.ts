@@ -1,0 +1,55 @@
+import { NextResponse } from 'next/server'
+import { analyzeZielBildForPrompt } from '@/lib/visualize/claude-analyze'
+import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
+import { loadKiVisualisierung, updateKiVisualisierung } from '@/lib/visualize/queries'
+
+export async function POST(req: Request) {
+  let body: {
+    angebot_id?: string
+    session_id?: string
+    ist_bild_url?: string
+    ziel_bild_url?: string
+    gewerk?: string
+  } = {}
+
+  try {
+    body = (await req.json()) as typeof body
+  } catch {
+    return NextResponse.json({ error: 'Ungültiger Body' }, { status: 400 })
+  }
+
+  const angebotId = body.angebot_id?.trim()
+  const sessionId = body.session_id?.trim()
+  const istUrl = body.ist_bild_url?.trim()
+  const zielUrl = body.ziel_bild_url?.trim()
+
+  if (!angebotId || !sessionId || !istUrl || !zielUrl) {
+    return NextResponse.json({ error: 'Pflichtfelder fehlen' }, { status: 400 })
+  }
+
+  const auth = await requireCrmAngebotAccess(angebotId)
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.message }, { status: auth.status })
+  }
+
+  const session = await loadKiVisualisierung(sessionId)
+  if (!session || session.angebot_id !== angebotId) {
+    return NextResponse.json({ error: 'Session nicht gefunden' }, { status: 404 })
+  }
+
+  try {
+    const prompt = await analyzeZielBildForPrompt({
+      ist_bild_url: istUrl,
+      ziel_bild_url: zielUrl,
+      gewerk: body.gewerk,
+    })
+    await updateKiVisualisierung(sessionId, {
+      analysierter_prompt: prompt,
+      ziel_bild_url: zielUrl,
+    })
+    return NextResponse.json({ prompt })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Analyse fehlgeschlagen'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
