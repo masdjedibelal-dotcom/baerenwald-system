@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { describeClaudeKeyForDebug, getClaudeApiKey } from '@/lib/copilot/claude-api-key'
+import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey } from '@/lib/copilot/claude-api-key'
 import { sendTelegram, sendTelegramTyping } from '@/lib/copilot/telegram'
 import { COPILOT_CLAUDE_TOOLS, COPILOT_MODEL } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 function anthropicClient(): Anthropic {
-  return new Anthropic({ apiKey: getClaudeApiKey() })
+  return createAnthropicClient(getClaudeApiKey())
 }
 
 function formatCopilotError(e: unknown): string {

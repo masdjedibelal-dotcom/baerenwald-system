@@ -1,5 +1,10 @@
 import 'server-only'
 
+import Anthropic from '@anthropic-ai/sdk'
+
+/** Direkt zu Anthropic — nicht über Netlify AI Gateway (/.netlify/ai/…). */
+export const ANTHROPIC_DIRECT_BASE_URL = 'https://api.anthropic.com'
+
 /** Entfernt BOM, Anführungszeichen und Leerzeichen (häufig bei Copy/Paste in Netlify). */
 export function normalizeClaudeApiKey(raw: string | undefined): string {
   if (!raw) return ''
@@ -13,7 +18,7 @@ export function normalizeClaudeApiKey(raw: string | undefined): string {
   ) {
     k = k.slice(1, -1).trim()
   }
-  return k
+  return k.replace(/\s/g, '')
 }
 
 export type ClaudeKeySource = 'CLAUDE_API_KEY' | 'ANTHROPIC_API_KEY' | 'none'
@@ -42,12 +47,29 @@ export function getClaudeApiKeySource(): ClaudeKeySource {
 }
 
 export function claudeApiKeyLooksValid(key: string): boolean {
-  return /^sk-ant-/.test(key)
+  return /^sk-ant-/.test(key) && key.length > 20
+}
+
+/** Netlify injiziert ANTHROPIC_BASE_URL → Gateway; mit eigenem Key → 401. */
+export function isNetlifyAiGatewayBaseUrl(): boolean {
+  const base = process.env.ANTHROPIC_BASE_URL?.trim() ?? ''
+  return base.includes('/.netlify/ai') || base.includes('netlify.app/.netlify/ai')
+}
+
+/** Anthropic-Client: eigener Key + feste API-URL (ignoriert Netlify-Gateway-Env). */
+export function createAnthropicClient(apiKey: string): Anthropic {
+  return new Anthropic({
+    apiKey,
+    baseURL: ANTHROPIC_DIRECT_BASE_URL,
+  })
 }
 
 /** Nur für Fehlermeldungen — kein vollständiger Key. */
 export function describeClaudeKeyForDebug(): string {
   const key = getClaudeApiKey()
   if (!key) return 'kein Key gesetzt'
-  return `Quelle=${getClaudeApiKeySource()}, Länge=${key.length}, Anfang=${key.slice(0, 16)}…, Format=${claudeApiKeyLooksValid(key) ? 'ok' : 'ungültig'}`
+  const gateway = isNetlifyAiGatewayBaseUrl()
+    ? ', Netlify-Gateway-Env aktiv (wird im Code umgangen)'
+    : ''
+  return `Quelle=${getClaudeApiKeySource()}, Länge=${key.length}, Anfang=${key.slice(0, 16)}…, Format=${claudeApiKeyLooksValid(key) ? 'ok' : 'ungültig'}${gateway}`
 }

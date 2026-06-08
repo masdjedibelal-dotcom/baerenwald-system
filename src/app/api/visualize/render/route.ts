@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     session_id?: string
     ist_bild_url?: string
     prompt?: string
+    ist_hinweis?: string
   } = {}
 
   try {
@@ -57,7 +58,12 @@ export async function POST(req: Request) {
   await updateKiVisualisierung(sessionId, { status: 'rendering' })
 
   try {
-    const remoteUrl = await renderInteriorDesign({ image: istUrl, prompt })
+    const istHinweis = body.ist_hinweis?.trim() || null
+    const remoteUrl = await renderInteriorDesign({
+      image: istUrl,
+      prompt,
+      istHinweis,
+    })
     const version = session.prompt_history.length + 1
     const ergebnisUrl = await persistRemoteImageToVisualisierungen({
       sourceUrl: remoteUrl,

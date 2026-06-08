@@ -2,8 +2,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   claudeApiKeyLooksValid,
+  createAnthropicClient,
   getClaudeApiKey,
   getClaudeApiKeySource,
+  isNetlifyAiGatewayBaseUrl,
   normalizeClaudeApiKey,
 } from '@/lib/copilot/claude-api-key'
 import { COPILOT_MODEL } from '@/lib/copilot/claude-tools'
@@ -35,6 +37,8 @@ export async function GET(req: NextRequest) {
       resolved_key_length: resolved.length,
       resolved_key_prefix: resolved ? `${resolved.slice(0, 12)}…` : null,
       resolved_key_format_ok: claudeApiKeyLooksValid(resolved),
+      ANTHROPIC_BASE_URL_netlify_gateway: isNetlifyAiGatewayBaseUrl(),
+      anthropic_uses_direct_api: true,
       TELEGRAM_BOT_TOKEN_set: !!process.env.TELEGRAM_BOT_TOKEN?.trim(),
       TELEGRAM_CHAT_ID_set: !!process.env.TELEGRAM_CHAT_ID?.trim(),
       SUPABASE_SERVICE_ROLE_KEY_set: !!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest) {
     }
   } else {
     try {
-      const client = new Anthropic({ apiKey: resolved })
+      const client = createAnthropicClient(resolved)
       await client.messages.create({
         model: COPILOT_MODEL,
         max_tokens: 8,

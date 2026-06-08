@@ -6,8 +6,10 @@ import { ImageIcon, Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
+import { VizZielbildCard } from '@/components/angebote/VizZielbildCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
+  VIZ_IST_FIX_TAGS,
   VIZ_MAX_IST_BILDER,
   VIZ_NACHPROMPT_TAGS,
   VIZ_STIL_TAGS,
@@ -107,6 +109,7 @@ export function AngebotVisualisierungClient({
   const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null)
   const [aktivesIstIndex, setAktivesIstIndex] = useState(0)
   const [prompt, setPrompt] = useState(initialSession?.analysierter_prompt ?? '')
+  const [istHinweis, setIstHinweis] = useState('')
   const [modus, setModus] = useState<Modus>('prompt')
   const [isRendering, setIsRendering] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -291,6 +294,7 @@ export function AngebotVisualisierungClient({
           session_id: sid,
           ist_bild_url: istUrl,
           ziel_bild_url: zielUrl,
+          ist_hinweis: istHinweis.trim() || undefined,
         }),
       })
       let data: { prompt?: string; error?: string }
@@ -331,6 +335,7 @@ export function AngebotVisualisierungClient({
           session_id: sid,
           ist_bild_url: istUrl,
           prompt: p,
+          ist_hinweis: istHinweis.trim() || undefined,
         }),
       })
       const data = (await res.json()) as {
@@ -349,6 +354,15 @@ export function AngebotVisualisierungClient({
     } finally {
       setIsRendering(false)
     }
+  }
+
+  function appendIstFixTag(tag: string) {
+    setIstHinweis((prev) => {
+      const t = prev.trim()
+      if (!t) return tag
+      if (t.toLowerCase().includes(tag.toLowerCase())) return t
+      return `${t}, ${tag}`
+    })
   }
 
   function appendStilTag(tag: string) {
@@ -391,6 +405,8 @@ export function AngebotVisualisierungClient({
   }
 
   const kannRendern = istBilderUrls.length > 0 && prompt.trim().length > 0 && !isRendering
+  const istUrlAktiv = istBilderUrls[aktivesIstIndex]?.trim()
+  const zielbildBeschreibung = prompt.trim() || session?.analysierter_prompt?.trim() || ''
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-8">
@@ -490,6 +506,32 @@ export function AngebotVisualisierungClient({
           </section>
 
           <section>
+            <h2 className="text-sm font-semibold text-bw-text">Ist-Geometrie schützen</h2>
+            <p className="mb-2 text-xs text-bw-text-muted">
+              Optional — nur Material/Farbe ändern, Raumform und Grenzen bleiben (z. B. Fliesen nur bis halbe Höhe).
+            </p>
+            <textarea
+              className="input min-h-[72px] w-full text-sm"
+              rows={2}
+              value={istHinweis}
+              onChange={(e) => setIstHinweis(e.target.value)}
+              placeholder="z. B. Fliesen nur bis zur Hälfte, Fenster links unverändert, Badewanne bleibt"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {VIZ_IST_FIX_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
+                  onClick={() => appendIstFixTag(tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
             <h2 className="text-sm font-semibold text-bw-text">Was soll entstehen?</h2>
             <div className="mt-2 flex gap-1 rounded-lg bg-bw-bg p-1">
               <button
@@ -552,7 +594,10 @@ export function AngebotVisualisierungClient({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-lg border border-bw-border object-cover" />
                 ) : null}
-                <p className="text-xs text-bw-text-muted">Claude analysiert das Bild und erstellt einen Prompt.</p>
+                <p className="text-xs text-bw-text-muted">
+                  Claude vergleicht Ist + Ziel und überträgt nur Stil (Material, Farbe, Muster) — nicht das Raumlayout
+                  vom Zielbild.
+                </p>
                 <Button
                   type="button"
                   variant="secondary"
@@ -560,15 +605,19 @@ export function AngebotVisualisierungClient({
                   disabled={isAnalyzing || !zielBildUrl || !istBilderUrls.length}
                   onClick={() => void analyzeZielBild()}
                 >
-                  {isAnalyzing ? 'Analysiert…' : 'Analysieren'}
+                  {isAnalyzing ? 'Analysiert…' : 'Stil analysieren'}
                 </Button>
+                <label className="block text-xs font-medium text-bw-text">Render-Prompt (vor Rendern anpassen)</label>
                 <textarea
                   className="input min-h-[100px] w-full text-sm"
                   rows={4}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Generierter Prompt erscheint hier…"
+                  placeholder="Nach Analyse: Prompt prüfen und ergänzen, z. B. welche Flächen welches Material bekommen…"
                 />
+                <p className="text-xs text-bw-text-muted">
+                  Nach dem ersten Render rechts „Anpassen“ nutzen — Prompt ändern und neu rendern.
+                </p>
               </div>
             )}
           </section>
@@ -608,34 +657,63 @@ export function AngebotVisualisierungClient({
             </div>
           ) : (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={aktiveErgebnis.ergebnis_url}
-                alt={`Visualisierung V${aktiveErgebnis.version}`}
-                className="w-full animate-in fade-in rounded-lg border border-bw-border object-cover duration-500"
-              />
-              {versionen.length > 1 ? (
-                <div className="flex flex-wrap gap-1">
-                  {versionen.map((v, i) => (
-                    <button
-                      key={v.version}
-                      type="button"
-                      className={cn(
-                        'rounded-md px-2.5 py-1 text-xs font-medium',
-                        i === aktiveVersion
-                          ? 'bg-bw-primary text-white'
-                          : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
-                      )}
-                      onClick={() => setAktiveVersion(i)}
-                    >
-                      V{v.version}
-                    </button>
-                  ))}
+              <div className="grid gap-4 xl:grid-cols-[1fr_min(300px,38%)]">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <figure className="m-0">
+                      <figcaption className="mb-1 text-xs font-medium text-bw-text-muted">Vorher</figcaption>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={istUrlAktiv}
+                        alt="Vorher"
+                        className="aspect-[4/3] w-full rounded-lg border border-bw-border object-cover"
+                      />
+                    </figure>
+                    <figure className="m-0">
+                      <figcaption className="mb-1 text-xs font-medium text-[#2E7D52]">Nachher</figcaption>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={aktiveErgebnis.ergebnis_url}
+                        alt={`Visualisierung V${aktiveErgebnis.version}`}
+                        className="aspect-[4/3] w-full animate-in fade-in rounded-lg border border-bw-border object-cover duration-500"
+                      />
+                    </figure>
+                  </div>
+                  {versionen.length > 1 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {versionen.map((v, i) => (
+                        <button
+                          key={v.version}
+                          type="button"
+                          className={cn(
+                            'rounded-md px-2.5 py-1 text-xs font-medium',
+                            i === aktiveVersion
+                              ? 'bg-bw-primary text-white'
+                              : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
+                          )}
+                          onClick={() => setAktiveVersion(i)}
+                        >
+                          V{v.version}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+
+                {istUrlAktiv && aktiveErgebnis.ergebnis_url ? (
+                  <VizZielbildCard
+                    vorherUrl={istUrlAktiv}
+                    nachherUrl={aktiveErgebnis.ergebnis_url}
+                    beschreibung={zielbildBeschreibung}
+                  />
+                ) : null}
+              </div>
 
               <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-                <p className="mb-2 text-xs font-semibold text-bw-text">Anpassen</p>
+                <p className="mb-1 text-xs font-semibold text-bw-text">Anpassen & neu rendern</p>
+                <p className="mb-2 text-xs text-bw-text-muted">
+                  Prompt ergänzen — Ist-Geometrie bleibt durch die Schutz-Regeln erhalten.
+                </p>
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {VIZ_NACHPROMPT_TAGS.map((tag) => (
                     <button

@@ -1,6 +1,11 @@
 import 'server-only'
 
 import { REPLICATE_INTERIOR_MODEL_VERSION } from '@/lib/visualize/constants'
+import {
+  VIZ_DEFAULT_PROMPT_STRENGTH,
+  VIZ_NEGATIVE_PROMPT,
+  buildRenderPrompt,
+} from '@/lib/visualize/render-prompt'
 
 const REPLICATE_API = 'https://api.replicate.com/v1/predictions'
 const POLL_MS = 2000
@@ -19,8 +24,12 @@ function replicateToken(): string {
 export async function renderInteriorDesign(input: {
   image: string
   prompt: string
+  istHinweis?: string | null
+  promptStrength?: number
 }): Promise<string> {
   const token = replicateToken()
+  const fullPrompt = buildRenderPrompt(input.prompt, input.istHinweis)
+  const promptStrength = input.promptStrength ?? VIZ_DEFAULT_PROMPT_STRENGTH
   const createRes = await fetch(REPLICATE_API, {
     method: 'POST',
     headers: {
@@ -31,11 +40,11 @@ export async function renderInteriorDesign(input: {
       version: REPLICATE_INTERIOR_MODEL_VERSION,
       input: {
         image: input.image,
-        prompt: input.prompt,
-        negative_prompt: 'ugly, blurry, low quality, distorted, deformed',
-        num_inference_steps: 30,
-        guidance_scale: 15,
-        prompt_strength: 0.8,
+        prompt: fullPrompt,
+        negative_prompt: VIZ_NEGATIVE_PROMPT,
+        num_inference_steps: 35,
+        guidance_scale: 12,
+        prompt_strength: promptStrength,
         seed: Math.floor(Math.random() * 1000),
       },
     }),

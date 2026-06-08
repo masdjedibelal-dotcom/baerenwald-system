@@ -18,4 +18,18 @@ export const VIZ_STIL_TAGS = [
   'Minimalistisch',
 ] as const
 
-export const VIZ_NACHPROMPT_TAGS = ['Fliesen heller', 'Wände weiß', 'Mehr Licht'] as const
+export const VIZ_NACHPROMPT_TAGS = [
+  'Fliesen heller',
+  'Wände weiß',
+  'Mehr Licht',
+  'Nur Material ändern',
+  'Fliesenhöhe unverändert',
+] as const
+
+/** Schnell-Hinweise: Was am Ist-Bild fix bleiben soll */
+export const VIZ_IST_FIX_TAGS = [
+  'Fliesen nur bis halbe Höhe',
+  'Fenster/Tür unverändert',
+  'Sanitärobjekte bleiben',
+  'Raumform beibehalten',
+] as const
