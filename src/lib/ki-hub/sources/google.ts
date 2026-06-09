@@ -19,6 +19,8 @@ function parseServiceAccount(): ServiceAccount | null {
   try {
     const parsed = JSON.parse(raw) as ServiceAccount
     if (!parsed.client_email || !parsed.private_key) return null
+    // Netlify: \n oft als Literal — für JWT-Signatur normalisieren
+    parsed.private_key = parsed.private_key.replace(/\\n/g, '\n')
     return parsed
   } catch {
     return null

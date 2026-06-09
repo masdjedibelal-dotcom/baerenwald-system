@@ -29,7 +29,12 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
       kpis: [
         {
           label: 'PostHog',
-          value: posthogOk ? '7 Tage aktiv' : '—',
+          value:
+            posthogOk && data.marketing.posthog.data?.pageviews_7d != null
+              ? `${data.marketing.posthog.data.pageviews_7d} Pageviews`
+              : posthogOk
+                ? '7 Tage aktiv'
+                : '—',
         },
         {
           label: 'GSC',

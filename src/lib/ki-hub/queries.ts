@@ -7,12 +7,17 @@ import type { KiEmpfehlungRow, KiHubEmpfehlungenGrouped } from '@/lib/ki-hub/typ
 export function groupEmpfehlungen(rows: KiEmpfehlungRow[]): KiHubEmpfehlungenGrouped {
   const kritisch: KiEmpfehlungRow[] = []
   const heute: KiEmpfehlungRow[] = []
+  const markt: KiEmpfehlungRow[] = []
   const marketing: KiEmpfehlungRow[] = []
   const beobachten: KiEmpfehlungRow[] = []
   const gelernt: KiEmpfehlungRow[] = []
 
   for (const row of rows) {
     if (row.umgesetzt) continue
+    if (row.bereich === 'markt') {
+      markt.push(row)
+      continue
+    }
     if (row.prioritaet === 'kritisch') {
       kritisch.push(row)
       continue
@@ -32,7 +37,7 @@ export function groupEmpfehlungen(rows: KiEmpfehlungRow[]): KiHubEmpfehlungenGro
     heute.push(row)
   }
 
-  return { kritisch, heute, marketing, beobachten, gelernt }
+  return { kritisch, heute, markt, marketing, beobachten, gelernt }
 }
 
 export async function loadNeuesteEmpfehlungen(limit = 40): Promise<KiEmpfehlungRow[]> {

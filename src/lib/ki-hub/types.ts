@@ -63,6 +63,7 @@ export type KiEmpfehlungPrioritaet = 'kritisch' | 'hoch' | 'mittel' | 'info'
 
 export type KiEmpfehlungBereich =
   | 'marketing'
+  | 'markt'
   | 'anfragen'
   | 'auftraege'
   | 'handwerker'
@@ -111,6 +112,7 @@ export type KiHubAnalyzeResult = {
   heute_tun: KiEmpfehlungInsert[]
   beobachten: KiEmpfehlungInsert[]
   gelernt: KiEmpfehlungInsert[]
+  markt_trends: KiEmpfehlungInsert[]
   marketing_content: KiEmpfehlungInsert[]
   analyse_lauf: string
 }
@@ -137,6 +139,7 @@ export type KiHubPulseCard = {
 export type KiHubEmpfehlungenGrouped = {
   kritisch: KiEmpfehlungRow[]
   heute: KiEmpfehlungRow[]
+  markt: KiEmpfehlungRow[]
   marketing: KiEmpfehlungRow[]
   beobachten: KiEmpfehlungRow[]
   gelernt: KiEmpfehlungRow[]

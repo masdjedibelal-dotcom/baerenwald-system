@@ -1,10 +1,15 @@
 import 'server-only'
 
+import type Anthropic from '@anthropic-ai/sdk'
 import {
   createAnthropicClient,
   getClaudeApiKey,
   getClaudeModel,
 } from '@/lib/copilot/claude-api-key'
+import {
+  getKiHubWebSearchTools,
+  isKiHubWebSearchEnabled,
+} from '@/lib/ki-hub/claude-web-search'
 import { compressForClaude, loadKiHubData } from '@/lib/ki-hub/load-data'
 import { loadEmpfehlungenFuerLauf } from '@/lib/ki-hub/queries'
 import { ruleBasedEmpfehlungen } from '@/lib/ki-hub/rule-alerts'
@@ -28,12 +33,28 @@ WICHTIG:
 - Keine personenbezogenen Daten erfinden — nur aus den Daten
 - Deutsch
 
+MARKT & WEB-RECHERCHE (für ALLE Kategorien, nicht nur Social Media):
+- Du hast web_search — nutze es für alles, was Bärenwald als Generalunternehmer interessieren könnte
+- Recherche-Themen (Beispiele): Nachfrage/Saison München, Bad/Sanitär/Heizung-Trends, Förderungen, Material-/Lohnkosten,
+  Wettbewerb/Positionierung, SEO/Suchverhalten (ergänzend zu GSC-Daten), Kundenverhalten, rechtliche/technische Neuerungen
+- Verknüpfe Markt-Insights IMMER mit den gelieferten CRM-/Marketing-Daten (Leads, Angebote, GSC, PostHog) — nicht isoliert
+- CRM-Zahlen, GSC und PostHog stehen bereits in den Daten — dafür nicht extra suchen
+- Keine erfundenen Statistiken — Web nur für Trends/Kontext; harte Fakten nur aus den gelieferten Daten oder klar als Schätzung/Trend markieren
+
+Verteile Markt-Erkenntnisse sinnvoll:
+- kritisch / heute_tun: dringende Chancen oder Risiken (z. B. Saisonfenster, Nachfrage-Spitze, Angebots-Druck)
+- beobachten: Muster am Markt, die ihr im Auge behalten solltet
+- gelernt: Erkenntnisse aus Kombination eurer Daten + Markt (konfidenz angeben)
+- marketing_content: zusätzlich 2–3 fertige Posts (Text + bild_prompt) — Social ist nur ein Teil der Empfehlungen
+- markt_trends: 3–6 kompakte Markt-Insights aus Web-Recherche + Bezug zu euren Daten (eigene Sektion in der UI)
+
 Antworte NUR als gültiges JSON (kein Markdown):
 {
   "kritisch": [{ "bereich": "anfragen|technik|...", "titel": "...", "beschreibung": "...", "sofortmassnahme": "...", "aktion_typ": "open_crm|link|copy|send_mail", "aktion_payload": {} }],
   "heute_tun": [{ "bereich": "...", "titel": "...", "beschreibung": "...", "content": { "typ": "mail|whatsapp|...", "text": "...", "betreff": "..." }, "aktion_typ": "...", "aktion_payload": {} }],
   "beobachten": [{ "bereich": "...", "titel": "...", "muster": "...", "daten_basis": "...", "empfehlung": "..." }],
   "gelernt": [{ "erkenntnis": "...", "daten_basis": "...", "konfidenz": "hoch|mittel|gering", "anwendung": "..." }],
+  "markt_trends": [{ "kategorie": "saison|nachfrage|foerderung|wettbewerb|kosten|seo|regulierung|sonstiges", "titel": "...", "zusammenfassung": "...", "bezug_crm": "...", "relevanz": "hoch|mittel|gering", "handlung": "...", "quelle_hinweis": "..." }],
   "marketing_content": [{ "trigger": "...", "plattform": "instagram|linkedin|whatsapp|reel_script", "text": "...", "bild_prompt": "...", "hashtags": [], "timing": "..." }]
 }`
 
@@ -42,6 +63,7 @@ type ClaudeRaw = {
   heute_tun?: Array<Record<string, unknown>>
   beobachten?: Array<Record<string, unknown>>
   gelernt?: Array<Record<string, unknown>>
+  markt_trends?: Array<Record<string, unknown>>
   marketing_content?: Array<Record<string, unknown>>
 }
 
@@ -110,6 +132,30 @@ function mapMarketing(row: Record<string, unknown>): KiEmpfehlungInsert {
   }
 }
 
+const MARKT_RELEVANZ: Record<string, KiEmpfehlungInsert['prioritaet']> = {
+  hoch: 'hoch',
+  mittel: 'mittel',
+  gering: 'info',
+}
+
+function mapMarktTrend(row: Record<string, unknown>): KiEmpfehlungInsert {
+  const relevanz = String(row.relevanz ?? 'mittel').toLowerCase()
+  return {
+    bereich: 'markt',
+    prioritaet: MARKT_RELEVANZ[relevanz] ?? 'mittel',
+    titel: String(row.titel ?? 'Markt-Trend'),
+    beschreibung: String(row.zusammenfassung ?? ''),
+    daten_basis: {
+      kategorie: row.kategorie ?? 'sonstiges',
+      bezug_crm: row.bezug_crm ?? null,
+      handlung: row.handlung ?? null,
+      quelle_hinweis: row.quelle_hinweis ?? null,
+      relevanz,
+    },
+    aktion_typ: 'copy',
+  }
+}
+
 function parseClaudeJson(text: string): ClaudeRaw {
   const trimmed = text.trim()
   const start = trimmed.indexOf('{')
@@ -132,27 +178,52 @@ function mergeRuleAndClaude(
   return merged
 }
 
+function extractClaudeText(content: Anthropic.Message['content']): string {
+  return content
+    .filter((b) => b.type === 'text')
+    .map((b) => (b.type === 'text' ? b.text : ''))
+    .join('')
+}
+
+async function callClaudeOnce(
+  anthropic: ReturnType<typeof createAnthropicClient>,
+  userContent: string,
+  withWebSearch: boolean
+): Promise<Anthropic.Message> {
+  return anthropic.messages.create({
+    model: getClaudeModel(),
+    max_tokens: 8192,
+    system: SYSTEM,
+    tools: withWebSearch ? getKiHubWebSearchTools() : undefined,
+    messages: [{ role: 'user', content: userContent }],
+  })
+}
+
 async function callClaude(data: KiHubLoadPayload): Promise<ClaudeRaw> {
   const key = getClaudeApiKey()
   if (!key) throw new Error('CLAUDE_API_KEY fehlt')
 
   const anthropic = createAnthropicClient(key)
   const compressed = compressForClaude(data)
+  const webSearch = isKiHubWebSearchEnabled()
 
-  const userContent = `Analysiere diese Daten:\n${JSON.stringify(compressed, null, 0)}\n\nUmgesetzte Empfehlungen letzte 7 Tage:\n${JSON.stringify(data.umgesetzt_7d)}`
+  const userContent = `Analysiere diese Daten:\n${JSON.stringify(compressed, null, 0)}\n\nUmgesetzte Empfehlungen letzte 7 Tage:\n${JSON.stringify(data.umgesetzt_7d)}${
+    webSearch
+      ? '\n\nNutze web_search für aktuelle Markt- und Brancheninfos (München, Handwerk, Bad/Sanitär/Heizung, Saison, Förderungen, Wettbewerb, SEO-Trends). Fülle markt_trends (3–6 Insights mit bezug_crm) UND verteile Erkenntnisse in kritisch, heute_tun, beobachten, gelernt, marketing_content.'
+      : ''
+  }`
 
-  const response = await anthropic.messages.create({
-    model: getClaudeModel(),
-    max_tokens: 4096,
-    system: SYSTEM,
-    messages: [{ role: 'user', content: userContent }],
-  })
+  let response: Anthropic.Message
+  try {
+    response = await callClaudeOnce(anthropic, userContent, webSearch)
+  } catch (e) {
+    if (!webSearch) throw e
+    console.warn('[ki-hub] Web-Search fehlgeschlagen, Fallback ohne Recherche:', e)
+    response = await callClaudeOnce(anthropic, userContent, false)
+  }
 
-  const text = response.content
-    .filter((b) => b.type === 'text')
-    .map((b) => (b.type === 'text' ? b.text : ''))
-    .join('')
-
+  const text = extractClaudeText(response.content)
+  if (!text.trim()) throw new Error('Leere Claude-Antwort')
   return parseClaudeJson(text)
 }
 
@@ -162,6 +233,7 @@ function toInserts(raw: ClaudeRaw): KiEmpfehlungInsert[] {
     ...(raw.heute_tun ?? []).map(mapHeute),
     ...(raw.beobachten ?? []).map(mapBeobachten),
     ...(raw.gelernt ?? []).map(mapGelernt),
+    ...(raw.markt_trends ?? []).map(mapMarktTrend),
     ...(raw.marketing_content ?? []).map(mapMarketing),
   ]
 }

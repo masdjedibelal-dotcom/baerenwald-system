@@ -6,7 +6,10 @@ import { ContentCard } from '@/components/ki-hub/ContentCard'
 import { EmpfehlungCard } from '@/components/ki-hub/EmpfehlungCard'
 import { KiHubDepthPanel } from '@/components/ki-hub/KiHubDepthPanel'
 import { KiHubGelerntSection } from '@/components/ki-hub/KiHubGelerntSection'
+import { KiHubMarktTrendsSection } from '@/components/ki-hub/KiHubMarktTrendsSection'
+import { KiHubMarketingPanel } from '@/components/ki-hub/KiHubMarketingPanel'
 import { KiHubPulseGrid } from '@/components/ki-hub/KiHubPulseGrid'
+import { fetchJsonSafe } from '@/lib/ki-hub/fetch-json'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
 import type {
   KiHubEmpfehlungenGrouped,
@@ -57,6 +60,7 @@ function quellenStatus(data: KiHubLoadPayload | undefined): string {
 const EMPTY_GROUP: KiHubEmpfehlungenGrouped = {
   kritisch: [],
   heute: [],
+  markt: [],
   marketing: [],
   beobachten: [],
   gelernt: [],
@@ -75,6 +79,7 @@ export function KiHubClient({ initialAnalysen }: Props) {
   const hasEmpfehlungen =
     empfehlungen.kritisch.length +
       empfehlungen.heute.length +
+      empfehlungen.markt.length +
       empfehlungen.marketing.length +
       empfehlungen.beobachten.length +
       empfehlungen.gelernt.length >
@@ -89,31 +94,31 @@ export function KiHubClient({ initialAnalysen }: Props) {
 
   const loadHub = useCallback(async () => {
     const res = await fetch('/api/ki-hub/load')
-    const json = (await res.json()) as HubResponse
+    const parsed = await fetchJsonSafe<HubResponse>(res)
+    if (!parsed.ok) throw new Error(parsed.message)
+    const json = parsed.data
     if (!res.ok) throw new Error(json.error ?? 'Laden fehlgeschlagen')
     applyResponse(json)
     return json
   }, [applyResponse])
 
-  const runAnalyze = useCallback(
-    async (data?: KiHubLoadPayload) => {
-      setAnalyzing(true)
-      setError(null)
-      try {
-        const res = await fetch('/api/ki-hub/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data }),
-        })
-        const json = (await res.json()) as HubResponse
-        if (!res.ok) throw new Error(json.error ?? 'Analyse fehlgeschlagen')
-        applyResponse(json)
-      } finally {
-        setAnalyzing(false)
-      }
-    },
-    [applyResponse]
-  )
+  const runAnalyze = useCallback(async () => {
+    setAnalyzing(true)
+    try {
+      const res = await fetch('/api/ki-hub/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const parsed = await fetchJsonSafe<HubResponse>(res)
+      if (!parsed.ok) throw new Error(parsed.message)
+      const json = parsed.data
+      if (!res.ok) throw new Error(json.error ?? 'Analyse fehlgeschlagen')
+      applyResponse(json)
+    } finally {
+      setAnalyzing(false)
+    }
+  }, [applyResponse])
 
   useEffect(() => {
     void (async () => {
@@ -130,27 +135,42 @@ export function KiHubClient({ initialAnalysen }: Props) {
   }, [loadHub])
 
   async function handleRefresh() {
-    setLoading(true)
     setError(null)
+    setLoading(true)
     try {
-      const loaded = await loadHub()
-      await runAnalyze(loaded.data)
+      await loadHub()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler')
-    } finally {
+      setError(e instanceof Error ? e.message : 'Laden fehlgeschlagen')
       setLoading(false)
+      return
+    }
+    setLoading(false)
+
+    try {
+      await runAnalyze()
+    } catch (e) {
+      setError(
+        `Daten & KPIs geladen — KI-Analyse: ${e instanceof Error ? e.message : 'Fehler'}`
+      )
     }
   }
 
   async function handleFirstAnalyze() {
+    setError(null)
     setLoading(true)
     try {
-      const loaded = await loadHub()
-      await runAnalyze(loaded.data)
+      await loadHub()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler')
-    } finally {
+      setError(e instanceof Error ? e.message : 'Laden fehlgeschlagen')
       setLoading(false)
+      return
+    }
+    setLoading(false)
+
+    try {
+      await runAnalyze()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Analyse fehlgeschlagen')
     }
   }
 
@@ -165,6 +185,7 @@ export function KiHubClient({ initialAnalysen }: Props) {
     setEmpfehlungen((prev) => ({
       kritisch: prev.kritisch.filter((e) => e.id !== id),
       heute: prev.heute.filter((e) => e.id !== id),
+      markt: prev.markt.filter((e) => e.id !== id),
       marketing: prev.marketing.filter((e) => e.id !== id),
       beobachten: prev.beobachten.filter((e) => e.id !== id),
       gelernt: prev.gelernt.filter((e) => e.id !== id),
@@ -223,6 +244,15 @@ export function KiHubClient({ initialAnalysen }: Props) {
       ) : (
         <KiHubPulseGrid cards={pulse} />
       )}
+
+      <KiHubMarketingPanel data={rawData} />
+
+      <KiHubMarktTrendsSection
+        items={empfehlungen.markt}
+        analyseLauf={analyseLauf}
+        analyzing={analyzing}
+        onMarkDone={handleMarkDone}
+      />
 
       {!loading && !hasEmpfehlungen && !analyzing ? (
         <div className="rounded-xl border border-dashed border-bw-border bg-bw-bg px-4 py-10 text-center">
