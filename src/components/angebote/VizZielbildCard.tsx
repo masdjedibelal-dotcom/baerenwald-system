@@ -1,29 +1,32 @@
 'use client'
 
 import { Download, Loader2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import {
   composeVizZielbildBlob,
   composeVizZielbildDataUrl,
   downloadVizZielbildBlob,
+  erklaerungFromBrief,
 } from '@/lib/visualize/compose-zielbild'
+import type { VizBauErklaerung } from '@/lib/visualize/types'
 import { cn } from '@/lib/utils'
 
 type VizZielbildCardProps = {
   vorherUrl: string
   nachherUrl: string
-  beschreibung: string
+  erklaerung?: VizBauErklaerung | null
   className?: string
 }
 
 export function VizZielbildCard({
   vorherUrl,
   nachherUrl,
-  beschreibung,
+  erklaerung,
   className,
 }: VizZielbildCardProps) {
+  const resolved = useMemo(() => erklaerungFromBrief(erklaerung), [erklaerung])
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +38,7 @@ export function VizZielbildCard({
     setError(null)
     setPreviewUrl(null)
 
-    void composeVizZielbildDataUrl({ vorherUrl, nachherUrl, beschreibung })
+    void composeVizZielbildDataUrl({ vorherUrl, nachherUrl, erklaerung: resolved })
       .then((url) => {
         if (!cancelled) setPreviewUrl(url)
       })
@@ -49,27 +52,27 @@ export function VizZielbildCard({
     return () => {
       cancelled = true
     }
-  }, [vorherUrl, nachherUrl, beschreibung])
+  }, [vorherUrl, nachherUrl, resolved])
 
   const handleDownload = useCallback(async () => {
     setDownloading(true)
     setError(null)
     try {
-      const blob = await composeVizZielbildBlob({ vorherUrl, nachherUrl, beschreibung })
+      const blob = await composeVizZielbildBlob({ vorherUrl, nachherUrl, erklaerung: resolved })
       downloadVizZielbildBlob(blob)
     } catch {
       setError('Download fehlgeschlagen.')
     } finally {
       setDownloading(false)
     }
-  }, [vorherUrl, nachherUrl, beschreibung])
+  }, [vorherUrl, nachherUrl, resolved])
 
   return (
     <div className={cn('rounded-xl border border-bw-border bg-bw-bg p-3', className)}>
       <div className="mb-2">
-        <p className="text-sm font-semibold text-bw-text">Zielbild</p>
+        <p className="text-sm font-semibold text-bw-text">Zielbild-Vorschau</p>
         <p className="text-xs text-bw-text-muted">
-          Logo, Vorher/Nachher und Wunsch — zum Teilen oder fürs Angebot.
+          Bärenwald · Vorher &amp; Nachher · Projekt-Analyse — PNG zum Teilen oder fürs Angebot.
         </p>
       </div>
 

@@ -1,15 +1,10 @@
 import 'server-only'
 
 import { REPLICATE_INTERIOR_MODEL_VERSION } from '@/lib/visualize/constants'
-import {
-  VIZ_DEFAULT_PROMPT_STRENGTH,
-  VIZ_NEGATIVE_PROMPT,
-  buildRenderPrompt,
-} from '@/lib/visualize/render-prompt'
 
 const REPLICATE_API = 'https://api.replicate.com/v1/predictions'
 const POLL_MS = 2000
-const TIMEOUT_MS = 60_000
+const TIMEOUT_MS = 120_000
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -18,34 +13,44 @@ function sleep(ms: number): Promise<void> {
 function replicateToken(): string {
   const token = process.env.REPLICATE_API_TOKEN?.trim()
   if (!token) throw new Error('REPLICATE_API_TOKEN fehlt')
-  return token
+  return token.replace(/^["']|["']$/g, '').replace(/\s/g, '')
+}
+
+type Prediction = {
+  id: string
+  status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled'
+  output?: string | string[] | null
+  error?: string | null
+}
+
+function extractOutputUrl(output: Prediction['output']): string | null {
+  if (!output) return null
+  if (typeof output === 'string') return output
+  if (Array.isArray(output) && typeof output[0] === 'string') return output[0]
+  return null
 }
 
 export async function renderInteriorDesign(input: {
   image: string
   prompt: string
-  istHinweis?: string | null
-  promptStrength?: number
 }): Promise<string> {
   const token = replicateToken()
-  const fullPrompt = buildRenderPrompt(input.prompt, input.istHinweis)
-  const promptStrength = input.promptStrength ?? VIZ_DEFAULT_PROMPT_STRENGTH
+
   const createRes = await fetch(REPLICATE_API, {
     method: 'POST',
     headers: {
-      Authorization: `Token ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      Prefer: 'wait=60',
     },
     body: JSON.stringify({
       version: REPLICATE_INTERIOR_MODEL_VERSION,
       input: {
         image: input.image,
-        prompt: fullPrompt,
-        negative_prompt: VIZ_NEGATIVE_PROMPT,
-        num_inference_steps: 35,
+        prompt: input.prompt,
+        num_inference_steps: 40,
         guidance_scale: 12,
-        prompt_strength: promptStrength,
-        seed: Math.floor(Math.random() * 1000),
+        prompt_strength: 0.75,
       },
     }),
   })
@@ -55,34 +60,34 @@ export async function renderInteriorDesign(input: {
     throw new Error(`Replicate Start fehlgeschlagen: ${errText.slice(0, 240)}`)
   }
 
-  const created = (await createRes.json()) as { id?: string }
-  const predictionId = created.id
-  if (!predictionId) throw new Error('Replicate: keine Prediction-ID')
+  let prediction = (await createRes.json()) as Prediction
 
-  const started = Date.now()
-  while (Date.now() - started < TIMEOUT_MS) {
-    await sleep(POLL_MS)
-    const pollRes = await fetch(`${REPLICATE_API}/${predictionId}`, {
-      headers: { Authorization: `Token ${token}` },
-    })
-    if (!pollRes.ok) {
-      throw new Error(`Replicate Polling fehlgeschlagen (${pollRes.status})`)
+  const deadline = Date.now() + TIMEOUT_MS
+  while (
+    prediction.status !== 'succeeded' &&
+    prediction.status !== 'failed' &&
+    prediction.status !== 'canceled'
+  ) {
+    if (Date.now() > deadline) {
+      throw new Error('Render dauert zu lange — bitte später erneut versuchen.')
     }
-    const result = (await pollRes.json()) as {
-      status?: string
-      output?: string | string[] | null
-      error?: string | null
+    if (prediction.status === 'starting' || prediction.status === 'processing') {
+      await sleep(POLL_MS)
+      const pollRes = await fetch(`${REPLICATE_API}/${prediction.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!pollRes.ok) throw new Error(`Replicate Polling fehlgeschlagen (${pollRes.status})`)
+      prediction = (await pollRes.json()) as Prediction
+      continue
     }
-    if (result.status === 'succeeded') {
-      const out = result.output
-      const url = Array.isArray(out) ? out[0] : out
-      if (!url || typeof url !== 'string') throw new Error('Replicate: kein Output-URL')
-      return url
-    }
-    if (result.status === 'failed' || result.status === 'canceled') {
-      throw new Error(result.error?.trim() || 'Render fehlgeschlagen')
-    }
+    break
   }
 
-  throw new Error('Replicate Timeout nach 60 Sekunden')
+  if (prediction.status !== 'succeeded') {
+    throw new Error(prediction.error?.trim() || 'Render fehlgeschlagen')
+  }
+
+  const url = extractOutputUrl(prediction.output)
+  if (!url) throw new Error('Replicate: kein Output-URL')
+  return url
 }

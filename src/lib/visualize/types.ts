@@ -1,5 +1,33 @@
 export type KiVizStatus = 'neu' | 'rendering' | 'fertig' | 'fehler'
 
+export type VizStilVorschlag = {
+  titel: string
+  kurz: string
+  prompt_de: string
+}
+
+export type VizRaumAnalyse = {
+  raum_typ: string
+  raum_label: string
+  ist_beschreibung: string
+  erkannte_elemente?: string[]
+  einschaetzung?: string
+  stil_vorschlaege: VizStilVorschlag[]
+  wunsch_entwurf: string
+}
+
+export type VizBauErklaerung = {
+  titel: string
+  chat_kurz: string
+  zielbild_headline: string
+  zusammenfassung: string
+  gewerke: Array<{ name: string; beschreibung: string }>
+  ablauf: string[]
+  naechste_schritte: string[]
+  hinweis_gu?: string
+  cta_text: string
+}
+
 export type KiVizPromptHistoryEntry = {
   prompt: string
   ergebnis_url: string

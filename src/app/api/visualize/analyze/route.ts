@@ -13,7 +13,6 @@ export async function POST(req: Request) {
     session_id?: string
     ist_bild_url?: string
     ziel_bild_url?: string
-    ist_hinweis?: string
     gewerk?: string
   } = {}
 
@@ -58,7 +57,6 @@ export async function POST(req: Request) {
       ist_bild_url: istUrl,
       ziel_bild_url: zielUrl,
       gewerk: body.gewerk,
-      ist_hinweis: body.ist_hinweis,
     })
     await updateKiVisualisierung(sessionId, {
       analysierter_prompt: prompt,

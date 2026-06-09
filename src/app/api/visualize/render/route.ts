@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { generateBauErklaerung } from '@/lib/visualize/claude-bauerklaerung'
+import { buildEnglishRenderPrompt } from '@/lib/visualize/claude-render-prompt'
 import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
 import { VIZ_MAX_RENDERS_PER_SESSION } from '@/lib/visualize/constants'
 import {
@@ -8,6 +10,10 @@ import {
 } from '@/lib/visualize/queries'
 import { renderInteriorDesign } from '@/lib/visualize/replicate-client'
 import { persistRemoteImageToVisualisierungen } from '@/lib/visualize/storage'
+import type { VizRaumAnalyse } from '@/lib/visualize/types'
+
+export const runtime = 'nodejs'
+export const maxDuration = 120
 
 export async function POST(req: Request) {
   let body: {
@@ -15,7 +21,7 @@ export async function POST(req: Request) {
     session_id?: string
     ist_bild_url?: string
     prompt?: string
-    ist_hinweis?: string
+    raum_analyse?: VizRaumAnalyse | null
   } = {}
 
   try {
@@ -26,10 +32,10 @@ export async function POST(req: Request) {
 
   const angebotId = body.angebot_id?.trim()
   const sessionId = body.session_id?.trim()
-  const prompt = body.prompt?.trim()
+  const wunschDe = body.prompt?.trim()
   let istUrl = body.ist_bild_url?.trim()
 
-  if (!angebotId || !sessionId || !prompt) {
+  if (!angebotId || !sessionId || !wunschDe) {
     return NextResponse.json({ error: 'angebot_id, session_id oder prompt fehlt' }, { status: 400 })
   }
 
@@ -58,12 +64,17 @@ export async function POST(req: Request) {
   await updateKiVisualisierung(sessionId, { status: 'rendering' })
 
   try {
-    const istHinweis = body.ist_hinweis?.trim() || null
+    const raumAnalyse = body.raum_analyse ?? null
+    const englishPrompt = await buildEnglishRenderPrompt({
+      wunschText: wunschDe,
+      raumAnalyse,
+    })
+
     const remoteUrl = await renderInteriorDesign({
       image: istUrl,
-      prompt,
-      istHinweis,
+      prompt: englishPrompt,
     })
+
     const version = session.prompt_history.length + 1
     const ergebnisUrl = await persistRemoteImageToVisualisierungen({
       sourceUrl: remoteUrl,
@@ -72,8 +83,13 @@ export async function POST(req: Request) {
       version,
     })
 
+    const erklaerung = await generateBauErklaerung({
+      wunschText: wunschDe,
+      raumAnalyse,
+    })
+
     const entry = {
-      prompt,
+      prompt: wunschDe,
       ergebnis_url: ergebnisUrl,
       version,
       created_at: new Date().toISOString(),
@@ -81,7 +97,13 @@ export async function POST(req: Request) {
     }
 
     const updated = await appendPromptHistory(sessionId, entry)
-    return NextResponse.json({ ergebnis_url: ergebnisUrl, version, session: updated })
+    return NextResponse.json({
+      ergebnis_url: ergebnisUrl,
+      version,
+      session: updated,
+      erklaerung,
+      render_prompt_en: englishPrompt,
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Render fehlgeschlagen'
     await updateKiVisualisierung(sessionId, { status: 'fehler' })

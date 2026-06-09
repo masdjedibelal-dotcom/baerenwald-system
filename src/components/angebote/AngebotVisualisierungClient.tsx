@@ -9,12 +9,15 @@ import { toast } from '@/components/ui/app-toast'
 import { VizZielbildCard } from '@/components/angebote/VizZielbildCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
-  VIZ_IST_FIX_TAGS,
   VIZ_MAX_IST_BILDER,
-  VIZ_NACHPROMPT_TAGS,
   VIZ_STIL_TAGS,
 } from '@/lib/visualize/constants'
-import type { KiVizPromptHistoryEntry, KiVisualisierung } from '@/lib/visualize/types'
+import type {
+  KiVizPromptHistoryEntry,
+  KiVisualisierung,
+  VizBauErklaerung,
+  VizRaumAnalyse,
+} from '@/lib/visualize/types'
 import type { AngebotDetail } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -109,12 +112,12 @@ export function AngebotVisualisierungClient({
   const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null)
   const [aktivesIstIndex, setAktivesIstIndex] = useState(0)
   const [prompt, setPrompt] = useState(initialSession?.analysierter_prompt ?? '')
-  const [istHinweis, setIstHinweis] = useState('')
+  const [raumAnalyse, setRaumAnalyse] = useState<VizRaumAnalyse | null>(null)
+  const [erklaerungByVersion, setErklaerungByVersion] = useState<Record<number, VizBauErklaerung>>({})
   const [modus, setModus] = useState<Modus>('prompt')
   const [isRendering, setIsRendering] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [aktiveVersion, setAktiveVersion] = useState(0)
-  const [nachprompt, setNachprompt] = useState('')
   const [insAngebotOpen, setInsAngebotOpen] = useState(false)
   const [insAngebotPdf, setInsAngebotPdf] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -128,7 +131,27 @@ export function AngebotVisualisierungClient({
   const zielBildUrl = session?.ziel_bild_url ?? null
   const versionen = useMemo(() => versionenAusSession(session), [session])
   const aktiveErgebnis = versionen[aktiveVersion] ?? null
+  const aktiveErklaerung = erklaerungByVersion[aktiveErgebnis?.version ?? 0] ?? null
   const leadFotos = useMemo(() => parseProjektFotos(detail.fotos_urls), [detail.fotos_urls])
+
+  const analyzeRoom = useCallback(
+    async (istUrl: string) => {
+      try {
+        const res = await fetch('/api/visualize/analyze-room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ angebot_id: detail.id, ist_bild_url: istUrl }),
+        })
+        const data = (await res.json()) as { raum_analyse?: VizRaumAnalyse; error?: string }
+        if (!res.ok || !data.raum_analyse) return
+        setRaumAnalyse(data.raum_analyse)
+        setPrompt((prev) => prev.trim() || data.raum_analyse?.wunsch_entwurf || '')
+      } catch {
+        /* optional */
+      }
+    },
+    [detail.id]
+  )
 
   const ensureSession = useCallback(async (): Promise<string | null> => {
     if (sessionId) return sessionId
@@ -217,6 +240,11 @@ export function AngebotVisualisierungClient({
       if (!res.ok || !data.session) throw new Error(data.error ?? 'Upload fehlgeschlagen')
       setSession(data.session)
       toast.success(kind === 'ziel' ? 'Ziel-Bild hochgeladen' : 'Ist-Bild hochgeladen')
+      if (kind === 'ist') {
+        const urls = data.session.ist_bilder_urls ?? []
+        const latest = urls[urls.length - 1]
+        if (latest) void analyzeRoom(latest)
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
     } finally {
@@ -294,7 +322,6 @@ export function AngebotVisualisierungClient({
           session_id: sid,
           ist_bild_url: istUrl,
           ziel_bild_url: zielUrl,
-          ist_hinweis: istHinweis.trim() || undefined,
         }),
       })
       let data: { prompt?: string; error?: string }
@@ -307,7 +334,7 @@ export function AngebotVisualisierungClient({
         throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${res.status})`)
       }
       setPrompt(data.prompt)
-      toast.success('Prompt erstellt — bitte prüfen')
+      toast.success('Wunschtext erstellt — bitte prüfen')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Analyse fehlgeschlagen')
     } finally {
@@ -335,19 +362,24 @@ export function AngebotVisualisierungClient({
           session_id: sid,
           ist_bild_url: istUrl,
           prompt: p,
-          ist_hinweis: istHinweis.trim() || undefined,
+          raum_analyse: raumAnalyse,
         }),
       })
       const data = (await res.json()) as {
         session?: KiVisualisierung
         version?: number
+        erklaerung?: VizBauErklaerung
         error?: string
       }
       if (!res.ok || !data.session) throw new Error(data.error ?? 'Render fehlgeschlagen')
       setSession(data.session)
       const idx = (data.session.prompt_history?.length ?? 1) - 1
+      const version = data.version ?? idx + 1
       setAktiveVersion(idx)
       setPrompt(p)
+      if (data.erklaerung) {
+        setErklaerungByVersion((prev) => ({ ...prev, [version]: data.erklaerung! }))
+      }
       toast.success(`Version V${data.version ?? idx + 1} fertig`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Render fehlgeschlagen')
@@ -356,29 +388,13 @@ export function AngebotVisualisierungClient({
     }
   }
 
-  function appendIstFixTag(tag: string) {
-    setIstHinweis((prev) => {
-      const t = prev.trim()
-      if (!t) return tag
-      if (t.toLowerCase().includes(tag.toLowerCase())) return t
-      return `${t}, ${tag}`
-    })
-  }
-
   function appendStilTag(tag: string) {
     setPrompt((prev) => {
       const t = prev.trim()
-      if (!t) return `${tag} interior design, photorealistic`
+      if (!t) return `${tag}-Stil, modern und hochwertig`
       if (t.toLowerCase().includes(tag.toLowerCase())) return t
-      return `${t}, ${tag.toLowerCase()} style`
+      return `${t}, ${tag}-Stil`
     })
-  }
-
-  function nachpromptRender(delta: string) {
-    const base = aktiveErgebnis?.prompt?.trim() || prompt.trim()
-    const next = `${base}, ${delta}`
-    setPrompt(next)
-    void renderPrompt(next)
   }
 
   async function insAngebotUebernehmen() {
@@ -406,10 +422,9 @@ export function AngebotVisualisierungClient({
 
   const kannRendern = istBilderUrls.length > 0 && prompt.trim().length > 0 && !isRendering
   const istUrlAktiv = istBilderUrls[aktivesIstIndex]?.trim()
-  const zielbildBeschreibung = prompt.trim() || session?.analysierter_prompt?.trim() || ''
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 pb-8">
+    <div className="mx-auto max-w-3xl space-y-4 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-bw-primary">KI-Visualisierung</p>
@@ -438,9 +453,7 @@ export function AngebotVisualisierungClient({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Linke Spalte */}
-        <div className="space-y-5 rounded-xl border border-bw-border bg-white p-4 md:p-5">
+      <div className="space-y-5 rounded-xl border border-bw-border bg-white p-4 md:p-5">
           <section>
             <h2 className="text-sm font-semibold text-bw-text">Ist-Zustand (Pflicht)</h2>
             <p className="mb-2 text-xs text-bw-text-muted">Max. {VIZ_MAX_IST_BILDER} Fotos — pro Render wird das aktive Bild genutzt</p>
@@ -506,32 +519,6 @@ export function AngebotVisualisierungClient({
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold text-bw-text">Ist-Geometrie schützen</h2>
-            <p className="mb-2 text-xs text-bw-text-muted">
-              Optional — nur Material/Farbe ändern, Raumform und Grenzen bleiben (z. B. Fliesen nur bis halbe Höhe).
-            </p>
-            <textarea
-              className="input min-h-[72px] w-full text-sm"
-              rows={2}
-              value={istHinweis}
-              onChange={(e) => setIstHinweis(e.target.value)}
-              placeholder="z. B. Fliesen nur bis zur Hälfte, Fenster links unverändert, Badewanne bleibt"
-            />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {VIZ_IST_FIX_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
-                  onClick={() => appendIstFixTag(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
             <h2 className="text-sm font-semibold text-bw-text">Was soll entstehen?</h2>
             <div className="mt-2 flex gap-1 rounded-lg bg-bw-bg p-1">
               <button
@@ -557,27 +544,9 @@ export function AngebotVisualisierungClient({
             </div>
 
             {modus === 'prompt' ? (
-              <>
-                <textarea
-                  className="input mt-3 min-h-[120px] w-full text-sm"
-                  rows={5}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Beschreibe wie es aussehen soll… z.B. modernes Bad, weiße Marmorfliesen, freistehende Badewanne, warmes Licht"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {VIZ_STIL_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
-                      onClick={() => appendStilTag(tag)}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </>
+              <p className="mt-2 text-xs text-bw-text-muted">
+                Beschreiben Sie auf Deutsch, wie der Raum aussehen soll.
+              </p>
             ) : (
               <div className="mt-3 space-y-2">
                 <VizImageDropzone
@@ -595,8 +564,7 @@ export function AngebotVisualisierungClient({
                   <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-lg border border-bw-border object-cover" />
                 ) : null}
                 <p className="text-xs text-bw-text-muted">
-                  Claude vergleicht Ist + Ziel und überträgt nur Stil (Material, Farbe, Muster) — nicht das Raumlayout
-                  vom Zielbild.
+                  Stil-Referenz — nur Material, Farbe und Atmosphäre werden übernommen, nicht das Raumlayout.
                 </p>
                 <Button
                   type="button"
@@ -605,21 +573,38 @@ export function AngebotVisualisierungClient({
                   disabled={isAnalyzing || !zielBildUrl || !istBilderUrls.length}
                   onClick={() => void analyzeZielBild()}
                 >
-                  {isAnalyzing ? 'Analysiert…' : 'Stil analysieren'}
+                  {isAnalyzing ? 'Analysiert…' : 'Stil aus Ziel-Bild übernehmen'}
                 </Button>
-                <label className="block text-xs font-medium text-bw-text">Render-Prompt (vor Rendern anpassen)</label>
-                <textarea
-                  className="input min-h-[100px] w-full text-sm"
-                  rows={4}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Nach Analyse: Prompt prüfen und ergänzen, z. B. welche Flächen welches Material bekommen…"
-                />
-                <p className="text-xs text-bw-text-muted">
-                  Nach dem ersten Render rechts „Anpassen“ nutzen — Prompt ändern und neu rendern.
-                </p>
               </div>
             )}
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-bw-text">Render-Prompt (Deutsch)</h2>
+            <p className="mb-2 text-xs text-bw-text-muted">
+              Wird serverseitig für die KI ins Englische übersetzt. Text anpassen und erneut auf Rendern klicken.
+            </p>
+            <textarea
+              className="input min-h-[120px] w-full text-sm"
+              rows={5}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="z. B. modernes Bad, weiße Marmorfliesen, warmes Licht, Wände in hellem Grau…"
+            />
+            {modus === 'prompt' ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {VIZ_STIL_TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
+                    onClick={() => appendStilTag(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <Button
@@ -646,113 +631,37 @@ export function AngebotVisualisierungClient({
               <div className="h-full w-1/3 animate-pulse rounded-full bg-bw-primary" />
             </div>
           ) : null}
-        </div>
 
-        {/* Rechte Spalte */}
-        <div className="space-y-4 rounded-xl border border-bw-border bg-white p-4 md:p-5">
-          {!aktiveErgebnis ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg bg-bw-bg text-center">
-              <div className="mb-3 text-2xl font-bold text-[#2E7D52]">Bärenwald</div>
-              <p className="text-sm text-bw-text-muted">Ergebnis erscheint hier</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-4 xl:grid-cols-[1fr_min(300px,38%)]">
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <figure className="m-0">
-                      <figcaption className="mb-1 text-xs font-medium text-bw-text-muted">Vorher</figcaption>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={istUrlAktiv}
-                        alt="Vorher"
-                        className="aspect-[4/3] w-full rounded-lg border border-bw-border object-cover"
-                      />
-                    </figure>
-                    <figure className="m-0">
-                      <figcaption className="mb-1 text-xs font-medium text-[#2E7D52]">Nachher</figcaption>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={aktiveErgebnis.ergebnis_url}
-                        alt={`Visualisierung V${aktiveErgebnis.version}`}
-                        className="aspect-[4/3] w-full animate-in fade-in rounded-lg border border-bw-border object-cover duration-500"
-                      />
-                    </figure>
-                  </div>
-                  {versionen.length > 1 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {versionen.map((v, i) => (
-                        <button
-                          key={v.version}
-                          type="button"
-                          className={cn(
-                            'rounded-md px-2.5 py-1 text-xs font-medium',
-                            i === aktiveVersion
-                              ? 'bg-bw-primary text-white'
-                              : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
-                          )}
-                          onClick={() => setAktiveVersion(i)}
-                        >
-                          V{v.version}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                {istUrlAktiv && aktiveErgebnis.ergebnis_url ? (
-                  <VizZielbildCard
-                    vorherUrl={istUrlAktiv}
-                    nachherUrl={aktiveErgebnis.ergebnis_url}
-                    beschreibung={zielbildBeschreibung}
-                  />
-                ) : null}
-              </div>
-
-              <div className="rounded-lg border border-bw-border bg-bw-bg p-3">
-                <p className="mb-1 text-xs font-semibold text-bw-text">Anpassen & neu rendern</p>
-                <p className="mb-2 text-xs text-bw-text-muted">
-                  Prompt ergänzen — Ist-Geometrie bleibt durch die Schutz-Regeln erhalten.
-                </p>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {VIZ_NACHPROMPT_TAGS.map((tag) => (
+          {aktiveErgebnis && istUrlAktiv ? (
+            <section className="space-y-3 border-t border-bw-border pt-5">
+              {versionen.length > 1 ? (
+                <div className="flex flex-wrap gap-1">
+                  {versionen.map((v, i) => (
                     <button
-                      key={tag}
+                      key={v.version}
                       type="button"
-                      className="rounded-full border border-bw-border bg-white px-2.5 py-0.5 text-xs hover:border-bw-primary"
-                      disabled={isRendering}
-                      onClick={() => nachpromptRender(tag)}
+                      className={cn(
+                        'rounded-md px-2.5 py-1 text-xs font-medium',
+                        i === aktiveVersion
+                          ? 'bg-bw-primary text-white'
+                          : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
+                      )}
+                      onClick={() => {
+                        setAktiveVersion(i)
+                        setPrompt(v.prompt)
+                      }}
                     >
-                      {tag}
+                      V{v.version}
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    className="input flex-1 py-1.5 text-sm"
-                    value={nachprompt}
-                    onChange={(e) => setNachprompt(e.target.value)}
-                    placeholder="Eigener Zusatz…"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && nachprompt.trim()) {
-                        nachpromptRender(nachprompt.trim())
-                        setNachprompt('')
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={!nachprompt.trim() || isRendering}
-                    onClick={() => {
-                      nachpromptRender(nachprompt.trim())
-                      setNachprompt('')
-                    }}
-                  >
-                    →
-                  </Button>
-                </div>
-              </div>
+              ) : null}
+
+              <VizZielbildCard
+                vorherUrl={istUrlAktiv}
+                nachherUrl={aktiveErgebnis.ergebnis_url}
+                erklaerung={aktiveErklaerung}
+              />
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -768,17 +677,15 @@ export function AngebotVisualisierungClient({
                   variant="secondary"
                   className="flex-1"
                   onClick={() => {
-                    setAktiveVersion(versionen.length)
                     setPrompt('')
                   }}
                 >
                   + Neue Variante
                 </Button>
               </div>
-            </>
-          )}
+            </section>
+          ) : null}
         </div>
-      </div>
 
       <Modal
         open={insAngebotOpen}
