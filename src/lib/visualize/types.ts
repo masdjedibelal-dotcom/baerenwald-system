@@ -19,13 +19,16 @@ export type VizRaumAnalyse = {
 export type VizBauErklaerung = {
   titel: string
   chat_kurz: string
+  zielbild_kicker?: string
   zielbild_headline: string
+  zielbild_teaser?: string
   zusammenfassung: string
   gewerke: Array<{ name: string; beschreibung: string }>
   ablauf: string[]
   naechste_schritte: string[]
   hinweis_gu?: string
   cta_text: string
+  preis_hinweis_optional?: string
 }
 
 export type KiVizPromptHistoryEntry = {

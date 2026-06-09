@@ -72,21 +72,25 @@ export function VizZielbildCard({
       <div className="mb-2">
         <p className="text-sm font-semibold text-bw-text">Zielbild-Vorschau</p>
         <p className="text-xs text-bw-text-muted">
-          Bärenwald · Vorher &amp; Nachher · Projekt-Analyse — PNG zum Teilen oder fürs Angebot.
+          Story 9:16 · Vorher &amp; Nachher · Editorial-Block — PNG zum Teilen oder fürs Angebot.
         </p>
       </div>
 
-      <div className="mb-3 flex min-h-[120px] items-center justify-center overflow-hidden rounded-lg border border-bw-border bg-white">
+      <div className="mb-3 flex min-h-[120px] items-center justify-center overflow-hidden rounded-lg border border-bw-border bg-[#0F2818]">
         {loading ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-sm text-bw-text-muted">
+          <div className="flex flex-col items-center gap-2 py-6 text-sm text-[#B8D4C4]">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
             Wird erstellt …
           </div>
         ) : previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt="Bärenwald Zielbild" className="block w-full" />
+          <img
+            src={previewUrl}
+            alt="Bärenwald Zielbild"
+            className="mx-auto block max-h-[min(70vh,720px)] w-auto max-w-full"
+          />
         ) : (
-          <p className="px-3 py-6 text-sm text-bw-text-muted">{error ?? 'Keine Vorschau'}</p>
+          <p className="px-3 py-6 text-sm text-[#B8D4C4]">{error ?? 'Keine Vorschau'}</p>
         )}
       </div>
 
