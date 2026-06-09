@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { generateBauErklaerung } from '@/lib/visualize/claude-bauerklaerung'
-import { buildEnglishRenderPrompt } from '@/lib/visualize/claude-render-prompt'
+import { buildRenderPrompt } from '@/lib/visualize/claude-render-prompt'
+import { fallbackVizBrief } from '@/lib/visualize/claude-viz-prepare'
 import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
 import { VIZ_MAX_RENDERS_PER_SESSION } from '@/lib/visualize/constants'
 import {
@@ -9,8 +10,12 @@ import {
   updateKiVisualisierung,
 } from '@/lib/visualize/queries'
 import { renderInteriorDesign } from '@/lib/visualize/replicate-client'
+import {
+  guidanceScaleForModus,
+  negativePromptForBrief,
+  promptStrengthForModus,
+} from '@/lib/visualize/render-strength'
 import { persistRemoteImageToVisualisierungen } from '@/lib/visualize/storage'
-import type { VizRaumAnalyse } from '@/lib/visualize/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -21,7 +26,8 @@ export async function POST(req: Request) {
     session_id?: string
     ist_bild_url?: string
     prompt?: string
-    raum_analyse?: VizRaumAnalyse | null
+    wunsch_text?: string
+    nachprompt?: string
   } = {}
 
   try {
@@ -32,11 +38,12 @@ export async function POST(req: Request) {
 
   const angebotId = body.angebot_id?.trim()
   const sessionId = body.session_id?.trim()
-  const wunschDe = body.prompt?.trim()
+  const wunschDe = (body.wunsch_text ?? body.prompt)?.trim()
+  const nachprompt = body.nachprompt?.trim() || undefined
   let istUrl = body.ist_bild_url?.trim()
 
   if (!angebotId || !sessionId || !wunschDe) {
-    return NextResponse.json({ error: 'angebot_id, session_id oder prompt fehlt' }, { status: 400 })
+    return NextResponse.json({ error: 'angebot_id, session_id oder Wunschtext fehlt' }, { status: 400 })
   }
 
   const auth = await requireCrmAngebotAccess(angebotId)
@@ -61,18 +68,24 @@ export async function POST(req: Request) {
     )
   }
 
-  await updateKiVisualisierung(sessionId, { status: 'rendering' })
+  await updateKiVisualisierung(sessionId, { status: 'rendering', wunsch_text: wunschDe })
 
   try {
-    const raumAnalyse = body.raum_analyse ?? null
-    const englishPrompt = await buildEnglishRenderPrompt({
+    const raumAnalyse = session.raum_analyse
+    const vizBrief = session.viz_brief ?? fallbackVizBrief(raumAnalyse)
+    const englishPrompt = await buildRenderPrompt({
       wunschText: wunschDe,
       raumAnalyse,
+      vizBrief,
+      nachprompt,
     })
 
     const remoteUrl = await renderInteriorDesign({
       image: istUrl,
       prompt: englishPrompt,
+      prompt_strength: promptStrengthForModus(vizBrief.modus, vizBrief.struktur_lock),
+      guidance_scale: guidanceScaleForModus(vizBrief.modus),
+      negative_prompt: negativePromptForBrief(vizBrief),
     })
 
     const version = session.prompt_history.length + 1
@@ -97,6 +110,12 @@ export async function POST(req: Request) {
     }
 
     const updated = await appendPromptHistory(sessionId, entry)
+    await updateKiVisualisierung(sessionId, {
+      render_prompt: englishPrompt,
+      gpt_erklaerung: erklaerung,
+      analysierter_prompt: wunschDe,
+    })
+
     return NextResponse.json({
       ergebnis_url: ergebnisUrl,
       version,

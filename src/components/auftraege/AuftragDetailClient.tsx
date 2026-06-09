@@ -11,6 +11,7 @@ import {
   List,
   ListChecks,
   Mail,
+  MapPin,
   MoreHorizontal,
   FileCheck,
   FileSignature,
@@ -31,6 +32,7 @@ import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
+import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -277,12 +279,19 @@ export function AuftragDetailClient({
 
   const projektName = auftragTitel(detail)
   const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
-  const metaLine = useMemo(() => {
-    const ort = detail.kunden?.ort?.trim() || detail.kunden?.plz?.trim() || ''
-    const parts: string[] = []
-    if (detail.kunden?.name) parts.push(detail.kunden.name)
-    if (ort) parts.push(ort)
-    return parts.join(' · ')
+  const headMeta = useMemo(() => {
+    const ort = detail.kunden?.ort?.trim() || ''
+    const plz = detail.kunden?.plz?.trim() || ''
+    const region = [plz, ort].filter(Boolean).join(' ')
+    return (
+      <DetailMetaRow>
+        {detail.kunden?.name ? <DetailMetaChip>{detail.kunden.name}</DetailMetaChip> : null}
+        {region ? <DetailMetaChip icon={MapPin}>{region}</DetailMetaChip> : null}
+        <DetailMetaChip className="font-mono text-[11px]">
+          AUF-{detail.id.slice(0, 8).toUpperCase()}
+        </DetailMetaChip>
+      </DetailMetaRow>
+    )
   }, [detail])
 
   const filteredTemplates = formModal
@@ -726,15 +735,9 @@ export function AuftragDetailClient({
       <DetailHead
         backHref="/auftraege"
         backLabel="Zurück zu Aufträge"
-        title={
-          <>
-            <span>{projektName}</span>
-            <div className="detail-head-status">
-              <AuftragStatusBadge status={detail.status} />
-            </div>
-          </>
-        }
-        sub={metaLine || undefined}
+        title={projektName}
+        badges={<AuftragStatusBadge status={detail.status} />}
+        meta={headMeta}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">
             {istAbgeschlossen ? (

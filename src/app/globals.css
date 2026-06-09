@@ -422,7 +422,15 @@
 
   /* Detail-Kopf: Titel + Aktionen ohne Karten-Rahmen (Master-Detail / volle Detailseite) */
   .detail-head {
-    @apply mb-2 flex flex-wrap items-center gap-2.5 px-0 py-1.5;
+    @apply mb-3 px-0;
+  }
+
+  .detail-head--project {
+    @apply mb-4 border-b border-bw-border/70 pb-4;
+  }
+
+  .detail-head-top {
+    @apply flex flex-wrap items-start gap-3;
   }
 
   /* Zurück nur in der mobilen TopBar — nicht im Detail-Kopf */
@@ -454,7 +462,7 @@
   }
 
   .detail-head-title {
-    @apply text-lg font-semibold tracking-tight text-bw-text;
+    @apply text-xl font-semibold tracking-tight text-bw-text md:text-2xl;
   }
 
   .detail-head-title-row {
@@ -470,7 +478,15 @@
   }
 
   .detail-head-sub {
-    @apply mt-0.5 text-[12.5px] text-bw-text-muted;
+    @apply mt-1.5 text-sm text-bw-text-muted;
+  }
+
+  .detail-head-meta {
+    @apply mt-2.5;
+  }
+
+  .detail-meta-row {
+    @apply flex flex-wrap gap-1.5;
   }
 
   /* Stammdaten-Props (Mockup .props / .prop) */
@@ -600,7 +616,7 @@
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium leading-tight;
+    @apply inline-flex min-h-[26px] items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-semibold leading-tight;
   }
 
   .badge-dot::before,
@@ -649,7 +665,7 @@
   .input {
     @apply w-full rounded-md border border-bw-border bg-bw-card px-3 py-2 text-bw-text outline-none transition-all duration-150 placeholder:text-bw-text-muted;
     font-size: 16px !important;
-    min-height: 36px;
+    min-height: 40px;
   }
 
   .input::placeholder,
@@ -2212,7 +2228,11 @@
   }
 
   .list-row-grid {
-    @apply grid cursor-pointer items-center gap-3 border-b border-bw-border px-4 py-3 transition-colors duration-150 hover:bg-bw-hover;
+    @apply grid min-h-[52px] cursor-pointer items-center gap-3 border-b border-bw-border px-4 py-3.5 transition-colors duration-150 hover:bg-bw-hover;
+  }
+
+  .list-row-grid .list-row-primary {
+    @apply truncate text-sm font-semibold text-bw-text;
   }
 
   .list-row-grid.head {
@@ -3089,6 +3109,11 @@
     .scroll-pb-mobile-nav {
       scroll-padding-bottom: var(--mobile-bottom-nav-height);
     }
+
+    /* Dashboard-FAB: zusätzlicher Platz über der Bottom-Nav */
+    .pb-mobile-fab-extra {
+      padding-bottom: 4rem;
+    }
   }
 
   @media (min-width: 768px) {
@@ -3432,11 +3457,11 @@
   }
 
   .app-entity-card {
-    @apply flex w-full rounded-xl border border-[var(--app-separator)] bg-[var(--app-card)] px-4 text-left shadow-sm transition-colors active:bg-bw-hover;
+    @apply flex w-full rounded-xl border border-bw-border/50 bg-[var(--app-card)] px-4 text-left shadow-sm transition-colors active:bg-bw-hover;
   }
 
   .app-entity-list-row {
-    @apply flex flex-col items-stretch gap-2 py-3.5;
+    @apply flex min-h-[72px] flex-col items-stretch gap-2 py-4;
   }
 
   .app-entity-list-row__main {
@@ -3449,8 +3474,8 @@
   }
 
   .app-entity-list-row__title {
-    @apply truncate font-medium leading-snug text-bw-text;
-    font-size: var(--app-text-sm);
+    @apply truncate font-semibold leading-snug text-bw-text;
+    font-size: var(--app-text-base, 15px);
   }
 
   .app-entity-list-row__line {

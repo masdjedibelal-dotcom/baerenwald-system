@@ -72,7 +72,7 @@ export function VizZielbildCard({
       <div className="mb-2">
         <p className="text-sm font-semibold text-bw-text">Zielbild-Vorschau</p>
         <p className="text-xs text-bw-text-muted">
-          Story 9:16 · Vorher &amp; Nachher · Editorial-Block — PNG zum Teilen oder fürs Angebot.
+          Feed 4:5 (1080×1350) · Vorher &amp; Nachher · wie Website — PNG zum Teilen oder fürs Angebot.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export function VizZielbildCard({
           <img
             src={previewUrl}
             alt="Bärenwald Zielbild"
-            className="mx-auto block max-h-[min(70vh,720px)] w-auto max-w-full"
+            className="mx-auto block max-h-[min(70vh,540px)] w-auto max-w-full"
           />
         ) : (
           <p className="px-3 py-6 text-sm text-[#B8D4C4]">{error ?? 'Keine Vorschau'}</p>

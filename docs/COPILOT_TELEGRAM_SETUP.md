@@ -2,9 +2,10 @@
 
 ## 1. Supabase
 
-Migration ausführen:
+Migrationen ausführen:
 
-`supabase/migrations/20260610120000_copilot_messages.sql`
+- `supabase/migrations/20260610120000_copilot_messages.sql`
+- `supabase/migrations/20260625120000_copilot_alerts.sql` (Dedup für Echtzeit-Alerts)
 
 ## 2. Umgebungsvariablen
 
@@ -15,6 +16,7 @@ Siehe `.env.copilot.example` — Werte in `.env.local` und **Netlify** setzen:
 - `GOOGLE_MAPS_API_KEY` (optional, Abfahrtszeit)
 - `CLAUDE_API_KEY` (oder alternativ `ANTHROPIC_API_KEY` — gleicher Wert, offizieller SDK-Name)
 - bestehend: `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `RESEND_API_KEY`
+- optional: `COPILOT_WEBHOOK_SECRET` (sonst `CRON_SECRET` für `/api/copilot/notify-lead`)
 
 ## 3. NPM
 
@@ -38,18 +40,31 @@ In `netlify.toml` (falls noch nicht vorhanden):
 
 Mo–Sa 07:30 — Morgen-Briefing per Telegram.
 
-## 6. Webhook (nach Deploy, einmalig)
+## 6. Echtzeit: Neue Anfrage → Telegram
+
+Bei jeder neuen Website-Anfrage (`POST /api/lead`) wird automatisch eine Telegram-Nachricht gesendet (Dedup über `copilot_alerts`).
+
+Manuell / Supabase-Webhook:
+
+```bash
+curl -X POST https://<SITE>/api/copilot/notify-lead \
+  -H "Authorization: Bearer <CRON_SECRET>" \
+  -H "Content-Type: application/json" \
+  -d '{"lead_id":"<UUID>"}'
+```
+
+## 7. Webhook (nach Deploy, einmalig)
 
 ```
 https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DEINE-NETLIFY-URL>/api/telegram
 ```
 
-## 7. Test
+## 8. Test
 
 - Nachricht an den Bot senden (nur `TELEGRAM_CHAT_ID` wird akzeptiert)
 - Manuell Briefing: `GET /api/cron/copilot-briefing` mit Header `Authorization: Bearer <CRON_SECRET>`
 
-## 8. Fehlerbehebung
+## 9. Fehlerbehebung
 
 ### `401 status code (no body)` im Bot
 

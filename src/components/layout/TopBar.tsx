@@ -146,13 +146,14 @@ export function TopBar({ user }: TopBarProps) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="Benachrichtigungen"
+          <Link
+            href="/ki-analytics"
+            aria-label="KI Hub"
+            title="KI Hub"
             className="flex h-8 w-8 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
           >
             <Bell className="h-4 w-4" />
-          </button>
+          </Link>
 
           {cta ? (
             <button type="button" onClick={() => router.push(cta.href)} className="btn-primary btn-sm">

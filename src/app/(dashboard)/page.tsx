@@ -2,6 +2,7 @@ import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Begruessing } from '@/components/dashboard/Begruessing'
+import { DashboardTodayBar } from '@/components/dashboard/DashboardTodayBar'
 import { DashboardAuftraegeImLauf } from '@/components/dashboard/DashboardAuftraegeImLauf'
 import { DashboardLetzteAnfragenCard } from '@/components/dashboard/DashboardLetzteAnfragenCard'
 import { DashboardOffeneTodosCard } from '@/components/dashboard/DashboardOffeneTodosCard'
@@ -261,6 +262,17 @@ export default async function DashboardPage() {
   )
   const aktivitaet = buildDashboardAktivitaet(anfragenListe, angeboteListe, auftraegeListe)
 
+  const heuteIso = new Date().toISOString().slice(0, 10)
+  const offeneAnfragenCount = anfragenListe.filter((l) =>
+    ['neu', 'kontaktiert', 'termin'].includes(l.status)
+  ).length
+  const anfragenUeber24h = anfragenListe.filter((l) => {
+    if (!['neu', 'kontaktiert', 'termin'].includes(l.status)) return false
+    const h = (Date.now() - new Date(l.created_at).getTime()) / 3_600_000
+    return h >= 24
+  }).length
+  const termineHeute = offeneTodosListe.filter((t) => String(t.datum).slice(0, 10) === heuteIso).length
+
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
   const deltaNeueAnfragenWoche = deltaVsPrevious(
@@ -299,10 +311,17 @@ export default async function DashboardPage() {
       : undefined
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 md:px-6">
+    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 max-md:pb-mobile-fab-extra md:px-6">
       <Begruessing name={vorname} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+      <DashboardTodayBar
+        offeneAnfragen={offeneAnfragenCount}
+        anfragenUeber24h={anfragenUeber24h}
+        termineHeute={termineHeute}
+        offeneTodos={offeneTodosListe.length}
+      />
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           zahl={neueAnfragenWocheCount}
           label="Neue Anfragen diese Woche"

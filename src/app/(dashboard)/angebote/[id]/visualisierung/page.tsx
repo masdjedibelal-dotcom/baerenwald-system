@@ -10,7 +10,7 @@ export default async function AngebotVisualisierungPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { session?: string }
+  searchParams: { session?: string; ist_url?: string }
 }) {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -30,5 +30,13 @@ export default async function AngebotVisualisierungPage({
   const initialSession = sessionId ? await loadKiVisualisierung(sessionId) : null
   if (initialSession && initialSession.angebot_id !== params.id) notFound()
 
-  return <AngebotVisualisierungClient detail={detail} initialSession={initialSession} />
+  const initialIstUrl = searchParams.ist_url?.trim() || null
+
+  return (
+    <AngebotVisualisierungClient
+      detail={detail}
+      initialSession={initialSession}
+      initialIstUrl={initialIstUrl}
+    />
+  )
 }

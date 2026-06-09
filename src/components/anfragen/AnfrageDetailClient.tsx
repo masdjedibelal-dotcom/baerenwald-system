@@ -9,6 +9,7 @@ import {
   Briefcase,
   Calendar,
   CircleX,
+  MapPin,
   FileText,
   HelpCircle,
   History,
@@ -42,13 +43,15 @@ import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { LeadStatusBadge } from '@/components/ui/Badge'
+import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
+import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
+import { LeadGptStudioBlock } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
@@ -90,6 +93,7 @@ import {
   formatRelativeDate,
 } from '@/lib/utils'
 import { isEchterFreitext } from '@/lib/lead-display-helpers'
+import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
 
 type DetailTab = 'stammdaten' | 'projekt' | 'schritte' | 'timeline' | 'notizen' | 'dokumente'
 
@@ -550,13 +554,17 @@ export function AnfrageDetailClient({
     })
   }
 
-  const headSub =
-    [
-      lead.created_at ? `Anfrage vom ${formatDatum(lead.created_at)}` : null,
-      lead.plz?.trim() || null,
-    ]
-      .filter(Boolean)
-      .join(' · ') || 'Anfrage'
+  const headMeta = (
+    <DetailMetaRow>
+      {lead.created_at ? (
+        <DetailMetaChip icon={Calendar}>
+          Anfrage vom {formatDatum(lead.created_at)}
+        </DetailMetaChip>
+      ) : null}
+      {lead.plz?.trim() ? <DetailMetaChip icon={MapPin}>{lead.plz.trim()}</DetailMetaChip> : null}
+      {lead.kanal ? <KanalBadge kanal={lead.kanal} /> : null}
+    </DetailMetaRow>
+  )
 
   const stammdatenCard = (
     <Card
@@ -660,8 +668,13 @@ export function AnfrageDetailClient({
     </>
   )
 
+  const istGptProjekt = isGptProjektStudio(lead.funnel_daten)
+
   const projektuebersichtCards = (
     <>
+      {istGptProjekt ? (
+        <LeadGptStudioBlock lead={lead} onUpdated={() => refresh()} />
+      ) : null}
       <LeadFunnelProjektAnzeige
         lead={lead}
         gewerke={wizardGewerke}
@@ -782,13 +795,19 @@ export function AnfrageDetailClient({
       <DetailHead
         backHref="/anfragen"
         backLabel="Zurück zu Anfragen"
-        title={
-          <div className="detail-head-title-row">
-            <span>{kundenName(lead)}</span>
+        title={kundenName(lead)}
+        badges={
+          <>
             <LeadStatusBadge status={lead.status} />
-          </div>
+            {istGptProjekt ? (
+              <span className="badge badge-plain inline-flex items-center gap-1 border border-[#2E7D52]/35 bg-[#EAF3DE] text-[#1A3D2B]">
+                <Sparkles className="h-3 w-3" aria-hidden />
+                KI-Projekt
+              </span>
+            ) : null}
+          </>
         }
-        sub={headSub}
+        meta={headMeta}
         actions={
           <>
             <button

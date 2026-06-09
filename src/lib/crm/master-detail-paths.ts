@@ -21,7 +21,11 @@ export function angebotIdFromPath(pathname: string): string | null {
 }
 
 export function angeboteFullBleedSubRoute(pathname: string): boolean {
-  return pathname === '/angebote/neu' || /\/angebote\/[^/]+\/bearbeiten(\/|$)/.test(pathname)
+  return (
+    pathname === '/angebote/neu' ||
+    /\/angebote\/[^/]+\/bearbeiten(\/|$)/.test(pathname) ||
+    /\/angebote\/[^/]+\/visualisierung(\/|$)/.test(pathname)
+  )
 }
 
 export function auftragIdFromPath(pathname: string): string | null {

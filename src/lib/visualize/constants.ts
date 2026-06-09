@@ -17,3 +17,13 @@ export const VIZ_STIL_TAGS = [
   'Industrial',
   'Minimalistisch',
 ] as const
+
+export const VIZ_NACHPROMPT_TAGS = [
+  'Fliesen heller',
+  'Mehr Licht',
+  'Wärmer',
+  'Minimalistischer',
+  'Mehr Holz',
+  'Heller (nur Farben)',
+  'Näher am Original',
+] as const

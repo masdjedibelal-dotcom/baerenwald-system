@@ -53,7 +53,10 @@ export function ToastProvider() {
   }, [push])
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-toast flex w-full max-w-md flex-col gap-2 px-4 md:px-0">
+    <div
+      className="pointer-events-none fixed right-4 top-14 z-toast flex w-full max-w-md flex-col gap-2 px-4 md:top-16 md:px-0"
+      style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+    >
       {toasts.map((t) => {
         const Icon = icons[t.type]
         return (

@@ -360,7 +360,7 @@ export function AngeboteListeClient({
                   style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}
                 >
                   <ListAvatar name={name} />
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">{name}</p>
+                  <p className="list-row-primary">{name}</p>
                   <p className="truncate text-[13px] text-bw-text">{angebotSituation(a)}</p>
                   <p className="truncate text-[13px] text-bw-text-muted">{angebotBereiche(a)}</p>
                   <p className="truncate text-[13px] tabular-nums text-bw-text-muted">

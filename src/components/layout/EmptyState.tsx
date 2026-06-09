@@ -17,15 +17,17 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface/60 px-6 py-10 text-center',
+        'empty-state flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-bw-border bg-bw-card px-6 py-10 text-center',
         className
       )}
     >
-      <Icon className="h-10 w-10 text-muted" aria-hidden />
+      <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-bw-hover">
+        <Icon className="h-7 w-7 text-bw-light" aria-hidden />
+      </div>
       <div className="space-y-1">
-        <p className="text-base font-medium text-ink">{title}</p>
+        <p className="empty-state-title text-base font-semibold text-bw-text">{title}</p>
         {description ? (
-          <p className="max-w-sm text-sm text-muted">{description}</p>
+          <p className="empty-state-text max-w-sm text-sm text-bw-text-muted">{description}</p>
         ) : null}
       </div>
       {action ? <div className="pt-1">{action}</div> : null}

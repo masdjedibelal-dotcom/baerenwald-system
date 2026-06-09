@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Inbox } from 'lucide-react'
+import { Inbox, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   ListFilterSection,
@@ -21,6 +21,7 @@ import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
+import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
 import { leadInAnfragenPipeline } from '@/lib/crm/pipeline-liste-filter'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import {
@@ -193,6 +194,7 @@ export function AnfragenListeClient({
 
   const [statusFilter, setStatusFilter] = useState<'' | LeadStatus>('')
   const [pipelineOnly, setPipelineOnly] = useState(true)
+  const [kiProjektOnly, setKiProjektOnly] = useState(false)
   const [kanal, setKanal] = useState<'' | LeadKanal>('')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
@@ -225,9 +227,15 @@ export function AnfragenListeClient({
     [zeitraum, customFrom, customTo]
   )
 
+  const kiProjektCount = useMemo(
+    () => baseLeads.filter((l) => isGptProjektStudio(l.funnel_daten)).length,
+    [baseLeads]
+  )
+
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
     return baseLeads.filter((l) => {
+      if (kiProjektOnly && !isGptProjektStudio(l.funnel_daten)) return false
       if (statusFilter && l.status !== statusFilter) return false
       if (kanal && l.kanal !== kanal) return false
       if (dateRange && !datumInZeitraum(l.created_at, dateRange)) return false
@@ -237,7 +245,7 @@ export function AnfragenListeClient({
       const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
       return name.includes(needle) || mail.includes(needle) || tel.includes(needle)
     })
-  }, [baseLeads, statusFilter, kanal, debouncedQ, dateRange])
+  }, [baseLeads, statusFilter, kanal, debouncedQ, dateRange, kiProjektOnly])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -253,11 +261,12 @@ export function AnfragenListeClient({
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim() || !pipelineOnly)
+  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim() || !pipelineOnly || kiProjektOnly)
 
   function resetAllFilters() {
     setStatusFilter('')
     setPipelineOnly(true)
+    setKiProjektOnly(false)
     setKanal('')
     setQ('')
     setZeitraum('alle')
@@ -285,8 +294,11 @@ export function AnfragenListeClient({
     if (q.trim()) {
       t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
     }
+    if (kiProjektOnly) {
+      t.push({ id: 'ki', label: 'KI-Projekt', onRemove: () => setKiProjektOnly(false) })
+    }
     return t
-  }, [statusFilter, kanal, zeitraum, q])
+  }, [statusFilter, kanal, zeitraum, q, kiProjektOnly])
 
   function openDetail(leadId: string) {
     router.push(`/anfragen/${leadId}`)
@@ -318,6 +330,15 @@ export function AnfragenListeClient({
               })),
               selected: [statusFilter],
               onChange: (v) => setStatusFilter((v[0] ?? '') as '' | LeadStatus),
+            },
+            {
+              label: 'Typ',
+              options: [
+                { label: 'Alle', value: 'all', count: baseLeads.length },
+                { label: 'KI-Projekt', value: 'ki', count: kiProjektCount },
+              ],
+              selected: [kiProjektOnly ? 'ki' : 'all'],
+              onChange: (v) => setKiProjektOnly((v[0] ?? 'all') === 'ki'),
             },
           ]}
         >
@@ -410,7 +431,17 @@ export function AnfragenListeClient({
                   lead.preis_max,
                   lead.funnel_daten
                 )}
-                badge={<LeadStatusBadge status={lead.status} />}
+                badge={
+                  <span className="flex flex-wrap items-center gap-1">
+                    {isGptProjektStudio(lead.funnel_daten) ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-md border border-[#2E7D52]/30 bg-[#EAF3DE] px-1.5 py-0.5 text-[10px] font-semibold text-[#1A3D2B]">
+                        <Sparkles className="h-3 w-3" aria-hidden />
+                        KI
+                      </span>
+                    ) : null}
+                    <LeadStatusBadge status={lead.status} />
+                  </span>
+                }
               />
             ))}
           </ListMobileStack>
@@ -456,7 +487,12 @@ export function AnfragenListeClient({
                 style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}
               >
                 <ListAvatar name={leadName(lead)} />
-                <p className="truncate text-[13.5px] font-medium text-bw-text">{leadName(lead)}</p>
+                <p className="truncate text-[13.5px] font-medium text-bw-text">
+                  {isGptProjektStudio(lead.funnel_daten) ? (
+                    <Sparkles className="mr-1 inline h-3 w-3 text-[#2E7D52]" aria-hidden />
+                  ) : null}
+                  {leadName(lead)}
+                </p>
                 <p className="truncate text-[13px] text-bw-text">{leadSituationText(lead)}</p>
                 <p className="truncate text-[13px] text-bw-text-muted">{leadBereicheText(lead)}</p>
                 <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{leadEingegangen(lead)}</p>

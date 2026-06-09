@@ -7,11 +7,7 @@ import { BrandLogo } from '@/components/brand/BrandLogo'
 import { LogOut, PanelLeftClose, PanelLeft, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import {
-  SIDEBAR_PRIMARY_NAV,
-  SIDEBAR_SECONDARY_NAV,
-  type NavItemDef,
-} from '@/lib/nav-config'
+import { SIDEBAR_NAV_GROUPS, type NavItemDef } from '@/lib/nav-config'
 
 const SIDEBAR_EXPANDED_KEY = 'bw-sidebar-expanded'
 
@@ -100,15 +96,25 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className={cn('flex flex-col gap-0.5', expanded ? 'w-full' : 'items-center')}>
-        {SIDEBAR_PRIMARY_NAV.map((item) => (
-          <RailItem key={item.href} item={item} active={isActive(item.href, item.exact)} expanded={expanded} />
-        ))}
-
-        <div className={cn('my-1 h-px bg-white/10', expanded ? 'mx-1 w-auto' : 'w-5')} />
-
-        {SIDEBAR_SECONDARY_NAV.map((item) => (
-          <RailItem key={item.href} item={item} active={isActive(item.href)} expanded={expanded} />
+      <nav className={cn('flex flex-col', expanded ? 'w-full gap-3' : 'items-center gap-0.5')}>
+        {SIDEBAR_NAV_GROUPS.map((group, gi) => (
+          <div key={group.id} className={cn('flex flex-col gap-0.5', gi > 0 && !expanded && 'mt-1')}>
+            {expanded ? (
+              <p className="mb-0.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                {group.label}
+              </p>
+            ) : gi > 0 ? (
+              <div className="my-1 h-px w-5 bg-white/10" />
+            ) : null}
+            {group.items.map((item) => (
+              <RailItem
+                key={item.href}
+                item={item}
+                active={isActive(item.href, item.exact)}
+                expanded={expanded}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 

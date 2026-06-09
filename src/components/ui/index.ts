@@ -17,6 +17,7 @@ export { DetailProp } from './detail-prop'
 export { ProgressBar } from './ProgressBar'
 export { DocCard, type DocType } from './DocCard'
 export { EmptyState } from './EmptyState'
+export { DetailMetaChip, DetailMetaRow } from './DetailMetaChip'
 export { ToastProvider, toast, type ToastItem } from './app-toast'
 export { SkeletonCard, SkeletonRow, SkeletonList } from './Skeleton'
 

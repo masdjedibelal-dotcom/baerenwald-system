@@ -9,8 +9,12 @@ export type DetailHeadProps = {
   backLabel?: string
   title: ReactNode
   sub?: ReactNode
+  /** Chips unter Titel (PLZ, Betrag, Kanal …) */
+  meta?: ReactNode
   badges?: ReactNode
   actions?: ReactNode
+  /** Stärkerer Projekt-Kopf mit Trennlinie */
+  variant?: 'default' | 'project'
   className?: string
 }
 
@@ -18,21 +22,27 @@ export type DetailHeadProps = {
 export function DetailHead({
   title,
   sub,
+  meta,
   badges,
   actions,
+  variant = 'project',
   className,
 }: DetailHeadProps) {
   return (
-    <div className={cn('detail-head', className)}>
-      <div className="detail-head-main min-w-0 flex-1">
-        <div className="detail-head-title">{title}</div>
-        {sub ? <div className="detail-head-sub">{sub}</div> : null}
+    <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
+      <div className="detail-head-top">
+        <div className="detail-head-main min-w-0 flex-1">
+          <div className="detail-head-title">{title}</div>
+          {badges ? (
+            <div className="detail-head-badges mt-2 flex flex-wrap items-center gap-1.5">{badges}</div>
+          ) : null}
+          {sub ? <div className="detail-head-sub">{sub}</div> : null}
+          {meta ? <div className="detail-head-meta">{meta}</div> : null}
+        </div>
+
+        {actions ? <div className="detail-head-actions min-w-0">{actions}</div> : null}
       </div>
-
-      {badges ? <div className="detail-head-badges flex shrink-0 flex-wrap items-center gap-1.5">{badges}</div> : null}
-
-      {actions ? <div className="detail-head-actions min-w-0">{actions}</div> : null}
-    </div>
+    </header>
   )
 }
 

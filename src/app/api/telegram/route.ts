@@ -52,7 +52,7 @@ async function runClaudeChat(userText: string): Promise<string> {
   const anthropic = anthropicClient()
   let response = await anthropic.messages.create({
     model: getClaudeModel(),
-    max_tokens: 1024,
+    max_tokens: 2048,
     system: COPILOT_SYSTEM,
     tools: COPILOT_CLAUDE_TOOLS,
     messages,
@@ -77,7 +77,7 @@ async function runClaudeChat(userText: string): Promise<string> {
 
     response = await anthropic.messages.create({
       model: getClaudeModel(),
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: COPILOT_SYSTEM,
       tools: COPILOT_CLAUDE_TOOLS,
       messages,

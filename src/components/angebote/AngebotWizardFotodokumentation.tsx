@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState, type DragEvent } from 'react'
-import { ImagePlus, Trash2 } from 'lucide-react'
+import { ImagePlus, Sparkles, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -133,6 +133,8 @@ function WizardFotoRow({
   onPatchBeschreibung,
   onPreview,
   onRemove,
+  onVisualisieren,
+  visualisierenLoading,
 }: {
   foto: AngebotProjektFoto
   disabled?: boolean
@@ -142,6 +144,8 @@ function WizardFotoRow({
   onPatchBeschreibung: (text: string) => void
   onPreview: () => void
   onRemove: () => void
+  onVisualisieren?: () => void
+  visualisierenLoading?: boolean
 }) {
   return (
     <div className="wizard-foto-item">
@@ -164,15 +168,29 @@ function WizardFotoRow({
           onChange={onPatchBeschreibung}
           onEndEdit={onEndEditBeschreibung}
         />
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm shrink-0 self-start p-1.5 sm:ml-0"
-          title="Bild entfernen"
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex shrink-0 flex-col gap-1 self-start sm:ml-0">
+          {onVisualisieren ? (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm gap-1 px-2 py-1 text-xs"
+              title="KI-Visualisierung für dieses Foto"
+              disabled={disabled || visualisierenLoading}
+              onClick={onVisualisieren}
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              Visualisieren
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm p-1.5"
+            title="Bild entfernen"
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -185,6 +203,8 @@ export function AngebotWizardFotodokumentation({
   uploading,
   disabled,
   onUploadFiles,
+  onVisualisierenFoto,
+  visualisierenFotoUrl,
 }: {
   fotos: AngebotProjektFoto[]
   onChange: (next: AngebotProjektFoto[]) => void
@@ -192,6 +212,9 @@ export function AngebotWizardFotodokumentation({
   uploading: boolean
   disabled?: boolean
   onUploadFiles: (files: File[]) => void
+  /** Öffnet KI-Visualisierung mit diesem Foto als Ist-Bild (neuer Tab). */
+  onVisualisierenFoto?: (fotoUrl: string) => void | Promise<void>
+  visualisierenFotoUrl?: string | null
 }) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [editBeschreibungUrl, setEditBeschreibungUrl] = useState<string | null>(null)
@@ -309,7 +332,8 @@ export function AngebotWizardFotodokumentation({
           />
         </label>
         <p className="wizard-projekt-field-hint mt-1">
-          Optional — per Klick oder Drag & Drop; erscheint im PDF unter dem Foto.
+          Optional — per Klick oder Drag & Drop; erscheint im PDF unter dem Foto. Pro Foto kannst du
+          eine KI-Visualisierung starten.
         </p>
       </div>
 
@@ -329,6 +353,10 @@ export function AngebotWizardFotodokumentation({
                 onPatchBeschreibung={(text) => patchBeschreibung(f.url, text)}
                 onPreview={() => setLightboxUrl(f.url)}
                 onRemove={() => removeFoto(f.url)}
+                onVisualisieren={
+                  onVisualisierenFoto ? () => void onVisualisierenFoto(f.url) : undefined
+                }
+                visualisierenLoading={visualisierenFotoUrl === f.url}
               />
             </Fragment>
           ))}

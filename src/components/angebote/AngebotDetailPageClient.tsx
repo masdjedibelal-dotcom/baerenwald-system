@@ -57,6 +57,7 @@ import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote
 import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
+import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import {
   angebotSummenBrutto,
   betragAnzeige,
@@ -340,12 +341,18 @@ export function AngebotDetailPageClient({
 
   const anhaengeCount = useMemo(() => anzahlAngebotAnhaenge(detail), [detail])
 
-  const headSub = [
-    betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max),
-    detail.gueltig_bis ? `gültig bis ${formatDatum(detail.gueltig_bis)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
+  const headMeta = (
+    <DetailMetaRow>
+      {betragLabel ? <DetailMetaChip>{betragLabel}</DetailMetaChip> : null}
+      {detail.gueltig_bis ? (
+        <DetailMetaChip icon={CalendarClock}>gültig bis {formatDatum(detail.gueltig_bis)}</DetailMetaChip>
+      ) : null}
+      {detail.angebotsnr ? (
+        <DetailMetaChip className="font-mono text-[11px]">{detail.angebotsnr}</DetailMetaChip>
+      ) : null}
+    </DetailMetaRow>
+  )
 
   function openVerlaengernModal() {
     const raw = detail.gueltig_bis?.slice(0, 10)
@@ -845,13 +852,9 @@ export function AngebotDetailPageClient({
       <DetailHead
         backHref="/angebote"
         backLabel="Zurück zu Angebote"
-        title={
-          <div className="detail-head-title-row">
-            <span>{kundeName}</span>
-            <AngebotEinfachStatusBadge status={statusEinfach} />
-          </div>
-        }
-        sub={headSub}
+        title={kundeName}
+        badges={<AngebotEinfachStatusBadge status={statusEinfach} />}
+        meta={headMeta}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}

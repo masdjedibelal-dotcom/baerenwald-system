@@ -165,9 +165,9 @@ export type AcceptAngebotAndCreateAuftragOptions = {
 
 export async function acceptAngebotAndCreateAuftrag(
   angebotId: string,
-  opts?: AcceptAngebotAndCreateAuftragOptions
+  opts?: AcceptAngebotAndCreateAuftragOptions & { asSystem?: boolean }
 ): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const { data: ang } = await supabase
     .from('angebote')
     .select('id, lead_id, status')
@@ -198,19 +198,32 @@ export async function acceptAngebotAndCreateAuftrag(
 
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)
-    await insertAngebotTimeline(
-      ang.lead_id,
-      angebotId,
-      'Angebot angenommen — Auftrag erstellt',
-      null
-    )
-    revalidatePath(`/anfragen/${ang.lead_id}`)
+    if (opts?.asSystem) {
+      await supabaseAdmin.from('lead_timeline').insert({
+        lead_id: ang.lead_id,
+        angebot_id: angebotId,
+        typ: 'angebot',
+        titel: 'Angebot angenommen — Auftrag erstellt',
+        beschreibung: null,
+        erstellt_von: null,
+      })
+    } else {
+      await insertAngebotTimeline(
+        ang.lead_id,
+        angebotId,
+        'Angebot angenommen — Auftrag erstellt',
+        null
+      )
+      revalidatePath(`/anfragen/${ang.lead_id}`)
+    }
   }
 
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/auftraege')
-  revalidatePath(`/auftraege/${res.auftragId}`)
+  if (!opts?.asSystem) {
+    revalidatePath('/angebote')
+    revalidatePath(`/angebote/${angebotId}`)
+    revalidatePath('/auftraege')
+    revalidatePath(`/auftraege/${res.auftragId}`)
+  }
 
   return { ok: true, auftragId: res.auftragId }
 }

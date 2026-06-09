@@ -38,3 +38,11 @@
 [[scheduled]]
   path = "/api/cron/copilot-briefing"
   schedule = "30 7 * * 1-6"
+
+[[scheduled]]
+  path = "/api/cron/ki-hub-analyze"
+  schedule = "0 7 * * 1-6"
+
+[[scheduled]]
+  path = "/api/cron/ki-hub-metrics"
+  schedule = "30 6 * * *"

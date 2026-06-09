@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { notifyNewLeadAlert } from '@/lib/copilot/crm-actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAnfrageBestaetigung } from '@/app/actions/mails'
 import { tomorrowYmd } from '@/lib/kalender-auto-termine'
@@ -231,6 +232,8 @@ export async function POST(req: Request) {
   if (kanal === 'website') {
     await sendAnfrageBestaetigung(leadId)
   }
+
+  void notifyNewLeadAlert(leadId).catch(() => undefined)
 
   return NextResponse.json({ ok: true, id: leadId })
 }

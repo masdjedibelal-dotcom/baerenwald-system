@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
 import {
   createAngebot,
@@ -62,7 +63,8 @@ export type SaveAngebotWizardDraftPayload = {
 }
 
 export async function saveAngebotWizardDraft(
-  input: SaveAngebotWizardDraftPayload
+  input: SaveAngebotWizardDraftPayload,
+  opts?: { asSystem?: boolean }
 ): Promise<
   { ok: true; angebotId: string; angebotsnr: string | null } | { ok: false; message: string }
 > {
@@ -150,10 +152,10 @@ export async function saveAngebotWizardDraft(
       wichtige_hinweise: projektFelder.wichtige_hinweise,
       varianten: projektFelder.varianten,
       handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-    })
+    }, { asSystem: opts?.asSystem })
     if (!upd.ok) return upd
-    const supabase = createClient()
-    const { data: nrRow } = await supabase
+    const db = opts?.asSystem ? supabaseAdmin : createClient()
+    const { data: nrRow } = await db
       .from('angebote')
       .select('angebotsnr')
       .eq('id', input.angebotId)
@@ -181,10 +183,10 @@ export async function saveAngebotWizardDraft(
     wichtige_hinweise: projektFelder.wichtige_hinweise,
     varianten: projektFelder.varianten,
     handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-  })
+  }, { asSystem: opts?.asSystem })
   if (!created.ok) return created
-  const supabase = createClient()
-  const { data: nrRow } = await supabase
+  const db = opts?.asSystem ? supabaseAdmin : createClient()
+  const { data: nrRow } = await db
     .from('angebote')
     .select('angebotsnr')
     .eq('id', created.id)
@@ -223,9 +225,10 @@ function normalizeVariantenFromDb(raw: unknown): AngebotVariantenPersistJson | n
 
 export async function loadAngebotWizardBootstrap(
   angebotId: string,
-  leadId: string
+  leadId: string,
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true; bootstrap: AngebotWizardBootstrap } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
 
   const { data: row, error } = await supabase
     .from('angebote')
@@ -348,9 +351,10 @@ export async function loadAngebotWizardBootstrap(
 /** 1:1-Kopie für neuen Wizard-Entwurf: gleiche Inhalte, Titel mit (2), (3), … — keine Angebots-ID. */
 export async function loadAngebotWizardBootstrapKopie(
   quelleAngebotId: string,
-  leadId: string
+  leadId: string,
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true; bootstrap: AngebotWizardBootstrap } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
 
   const { data: row, error } = await supabase
     .from('angebote')

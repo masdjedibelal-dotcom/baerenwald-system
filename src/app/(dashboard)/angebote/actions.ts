@@ -241,9 +241,10 @@ async function zahlungsbedingungenFuerSpeichern(
 }
 
 export async function createAngebot(
-  input: CreateAngebotInput
+  input: CreateAngebotInput,
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const positionen = normalizeAngebotPositionen(input.positionen)
   const summen = summenAusPositionen(positionen, 19)
   const zahlungsbedingungen = await zahlungsbedingungenFuerSpeichern(supabase, input)
@@ -321,24 +322,44 @@ export async function createAngebot(
       .maybeSingle()
     const ls = (leadRow?.status ?? 'neu') as LeadStatus
     if (leadStatusVorAngebot(ls)) {
-      const leadUpd = await updateLeadStatus(input.lead_id, 'angebot', 'Angebot erstellt')
-      if (!leadUpd.ok) return leadUpd
+      if (opts?.asSystem) {
+        const now = new Date().toISOString()
+        await supabaseAdmin
+          .from('leads')
+          .update({ status: 'angebot', updated_at: now })
+          .eq('id', input.lead_id)
+        await supabaseAdmin.from('leads_status_history').insert({
+          lead_id: input.lead_id,
+          status_alt: ls,
+          status_neu: 'angebot',
+          user_id: null,
+          notiz: 'Angebot erstellt',
+        })
+      } else {
+        const leadUpd = await updateLeadStatus(input.lead_id, 'angebot', 'Angebot erstellt')
+        if (!leadUpd.ok) return leadUpd
+      }
     }
   }
 
-  revalidatePath('/angebote')
-  if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+  if (!opts?.asSystem) {
+    revalidatePath('/angebote')
+    if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+  }
   return { ok: true, id }
 }
 
 export async function updateAngebot(
   angebotId: string,
-  input: Omit<CreateAngebotInput, 'lead_id'> & { lead_id: string | null }
+  input: Omit<CreateAngebotInput, 'lead_id'> & { lead_id: string | null },
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
+  const user = opts?.asSystem
+    ? null
+    : (
+        await supabase.auth.getUser()
+      ).data.user
   const { data: current, error: loadErr } = await supabase
     .from('angebote')
     .select('id, status, varianten, gesendet_kunde_at, status_einfach, lead_id')
@@ -494,9 +515,11 @@ export async function updateAngebot(
     if (!syncLead.ok) return syncLead
   }
 
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
-  if (leadId) revalidatePath(`/anfragen/${leadId}`)
+  if (!opts?.asSystem) {
+    revalidatePath('/angebote')
+    revalidatePath(`/angebote/${angebotId}`)
+    if (leadId) revalidatePath(`/anfragen/${leadId}`)
+  }
   return { ok: true }
 }
 
@@ -516,9 +539,10 @@ export async function updateAngebotNotizen(
 
 export async function setAngebotStatus(
   angebotId: string,
-  status: AngebotStatus
+  status: AngebotStatus,
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const now = new Date().toISOString()
   const extra: Record<string, string> = {}
   if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
@@ -529,8 +553,10 @@ export async function setAngebotStatus(
     .update({ status, updated_at: now, ...extra })
     .eq('id', angebotId)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
+  if (!opts?.asSystem) {
+    revalidatePath(`/angebote/${angebotId}`)
+    revalidatePath('/angebote')
+  }
   return { ok: true }
 }
 
@@ -587,11 +613,14 @@ export async function persistPdfForAngebot(
   return { ok: true, buffer, publicUrl }
 }
 
-export async function sendAngebotToHandwerker(angebotId: string) {
+export async function sendAngebotToHandwerker(
+  angebotId: string,
+  opts?: { asSystem?: boolean }
+) {
   const detail = await loadAngebotDetailAdmin(angebotId)
   if (!detail?.kunden) return { ok: false as const, message: 'Daten unvollständig' }
 
-  const st = await setAngebotStatus(angebotId, 'gesendet_handwerker')
+  const st = await setAngebotStatus(angebotId, 'gesendet_handwerker', { asSystem: opts?.asSystem })
   if (!st.ok) return st
 
   const rows = detail.angebot_handwerker ?? []
@@ -883,9 +912,15 @@ export async function acceptHandwerker(angebotId: string) {
 
 export async function sendAngebotToKunde(
   angebotId: string,
-  options?: { to?: string[]; cc?: string[]; betreff?: string; skipTimeline?: boolean }
+  options?: {
+    to?: string[]
+    cc?: string[]
+    betreff?: string
+    skipTimeline?: boolean
+    asSystem?: boolean
+  }
 ) {
-  const supabase = createClient()
+  const supabase = options?.asSystem ? supabaseAdmin : createClient()
   const detail = await loadAngebotDetailAdmin(angebotId)
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
@@ -907,7 +942,7 @@ export async function sendAngebotToKunde(
 
   const [pdf, st] = await Promise.all([
     persistPdfForAngebot(angebotId, { detail, skipRevalidate: true }),
-    setAngebotStatus(angebotId, 'gesendet_kunde'),
+    setAngebotStatus(angebotId, 'gesendet_kunde', { asSystem: options?.asSystem }),
   ])
   if (!pdf.ok) return pdf
   if (!st.ok) return st
@@ -1165,11 +1200,12 @@ export type HandwerkerGewerkListeEintrag = {
 }
 
 export async function listHandwerkerFuerGewerk(
-  gewerkId: string
+  gewerkId: string,
+  opts?: { asSystem?: boolean }
 ): Promise<
   { ok: true; handwerker: HandwerkerGewerkListeEintrag[] } | { ok: false; message: string }
 > {
-  const supabase = createClient()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const { data: gw, error: gErr } = await supabase
     .from('gewerke')
     .select('slug')
@@ -1655,12 +1691,15 @@ export async function createAuftragFromAngebot(
 }
 
 export async function markKundeAkzeptiert(
-  angebotId: string
+  angebotId: string,
+  opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
+  const user = opts?.asSystem
+    ? null
+    : (
+        await supabase.auth.getUser()
+      ).data.user
 
   const { data: row } = await supabase
     .from('angebote')
@@ -1672,7 +1711,7 @@ export async function markKundeAkzeptiert(
     return { ok: false, message: 'Nur bei Status „Gesendet Kunde“ möglich.' }
   }
 
-  const st = await setAngebotStatus(angebotId, 'kunde_akzeptiert')
+  const st = await setAngebotStatus(angebotId, 'kunde_akzeptiert', { asSystem: opts?.asSystem })
   if (!st.ok) return st
 
   await supabase
@@ -1693,8 +1732,15 @@ export async function markKundeAkzeptiert(
 
     const leadStatus = (lead?.status ?? 'neu') as LeadStatus
     if (leadStatusVorAngebot(leadStatus)) {
-      const upd = await updateLeadStatus(leadId, 'angebot', 'Angebot vom Kunden angenommen')
-      if (!upd.ok) return upd
+      if (opts?.asSystem) {
+        await supabaseAdmin
+          .from('leads')
+          .update({ status: 'angebot', updated_at: new Date().toISOString() })
+          .eq('id', leadId)
+      } else {
+        const upd = await updateLeadStatus(leadId, 'angebot', 'Angebot vom Kunden angenommen')
+        if (!upd.ok) return upd
+      }
     }
 
     const { error: tlErr } = await supabase.from('lead_timeline').insert({
@@ -1706,11 +1752,13 @@ export async function markKundeAkzeptiert(
     })
     if (tlErr) console.warn('lead_timeline angebot_angenommen:', tlErr.message)
 
-    revalidatePath(`/anfragen/${leadId}`)
-    revalidatePath('/anfragen')
+    if (!opts?.asSystem) {
+      revalidatePath(`/anfragen/${leadId}`)
+      revalidatePath('/anfragen')
+    }
   }
 
-  revalidatePath('/')
+  if (!opts?.asSystem) revalidatePath('/')
   return { ok: true }
 }
 

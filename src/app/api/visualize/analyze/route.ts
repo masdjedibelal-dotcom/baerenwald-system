@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { analyzeInspirationImage } from '@/lib/visualize/claude-analyze-room'
 import { analyzeZielBildForPrompt } from '@/lib/visualize/claude-analyze'
 import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
 import { loadKiVisualisierung, updateKiVisualisierung } from '@/lib/visualize/queries'
@@ -53,16 +54,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const prompt = await analyzeZielBildForPrompt({
-      ist_bild_url: istUrl,
-      ziel_bild_url: zielUrl,
-      gewerk: body.gewerk,
-    })
+    const [prompt, inspiration_analyse] = await Promise.all([
+      analyzeZielBildForPrompt({
+        ist_bild_url: istUrl,
+        ziel_bild_url: zielUrl,
+        gewerk: body.gewerk,
+      }),
+      analyzeInspirationImage(zielUrl).catch(() => null),
+    ])
     await updateKiVisualisierung(sessionId, {
       analysierter_prompt: prompt,
       ziel_bild_url: zielUrl,
+      ...(inspiration_analyse ? { inspiration_analyse } : {}),
     })
-    return NextResponse.json({ prompt })
+    return NextResponse.json({ prompt, inspiration_analyse })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Analyse fehlgeschlagen'
     return NextResponse.json({ error: message }, { status: 500 })

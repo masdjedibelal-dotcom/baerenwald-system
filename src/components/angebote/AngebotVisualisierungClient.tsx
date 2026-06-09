@@ -1,21 +1,26 @@
 'use client'
 
-import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ImageIcon, Loader2, Sparkles, X } from 'lucide-react'
+import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
+import { VizPrepareQuestions } from '@/components/angebote/VizPrepareQuestions'
 import { VizZielbildCard } from '@/components/angebote/VizZielbildCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
   VIZ_MAX_IST_BILDER,
+  VIZ_NACHPROMPT_TAGS,
   VIZ_STIL_TAGS,
 } from '@/lib/visualize/constants'
 import type {
   KiVizPromptHistoryEntry,
   KiVisualisierung,
   VizBauErklaerung,
+  VizPrepareQuestion,
   VizRaumAnalyse,
 } from '@/lib/visualize/types'
 import type { AngebotDetail } from '@/lib/types'
@@ -104,18 +109,37 @@ function VizImageDropzone({
 export function AngebotVisualisierungClient({
   detail,
   initialSession,
+  initialIstUrl,
 }: {
   detail: AngebotDetail
   initialSession?: KiVisualisierung | null
+  /** Aus Wizard: Foto-URL als Ist-Bild übernehmen */
+  initialIstUrl?: string | null
 }) {
+  const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [session, setSession] = useState<KiVisualisierung | null>(initialSession ?? null)
   const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null)
   const [aktivesIstIndex, setAktivesIstIndex] = useState(0)
-  const [prompt, setPrompt] = useState(initialSession?.analysierter_prompt ?? '')
-  const [raumAnalyse, setRaumAnalyse] = useState<VizRaumAnalyse | null>(null)
-  const [erklaerungByVersion, setErklaerungByVersion] = useState<Record<number, VizBauErklaerung>>({})
+  const [prompt, setPrompt] = useState(
+    initialSession?.wunsch_text ?? initialSession?.analysierter_prompt ?? ''
+  )
+  const [raumAnalyse, setRaumAnalyse] = useState<VizRaumAnalyse | null>(
+    initialSession?.raum_analyse ?? null
+  )
+  const [erklaerungByVersion, setErklaerungByVersion] = useState<Record<number, VizBauErklaerung>>(
+    () => {
+      if (initialSession?.gpt_erklaerung && initialSession.prompt_history.length) {
+        const v = initialSession.prompt_history[initialSession.prompt_history.length - 1]?.version
+        if (v) return { [v]: initialSession.gpt_erklaerung }
+      }
+      return {}
+    }
+  )
   const [modus, setModus] = useState<Modus>('prompt')
   const [isRendering, setIsRendering] = useState(false)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [pendingQuestion, setPendingQuestion] = useState<VizPrepareQuestion | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [aktiveVersion, setAktiveVersion] = useState(0)
   const [insAngebotOpen, setInsAngebotOpen] = useState(false)
@@ -126,6 +150,7 @@ export function AngebotVisualisierungClient({
   const [istDragging, setIstDragging] = useState(false)
   const istInputId = `viz-ist-upload-${detail.id}`
   const zielInputId = `viz-ziel-upload-${detail.id}`
+  const initialIstAppliedRef = useRef(false)
 
   const istBilderUrls = session?.ist_bilder_urls ?? []
   const zielBildUrl = session?.ziel_bild_url ?? null
@@ -135,17 +160,40 @@ export function AngebotVisualisierungClient({
   const leadFotos = useMemo(() => parseProjektFotos(detail.fotos_urls), [detail.fotos_urls])
 
   const analyzeRoom = useCallback(
-    async (istUrl: string) => {
+    async (istUrl: string, sid?: string) => {
       try {
         const res = await fetch('/api/visualize/analyze-room', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ angebot_id: detail.id, ist_bild_url: istUrl }),
+          body: JSON.stringify({
+            angebot_id: detail.id,
+            session_id: sid,
+            ist_bild_url: istUrl,
+          }),
         })
         const data = (await res.json()) as { raum_analyse?: VizRaumAnalyse; error?: string }
         if (!res.ok || !data.raum_analyse) return
         setRaumAnalyse(data.raum_analyse)
         setPrompt((prev) => prev.trim() || data.raum_analyse?.wunsch_entwurf || '')
+      } catch {
+        /* optional */
+      }
+    },
+    [detail.id]
+  )
+
+  const analyzeInspiration = useCallback(
+    async (zielUrl: string, sid: string) => {
+      try {
+        await fetch('/api/visualize/analyze-inspiration', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            angebot_id: detail.id,
+            session_id: sid,
+            ziel_bild_url: zielUrl,
+          }),
+        })
       } catch {
         /* optional */
       }
@@ -192,6 +240,10 @@ export function AngebotVisualisierungClient({
   }, [detail.id, sessionId])
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     if (initialSession) {
       setSession(initialSession)
       setSessionId(initialSession.id)
@@ -199,9 +251,10 @@ export function AngebotVisualisierungClient({
       if (hist.length) {
         setAktiveVersion(hist.length - 1)
         setPrompt(hist[hist.length - 1]?.prompt ?? '')
-      } else if (initialSession.analysierter_prompt) {
-        setPrompt(initialSession.analysierter_prompt)
+      } else if (initialSession.wunsch_text || initialSession.analysierter_prompt) {
+        setPrompt(initialSession.wunsch_text ?? initialSession.analysierter_prompt ?? '')
       }
+      if (initialSession.raum_analyse) setRaumAnalyse(initialSession.raum_analyse)
       return
     }
     void ensureSession()
@@ -212,6 +265,53 @@ export function AngebotVisualisierungClient({
       setAktiveVersion(versionen.length - 1)
     }
   }, [versionen.length, aktiveVersion])
+
+  useEffect(() => {
+    const istUrl = initialIstUrl?.trim()
+    if (!istUrl || initialIstAppliedRef.current || initialSession) return
+
+    initialIstAppliedRef.current = true
+
+    void (async () => {
+      const sid = await ensureSession()
+      if (!sid) return
+
+      const loadRes = await fetch('/api/visualize/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ angebot_id: detail.id, session_id: sid }),
+      })
+      const loadData = (await loadRes.json()) as { session?: KiVisualisierung }
+      const existing = loadData.session?.ist_bilder_urls ?? []
+      const already = existing.includes(istUrl)
+      const nextUrls = already
+        ? existing
+        : [...existing, istUrl].slice(0, VIZ_MAX_IST_BILDER)
+
+      if (!already) {
+        const res = await fetch('/api/visualize/session', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            angebot_id: detail.id,
+            session_id: sid,
+            ist_bilder_urls: nextUrls,
+          }),
+        })
+        const data = (await res.json()) as { session?: KiVisualisierung; error?: string }
+        if (!res.ok || !data.session) {
+          toast.error(data.error ?? 'Ist-Bild konnte nicht übernommen werden')
+          return
+        }
+        setSession(data.session)
+      }
+
+      const idx = nextUrls.indexOf(istUrl)
+      setAktivesIstIndex(idx >= 0 ? idx : 0)
+      void analyzeRoom(istUrl, sid)
+      toast.success('Foto aus Angebot als Ist-Bild übernommen')
+    })()
+  }, [initialIstUrl, initialSession, ensureSession, detail.id, analyzeRoom])
 
   async function uploadFile(file: File, kind: 'ist' | 'ziel') {
     if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
@@ -243,7 +343,10 @@ export function AngebotVisualisierungClient({
       if (kind === 'ist') {
         const urls = data.session.ist_bilder_urls ?? []
         const latest = urls[urls.length - 1]
-        if (latest) void analyzeRoom(latest)
+        if (latest) void analyzeRoom(latest, sid)
+      }
+      if (kind === 'ziel' && data.session.ziel_bild_url) {
+        void analyzeInspiration(data.session.ziel_bild_url, sid)
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
@@ -342,17 +445,17 @@ export function AngebotVisualisierungClient({
     }
   }
 
-  async function renderPrompt(overridePrompt?: string) {
+  async function executeRender(wunsch: string, nachprompt?: string) {
     const sid = await ensureSession()
     if (!sid) return
-    const p = (overridePrompt ?? prompt).trim()
     const istUrl = istBilderUrls[aktivesIstIndex]?.trim()
-    if (!istUrl || !p) {
+    if (!istUrl || !wunsch) {
       toast.error('Ist-Bild und Prompt erforderlich')
       return
     }
 
     setIsRendering(true)
+    setPendingQuestion(null)
     try {
       const res = await fetch('/api/visualize/render', {
         method: 'POST',
@@ -361,8 +464,8 @@ export function AngebotVisualisierungClient({
           angebot_id: detail.id,
           session_id: sid,
           ist_bild_url: istUrl,
-          prompt: p,
-          raum_analyse: raumAnalyse,
+          wunsch_text: wunsch,
+          nachprompt,
         }),
       })
       const data = (await res.json()) as {
@@ -376,7 +479,7 @@ export function AngebotVisualisierungClient({
       const idx = (data.session.prompt_history?.length ?? 1) - 1
       const version = data.version ?? idx + 1
       setAktiveVersion(idx)
-      setPrompt(p)
+      setPrompt(wunsch)
       if (data.erklaerung) {
         setErklaerungByVersion((prev) => ({ ...prev, [version]: data.erklaerung! }))
       }
@@ -386,6 +489,74 @@ export function AngebotVisualisierungClient({
     } finally {
       setIsRendering(false)
     }
+  }
+
+  async function prepareAndMaybeRender(
+    wunsch: string,
+    answer?: { question_id: string; option_id: string; option_label: string }
+  ) {
+    const sid = await ensureSession()
+    if (!sid) return
+    const istUrl = istBilderUrls[aktivesIstIndex]?.trim()
+    if (!istUrl || !wunsch) {
+      toast.error('Ist-Bild und Prompt erforderlich')
+      return
+    }
+
+    setIsPreparing(true)
+    try {
+      const res = await fetch('/api/visualize/prepare-render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          angebot_id: detail.id,
+          session_id: sid,
+          wunsch_text: wunsch,
+          ...(answer ? { answer } : {}),
+        }),
+      })
+      const data = (await res.json()) as {
+        ready?: boolean
+        questions?: VizPrepareQuestion[]
+        session?: KiVisualisierung
+        error?: string
+      }
+      if (!res.ok) throw new Error(data.error ?? 'Vorbereitung fehlgeschlagen')
+      if (data.session) setSession(data.session)
+      setPrompt(wunsch)
+
+      if (!data.ready && data.questions?.length) {
+        setPendingQuestion(data.questions[0])
+        return
+      }
+
+      setPendingQuestion(null)
+      await executeRender(wunsch)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Vorbereitung fehlgeschlagen')
+    } finally {
+      setIsPreparing(false)
+    }
+  }
+
+  function requestRender(overridePrompt?: string) {
+    const wunsch = (overridePrompt ?? prompt).trim()
+    void prepareAndMaybeRender(wunsch)
+  }
+
+  function answerVizQuestion(questionId: string, optionId: string, optionLabel: string) {
+    const wunsch = prompt.trim()
+    void prepareAndMaybeRender(wunsch, {
+      question_id: questionId,
+      option_id: optionId,
+      option_label: optionLabel,
+    })
+  }
+
+  function renderWithNachprompt(tag: string) {
+    const base = prompt.trim()
+    if (!base) return
+    void executeRender(base, tag)
   }
 
   function appendStilTag(tag: string) {
@@ -420,24 +591,50 @@ export function AngebotVisualisierungClient({
     toast.success('Visualisierung ins Angebot übernommen')
   }
 
-  const kannRendern = istBilderUrls.length > 0 && prompt.trim().length > 0 && !isRendering
+  const kannRendern =
+    istBilderUrls.length > 0 &&
+    prompt.trim().length > 0 &&
+    !isRendering &&
+    !isPreparing &&
+    !pendingQuestion
   const istUrlAktiv = istBilderUrls[aktivesIstIndex]?.trim()
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-4 pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-primary">KI-Visualisierung</p>
-          <h1 className="text-xl font-semibold text-bw-text">Visualisierung erstellen</h1>
-          <p className="text-sm text-bw-text-muted">
-            {detail.angebotsnr ?? 'Angebot'} · {detail.kunden?.name ?? 'Kunde'}
-          </p>
-        </div>
-        <Link href={`/angebote/${detail.id}`} className="text-sm text-bw-link hover:underline">
-          ← Zurück zum Angebot
-        </Link>
-      </div>
+  const angebotLabel = detail.angebotsnr ?? 'Angebot'
+  const kundeName = detail.kunden?.name ?? 'Kunde'
 
+  function closeWizard() {
+    router.push(`/angebote/${detail.id}`)
+  }
+
+  const wizardHeader = (
+    <>
+      <WizardMobileToolbar
+        onClose={closeWizard}
+        totalSteps={1}
+        currentStep={1}
+        stepLabel="KI-Visualisierung"
+        actions={<span className="sr-only">Aktionen im Formular</span>}
+      />
+      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={closeWizard} aria-label="Schließen">
+          <X className="h-4 w-4" />
+        </button>
+        <div className="h-6 w-px bg-bw-border" aria-hidden />
+        <div className="title-block min-w-0 flex-1">
+          <div className="ttl">KI-Visualisierung erstellen</div>
+          <div className="sub">
+            {angebotLabel} · {kundeName}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  if (!mounted) return null
+
+  const wizard = (
+    <AppFlowScreen className="wizard-flow" header={wizardHeader}>
+      <div className="wizard-inner mx-auto max-w-3xl space-y-4 pb-8">
       {sessionError ? (
         <div className="rounded-lg border border-status-cancel-bg bg-red-50 px-4 py-3 text-sm text-status-cancel-text">
           <p className="font-medium">Visualisierung nicht bereit</p>
@@ -607,17 +804,25 @@ export function AngebotVisualisierungClient({
             ) : null}
           </section>
 
+          {pendingQuestion ? (
+            <VizPrepareQuestions
+              question={pendingQuestion}
+              disabled={isPreparing || isRendering}
+              onAnswer={answerVizQuestion}
+            />
+          ) : null}
+
           <Button
             type="button"
             variant="primary"
             className="w-full bg-[#1A3D2B] hover:bg-[#153222]"
             disabled={!kannRendern}
-            onClick={() => void renderPrompt()}
+            onClick={() => requestRender()}
           >
-            {isRendering ? (
+            {isRendering || isPreparing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                KI rendert… (~8–60 Sek.)
+                {isPreparing ? 'Bereite Render vor…' : 'KI rendert… (~8–60 Sek.)'}
               </>
             ) : (
               <>
@@ -626,7 +831,7 @@ export function AngebotVisualisierungClient({
               </>
             )}
           </Button>
-          {isRendering ? (
+          {isRendering || isPreparing ? (
             <div className="h-1.5 overflow-hidden rounded-full bg-bw-border">
               <div className="h-full w-1/3 animate-pulse rounded-full bg-bw-primary" />
             </div>
@@ -663,6 +868,23 @@ export function AngebotVisualisierungClient({
                 erklaerung={aktiveErklaerung}
               />
 
+              <div>
+                <p className="mb-2 text-xs font-medium text-bw-text-muted">Feintuning (wie Website)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {VIZ_NACHPROMPT_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      disabled={isRendering || isPreparing}
+                      className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary disabled:opacity-50"
+                      onClick={() => renderWithNachprompt(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   type="button"
@@ -686,6 +908,7 @@ export function AngebotVisualisierungClient({
             </section>
           ) : null}
         </div>
+      </div>
 
       <Modal
         open={insAngebotOpen}
@@ -727,6 +950,8 @@ export function AngebotVisualisierungClient({
           Auf Visualisierungs-Seite im PDF einfügen
         </label>
       </Modal>
-    </div>
+    </AppFlowScreen>
   )
+
+  return createPortal(wizard, document.body)
 }

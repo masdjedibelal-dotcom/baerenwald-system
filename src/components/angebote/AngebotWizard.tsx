@@ -22,6 +22,7 @@ import {
   Send,
   X,
 } from 'lucide-react'
+import { AngebotWizardComplete } from '@/components/angebote/AngebotWizardComplete'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -64,6 +65,7 @@ import {
   resolveAngebotMailSchluss,
 } from '@/lib/templates/angebot-mail'
 import { AngebotWizardFotodokumentation } from '@/components/angebote/AngebotWizardFotodokumentation'
+import { AngebotWizardVizBlock } from '@/components/angebote/AngebotWizardVizBlock'
 import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
 import { AngebotWizardAngebotDetailsCard } from '@/components/angebote/AngebotWizardAngebotDetailsCard'
 import { AngebotWizardMailTexteCard } from '@/components/angebote/AngebotWizardMailTexteCard'
@@ -273,6 +275,7 @@ export function AngebotWizard({
   const [projektUploading, setProjektUploading] = useState(false)
   const [hwZuweisungen, setHwZuweisungen] = useState<GewerkHandwerkerZuweisung[]>([])
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
+  const [completedAngebotId, setCompletedAngebotId] = useState<string | null>(null)
   const [angebotsnr, setAngebotsnr] = useState(bootstrap?.angebotsnr?.trim() || 'Entwurf')
 
   function patchProjektTitel(neu: string) {
@@ -295,6 +298,7 @@ export function AngebotWizard({
     })
   }
   const [saving, setSaving] = useState(false)
+  const [vizFotoLoading, setVizFotoLoading] = useState<string | null>(null)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(() =>
     bootstrap?.angebotId ? new Date() : null
@@ -504,6 +508,34 @@ export function AngebotWizard({
     await persistDraft({ notify: true })
   }
 
+  const handleVisualisierenFoto = useCallback(
+    async (fotoUrl: string) => {
+      setVizFotoLoading(fotoUrl)
+      try {
+        let id = angebotId
+        if (!id) {
+          id = await persistDraft({ notify: false })
+          if (!id) {
+            toast.error(
+              'Entwurf konnte nicht gespeichert werden — bitte Titel und mindestens eine Position prüfen.'
+            )
+            return
+          }
+          toast.success('Entwurf gespeichert — Visualisierung wird geöffnet')
+        }
+        const params = new URLSearchParams({ ist_url: fotoUrl })
+        window.open(
+          `/angebote/${id}/visualisierung?${params.toString()}`,
+          '_blank',
+          'noopener,noreferrer'
+        )
+      } finally {
+        setVizFotoLoading(null)
+      }
+    },
+    [angebotId, persistDraft]
+  )
+
   async function handleWeiter() {
     if (step === 1) {
       const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -582,10 +614,9 @@ export function AngebotWizard({
       toast.error(res.message)
       return
     }
-    toast.success('Entwurf gespeichert — jetzt Handwerker anfragen.')
+    toast.success('Angebot erstellt')
     onDone?.(id)
-    onClose()
-    router.push(`/angebote/${id}#angebot-versand-handwerker`)
+    setCompletedAngebotId(id)
     router.refresh()
   }
 
@@ -808,8 +839,19 @@ export function AngebotWizard({
   const wizard = (
     <AppFlowScreen
       className="wizard-flow"
-      header={wizardHeader}
+      header={completedAngebotId ? undefined : wizardHeader}
     >
+      {completedAngebotId ? (
+        <AngebotWizardComplete
+          angebotId={completedAngebotId}
+          kundeName={name}
+          onClose={() => {
+            setCompletedAngebotId(null)
+            onClose()
+          }}
+        />
+      ) : (
+      <>
       <div className="wizard-inner">
           {step === 1 ? (
             <>
@@ -941,7 +983,13 @@ export function AngebotWizard({
                 uploading={projektUploading}
                 disabled={saving}
                 onUploadFiles={(files) => void uploadProjektFotoFiles(files)}
+                onVisualisierenFoto={handleVisualisierenFoto}
+                visualisierenFotoUrl={vizFotoLoading}
               />
+
+              <WizardProjektDivider />
+
+              <AngebotWizardVizBlock angebotId={angebotId} disabled={saving} />
                 </div>
               ) : dokumentTyp === 'einfach' ? (
                 <div className="wizard-projekt-flow">
@@ -1049,7 +1097,8 @@ export function AngebotWizard({
           }}
         />
       ) : null}
-
+      </>
+      )}
     </AppFlowScreen>
   )
 

@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
+import { EinstellungenHub } from '@/components/einstellungen/EinstellungenHub'
 
 export default function EinstellungenIndexPage() {
-  redirect('/einstellungen/firma')
+  return <EinstellungenHub />
 }

@@ -20,23 +20,53 @@ export type NavItemDef = {
   exact?: boolean
 }
 
-/** Primäre Arbeits-Navigation (Desktop Sidebar). */
-export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { href: '/anfragen', icon: Inbox, label: 'Anfragen' },
-  { href: '/angebote', icon: FileText, label: 'Angebote' },
-  { href: '/auftraege', icon: Wrench, label: 'Aufträge' },
+export type NavGroupDef = {
+  id: string
+  label: string
+  items: NavItemDef[]
+}
+
+/** Gruppierte Sidebar-Navigation (Desktop). */
+export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
+  {
+    id: 'arbeit',
+    label: 'Arbeit',
+    items: [
+      { href: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+      { href: '/anfragen', icon: Inbox, label: 'Anfragen' },
+      { href: '/angebote', icon: FileText, label: 'Angebote' },
+      { href: '/auftraege', icon: Wrench, label: 'Aufträge' },
+    ],
+  },
+  {
+    id: 'stammdaten',
+    label: 'Stammdaten',
+    items: [
+      { href: '/kunden', icon: Users, label: 'Kunden' },
+      { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
+      { href: '/partner', icon: Building2, label: 'Partner' },
+    ],
+  },
+  {
+    id: 'finanzen',
+    label: 'Finanzen',
+    items: [{ href: '/rechnungen', icon: Receipt, label: 'Rechnungen' }],
+  },
+  {
+    id: 'planung',
+    label: 'Planung',
+    items: [
+      { href: '/kalender', icon: Calendar, label: 'Kalender' },
+      { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub' },
+    ],
+  },
 ]
 
-/** Sekundär (Desktop Sidebar unter Trennlinie). */
-export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = [
-  { href: '/kunden', icon: Users, label: 'Kunden' },
-  { href: '/rechnungen', icon: Receipt, label: 'Rechnungen' },
-  { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
-  { href: '/partner', icon: Building2, label: 'Partner' },
-  { href: '/kalender', icon: Calendar, label: 'Kalender' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics' },
-]
+/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
+export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS[0].items
+
+/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
+export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).flatMap((g) => g.items)
 
 /** Mobile BottomNav (5 Slots + Mehr). */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
@@ -53,7 +83,7 @@ export const MORE_SHEET_NAV: NavItemDef[] = [
   { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
   { href: '/partner', icon: Building2, label: 'Partner' },
   { href: '/kalender', icon: Calendar, label: 'Kalender' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen' },
 ]
 
@@ -76,7 +106,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/kalender': { title: 'Kalender' },
   '/angebote': { title: 'Angebote' },
   '/einstellungen': { title: 'Einstellungen' },
-  '/ki-analytics': { title: 'KI Analytics' },
+  '/ki-analytics': { title: 'KI Hub' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -89,7 +119,7 @@ export const SECTION_LABELS: Record<string, string> = {
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
-  'ki-analytics': 'KI Analytics',
+  'ki-analytics': 'KI Hub',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

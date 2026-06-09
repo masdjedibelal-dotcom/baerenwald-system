@@ -1,11 +1,22 @@
 import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { KiVizPromptHistoryEntry, KiVisualisierung } from '@/lib/visualize/types'
+import type {
+  KiVizPromptHistoryEntry,
+  KiVisualisierung,
+  VizBauErklaerung,
+  VizBrief,
+  VizRaumAnalyse,
+} from '@/lib/visualize/types'
 
 function parseHistory(raw: unknown): KiVizPromptHistoryEntry[] {
   if (!Array.isArray(raw)) return []
   return raw.filter((e) => e && typeof e === 'object') as KiVizPromptHistoryEntry[]
+}
+
+function parseJson<T>(raw: unknown): T | null {
+  if (!raw || typeof raw !== 'object') return null
+  return raw as T
 }
 
 function rowToViz(row: Record<string, unknown>): KiVisualisierung {
@@ -15,6 +26,12 @@ function rowToViz(row: Record<string, unknown>): KiVisualisierung {
     ist_bilder_urls: Array.isArray(row.ist_bilder_urls) ? (row.ist_bilder_urls as string[]) : [],
     ziel_bild_url: (row.ziel_bild_url as string | null) ?? null,
     analysierter_prompt: (row.analysierter_prompt as string | null) ?? null,
+    wunsch_text: (row.wunsch_text as string | null) ?? null,
+    raum_analyse: parseJson<VizRaumAnalyse>(row.raum_analyse),
+    inspiration_analyse: parseJson<VizRaumAnalyse>(row.inspiration_analyse),
+    viz_brief: parseJson<VizBrief>(row.viz_brief),
+    gpt_erklaerung: parseJson<VizBauErklaerung>(row.gpt_erklaerung),
+    render_prompt: (row.render_prompt as string | null) ?? null,
     prompt_history: parseHistory(row.prompt_history),
     ausgewaehlte_urls: Array.isArray(row.ausgewaehlte_urls) ? (row.ausgewaehlte_urls as string[]) : [],
     ins_angebot: Boolean(row.ins_angebot),

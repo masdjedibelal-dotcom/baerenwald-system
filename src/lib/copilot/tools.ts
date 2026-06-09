@@ -1,9 +1,19 @@
 import 'server-only'
 
-import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
+import { notifyNewLeadAlert } from '@/lib/copilot/crm-actions'
 import { sendMail } from '@/lib/mail-service'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { LeadStatus } from '@/lib/types'
+
+export {
+  createAngebotEntwurfCopilot,
+  createKundeCopilot,
+  getEntity,
+  getTermine,
+  notifyNewLeadAlert,
+  searchCrm,
+  sendeAngebotCopilot,
+} from '@/lib/copilot/crm-actions'
 
 function parseTerminFromIso(startIso: string, endIso?: string) {
   const start = new Date(startIso)
@@ -193,6 +203,7 @@ export async function createLead(input: {
     .select('id')
     .single()
   if (error) throw error
+  void notifyNewLeadAlert(data.id).catch(() => undefined)
   return data
 }
 
@@ -210,7 +221,18 @@ export async function sendMailKunde(input: {
   name: string
   betreff: string
   text: string
+  bestaetigt?: boolean
 }) {
+  if (!input.bestaetigt) {
+    return {
+      vorschau: true,
+      an: input.to,
+      name: input.name,
+      betreff: input.betreff,
+      text_vorschau: input.text.slice(0, 500),
+      hinweis: 'Zum Versand send_mail_kunde mit bestaetigt: true erneut aufrufen.',
+    }
+  }
   const html = `<p>${input.text.replace(/</g, '&lt;').replace(/\n/g, '<br/>')}</p>`
   const r = await sendMail({
     typ: 'freitext_kunde',
@@ -219,10 +241,5 @@ export async function sendMailKunde(input: {
     betreff: input.betreff,
     html,
   })
-  return r.success
-}
-
-export async function sendeAngebot(angebotId: string) {
-  const r = await sendAngebotToKunde(angebotId)
-  return r.ok
+  return { ok: r.success, gesendet: r.success }
 }
