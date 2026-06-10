@@ -1,67 +1,7 @@
 import 'server-only'
 
-import { createSign } from 'crypto'
+import { fetchGscAccessToken } from '@/lib/ki-hub/sources/gsc-auth'
 import type { KiHubQuelleResult } from '@/lib/ki-hub/types'
-
-type ServiceAccount = {
-  client_email: string
-  private_key: string
-}
-
-function base64url(input: Buffer | string): string {
-  const buf = typeof input === 'string' ? Buffer.from(input) : input
-  return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-}
-
-function parseServiceAccount(): ServiceAccount | null {
-  const raw = process.env.GSC_SERVICE_ACCOUNT_JSON?.trim()
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as ServiceAccount
-    if (!parsed.client_email || !parsed.private_key) return null
-    // Netlify: \n oft als Literal — für JWT-Signatur normalisieren
-    parsed.private_key = parsed.private_key.replace(/\\n/g, '\n')
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-async function getGoogleAccessToken(sa: ServiceAccount): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const payload = base64url(
-    JSON.stringify({
-      iss: sa.client_email,
-      scope: 'https://www.googleapis.com/auth/webmasters.readonly',
-      aud: 'https://oauth2.googleapis.com/token',
-      iat: now,
-      exp: now + 3600,
-    })
-  )
-  const signInput = `${header}.${payload}`
-  const sign = createSign('RSA-SHA256')
-  sign.update(signInput)
-  sign.end()
-  const signature = base64url(sign.sign(sa.private_key))
-  const jwt = `${signInput}.${signature}`
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-    next: { revalidate: 0 },
-  })
-
-  const json = (await res.json()) as { access_token?: string; error_description?: string }
-  if (!json.access_token) {
-    throw new Error(json.error_description ?? 'Google Token fehlgeschlagen')
-  }
-  return json.access_token
-}
 
 type GscRow = {
   keys?: string[]
@@ -73,17 +13,13 @@ type GscRow = {
 
 export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string, unknown>>> {
   const siteUrl = process.env.GSC_SITE_URL?.trim()
-  const sa = parseServiceAccount()
 
   if (!siteUrl) {
     return { status: 'unavailable', error: 'GSC_SITE_URL fehlt' }
   }
-  if (!sa) {
-    return { status: 'unavailable', error: 'GSC_SERVICE_ACCOUNT_JSON fehlt' }
-  }
 
   try {
-    const token = await getGoogleAccessToken(sa)
+    const { token, mode, serviceAccountEmail } = await fetchGscAccessToken()
     const end = new Date()
     const start = new Date(end)
     start.setDate(start.getDate() - 28)
@@ -113,7 +49,10 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
       const errText = await res.text()
       let hint = ''
       if (res.status === 403) {
-        hint = ` — ${sa.client_email} in Search Console unter „Nutzer“ mit Vollzugriff einladen; GSC_SITE_URL exakt wie Property (${siteUrl}).`
+        hint =
+          mode === 'oauth'
+            ? ` — Mit dem verbundenen Google-Konto in Search Console als Eigentümer anmelden; GSC_SITE_URL exakt wie Property (${siteUrl}).`
+            : ` — ${serviceAccountEmail ?? 'Service-Account'} in Search Console unter „Nutzer“ mit Vollzugriff einladen; GSC_SITE_URL exakt wie Property (${siteUrl}).`
       }
       return {
         status: 'unavailable',
@@ -143,6 +82,7 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
       status: 'ok',
       data: {
         site_url: siteUrl,
+        auth_mode: mode,
         zeitraum_tage: 28,
         clicks: totals.clicks,
         impressions: totals.impressions,

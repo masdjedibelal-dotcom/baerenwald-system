@@ -63,7 +63,15 @@ export function KiHubMarketingPanel({ data }: Props) {
               </div>
             </>
           ) : (
-            <p className="mt-2 text-xs text-amber-800">{google.error ?? 'Nicht verbunden'}</p>
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-amber-800">{google.error ?? 'Nicht verbunden'}</p>
+              <a
+                href="/api/ki-hub/gsc/oauth/start"
+                className="inline-flex text-xs font-medium text-bw-link hover:underline"
+              >
+                Mit Google verbinden
+              </a>
+            </div>
           )}
         </div>
 

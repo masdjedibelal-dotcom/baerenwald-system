@@ -69,7 +69,7 @@ export function rechnungComplianceMigrationHinweis(): string {
   return (
     'Datenbank-Schema veraltet: Bitte Migrationen ausführen — ' +
     'npm run db:rechnungen-compliance und npm run db:rechnung-nummer ' +
-    '(SUPABASE_DB_URL in .env.local). Rechnungsnummern: RE2026-2066, RE2026-2067, …'
+    '(SUPABASE_DB_URL in .env.local). Rechnungsnummern: RE2026-2069, RE2026-2070, …'
   )
 }
 

@@ -50,7 +50,7 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
           ? gscImpressions != null
             ? `${gscImpressions} Impressionen (28d)`
             : null
-          : 'GSC: Service-Account in Search Console freigeben'
+          : 'GSC: Mit Google verbinden (KI Hub → Marketing)'
         : 'PostHog: Personal API Key (Query Read) in Netlify setzen',
     },
     {

@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** Erste Rechnungsnummer im Jahr 2026 (danach fortlaufend). */
-export const RE_NUMMER_START_2026 = 2066
+export const RE_NUMMER_START_2026 = 2069
 
 export type RechnungBelegNummerTyp = 'rechnung' | 'gutschrift'
 
@@ -29,7 +29,7 @@ function startNummerFuerJahr(jahr: string): number {
   return jahr === '2026' ? RE_NUMMER_START_2026 : 1
 }
 
-/** Nächste Nummer per Abfrage (RE2026-2066, RE2026-2067, …). */
+/** Nächste Nummer per Abfrage (RE2026-2069, RE2026-2070, …). */
 export async function nextRechnungsnummerAusDb(
   supabase: SupabaseClient,
   typ: RechnungBelegNummerTyp = 'rechnung'
@@ -62,7 +62,7 @@ export async function nextRechnungsnummerAusDb(
 }
 
 /**
- * Vergibt RE{Jahr}-{Nr} (ab 2066 in 2026) bzw. GS-RE… für Gutschriften.
+ * Vergibt RE{Jahr}-{Nr} (ab 2069 in 2026) bzw. GS-RE… für Gutschriften.
  * Nutzt RPC `generate_beleg_nummer`, falls das RE-Format liefert — sonst DB-Fallback.
  */
 export async function allocateRechnungsnummer(
