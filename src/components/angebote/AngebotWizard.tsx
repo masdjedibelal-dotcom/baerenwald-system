@@ -71,7 +71,6 @@ import { AngebotWizardAngebotDetailsCard } from '@/components/angebote/AngebotWi
 import { AngebotWizardMailTexteCard } from '@/components/angebote/AngebotWizardMailTexteCard'
 import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
 import { AngebotWizardProjektBeschreibungCard } from '@/components/angebote/AngebotWizardProjektBeschreibungCard'
-import { AngebotWizardHandwerkerStep, buildGewerkHandwerkerZuweisungen, gewerkHandwerkerZuweisungenToMaps, type GewerkHandwerkerZuweisung } from '@/components/angebote/AngebotWizardHandwerkerStep'
 import { isValidEmail } from '@/lib/email-recipients'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
@@ -111,7 +110,8 @@ function WizardProjektSection({ children }: { children: ReactNode }) {
   return <section className="wizard-projekt-section">{children}</section>
 }
 
-const WIZARD_STEP_LABELS = ['Leistungen', 'Finalisieren', 'Handwerker'] as const
+const WIZARD_STEP_LABELS = ['Leistungen', 'Finalisieren'] as const
+const WIZARD_TOTAL_STEPS = WIZARD_STEP_LABELS.length
 
 function WizardSection({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('wizard-section-gap', className)}>{children}</div>
@@ -273,7 +273,6 @@ export function AngebotWizard({
   )
   const [wichtigeHinweisePersist] = useState(() => bootstrap?.wichtige_hinweise?.trim() ?? '')
   const [projektUploading, setProjektUploading] = useState(false)
-  const [hwZuweisungen, setHwZuweisungen] = useState<GewerkHandwerkerZuweisung[]>([])
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const [completedAngebotId, setCompletedAngebotId] = useState<string | null>(null)
   const [angebotsnr, setAngebotsnr] = useState(bootstrap?.angebotsnr?.trim() || 'Entwurf')
@@ -421,14 +420,8 @@ export function AngebotWizard({
     }
   }
 
-  useEffect(() => {
-    if (step === 3) {
-      setHwZuweisungen((prev) => buildGewerkHandwerkerZuweisungen(zeilen, prev))
-    }
-  }, [step, zeilen])
-
   const persistDraft = useCallback(
-    async (opts?: { notify?: boolean; withHandwerker?: boolean }): Promise<string | null> => {
+    async (opts?: { notify?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
@@ -448,10 +441,6 @@ export function AngebotWizard({
       }
 
       setSaving(true)
-      const hwMaps =
-        opts?.withHandwerker && hwZuweisungen.length
-          ? gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
-          : { positionQueues: [], notizenByGewerk: {} as Record<string, string> }
       const res = await saveAngebotWizardDraft({
         angebotId,
         lead_id: lead.id,
@@ -465,8 +454,8 @@ export function AngebotWizard({
         wichtige_hinweise:
           dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
         varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
-        handwerker_zuweisungen: hwMaps.positionQueues,
-        handwerker_aufgabe_notizen: hwMaps.notizenByGewerk,
+        handwerker_zuweisungen: [],
+        handwerker_aufgabe_notizen: {},
       })
       setSaving(false)
       if (!res.ok) {
@@ -500,7 +489,6 @@ export function AngebotWizard({
       projektFotos,
       variantenPersist,
       wichtigeHinweisePersist,
-      hwZuweisungen,
     ]
   )
 
@@ -554,7 +542,11 @@ export function AngebotWizard({
     }
     const id = await persistDraft({ notify: true })
     if (!id) return
-    setStep((s) => Math.min(3, s + 1))
+    if (step >= WIZARD_TOTAL_STEPS) {
+      await handleWizardFertig()
+      return
+    }
+    setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
   }
 
   const todayYmd = new Date().toISOString().slice(0, 10)
@@ -592,18 +584,9 @@ export function AngebotWizard({
     }
   }
 
-  async function handleHandwerkerFertig() {
-    const blocks = buildGewerkHandwerkerZuweisungen(zeilen, hwZuweisungen)
-    if (!blocks.length) {
-      toast.error('Bitte zuerst Leistungen mit Gewerk anlegen.')
-      return
-    }
-    if (blocks.some((b) => !b.handwerker_id.trim())) {
-      toast.error('Bitte für jedes Gewerk einen Handwerker auswählen.')
-      return
-    }
+  async function handleWizardFertig() {
     setSaving(true)
-    const id = await persistDraft({ withHandwerker: true })
+    const id = await persistDraft({ notify: false })
     if (!id) {
       setSaving(false)
       return
@@ -674,12 +657,7 @@ export function AngebotWizard({
     : null
 
   useEffect(() => {
-    if (step !== 3 || angebotId) return
-    void persistDraft()
-  }, [step, angebotId, persistDraft])
-
-  useEffect(() => {
-    if (step !== 3) return
+    if (step !== 2) return
     if (mailRecipientsInitRef.current) return
     const e = (rechnungsempfaenger.email || email || '').trim()
     if (e && isValidEmail(e)) setMailTo([e])
@@ -701,64 +679,60 @@ export function AngebotWizard({
 
   if (!mounted) return null
 
-  const wizardMobileActions =
-    step < 3 ? (
-      <>
-        {step > 1 ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="wizard-mobile-toolbar__back shrink-0 px-2"
-            onClick={() => setStep((s) => s - 1)}
-            aria-label="Zurück"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-        ) : null}
+  const wizardMobileActions = (
+    <>
+      {step > 1 ? (
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
-          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
-          loading={saving}
-          onClick={() => void handleEntwurfSpeichern()}
-          aria-label="Entwurf speichern"
-          title="Entwurf speichern"
+          className="wizard-mobile-toolbar__back shrink-0 px-2"
+          onClick={() => setStep((s) => s - 1)}
+          aria-label="Zurück"
         >
-          <Save className="h-4 w-4" aria-hidden />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
-          loading={saving}
-          onClick={() => void handleWeiter()}
-        >
-          Weiter
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </>
-    ) : (
+      ) : null}
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="wizard-mobile-toolbar__save shrink-0 px-2.5"
+        loading={saving}
+        onClick={() => void handleEntwurfSpeichern()}
+        aria-label="Entwurf speichern"
+        title="Entwurf speichern"
+      >
+        <Save className="h-4 w-4" aria-hidden />
+      </Button>
       <Button
         type="button"
         variant="primary"
         size="sm"
         className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
         loading={saving}
-        onClick={() => void handleHandwerkerFertig()}
+        onClick={() => void handleWeiter()}
       >
-        <Send className="h-4 w-4" />
-        Fertig
+        {step >= WIZARD_TOTAL_STEPS ? (
+          <>
+            <Send className="h-4 w-4" />
+            Fertig
+          </>
+        ) : (
+          <>
+            Weiter
+            <ChevronRight className="h-4 w-4" />
+          </>
+        )}
       </Button>
-    )
+    </>
+  )
 
   const wizardHeader = (
     <>
       <WizardMobileToolbar
         onClose={onClose}
-        totalSteps={3}
+        totalSteps={WIZARD_TOTAL_STEPS}
         currentStep={step}
         stepLabel={`Schritt ${step}: ${WIZARD_STEP_LABELS[step - 1]}`}
         actions={wizardMobileActions}
@@ -791,8 +765,6 @@ export function AngebotWizard({
         <Step n={1} label="Leistungen" active={step === 1} done={step > 1} />
         <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
         <Step n={2} label="Finalisieren" active={step === 2} done={step > 2} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={3} label="Handwerker" active={step === 3} done={false} />
       </nav>
       <div className="flex-1" />
       {step > 1 ? (
@@ -801,37 +773,37 @@ export function AngebotWizard({
           Zurück
         </Button>
       ) : null}
-      {step < 3 ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1.5"
-          loading={saving}
-          onClick={() => void handleEntwurfSpeichern()}
-        >
-          <Save className="h-4 w-4" aria-hidden />
-          Speichern
-        </Button>
-      ) : null}
-      {step < 3 ? (
-        <Button type="button" variant="primary" size="sm" loading={saving} onClick={() => void handleWeiter()}>
-          Weiter
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      ) : (
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          className="gap-1.5"
-          loading={saving}
-          onClick={() => void handleHandwerkerFertig()}
-        >
-          <Send className="h-4 w-4" />
-          Speichern & Handwerker einholen
-        </Button>
-      )}
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="gap-1.5"
+        loading={saving}
+        onClick={() => void handleEntwurfSpeichern()}
+      >
+        <Save className="h-4 w-4" aria-hidden />
+        Speichern
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        size="sm"
+        className="gap-1.5"
+        loading={saving}
+        onClick={() => void handleWeiter()}
+      >
+        {step >= WIZARD_TOTAL_STEPS ? (
+          <>
+            <Send className="h-4 w-4" />
+            Angebot erstellen
+          </>
+        ) : (
+          <>
+            Weiter
+            <ChevronRight className="h-4 w-4" />
+          </>
+        )}
+      </Button>
       </div>
     </>
   )
@@ -1057,28 +1029,16 @@ export function AngebotWizard({
                   kleinunternehmer={kleinunternehmer}
                   lohnNettoPdf={lohnNettoPdf}
                 />
+
+                <Card className="border-dashed">
+                  <p className="text-sm text-bw-text-muted">
+                    Handwerker-Zuweisung ist optional und erfolgt nach dem Speichern im Angebot — auch
+                    für freie Positionen ohne Gewerk. Bei Bedarf Partner dort anfragen, bevor Sie an den
+                    Kunden senden.
+                  </p>
+                </Card>
               </div>
             </>
-          ) : null}
-
-          {step === 3 ? (
-            <div className="wizard-projekt-flow">
-              <AngebotWizardHandwerkerStep
-                zeilen={zeilen}
-                gewerke={gewerke}
-                handwerker={handwerker}
-                zuweisungen={hwZuweisungen}
-                onChange={setHwZuweisungen}
-                disabled={saving}
-              />
-              <Card className="mt-4">
-                <p className="text-sm text-bw-text-muted">
-                  Nach dem Speichern öffnet sich das Angebot im CRM. Dort senden Sie die Partner-Anfrage
-                  (E-Mail oder WhatsApp-Link) und warten auf Angebot/Rechnung. Erst danach ist der Versand
-                  an den Kunden freigeschaltet.
-                </p>
-              </Card>
-            </div>
           ) : null}
         </div>
 
