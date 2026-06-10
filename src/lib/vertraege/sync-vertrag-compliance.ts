@@ -13,8 +13,8 @@ export async function syncRahmenvertragComplianceDoc(input: {
     auftrag_id: null,
     typ: RAHMENVERTRAG_TYP_SLUG,
     bezeichnung: input.vertrags_nr?.trim()
-      ? `Rahmenvertrag ${input.vertrags_nr.trim()}`
-      : 'Rahmenvertrag',
+      ? `Rahmenvertrag ${input.vertrags_nr.trim()} (inkl. AVV Anlage 1 + 2)`
+      : 'Rahmenvertrag (inkl. AVV Anlage 1 + 2)',
     gueltig_bis: null,
     datei_url: input.pdf_url.trim(),
   })

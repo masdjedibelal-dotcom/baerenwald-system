@@ -1,12 +1,29 @@
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import { partnerDokumentIstFreigegeben } from '@/lib/handwerker/partner-dokument-status'
+import {
+  COMPLIANCE_EBENE_LABELS,
+  filterLeistungComplianceTypen,
+  filterPartnerComplianceTypen,
+  istPflichtFuerPartner,
+  istPflichtFuerProjekt,
+  normalizeComplianceEbene,
+  type ComplianceEbene,
+} from '@/lib/handwerker/compliance-partner-profile'
+
+export type { ComplianceEbene }
+export {
+  COMPLIANCE_EBENE_LABELS,
+  filterPartnerComplianceTypen,
+  filterLeistungComplianceTypen,
+} from '@/lib/handwerker/compliance-partner-profile'
 
 export type ComplianceScope = 'standard' | 'stamm' | 'bauprojekt' | 'gewerk'
 
+/** @deprecated Nutze COMPLIANCE_EBENE_LABELS */
 export const COMPLIANCE_SCOPE_LABELS: Record<ComplianceScope, string> = {
   standard: 'Allgemeine Partnerunterlagen',
   stamm: 'Allgemeine Partnerunterlagen',
-  bauprojekt: 'Bauprojekt & Vertrag',
+  bauprojekt: 'Leistungsvertrag & Auftrag',
   gewerk: 'Gewerkspezifisch',
 }
 
@@ -15,26 +32,38 @@ export type ComplianceDokumentStatus = 'fehlend' | 'ok' | 'warnung' | 'abgelaufe
 export const INDIVIDUELL_TYP_SLUG = 'individuell'
 
 export function isStandardScope(typ: ComplianceDokumentTyp): boolean {
-  const s = typ.scope ?? 'stamm'
-  return s === 'standard' || s === 'stamm'
+  const ebene = normalizeComplianceEbene(typ)
+  return ebene === 'allgemein' || ebene === 'meister'
 }
 
 export function isProjektScope(typ: ComplianceDokumentTyp): boolean {
-  return !isStandardScope(typ)
+  return normalizeComplianceEbene(typ) === 'leistung'
 }
 
-/** Nur allgemeine Partner-Compliance (Handwerker-Tab). */
-export function filterStandardComplianceTypen(typen: ComplianceDokumentTyp[]): ComplianceDokumentTyp[] {
-  return typen
-    .filter((t) => t.aktiv !== false && isStandardScope(t))
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+/** Stamm: Allgemein + Meister (Partner-Tab). */
+export function filterStandardComplianceTypen(
+  typen: ComplianceDokumentTyp[],
+  handwerkerGewerke?: string[] | null,
+  alleGewerke: Gewerk[] = []
+): ComplianceDokumentTyp[] {
+  const allg = filterPartnerComplianceTypen(typen, 'allgemein', handwerkerGewerke, alleGewerke)
+  const meister = filterPartnerComplianceTypen(typen, 'meister', handwerkerGewerke, alleGewerke)
+  return [...allg, ...meister]
 }
 
-/** Projekt-Checkliste: alle nicht-Standard-Typen, ohne Gewerk-Filter. */
-export function filterProjektComplianceTypen(typen: ComplianceDokumentTyp[]): ComplianceDokumentTyp[] {
-  return typen
-    .filter((t) => t.aktiv !== false && isProjektScope(t) && !t.mehrfach_erlaubt)
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+/** Projekt-Checkliste (Leistungsebene). */
+export function filterProjektComplianceTypen(
+  typen: ComplianceDokumentTyp[],
+  projektGewerkSlugs: string[] = [],
+  handwerkerGewerke?: string[] | null,
+  alleGewerke: Gewerk[] = []
+): ComplianceDokumentTyp[] {
+  return filterLeistungComplianceTypen(
+    typen,
+    projektGewerkSlugs,
+    handwerkerGewerke,
+    alleGewerke
+  ).filter((t) => !t.mehrfach_erlaubt || t.slug === INDIVIDUELL_TYP_SLUG)
 }
 
 export function individuellTyp(typen: ComplianceDokumentTyp[]): ComplianceDokumentTyp | undefined {
@@ -46,13 +75,30 @@ export function gruppeComplianceTypen(
 ): { kategorie: string; typen: ComplianceDokumentTyp[] }[] {
   const map = new Map<string, ComplianceDokumentTyp[]>()
   for (const t of typen) {
-    const scope = (t.scope ?? 'standard') as ComplianceScope
-    const key = t.kategorie?.trim() || COMPLIANCE_SCOPE_LABELS[scope] || 'Weitere'
+    const ebene = normalizeComplianceEbene(t)
+    const key = t.kategorie?.trim() || COMPLIANCE_EBENE_LABELS[ebene] || 'Weitere'
     const list = map.get(key) ?? []
     list.push(t)
     map.set(key, list)
   }
   return Array.from(map.entries()).map(([kategorie, items]) => ({ kategorie, typen: items }))
+}
+
+export function gruppeNachEbene(
+  typen: ComplianceDokumentTyp[],
+  handwerkerGewerke: string[] | null | undefined,
+  alleGewerke: Gewerk[]
+): { ebene: ComplianceEbene; label: string; typen: ComplianceDokumentTyp[] }[] {
+  const ebenen: ComplianceEbene[] = ['allgemein', 'meister', 'leistung']
+  return ebenen
+    .map((ebene) => {
+      const items =
+        ebene === 'leistung'
+          ? typen.filter((t) => normalizeComplianceEbene(t) === 'leistung')
+          : filterPartnerComplianceTypen(typen, ebene, handwerkerGewerke, alleGewerke)
+      return { ebene, label: COMPLIANCE_EBENE_LABELS[ebene], typen: items }
+    })
+    .filter((g) => g.typen.length > 0)
 }
 
 export function dokumenteFuerProjekt(
@@ -121,20 +167,45 @@ export function complianceDokumentStatus(
   return 'ok'
 }
 
-export function istPflichtTyp(typ: ComplianceDokumentTyp, projektKontext = false): boolean {
-  if (typ.pflicht_fuer_fachbetriebe && isStandardScope(typ)) return true
-  if (projektKontext && typ.pflicht_bauprojekt) return true
-  return false
+export function istPflichtTyp(
+  typ: ComplianceDokumentTyp,
+  opts?: {
+    projektKontext?: boolean
+    handwerkerGewerke?: string[] | null
+    projektGewerkSlugs?: string[]
+    alleGewerke?: Gewerk[]
+  }
+): boolean {
+  const gewerke = opts?.alleGewerke ?? []
+  if (opts?.projektKontext) {
+    return istPflichtFuerProjekt(
+      typ,
+      opts.projektGewerkSlugs ?? [],
+      opts.handwerkerGewerke,
+      gewerke
+    )
+  }
+  return istPflichtFuerPartner(typ, opts?.handwerkerGewerke, gewerke)
 }
 
 export function projektChecklisteFortschritt(
   typen: ComplianceDokumentTyp[],
   dokumente: PartnerDokument[],
   handwerkerId: string,
-  auftragId: string
+  auftragId: string,
+  projektGewerkSlugs: string[] = [],
+  handwerkerGewerke?: string[] | null,
+  alleGewerke: Gewerk[] = []
 ): { erfuellt: number; pflicht: number; gesamt: number } {
-  const projektTypen = filterProjektComplianceTypen(typen)
-  const pflichtTypen = projektTypen.filter((t) => t.pflicht_bauprojekt)
+  const projektTypen = filterProjektComplianceTypen(
+    typen,
+    projektGewerkSlugs,
+    handwerkerGewerke,
+    alleGewerke
+  )
+  const pflichtTypen = projektTypen.filter((t) =>
+    istPflichtFuerProjekt(t, projektGewerkSlugs, handwerkerGewerke, alleGewerke)
+  )
   const docs = dokumenteFuerProjekt(dokumente, handwerkerId, auftragId)
   const erfuelltPflicht = pflichtTypen.filter(
     (t) => complianceDokumentStatus(t, dokumentFuerTyp(docs, t.slug)) !== 'fehlend'

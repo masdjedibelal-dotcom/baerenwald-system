@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase-server'
 import { HandwerkerDetailClient } from '@/components/handwerker/HandwerkerDetailClient'
 import { loadHandwerkerDetail } from '@/app/(dashboard)/handwerker/actions'
 import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
+import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { loadRahmenVertragForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
 
 export async function generateMetadata({
@@ -21,25 +22,23 @@ export default async function HandwerkerDetailPage({ params }: { params: Promise
   const { id } = await params
   const supabase = createClient()
 
-  const [detail, { data: gewData }, rahmenVertrag, complianceTypen] = await Promise.all([
+  const [detail, gewerke, rahmenVertrag, complianceTypen] = await Promise.all([
     loadHandwerkerDetail(id),
-    supabase.from('gewerke').select('slug, name').eq('aktiv', true).order('name'),
+    loadGewerkeAusfuehrung(supabase),
     loadRahmenVertragForHandwerker(id),
     loadComplianceTypen(),
   ])
 
   if (!detail.handwerker) notFound()
 
-  const gewerkeSlugs = (gewData ?? []).map((g) => ({
-    slug: g.slug as string,
-    name: g.name as string,
-  }))
+  const gewerkeSlugs = gewerke.map((g) => ({ slug: g.slug, name: g.name }))
 
   return (
     <div>
       <HandwerkerDetailClient
         payload={detail}
         gewerkeSlugs={gewerkeSlugs}
+        gewerke={gewerke}
         complianceTypen={complianceTypen}
         rahmenVertrag={rahmenVertrag}
       />

@@ -7,7 +7,7 @@ import {
   istPflichtTyp,
   type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 
 export const RAHMENVERTRAG_TYP_SLUG = 'rahmenvertrag'
@@ -45,12 +45,14 @@ export function projektvertragErfuellt(
 export function fehlendeStandardCompliance(
   typen: ComplianceDokumentTyp[],
   dokumente: PartnerDokument[],
-  rahmenVertrag?: HandwerkerVertragRow | null
+  rahmenVertrag?: HandwerkerVertragRow | null,
+  handwerkerGewerke?: string[] | null,
+  alleGewerke: Gewerk[] = []
 ): ComplianceDokumentTyp[] {
-  const standard = filterStandardComplianceTypen(typen)
+  const standard = filterStandardComplianceTypen(typen, handwerkerGewerke, alleGewerke)
   const standardDocs = dokumente.filter((d) => !d.auftrag_id)
   return standard.filter((t) => {
-    if (!istPflichtTyp(t)) return false
+    if (!istPflichtTyp(t, { handwerkerGewerke, alleGewerke })) return false
     if (t.slug === RAHMENVERTRAG_TYP_SLUG) {
       return !rahmenvertragErfuellt(standardDocs, rahmenVertrag)
     }
@@ -62,14 +64,26 @@ export function fehlendeProjektCompliance(
   typen: ComplianceDokumentTyp[],
   dokumente: PartnerDokument[],
   handwerkerId: string,
-  auftragId: string
+  auftragId: string,
+  projektGewerkSlugs: string[] = [],
+  handwerkerGewerke?: string[] | null,
+  alleGewerke: Gewerk[] = []
 ): ComplianceDokumentTyp[] {
-  const projektTypen = filterProjektComplianceTypen(typen)
+  const projektTypen = filterProjektComplianceTypen(
+    typen,
+    projektGewerkSlugs,
+    handwerkerGewerke,
+    alleGewerke
+  )
   const docs = dokumenteFuerProjekt(dokumente, handwerkerId, auftragId)
   return projektTypen.filter(
     (t) =>
-      t.pflicht_bauprojekt &&
-      complianceDokumentStatus(t, dokumentFuerTyp(docs, t.slug)) === 'fehlend'
+      istPflichtTyp(t, {
+        projektKontext: true,
+        projektGewerkSlugs,
+        handwerkerGewerke,
+        alleGewerke,
+      }) && complianceDokumentStatus(t, dokumentFuerTyp(docs, t.slug)) === 'fehlend'
   )
 }
 

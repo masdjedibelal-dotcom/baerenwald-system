@@ -19,6 +19,8 @@ export type ComplianceTypRow = {
   pflicht_bauprojekt: boolean
   vertrag_referenz: string | null
   mehrfach_erlaubt: boolean
+  compliance_ebene: 'allgemein' | 'meister' | 'leistung'
+  nur_bei_bauleistung: boolean
 }
 
 export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
@@ -48,6 +50,8 @@ export async function updateComplianceTyp(
       | 'kategorie'
       | 'scope'
       | 'mehrfach_erlaubt'
+      | 'compliance_ebene'
+      | 'nur_bei_bauleistung'
     >
   >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -78,6 +82,8 @@ export async function createComplianceTyp(input: {
   kategorie?: string | null
   scope?: 'standard' | 'bauprojekt' | 'gewerk'
   mehrfach_erlaubt?: boolean
+  compliance_ebene?: 'allgemein' | 'meister' | 'leistung'
+  nur_bei_bauleistung?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const name = input.bezeichnung.trim()
@@ -101,6 +107,8 @@ export async function createComplianceTyp(input: {
       kategorie: input.kategorie?.trim() || null,
       scope: input.scope ?? 'bauprojekt',
       mehrfach_erlaubt: input.mehrfach_erlaubt ?? false,
+      compliance_ebene: input.compliance_ebene ?? 'leistung',
+      nur_bei_bauleistung: input.nur_bei_bauleistung ?? false,
     })
     if (error) return { ok: false, message: error.message }
     revalidatePath('/einstellungen/compliance')

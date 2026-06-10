@@ -10,6 +10,11 @@ import {
   leistungSchwerpunktAusGewerk,
   type VertragParagraph,
 } from '@/lib/vertraege/klauseln'
+import {
+  RAHMEN_AVV_ANLAGE_1,
+  RAHMEN_AVV_ANLAGE_2,
+  rahmenVertragPlatzhalter,
+} from '@/lib/vertraege/rahmen-anlagen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
 
@@ -81,6 +86,8 @@ const styles = StyleSheet.create({
   footerColRight: { flex: 1, fontSize: 7.5, color: TEXT_MUTED, lineHeight: 1.5, textAlign: 'right', maxWidth: '46%' },
   footerPageRow: { marginTop: 6, alignItems: 'center' },
   footerPageText: { fontSize: 8, color: TEXT_MUTED },
+  anlageTitle: { fontSize: 10, fontWeight: 'bold', color: GRUEN, marginBottom: 8 },
+  anlageIntro: { fontSize: 8.5, lineHeight: 1.5, marginBottom: 10, color: TEXT_PRIMARY },
 })
 
 function firmenName(firm: FirmenEinstellungen) {
@@ -244,18 +251,74 @@ function ParagraphBlock({ nr, title, body }: { nr: string; title: string; body: 
   )
 }
 
+function applyPlatzhalter(text: string, dynamic?: Record<string, string>): string {
+  if (!dynamic) return text
+  let body = text
+  for (const [k, v] of Object.entries(dynamic)) {
+    body = body.replaceAll(`{{${k}}}`, v)
+  }
+  return body
+}
+
 function Paragraphs({ items, dynamic }: { items: VertragParagraph[]; dynamic?: Record<string, string> }) {
   return (
     <>
-      {items.map((p) => {
-        let body = p.body
-        if (dynamic) {
-          for (const [k, v] of Object.entries(dynamic)) {
-            body = body.replaceAll(`{{${k}}}`, v)
-          }
-        }
-        return <ParagraphBlock key={p.nr} nr={p.nr} title={p.title} body={body} />
-      })}
+      {items.map((p) => (
+        <ParagraphBlock
+          key={p.nr}
+          nr={p.nr}
+          title={p.title}
+          body={applyPlatzhalter(p.body, dynamic)}
+        />
+      ))}
+    </>
+  )
+}
+
+function AvvAnlageKopf({
+  nr,
+  titel,
+  intro,
+}: {
+  nr: string
+  titel: string
+  intro: string
+}) {
+  return (
+    <>
+      <Text style={styles.anlageTitle}>
+        {nr} – {titel}
+      </Text>
+      <Text style={styles.anlageIntro}>{intro}</Text>
+    </>
+  )
+}
+
+function RahmenAvvAnlagen({ payload }: { payload: VertragPdfPayload }) {
+  const ph = rahmenVertragPlatzhalter(payload.firm, payload.handwerker)
+  const anlage1Intro = `${ph.auftraggeber}, ${ph.auftraggeber_adresse}, vertreten durch ${ph.auftraggeber_vertreter} (Verantwortlicher), und ${ph.partner}, ${ph.partner_adresse}, vertreten durch ${ph.partner_vertreter} (Auftragsverarbeiter).`
+  const anlage2Intro = `${ph.partner}, ${ph.partner_adresse}, vertreten durch ${ph.partner_vertreter} (Verantwortlicher), und ${ph.auftraggeber}, ${ph.auftraggeber_adresse}, vertreten durch ${ph.auftraggeber_vertreter} (Auftragsverarbeiter).`
+
+  return (
+    <>
+      <Page size="A4" style={styles.page}>
+        <AvvAnlageKopf
+          nr="Anlage 1"
+          titel="Auftragsverarbeitungsvertrag — Endkundendaten"
+          intro={anlage1Intro}
+        />
+        <Paragraphs items={RAHMEN_AVV_ANLAGE_1} dynamic={ph} />
+        <PdfFooter firm={payload.firm} />
+      </Page>
+      <Page size="A4" style={styles.page}>
+        <AvvAnlageKopf
+          nr="Anlage 2"
+          titel="Auftragsverarbeitungsvertrag — Partner- und Mitarbeiterdaten"
+          intro={anlage2Intro}
+        />
+        <Paragraphs items={RAHMEN_AVV_ANLAGE_2} dynamic={ph} />
+        <PdfFooter firm={payload.firm} />
+      </Page>
     </>
   )
 }
@@ -270,7 +333,7 @@ function VertragInhalt({ payload }: { payload: VertragPdfPayload }) {
   }
 
   if (!isProjekt) {
-    return <Paragraphs items={RAHMEN_PARAGRAPHEN} />
+    return <Paragraphs items={RAHMEN_PARAGRAPHEN.slice(0, 7)} />
   }
 
   return (
@@ -324,21 +387,35 @@ export function VertragPdfDocument({
           <PdfFooter firm={payload.firm} />
         </Page>
       ) : (
-        <Page size="A4" style={styles.page}>
-          <View style={styles.signRow}>
-            <View style={styles.signCol}>
-              <Text style={styles.signLabel}>Ort / Datum</Text>
-              <View style={styles.signLine} />
-              <Text style={styles.signLabel}>{firmenName(payload.firm)} · Auftraggeber</Text>
+        <>
+          <Page size="A4" style={styles.page}>
+            <Paragraphs items={RAHMEN_PARAGRAPHEN.slice(7)} />
+            <PdfFooter firm={payload.firm} />
+          </Page>
+          <RahmenAvvAnlagen payload={payload} />
+          <Page size="A4" style={styles.page}>
+            <Text style={styles.sectionTitle}>Unterschriften</Text>
+            <Text style={styles.paraBody}>
+              Der Partner-Rahmenvertrag einschließlich Anlage 1 und Anlage 2 (AVV) wird hiermit
+              anerkannt und vereinbart.
+            </Text>
+            <View style={styles.signRow}>
+              <View style={styles.signCol}>
+                <Text style={styles.signLabel}>Ort / Datum</Text>
+                <View style={styles.signLine} />
+                <Text style={styles.signLabel}>{firmenName(payload.firm)} · Auftraggeber</Text>
+              </View>
+              <View style={styles.signCol}>
+                <Text style={styles.signLabel}>Ort / Datum</Text>
+                <View style={styles.signLine} />
+                <Text style={styles.signLabel}>
+                  {handwerkerAnzeigename(payload.handwerker)} · Partner
+                </Text>
+              </View>
             </View>
-            <View style={styles.signCol}>
-              <Text style={styles.signLabel}>Ort / Datum</Text>
-              <View style={styles.signLine} />
-              <Text style={styles.signLabel}>{handwerkerAnzeigename(payload.handwerker)} · Partner</Text>
-            </View>
-          </View>
-          <PdfFooter firm={payload.firm} />
-        </Page>
+            <PdfFooter firm={payload.firm} />
+          </Page>
+        </>
       )}
     </Document>
   )

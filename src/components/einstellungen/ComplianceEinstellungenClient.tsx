@@ -79,7 +79,15 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
               <div>
                 <p className="text-[13.5px] font-medium text-bw-text">{t.bezeichnung}</p>
                 <EinstellungenListMeta>
-                  {[t.scope === 'bauprojekt' ? 'Bauprojekt' : t.scope === 'gewerk' ? 'Gewerk' : 'Standard', t.beschreibung]
+                  {[
+                    t.compliance_ebene === 'meister'
+                      ? 'Meister & Fachbetrieb'
+                      : t.compliance_ebene === 'leistung'
+                        ? 'Leistungsvertrag'
+                        : 'Allgemein',
+                    t.nur_bei_bauleistung ? 'nur Bauleistung' : null,
+                    t.beschreibung,
+                  ]
                     .filter(Boolean)
                     .join(' · ') || '—'}
                 </EinstellungenListMeta>
@@ -122,7 +130,33 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
                 }}
               />
             </div>
+            <div className="mb-3 grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-1 block text-bw-text-muted">Ebene</span>
+                <select
+                  className="input w-full py-1.5 text-sm"
+                  value={t.compliance_ebene ?? 'allgemein'}
+                  onChange={(e) =>
+                    void patchRow(t.id, {
+                      compliance_ebene: e.target.value as ComplianceTypRow['compliance_ebene'],
+                    })
+                  }
+                >
+                  <option value="allgemein">Allgemein (alle Partner)</option>
+                  <option value="meister">Meister & Fachbetrieb</option>
+                  <option value="leistung">Leistungsvertrag & Auftrag</option>
+                </select>
+              </label>
+            </div>
             <div className="flex flex-wrap items-center gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={t.nur_bei_bauleistung}
+                  onChange={(e) => void patchRow(t.id, { nur_bei_bauleistung: e.target.checked })}
+                />
+                Nur bei Bauleistung
+              </label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"

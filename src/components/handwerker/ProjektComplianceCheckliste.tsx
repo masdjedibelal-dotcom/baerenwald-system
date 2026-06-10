@@ -19,6 +19,7 @@ import {
   partnerDokumentStatusLabel,
 } from '@/lib/handwerker/partner-dokument-status'
 import { createClient } from '@/lib/supabase'
+import { complianceAblaufHinweis, COMPLIANCE_EBENE_LABELS } from '@/lib/handwerker/compliance-partner-profile'
 import {
   complianceDokumentStatus,
   dokumenteFuerProjekt,
@@ -33,6 +34,7 @@ import {
   projektChecklisteFortschritt,
   type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
+import type { Gewerk } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 
 const BUCKET = 'partner-dokumente'
@@ -73,6 +75,9 @@ export function ProjektComplianceCheckliste({
   auftragTitel,
   dokumente,
   complianceTypen,
+  handwerkerGewerke = [],
+  projektGewerkSlugs = [],
+  gewerke = [],
   compact = false,
   showAuftragLink = false,
 }: {
@@ -82,6 +87,9 @@ export function ProjektComplianceCheckliste({
   auftragTitel?: string | null
   dokumente: PartnerDokument[]
   complianceTypen: ComplianceDokumentTyp[]
+  handwerkerGewerke?: string[]
+  projektGewerkSlugs?: string[]
+  gewerke?: Gewerk[]
   compact?: boolean
   showAuftragLink?: boolean
 }) {
@@ -94,15 +102,41 @@ export function ProjektComplianceCheckliste({
   const freiRef = useRef<HTMLInputElement>(null)
   const individuellRef = useRef<HTMLInputElement>(null)
 
-  const projektTypen = useMemo(() => filterProjektComplianceTypen(complianceTypen), [complianceTypen])
+  const projektTypen = useMemo(
+    () =>
+      filterProjektComplianceTypen(
+        complianceTypen,
+        projektGewerkSlugs,
+        handwerkerGewerke,
+        gewerke
+      ),
+    [complianceTypen, projektGewerkSlugs, handwerkerGewerke, gewerke]
+  )
   const gruppen = useMemo(() => gruppeComplianceTypen(projektTypen), [projektTypen])
   const projektDocs = useMemo(
     () => dokumenteFuerProjekt(dokumente, handwerkerId, auftragId),
     [dokumente, handwerkerId, auftragId]
   )
   const fortschritt = useMemo(
-    () => projektChecklisteFortschritt(complianceTypen, dokumente, handwerkerId, auftragId),
-    [complianceTypen, dokumente, handwerkerId, auftragId]
+    () =>
+      projektChecklisteFortschritt(
+        complianceTypen,
+        dokumente,
+        handwerkerId,
+        auftragId,
+        projektGewerkSlugs,
+        handwerkerGewerke,
+        gewerke
+      ),
+    [
+      complianceTypen,
+      dokumente,
+      handwerkerId,
+      auftragId,
+      projektGewerkSlugs,
+      handwerkerGewerke,
+      gewerke,
+    ]
   )
   const indTyp = useMemo(() => individuellTyp(complianceTypen), [complianceTypen])
   const individuelleDocs = useMemo(
@@ -235,8 +269,8 @@ export function ProjektComplianceCheckliste({
           </p>
           {!compact ? (
             <p className="mt-1 text-[11px] text-bw-text-muted">
-              Projektvertrag: CRM-Wizard oder Partner-Bestätigung im Portal (API{' '}
-              <code className="text-[10px]">/api/portal/auftraege/…/projektvertrag</code>).
+              {COMPLIANCE_EBENE_LABELS.leistung} — Anlagen zum Leistungsvertrag. Rahmen- und
+              Projektvertrag im Portal unter Verträge.
             </p>
           ) : null}
         </div>
@@ -258,7 +292,13 @@ export function ProjektComplianceCheckliste({
             {gruppe.typen.map((typ) => {
               const doc = dokumentFuerTyp(projektDocs, typ.slug)
               const status = complianceDokumentStatus(typ, doc)
-              const pflicht = istPflichtTyp(typ, true)
+              const pflicht = istPflichtTyp(typ, {
+                projektKontext: true,
+                projektGewerkSlugs,
+                handwerkerGewerke,
+                alleGewerke: gewerke,
+              })
+              const ablaufHinweis = complianceAblaufHinweis(status, doc?.gueltig_bis)
               const uploading = uploadingTyp === typ.slug
 
               return (
@@ -286,6 +326,9 @@ export function ProjektComplianceCheckliste({
                           <span className="block text-status-cancel-text">{doc.ablehnung_grund}</span>
                         ) : null}
                       </p>
+                      {ablaufHinweis ? (
+                        <p className="text-[11px] font-medium text-amber-800">{ablaufHinweis}</p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">

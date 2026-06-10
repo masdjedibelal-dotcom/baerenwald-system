@@ -15,14 +15,21 @@ import {
 } from '@/app/(dashboard)/handwerker/actions'
 import { createClient } from '@/lib/supabase'
 import {
+  complianceAblaufHinweis,
+  COMPLIANCE_EBENE_LABELS,
+  partnerHatMeisterGewerke,
+  partnerLeistetBauleistung,
+} from '@/lib/handwerker/compliance-partner-profile'
+import {
   complianceDokumentStatus,
   dokumentFuerTyp,
-  filterStandardComplianceTypen,
+  filterPartnerComplianceTypen,
   gruppeComplianceTypen,
   istPflichtTyp,
   standardDokumente,
   type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
+import type { Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const BUCKET = 'partner-dokumente'
@@ -55,11 +62,15 @@ function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
 
 export function HandwerkerComplianceTab({
   handwerkerId,
+  handwerkerGewerke,
+  gewerke = [],
   dokumente,
   complianceTypen,
   rahmenVertrag = null,
 }: {
   handwerkerId: string
+  handwerkerGewerke: string[]
+  gewerke?: Gewerk[]
   dokumente: PartnerDokument[]
   complianceTypen: ComplianceDokumentTyp[]
   rahmenVertrag?: HandwerkerVertragRow | null
@@ -69,11 +80,30 @@ export function HandwerkerComplianceTab({
   const [uploadingTyp, setUploadingTyp] = useState<string | null>(null)
   const typRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const standardTypen = useMemo(
-    () => filterStandardComplianceTypen(complianceTypen),
-    [complianceTypen]
+  const profil = useMemo(
+    () => ({
+      bau: partnerLeistetBauleistung(handwerkerGewerke, gewerke),
+      meister: partnerHatMeisterGewerke(handwerkerGewerke, gewerke),
+    }),
+    [handwerkerGewerke, gewerke]
   )
-  const gruppen = useMemo(() => gruppeComplianceTypen(standardTypen), [standardTypen])
+
+  const ebenen = useMemo(
+    () =>
+      (['allgemein', 'meister'] as const)
+        .map((ebene) => ({
+          ebene,
+          label: COMPLIANCE_EBENE_LABELS[ebene],
+          typen: filterPartnerComplianceTypen(
+            complianceTypen,
+            ebene,
+            handwerkerGewerke,
+            gewerke
+          ),
+        }))
+        .filter((e) => e.typen.length > 0),
+    [complianceTypen, handwerkerGewerke, gewerke]
+  )
   const standardDocs = useMemo(() => standardDokumente(dokumente), [dokumente])
 
   async function openDatei(stored: string | null | undefined) {
@@ -152,14 +182,22 @@ export function HandwerkerComplianceTab({
   return (
     <div className="space-y-6 pb-4">
       <p className="text-sm text-bw-text-muted">
-        Allgemeine Partnerunterlagen für alle Gewerke — unabhängig von einzelnen Bauprojekten.
-        Projektbezogene Nachweise finden Sie unter Tab „Aufträge“ bzw. im jeweiligen Auftrag unter
-        Dokumente.
+        Stamm-Unterlagen pflegt der Partner im Portal. Leistungsbezogene Anlagen (Leistungsvertrag)
+        erscheinen je Auftrag unter Tab „Aufträge“ bzw. Auftrag → Dokumente.
+      </p>
+      <p className="text-xs text-bw-text-muted">
+        Profil: {profil.bau ? 'Bauleistungen' : 'keine Bau-Gewerke'}
+        {profil.meister ? ' · Meister/Fachbetrieb' : ''}
       </p>
 
-      {gruppen.map((gruppe) => (
-        <section key={gruppe.kategorie} className="space-y-2">
-          <h3 className="text-sm font-semibold text-bw-text">{gruppe.kategorie}</h3>
+      {ebenen.map(({ ebene, label, typen }) => {
+        const gruppen = gruppeComplianceTypen(typen)
+        return (
+        <section key={ebene} className="space-y-3">
+          <h2 className="text-sm font-semibold text-bw-text">{label}</h2>
+          {gruppen.map((gruppe) => (
+        <div key={`${ebene}-${gruppe.kategorie}`} className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{gruppe.kategorie}</h3>
           <div className="overflow-hidden rounded-xl border border-bw-border">
             <ul className="divide-y divide-bw-border">
               {gruppe.typen.map((typ) => {
@@ -169,7 +207,11 @@ export function HandwerkerComplianceTab({
                   rahmenvertragErfuellt(standardDocs, rahmenVertrag)
                 const status = rvOk ? 'ok' : complianceDokumentStatus(typ, doc)
                 const rvPdf = rahmenVertrag?.pdf_url?.trim()
-                const pflicht = istPflichtTyp(typ)
+                const pflicht = istPflichtTyp(typ, {
+                  handwerkerGewerke,
+                  alleGewerke: gewerke,
+                })
+                const ablaufHinweis = complianceAblaufHinweis(status, doc?.gueltig_bis)
                 const uploading = uploadingTyp === typ.slug
 
                 return (
@@ -200,6 +242,9 @@ export function HandwerkerComplianceTab({
                             </p>
                           ) : null}
                           <p className="mt-1 text-[11px] text-bw-text-muted">{statusLabel(status)}</p>
+                          {ablaufHinweis ? (
+                            <p className="mt-0.5 text-[11px] font-medium text-amber-800">{ablaufHinweis}</p>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -286,8 +331,11 @@ export function HandwerkerComplianceTab({
               })}
             </ul>
           </div>
+        </div>
+          ))}
         </section>
-      ))}
+        )
+      })}
     </div>
   )
 }

@@ -759,6 +759,10 @@ export type ComplianceDokumentTyp = {
   pflicht_bauprojekt?: boolean
   vertrag_referenz?: string | null
   mehrfach_erlaubt?: boolean
+  /** allgemein | meister | leistung */
+  compliance_ebene?: ComplianceEbene | null
+  /** Nur wenn Partner Bau-Gewerke hat */
+  nur_bei_bauleistung?: boolean
 }
 
 export type PartnerDokument = {
@@ -832,6 +836,8 @@ export type Handwerker = {
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'
 
+export type ComplianceEbene = 'allgemein' | 'meister' | 'leistung'
+
 export type Gewerk = {
   id: string
   name: string
@@ -839,6 +845,8 @@ export type Gewerk = {
   aktiv: boolean
   ausfuehrung?: GewerkAusfuehrung | string
   fachbetrieb_hinweis?: string | null
+  /** false = Facility/Reinigung — kein Bau-Stamm-Paket */
+  ist_bauleistung?: boolean
 }
 
 export type Preisliste = {

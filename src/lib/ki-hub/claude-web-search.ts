@@ -2,6 +2,20 @@ import 'server-only'
 
 import type Anthropic from '@anthropic-ai/sdk'
 
+/** SDK-Typen kennen web_search noch nicht — eigene Form für die API-Nutzung. */
+type KiHubWebSearchTool = {
+  type: 'web_search_20250305'
+  name: 'web_search'
+  max_uses: number
+  user_location: {
+    type: 'approximate'
+    city: string
+    region: string
+    country: string
+    timezone: string
+  }
+}
+
 /** Anthropic Server-Tool — Recherche läuft bei Anthropic, kein Tavily nötig. */
 export function isKiHubWebSearchEnabled(): boolean {
   const flag = process.env.KI_HUB_WEB_SEARCH?.trim().toLowerCase()
@@ -18,18 +32,17 @@ export function getKiHubWebSearchMaxUses(): number {
 
 /** Sonnet 4.6 — Standard web_search ohne Code-Execution-Pflicht. */
 export function getKiHubWebSearchTools(): Anthropic.MessageCreateParams['tools'] {
-  return [
-    {
-      type: 'web_search_20250305',
-      name: 'web_search',
-      max_uses: getKiHubWebSearchMaxUses(),
-      user_location: {
-        type: 'approximate',
-        city: 'München',
-        region: 'Bayern',
-        country: 'DE',
-        timezone: 'Europe/Berlin',
-      },
+  const webSearchTool: KiHubWebSearchTool = {
+    type: 'web_search_20250305',
+    name: 'web_search',
+    max_uses: getKiHubWebSearchMaxUses(),
+    user_location: {
+      type: 'approximate',
+      city: 'München',
+      region: 'Bayern',
+      country: 'DE',
+      timezone: 'Europe/Berlin',
     },
-  ] as Anthropic.MessageCreateParams['tools']
+  }
+  return [webSearchTool] as unknown as Anthropic.MessageCreateParams['tools']
 }

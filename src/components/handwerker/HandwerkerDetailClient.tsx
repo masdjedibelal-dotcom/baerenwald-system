@@ -50,7 +50,7 @@ import {
   updateHandwerkerNotizen,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
-import type { ComplianceDokumentTyp, Handwerker } from '@/lib/types'
+import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -84,11 +84,13 @@ function isAuftragAbgeschlossen(auftragStatus: string): boolean {
 export function HandwerkerDetailClient({
   payload,
   gewerkeSlugs,
+  gewerke = [],
   complianceTypen,
   rahmenVertrag = null,
 }: {
   payload: HandwerkerDetailPayload
   gewerkeSlugs: { slug: string; name: string }[]
+  gewerke?: Gewerk[]
   complianceTypen: ComplianceDokumentTyp[]
   rahmenVertrag?: HandwerkerVertragRow | null
 }) {
@@ -100,6 +102,7 @@ export function HandwerkerDetailClient({
     [gewerkeSlugs]
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
+  const hwGewerkSlugs = useMemo(() => gewerkSlugsFromField(hw.gewerke), [hw.gewerke])
   const dokumenteAnzahl = useMemo(
     () => standardDokumente(payload.dokumente).length,
     [payload.dokumente]
@@ -404,6 +407,8 @@ export function HandwerkerDetailClient({
                       auftragTitel={a.titel}
                       dokumente={payload.dokumente}
                       complianceTypen={complianceTypen}
+                      handwerkerGewerke={hwGewerkSlugs}
+                      gewerke={gewerke}
                       compact
                       showAuftragLink
                     />
@@ -445,6 +450,8 @@ export function HandwerkerDetailClient({
                       auftragTitel={a.titel}
                       dokumente={payload.dokumente}
                       complianceTypen={complianceTypen}
+                      handwerkerGewerke={hwGewerkSlugs}
+                      gewerke={gewerke}
                       compact
                       showAuftragLink
                     />
@@ -481,6 +488,8 @@ export function HandwerkerDetailClient({
   const tabCompliance = (
     <HandwerkerComplianceTab
       handwerkerId={hw.id}
+      handwerkerGewerke={hwGewerkSlugs}
+      gewerke={gewerke}
       dokumente={payload.dokumente}
       complianceTypen={complianceTypen}
       rahmenVertrag={rahmenVertrag}

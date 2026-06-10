@@ -3,7 +3,8 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { FileText, Pencil, Shield, Trash2, Upload } from 'lucide-react'
 import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import { gewerkSlugsAusPositionen } from '@/lib/handwerker/compliance-partner-profile'
+import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
@@ -37,6 +38,7 @@ export function AuftragDokumenteTab({
   vertraege = [],
   complianceTypen = [],
   partnerDokumente = [],
+  gewerke = [],
   onChanged,
 }: {
   detail: AuftragDetail
@@ -44,6 +46,7 @@ export function AuftragDokumenteTab({
   vertraege?: HandwerkerVertragRow[]
   complianceTypen?: ComplianceDokumentTyp[]
   partnerDokumente?: PartnerDokument[]
+  gewerke?: Gewerk[]
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -188,6 +191,11 @@ export function AuftragDokumenteTab({
     })
   }, [detail.auftrag_handwerker])
 
+  const projektGewerkSlugs = useMemo(
+    () => gewerkSlugsAusPositionen(detail.auftrag_positionen ?? []),
+    [detail.auftrag_positionen]
+  )
+
   return (
     <div className="auftrag-dok-panel space-y-8 pb-4">
       {handwerkerZeilen.length > 0 && complianceTypen.length > 0 ? (
@@ -215,6 +223,8 @@ export function AuftragDokumenteTab({
                   auftragTitel={detail.titel}
                   dokumente={partnerDokumente}
                   complianceTypen={complianceTypen}
+                  projektGewerkSlugs={projektGewerkSlugs}
+                  gewerke={gewerke}
                 />
               </div>
             ))}

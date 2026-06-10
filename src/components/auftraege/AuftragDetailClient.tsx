@@ -702,6 +702,7 @@ export function AuftragDetailClient({
         vertraege={vertraegeListe}
         complianceTypen={complianceTypen}
         partnerDokumente={partnerDokumente}
+        gewerke={gewerke as Gewerk[]}
         onChanged={() => refresh()}
       />
     ) : mainTab === 'finanzen' ? (
@@ -724,6 +725,7 @@ export function AuftragDetailClient({
         vertraege={vertraegeListe}
         complianceTypen={complianceTypen}
         partnerDokumente={partnerDokumente}
+        gewerke={gewerke as Gewerk[]}
         onChanged={() => refresh()}
       />
     ) : mainTab === 'finanzen' ? (
