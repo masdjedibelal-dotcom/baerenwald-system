@@ -47,9 +47,14 @@ export async function fetchPostHogSummary(): Promise<KiHubQuelleResult<Record<st
 
     const text = await res.text()
     if (!res.ok) {
+      let hint = ''
+      if (res.status === 401 || res.status === 403) {
+        hint =
+          ' — Personal API Key mit Scope „Query Read“ verwenden (nicht phc_-Ingest-Key). Host (eu/us) und PROJECT_ID prüfen.'
+      }
       return {
         status: 'unavailable',
-        error: `PostHog ${res.status}: ${text.slice(0, 100)}`,
+        error: `PostHog ${res.status}: ${text.slice(0, 80)}${hint}`,
       }
     }
 

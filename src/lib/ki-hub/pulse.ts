@@ -45,11 +45,13 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
           value: resendRate != null ? `${resendRate}% Zustellung` : '—',
         },
       ],
-      hint: gscOk
-        ? gscImpressions != null
-          ? `${gscImpressions} Impressionen (28d)`
-          : null
-        : 'GSC_SERVICE_ACCOUNT_JSON + GSC_SITE_URL setzen',
+      hint: posthogOk
+        ? gscOk
+          ? gscImpressions != null
+            ? `${gscImpressions} Impressionen (28d)`
+            : null
+          : 'GSC: Service-Account in Search Console freigeben'
+        : 'PostHog: Personal API Key (Query Read) in Netlify setzen',
     },
     {
       id: 'anfragen',

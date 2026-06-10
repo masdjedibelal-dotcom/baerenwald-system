@@ -30,8 +30,9 @@ export default async function AnfrageDetailPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams?: { angebot_kopie_von?: string }
+  searchParams?: { angebot_kopie_von?: string; angebote?: string }
 }) {
+  const angeboteAuswahlInitial = searchParams?.angebote === '1'
   const supabase = createClient()
   const lead = await loadAnfrageDetail(supabase, params.id)
 
@@ -125,6 +126,7 @@ export default async function AnfrageDetailPage({
         angebotKopieVonQuelleId={angebotKopieVon}
         wizardHandwerker={wizardHandwerker}
         angebotFlowSnapshot={angebotFlowSnapshot}
+        angeboteAuswahlInitial={angeboteAuswahlInitial}
       />
     )
   }
@@ -151,6 +153,7 @@ export default async function AnfrageDetailPage({
       angebotKopieVonQuelleId={angebotKopieVon}
       wizardHandwerker={wizardHandwerker}
       angebotFlowSnapshot={angebotFlowSnapshot}
+      angeboteAuswahlInitial={angeboteAuswahlInitial}
     />
   )
 }

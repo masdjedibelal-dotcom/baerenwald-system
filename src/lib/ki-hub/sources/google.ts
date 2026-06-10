@@ -111,7 +111,14 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
 
     if (!res.ok) {
       const errText = await res.text()
-      return { status: 'unavailable', error: `GSC ${res.status}: ${errText.slice(0, 120)}` }
+      let hint = ''
+      if (res.status === 403) {
+        hint = ` — ${sa.client_email} in Search Console unter „Nutzer“ mit Vollzugriff einladen; GSC_SITE_URL exakt wie Property (${siteUrl}).`
+      }
+      return {
+        status: 'unavailable',
+        error: `GSC ${res.status}: ${errText.slice(0, 100)}${hint}`,
+      }
     }
 
     const json = (await res.json()) as { rows?: GscRow[] }

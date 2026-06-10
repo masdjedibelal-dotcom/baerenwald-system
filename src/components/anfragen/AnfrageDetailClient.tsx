@@ -55,6 +55,7 @@ import { LeadGptStudioBlock } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
+import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { kundentypLabel, resolveLeadKunde } from '@/lib/lead-display-helpers'
@@ -139,6 +140,7 @@ export function AnfrageDetailClient({
   kundenObjekte = [],
   angebotKopieVonQuelleId,
   angebotFlowSnapshot = null,
+  angeboteAuswahlInitial = false,
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
@@ -150,6 +152,8 @@ export function AnfrageDetailClient({
   /** Server: beim Aufruf mit ?angebot_kopie_von= wird der Wizard als 1:1-Kopie geöffnet. */
   angebotKopieVonQuelleId?: string
   angebotFlowSnapshot?: AnfrageAngebotFlowSnapshot | null
+  /** z. B. Redirect von /anfragen/[id]/angebote — Modal sofort öffnen */
+  angeboteAuswahlInitial?: boolean
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -163,6 +167,7 @@ export function AnfrageDetailClient({
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
   const kopieQueryHandledRef = useRef(false)
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
+  const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
 
   const [tab, setTab] = useState<DetailTab>('schritte')
   const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
@@ -336,13 +341,15 @@ export function AnfrageDetailClient({
 
   const hasAngebote = angeboteListe.length > 0
 
-  const openAngebotErstellen = useCallback(() => {
+  const openAngebotAuswahl = useCallback(() => {
     if (angeboteListe.length === 0) {
       openAngebotWizard(null)
       return
     }
-    router.push(`/anfragen/${lead.id}/angebote`)
-  }, [angeboteListe.length, lead.id, openAngebotWizard, router])
+    setAngebotAuswahlOpen(true)
+  }, [angeboteListe.length, openAngebotWizard])
+
+  const openAngebotErstellen = openAngebotAuswahl
 
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -866,6 +873,25 @@ export function AnfrageDetailClient({
           }}
         />
       ) : null}
+
+      <AngebotAuswahlModal
+        open={angebotAuswahlOpen}
+        onClose={() => setAngebotAuswahlOpen(false)}
+        leadId={lead.id}
+        angebote={angeboteListe}
+        onNeuesAngebot={() => {
+          setAngebotAuswahlOpen(false)
+          openAngebotWizard(null)
+        }}
+        onWeiterbearbeiten={(bootstrap) => {
+          setAngebotAuswahlOpen(false)
+          openAngebotWizard(bootstrap)
+        }}
+        onKopie={(bootstrap) => {
+          setAngebotAuswahlOpen(false)
+          openAngebotWizard(bootstrap)
+        }}
+      />
 
       <AnfrageNeuSheet
         open={bearbeitenOpen}

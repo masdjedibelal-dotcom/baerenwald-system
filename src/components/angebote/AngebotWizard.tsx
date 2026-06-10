@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { AngebotWizardComplete } from '@/components/angebote/AngebotWizardComplete'
+import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -275,6 +276,7 @@ export function AngebotWizard({
   const [projektUploading, setProjektUploading] = useState(false)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const [completedAngebotId, setCompletedAngebotId] = useState<string | null>(null)
+  const [versendetErfolg, setVersendetErfolg] = useState(false)
   const [angebotsnr, setAngebotsnr] = useState(bootstrap?.angebotsnr?.trim() || 'Entwurf')
 
   function patchProjektTitel(neu: string) {
@@ -542,10 +544,6 @@ export function AngebotWizard({
     }
     const id = await persistDraft({ notify: true })
     if (!id) return
-    if (step >= WIZARD_TOTAL_STEPS) {
-      await handleWizardFertig()
-      return
-    }
     setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
   }
 
@@ -584,22 +582,43 @@ export function AngebotWizard({
     }
   }
 
-  async function handleWizardFertig() {
+  async function handleWizardErstellen() {
+    setSaving(true)
+    const id = await persistDraft({ notify: false })
+    setSaving(false)
+    if (!id) return
+    toast.success('Angebot erstellt')
+    setVersendetErfolg(false)
+    setCompletedAngebotId(id)
+    router.refresh()
+  }
+
+  async function handleWizardErstellenUndVersenden() {
+    if (!mailTo.length) {
+      toast.error('Bitte mindestens eine E-Mail-Adresse unter „An“ angeben.')
+      return
+    }
     setSaving(true)
     const id = await persistDraft({ notify: false })
     if (!id) {
       setSaving(false)
       return
     }
-    const res = await sendAngebotWizard({ angebotId: id, lead_id: lead.id })
+    const res = await sendAngebotWizard({
+      angebotId: id,
+      lead_id: lead.id,
+      mailTo,
+      mailCc,
+    })
     setSaving(false)
     if (!res.ok) {
       toast.error(res.message)
       return
     }
-    toast.success('Angebot erstellt')
-    onDone?.(id)
+    toast.success('Angebot erstellt und versendet')
+    setVersendetErfolg(true)
     setCompletedAngebotId(id)
+    onDone?.(id)
     router.refresh()
   }
 
@@ -679,9 +698,47 @@ export function AngebotWizard({
 
   if (!mounted) return null
 
-  const wizardMobileActions = (
-    <>
-      {step > 1 ? (
+  const wizardMobileActions =
+    step < WIZARD_TOTAL_STEPS ? (
+      <>
+        {step > 1 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="wizard-mobile-toolbar__back shrink-0 px-2"
+            onClick={() => setStep((s) => s - 1)}
+            aria-label="Zurück"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
+          loading={saving}
+          onClick={() => void handleEntwurfSpeichern()}
+          aria-label="Entwurf speichern"
+          title="Entwurf speichern"
+        >
+          <Save className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+          loading={saving}
+          onClick={() => void handleWeiter()}
+        >
+          Weiter
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </>
+    ) : (
+      <>
         <Button
           type="button"
           variant="ghost"
@@ -692,41 +749,30 @@ export function AngebotWizard({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-      ) : null}
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="wizard-mobile-toolbar__save shrink-0 px-2.5"
-        loading={saving}
-        onClick={() => void handleEntwurfSpeichern()}
-        aria-label="Entwurf speichern"
-        title="Entwurf speichern"
-      >
-        <Save className="h-4 w-4" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        size="sm"
-        className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
-        loading={saving}
-        onClick={() => void handleWeiter()}
-      >
-        {step >= WIZARD_TOTAL_STEPS ? (
-          <>
-            <Send className="h-4 w-4" />
-            Fertig
-          </>
-        ) : (
-          <>
-            Weiter
-            <ChevronRight className="h-4 w-4" />
-          </>
-        )}
-      </Button>
-    </>
-  )
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
+          loading={saving}
+          onClick={() => void handleWizardErstellen()}
+          aria-label="Angebot erstellen"
+        >
+          <Check className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
+          loading={saving}
+          onClick={() => void handleWizardErstellenUndVersenden()}
+        >
+          <Send className="h-4 w-4" />
+          Senden
+        </Button>
+      </>
+    )
 
   const wizardHeader = (
     <>
@@ -773,37 +819,57 @@ export function AngebotWizard({
           Zurück
         </Button>
       ) : null}
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="gap-1.5"
-        loading={saving}
-        onClick={() => void handleEntwurfSpeichern()}
-      >
-        <Save className="h-4 w-4" aria-hidden />
-        Speichern
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        size="sm"
-        className="gap-1.5"
-        loading={saving}
-        onClick={() => void handleWeiter()}
-      >
-        {step >= WIZARD_TOTAL_STEPS ? (
-          <>
-            <Send className="h-4 w-4" />
-            Angebot erstellen
-          </>
-        ) : (
-          <>
+      {step < WIZARD_TOTAL_STEPS ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            loading={saving}
+            onClick={() => void handleEntwurfSpeichern()}
+          >
+            <Save className="h-4 w-4" aria-hidden />
+            Speichern
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="gap-1.5"
+            loading={saving}
+            onClick={() => void handleWeiter()}
+          >
             Weiter
             <ChevronRight className="h-4 w-4" />
-          </>
-        )}
-      </Button>
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            loading={saving}
+            onClick={() => void handleWizardErstellen()}
+          >
+            <Check className="h-4 w-4" aria-hidden />
+            Angebot erstellen
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="gap-1.5"
+            loading={saving}
+            onClick={() => void handleWizardErstellenUndVersenden()}
+          >
+            <Send className="h-4 w-4" aria-hidden />
+            Erstellen und versenden
+          </Button>
+        </>
+      )}
       </div>
     </>
   )
@@ -817,6 +883,7 @@ export function AngebotWizard({
         <AngebotWizardComplete
           angebotId={completedAngebotId}
           kundeName={name}
+          versendet={versendetErfolg}
           onClose={() => {
             setCompletedAngebotId(null)
             onClose()
@@ -1030,11 +1097,21 @@ export function AngebotWizard({
                   lohnNettoPdf={lohnNettoPdf}
                 />
 
+                <WizardProjektDivider />
+
+                <AngebotWizardVersandEmpfaengerCard
+                  mailTo={mailTo}
+                  onMailToChange={setMailTo}
+                  mailCc={mailCc}
+                  onMailCcChange={setMailCc}
+                  disabled={saving}
+                />
+
                 <Card className="border-dashed">
                   <p className="text-sm text-bw-text-muted">
-                    Handwerker-Zuweisung ist optional und erfolgt nach dem Speichern im Angebot — auch
-                    für freie Positionen ohne Gewerk. Bei Bedarf Partner dort anfragen, bevor Sie an den
-                    Kunden senden.
+                    Mit <strong>Angebot erstellen</strong> speichern Sie nur den Entwurf. Mit{' '}
+                    <strong>Erstellen und versenden</strong> wird das Angebot direkt an den Kunden
+                    geschickt. Handwerker-Zuweisung ist optional und kann danach im Angebot erfolgen.
                   </p>
                 </Card>
               </div>

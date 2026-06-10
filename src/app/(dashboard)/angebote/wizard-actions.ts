@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
 import {
   createAngebot,
+  sendAngebotToKunde,
   updateAngebot,
 } from '@/app/(dashboard)/angebote/actions'
 import type {
@@ -197,7 +198,14 @@ export async function saveAngebotWizardDraft(
 export async function sendAngebotWizard(input: {
   angebotId: string
   lead_id: string
+  mailTo: string[]
+  mailCc?: string[]
 }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const sent = await sendAngebotToKunde(input.angebotId, {
+    to: input.mailTo,
+    cc: input.mailCc,
+  })
+  if (!sent.ok) return sent
   revalidatePath(`/anfragen/${input.lead_id}`)
   revalidatePath('/anfragen')
   revalidatePath('/angebote')
