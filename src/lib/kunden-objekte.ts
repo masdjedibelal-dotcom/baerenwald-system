@@ -40,6 +40,15 @@ export function kundenObjektKurzlabel(o: KundenObjekt): string {
   return parts.join(' · ') || o.titel?.trim() || 'Objekt'
 }
 
+/** Mindestens Straße oder PLZ/Ort — ohne das kein Ausführungsort im PDF. */
+export function kundenObjektHatAnschrift(
+  o: Pick<KundenObjekt, 'strasse' | 'hausnummer' | 'plz' | 'ort'>
+): boolean {
+  const str = kundenObjektStrasseZeile(o)
+  const po = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
+  return Boolean(str || po)
+}
+
 /** Mehrzeilig für PDF „Durchführung in:“ */
 export function formatKundenObjektDurchfuehrung(o: KundenObjekt): string {
   const lines: string[] = []
@@ -50,4 +59,12 @@ export function formatKundenObjektDurchfuehrung(o: KundenObjekt): string {
   const po = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
   if (po) lines.push(po)
   return lines.join('\n')
+}
+
+/** Ausführungsort nur bei echter Anschrift — kein Fallback auf Projekt-Titel. */
+export function resolveAngebotDurchfuehrungIn(
+  verwaltersObjekt: KundenObjekt | null | undefined
+): string | null {
+  if (!verwaltersObjekt || !kundenObjektHatAnschrift(verwaltersObjekt)) return null
+  return formatKundenObjektDurchfuehrung(verwaltersObjekt)
 }

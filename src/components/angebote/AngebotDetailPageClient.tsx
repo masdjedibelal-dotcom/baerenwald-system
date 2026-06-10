@@ -51,6 +51,7 @@ import {
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { extendAngebotGueltigkeit } from '@/app/(dashboard)/angebote/extend-gueltigkeit-action'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
+import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
 import { previewAuftragsbestaetigungMail } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
@@ -248,6 +249,7 @@ export function AngebotDetailPageClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
+  const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
   const [verlaengernOpen, setVerlaengernOpen] = useState(false)
   const [verlaengernDatum, setVerlaengernDatum] = useState(() => {
     const raw = detail.gueltig_bis?.slice(0, 10)
@@ -272,6 +274,12 @@ export function AngebotDetailPageClient({
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
 
+  function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap) {
+    setWizardBootstrap(bootstrap)
+    setWizardSessionKey((k) => k + 1)
+    setWizardOpen(true)
+  }
+
   function openWizardBearbeiten() {
     if (!kannBearbeiten) {
       toast.error('Dieses Angebot kann nicht mehr bearbeitet werden.')
@@ -281,15 +289,17 @@ export function AngebotDetailPageClient({
       router.push(`/angebote/neu?angebot_id=${detail.id}`)
       return
     }
+    if (statusEinfach !== 'entwurf') {
+      setBearbeitenWahlOpen(true)
+      return
+    }
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(detail.id, detail.lead_id!)
       if (!res.ok) {
         toast.error(res.message)
         return
       }
-      setWizardBootstrap(res.bootstrap)
-      setWizardSessionKey((k) => k + 1)
-      setWizardOpen(true)
+      openWizardMitBootstrap(res.bootstrap)
     })
   }
 
@@ -915,6 +925,16 @@ export function AngebotDetailPageClient({
             closeWizard()
             refresh()
           }}
+        />
+      ) : null}
+
+      {detail.lead_id ? (
+        <AngebotBearbeitenWahlModal
+          open={bearbeitenWahlOpen}
+          onClose={() => setBearbeitenWahlOpen(false)}
+          angebotId={detail.id}
+          leadId={detail.lead_id}
+          onBearbeiten={openWizardMitBootstrap}
         />
       ) : null}
 

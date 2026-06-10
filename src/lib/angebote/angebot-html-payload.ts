@@ -28,7 +28,7 @@ import { buildProjektPdfBloecke } from '@/lib/angebote/angebot-projekt-pdf-block
 import { istFreitextPosition } from '@/lib/dokument-zeilen'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import { formatKundeEmpfaengerFuerDokument, kundeAnredeKontextFromEmpfaenger, kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
-import { formatKundenObjektDurchfuehrung } from '@/lib/kunden-objekte'
+import { resolveAngebotDurchfuehrungIn } from '@/lib/kunden-objekte'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveAngebotLeistungsumfang } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import type { AngebotDetail, AngebotPosition, Gewerk } from '@/lib/types'
@@ -221,9 +221,7 @@ export function buildAngebotHtmlInputAusDetail(
     : null
 
   const verwaltersObjekt = detail.kunden_objekte ?? null
-  const durchfuehrungIn = verwaltersObjekt
-    ? formatKundenObjektDurchfuehrung(verwaltersObjekt)
-    : leistungsumfang || null
+  const durchfuehrungIn = resolveAngebotDurchfuehrungIn(verwaltersObjekt)
 
   const payload: AngebotHtmlInput = {
     firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),

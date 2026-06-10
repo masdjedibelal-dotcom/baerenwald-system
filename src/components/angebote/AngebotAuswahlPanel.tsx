@@ -10,6 +10,7 @@ import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
+import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import type { AngebotStatus } from '@/lib/types'
@@ -46,6 +47,7 @@ export function AngebotAuswahlPanel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [bearbeitenWahlId, setBearbeitenWahlId] = useState<string | null>(null)
 
   const rows = useMemo(
     () =>
@@ -60,7 +62,11 @@ export function AngebotAuswahlPanel({
 
   const bearbeitbarCount = rows.filter((a) => angebotDarfImWizardBearbeitetWerden(a.status)).length
 
-  function handleBearbeiten(angebotId: string) {
+  function handleBearbeiten(angebotId: string, status: string) {
+    if (status !== 'entwurf') {
+      setBearbeitenWahlId(angebotId)
+      return
+    }
     setLoadingId(angebotId)
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(angebotId, leadId)
@@ -124,7 +130,7 @@ export function AngebotAuswahlPanel({
           ) : (
             <Pencil className="h-[15px] w-[15px]" aria-hidden />
           ),
-        onClick: () => handleBearbeiten(a.id),
+        onClick: () => handleBearbeiten(a.id, a.status),
       })
     }
 
@@ -278,6 +284,20 @@ export function AngebotAuswahlPanel({
       )}
 
       {footer}
+
+      {bearbeitenWahlId ? (
+        <AngebotBearbeitenWahlModal
+          open
+          onClose={() => setBearbeitenWahlId(null)}
+          angebotId={bearbeitenWahlId}
+          leadId={leadId}
+          onBearbeiten={(bootstrap) => {
+            setBearbeitenWahlId(null)
+            onClose?.()
+            onWeiterbearbeiten(bootstrap)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
