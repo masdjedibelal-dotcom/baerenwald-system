@@ -122,24 +122,62 @@ function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
     .join('')
 }
 
+function formatTsDe(iso: string | null | undefined): string {
+  if (!iso?.trim()) return '—'
+  try {
+    return new Date(iso).toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso.slice(0, 16)
+  }
+}
+
+function isMangelOffenPdf(m: AbnahmeMangel): boolean {
+  const s = m.status ?? 'offen'
+  return s === 'offen' || s === 'in_bearbeitung'
+}
+
+function maengelListeHtml(maengel: AbnahmeMangel[], nurOffen: boolean): string {
+  const list = maengel.filter((m) => (nurOffen ? isMangelOffenPdf(m) : !isMangelOffenPdf(m)))
+  if (!list.length) return ''
+  return `<ul style="margin:0;padding-left:18px;font-size:9pt;line-height:1.5;color:${TEXT};">
+    ${list
+      .map((m) => {
+        const verlauf = (m.verlauf ?? [])
+          .slice(-3)
+          .map((v) => `${formatTsDe(v.at)}: ${esc(v.typ)}${v.notiz ? ` — ${esc(v.notiz)}` : ''}`)
+          .join('<br/>')
+        return `<li style="margin:0 0 8px;page-break-inside:avoid;">
+          <strong>${esc(m.beschreibung)}</strong>
+          ${m.frist ? `<span style="display:block;font-size:8pt;color:#991B1B;">Frist: ${esc(m.frist.slice(0, 10))}</span>` : ''}
+          ${m.erfasst_at ? `<span style="display:block;font-size:8pt;color:${MUTED};">Erfasst: ${formatTsDe(m.erfasst_at)}</span>` : ''}
+          ${m.behoben_at ? `<span style="display:block;font-size:8pt;color:#166534;">Behoben: ${formatTsDe(m.behoben_at)}</span>` : ''}
+          ${m.abgenommen_at ? `<span style="display:block;font-size:8pt;color:#166534;">Abgenommen: ${formatTsDe(m.abgenommen_at)}</span>` : ''}
+          ${verlauf ? `<span style="display:block;font-size:7.5pt;color:${MUTED};margin-top:2px;">${verlauf}</span>` : ''}
+        </li>`
+      })
+      .join('')}
+  </ul>`
+}
+
 function offenePunkteHtml(maengel: AbnahmeMangel[]): string {
-  const inner =
-    maengel.length > 0
-      ? `<ul style="margin:0;padding-left:18px;font-size:9pt;line-height:1.5;color:${TEXT};">
-          ${maengel
-            .map(
-              (m) =>
-                `<li style="margin:0 0 6px;">${esc(m.beschreibung)}${
-                  m.frist
-                    ? `<span style="display:block;font-size:8pt;color:#991B1B;">Frist: ${esc(m.frist.slice(0, 10))}</span>`
-                    : ''
-                }</li>`
-            )
-            .join('')}
-        </ul>`
-      : ''
+  const inner = maengelListeHtml(maengel, true)
   return `${sectionHeading('Offene Punkte / Mängel')}
-    <div style="min-height:110px;border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;margin-top:4px;page-break-inside:avoid;">
+    <div style="min-height:80px;border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;margin-top:4px;page-break-inside:avoid;">
+      ${inner || `<p style="margin:0;font-size:9pt;color:${MUTED};">Keine offenen Mängel.</p>`}
+    </div>`
+}
+
+function behobeneMaengelHtml(maengel: AbnahmeMangel[]): string {
+  const inner = maengelListeHtml(maengel, false)
+  if (!inner) return ''
+  return `${sectionHeading('Behobene / abgenommene Mängel')}
+    <div style="border:1px solid #BBF7D0;border-radius:4px;padding:10px 12px;margin-top:4px;background:#F0FDF4;page-break-inside:avoid;">
       ${inner}
     </div>`
 }
@@ -206,6 +244,7 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
     ${sectionHeading('Abnahmecheckliste')}
     ${gewerkeChecklisteHtml(p.gewerke)}
     ${offenePunkteHtml(p.maengel)}
+    ${behobeneMaengelHtml(p.maengel)}
     ${notizen}
     ${unterschriftBlock(p.abnahmeDatum)}
   </div>

@@ -23,11 +23,27 @@ export type AbnahmePunkt = {
   foto_urls?: string[]
 }
 
+export type AbnahmeMangelStatus = 'offen' | 'in_bearbeitung' | 'behoben' | 'abgenommen'
+
+export type AbnahmeMangelVerlaufEintrag = {
+  at: string
+  typ: string
+  notiz?: string | null
+}
+
 export type AbnahmeMangel = {
   punkt_id: string
   beschreibung: string
   foto_urls?: string[]
   frist: string | null
+  status?: AbnahmeMangelStatus
+  erfasst_at?: string
+  behoben_at?: string | null
+  abgenommen_at?: string | null
+  behoben_von?: string | null
+  handwerker_id?: string | null
+  foto_nachher_urls?: string[]
+  verlauf?: AbnahmeMangelVerlaufEintrag[]
 }
 
 export type AuftragAbnahmeprotokoll = {
@@ -200,16 +216,7 @@ export function neuerAbnahmePunktFreitext(): AbnahmePunkt {
   }
 }
 
-export function maengelAusPunkten(punkte: AbnahmePunkt[]): AbnahmeMangel[] {
-  return punkte
-    .filter((p) => p.status === 'mangel')
-    .map((p) => ({
-      punkt_id: p.id,
-      beschreibung: p.notiz?.trim() || p.beschreibung,
-      foto_urls: [...(p.foto_urls ?? [])],
-      frist: null,
-    }))
-}
+export { maengelAusPunkten, mergeMaengelFromPunkte, countOffeneMaengel, isMangelOffen } from '@/lib/auftraege/abnahme-maengel-helpers'
 
 export function abnahmePunkteStatistik(punkte: AbnahmePunkt[]): {
   ok: number

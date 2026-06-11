@@ -12,6 +12,7 @@ import { toast } from '@/components/ui/app-toast'
 import { saveAbnahmeprotokollPdfOnly } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import {
   buildAbnahmePunkteInitial,
+  maengelAusPunkten,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { downloadPdfFromBase64 } from '@/lib/download-pdf-base64'
@@ -93,7 +94,7 @@ export function AbnahmeprotokollCreateWizard({
         auftragId,
         abnahmeDatum,
         punkte,
-        maengel: [],
+        maengel: maengelAusPunkten(punkte),
         notizen: notizen.trim() || null,
       })
       if (!r.ok) {

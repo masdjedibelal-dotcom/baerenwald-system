@@ -611,6 +611,8 @@ export type PunchListRow = {
   foto_nachher_urls: string[] | null
   behoben_at: string | null
   behoben_von: string | null
+  abnahme_punkt_id?: string | null
+  protokoll_id?: string | null
   created_at: string
   gewerke?: { id: string; name: string; slug?: string } | null
 }

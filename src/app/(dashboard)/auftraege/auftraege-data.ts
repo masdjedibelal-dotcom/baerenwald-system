@@ -37,7 +37,8 @@ const AUFTRAG_DETAIL_SELECT = `
       nachtraege(*),
       punch_list(
         id, auftrag_id, gewerk_id, beschreibung, status, prioritaet,
-        foto_urls, foto_nachher_urls, behoben_at, behoben_von, created_at,
+        foto_urls, foto_nachher_urls, behoben_at, behoben_von,
+        abnahme_punkt_id, protokoll_id, created_at,
         gewerke(id, name, slug)
       ),
       baustopps(*),

@@ -12,7 +12,18 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailText, type MailAnrede } from '@/lib/mail/anrede'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import { renderAbnahmeProtokollPdfBuffer } from '@/lib/auftraege/render-abnahme-protokoll-pdf'
-import { abnahmePunkteStatistik } from '@/lib/auftraege/abnahme-protokoll-types'
+import {
+  abnahmePunkteStatistik,
+  type AbnahmeMangelStatus,
+} from '@/lib/auftraege/abnahme-protokoll-types'
+import {
+  appendMangelVerlauf,
+  applyPunktStatusFromMaengel,
+  countOffeneMaengel,
+  mergeMaengelFromPunkte,
+  normalizeMaengel,
+} from '@/lib/auftraege/abnahme-maengel-helpers'
+import { syncPunchListFromAbnahmeMaengel } from '@/lib/auftraege/sync-abnahme-punch-list'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { sendMail } from '@/lib/mail-service'
 
@@ -22,6 +33,104 @@ async function getAuthUserId(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser()
   return user?.id ?? null
+}
+
+function prepareAbnahmePayload(input: {
+  punkte: AbnahmePunkt[]
+  maengel: AbnahmeMangel[]
+}): { punkte: AbnahmePunkt[]; maengel: AbnahmeMangel[] } {
+  const maengel = normalizeMaengel(
+    input.maengel.length > 0 ? input.maengel : mergeMaengelFromPunkte(input.punkte, [])
+  )
+  const punkte = applyPunktStatusFromMaengel(input.punkte, maengel)
+  return { punkte, maengel }
+}
+
+async function afterAbnahmePersist(input: {
+  auftragId: string
+  protokollId: string
+  punkte: AbnahmePunkt[]
+  maengel: AbnahmeMangel[]
+  prevOffeneMaengel: number
+  beschreibungExtra?: string
+}): Promise<void> {
+  const maengel = normalizeMaengel(input.maengel)
+  const offen = countOffeneMaengel(maengel)
+  const uid = await getAuthUserId()
+
+  try {
+    await syncPunchListFromAbnahmeMaengel({
+      auftragId: input.auftragId,
+      protokollId: input.protokollId,
+      punkte: input.punkte,
+      maengel,
+    })
+  } catch (e) {
+    console.warn('[syncPunchListFromAbnahmeMaengel]', e)
+  }
+
+  if (offen > 0 && input.prevOffeneMaengel === 0) {
+    await insertAuftragTimelineEvent({
+      auftrag_id: input.auftragId,
+      typ: 'mangel_neu',
+      titel: `${offen} Mangel${offen === 1 ? '' : 'e'} erfasst`,
+      beschreibung:
+        input.beschreibungExtra ??
+        'Abnahme mit offenen Mängeln — Nacharbeit im Auftrag unter „Mängel bearbeiten“.',
+      erstellt_von: uid,
+      sichtbar_fuer_kunde: false,
+    })
+  }
+}
+
+async function persistProtokollPdfForRow(
+  auftragId: string,
+  protokollId: string,
+  input: {
+    abnahmeDatum: string
+    punkte: AbnahmePunkt[]
+    maengel: AbnahmeMangel[]
+    notizen: string | null
+    protokollTyp?: string
+  }
+): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
+  const built = await buildPdfBuffer({
+    auftragId,
+    abnahmeDatum: input.abnahmeDatum,
+    punkte: input.punkte,
+    maengel: input.maengel,
+    notizen: input.notizen,
+  })
+  if (!built.ok) return built
+
+  const stored = await persistPdf(auftragId, built.buffer)
+  if (!stored.ok) return stored
+
+  const { error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .update({
+      abnahme_datum: input.abnahmeDatum.slice(0, 10),
+      notizen: input.notizen?.trim() || null,
+      punkte: input.punkte,
+      maengel: input.maengel,
+      pdf_url: stored.publicUrl,
+      protokoll_typ: input.protokollTyp ?? 'nachabnahme',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', protokollId)
+
+  if (error) return { ok: false, message: error.message }
+
+  await supabaseAdmin
+    .from('auftraege')
+    .update({
+      abnahme_protokoll_url: stored.publicUrl,
+      abnahme_datum: input.abnahmeDatum.slice(0, 10),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', auftragId)
+
+  return { ok: true, publicUrl: stored.publicUrl }
 }
 
 function escapeHtml(s: string): string {
@@ -191,11 +300,12 @@ export async function saveAndSendAbnahmeprotokoll(input: {
   })
   if (!mailBuilt.ok) return mailBuilt
 
+  const prepared = prepareAbnahmePayload(input)
   const built = await buildPdfBuffer({
     auftragId: input.auftragId,
     abnahmeDatum: input.abnahmeDatum,
-    punkte: input.punkte,
-    maengel: input.maengel,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
     notizen: input.notizen,
   })
   if (!built.ok) return built
@@ -203,18 +313,20 @@ export async function saveAndSendAbnahmeprotokoll(input: {
   const stored = await persistPdf(input.auftragId, built.buffer)
   if (!stored.ok) return stored
 
-  const hatMaengel =
-    input.maengel.length > 0 || input.punkte.some((p) => p.status === 'mangel')
+  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
 
   const existing = await loadAbnahmeprotokollSummary(input.auftragId)
+  const prevOffene = existing ? countOffeneMaengel(existing.maengel) : 0
   const row = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
-    punkte: input.punkte,
-    maengel: input.maengel,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
     pdf_url: stored.publicUrl,
     an_kunde_gesendet_at: new Date().toISOString(),
   }
+
+  let protokollId = existing?.id ?? ''
 
   if (existing) {
     const { error: upErr } = await supabaseAdmin
@@ -223,16 +335,32 @@ export async function saveAndSendAbnahmeprotokoll(input: {
       .eq('id', existing.id)
     if (upErr) return { ok: false, message: upErr.message }
   } else {
-    const { error: insErr } = await supabaseAdmin.from('auftrag_abnahmeprotokolle').insert({
-      auftrag_id: input.auftragId,
-      ...row,
-    })
+    const { data: inserted, error: insErr } = await supabaseAdmin
+      .from('auftrag_abnahmeprotokolle')
+      .insert({
+        auftrag_id: input.auftragId,
+        ...row,
+        protokoll_typ: 'erstabnahme',
+      })
+      .select('id')
+      .single()
     if (insErr) {
       if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
         return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
       }
       return { ok: false, message: insErr.message }
     }
+    protokollId = (inserted as { id: string }).id
+  }
+
+  if (protokollId) {
+    await afterAbnahmePersist({
+      auftragId: input.auftragId,
+      protokollId,
+      punkte: prepared.punkte,
+      maengel: prepared.maengel,
+      prevOffeneMaengel: prevOffene,
+    })
   }
 
   await supabaseAdmin
@@ -288,7 +416,8 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   | { ok: true; pdfBase64: string; filename: string; publicUrl: string }
   | { ok: false; message: string }
 > {
-  const built = await buildPdfBuffer(input)
+  const prepared = prepareAbnahmePayload(input)
+  const built = await buildPdfBuffer({ ...input, ...prepared })
   if (!built.ok) return built
 
   const stored = await persistPdf(input.auftragId, built.buffer)
@@ -297,15 +426,21 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   const row = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
-    punkte: input.punkte,
-    maengel: input.maengel,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
     pdf_url: stored.publicUrl,
+    protokoll_typ: 'erstabnahme',
   }
 
-  const { error: insErr } = await supabaseAdmin.from('auftrag_abnahmeprotokolle').insert({
-    auftrag_id: input.auftragId,
-    ...row,
-  })
+  const { data: inserted, error: insErr } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .insert({
+      auftrag_id: input.auftragId,
+      ...row,
+    })
+    .select('id')
+    .single()
+
   if (insErr) {
     if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
       return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
@@ -313,23 +448,35 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     return { ok: false, message: insErr.message }
   }
 
+  const protokollId = (inserted as { id: string }).id
+  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
+
   await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_protokoll_url: stored.publicUrl,
       abnahme_datum: input.abnahmeDatum.slice(0, 10),
       updated_at: new Date().toISOString(),
-      status: 'abnahme',
-      fortschritt: 85,
+      ...(!hatMaengel ? { status: 'abnahme', fortschritt: 85 } : {}),
     })
     .eq('id', input.auftragId)
+
+  await afterAbnahmePersist({
+    auftragId: input.auftragId,
+    protokollId,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    prevOffeneMaengel: 0,
+  })
 
   const uid = await getAuthUserId()
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
     typ: 'abnahmeprotokoll_erstellt',
     titel: 'Abnahmeprotokoll erstellt',
-    beschreibung: 'Abnahmeprotokoll als PDF erstellt.',
+    beschreibung: hatMaengel
+      ? `Abnahmeprotokoll erstellt — ${countOffeneMaengel(prepared.maengel)} Mängel in der Checkliste.`
+      : 'Abnahmeprotokoll als PDF erstellt.',
     erstellt_von: uid,
     sichtbar_fuer_kunde: false,
   })
@@ -438,29 +585,39 @@ export async function loadAbnahmeprotokollSummary(auftragId: string): Promise<{
 
   if (error || !data) return null
   const punkte = (data.punkte ?? []) as AbnahmePunkt[]
+  const maengel = normalizeMaengel((data.maengel ?? []) as AbnahmeMangel[])
   return {
     id: data.id as string,
     abnahme_datum: data.abnahme_datum as string,
     notizen: (data.notizen as string | null) ?? null,
-    punkte,
-    maengel: (data.maengel ?? []) as AbnahmeMangel[],
+    punkte: applyPunktStatusFromMaengel(punkte, maengel),
+    maengel,
     pdf_url: (data.pdf_url as string | null) ?? null,
     an_kunde_gesendet_at: (data.an_kunde_gesendet_at as string | null) ?? null,
     statistik: abnahmePunkteStatistik(punkte),
   }
 }
 
-/** Zwischenspeichern (digital vor Ort) ohne neues PDF. */
+/** Zwischenspeichern (digital vor Ort) — optional PDF neu erzeugen. */
 export async function saveAbnahmeprotokollDraft(input: {
   auftragId: string
   abnahmeDatum: string
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  regeneratePdf?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const existing = await loadAbnahmeprotokollSummary(input.auftragId)
-  const hatMaengel =
-    input.maengel.length > 0 || input.punkte.some((p) => p.status === 'mangel')
+  const prevOffene = existing ? countOffeneMaengel(existing.maengel) : 0
+  const prepared = prepareAbnahmePayload({
+    punkte: input.punkte,
+    maengel:
+      input.maengel.length > 0
+        ? input.maengel
+        : mergeMaengelFromPunkte(input.punkte, existing?.maengel ?? []),
+  })
+  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
+  let protokollId = existing?.id ?? ''
 
   if (existing) {
     const { error } = await supabaseAdmin
@@ -468,26 +625,33 @@ export async function saveAbnahmeprotokollDraft(input: {
       .update({
         abnahme_datum: input.abnahmeDatum.slice(0, 10),
         notizen: input.notizen?.trim() || null,
-        punkte: input.punkte,
-        maengel: input.maengel,
+        punkte: prepared.punkte,
+        maengel: prepared.maengel,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
     if (error) return { ok: false, message: error.message }
   } else {
-    const { error: insErr } = await supabaseAdmin.from('auftrag_abnahmeprotokolle').insert({
-      auftrag_id: input.auftragId,
-      abnahme_datum: input.abnahmeDatum.slice(0, 10),
-      notizen: input.notizen?.trim() || null,
-      punkte: input.punkte,
-      maengel: input.maengel,
-      pdf_url: null,
-    })
+    const { data: inserted, error: insErr } = await supabaseAdmin
+      .from('auftrag_abnahmeprotokolle')
+      .insert({
+        auftrag_id: input.auftragId,
+        abnahme_datum: input.abnahmeDatum.slice(0, 10),
+        notizen: input.notizen?.trim() || null,
+        punkte: prepared.punkte,
+        maengel: prepared.maengel,
+        pdf_url: null,
+        protokoll_typ: 'erstabnahme',
+      })
+      .select('id')
+      .single()
     if (insErr) {
       if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
         return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
       }
       return { ok: false, message: insErr.message }
     }
+    protokollId = (inserted as { id: string }).id
   }
 
   await supabaseAdmin
@@ -499,6 +663,145 @@ export async function saveAbnahmeprotokollDraft(input: {
     })
     .eq('id', input.auftragId)
 
+  if (protokollId) {
+    await afterAbnahmePersist({
+      auftragId: input.auftragId,
+      protokollId,
+      punkte: prepared.punkte,
+      maengel: prepared.maengel,
+      prevOffeneMaengel: prevOffene,
+    })
+  }
+
+  if (input.regeneratePdf && protokollId) {
+    const pdf = await persistProtokollPdfForRow(input.auftragId, protokollId, {
+      abnahmeDatum: input.abnahmeDatum,
+      punkte: prepared.punkte,
+      maengel: prepared.maengel,
+      notizen: input.notizen,
+      protokollTyp: hatMaengel ? 'nachabnahme' : 'erstabnahme',
+    })
+    if (!pdf.ok) return pdf
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
+}
+
+export async function updateAbnahmeMaengel(input: {
+  auftragId: string
+  punktId: string
+  status: AbnahmeMangelStatus
+  beschreibung?: string
+  frist?: string | null
+  foto_nachher_urls?: string[]
+  notiz?: string | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const summary = await loadAbnahmeprotokollSummary(input.auftragId)
+  if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll vorhanden.' }
+
+  const uid = await getAuthUserId()
+  const now = new Date().toISOString()
+  const idx = summary.maengel.findIndex((m) => m.punkt_id === input.punktId)
+  if (idx < 0) return { ok: false, message: 'Mangel nicht gefunden.' }
+
+  let m = normalizeMaengel([summary.maengel[idx]!])[0]!
+  if (input.beschreibung !== undefined) m = { ...m, beschreibung: input.beschreibung.trim() }
+  if (input.frist !== undefined) m = { ...m, frist: input.frist }
+  if (input.foto_nachher_urls !== undefined) m = { ...m, foto_nachher_urls: input.foto_nachher_urls }
+
+  const prevStatus = m.status ?? 'offen'
+  m = { ...m, status: input.status }
+
+  if (input.status === 'in_bearbeitung' && prevStatus === 'offen') {
+    m = appendMangelVerlauf(m, 'in_bearbeitung', input.notiz)
+  }
+  if (input.status === 'behoben') {
+    m = {
+      ...appendMangelVerlauf(m, 'behoben', input.notiz, now),
+      behoben_at: now,
+      behoben_von: uid,
+    }
+  }
+  if (input.status === 'abgenommen') {
+    m = {
+      ...appendMangelVerlauf(m, 'abgenommen', input.notiz, now),
+      abgenommen_at: now,
+      behoben_at: m.behoben_at ?? now,
+      behoben_von: m.behoben_von ?? uid,
+    }
+  }
+
+  const maengel = [...summary.maengel]
+  maengel[idx] = m
+  const punkte = applyPunktStatusFromMaengel(summary.punkte, maengel)
+
+  const { error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .update({
+      punkte,
+      maengel: normalizeMaengel(maengel),
+      updated_at: now,
+    })
+    .eq('id', summary.id)
+
+  if (error) return { ok: false, message: error.message }
+
+  await afterAbnahmePersist({
+    auftragId: input.auftragId,
+    protokollId: summary.id,
+    punkte,
+    maengel: normalizeMaengel(maengel),
+    prevOffeneMaengel: countOffeneMaengel(summary.maengel),
+  })
+
+  if (input.status === 'behoben' || input.status === 'abgenommen') {
+    await insertAuftragTimelineEvent({
+      auftrag_id: input.auftragId,
+      typ: 'mangel_behoben',
+      titel: input.status === 'abgenommen' ? 'Mangel abgenommen' : 'Mangel behoben',
+      beschreibung: m.beschreibung,
+      erstellt_von: uid,
+      foto_urls: m.foto_nachher_urls ?? [],
+      sichtbar_fuer_kunde: input.status === 'abgenommen',
+      fuer_kunde_freigegeben: input.status === 'abgenommen',
+      freigegeben_at: input.status === 'abgenommen' ? now : null,
+    })
+  }
+
+  const pdf = await persistProtokollPdfForRow(input.auftragId, summary.id, {
+    abnahmeDatum: summary.abnahme_datum,
+    punkte,
+    maengel: normalizeMaengel(maengel),
+    notizen: summary.notizen,
+    protokollTyp: countOffeneMaengel(maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
+  })
+  if (!pdf.ok) return pdf
+
+  revalidatePath(`/auftraege/${input.auftragId}`)
+  return { ok: true }
+}
+
+export async function regenerateAbnahmeprotokollPdf(
+  auftragId: string
+): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
+  const summary = await loadAbnahmeprotokollSummary(auftragId)
+  if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll vorhanden.' }
+
+  const prepared = prepareAbnahmePayload({
+    punkte: summary.punkte,
+    maengel: summary.maengel,
+  })
+
+  const pdf = await persistProtokollPdfForRow(auftragId, summary.id, {
+    abnahmeDatum: summary.abnahme_datum,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    notizen: summary.notizen,
+    protokollTyp: countOffeneMaengel(prepared.maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
+  })
+  if (!pdf.ok) return pdf
+
+  revalidatePath(`/auftraege/${auftragId}`)
+  return { ok: true, publicUrl: pdf.publicUrl }
 }

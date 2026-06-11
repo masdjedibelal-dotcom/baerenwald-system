@@ -32,6 +32,8 @@ import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/l
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
+import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
@@ -354,7 +356,7 @@ export function AuftragDetailClient({
         return
       }
       if (action === 'auftrag.mangel') {
-        setMainTab('dokumente')
+        router.push(`/auftraege/${detail.id}/abnahme/maengel`)
         return
       }
       if (action === 'auftrag.baustopp') {
@@ -498,6 +500,18 @@ export function AuftragDetailClient({
 
   const hatAbnahme = Boolean(detail.abnahme_protokoll_url)
   const hatRechnung = rechnungenListe.length > 0
+  const [offeneMaengelProtokoll, setOffeneMaengelProtokoll] = useState(0)
+  const offeneMaengelPunch = useMemo(() => {
+    const rows = detail.punch_list ?? []
+    return rows.filter((p) => p.status === 'offen' || p.status === 'in_bearbeitung').length
+  }, [detail.punch_list])
+  const offeneMaengelCount = Math.max(offeneMaengelPunch, offeneMaengelProtokoll)
+
+  useEffect(() => {
+    void loadAbnahmeprotokollSummary(detail.id).then((s) => {
+      setOffeneMaengelProtokoll(s ? countOffeneMaengel(s.maengel) : 0)
+    })
+  }, [detail.id, detail.abnahme_protokoll_url])
 
   const angebotHandwerker = useMemo((): AngebotHandwerkerRow[] => {
     const raw = detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null | undefined
@@ -523,6 +537,8 @@ export function AuftragDetailClient({
           : undefined,
         onAbschluss: openAbschluss,
         onRechnung: openRechnungErstellen,
+        offeneMaengelCount,
+        onMaengel: () => router.push(`/auftraege/${detail.id}/abnahme/maengel`),
       }),
     [
       detail.status,
@@ -534,6 +550,7 @@ export function AuftragDetailClient({
       hatAbnahme,
       hatRechnung,
       angebotHandwerker,
+      offeneMaengelCount,
       openAbschluss,
       openRechnungErstellen,
       router,

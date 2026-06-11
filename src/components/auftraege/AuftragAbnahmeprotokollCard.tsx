@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardCheck, Download, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, Download, ExternalLink, Plus, Trash2, Wrench } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteAbnahmeprotokoll,
   loadAbnahmeprotokolleListe,
+  loadAbnahmeprotokollSummary,
   type AbnahmeprotokollListeEintrag,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { formatDatum } from '@/lib/utils'
 
 export function AuftragAbnahmeprotokollCard({
@@ -22,10 +24,14 @@ export function AuftragAbnahmeprotokollCard({
 }) {
   const router = useRouter()
   const [liste, setListe] = useState<AbnahmeprotokollListeEintrag[]>([])
+  const [offeneMaengel, setOffeneMaengel] = useState(0)
   const [pending, startTransition] = useTransition()
 
   const reload = useCallback(() => {
     void loadAbnahmeprotokolleListe(auftragId).then(setListe)
+    void loadAbnahmeprotokollSummary(auftragId).then((s) => {
+      setOffeneMaengel(s ? countOffeneMaengel(s.maengel) : 0)
+    })
   }, [auftragId])
 
   useEffect(() => {
@@ -53,17 +59,48 @@ export function AuftragAbnahmeprotokollCard({
       className="scroll-mt-24"
       bodyClassName="p-4"
       action={
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
-        >
-          <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-          Neu
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {liste.length > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push(`/auftraege/${auftragId}/abnahme`)}
+            >
+              <ClipboardList className="mr-1.5 h-4 w-4" aria-hidden />
+              Vor Ort
+            </Button>
+          ) : null}
+          {offeneMaengel > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push(`/auftraege/${auftragId}/abnahme/maengel`)}
+            >
+              <Wrench className="mr-1.5 h-4 w-4" aria-hidden />
+              Mängel ({offeneMaengel})
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
+          >
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+            Neu
+          </Button>
+        </div>
       }
     >
+      {offeneMaengel > 0 ? (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <strong>{offeneMaengel}</strong> offene Mängel — bitte unter „Mängel bearbeiten“ nacharbeiten und
+          dokumentieren.
+        </p>
+      ) : null}
+
       {liste.length === 0 ? (
         <div className="space-y-3">
           <p className="text-sm text-bw-text-muted">

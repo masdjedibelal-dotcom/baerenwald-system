@@ -140,6 +140,7 @@ export function AbnahmeprotokollFillFlow({
         punkte,
         maengel: step >= 2 ? maengel : maengelAusPunkten(punkte),
         notizen: saved.notizen,
+        regeneratePdf: step >= 2,
       })
       if (!r.ok) toast.error(r.message)
       else {

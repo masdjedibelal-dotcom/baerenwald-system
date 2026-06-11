@@ -2,7 +2,7 @@
 
 import { ChevronDown, ExternalLink, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/lead-vertriebs-analyse-action'
+import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/actions'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { gptGalerieUrls, isGptProjektStudio, parseGptProjektStudioFunnel } from '@/lib/gpt-viz/funnel-daten'

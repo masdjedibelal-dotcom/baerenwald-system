@@ -1146,3 +1146,5 @@ export async function saveLeadAlsVerloren(input: {
   const beschreibung = [grundLabel, input.notiz?.trim()].filter(Boolean).join(' — ')
   return updateLeadStatus(input.leadId, 'abgebrochen', beschreibung || grundLabel)
 }
+
+export { ensureLeadVertriebsAnalyse } from './lead-vertriebs-analyse-action'

@@ -110,6 +110,8 @@ export function buildAuftragNaechsteSchritte(opts: {
   onHwAngebot?: () => void
   onAbschluss?: () => void
   onRechnung?: () => void
+  offeneMaengelCount?: number
+  onMaengel?: () => void
 }): NaechsterSchritt[] {
   const {
     status,
@@ -121,11 +123,13 @@ export function buildAuftragNaechsteSchritte(opts: {
     auftragHandwerkerCount = 0,
     angebotHandwerker = [],
     bautagebuchCount = 0,
+    offeneMaengelCount = 0,
     onHandwerkerZuweisen,
     onBautagebuch,
     onHwAngebot,
     onAbschluss,
     onRechnung,
+    onMaengel,
   } = opts
 
   if (status === 'storniert') return []
@@ -135,10 +139,13 @@ export function buildAuftragNaechsteSchritte(opts: {
   const hwAngebot = hwAngebotSchritt(angebotHandwerker)
   const bautagebuchDone = bautagebuchCount > 0
 
+  const maengelErledigt = offeneMaengelCount === 0
+
   let naechsterId: string | null = null
   if (!abgeschlossen) {
     if (!hwZugewiesen) naechsterId = 'handwerker'
     else if (!hwAngebot.done && angebotId) naechsterId = 'hw-angebot'
+    else if (offeneMaengelCount > 0) naechsterId = 'maengel'
     else naechsterId = 'abschluss'
   } else if (!hatRechnung) {
     naechsterId = 'rechnung'
@@ -187,6 +194,27 @@ export function buildAuftragNaechsteSchritte(opts: {
       dateLabel: hatAbnahme ? 'Erledigt' : 'Optional',
       done: hatAbnahme,
       href: hatAbnahme ? undefined : `/auftraege/${auftragId}/abnahme/erstellen`,
+    },
+    {
+      id: 'maengel',
+      label:
+        offeneMaengelCount > 0
+          ? `Mängel beheben (${offeneMaengelCount} offen)`
+          : 'Mängel-Nacharbeit (optional)',
+      dateLabel: labelAlsNaechstes(
+        'maengel',
+        maengelErledigt || abgeschlossen || offeneMaengelCount === 0,
+        offeneMaengelCount > 0 ? 'Offen' : '—'
+      ),
+      done: maengelErledigt || abgeschlossen,
+      onClick:
+        offeneMaengelCount > 0 && !abgeschlossen
+          ? onMaengel
+          : undefined,
+      href:
+        offeneMaengelCount > 0 && !onMaengel
+          ? `/auftraege/${auftragId}/abnahme/maengel`
+          : undefined,
     },
     {
       id: 'abschluss',
