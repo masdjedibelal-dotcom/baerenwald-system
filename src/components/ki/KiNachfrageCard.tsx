@@ -39,7 +39,7 @@ export function KiNachfrageCard({ analyse, onGenerateKi, kiLoading }: KiCardProp
       <KiCountList title="Rechner-Leistungen" items={ergebnis.rechner_leistungen ?? []} />
       {ergebnis.budgets ? (
         <div>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Budget</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Preisrahmen</h4>
           <p className="text-sm">Median {formatEur(ergebnis.budgets.median)}</p>
           <p className="text-xs text-muted">{ergebnis.budgets.anzahl} Angaben</p>
         </div>

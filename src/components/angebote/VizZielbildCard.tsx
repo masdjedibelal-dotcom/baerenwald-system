@@ -11,6 +11,11 @@ import {
   erklaerungFromBrief,
 } from '@/lib/visualize/compose-zielbild'
 import type { VizBauErklaerung } from '@/lib/visualize/types'
+import {
+  zielbildPreviewFrameClass,
+  zielbildPreviewMediaClass,
+  zielbildPreviewPlaceholderClass,
+} from '@/lib/gpt-viz/zielbild-preview-classes'
 import { cn } from '@/lib/utils'
 
 type VizZielbildCardProps = {
@@ -76,21 +81,19 @@ export function VizZielbildCard({
         </p>
       </div>
 
-      <div className="mb-3 flex min-h-[120px] items-center justify-center overflow-hidden rounded-lg border border-bw-border bg-[#0F2818]">
+      <div className={cn(zielbildPreviewFrameClass, 'mb-3')}>
         {loading ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-sm text-[#B8D4C4]">
+          <div className={cn(zielbildPreviewPlaceholderClass, 'flex-col gap-2 py-6')}>
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            Wird erstellt …
+            <span>Wird erstellt …</span>
           </div>
         ) : previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt="Bärenwald Zielbild"
-            className="mx-auto block max-h-[min(70vh,540px)] w-auto max-w-full"
-          />
+          <img src={previewUrl} alt="Bärenwald Zielbild" className={zielbildPreviewMediaClass} />
         ) : (
-          <p className="px-3 py-6 text-sm text-[#B8D4C4]">{error ?? 'Keine Vorschau'}</p>
+          <p className={cn(zielbildPreviewPlaceholderClass, 'py-6 text-sm')}>
+            {error ?? 'Keine Vorschau'}
+          </p>
         )}
       </div>
 

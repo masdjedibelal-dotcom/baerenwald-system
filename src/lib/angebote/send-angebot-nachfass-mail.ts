@@ -26,7 +26,6 @@ type NachfassAngebotRow = {
         typ?: string | null
         vorname?: string | null
         nachname?: string | null
-        firma?: string | null
       }
     | {
         name?: string | null
@@ -34,7 +33,6 @@ type NachfassAngebotRow = {
         typ?: string | null
         vorname?: string | null
         nachname?: string | null
-        firma?: string | null
       }[]
     | null
   leads:
@@ -142,7 +140,7 @@ export async function sendAngebotNachfassMailById(
       notizen,
       anrede,
       nachgefasst_am,
-      kunden(name, email, typ, vorname, nachname, firma),
+      kunden(name, email, typ, vorname, nachname),
       leads(plz, kontakt_name, kundentyp)
     `
     )

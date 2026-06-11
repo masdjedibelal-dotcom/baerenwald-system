@@ -14,11 +14,7 @@ function angebotPdfDateiname(detail: AngebotDetail): string {
 }
 
 export function anzahlAngebotAnhaenge(detail: AngebotDetail): number {
-  let n = 1
-  if (detail.dokument_typ === 'projekt') {
-    n += parseProjektFotos(detail.fotos_urls).length
-  }
-  return n
+  return 1 + parseProjektFotos(detail.fotos_urls).length
 }
 
 export function AngebotAnhaengeTab({ detail }: { detail: AngebotDetail }) {
@@ -36,18 +32,16 @@ export function AngebotAnhaengeTab({ detail }: { detail: AngebotDetail }) {
       },
     ]
 
-    if (detail.dokument_typ === 'projekt') {
-      parseProjektFotos(detail.fotos_urls).forEach((foto, i) => {
-        rows.push({
-          id: `foto-${i}-${foto.url}`,
-          name: foto.beschreibung?.trim() || `Foto ${i + 1}`,
-          datum: erstellt,
-          href: foto.url,
-        })
+    parseProjektFotos(detail.fotos_urls).forEach((foto, i) => {
+      rows.push({
+        id: `foto-${i}-${foto.url}`,
+        name: foto.beschreibung?.trim() || `Foto ${i + 1}`,
+        datum: erstellt,
+        href: foto.url,
       })
-    }
+    })
     return rows
-  }, [detail.dokument_typ, detail.fotos_urls, erstellt, pdfHref, pdfName])
+  }, [detail.fotos_urls, erstellt, pdfHref, pdfName])
 
   return (
     <CrmDokumenteTabelle

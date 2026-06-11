@@ -32,8 +32,8 @@ export function buildAuftragNaechsteSchritte(
   const hwDone = handwerkerSchrittErledigt(detail)
   const baustartDone = status !== 'offen' && status !== 'storniert'
   const inAusfuehrung = status === 'in_arbeit' || status === 'abnahme' || status === 'abgeschlossen'
-  const zurAbnahmeDone = Boolean(detail.abnahme_protokoll_url) || status === 'abgeschlossen'
-  const abnahmeDone = Boolean(detail.abnahme_protokoll_url) || status === 'abgeschlossen'
+  const hatAbnahmeProtokoll = Boolean(detail.abnahme_protokoll_url)
+  const abgeschlossen = status === 'abgeschlossen'
 
   const steps: LeadSchritt[] = [
     {
@@ -60,34 +60,34 @@ export function buildAuftragNaechsteSchritte(
       id: 'ausfuehrung',
       label: 'Ausführung auf der Baustelle',
       dateLabel: inAusfuehrung ? (status === 'in_arbeit' ? 'Läuft' : 'Erledigt') : '—',
-      done: zurAbnahmeDone || abnahmeDone,
+      done: inAusfuehrung && status !== 'in_arbeit',
     },
     {
       id: 'abnahme',
-      label: 'Abnahme durchführen',
-      dateLabel: abnahmeDone ? 'Erledigt' : zurAbnahmeDone ? 'Läuft' : '—',
-      done: abnahmeDone,
-      onClick:
-        status === 'in_arbeit' && !zurAbnahmeDone ? opts.onZurAbnahme : undefined,
+      label: 'Abnahmeprotokoll (optional)',
+      dateLabel: hatAbnahmeProtokoll ? 'Erledigt' : 'Optional',
+      done: hatAbnahmeProtokoll,
+      href: hatAbnahmeProtokoll ? undefined : `/auftraege/${detail.id}/abnahme/erstellen`,
     },
     {
       id: 'abschluss',
-      label: 'Abnahme abschließen',
-      dateLabel: abnahmeDone ? 'Erledigt' : '—',
-      done: abnahmeDone,
-      onClick: status === 'abnahme' ? opts.onAbnahmeAbschliessen : undefined,
+      label: 'Auftrag abschließen',
+      dateLabel: abgeschlossen ? 'Erledigt' : baustartDone ? 'Bereit' : '—',
+      done: abgeschlossen,
+      onClick:
+        !abgeschlossen && (status === 'abnahme' || status === 'in_arbeit')
+          ? opts.onAbnahmeAbschliessen
+          : undefined,
     },
     {
       id: 'rechnung',
       label: 'Rechnung erstellen',
-      dateLabel: abnahmeDone && opts.hatPositionen ? 'Bereit' : '—',
+      dateLabel: abgeschlossen ? 'Erledigt' : baustartDone && opts.hatPositionen ? 'Bereit' : '—',
       done: false,
       onClick:
-        abnahmeDone && opts.hatPositionen && status !== 'abgeschlossen'
-          ? opts.onRechnung
-          : undefined,
+        baustartDone && opts.hatPositionen && !abgeschlossen ? opts.onRechnung : undefined,
       href:
-        abnahmeDone && opts.hatPositionen && status !== 'abgeschlossen'
+        baustartDone && opts.hatPositionen && !abgeschlossen
           ? `/rechnungen/neu?auftrag_id=${detail.id}`
           : undefined,
     },

@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { EingangsrechnungKategorie } from '@/lib/types'
-import { insertKalenderAutoTermin } from '@/lib/kalender-auto-termine'
 
 export async function createEingangsrechnung(input: {
   auftragId: string
@@ -94,19 +93,6 @@ export async function createEinbehalt(input: {
   })
 
   if (error) return { ok: false, message: error.message }
-
-  const { data: hw } = await supabaseAdmin
-    .from('handwerker')
-    .select('name')
-    .eq('id', input.handwerker_id)
-    .maybeSingle()
-  const hwName = (hw as { name?: string } | null)?.name?.trim() ?? 'Handwerker'
-  await insertKalenderAutoTermin({
-    titel: `Einbehalt: ${hwName}`,
-    datum: input.freigabe_datum,
-    typ: 'sonstiges',
-    auftrag_id: input.auftragId,
-  })
 
   revalidatePath(`/auftraege/${input.auftragId}/finanzen`)
   return { ok: true }

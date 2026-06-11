@@ -129,25 +129,35 @@ export function buildPortalComplianceAuftrag(opts: {
   handwerkerGewerke: string[] | null | undefined
   alleGewerke: Gewerk[]
   projektvertragOk: boolean
+  /** Vom CRM gewählt; null = alle Leistungs-Typen mit Auto-Pflicht */
+  compliancePflichtSlugs?: string[] | null
 }): PortalComplianceAuftrag {
   const projektDocs = dokumenteFuerProjekt(opts.dokumente, opts.handwerkerId, opts.auftragId)
-  const leistungTypen = filterLeistungComplianceTypen(
+  let leistungTypen = filterLeistungComplianceTypen(
     opts.typen,
     opts.projektGewerkSlugs,
     opts.handwerkerGewerke,
     opts.alleGewerke
   )
 
+  const crmSlugs = opts.compliancePflichtSlugs
+  if (crmSlugs != null) {
+    const slugSet = new Set(crmSlugs)
+    leistungTypen = leistungTypen.filter((t) => slugSet.has(t.slug))
+  }
+
   const leistung = leistungTypen.map((typ) =>
     zeileFuerTyp(
       typ,
       dokumentFuerTyp(projektDocs, typ.slug),
-      istPflichtFuerProjekt(
-        typ,
-        opts.projektGewerkSlugs,
-        opts.handwerkerGewerke,
-        opts.alleGewerke
-      )
+      crmSlugs != null
+        ? crmSlugs.includes(typ.slug)
+        : istPflichtFuerProjekt(
+            typ,
+            opts.projektGewerkSlugs,
+            opts.handwerkerGewerke,
+            opts.alleGewerke
+          )
     )
   )
 

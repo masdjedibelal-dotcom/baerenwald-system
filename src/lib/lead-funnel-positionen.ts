@@ -72,7 +72,7 @@ export function resolveGewerkForFunnelPosition(
   return { gewerk_id: '', gewerk_name: 'Freie Leistung', gewerk_slug: 'frei' }
 }
 
-export const LEISTUNG_EINHEITEN = ['pauschal', 'm²', 'Stück', 'Std.', 'lfd. m'] as const
+export const LEISTUNG_EINHEITEN = ['pauschal', 'm²', 'Stück', 'lfm', 'lfd. m', 'Std.'] as const
 
 export const LEISTUNG_EINHEIT_OPTIONS = LEISTUNG_EINHEITEN.map((e) => ({ value: e, label: e }))
 

@@ -25,13 +25,19 @@ import {
   type KommunikationMailVorlageKontext,
   type MailComposeContext,
 } from '@/lib/kommunikation/types'
+import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
+import { markLeadKontaktiertWennNeu } from '@/app/(dashboard)/anfragen/actions'
 
 const EMAIL_LOG_SELECT_FULL =
-  'id, typ, kontext_typ, richtung, an_email, von_email, cc_email, betreff, created_at, status'
+  'id, typ, kontext_typ, richtung, an_email, von_email, cc_email, betreff, created_at, status, gesendet_von'
 const EMAIL_LOG_SELECT_LEGACY = 'id, typ, an_email, betreff, created_at, status'
 
-function normalizeEmailLogRow(row: Record<string, unknown>): KommunikationListeZeile {
+function normalizeEmailLogRow(
+  row: Record<string, unknown>,
+  teamNames: Map<string, string>
+): KommunikationListeZeile {
+  const gesendetVon = typeof row.gesendet_von === 'string' ? row.gesendet_von : null
   return {
     id: String(row.id),
     typ: String(row.typ ?? ''),
@@ -43,6 +49,8 @@ function normalizeEmailLogRow(row: Record<string, unknown>): KommunikationListeZ
     betreff: String(row.betreff ?? ''),
     created_at: String(row.created_at ?? ''),
     status: String(row.status ?? 'gesendet'),
+    gesendet_von: gesendetVon,
+    gesendet_von_name: gesendetVon ? teamNames.get(gesendetVon) ?? null : null,
   }
 }
 
@@ -51,7 +59,7 @@ async function runEmailLogListQuery(
   apply: (q: { eq: (col: string, val: string) => unknown; or: (expr: string) => unknown }) => unknown
 ): Promise<KommunikationListeZeile[]> {
   const base = (select: string) =>
-    supabaseAdmin.from('email_log').select(select).order('created_at', { ascending: false }).limit(80)
+    supabaseAdmin.from('email_log').select(select).order('created_at', { ascending: false }).limit(120)
 
   let result = (await apply(base(EMAIL_LOG_SELECT_FULL))) as {
     data: Record<string, unknown>[] | null
@@ -59,7 +67,7 @@ async function runEmailLogListQuery(
   }
   let { data, error } = result
 
-  if (error && /column|kontext_typ|richtung|von_email|cc_email/i.test(error.message)) {
+  if (error && /column|kontext_typ|richtung|von_email|cc_email|gesendet_von/i.test(error.message)) {
     result = (await apply(base(EMAIL_LOG_SELECT_LEGACY))) as typeof result
     ;({ data, error } = result)
   }
@@ -68,7 +76,11 @@ async function runEmailLogListQuery(
     console.warn('[loadKommunikationListe]', error.message)
     return []
   }
-  return (data ?? []).map((row) => normalizeEmailLogRow(row as Record<string, unknown>))
+
+  const team = await loadCrmTeamMitglieder()
+  const teamNames = new Map(team.map((m) => [m.id, m.name]))
+
+  return (data ?? []).map((row) => normalizeEmailLogRow(row as Record<string, unknown>, teamNames))
 }
 
 export type KommunikationMailVorlage = {
@@ -133,21 +145,41 @@ export async function loadKommunikationListe(
   if (filter.auftragId) {
     const auftragId = filter.auftragId
     const [{ data: auf }, { data: rechnungen }] = await Promise.all([
-      supabaseAdmin.from('auftraege').select('kunde_id, lead_id').eq('id', auftragId).maybeSingle(),
+      supabaseAdmin
+        .from('auftraege')
+        .select('kunde_id, lead_id, angebot_id')
+        .eq('id', auftragId)
+        .maybeSingle(),
       supabaseAdmin.from('rechnungen').select('id').eq('auftrag_id', auftragId),
     ])
+    const leadId = (auf?.lead_id as string | null) ?? null
+    const angebotIds = new Set<string>()
+    const angebotId = (auf?.angebot_id as string | null)?.trim()
+    if (angebotId) angebotIds.add(angebotId)
+    if (leadId) {
+      const { data: angeboteLead } = await supabaseAdmin
+        .from('angebote')
+        .select('id')
+        .eq('lead_id', leadId)
+      for (const row of angeboteLead ?? []) {
+        const id = (row as { id?: string }).id?.trim()
+        if (id) angebotIds.add(id)
+      }
+    }
     const rechnungIds = (rechnungen ?? []).map((r) => r.id as string).filter(Boolean)
     const parts = [
       emailLogEqFilter('auftrag_id', auftragId),
       emailLogEqFilter('kunde_id', auf?.kunde_id as string | null),
-      emailLogEqFilter('lead_id', auf?.lead_id as string | null),
+      emailLogEqFilter('lead_id', leadId),
+      emailLogInFilter('angebot_id', Array.from(angebotIds)),
       emailLogInFilter('rechnung_id', rechnungIds),
     ].filter(Boolean) as string[]
     return runEmailLogListQuery((q) => applyEmailLogOrFilter(q, parts))
   }
   if (filter.leadId) {
     const leadId = filter.leadId
-    const [{ data: angebote }, { data: auftraege }] = await Promise.all([
+    const [{ data: leadRow }, { data: angebote }, { data: auftraege }] = await Promise.all([
+      supabaseAdmin.from('leads').select('kunde_id').eq('id', leadId).maybeSingle(),
       supabaseAdmin.from('angebote').select('id').eq('lead_id', leadId),
       supabaseAdmin.from('auftraege').select('id').eq('lead_id', leadId),
     ])
@@ -159,6 +191,7 @@ export async function loadKommunikationListe(
     const rechnungIds = (rechnungen ?? []).map((r) => r.id as string).filter(Boolean)
     const parts = [
       emailLogEqFilter('lead_id', leadId),
+      emailLogEqFilter('kunde_id', leadRow?.kunde_id as string | null),
       emailLogInFilter('angebot_id', angebotIds),
       emailLogInFilter('auftrag_id', auftragIds),
       emailLogInFilter('rechnung_id', rechnungIds),
@@ -362,6 +395,9 @@ export async function sendFreitextKundenMail(input: {
       titel: 'E-Mail gesendet',
       beschreibung: `${input.betreff.trim()} · An ${toPrimary}`,
     })
+    if (input.ctx.kontextTyp === 'anfrage') {
+      await markLeadKontaktiertWennNeu(input.ctx.leadId, 'E-Mail an Kunden')
+    }
   }
 
   revalidateKommunikationPaths({

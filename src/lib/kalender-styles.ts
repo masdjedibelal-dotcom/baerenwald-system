@@ -1,5 +1,14 @@
 import type { KalenderTermin } from '@/lib/types'
 
+/** Nur echte Termine (Vor-Ort, Baubeginn, Abnahme) — keine CRM-Auto-Erinnerungen. */
+export const ECHTE_KALENDER_TERMIN_TYPEN = ['besichtigung', 'beginn', 'abnahme'] as const satisfies readonly KalenderTermin['typ'][]
+
+export function istEchterKalenderTermin(
+  termin: Pick<KalenderTermin, 'typ'>
+): termin is KalenderTermin & { typ: (typeof ECHTE_KALENDER_TERMIN_TYPEN)[number] } {
+  return (ECHTE_KALENDER_TERMIN_TYPEN as readonly string[]).includes(termin.typ)
+}
+
 /** Anzeige in Mails, Kalender und Termin-Dialog (DB-Typ bleibt `besichtigung`). */
 export const VOR_ORT_TERMIN_TITEL = 'Vor-Ort-Termin'
 

@@ -623,7 +623,7 @@ export async function notifyNewLeadAlert(leadId: string): Promise<{ sent: boolea
     lead.plz ? `PLZ ${lead.plz}` : '',
     bereiche ? `Bereiche: ${bereiche}` : '',
     lead.situation ? lead.situation.slice(0, 200) : '',
-    budget ? `Budget: ${budget}` : '',
+    budget ? `Preisrahmen: ${budget}` : '',
     `Kanal: ${lead.kanal ?? '—'}`,
     `ID: <code>${lead.id}</code>`,
   ].filter(Boolean)

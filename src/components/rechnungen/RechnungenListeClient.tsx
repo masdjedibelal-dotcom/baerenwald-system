@@ -17,10 +17,20 @@ import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
-import type { RechnungListeZeile, RechnungStatus } from '@/lib/types'
+import type { RechnungListeZeile } from '@/lib/types'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDatum, formatPreis, cn } from '@/lib/utils'
-import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
+import { rechnungInRechnungenPipeline } from '@/lib/crm/pipeline-liste-filter'
+import {
+  countRechnungStatusFilters,
+  isRechnungUeberfaellig,
+  matchesRechnungStatusFilter,
+  rechnungDisplayStatusLabel,
+  RECHNUNG_ALLE_STATUS_FILTERS,
+  RECHNUNG_PIPELINE_STATUS_FILTERS,
+  RECHNUNG_STATUS_FILTER_LABELS,
+  type RechnungListenStatusFilter,
+} from '@/lib/rechnungen/rechnung-liste-helpers'
 import {
   getZeitraumRange,
   datumInZeitraum,
@@ -51,25 +61,12 @@ function auftragTitel(r: RechnungListeZeile): string | null {
   return a.titel ?? null
 }
 
-function parseYmdLocal(ymd: string): Date {
-  const p = ymd.split('-').map((x) => parseInt(x, 10))
-  if (p.length !== 3 || p.some((n) => Number.isNaN(n))) return new Date(NaN)
-  return new Date(p[0], p[1] - 1, p[2])
-}
-
 function isUeberfaellig(r: RechnungListeZeile): boolean {
-  if (r.status !== 'gesendet' || !r.faellig_am) return false
-  const due = parseYmdLocal(r.faellig_am)
-  if (Number.isNaN(due.getTime())) return false
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return due < today
+  return isRechnungUeberfaellig(r)
 }
 
 function displayStatusLabel(r: RechnungListeZeile): string {
-  if (isUeberfaellig(r)) return 'Überfällig'
-  return RECHNUNG_STATUS_LABELS[r.status]
+  return rechnungDisplayStatusLabel(r)
 }
 
 function statusBadgeClass(r: RechnungListeZeile) {
@@ -80,11 +77,6 @@ function statusBadgeClass(r: RechnungListeZeile) {
   return 'bg-bw-hover text-bw-text'
 }
 
-type RechnungChip = 'alle' | RechnungStatus | 'ueberfaellig'
-
-const RECHNUNG_GRID_COLS =
-  'minmax(108px,1fr) minmax(160px,1.5fr) minmax(96px,0.85fr) minmax(108px,0.95fr) minmax(96px,0.85fr) minmax(96px,0.85fr)'
-
 type RechnungSortRow = {
   rechnungsnummer: string
   kunde: string
@@ -93,6 +85,9 @@ type RechnungSortRow = {
   rechnungsdatum: string
   faellig_am: string
 }
+
+const RECHNUNG_GRID_COLS =
+  'minmax(108px,1fr) minmax(160px,1.5fr) minmax(96px,0.85fr) minmax(108px,0.95fr) minmax(96px,0.85fr) minmax(96px,0.85fr)'
 
 function rechnungListCardBadge(r: RechnungListeZeile) {
   if (isUeberfaellig(r)) {
@@ -121,58 +116,38 @@ export function RechnungenListeClient({
 }) {
   const router = useRouter()
   const { exportToCSV } = useExport()
-  const [chip, setChip] = useState<RechnungChip>('alle')
+  const [pipelineOnly, setPipelineOnly] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<RechnungListenStatusFilter>('offen')
   const [q, setQ] = useState('')
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
 
+  const pipelineRows = useMemo(
+    () => rows.filter((r) => rechnungInRechnungenPipeline(r)),
+    [rows]
+  )
+  const baseRows = pipelineOnly ? pipelineRows : rows
+
+  const statusFilterOptions = pipelineOnly
+    ? RECHNUNG_PIPELINE_STATUS_FILTERS
+    : RECHNUNG_ALLE_STATUS_FILTERS
+
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
     [zeitraum, customFrom, customTo]
   )
 
-  const statusCounts = useMemo(() => {
-    const c = {
-      alle: rows.length,
-      entwurf: 0,
-      gesendet: 0,
-      bezahlt: 0,
-      ueberfaellig: 0,
-      storniert: 0,
-    }
-    for (const r of rows) {
-      if (r.status === 'storniert') {
-        c.storniert++
-        continue
-      }
-      if (r.status === 'bezahlt') {
-        c.bezahlt++
-        continue
-      }
-      if (isUeberfaellig(r)) {
-        c.ueberfaellig++
-        continue
-      }
-      if (r.status === 'gesendet') c.gesendet++
-      else if (r.status === 'entwurf') c.entwurf++
-    }
-    return c
-  }, [rows])
+  const statusCounts = useMemo(
+    () => countRechnungStatusFilters(baseRows, statusFilterOptions),
+    [baseRows, statusFilterOptions]
+  )
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (chip !== 'alle') {
-        if (chip === 'ueberfaellig') {
-          if (!isUeberfaellig(r)) return false
-        } else if (chip === 'gesendet') {
-          if (r.status !== 'gesendet' || isUeberfaellig(r)) return false
-        } else if (r.status !== chip) {
-          return false
-        }
-      }
+    return baseRows.filter((r) => {
+      if (!matchesRechnungStatusFilter(r, statusFilter)) return false
       if (dateRange && !datumInZeitraum(r.rechnungsdatum, dateRange)) return false
       if (!needle) return true
       const pool = [
@@ -185,7 +160,7 @@ export function RechnungenListeClient({
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [rows, chip, q, dateRange])
+  }, [baseRows, statusFilter, q, dateRange])
 
   const sortRows = useMemo(
     (): RechnungSortRow[] =>
@@ -207,10 +182,16 @@ export function RechnungenListeClient({
     return sortedRows.map((row) => byNummer.get(row.rechnungsnummer)).filter(Boolean) as RechnungListeZeile[]
   }, [filtered, sortedRows])
 
-  const hasFilters = !!(chip !== 'alle' || zeitraum !== 'alle' || q.trim())
+  const hasFilters = !!(
+    statusFilter !== (pipelineOnly ? 'offen' : '') ||
+    zeitraum !== 'alle' ||
+    q.trim() ||
+    !pipelineOnly
+  )
 
   function resetFilters() {
-    setChip('alle')
+    setPipelineOnly(true)
+    setStatusFilter('offen')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -262,17 +243,28 @@ export function RechnungenListeClient({
       <ListFilterSection
         chipGroups={[
           {
-            label: 'Status',
+            label: 'Ansicht',
             options: [
-              { label: 'Alle', value: 'alle', count: statusCounts.alle },
-              { label: 'Entwurf', value: 'entwurf', count: statusCounts.entwurf },
-              { label: 'Gesendet', value: 'gesendet', count: statusCounts.gesendet },
-              { label: 'Bezahlt', value: 'bezahlt', count: statusCounts.bezahlt },
-              { label: 'Überfällig', value: 'ueberfaellig', count: statusCounts.ueberfaellig },
-              { label: 'Storniert', value: 'storniert', count: statusCounts.storniert },
+              { label: 'Pipeline', value: 'pipeline', count: pipelineRows.length },
+              { label: 'Alle', value: 'all', count: rows.length },
             ],
-            selected: [chip],
-            onChange: (vals) => setChip((vals[0] as RechnungChip) || 'alle'),
+            selected: [pipelineOnly ? 'pipeline' : 'all'],
+            onChange: (v) => {
+              const isPipeline = (v[0] ?? 'pipeline') === 'pipeline'
+              setPipelineOnly(isPipeline)
+              setStatusFilter(isPipeline ? 'offen' : '')
+            },
+          },
+          {
+            label: 'Status',
+            options: statusFilterOptions.map((key) => ({
+              value: key,
+              label: RECHNUNG_STATUS_FILTER_LABELS[key],
+              count: statusCounts[key],
+            })),
+            selected: [statusFilter],
+            onChange: (v) =>
+              setStatusFilter((v[0] ?? (pipelineOnly ? 'offen' : '')) as RechnungListenStatusFilter),
           },
         ]}
       >
@@ -323,7 +315,9 @@ export function RechnungenListeClient({
           description={
             rows.length === 0
               ? 'Legen Sie eine Rechnung an.'
-              : 'Passe Filter oder Suche an.'
+              : pipelineOnly && pipelineRows.length === 0
+                ? 'Keine offenen Rechnungen in der Pipeline.'
+                : 'Passe Filter oder Suche an.'
           }
         />
       ) : (

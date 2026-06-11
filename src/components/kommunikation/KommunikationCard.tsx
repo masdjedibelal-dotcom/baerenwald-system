@@ -1,32 +1,42 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Mail } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Eye } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { FilterChips } from '@/components/ui/FilterChips'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import {
   loadKommunikationListe,
   type KommunikationFilter,
 } from '@/app/(dashboard)/kommunikation/actions'
 import {
-  freitextMailTypLabel,
-  type KommunikationListeZeile,
-} from '@/lib/kommunikation/types'
-import { formatDatumZeit } from '@/lib/utils'
+  filterKommunikationRows,
+  kommunikationMailAbsender,
+  kommunikationMailArt,
+  kommunikationMailArtLabel,
+  type KommunikationMailFilter,
+} from '@/lib/kommunikation/mail-liste-helpers'
+import type { KommunikationListeZeile } from '@/lib/kommunikation/types'
+import type { ReactNode } from 'react'
+import { cn, formatDatumZeit } from '@/lib/utils'
 
 export function KommunikationCard({
   filter,
   reloadKey = 0,
   className,
+  toolbar,
 }: {
   filter: KommunikationFilter
   /** Erhöhen nach Versand, um Liste neu zu laden */
   reloadKey?: number
   className?: string
+  /** Aktionen oberhalb der Mail-Liste (z. B. E-Mail schreiben, Angebot versenden) */
+  toolbar?: ReactNode
 }) {
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState<KommunikationListeZeile[]>([])
   const [previewId, setPreviewId] = useState<string | null>(null)
+  const [mailFilter, setMailFilter] = useState<KommunikationMailFilter>('alle')
 
   const filterKey = [
     filter.kundeId ?? '',
@@ -58,58 +68,116 @@ export function KommunikationCard({
     filter.rechnungId
   )
 
+  const ausgehend = useMemo(
+    () => rows.filter((r) => r.richtung !== 'empfangen'),
+    [rows]
+  )
+
+  const counts = useMemo(() => {
+    const system = ausgehend.filter((r) => kommunikationMailArt(r) === 'system').length
+    const direkt = ausgehend.filter((r) => kommunikationMailArt(r) === 'direkt').length
+    return { alle: ausgehend.length, system, direkt }
+  }, [ausgehend])
+
+  const sichtbar = useMemo(
+    () => filterKommunikationRows(rows, mailFilter),
+    [rows, mailFilter]
+  )
+
   if (!hasFilter) return null
 
   return (
     <>
       <Card collapsible title="Kommunikation" className={className} flush bodyClassName="p-0">
+        {toolbar ? <div className="border-b border-bw-border px-4 py-3">{toolbar}</div> : null}
+        <div className="space-y-3 px-4 py-3">
+          <FilterChips
+            options={[
+              { label: 'Alle', value: 'alle', count: counts.alle || undefined },
+              { label: 'System', value: 'system', count: counts.system || undefined },
+              { label: 'Direkt', value: 'direkt', count: counts.direkt || undefined },
+            ]}
+            selected={[mailFilter]}
+            onChange={(values) => setMailFilter((values[0] as KommunikationMailFilter) ?? 'alle')}
+          />
+        </div>
+
         {pending && rows.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-bw-text-muted">Lade …</p>
-        ) : rows.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-bw-text-muted">
-            Noch keine E-Mails in diesem Kontext protokolliert.
+          <p className="px-4 pb-6 text-sm text-bw-text-muted">Lade …</p>
+        ) : sichtbar.length === 0 ? (
+          <p className="px-4 pb-6 text-sm text-bw-text-muted">
+            {ausgehend.length === 0
+              ? 'Noch keine ausgehenden E-Mails an den Kunden protokolliert.'
+              : 'Keine E-Mails für diesen Filter.'}
           </p>
         ) : (
-          <ul className="divide-y divide-bw-border">
-            {rows.map((row) => {
-              const inbound = row.richtung === 'empfangen'
-              const vonAn = inbound
-                ? row.von_email ?? row.an_email
-                : row.an_email
-              return (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewId(row.id)}
-                    className="flex w-full flex-col gap-1 px-4 py-3 text-left transition-colors hover:bg-bw-hover"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      {inbound ? (
-                        <ArrowDownLeft className="h-4 w-4 shrink-0 text-bw-primary" aria-hidden />
-                      ) : (
-                        <ArrowUpRight className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
-                      )}
-                      <span className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">
-                        {freitextMailTypLabel(row.typ, row.kontext_typ)}
-                      </span>
-                      {row.status === 'fehler' ? (
-                        <span className="rounded bg-red-100 px-1.5 text-[10px] text-red-800">Fehler</span>
-                      ) : null}
-                    </div>
-                    <p className="truncate text-sm font-medium text-bw-text">{row.betreff}</p>
-                    <p className="flex flex-wrap items-center gap-x-2 text-xs text-bw-text-muted">
-                      <span className="inline-flex items-center gap-1">
-                        <Mail className="h-3 w-3" aria-hidden />
-                        {inbound ? `Von ${vonAn}` : `An ${vonAn}`}
-                      </span>
-                      <span>·</span>
-                      <span>{formatDatumZeit(row.created_at)}</span>
-                    </p>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-[13px]">
+              <thead>
+                <tr className="border-y border-bw-border bg-bw-bg text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+                  <th className="px-4 py-2 font-semibold">Betreff</th>
+                  <th className="hidden px-3 py-2 font-semibold sm:table-cell">Absender</th>
+                  <th className="px-3 py-2 font-semibold">Art</th>
+                  <th className="hidden px-3 py-2 font-semibold md:table-cell">Datum</th>
+                  <th className="px-3 py-2 text-right font-semibold">
+                    <span className="sr-only">Vorschau</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bw-border">
+                {sichtbar.map((row) => {
+                  const art = kommunikationMailArt(row)
+                  const absender = kommunikationMailAbsender(row, art)
+                  return (
+                    <tr key={row.id} className="hover:bg-bw-hover">
+                      <td className="max-w-[220px] px-4 py-2.5">
+                        <p className="truncate font-medium text-bw-text" title={row.betreff}>
+                          {row.betreff || '—'}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-bw-text-muted sm:hidden">
+                          {absender} · {formatDatumZeit(row.created_at)}
+                        </p>
+                        {row.status === 'fehler' ? (
+                          <span className="mt-1 inline-block rounded bg-red-100 px-1.5 text-[10px] text-red-800">
+                            Fehler
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="hidden max-w-[160px] truncate px-3 py-2.5 text-bw-text-muted sm:table-cell">
+                        {absender}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium',
+                            art === 'system'
+                              ? 'bg-bw-bg text-bw-text-muted'
+                              : 'bg-[#EAF3DE] text-[#1A3D2B]'
+                          )}
+                        >
+                          {kommunikationMailArtLabel(art)}
+                        </span>
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-2.5 text-bw-text-muted md:table-cell">
+                        {formatDatumZeit(row.created_at)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewId(row.id)}
+                          className="btn btn-ghost btn-sm inline-flex gap-1 px-2"
+                          aria-label="E-Mail ansehen"
+                        >
+                          <Eye className="h-3.5 w-3.5" aria-hidden />
+                          <span className="hidden sm:inline">Ansehen</span>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

@@ -35,7 +35,6 @@ import {
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
-import { insertKalenderAutoTermin, addDaysYmd } from '@/lib/kalender-auto-termine'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
@@ -133,15 +132,6 @@ export async function createRechnungEntwurf(input: {
   )
 
   if (error || !row) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-
-  if (input.faellig_am) {
-    await insertKalenderAutoTermin({
-      titel: `Fällig: ${rechnungsnummer}`,
-      datum: input.faellig_am,
-      typ: 'sonstiges',
-      auftrag_id: input.auftrag_id,
-    })
-  }
 
   revalidatePath('/rechnungen')
   return { ok: true, id: row.id as string }
@@ -568,16 +558,6 @@ export async function sendRechnung(
     .eq('id', rechnungId)
 
   if (error) return { ok: false, message: error.message }
-
-  const heute = new Date().toISOString().slice(0, 10)
-  await insertKalenderAutoTermin({
-    titel: rec?.rechnungsnummer
-      ? `Zahlungserinnerung: ${rec.rechnungsnummer}`
-      : 'Zahlungserinnerung Rechnung',
-    datum: addDaysYmd(heute, 7),
-    typ: 'sonstiges',
-    auftrag_id: (rec?.auftrag_id as string | null) ?? null,
-  })
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)

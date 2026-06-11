@@ -1199,6 +1199,22 @@
     @apply rounded-lg border border-dashed border-bw-border-strong bg-bw-card px-10 py-10 text-center text-bw-text-muted;
   }
 
+  .pos-list-head {
+    display: grid;
+    grid-template-columns: 36px 1fr 110px 130px 90px auto;
+    gap: 12px;
+    align-items: center;
+    padding: 0 14px 6px;
+  }
+
+  .pos-list-head .pos-nr {
+    @apply h-auto w-auto border-0 bg-transparent p-0 text-[11px] font-medium uppercase tracking-wide text-bw-text-muted;
+  }
+
+  .pos-list-head .pos-cell {
+    @apply text-[11px] font-medium uppercase tracking-wide text-bw-text-muted;
+  }
+
   .pos-acc {
     @apply overflow-hidden rounded-lg border border-hairline border-bw-border bg-bw-card transition-[box-shadow,border-color] duration-150;
   }
@@ -3413,7 +3429,7 @@
   }
 
   .app-list-filters {
-    @apply sticky top-0 z-[2] -mx-4 bg-app-grouped px-4 pb-2 pt-1 md:-mx-6 md:px-6;
+    @apply sticky top-0 z-[2] -mx-4 bg-bw-bg px-4 pb-2 pt-1 md:-mx-6 md:px-6;
   }
 
   .list-filter-toolbar-row {

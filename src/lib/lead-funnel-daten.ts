@@ -47,6 +47,7 @@ export interface NormalizedFunnelDaten {
   badAusstattung: string | null
   plz: string | null
   groessen: Record<string, number>
+  groessen_einheiten: Record<string, string>
   fachdetails: Record<string, string[]>
   breakdown: {
     gewerk?: string
@@ -613,6 +614,14 @@ export function normalizeFunnelDaten(
 
   mergeGroessen(groessen, groessenFromFachdetails(fd.fachdetails))
 
+  const groessen_einheiten: Record<string, string> = {}
+  const rawEinheiten = fd.groessen_einheiten ?? fd.groesseEinheiten
+  if (rawEinheiten && typeof rawEinheiten === 'object' && !Array.isArray(rawEinheiten)) {
+    for (const [k, v] of Object.entries(rawEinheiten as Record<string, unknown>)) {
+      if (typeof v === 'string' && v.trim()) groessen_einheiten[k] = v.trim()
+    }
+  }
+
   dedupeFachdetails(fachdetails)
 
   const labels = {
@@ -645,6 +654,7 @@ export function normalizeFunnelDaten(
     badAusstattung,
     plz,
     groessen,
+    groessen_einheiten,
     fachdetails,
     breakdown,
     preis_modus,
@@ -803,11 +813,16 @@ export function kundentypFunnelLabel(value: string | undefined): string {
   return KUNDENTYP_OPTIONS.find((k) => k.value === value)?.label ?? value
 }
 
-export function groesseDisplay(bereich: string, wert: number | string): string {
+export function groesseDisplay(
+  bereich: string,
+  wert: number | string,
+  einheitOverride?: string | null
+): string {
   const g = GROESSEN_CONFIG[bereich]
+  const einheit = einheitOverride?.trim() || g?.einheit || ''
   const n = typeof wert === 'number' ? wert : Number(wert)
   if (!Number.isFinite(n)) return '—'
-  return `${n} ${g?.einheit ?? ''}`.trim()
+  return `${n} ${einheit}`.trim()
 }
 
 /** Zahl aus Website/CRM (8, "12", "12,5"). */
@@ -919,6 +934,7 @@ export function collectGroessenFromFunnelDaten(
 export function buildFunnelDatenFromForm(input: {
   fachdetails: Record<string, string[]>
   groessen: Record<string, number>
+  groessen_einheiten?: Record<string, string>
   kundentyp: string
   quelle: string
   extra?: Record<string, unknown>
@@ -931,10 +947,15 @@ export function buildFunnelDatenFromForm(input: {
   for (const [k, v] of Object.entries(input.groessen)) {
     if (Number.isFinite(v) && v > 0) groessen[k] = v
   }
+  const groessen_einheiten: Record<string, string> = {}
+  for (const [k, v] of Object.entries(input.groessen_einheiten ?? {})) {
+    if (v?.trim()) groessen_einheiten[k] = v.trim()
+  }
   return {
     ...input.extra,
     fachdetails,
     groessen,
+    ...(Object.keys(groessen_einheiten).length ? { groessen_einheiten } : {}),
     kundentyp: input.kundentyp,
     quelle: input.quelle,
   }

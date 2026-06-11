@@ -24,7 +24,7 @@ export function defaultAngebotRechtshinweise(
   const klein = parseKleinunternehmerSetting(firm.kleinunternehmer)
   return {
     hinweis_35a: kundeZeigt35a(kundeTyp) && !klein,
-    hinweis_19: klein,
+    hinweis_19: false,
     hinweis_13b: false,
   }
 }
@@ -40,21 +40,16 @@ export function parseRechtshinweiseFromWizardMeta(
   return {
     hinweis_35a:
       typeof wm.hinweis_35a === 'boolean' ? wm.hinweis_35a : defaults.hinweis_35a,
-    hinweis_19:
-      typeof wm.hinweis_19 === 'boolean' ? wm.hinweis_19 : defaults.hinweis_19,
+    hinweis_19: false,
     hinweis_13b:
       typeof wm.hinweis_13b === 'boolean' ? wm.hinweis_13b : defaults.hinweis_13b,
   }
 }
 
 export function formatHinweis35a(lohnNetto: number): string {
-  const abschlag20 = Math.round(lohnNetto * 0.2 * 100) / 100
   const f = (n: number) =>
     n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return HINWEIS_35A_TEMPLATE.replace('{lohnNetto}', `${f(lohnNetto)} €`).replace(
-    '{abschlag20}',
-    `${f(abschlag20)} €`
-  )
+  return HINWEIS_35A_TEMPLATE.replace('{lohnNetto}', `${f(lohnNetto)} €`)
 }
 
 export { HINWEIS_KLEINUNTERNEHMER, HINWEIS_REVERSE_CHARGE_13B }
@@ -65,10 +60,6 @@ export function kannHinweis35aAngebot(
   lohnNetto: number
 ): boolean {
   return lohnNetto > 0 && kundeZeigt35a(kundeTyp) && !parseKleinunternehmerSetting(firm.kleinunternehmer)
-}
-
-export function kannHinweis19Angebot(firm: FirmenEinstellungen): boolean {
-  return parseKleinunternehmerSetting(firm.kleinunternehmer)
 }
 
 export function kannHinweis13bAngebot(

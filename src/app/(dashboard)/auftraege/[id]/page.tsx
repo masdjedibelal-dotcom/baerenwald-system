@@ -12,7 +12,10 @@ import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/
 import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/actions'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
-import type { Preisliste, LeadTimelineRow } from '@/lib/types'
+import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
+
+const LEAD_STAMMDATEN_SELECT =
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
@@ -55,18 +58,27 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
     const rahmenVertraegeByHandwerker = await loadRahmenVertraegeForHandwerker(handwerkerIds)
 
     let leadTimeline: LeadTimelineRow[] = []
+    let lead: Pick<
+      Lead,
+      'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
+    > | null = null
     if (detail.lead_id) {
-      const { data: tlByLead } = await supabase
-        .from('lead_timeline')
-        .select('*')
-        .eq('lead_id', detail.lead_id)
-        .order('created_at', { ascending: true })
+      const [{ data: tlByLead }, { data: leadRow }] = await Promise.all([
+        supabase
+          .from('lead_timeline')
+          .select('*')
+          .eq('lead_id', detail.lead_id)
+          .order('created_at', { ascending: true }),
+        supabase.from('leads').select(LEAD_STAMMDATEN_SELECT).eq('id', detail.lead_id).maybeSingle(),
+      ])
       leadTimeline = (tlByLead ?? []) as LeadTimelineRow[]
+      lead = (leadRow as typeof lead) ?? null
     }
 
     return (
       <AuftragDetailClient
         detail={detail}
+        lead={lead}
         templates={templates}
         gewerke={(gwRes.data ?? []) as { id: string; name: string; slug: string }[]}
         preislisten={(plRes.data ?? []) as Preisliste[]}

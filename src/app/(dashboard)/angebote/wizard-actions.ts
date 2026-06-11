@@ -124,7 +124,7 @@ export async function saveAngebotWizardDraft(
       : {
           dokument_typ: 'einfach' as const,
           projektbeschreibung: null,
-          fotos_urls: [],
+          fotos_urls: Array.isArray(input.fotos_urls) ? input.fotos_urls : ([] as AngebotProjektFoto[]),
           wichtige_hinweise: null,
           varianten: null,
           hinweise: input.meta.hinweise?.trim() || null,

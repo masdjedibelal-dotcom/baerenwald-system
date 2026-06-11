@@ -15,7 +15,7 @@ export function KiAngebotAbgleichCard({ analyse, onGenerateKi, kiLoading }: KiCa
       />
       <KiHeroStat label="Abgleiche" value={ergebnis.verglichen} />
       <KiHeroStat
-        label="Budget Δ (Median)"
+        label="Preisrahmen Δ (Median)"
         value={
           ergebnis.preis_abgleich?.median_delta_prozent != null
             ? `${ergebnis.preis_abgleich.median_delta_prozent > 0 ? '+' : ''}${ergebnis.preis_abgleich.median_delta_prozent}%`

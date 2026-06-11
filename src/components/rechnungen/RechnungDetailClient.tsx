@@ -51,7 +51,11 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Preisliste, Rechnung, RechnungBelegTyp, RechnungStatus } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { berechneRechnung, kundeZeigt35a } from '@/lib/rechnung-berechnung'
+import {
+  berechneRechnung,
+  formatHinweis35aRechnung,
+  rechnungZeigtHinweis35a,
+} from '@/lib/rechnung-berechnung'
 import { formatDatum, formatPreis } from '@/lib/utils'
 import {
   HINWEIS_KLEINUNTERNEHMER,
@@ -156,11 +160,9 @@ export function RechnungDetailClient({
     detail.status !== 'storniert' &&
     belegTyp === 'rechnung'
 
-  const zeigt35a =
+  const hinweis35a =
     belegTyp === 'rechnung' &&
-    kundeZeigt35a(detail.kunden?.typ) &&
-    !kleinunternehmerFirma &&
-    !detail.reverse_charge_13b
+    rechnungZeigtHinweis35a(detail.kunden?.typ, berechnung.lohn_netto, kleinunternehmerFirma)
 
   const zahlungszielTage = Math.max(
     1,
@@ -417,10 +419,9 @@ export function RechnungDetailClient({
         <span>Brutto</span>
         <span className="tabular-nums">{formatEurBetrag(berechnung.brutto)}</span>
       </div>
-      {zeigt35a && berechnung.lohn_netto > 0 ? (
+      {hinweis35a ? (
         <p className="mt-2 border-t border-bw-border pt-2 text-xs text-bw-text-muted">
-          § 35a EStG: Lohnanteil {formatEurBetrag(berechnung.lohn_netto)} (20 % ={' '}
-          {formatEurBetrag(berechnung.lohn_netto * 0.2)})
+          {formatHinweis35aRechnung(berechnung.lohn_netto)}
         </p>
       ) : null}
     </div>

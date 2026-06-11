@@ -1,10 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey, getClaudeModel } from '@/lib/copilot/claude-api-key'
-import { sendTelegram, sendTelegramTyping } from '@/lib/copilot/telegram'
 import { COPILOT_CLAUDE_TOOLS } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
-import { loadHistory, saveMessage } from '@/lib/copilot/memory'
+import { formatUnknownError } from '@/lib/copilot/format-unknown-error'
+import { clearCopilotHistory, loadHistory, saveMessage } from '@/lib/copilot/memory'
+import {
+  COPILOT_HISTORY_TURNS,
+  normalizeCopilotUserMessage,
+} from '@/lib/copilot/message-limits'
 import { COPILOT_SYSTEM } from '@/lib/copilot/system-prompt'
+import { sendTelegram, sendTelegramLong, sendTelegramTyping } from '@/lib/copilot/telegram'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,13 +19,13 @@ function anthropicClient(): Anthropic {
 }
 
 function formatCopilotError(e: unknown): string {
-  const hint = describeClaudeKeyForDebug()
   if (e instanceof Anthropic.AuthenticationError) {
+    const hint = describeClaudeKeyForDebug()
     return `Claude API-Key von Anthropic abgelehnt (401). ${hint}. Neuen Key auf console.anthropic.com erzeugen, in Netlify unter CLAUDE_API_KEY eintragen (Production), alte/leere Variable löschen, redeployen.`
   }
-  const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+  const msg = formatUnknownError(e)
   if (/401.*no body/i.test(msg)) {
-    return `Claude API-Key abgelehnt (401). ${hint}.`
+    return `Claude API-Key abgelehnt (401). ${describeClaudeKeyForDebug()}.`
   }
   return msg
 }
@@ -39,12 +44,11 @@ type TelegramMessage = {
 }
 
 async function transcribeVoice(_fileId: string): Promise<string | null> {
-  // Transkription (z. B. Whisper) kann später ergänzt werden
   return null
 }
 
 async function runClaudeChat(userText: string): Promise<string> {
-  const history = await loadHistory(20)
+  const history = await loadHistory(COPILOT_HISTORY_TURNS)
   await saveMessage('user', userText)
 
   const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userText }]
@@ -65,10 +69,21 @@ async function runClaudeChat(userText: string): Promise<string> {
     for (const tool of toolUses) {
       if (tool.type !== 'tool_use') continue
       const result = await executeCopilotTool(tool.name, tool.input as Record<string, unknown>)
+      let serialized: string
+      try {
+        serialized = JSON.stringify(result)
+      } catch {
+        serialized = JSON.stringify({ error: 'Tool-Ergebnis konnte nicht serialisiert werden.' })
+      }
+      if (serialized.length > 24_000) {
+        serialized = JSON.stringify({
+          error: 'Tool-Antwort zu groß — bitte kleinere Anfrage oder weniger Daten auf einmal.',
+        })
+      }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: tool.id,
-        content: JSON.stringify(result),
+        content: serialized,
       })
     }
 
@@ -139,9 +154,27 @@ export async function POST(req: Request) {
 
     if (!userText) return Response.json({ ok: true })
 
+    const lower = userText.toLowerCase()
+    if (lower === '/reset' || lower === '/clear' || lower === 'verlauf löschen') {
+      await clearCopilotHistory()
+      await sendTelegram('🧹 Chat-Verlauf gelöscht. Du kannst wieder mit kurzen Nachrichten starten.')
+      return Response.json({ ok: true })
+    }
+
+    const normalized = normalizeCopilotUserMessage(userText)
+    userText = normalized.text
+
+    if (normalized.truncated) {
+      await sendTelegram(
+        `⚠️ Deine Nachricht war sehr lang (${normalized.originalLength} Zeichen) und wurde auf ${userText.length} Zeichen gekürzt. Für lange Texte bitte in mehrere Nachrichten aufteilen.`
+      )
+    } else if (userText.length > 1200) {
+      await sendTelegram('⏳ Lange Nachricht — einen Moment …')
+    }
+
     await sendTelegramTyping()
     const reply = await runClaudeChat(userText)
-    await sendTelegram(reply)
+    await sendTelegramLong(reply)
   } catch (e) {
     const msg = formatCopilotError(e)
     await sendTelegram(`❌ Copilot-Fehler: ${msg.slice(0, 500)}`).catch(() => undefined)

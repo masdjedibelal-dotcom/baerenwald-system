@@ -1,5 +1,6 @@
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
+import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { auftragTitel, auftragWertNum } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -9,7 +10,12 @@ import type {
   AbschlussdokuSummen,
 } from '@/lib/templates/abschlussdokumentation-template'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import {
+  kundeAnredeKontextFromEmpfaenger,
+  kundeRechnungsempfaengerAusStammdaten,
+} from '@/lib/kunde-rechnungsempfaenger'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { angebotPdfBegruessung } from '@/lib/templates/angebot-mail'
 import type { AngebotPosition, AuftragDetail } from '@/lib/types'
 
 function round2(n: number): number {
@@ -126,8 +132,17 @@ export function buildAbschlussdokuHtmlInput(
     caption: `Dokumentation ${i + 1}`,
   }))
 
+  const mailAnrede = istPrivatKundeTyp(pdf.kunde.typ) ? 'du' : 'sie'
+  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(pdf.kunde)
+  const begruessung = angebotPdfBegruessung(
+    mailAnrede,
+    kundeAnredeKontextFromEmpfaenger(empfaengerStamm)
+  )
+
   return {
     firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
+    mail_anrede: mailAnrede,
+    begruessung,
     firmenname: firm.firmenname,
     firmen_rechtsform: firm.rechtsform?.trim() || null,
     firmen_adresse: firmZeileAdresse(firm),
@@ -151,12 +166,10 @@ export function buildAbschlussdokuHtmlInput(
       einheit: p.einheit,
       preis_netto: p.preis_fix,
     })),
-    handwerkerZeilen: pdf.handwerkerZeilen,
     abnahmePunkte: pdf.abnahmePunkte,
     bautagebuch,
     fotoUrls,
     mitBautagebuch: pdf.mitBautagebuch,
     mitFotos: pdf.mitFotos,
-    mitHandwerker: pdf.mitHandwerker,
   }
 }

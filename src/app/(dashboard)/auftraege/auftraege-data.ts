@@ -21,7 +21,7 @@ function parsePositionen(raw: unknown): AngebotPosition[] {
 const AUFTRAG_DETAIL_SELECT = `
       *,
       kunden(*),
-      angebote(*),
+      angebote(*, angebot_handwerker(id, hw_status, hw_eingereicht_at, gesendet_at, handwerker_id, gewerk_id)),
       auftrag_handwerker(
         *,
         handwerker(id, name, email, telefon, firma),

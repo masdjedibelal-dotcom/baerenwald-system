@@ -374,6 +374,8 @@ export type AngebotHandwerkerRow = {
   hw_eingereicht_at?: string | null
   hw_status?: string | null
   hw_notiz?: string | null
+  hw_crm_notiz?: string | null
+  hw_crm_antwort_at?: string | null
   handwerker?: {
     id: string
     name: string
@@ -463,6 +465,8 @@ export type AuftragHandwerkerRow = {
   notizen?: string | null
   projektvertrag_bestaetigt_am?: string | null
   projektvertrag_quelle?: 'crm_wizard' | 'portal_bestaetigung' | null
+  /** Vom CRM gewählte Pflicht-Unterlagen; null = Legacy-Automatik im Portal */
+  compliance_pflicht_slugs?: string[] | null
   handwerker?: {
     id?: string
     name: string
@@ -492,6 +496,8 @@ export type AuftragBautagebuchEintrag = {
   sort_order?: number | null
   created_at?: string | null
   updated_at?: string | null
+  /** Signierte Anzeige-URLs (nur CRM-UI, nicht persistieren). */
+  foto_display_urls?: string[] | null
 }
 
 export type AuftragPositionNotiz = {
@@ -832,6 +838,7 @@ export type Handwerker = {
   bewertung_anzahl?: number | null
   partner_kategorien?: PartnerKategorie | null
   partner_dokumente?: PartnerDokument[] | null
+  auth_user_id?: string | null
 }
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'

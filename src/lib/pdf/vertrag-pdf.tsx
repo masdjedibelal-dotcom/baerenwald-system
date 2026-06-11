@@ -31,10 +31,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: GRUEN,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  logo: { height: 72, width: 72, objectFit: 'contain' },
-  logoWordmark: { fontSize: 15, fontWeight: 'bold', color: GRUEN, letterSpacing: 0.2 },
-  brandFallback: { fontSize: 15, fontWeight: 'bold', color: GRUEN, letterSpacing: 0.2 },
+  logo: { height: 80, maxWidth: 320, objectFit: 'contain' },
   docTitleCenter: {
     fontSize: 13,
     fontWeight: 'bold',
@@ -130,19 +127,17 @@ function dokumentTitel(payload: VertragPdfPayload): string {
   return payload.typ === 'projekt' ? 'Projektvertrag' : 'Rahmenvertrag'
 }
 
-function LogoKopf({ logoSrc, firm }: { logoSrc: string | null; firm: FirmenEinstellungen }) {
-  const name = firmenName(firm)
+function LogoKopf({ logoSrc }: { logoSrc: string | null }) {
   const usable =
     logoSrc &&
     (logoSrc.startsWith('data:') || /^https?:\/\//i.test(logoSrc)) &&
     !/^file:/i.test(logoSrc)
 
+  if (!usable) return null
+
   return (
     <View style={styles.logoWrap}>
-      <View style={styles.logoRow}>
-        {usable ? <Image style={styles.logo} src={logoSrc} /> : null}
-        <Text style={usable ? styles.logoWordmark : styles.brandFallback}>{name}</Text>
-      </View>
+      <Image style={styles.logo} src={logoSrc} />
     </View>
   )
 }
@@ -358,7 +353,7 @@ export function VertragPdfDocument({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <LogoKopf logoSrc={logoSrc} firm={payload.firm} />
+        <LogoKopf logoSrc={logoSrc} />
         <ParteienUndBauvorhabenBlock payload={payload} />
         <VertragInhalt payload={payload} />
         <PdfFooter firm={payload.firm} />

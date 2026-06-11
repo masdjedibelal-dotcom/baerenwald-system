@@ -17,6 +17,17 @@ export function formatAnthropicError(e: unknown): string {
     if (e.status === 429) {
       return 'Claude Rate-Limit erreicht — bitte kurz warten.'
     }
+    if (e.status === 400 || e.status === 413) {
+      const m = (e.message || '').toLowerCase()
+      if (
+        m.includes('prompt is too long') ||
+        m.includes('too many tokens') ||
+        m.includes('context length') ||
+        m.includes('maximum')
+      ) {
+        return 'Nachricht oder Verlauf zu lang — bitte kürzer formulieren oder Verlauf mit /reset leeren.'
+      }
+    }
     return e.message || `Claude API-Fehler (${e.status})`
   }
   if (e instanceof Error) return e.message

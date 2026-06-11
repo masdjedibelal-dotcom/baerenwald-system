@@ -21,10 +21,13 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { berechneRechnung, kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import {
+  berechneRechnung,
+  parseKleinunternehmerSetting,
+  rechnungZeigtHinweis35a,
+} from '@/lib/rechnung-berechnung'
 import {
   DEFAULT_MWST_SATZ,
-  HINWEIS_35A_TEMPLATE,
   HINWEIS_KLEINUNTERNEHMER,
   HINWEIS_REVERSE_CHARGE_13B,
 } from '@/lib/rechnung-config'
@@ -131,13 +134,12 @@ export function buildRechnungHtmlInput(
   if (freitextHinweise) hinweiseParts.push(freitextHinweise)
   if (kleinunternehmer) hinweiseParts.push(HINWEIS_KLEINUNTERNEHMER)
   if (row.reverse_charge_13b) hinweiseParts.push(HINWEIS_REVERSE_CHARGE_13B)
-  if (kundeZeigt35a(row.kunden.typ) && berechnung.lohn_netto > 0) {
-    const abschlag = Math.round(berechnung.lohn_netto * 0.2 * 100) / 100
-    hinweiseParts.push(
-      HINWEIS_35A_TEMPLATE.replace('{lohnNetto}', berechnung.lohn_netto.toFixed(2).replace('.', ','))
-        .replace('{abschlag20}', abschlag.toFixed(2).replace('.', ','))
-    )
-  }
+
+  const hinweis35a = rechnungZeigtHinweis35a(
+    row.kunden.typ,
+    berechnung.lohn_netto,
+    kleinunternehmer
+  )
 
   const steuer = firmenSteuerFooterZeilen(firm)
   const bank = firmenBankverbindungZeilen(firm)
@@ -152,7 +154,7 @@ export function buildRechnungHtmlInput(
     projekt_titel: projektTitel || null,
     firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
     mail_anrede: anrede,
-    firmenname: firm.firmenname?.trim() || 'Bärenwald',
+    firmenname: firm.firmenname?.trim() || 'Bärenwald München',
     firmen_rechtsform: firm.rechtsform?.trim() || null,
     geschaeftsfuehrer: firm.geschaeftsfuehrer?.trim() || null,
     firmen_adresse: firmZeileAdresse(firm),
@@ -187,7 +189,7 @@ export function buildRechnungHtmlInput(
       material_netto: berechnung.material_netto,
     },
     rechtshinweise: {
-      hinweis_35a: kundeZeigt35a(row.kunden.typ) && berechnung.lohn_netto > 0,
+      hinweis_35a: hinweis35a,
       hinweis_19: kleinunternehmer,
       hinweis_13b: Boolean(row.reverse_charge_13b),
     },

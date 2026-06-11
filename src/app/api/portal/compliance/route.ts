@@ -46,7 +46,7 @@ export async function GET() {
       .order('hochgeladen_am', { ascending: false }),
     supabase
       .from('auftrag_handwerker')
-      .select('auftrag_id, projektvertrag_bestaetigt_am, auftraege(id, titel, status)')
+      .select('auftrag_id, projektvertrag_bestaetigt_am, compliance_pflicht_slugs, auftraege(id, titel, status)')
       .eq('handwerker_id', hw.id)
       .order('created_at', { ascending: false })
       .limit(30),
@@ -117,6 +117,7 @@ export async function GET() {
           hw.id,
           row.projektvertrag_bestaetigt_am as string | null
         ),
+        compliancePflichtSlugs: (row.compliance_pflicht_slugs as string[] | null) ?? null,
       })
     })
     .filter(Boolean)

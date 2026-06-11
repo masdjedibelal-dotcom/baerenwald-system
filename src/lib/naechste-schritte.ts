@@ -1,220 +1,210 @@
-import type { AngebotStatusEinfach } from '@/lib/angebot-einfach'
 import type { NaechsterSchritt } from '@/components/crm/NaechsteSchritteCard'
-import type { AngebotHandwerkerRow } from '@/lib/types'
-import {
-  darfAngebotAnKundeSenden,
-  handwerkerAnfrageErledigt,
-  handwerkerEinreichungErledigt,
-  handwerkerFreigabeErledigt,
-  hatAngebotHandwerker,
-} from '@/lib/angebote/angebot-handwerker-flow'
-import type { AuftragHandwerkerComplianceZeile } from '@/lib/handwerker/compliance-vertrag-status'
+import type { AngebotStatusEinfach } from '@/lib/angebot-einfach'
+import { kannHwEinreichungPruefen } from '@/lib/partner/handwerker-einreichung'
+import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
 
 export function buildAngebotNaechsteSchritte(opts: {
   status: AngebotStatusEinfach
   angebotId: string
-  angebotStatusRaw?: string | null
-  handwerkerRows?: AngebotHandwerkerRow[]
-  leadId?: string | null
   auftragId?: string | null
-  onHandwerkerAnfragen?: () => void
-  onHandwerkerBestaetigen?: () => void
-  onSenden?: () => void
-  onAnnehmen?: () => void
+  nachgefasst?: boolean
+  onNachfassen?: () => void
+  onAuftragAnlegen?: () => void
 }): NaechsterSchritt[] {
-  const {
-    status,
-    angebotId,
-    angebotStatusRaw,
-    handwerkerRows = [],
-    leadId,
-    auftragId,
-    onHandwerkerAnfragen,
-    onHandwerkerBestaetigen,
-    onSenden,
-    onAnnehmen,
-  } = opts
-  const steps: NaechsterSchritt[] = []
-  const hatHw = hatAngebotHandwerker(handwerkerRows)
-  const hwAnfrageDone = !hatHw || handwerkerAnfrageErledigt(handwerkerRows)
-  const hwEinreichungDone = !hatHw || handwerkerEinreichungErledigt(handwerkerRows)
-  const hwFreigabeDone = !hatHw || handwerkerFreigabeErledigt(handwerkerRows)
-  const darfKunde = darfAngebotAnKundeSenden(handwerkerRows, angebotStatusRaw)
+  const { status, auftragId, nachgefasst = false, onNachfassen, onAuftragAnlegen } = opts
 
-  if (hatHw) {
-    steps.push({
-      id: 'hw_anfragen',
-      label: 'Handwerker anfragen',
-      dateLabel: hwAnfrageDone ? 'Erledigt' : 'Als Nächstes',
-      done: hwAnfrageDone,
-      onClick: hwAnfrageDone ? undefined : onHandwerkerAnfragen,
-    })
-    steps.push({
-      id: 'hw_einreichung',
-      label: 'Partner-Angebot / Rechnung einholen',
-      dateLabel: hwEinreichungDone ? 'Erledigt' : hwAnfrageDone ? 'Als Nächstes' : '—',
-      done: hwEinreichungDone,
-      href: !hwEinreichungDone && hwAnfrageDone ? `#handwerker-partner` : undefined,
-    })
-    steps.push({
-      id: 'hw_freigabe',
-      label: 'Partner-Einreichung bestätigen',
-      dateLabel: hwFreigabeDone ? 'Erledigt' : hwEinreichungDone ? 'Als Nächstes' : '—',
-      done: hwFreigabeDone,
-      onClick: hwFreigabeDone || !hwEinreichungDone ? undefined : onHandwerkerBestaetigen,
-      href: !hwFreigabeDone && hwEinreichungDone ? `#handwerker-partner` : undefined,
-    })
-  } else {
-    steps.push({
-      id: 'hw_zuweisen',
-      label: 'Handwerker zuweisen & anfragen',
-      dateLabel: 'Als Nächstes',
-      done: false,
-      onClick: onHandwerkerAnfragen,
-    })
-  }
+  const gesendet = status === 'gesendet' || status === 'abgelaufen'
+  const nachfassErledigt =
+    nachgefasst || status === 'angenommen' || status === 'abgelehnt' || Boolean(auftragId)
+  const kannNachfassen =
+    (status === 'gesendet' || status === 'abgelaufen') && !nachgefasst && !auftragId
 
-  const gesendet = status === 'gesendet' || status === 'angenommen' || status === 'abgelehnt'
-  steps.push({
-    id: 'senden',
-    label: 'Angebot an Kunden senden',
-    dateLabel: gesendet ? 'Erledigt' : darfKunde ? 'Als Nächstes' : '—',
-    done: gesendet,
-    onClick: gesendet || !darfKunde ? undefined : onSenden,
-  })
+  const steps: NaechsterSchritt[] = [
+    {
+      id: 'nachfassen',
+      label: 'Angebot nachfassen',
+      dateLabel: nachfassErledigt ? 'Erledigt' : kannNachfassen ? 'Als Nächstes' : '—',
+      done: nachfassErledigt,
+      onClick: kannNachfassen ? onNachfassen : undefined,
+    },
+    {
+      id: 'auftrag',
+      label: 'Auftrag anlegen',
+      dateLabel: auftragId ? 'Erledigt' : gesendet ? 'Als Nächstes' : '—',
+      done: Boolean(auftragId),
+      onClick: gesendet && !auftragId ? onAuftragAnlegen : undefined,
+      href: auftragId ? `/auftraege/${auftragId}` : undefined,
+    },
+  ]
 
-  steps.push({
-    id: 'angenommen',
-    label: 'Angebot angenommen',
-    dateLabel: status === 'angenommen' || auftragId ? 'Erledigt' : '—',
-    done: status === 'angenommen' || Boolean(auftragId),
-    onClick: status === 'gesendet' ? onAnnehmen : undefined,
-  })
-
-  steps.push({
-    id: 'auftrag',
-    label: 'Auftrag anlegen',
-    dateLabel: auftragId ? 'Erledigt' : '—',
-    done: Boolean(auftragId),
-    href: auftragId ? `/auftraege/${auftragId}` : undefined,
-  })
-
-  if (leadId) {
-    steps.push({
-      id: 'anfrage',
-      label: 'Zur Anfrage',
-      dateLabel: '',
-      done: false,
-      href: `/anfragen/${leadId}`,
-    })
-  }
-
-  void angebotId
-  return steps.filter((s) => s.id !== 'anfrage' || leadId)
+  void opts.angebotId
+  return steps
 }
 
-export function buildAuftragComplianceSchritte(
-  zeilen: AuftragHandwerkerComplianceZeile[],
-  auftragId: string,
-  onProjektVertragWizard?: () => void
-): NaechsterSchritt[] {
-  const steps: NaechsterSchritt[] = []
-  for (const z of zeilen) {
-    steps.push({
-      id: `rv-${z.handwerker_id}`,
-      label: `Rahmenvertrag: ${z.handwerker_name}`,
-      dateLabel: z.rahmenvertrag_ok ? 'Erledigt' : 'Pflicht',
-      done: z.rahmenvertrag_ok,
-      href: z.rahmenvertrag_ok
-        ? undefined
-        : `/handwerker/${z.handwerker_id}?tab=compliance`,
-    })
-    steps.push({
-      id: `nu-${z.handwerker_id}`,
-      label: `Projektvertrag: ${z.handwerker_name}`,
-      dateLabel: z.projektvertrag_ok
-        ? 'Erledigt'
-        : 'CRM-Wizard oder Portal-Bestätigung',
-      done: z.projektvertrag_ok,
-      onClick: z.projektvertrag_ok ? undefined : onProjektVertragWizard,
-      href: z.projektvertrag_ok ? undefined : `#compliance-checkliste`,
-    })
-    if (z.fehlende_unterlagen > 0) {
-      steps.push({
-        id: `comp-${z.handwerker_id}`,
-        label: `Unterlagen ${z.handwerker_name} (${z.fehlende_unterlagen} fehlen)`,
-        dateLabel: z.fehlende_unterlagen_labels.slice(0, 2).join(', '),
-        done: false,
-        href: `#compliance-checkliste`,
-      })
-    } else if (z.projektvertrag_ok) {
-      steps.push({
-        id: `comp-${z.handwerker_id}`,
-        label: `Unterlagen ${z.handwerker_name}`,
-        dateLabel: 'Vollständig',
-        done: true,
-      })
+function handwerkerZugewiesen(
+  positionen: AuftragPosition[],
+  auftragHandwerkerCount: number
+): boolean {
+  if (positionen.length === 0) {
+    return auftragHandwerkerCount > 0
+  }
+  return positionen.every((p) => Boolean(p.handwerker_id?.trim()))
+}
+
+function hwAngebotSchritt(rows: AngebotHandwerkerRow[]): {
+  done: boolean
+  dateLabel: string
+  pendingReview: number
+} {
+  if (rows.length === 0) {
+    return { done: true, dateLabel: '—', pendingReview: 0 }
+  }
+
+  const pendingReview = rows.filter((z) => kannHwEinreichungPruefen(z)).length
+  if (pendingReview > 0) {
+    return {
+      done: false,
+      dateLabel: `${pendingReview} zu prüfen`,
+      pendingReview,
     }
   }
-  void auftragId
-  return steps
+
+  const wartendAufPartner = rows.some((z) => {
+    const st = (z.hw_status ?? '').toLowerCase()
+    return Boolean(z.gesendet_at?.trim()) && !z.hw_eingereicht_at?.trim() && st !== 'uebernommen'
+  })
+  if (wartendAufPartner) {
+    return { done: false, dateLabel: 'Wartet auf Partner', pendingReview: 0 }
+  }
+
+  const offeneRueckfrage = rows.some((z) => (z.hw_status ?? '').toLowerCase() === 'rueckfrage')
+  if (offeneRueckfrage) {
+    return { done: false, dateLabel: 'Rückfrage offen', pendingReview: 0 }
+  }
+
+  const erledigt = rows.every((z) => {
+    const st = (z.hw_status ?? '').toLowerCase()
+    if (!z.gesendet_at?.trim()) return true
+    return st === 'uebernommen' || st === 'abgelehnt'
+  })
+
+  return {
+    done: erledigt,
+    dateLabel: erledigt ? 'Erledigt' : 'Offen',
+    pendingReview: 0,
+  }
 }
 
 export function buildAuftragNaechsteSchritte(opts: {
   status: string
   auftragId: string
+  angebotId?: string | null
   hatAbnahme: boolean
-  rechnungenCount: number
-  complianceZeilen?: AuftragHandwerkerComplianceZeile[]
-  onProjektVertragWizard?: () => void
+  hatRechnung?: boolean
+  positionen?: AuftragPosition[]
+  auftragHandwerkerCount?: number
+  angebotHandwerker?: AngebotHandwerkerRow[]
+  bautagebuchCount?: number
+  onHandwerkerZuweisen?: () => void
+  onBautagebuch?: () => void
+  onHwAngebot?: () => void
+  onAbschluss?: () => void
+  onRechnung?: () => void
 }): NaechsterSchritt[] {
   const {
     status,
     auftragId,
+    angebotId,
     hatAbnahme,
-    rechnungenCount,
-    complianceZeilen = [],
-    onProjektVertragWizard,
+    hatRechnung = false,
+    positionen = [],
+    auftragHandwerkerCount = 0,
+    angebotHandwerker = [],
+    bautagebuchCount = 0,
+    onHandwerkerZuweisen,
+    onBautagebuch,
+    onHwAngebot,
+    onAbschluss,
+    onRechnung,
   } = opts
+
+  if (status === 'storniert') return []
+
   const abgeschlossen = status === 'abgeschlossen'
-  const hatRechnung = rechnungenCount > 0
+  const hwZugewiesen = handwerkerZugewiesen(positionen, auftragHandwerkerCount)
+  const hwAngebot = hwAngebotSchritt(angebotHandwerker)
+  const bautagebuchDone = bautagebuchCount > 0
 
-  const complianceSteps =
-    !abgeschlossen && complianceZeilen.length > 0
-      ? buildAuftragComplianceSchritte(complianceZeilen, auftragId, onProjektVertragWizard)
-      : []
+  let naechsterId: string | null = null
+  if (!abgeschlossen) {
+    if (!hwZugewiesen) naechsterId = 'handwerker'
+    else if (!hwAngebot.done && angebotId) naechsterId = 'hw-angebot'
+    else naechsterId = 'abschluss'
+  } else if (!hatRechnung) {
+    naechsterId = 'rechnung'
+  }
 
-  const abschlussSteps: NaechsterSchritt[] = [
+  const labelAlsNaechstes = (id: string, erledigt: boolean, fallback: string) => {
+    if (erledigt) return 'Erledigt'
+    if (naechsterId === id) return 'Als Nächstes'
+    return fallback
+  }
+
+  const steps: NaechsterSchritt[] = [
     {
-      id: 'abnahme',
-      label: 'Abnahmeprotokoll',
-      dateLabel: hatAbnahme || abgeschlossen ? 'Erledigt' : 'Als Nächstes',
-      done: hatAbnahme || abgeschlossen,
-      href: hatAbnahme || abgeschlossen ? undefined : `/auftraege/${auftragId}/abnahme`,
+      id: 'handwerker',
+      label: 'Handwerker zuweisen',
+      dateLabel: labelAlsNaechstes('handwerker', hwZugewiesen || abgeschlossen, 'Offen'),
+      done: hwZugewiesen || abgeschlossen,
+      onClick: hwZugewiesen || abgeschlossen ? undefined : onHandwerkerZuweisen,
     },
     {
-      id: 'rechnung',
-      label: 'Rechnung erstellen',
-      dateLabel: hatRechnung ? 'Erledigt' : hatAbnahme ? 'Als Nächstes' : '—',
-      done: hatRechnung,
+      id: 'hw-angebot',
+      label: 'Handwerker-Angebot Rückmeldung',
+      dateLabel: labelAlsNaechstes(
+        'hw-angebot',
+        hwAngebot.done || abgeschlossen || !angebotId,
+        hwAngebot.dateLabel === '—' ? '—' : hwAngebot.dateLabel
+      ),
+      done: hwAngebot.done || abgeschlossen || !angebotId,
+      onClick:
+        hwAngebot.done || abgeschlossen || !angebotId ? undefined : onHwAngebot,
       href:
-        hatRechnung || !hatAbnahme
-          ? undefined
-          : `/auftraege/${auftragId}/rechnungen-auswahl`,
+        !hwAngebot.done && !abgeschlossen && angebotId && !onHwAngebot
+          ? `/angebote/${angebotId}`
+          : undefined,
+    },
+    {
+      id: 'bautagebuch',
+      label: 'Bautagebuch anfordern / erstellen',
+      dateLabel: bautagebuchDone || abgeschlossen ? 'Erledigt' : 'Optional',
+      done: bautagebuchDone || abgeschlossen,
+      onClick: bautagebuchDone || abgeschlossen ? undefined : onBautagebuch,
+    },
+    {
+      id: 'abnahme',
+      label: 'Abnahmeprotokoll (optional)',
+      dateLabel: hatAbnahme ? 'Erledigt' : 'Optional',
+      done: hatAbnahme,
+      href: hatAbnahme ? undefined : `/auftraege/${auftragId}/abnahme/erstellen`,
     },
     {
       id: 'abschluss',
       label: 'Auftrag abschließen',
-      dateLabel: abgeschlossen ? 'Erledigt' : hatAbnahme && hatRechnung ? 'Als Nächstes' : '—',
+      dateLabel: labelAlsNaechstes('abschluss', abgeschlossen, '—'),
       done: abgeschlossen,
-      href:
-        abgeschlossen || !hatAbnahme || !hatRechnung
-          ? undefined
-          : `/auftraege/${auftragId}/abschluss`,
+      onClick: !abgeschlossen ? onAbschluss : undefined,
+    },
+    {
+      id: 'rechnung',
+      label: 'Rechnung erstellen',
+      dateLabel: labelAlsNaechstes('rechnung', hatRechnung, '—'),
+      done: hatRechnung,
+      onClick: abgeschlossen && !hatRechnung ? onRechnung : undefined,
     },
   ]
 
-  return [...complianceSteps, ...abschlussSteps]
+  return steps
 }
 
 export function buildRechnungNaechsteSchritte(opts: {

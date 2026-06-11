@@ -517,3 +517,28 @@ export async function ablehnenPartnerDokument(
   revalidatePartnerDokumentPfade(handwerkerId, (doc as { auftrag_id?: string | null }).auftrag_id)
   return { ok: true }
 }
+
+export async function getPartnerPortalLoginHint(
+  handwerkerId: string
+): Promise<
+  | { ok: true; loginLink: string; hasAuthAccount: boolean }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const { data: row, error } = await supabase
+    .from('handwerker')
+    .select('auth_user_id')
+    .eq('id', handwerkerId)
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+
+  const { buildPartnerDashboardLink } = await import('@/lib/portal-utils')
+  return {
+    ok: true,
+    loginLink: buildPartnerDashboardLink(),
+    hasAuthAccount: Boolean(
+      (row as { auth_user_id?: string | null } | null)?.auth_user_id
+    ),
+  }
+}

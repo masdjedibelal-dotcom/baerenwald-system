@@ -11,17 +11,13 @@ export function AngebotWizardRechtlicheHinweiseCard({
   meta,
   onMetaChange,
   hinweis35aErlaubt,
-  hinweis19Erlaubt,
   hinweis13bErlaubt,
-  kleinunternehmer,
   lohnNettoPdf,
 }: {
   meta: AngebotWizardMeta
   onMetaChange: (patch: Partial<AngebotWizardMeta>) => void
   hinweis35aErlaubt: boolean
-  hinweis19Erlaubt: boolean
   hinweis13bErlaubt: boolean
-  kleinunternehmer: boolean
   lohnNettoPdf: number
 }) {
   const form = (
@@ -44,27 +40,6 @@ export function AngebotWizardRechtlicheHinweiseCard({
             Lohnkosten-Hinweis für Privatkunden
             {lohnNettoPdf > 0 ? ` (${formatEurBetrag(lohnNettoPdf)} netto)` : ''}
             {!hinweis35aErlaubt ? ' — nur bei Privatkunden und Lohnanteil > 0' : ''}
-          </span>
-        </span>
-      </label>
-      <label
-        className={cn(
-          'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]',
-          hinweis19Erlaubt ? 'border-bw-border bg-bw-hover/30' : 'cursor-not-allowed border-bw-border/60 opacity-50'
-        )}
-      >
-        <input
-          type="checkbox"
-          checked={Boolean(meta.hinweis_19)}
-          disabled={!hinweis19Erlaubt}
-          onChange={(e) => onMetaChange({ hinweis_19: e.target.checked })}
-        />
-        <span>
-          <span className="font-medium">§ 19 UStG (Kleinunternehmer)</span>
-          <span className="mt-0.5 block text-[11px] text-bw-text-muted">
-            {kleinunternehmer
-              ? 'Keine Umsatzsteuer im Angebot ausweisen'
-              : 'Nur wenn Kleinunternehmer in den Firmeneinstellungen aktiv ist'}
           </span>
         </span>
       </label>
@@ -96,10 +71,6 @@ export function AngebotWizardRechtlicheHinweiseCard({
       <MobileOverviewField
         label="§ 35a EStG"
         value={meta.hinweis_35a ? 'Aktiv' : 'Aus'}
-      />
-      <MobileOverviewField
-        label="§ 19 UStG"
-        value={meta.hinweis_19 ? 'Aktiv' : 'Aus'}
       />
       <MobileOverviewField
         label="§ 13b UStG"

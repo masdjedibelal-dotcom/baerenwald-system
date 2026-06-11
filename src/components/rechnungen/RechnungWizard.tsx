@@ -20,6 +20,7 @@ import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { RechnungWizardDetailsCard } from '@/components/rechnungen/RechnungWizardDetailsCard'
+import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import {
   finalizeRechnungWizardWithoutMail,
@@ -40,8 +41,8 @@ import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempf
 import {
   berechneRechnung,
   kundeKannReverseCharge13b,
-  kundeZeigt35a,
   parseKleinunternehmerSetting,
+  rechnungZeigtHinweis35a,
 } from '@/lib/rechnung-berechnung'
 import {
   DEFAULT_MWST_SATZ,
@@ -183,8 +184,11 @@ export function RechnungWizard({
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
   )
 
-  const zeigt35a =
-    kundeZeigt35a(kunde?.typ) && !kleinunternehmer && berechnung.lohn_netto > 0
+  const zeigtHinweis35a = rechnungZeigtHinweis35a(
+    kunde?.typ,
+    berechnung.lohn_netto,
+    kleinunternehmer
+  )
   const zeigt13b = kundeKannReverseCharge13b(kunde?.typ)
 
   useEffect(() => {
@@ -503,7 +507,23 @@ export function RechnungWizard({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner">
           {step === 1 ? (
-            <div>
+            <div className="space-y-4">
+              <KundenStammdatenCard
+                kunde={kunde as Kunde | null}
+                collapsible={false}
+                action={
+                  kunde ? (
+                    <button
+                      type="button"
+                      onClick={() => setStammdatenModalOpen(true)}
+                      className="btn btn-ghost btn-sm"
+                      aria-label="Stammdaten bearbeiten"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null
+                }
+              />
               <AngebotWizardPositionenByGewerk
                 zeilen={zeilen}
                 onChange={setZeilen}
@@ -516,7 +536,7 @@ export function RechnungWizard({
                 ensureInitialGewerkBlock
                 defaultGewerkTitel={projektTitel}
               />
-              <Card title="Summe (Vorschau)" className="mt-4">
+              <Card title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <span className="text-bw-text-muted">Netto</span>
@@ -549,7 +569,12 @@ export function RechnungWizard({
                 <ul className="list-disc space-y-1 pl-5 text-sm text-bw-text-muted">
                   {kleinunternehmer ? <li>{HINWEIS_KLEINUNTERNEHMER}</li> : null}
                   {meta.reverse_charge_13b ? <li>{HINWEIS_REVERSE_CHARGE_13B}</li> : null}
-                  {zeigt35a ? <li>§ 35a EStG Hinweis wird bei Privatkunden mit Lohnkosten ergänzt.</li> : null}
+                  {zeigtHinweis35a ? (
+                    <li>
+                      Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG zum ausgewiesenen Lohnkostenanteil
+                      erscheint unten auf der Rechnung.
+                    </li>
+                  ) : null}
                 </ul>
               </Card>
             </div>

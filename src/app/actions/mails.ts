@@ -23,8 +23,12 @@ import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail
 import {
   buildPortalButton,
   buildPortalLoginLink,
+  buildPartnerDashboardLink,
+  buildPartnerPortalButton,
   defaultPortalInviteBetreff,
   defaultPortalInviteText,
+  defaultPartnerPortalInviteBetreff,
+  defaultPartnerPortalInviteText,
 } from '@/lib/portal-utils'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
@@ -589,6 +593,135 @@ export async function previewKundenPortalMail(input: {
     name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
     portalLink,
     anrede,
+    text: input.text,
+    branding,
+  })
+  return { ok: true, html }
+}
+
+function partnerPortalMailHtml(input: {
+  name: string
+  portalLink: string
+  text: string
+  branding: MailBranding
+}): string {
+  const greeting = `Hallo ${escapeHtml(input.name)},`
+  const body = escapeHtml(input.text)
+    .split(/\n\n+/)
+    .map((p) => p.replace(/\n/g, '<br/>'))
+    .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
+    .join('')
+  const portal = buildPartnerPortalButton(input.portalLink)
+  const content = `
+    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
+    ${body}
+    ${portal}
+    <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
+      Bei Fragen erreichst du uns jederzeit per Antwort auf diese E-Mail.
+    </p>
+  `
+  return mailHtmlBase(
+    content,
+    defaultPartnerPortalInviteBetreff(),
+    input.branding,
+    'Du erhältst diese E-Mail mit Einladung zum Partner-Portal.',
+    { skipMeinBaerenwaldPs: true, anrede: 'du' }
+  )
+}
+
+export async function getPartnerPortalMailDraft(
+  handwerkerId: string
+): Promise<
+  | {
+      ok: true
+      to: string
+      cc: string[]
+      betreff: string
+      text: string
+      html: string
+      portalLink: string
+    }
+  | { ok: false; message: string }
+> {
+  const { data: hw, error } = await supabaseAdmin
+    .from('handwerker')
+    .select('id, name, email')
+    .eq('id', handwerkerId)
+    .maybeSingle()
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+  const to = String((hw as { email?: string | null }).email ?? '').trim()
+  if (!to) return { ok: false, message: 'Handwerker hat keine E-Mail-Adresse.' }
+
+  const portalLink = buildPartnerDashboardLink()
+  const name = String((hw as { name?: string | null }).name ?? 'Partner').trim()
+  const branding = await getMailBranding(supabaseAdmin)
+  const betreff = defaultPartnerPortalInviteBetreff()
+  const text = defaultPartnerPortalInviteText()
+  const html = partnerPortalMailHtml({ name, portalLink, text, branding })
+  return {
+    ok: true,
+    to,
+    cc: [],
+    betreff,
+    text,
+    html,
+    portalLink,
+  }
+}
+
+export async function sendPartnerPortalLinkMail(input: {
+  handwerkerId: string
+  to: string
+  cc?: string[]
+  betreff: string
+  text: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
+  const { data: hw, error } = await supabaseAdmin
+    .from('handwerker')
+    .select('id, name')
+    .eq('id', input.handwerkerId)
+    .maybeSingle()
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+
+  const portalLink = buildPartnerDashboardLink()
+  const branding = await getMailBranding(supabaseAdmin)
+  const html = partnerPortalMailHtml({
+    name: String((hw as { name?: string | null }).name ?? 'Partner').trim(),
+    portalLink,
+    text: input.text,
+    branding,
+  })
+
+  const r = await sendMail({
+    typ: 'handwerker_portal',
+    an: input.to.trim(),
+    cc: input.cc ?? [],
+    anName: String((hw as { name?: string | null }).name ?? '').trim() || null,
+    betreff: input.betreff.trim(),
+    html,
+    kontextTyp: 'handwerker',
+  })
+  if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }
+  return { ok: true }
+}
+
+export async function previewPartnerPortalMail(input: {
+  handwerkerId: string
+  text: string
+}): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
+  const { data: hw, error } = await supabaseAdmin
+    .from('handwerker')
+    .select('id, name')
+    .eq('id', input.handwerkerId)
+    .maybeSingle()
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+
+  const portalLink = buildPartnerDashboardLink()
+  const branding = await getMailBranding(supabaseAdmin)
+  const html = partnerPortalMailHtml({
+    name: String((hw as { name?: string | null }).name ?? 'Partner').trim(),
+    portalLink,
     text: input.text,
     branding,
   })

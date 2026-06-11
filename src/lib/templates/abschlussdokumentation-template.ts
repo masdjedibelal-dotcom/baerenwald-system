@@ -18,6 +18,7 @@ const BORDER = '#D1D5DB'
 const GREEN_SUM = '#2E7D52'
 
 import { ABSCHLUSS_PROTOKOLL_TITEL } from '@/lib/auftraege/abschlussdokumentation-labels'
+import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 export type AbschlussdokuSummen = {
   netto: number
@@ -28,6 +29,8 @@ export type AbschlussdokuSummen = {
 
 export type AbschlussdokuHtmlInput = {
   firmen_logo_url?: string | null
+  mail_anrede?: AngebotMailAnrede
+  begruessung?: string | null
   firmenname: string
   firmen_rechtsform?: string | null
   firmen_adresse: string
@@ -49,7 +52,6 @@ export type AbschlussdokuHtmlInput = {
     einheit?: string | null
     preis_netto?: number | null
   }>
-  handwerkerZeilen: string[]
   abnahmePunkte: AbnahmePunkt[] | null
   bautagebuch: Array<{
     datumSort: string
@@ -60,7 +62,6 @@ export type AbschlussdokuHtmlInput = {
   fotoUrls: Array<{ url: string; caption?: string | null }>
   mitBautagebuch: boolean
   mitFotos: boolean
-  mitHandwerker: boolean
 }
 
 function esc(s: string): string {
@@ -217,12 +218,37 @@ function auftragDetailsKarte(p: AbschlussdokuHtmlInput): string {
   </div>`
 }
 
+function abschlussEinleitungInhalte(p: AbschlussdokuHtmlInput): string {
+  const parts = ['die erbrachten Leistungen']
+  if (p.mitBautagebuch && p.bautagebuch.length > 0) parts.push(ABSCHLUSS_PROTOKOLL_TITEL)
+  if (p.abnahmePunkte && p.abnahmePunkte.length > 0) parts.push('Abnahme')
+  if (p.mitFotos && p.fotoUrls.length > 0) parts.push('Fotodokumentation')
+  if (parts.length === 1) return parts[0]!
+  const last = parts.pop()!
+  return `${parts.join(', ')} und ${last}`
+}
+
 function einleitungHtml(p: AbschlussdokuHtmlInput): string {
   const team = firmennameZeile(p)
+  const anrede = p.mail_anrede ?? 'sie'
+  const begr = esc(
+    p.begruessung?.trim() ||
+      (anrede === 'du' ? 'Hallo,' : 'Sehr geehrte Damen und Herren,')
+  )
+  const inhalte = esc(abschlussEinleitungInhalte(p))
+
+  if (anrede === 'du') {
+    return `<div style="margin:0 0 18px;font-size:10.5pt;line-height:1.65;color:${TEXT};">
+    <p style="margin:0;">${begr}</p>
+    <p style="margin:12px 0 0;">hiermit erhältst du die <strong>Abschlussdokumentation</strong> zu deinem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
+    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss.</p>
+  </div>`
+  }
+
   return `<div style="margin:0 0 18px;font-size:10.5pt;line-height:1.65;color:${TEXT};">
-    <p style="margin:0;">Sehr geehrte Damen und Herren,</p>
+    <p style="margin:0;">${begr}</p>
     <p style="margin:12px 0 0;">hiermit erhalten Sie die <strong>Abschlussdokumentation</strong> zu Ihrem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
-    <p style="margin:12px 0 0;">Dieses Dokument fasst — soweit vorhanden — das ${esc(ABSCHLUSS_PROTOKOLL_TITEL)}, die erbrachten Leistungen, beteiligte Partner, Abnahme und Fotodokumentation zusammen und dient als Nachweis zum Projektabschluss.</p>
+    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss.</p>
   </div>`
 }
 
@@ -315,15 +341,6 @@ function abnahmeHtml(punkte: AbnahmePunkt[]): string {
     .join('')
 }
 
-function handwerkerHtml(zeilen: string[]): string {
-  const items = zeilen
-    .map(
-      (z) => `<li style="margin:0 0 5px;padding:6px 8px;background:#F9FAFB;border:1px solid ${BORDER};border-radius:4px;font-size:9pt;list-style:none;">${esc(z)}</li>`
-    )
-    .join('')
-  return `<ul style="margin:0;padding:0;">${items}</ul>`
-}
-
 function bautagebuchUebersichtHtml(eintraege: AbschlussdokuHtmlInput['bautagebuch']): string {
   const byDate = new Map<string, AbschlussdokuHtmlInput['bautagebuch']>()
   for (const e of eintraege) {
@@ -378,9 +395,15 @@ function fotosHtml(bilder: AbschlussdokuHtmlInput['fotoUrls']): string {
 
 function abschlussHtml(p: AbschlussdokuHtmlInput): string {
   const team = firmennameZeile(p)
+  const anrede = p.mail_anrede ?? 'sie'
+  const bestaetigung =
+    anrede === 'du'
+      ? 'Mit dieser Abschlussdokumentation bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir dir jederzeit zur Verfügung.'
+      : 'Mit dieser Abschlussdokumentation bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir Ihnen jederzeit zur Verfügung.'
+  const gruss = anrede === 'du' ? 'Viele Grüße' : 'Mit freundlichen Grüßen'
   return `<div class="avoid-fuss-overlap" style="margin-top:24px;font-size:10.5pt;line-height:1.6;color:${TEXT};page-break-inside:avoid;">
-    <p style="margin:0 0 12px;">Mit dieser Abschlussdokumentation bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir Ihnen jederzeit zur Verfügung.</p>
-    <p style="margin:0 0 4px;">Mit freundlichen Grüßen</p>
+    <p style="margin:0 0 12px;">${bestaetigung}</p>
+    <p style="margin:0 0 4px;">${gruss}</p>
     <p style="margin:0;font-weight:700;color:${ACCENT};">${esc(team)}</p>
   </div>`
 }
@@ -458,10 +481,6 @@ export function buildAbschlussdokumentationHtml(p: AbschlussdokuHtmlInput): stri
   }
 
   sections.push(`${sectionHeading('Leistungsübersicht')}${leistungenTableHtml(p)}`)
-
-  if (p.mitHandwerker && p.handwerkerZeilen.length > 0) {
-    sections.push(`${sectionHeading('Beteiligte Handwerker & Partner')}${handwerkerHtml(p.handwerkerZeilen)}`)
-  }
 
   if (p.abnahmePunkte && p.abnahmePunkte.length > 0) {
     sections.push(`${sectionHeading('Abnahmeprotokoll')}${abnahmeHtml(p.abnahmePunkte)}`)

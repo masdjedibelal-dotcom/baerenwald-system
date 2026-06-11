@@ -54,10 +54,8 @@ import { summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   kannHinweis13bAngebot,
-  kannHinweis19Angebot,
   kannHinweis35aAngebot,
 } from '@/lib/angebote/angebot-rechtshinweise'
-import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
   buildAngebotMail,
   defaultAngebotEinleitungText,
@@ -353,13 +351,11 @@ export function AngebotWizard({
     () => summenAusPositionen(dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke), 19),
     [zeilen, firm, gewerke]
   )
-  const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
   const lohnNettoPdf =
     summenKostenaufstellungAusPositionen(
       dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke)
     )?.lohn_netto ?? 0
   const hinweis35aErlaubt = kannHinweis35aAngebot(kundeTyp, firm, lohnNettoPdf)
-  const hinweis19Erlaubt = kannHinweis19Angebot(firm)
   const hinweis13bErlaubt = kannHinweis13bAngebot(kundeTyp, firm)
 
   useEffect(() => {
@@ -452,7 +448,7 @@ export function AngebotWizard({
         meta: { ...meta, mit_anfahrt: mitAnfahrt },
         dokument_typ: dokumentTyp,
         projektbeschreibung: projektbeschreibung.trim() || null,
-        fotos_urls: dokumentTyp === 'projekt' ? projektFotos : [],
+        fotos_urls: projektFotos,
         wichtige_hinweise:
           dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
         varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
@@ -904,7 +900,7 @@ export function AngebotWizard({
                     value={[leadState.plz, leadState.kunden?.ort].filter(Boolean).join(' · ') || '—'}
                   />
                   <Detail
-                    label="Budget-Rahmen"
+                    label="Preisrahmen"
                     value={
                       lead.preis_min != null && lead.preis_max != null
                         ? formatEurRange(lead.preis_min, lead.preis_max)
@@ -1012,23 +1008,6 @@ export function AngebotWizard({
                   untertitel="Pro Gewerk eigener Abschnitt — Anfahrt je Gewerk separat"
                 />
               </WizardProjektSection>
-
-              <WizardProjektDivider />
-
-              <AngebotWizardFotodokumentation
-                fotos={projektFotos}
-                onChange={setProjektFotos}
-                notizFotos={notizFotos}
-                uploading={projektUploading}
-                disabled={saving}
-                onUploadFiles={(files) => void uploadProjektFotoFiles(files)}
-                onVisualisierenFoto={handleVisualisierenFoto}
-                visualisierenFotoUrl={vizFotoLoading}
-              />
-
-              <WizardProjektDivider />
-
-              <AngebotWizardVizBlock angebotId={angebotId} disabled={saving} />
                 </div>
               ) : dokumentTyp === 'einfach' ? (
                 <div className="wizard-projekt-flow">
@@ -1059,6 +1038,27 @@ export function AngebotWizard({
                   </WizardProjektSection>
                 </div>
               ) : null}
+
+              {dokumentTyp === 'projekt' || dokumentTyp === 'einfach' ? (
+                <>
+                  <WizardProjektDivider />
+
+                  <AngebotWizardFotodokumentation
+                    fotos={projektFotos}
+                    onChange={setProjektFotos}
+                    notizFotos={notizFotos}
+                    uploading={projektUploading}
+                    disabled={saving}
+                    onUploadFiles={(files) => void uploadProjektFotoFiles(files)}
+                    onVisualisierenFoto={handleVisualisierenFoto}
+                    visualisierenFotoUrl={vizFotoLoading}
+                  />
+
+                  <WizardProjektDivider />
+
+                  <AngebotWizardVizBlock angebotId={angebotId} disabled={saving} />
+                </>
+              ) : null}
             </>
           ) : null}
 
@@ -1070,6 +1070,16 @@ export function AngebotWizard({
                   onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
                   dokumentTyp={dokumentTyp}
                   todayYmd={todayYmd}
+                />
+
+                <WizardProjektDivider />
+
+                <AngebotWizardVersandEmpfaengerCard
+                  mailTo={mailTo}
+                  onMailToChange={setMailTo}
+                  mailCc={mailCc}
+                  onMailCcChange={setMailCc}
+                  disabled={saving}
                 />
 
                 <WizardProjektDivider />
@@ -1091,20 +1101,8 @@ export function AngebotWizard({
                   meta={meta}
                   onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
                   hinweis35aErlaubt={hinweis35aErlaubt}
-                  hinweis19Erlaubt={hinweis19Erlaubt}
                   hinweis13bErlaubt={hinweis13bErlaubt}
-                  kleinunternehmer={kleinunternehmer}
                   lohnNettoPdf={lohnNettoPdf}
-                />
-
-                <WizardProjektDivider />
-
-                <AngebotWizardVersandEmpfaengerCard
-                  mailTo={mailTo}
-                  onMailToChange={setMailTo}
-                  mailCc={mailCc}
-                  onMailCcChange={setMailCc}
-                  disabled={saving}
                 />
 
                 <Card className="border-dashed">

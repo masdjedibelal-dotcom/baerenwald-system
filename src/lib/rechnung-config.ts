@@ -33,8 +33,8 @@ export const HINWEIS_KLEINUNTERNEHMER =
 export const HINWEIS_REVERSE_CHARGE_13B =
   'Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG (Reverse Charge). Die USt. ist vom Leistungsempfänger zu entrichten.'
 
-/** § 35a EStG: Hinweistext (Platzhalter {lohnNetto} {abschlag20}) */
+/** § 35a Abs. 3 EStG — nur wenn Lohnkosten auf der Rechnung ausgewiesen sind (Platzhalter {lohnNetto}) */
 export const HINWEIS_35A_TEMPLATE =
-  'Für Privatkunden: Der Lohnkostenanteil von {lohnNetto} kann nach § 35a EStG steuerlich geltend gemacht werden (20 % = {abschlag20}).'
+  'Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von {lohnNetto} kann bei der Einkommensteuer geltend gemacht werden.'
 
 export const MWST_SAETZE_RECHNUNG = [0, 7, 19] as const

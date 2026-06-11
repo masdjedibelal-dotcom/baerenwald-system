@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { ChevronDown, Eye, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,8 +16,11 @@ import {
 } from '@/lib/auftraege/auftrag-position-blocks'
 import { BautagebuchKundeSendModal } from '@/components/auftraege/BautagebuchKundeSendModal'
 import {
+  anfrageHandwerkerBautagebuchEintrag,
   createAuftragBautagebuchEintrag,
   deleteAuftragBautagebuchEintrag,
+  freigebenBautagebuchEintrag,
+  listAuftragBautagebuch,
   updateAuftragBautagebuchEintrag,
 } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import {
@@ -27,6 +30,17 @@ import {
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
+
+const BAUTAGEBUCH_POLL_MS = 20_000
+
+function eintragFotosAnzeige(e: AuftragBautagebuchEintrag): string[] {
+  if (e.foto_display_urls?.length) return e.foto_display_urls
+  return e.foto_urls ?? []
+}
+
+function istPartnerEntwurf(e: AuftragBautagebuchEintrag): boolean {
+  return Boolean(e.handwerker_id) && !e.fuer_kunde_freigegeben
+}
 
 export function AuftragBautagebuchCard({
   auftragId,
@@ -62,8 +76,40 @@ export function AuftragBautagebuchCard({
   const [editGewerk, setEditGewerk] = useState('')
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editFotos, setEditFotos] = useState<string[]>([])
+  const [editFotoDisplay, setEditFotoDisplay] = useState<string[]>([])
   const [filterPartner, setFilterPartner] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [rows, setRows] = useState(eintraege)
+  const seenPartnerIds = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    setRows(eintraege)
+  }, [eintraege])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      void listAuftragBautagebuch(auftragId).then((list) => {
+        if (cancelled) return
+        setRows(list)
+        const neu = list.filter((e) => istPartnerEntwurf(e) && !seenPartnerIds.current.has(e.id))
+        if (neu.length) {
+          setOpenIds((prev) => {
+            const next = new Set(prev)
+            for (const e of neu) next.add(e.id)
+            return next
+          })
+          for (const e of neu) seenPartnerIds.current.add(e.id)
+        }
+      })
+    }
+    poll()
+    const id = window.setInterval(poll, BAUTAGEBUCH_POLL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [auftragId])
 
   const gewerkOptionen = useMemo(
     () => gewerkOptionenAusPositionen(positionen, gewerke),
@@ -87,7 +133,7 @@ export function AuftragBautagebuchCard({
   }
 
   const sorted = useMemo(() => {
-    let list = eintraege
+    let list = rows
     if (filterPartner) {
       list = list.filter((e) => Boolean(e.handwerker_id))
     }
@@ -96,12 +142,44 @@ export function AuftragBautagebuchCard({
       if (d !== 0) return d
       return (b.sort_order ?? 0) - (a.sort_order ?? 0)
     })
-  }, [eintraege, filterPartner])
+  }, [rows, filterPartner])
+
+  const pendingPartner = useMemo(
+    () =>
+      [...rows]
+        .filter(istPartnerEntwurf)
+        .sort((a, b) => new Date(b.created_at ?? b.datum).getTime() - new Date(a.created_at ?? a.datum).getTime()),
+    [rows]
+  )
 
   const partnerCount = useMemo(
-    () => eintraege.filter((e) => Boolean(e.handwerker_id)).length,
-    [eintraege]
+    () => rows.filter((e) => Boolean(e.handwerker_id)).length,
+    [rows]
   )
+
+  const zugewiesenePartner = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    for (const p of positionen) {
+      if (!p.handwerker_id) continue
+      map.set(p.handwerker_id, {
+        id: p.handwerker_id,
+        name: p.handwerker?.name?.trim() || 'Partner',
+      })
+    }
+    return Array.from(map.values())
+  }, [positionen])
+
+  function requestPartnerBautagebuch(handwerkerId: string, name: string) {
+    startTransition(async () => {
+      const res = await anfrageHandwerkerBautagebuchEintrag({ auftragId, handwerkerId })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(`Tagebucheintrag an ${name} angefordert.`)
+      onChanged()
+    })
+  }
 
   function toggleOpen(id: string) {
     setOpenIds((prev) => {
@@ -141,6 +219,7 @@ export function AuftragBautagebuchCard({
         setNeuFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
       } else {
         setEditFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
+        setEditFotoDisplay((prev) => mergeBautagebuchFotoUrls(prev, urls))
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
@@ -201,7 +280,19 @@ export function AuftragBautagebuchCard({
     )
     setEditBeschreibung(e.beschreibung ?? '')
     setEditFotos([...(e.foto_urls ?? [])])
+    setEditFotoDisplay(eintragFotosAnzeige(e))
     setOpenIds((prev) => new Set(prev).add(e.id))
+  }
+
+  function freigebenLive(e: AuftragBautagebuchEintrag) {
+    startTransition(async () => {
+      const r = await freigebenBautagebuchEintrag({ auftragId, eintragId: e.id })
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Eintrag ist auf der Kunden-Projektseite sichtbar.')
+        onChanged()
+      }
+    })
   }
 
   function saveEdit() {
@@ -313,6 +404,22 @@ export function AuftragBautagebuchCard({
 
   return (
     <div className="auftrag-bautagebuch auftrag-pos-compact">
+      {zugewiesenePartner.length > 0 ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {zugewiesenePartner.map((hw) => (
+            <Button
+              key={hw.id}
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={pending}
+              onClick={() => requestPartnerBautagebuch(hw.id, hw.name)}
+            >
+              Tagebuch einfordern · {hw.name}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <input
         ref={fileRef}
         type="file"
@@ -335,6 +442,71 @@ export function AuftragBautagebuchCard({
           e.target.value = ''
         }}
       />
+
+      {pendingPartner.length > 0 ? (
+        <div className="mb-4 space-y-3">
+          {pendingPartner.map((e) => {
+            const fotos = eintragFotosAnzeige(e)
+            return (
+              <div
+                key={`pending-${e.id}`}
+                className="rounded-lg border border-violet-300 bg-violet-50/80 p-4 shadow-sm"
+              >
+                <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">
+                      Neu vom Partner — zur Prüfung
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-bw-text">{e.titel}</p>
+                    <p className="text-xs text-bw-text-muted">
+                      {formatDatum(e.datum)}
+                      {e.handwerker?.name ? ` · ${e.handwerker.name}` : ''}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-950">
+                    Entwurf
+                  </span>
+                </div>
+
+                {e.beschreibung?.trim() ? (
+                  <RichTextContent html={e.beschreibung} className="text-[13px] text-bw-text" />
+                ) : (
+                  <p className="text-sm text-bw-text-muted">Keine Beschreibung.</p>
+                )}
+
+                {fotos.length > 0 ? (
+                  <div className="bt-foto-grid mt-3">
+                    {fotos.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="bt-foto-thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" variant="primary" size="sm" onClick={() => setSendEintrag(e)}>
+                    <Send className="mr-1 h-3 w-3" aria-hidden />
+                    An Kunden senden
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(e)}>
+                    <Pencil className="mr-1 h-3 w-3" aria-hidden />
+                    Bearbeiten
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" loading={pending} onClick={() => freigebenLive(e)}>
+                    Live stellen
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSendEintrag(e)}>
+                    <Eye className="mr-1 h-3 w-3" aria-hidden />
+                    Vorschau
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
 
       {(partnerCount > 0 || sorted.length > 0) ? (
         <div className="bt-list-toolbar">
@@ -359,7 +531,7 @@ export function AuftragBautagebuchCard({
       ) : null}
 
       {sorted.length === 0 ? (
-        eintraege.length === 0 ? (
+        rows.length === 0 ? (
           <div className="bt-empty-row">
             <p className="text-sm text-bw-text-muted">Noch keine Einträge</p>
             {addTrigger}
@@ -418,16 +590,19 @@ export function AuftragBautagebuchCard({
                           />
                         ) : null}
                         <Textarea label="Beschreibung" value={editBeschreibung} onChange={(ev) => setEditBeschreibung(ev.target.value)} rows={5} />
-                        {editFotos.length > 0 ? (
+                        {(e.foto_urls ?? []).length > 0 ? (
                           <div className="bt-foto-grid">
-                            {editFotos.map((url) => (
-                              <div key={url} className="bt-foto-thumb">
+                            {editFotoDisplay.map((url, i) => (
+                              <div key={`${url}-${i}`} className="bt-foto-thumb">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={url} alt="" />
                                 <button
                                   type="button"
                                   className="bt-foto-remove"
-                                  onClick={() => setEditFotos((p) => p.filter((u) => u !== url))}
+                                  onClick={() => {
+                                    setEditFotos((p) => p.filter((_, idx) => idx !== i))
+                                    setEditFotoDisplay((p) => p.filter((_, idx) => idx !== i))
+                                  }}
                                 >
                                   <X className="h-3 w-3" aria-hidden />
                                 </button>
@@ -464,9 +639,9 @@ export function AuftragBautagebuchCard({
                         ) : (
                           <p className="text-sm text-bw-text-muted">Keine Beschreibung.</p>
                         )}
-                        {(e.foto_urls ?? []).length > 0 ? (
+                        {eintragFotosAnzeige(e).length > 0 ? (
                           <div className="bt-foto-grid">
-                            {(e.foto_urls ?? []).map((url) => (
+                            {eintragFotosAnzeige(e).map((url) => (
                               <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="bt-foto-thumb">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={url} alt="" />

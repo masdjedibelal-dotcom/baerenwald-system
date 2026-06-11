@@ -4,6 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
+import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
+import {
+  filterLeistungComplianceTypen,
+  gewerkSlugsAusPositionen,
+  istPflichtFuerProjekt,
+} from '@/lib/handwerker/compliance-partner-profile'
+import { sendProjektvertragBereitMail } from '@/lib/vertraege/send-projektvertrag-bereit-mail'
 import {
   bauvorhabenAusAuftrag,
   leistungsumfangAusPositionen,
@@ -13,6 +21,7 @@ import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
+  CompliancePoolItem,
   HandwerkerVertragRow,
   ProjektVertragWizardBootstrap,
   ProjektVertragWizardMeta,
@@ -212,6 +221,97 @@ export async function loadProjektVertragBootstrap(
   }
 }
 
+export async function loadHandwerkerAcceptWizardBootstrap(input: {
+  auftragId: string
+  handwerkerId: string
+  gewerkId: string
+  zuweisungId: string
+}): Promise<{ ok: true; bootstrap: ProjektVertragWizardBootstrap } | { ok: false; message: string }> {
+  const auftragId = input.auftragId.trim()
+  const handwerkerId = input.handwerkerId.trim()
+  const gewerkId = input.gewerkId.trim()
+  const zuweisungId = input.zuweisungId.trim()
+  if (!auftragId || !handwerkerId || !gewerkId || !zuweisungId) {
+    return { ok: false, message: 'Auftrag, Handwerker, Gewerk oder Zuweisung fehlt.' }
+  }
+
+  const base = await loadProjektVertragBootstrap(auftragId)
+  if (!base.ok) return base
+
+  const gewerkName =
+    base.bootstrap.gewerk_optionen.find((g) => g.id === gewerkId)?.name ??
+    base.bootstrap.meta.gewerk_name ??
+    ''
+
+  const pos = positionenFuerHandwerkerGewerk(base.bootstrap.positionen, handwerkerId, gewerkName)
+  const meta: ProjektVertragWizardMeta = {
+    ...base.bootstrap.meta,
+    handwerker_id: handwerkerId,
+    gewerk_id: gewerkId,
+    gewerk_name: gewerkName,
+    bauvorhaben: bauvorhabenAusAuftrag({
+      titel: base.bootstrap.auftrag_titel,
+      kunde_adresse: base.bootstrap.kunde_adresse,
+      kunde_plz: base.bootstrap.kunde_plz,
+      kunde_ort: base.bootstrap.kunde_ort,
+      gewerk_name: gewerkName,
+    }),
+    leistungsumfang: leistungsumfangAusPositionen(pos),
+    verguetung_text: verguetungAusPositionen(pos),
+    notizen: base.bootstrap.meta.notizen?.trim()
+      ? base.bootstrap.meta.notizen
+      : 'Nach CRM-Übernahme — Partner bestätigt Vertrag und Unterlagen im Portal.',
+  }
+
+  const supabase = createClient()
+  const [typen, gewerke, zuordnungRes] = await Promise.all([
+    loadComplianceTypen(),
+    loadGewerkeAusfuehrung(supabase),
+    supabaseAdmin
+      .from('auftrag_handwerker')
+      .select('compliance_pflicht_slugs, handwerker(gewerke)')
+      .eq('auftrag_id', auftragId)
+      .eq('handwerker_id', handwerkerId)
+      .maybeSingle(),
+  ])
+
+  const projektGewerkSlugs = gewerkSlugsAusPositionen(
+    base.bootstrap.positionen.map((p) => ({ gewerk_slug: p.gewerk_slug }))
+  )
+  const hwGewerke =
+    (unwrapJoin(
+      (zuordnungRes.data as { handwerker?: { gewerke?: string[] | null } | null } | null)?.handwerker
+    )?.gewerke as string[] | null | undefined) ?? null
+
+  const poolTypen = filterLeistungComplianceTypen(typen, projektGewerkSlugs, hwGewerke, gewerke)
+  const compliance_pool: CompliancePoolItem[] = poolTypen.map((t) => ({
+    slug: t.slug,
+    bezeichnung: t.bezeichnung,
+    beschreibung: t.beschreibung,
+    default_pflicht: istPflichtFuerProjekt(t, projektGewerkSlugs, hwGewerke, gewerke),
+  }))
+
+  const savedSlugs = (zuordnungRes.data as { compliance_pflicht_slugs?: string[] | null } | null)
+    ?.compliance_pflicht_slugs
+  const initial_compliance_slugs =
+    savedSlugs != null
+      ? savedSlugs.filter((s) => compliance_pool.some((p) => p.slug === s))
+      : compliance_pool.filter((p) => p.default_pflicht).map((p) => p.slug)
+
+  return {
+    ok: true,
+    bootstrap: {
+      ...base.bootstrap,
+      meta,
+      accept_mode: {
+        zuweisung_id: zuweisungId,
+        compliance_pool,
+        initial_compliance_slugs,
+      },
+    },
+  }
+}
+
 export async function loadRahmenVertragBootstrap(
   handwerkerId: string,
   vertragId?: string | null
@@ -367,6 +467,63 @@ export async function finalizeProjektVertrag(payload: {
     vertrag_id: draft.vertrag_id,
     vertrags_nr: draft.vertrags_nr,
     pdf_url: pdf.publicUrl,
+  }
+}
+
+export async function finalizeHandwerkerAcceptWizard(payload: {
+  vertrag_id?: string | null
+  auftrag_id: string
+  handwerker_id: string
+  meta: ProjektVertragWizardMeta
+  compliance_slugs: string[]
+}): Promise<
+  { ok: true; vertrag_id: string; vertrags_nr: string; pdf_url: string; mailGesendet: boolean; mailHinweis?: string }
+  | { ok: false; message: string }
+> {
+  const auftragId = payload.auftrag_id.trim()
+  const handwerkerId = payload.handwerker_id.trim()
+  if (!auftragId || !handwerkerId) {
+    return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
+  }
+
+  const slugs = Array.from(new Set(payload.compliance_slugs.map((s) => s.trim()).filter(Boolean)))
+
+  const { error: slugErr } = await supabaseAdmin
+    .from('auftrag_handwerker')
+    .update({ compliance_pflicht_slugs: slugs })
+    .eq('auftrag_id', auftragId)
+    .eq('handwerker_id', handwerkerId)
+
+  if (slugErr) return { ok: false, message: slugErr.message }
+
+  const finalized = await finalizeProjektVertrag({
+    vertrag_id: payload.vertrag_id,
+    auftrag_id: auftragId,
+    meta: payload.meta,
+  })
+  if (!finalized.ok) return finalized
+
+  const mail = await sendProjektvertragBereitMail({
+    auftragId,
+    handwerkerId,
+    vertragId: finalized.vertrag_id,
+  })
+
+  const { data: auftrag } = await supabaseAdmin
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  const angebotId = (auftrag as { angebot_id?: string | null } | null)?.angebot_id
+  if (angebotId) revalidatePath(`/angebote/${angebotId}`)
+
+  return {
+    ok: true,
+    vertrag_id: finalized.vertrag_id,
+    vertrags_nr: finalized.vertrags_nr,
+    pdf_url: finalized.pdf_url,
+    mailGesendet: mail.ok && mail.gesendet,
+    mailHinweis: mail.ok && !mail.gesendet ? mail.hinweis : mail.ok ? undefined : mail.message,
   }
 }
 

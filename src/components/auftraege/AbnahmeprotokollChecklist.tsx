@@ -101,12 +101,14 @@ export function AbnahmeprotokollChecklist({
                         p.status === 'mangel' && isVorort && 'border-red-200 bg-red-50/50'
                       )}
                     >
-                      <div className={cn('flex gap-2', isVorort && 'w-full')}>
-                        <StatusToggle
-                          value={p.status}
-                          onChange={(s) => patchPunkt(p.id, { status: s })}
-                          compact={isVorort}
-                        />
+                      <div className={cn('flex gap-2', isVorort && 'w-full', !isVorort && 'w-full items-start')}>
+                        {isVorort ? (
+                          <StatusToggle
+                            value={p.status}
+                            onChange={(s) => patchPunkt(p.id, { status: s })}
+                            compact={isVorort}
+                          />
+                        ) : null}
                         <div className="min-w-0 flex-1">
                           {isVorort ? (
                             <p className="text-[14px] font-medium leading-snug text-bw-text">

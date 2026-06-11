@@ -9,6 +9,7 @@ import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leis
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase } from '@/lib/mail-templates'
+import { buildPortalLoginLink } from '@/lib/portal-utils'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
 import { BAUTAGEBUCH_MAX_FOTOS } from '@/lib/auftraege/bautagebuch-fotos'
@@ -94,13 +95,9 @@ function gewerkPhaseStrip(
 
 function updateBlock(
   eintrag: AuftragBautagebuchEintrag,
-  anrede: AngebotMailAnrede,
-  eintragLink?: string | null
+  anrede: AngebotMailAnrede
 ): string {
-  const titelRaw = eintrag.titel.trim()
-  const titel = eintragLink?.trim()
-    ? `<a href="${esc(eintragLink.trim())}" style="color:#1A3D2B;text-decoration:none;font-weight:700;">${esc(titelRaw)}</a>`
-    : esc(titelRaw)
+  const titel = esc(eintrag.titel.trim())
   const datum = esc(formatDatum(eintrag.datum))
   const label = anrede === 'du' ? 'Aktuelles Update' : 'Aktuelles Update'
   const beschreibungHtml = eintrag.beschreibung?.trim()
@@ -135,11 +132,10 @@ function projektUebersichtBlock(
   positionen: AuftragPosition[],
   gewerke: GewerkOpt[],
   eintrag: AuftragBautagebuchEintrag,
-  anrede: AngebotMailAnrede,
-  eintragLink?: string | null
+  anrede: AngebotMailAnrede
 ): string {
   const blocks = groupAuftragPositionenByGewerk(positionen, gewerke)
-  return `${gewerkPhaseStrip(blocks, eintrag)}${updateBlock(eintrag, anrede, eintragLink)}`
+  return `${gewerkPhaseStrip(blocks, eintrag)}${updateBlock(eintrag, anrede)}`
 }
 
 export function defaultBautagebuchKundenNachricht(
@@ -151,11 +147,11 @@ export function defaultBautagebuchKundenNachricht(
   if (anrede === 'du') {
     return `es gibt ein neues Update zu ${projekt} (${formatDatum(eintrag.datum)}): „${eintrag.titel.trim()}“.
 
-Unten findest du alle Details zu diesem Eintrag. Fotos und den vollständigen Verlauf siehst du in deinem Projekttagebuch.`
+Details, Fotos und den Verlauf findest du in MeinBärenwald.`
   }
   return `es gibt ein neues Update zu ${projekt} (${formatDatum(eintrag.datum)}): „${eintrag.titel.trim()}“.
 
-Unten sehen Sie alle Details zu diesem Eintrag. Fotos und den vollständigen Verlauf finden Sie in Ihrem Projekttagebuch.`
+Details, Fotos und den Verlauf finden Sie in MeinBärenwald.`
 }
 
 export function bautagebuchKundenMailBetreff(
@@ -187,25 +183,9 @@ export function buildBautagebuchKundenMail(
   const anrede = data.anrede
   const begr = esc(data.begruessung.trim() || (anrede === 'du' ? 'Hallo,' : 'Guten Tag,'))
   const nachrichtHtml = textToHtmlParagraphs(data.nachricht)
-  const link = data.statusLink?.trim() ?? ''
-  const uebersicht = projektUebersichtBlock(data.positionen, data.gewerke, data.eintrag, anrede, link)
+  const uebersicht = projektUebersichtBlock(data.positionen, data.gewerke, data.eintrag, anrede)
 
-  const ctaLabel = anrede === 'du' ? 'Dieses Update im Projekttagebuch' : 'Dieses Update im Projekttagebuch'
-  const ctaHint =
-    anrede === 'du'
-      ? 'Der Link führt direkt zu diesem Eintrag — weitere Updates und Fotos siehst du im Projekttagebuch.'
-      : 'Der Link führt direkt zu diesem Eintrag — weitere Updates und Fotos finden Sie im Projekttagebuch.'
-  const ctaHtml =
-    link && !data.previewMode
-      ? `<p style="margin:4px 0 16px;">${mailPrimaryButtonHtml(`${ctaLabel} →`, link, { margin: '0', size: 'sm' })}</p>
-         <p style="font-size:12px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${esc(ctaHint)}</p>`
-      : data.previewMode && !link
-        ? `<p style="font-size:12px;color:#6B7280;margin:16px 0 0;font-style:italic;line-height:1.5;">${
-            anrede === 'du'
-              ? 'Der persönliche Link zum Projekttagebuch wird beim Versand eingefügt.'
-              : 'Der persönliche Link zum Projekttagebuch wird beim Versand eingefügt.'
-          }</p>`
-        : ''
+  const portalTopHtml = `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', buildPortalLoginLink(), { margin: '0' })}</p>`
 
   const tel = esc(b.telefon)
   const telHref = tel.replace(/\s/g, '')
@@ -228,15 +208,15 @@ export function buildBautagebuchKundenMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+      ${portalTopHtml}
       ${nachrichtHtml}
       ${uebersicht}
-      ${ctaHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     disclaimer,
-    { anrede, statusLink: link || null }
+    { anrede, skipMeinBaerenwaldPs: true }
   )
 
   return {

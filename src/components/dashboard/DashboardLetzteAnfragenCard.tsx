@@ -1,10 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { Inbox } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { LeadStatusBadge } from '@/components/ui/Badge'
-import { LinkChevron } from '@/components/ui/LinkChevron'
+import { DashboardCardAlleLink } from '@/components/dashboard/DashboardCardAlleLink'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { AppEntityListRow } from '@/components/layout/app'
 import { DashboardCardPagination } from '@/components/dashboard/DashboardCardPagination'
@@ -24,24 +23,21 @@ export function DashboardLetzteAnfragenCard({ anfragen }: { anfragen: LeadWithAn
 
   return (
     <Card
+      collapsible={false}
       title={
         <span className="inline-flex items-center gap-2">
           <Inbox className="h-4 w-4 text-bw-text-muted" aria-hidden />
           Letzte Anfragen
         </span>
       }
-      action={
-        <Link href="/anfragen" className="text-xs font-medium text-bw-link hover:underline">
-          <LinkChevron>Alle</LinkChevron>
-        </Link>
-      }
+      action={<DashboardCardAlleLink href="/anfragen" />}
       bodyClassName="p-0"
     >
       {pager.total === 0 ? (
         <p className="px-4 py-6 text-sm text-bw-text-muted">Noch keine Anfragen.</p>
       ) : (
         <>
-          <DashboardCardScrollList>
+          <DashboardCardScrollList paginated>
             {pager.pageItems.map((lead) => (
               <AppEntityListRow
                 key={lead.id}

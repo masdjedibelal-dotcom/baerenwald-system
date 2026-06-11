@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { AlertCircle, Calendar, Inbox, Sparkles } from 'lucide-react'
+import { AlertCircle, Calendar, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Props = {
   offeneAnfragen: number
-  anfragenUeber24h: number
+  anfragenUeber48h: number
   termineHeute: number
   offeneTodos: number
 }
@@ -50,36 +50,27 @@ function TodayChip({
 
 export function DashboardTodayBar({
   offeneAnfragen,
-  anfragenUeber24h,
+  anfragenUeber48h,
   termineHeute,
   offeneTodos,
 }: Props) {
   return (
-    <section className="space-y-2" aria-label="Heute">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-bw-text">Heute</h2>
-        <Link
-          href="/ki-analytics"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#2E7D52]/25 bg-[#EAF3DE]/80 px-2.5 py-1 text-xs font-medium text-[#1A3D2B] hover:bg-[#EAF3DE]"
-        >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          KI Hub
-        </Link>
-      </div>
+    <section className="space-y-2" aria-label="Aufgaben">
+      <h2 className="text-sm font-semibold text-bw-text">Aufgaben</h2>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <TodayChip
-          href="/anfragen"
+          href="/anfragen?status=neu"
           icon={Inbox}
           label="Offene Anfragen"
           value={offeneAnfragen}
-          tone={anfragenUeber24h > 0 ? 'warn' : 'ok'}
+          tone={anfragenUeber48h > 0 ? 'warn' : 'ok'}
         />
         <TodayChip
           href="/anfragen?status=neu"
           icon={AlertCircle}
-          label=">24h ohne Antwort"
-          value={anfragenUeber24h}
-          tone={anfragenUeber24h > 0 ? 'warn' : 'neutral'}
+          label=">48h ohne Antwort"
+          value={anfragenUeber48h}
+          tone={anfragenUeber48h > 0 ? 'warn' : 'neutral'}
         />
         <TodayChip
           href="/kalender"
@@ -90,7 +81,7 @@ export function DashboardTodayBar({
         <TodayChip
           href="/kalender"
           icon={Calendar}
-          label="Offene To-dos"
+          label="Offene Termine"
           value={offeneTodos}
         />
       </div>

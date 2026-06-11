@@ -94,7 +94,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   angebot: 'Angebot',
   auftrag: 'Auftrag',
   abgeschlossen: 'Abgeschlossen',
-  abgebrochen: 'Abgelehnt', // LEAD_ABGEBROCHEN_LABEL in crm-labels.ts
+  abgebrochen: 'Verloren', // LEAD_ABGEBROCHEN_LABEL in crm-labels.ts
 }
 
 export const VERLOREN_GRUND_LABELS: Record<string, string> = {
@@ -345,12 +345,12 @@ export function formatAnfragePreisAnzeige(
 
 /** Tabellenkopf bei gemischten Kanälen. */
 export function anfragenPreisSpaltenLabel(): string {
-  return 'Preis / Budget'
+  return 'Preisrahmen'
 }
 
-/** Detail-Ansicht: Website = Preis, sonst Budget. */
-export function anfragePreisDetailLabel(kanal: LeadKanal): string {
-  return kanal === 'website' ? 'Preis' : 'Budget'
+/** Detail-Ansicht: einheitlich Preisrahmen. */
+export function anfragePreisDetailLabel(_kanal: LeadKanal): string {
+  return 'Preisrahmen'
 }
 
 /** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */

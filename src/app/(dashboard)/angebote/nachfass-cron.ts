@@ -32,7 +32,7 @@ export async function runAngebotNachfassCron(): Promise<{
       anrede,
       status,
       status_einfach,
-      kunden(name, email, typ, vorname, nachname, firma),
+      kunden(name, email, typ, vorname, nachname),
       leads(plz, kontakt_name, kundentyp)
     `
     )

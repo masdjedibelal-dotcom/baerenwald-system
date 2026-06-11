@@ -329,10 +329,9 @@ function rechtshinweisePlain(
   const lohn = ka?.lohn_netto ?? 0
   const pStyle = `margin:0 0 8px;font-size:8pt;color:${TEXT_PRIMARY};line-height:1.55;text-align:left;font-weight:400;`
   if (rh.hinweis_35a && lohn > 0) {
-    const abschlag20 = Math.round(lohn * 0.2 * 100) / 100
     parts.push(
       `<p style="${pStyle}">
-        <strong>Hinweis § 35a EStG:</strong> Der Lohnkostenanteil von ${euro(lohn)} kann bei privaten Auftraggebern steuerlich geltend gemacht werden (20&nbsp;% ≈ ${euro(abschlag20)}).
+        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${euro(lohn)} kann bei der Einkommensteuer geltend gemacht werden.
       </p>`
     )
   }
@@ -476,19 +475,44 @@ function angebotDokumentEndeHtml(props: AngebotHtmlInput): string {
   </div>`
 }
 
-function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
+/** Logo-Band für PDFs (Angebot, Abnahmeprotokoll, …). */
+export function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
   const src = props.firmen_logo_url?.trim()
   if (!src || /^file:/i.test(src)) return ''
   if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  const name = firmennameZeile(props)
   const safeSrc = src.replace(/"/g, '&quot;')
   return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${PROJEKT_ACCENT};">
-    <img src="${safeSrc}" alt="${esc(name)}" style="height:80px;width:auto;max-width:320px;object-fit:contain;display:block;" />
+    <img src="${safeSrc}" alt="" role="presentation" style="height:80px;width:auto;max-width:320px;object-fit:contain;display:block;" />
   </div>`
 }
 
+/** Rechnungs-Briefkopf — gleiches Layout wie Projektangebot (Logo + grüner Kopfbalken). */
+function rechnungBriefkopfHtml(props: AngebotHtmlInput): string {
+  const projektTitel =
+    props.projekt_titel?.trim() || props.leistungsumfang?.trim() || 'Rechnung'
+  const teamLabel = `${firmennameZeile(props)} Team`
+  return `<header style="border-bottom:3px solid ${PROJEKT_ACCENT};padding-bottom:14px;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:9pt;color:${TEXT_PRIMARY};text-transform:uppercase;letter-spacing:0.06em;font-weight:400;">Rechnung</div>
+        <h1 style="font-size:15pt;font-weight:700;color:${PROJEKT_ACCENT};margin:6px 0 0;line-height:1.3;">
+          ${esc(projektTitel)}
+        </h1>
+        <div style="margin-top:10px;font-size:9pt;line-height:1.5;color:${TEXT_PRIMARY};font-weight:400;">
+          Ausführung durch geprüfte Fach- &amp; Subunternehmen<br/>
+          Koordination: ${esc(teamLabel)}
+        </div>
+      </div>
+      <div style="flex:0 0 auto;padding-top:2px;text-align:right;">
+        ${briefAbsenderHtml(props).replace('margin-bottom:6mm;', 'margin-bottom:10px;')}
+        ${briefMetaHtml(props)}
+      </div>
+    </div>
+  </header>`
+}
+
 /** Kleiner Briefkopf-Absender (DIN-ähnlich, wie Musterangebot). */
-function briefAbsenderHtml(props: AngebotHtmlInput): string {
+export function briefAbsenderHtml(props: AngebotHtmlInput): string {
   const kontakt = props.firmen_kontakt
     .split(' · ')
     .map((z) => z.trim())
@@ -540,10 +564,11 @@ function briefMetaHtml(props: AngebotHtmlInput): string {
 }
 
 /** Briefkopf: Titel links, Absender + Meta rechtsbündig. */
-function briefkopfZeileHtml(
+export function briefkopfZeileHtml(
   props: AngebotHtmlInput,
   titel: string,
-  titelStyle = `font-size:18pt;font-weight:700;margin:0 0 8px;color:${TEXT_PRIMARY};`
+  titelStyle = `font-size:18pt;font-weight:700;margin:0 0 8px;color:${TEXT_PRIMARY};`,
+  metaHtml?: string
 ): string {
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:18px;">
     <div style="flex:1;min-width:0;">
@@ -551,7 +576,7 @@ function briefkopfZeileHtml(
     </div>
     <div style="flex:0 0 auto;padding-top:2px;text-align:right;">
       ${briefAbsenderHtml(props).replace('margin-bottom:6mm;', 'margin-bottom:10px;')}
-      ${briefMetaHtml(props)}
+      ${metaHtml ?? briefMetaHtml(props)}
     </div>
   </div>`
 }
@@ -1006,6 +1031,7 @@ export function buildAngebotHtml(
       : ''
 
   const schlussBlock = istRechnung ? rechnungPdfSchlussHtml(props) : angebotDokumentEndeHtml(props)
+  const bankBlock = bankverbindungHtml(props, props.angebotsnr)
 
   const variantBlock = (() => {
     const vb = props.variant_block
@@ -1017,14 +1043,23 @@ export function buildAngebotHtml(
   ${summenBlockHtml(vb.summen)}`
   })()
 
+  const fotosBlock =
+    props.dokumentation_bilder && props.dokumentation_bilder.length > 0
+      ? projektFotosHtml(props.dokumentation_bilder)
+      : ''
+
   const erstePosUeberschrift =
     props.variant_erste_ueberschrift?.trim()
       ? `<h2 style="font-size:13pt;font-weight:700;color:${TEXT_PRIMARY};margin:18px 0 8px;">${esc(props.variant_erste_ueberschrift.trim())}</h2>`
       : ''
 
+  const kopfBlock = istRechnung
+    ? rechnungBriefkopfHtml(props)
+    : briefkopfZeileHtml(props, dokumentTitel)
+
   const body = `
   ${angebotLogoKopfHtml(props)}
-  ${briefkopfZeileHtml(props, dokumentTitel)}
+  ${kopfBlock}
   ${briefEmpfaengerHtml(props)}
   <p style="margin:0 0 12px;line-height:1.55;font-size:11pt;color:${TEXT_PRIMARY};font-weight:400;">
     ${begr}<br/><br/>
@@ -1033,12 +1068,14 @@ export function buildAngebotHtml(
   ${kiViz}
   ${erstePosUeberschrift}
   ${posTables}
+  ${fotosBlock}
   ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise)}
   ${variantBlock}
   <p style="margin-top:18px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${esc(props.zahlungsbedingungen)}</p>
+  ${istRechnung ? bankBlock : ''}
   ${hinweisBlock}
   ${schlussBlock}
-  ${bankverbindungHtml(props, props.angebotsnr)}
+  ${!istRechnung ? bankBlock : ''}
   `
 
   const docTitle = istRechnung ? `Rechnung ${props.angebotsnr}` : `Angebot ${props.angebotsnr}`

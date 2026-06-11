@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { notifyNewLeadAlert } from '@/lib/copilot/crm-actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAnfrageBestaetigung } from '@/app/actions/mails'
-import { tomorrowYmd } from '@/lib/kalender-auto-termine'
 import { collectGroessenFromFunnelDaten } from '@/lib/lead-funnel-daten'
 import { isEchterFreitext } from '@/lib/lead-display-helpers'
 import {
@@ -214,19 +213,6 @@ export async function POST(req: Request) {
     titel: 'Anfrage erstellt',
     beschreibung: null,
     erstellt_von: null,
-  })
-
-  await supabaseAdmin.from('kalender_termine').insert({
-    titel: `Kontakt: ${name}`,
-    datum: tomorrowYmd(),
-    typ: 'sonstiges',
-    lead_id: leadId,
-    auftrag_id: null,
-    uhrzeit_von: null,
-    uhrzeit_bis: null,
-    adresse: null,
-    beschreibung: null,
-    erledigt: false,
   })
 
   if (kanal === 'website') {

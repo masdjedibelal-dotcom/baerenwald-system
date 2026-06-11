@@ -21,6 +21,11 @@ import {
 import { BEREICH_LABELS, KANAL_LABELS, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
+import {
+  GROESSEN_EINHEITEN,
+  defaultGroesseEinheit,
+  groesseEinheitLabel,
+} from '@/lib/dokument-einheiten'
 import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
 import { namenAusFunnelDaten, splitDeutscherVollname } from '@/lib/kunde-namen'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
@@ -102,6 +107,7 @@ export function AnfrageNeuForm({
   const [bereiche, setBereiche] = useState<string[]>([])
   const [fachdetails, setFachdetails] = useState<Record<string, string>>({})
   const [groessen, setGroessen] = useState<Record<string, number>>({})
+  const [groessenEinheiten, setGroessenEinheiten] = useState<Record<string, string>>({})
   const [kundentyp, setKundentyp] = useState('')
   const [zeitraum, setZeitraum] = useState('')
   const [zustand, setZustand] = useState('')
@@ -267,6 +273,19 @@ export function AnfrageNeuForm({
     }
     setGroessen(gro)
 
+    const eRaw =
+      fd.groessen_einheiten &&
+      typeof fd.groessen_einheiten === 'object' &&
+      fd.groessen_einheiten !== null &&
+      !Array.isArray(fd.groessen_einheiten)
+        ? (fd.groessen_einheiten as Record<string, unknown>)
+        : {}
+    const einheiten: Record<string, string> = {}
+    for (const [k, v] of Object.entries(eRaw)) {
+      if (typeof v === 'string' && v.trim()) einheiten[k] = v.trim()
+    }
+    setGroessenEinheiten(einheiten)
+
     const kt = typeof fd.kundentyp === 'string' && fd.kundentyp ? fd.kundentyp : (L.kundentyp ?? '').trim()
     setKundentyp(kt)
 
@@ -314,6 +333,7 @@ export function AnfrageNeuForm({
     setBereiche(val === 'gewerbe' ? ['gewerbe'] : [])
     setFachdetails({})
     setGroessen({})
+    setGroessenEinheiten({})
     setZustand('')
     setDringlichkeit('')
     setZugaenglichkeit('')
@@ -413,6 +433,7 @@ export function AnfrageNeuForm({
           .map(([k, v]) => [k, [v]])
       ),
       groessen,
+      groessen_einheiten: groessenEinheiten,
       quelle: 'crm_manuell',
     }
 
@@ -791,7 +812,7 @@ export function AnfrageNeuForm({
                       <input
                         type="number"
                         min={0}
-                        className="input flex-1"
+                        className="input min-w-0 flex-1"
                         name={`groesse-${bereich}`}
                         value={groessen[bereich] ?? ''}
                         onChange={(e) => {
@@ -809,7 +830,21 @@ export function AnfrageNeuForm({
                         }}
                         placeholder="0"
                       />
-                      <span className="shrink-0 text-sm text-bw-text-muted">{g.einheit}</span>
+                      <select
+                        className="input shrink-0"
+                        value={groessenEinheiten[bereich] ?? defaultGroesseEinheit(bereich)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setGroessenEinheiten((prev) => ({ ...prev, [bereich]: val }))
+                        }}
+                        aria-label={`Einheit ${groessePropLabel(bereich)}`}
+                      >
+                        {GROESSEN_EINHEITEN.map((u) => (
+                          <option key={u} value={u}>
+                            {groesseEinheitLabel(u)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     {g.hinweis ? <p className="form-field-hint">{g.hinweis}</p> : null}
                   </Field>

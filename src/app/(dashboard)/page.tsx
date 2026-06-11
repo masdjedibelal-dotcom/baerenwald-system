@@ -3,10 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Begruessing } from '@/components/dashboard/Begruessing'
 import { DashboardTodayBar } from '@/components/dashboard/DashboardTodayBar'
-import { DashboardAuftraegeImLauf } from '@/components/dashboard/DashboardAuftraegeImLauf'
-import { DashboardLetzteAnfragenCard } from '@/components/dashboard/DashboardLetzteAnfragenCard'
-import { DashboardOffeneTodosCard } from '@/components/dashboard/DashboardOffeneTodosCard'
-import { DashboardAktivitaetCard } from '@/components/dashboard/DashboardAktivitaetCard'
+import { DashboardDetailsSection } from '@/components/dashboard/DashboardDetailsSection'
 import { buildDashboardAktivitaet } from '@/lib/dashboard-aktivitaet'
 import { deltaVsPrevious } from '@/lib/dashboard-delta'
 import { dashboardLeadPeriodBoundaries } from '@/lib/dashboard-periods'
@@ -15,7 +12,7 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotListeEintrag, AngebotPosition, KalenderTermin, LeadWithAngebote } from '@/lib/types'
 import type { AuftragListeEintrag } from '@/lib/types'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
-import { CheckCircle2, Inbox, FileText, Wrench } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 
 export const revalidate = 60
 
@@ -97,15 +94,10 @@ export default async function DashboardPage() {
   const [
     neueAnfragenWocheCount,
     neueAnfragenVorwocheCount,
-    neueAnfragenMonatCount,
-    neueAnfragenVormonatCount,
     offeneAngeboteCount,
     aktiveAuftraegeCount,
-    auftraegeInArbeitCount,
     abgeschlossenMonatCount,
     abgeschlossenVormonatCount,
-    abgeschlossenWocheCount,
-    abgeschlossenVorwocheCount,
     offeneTodos,
     letzteAnfragen,
     letzteAngebote,
@@ -126,19 +118,6 @@ export default async function DashboardPage() {
     ),
     safeCount(() =>
       supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', leadPeriods.monthStartIso)
-    ),
-    safeCount(() =>
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', leadPeriods.prevMonthStartIso)
-        .lt('created_at', leadPeriods.monthStartIso)
-    ),
-    safeCount(() =>
-      supabase
         .from('angebote')
         .select('id', { count: 'exact', head: true })
         .in('status', ['gesendet_kunde', 'gesendet_handwerker', 'handwerker_akzeptiert'])
@@ -148,12 +127,6 @@ export default async function DashboardPage() {
         .from('auftraege')
         .select('id', { count: 'exact', head: true })
         .in('status', ['offen', 'in_arbeit', 'abnahme'])
-    ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'in_arbeit')
     ),
     safeCount(() =>
       supabase
@@ -170,21 +143,6 @@ export default async function DashboardPage() {
         .gte('updated_at', leadPeriods.prevMonthStartIso)
         .lt('updated_at', leadPeriods.monthStartIso)
     ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'abgeschlossen')
-        .gte('updated_at', leadPeriods.weekStartIso)
-    ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'abgeschlossen')
-        .gte('updated_at', leadPeriods.prevWeekStartIso)
-        .lt('updated_at', leadPeriods.weekStartIso)
-    ),
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
@@ -197,6 +155,7 @@ export default async function DashboardPage() {
       `
           )
           .eq('erledigt', false)
+          .in('typ', ['besichtigung', 'beginn', 'abnahme'])
           .order('datum', { ascending: true })
           .order('uhrzeit_von', { ascending: true })
           .limit(128)
@@ -263,13 +222,11 @@ export default async function DashboardPage() {
   const aktivitaet = buildDashboardAktivitaet(anfragenListe, angeboteListe, auftraegeListe)
 
   const heuteIso = new Date().toISOString().slice(0, 10)
-  const offeneAnfragenCount = anfragenListe.filter((l) =>
-    ['neu', 'kontaktiert', 'termin'].includes(l.status)
-  ).length
-  const anfragenUeber24h = anfragenListe.filter((l) => {
-    if (!['neu', 'kontaktiert', 'termin'].includes(l.status)) return false
+  const offeneAnfragenCount = anfragenListe.filter((l) => l.status === 'neu').length
+  const anfragenUeber48h = anfragenListe.filter((l) => {
+    if (l.status !== 'neu') return false
     const h = (Date.now() - new Date(l.created_at).getTime()) / 3_600_000
-    return h >= 24
+    return h >= 48
   }).length
   const termineHeute = offeneTodosListe.filter((t) => String(t.datum).slice(0, 10) === heuteIso).length
 
@@ -280,48 +237,26 @@ export default async function DashboardPage() {
     neueAnfragenVorwocheCount,
     'vs. Vorwoche'
   )
-  const deltaNeueAnfragenMonat = deltaVsPrevious(
-    neueAnfragenMonatCount,
-    neueAnfragenVormonatCount,
-    'vs. Vormonat'
-  )
-  const subDeltaNeueAnfragenMonat =
-    neueAnfragenMonatCount > 0 || neueAnfragenVormonatCount > 0
-      ? {
-          prefix: `${neueAnfragenMonatCount} im Monat · `,
-          ...(deltaNeueAnfragenMonat ?? { label: 'kein Vergleich', trend: 'neutral' as const }),
-        }
-      : undefined
   const deltaAbgeschlossenMonat = deltaVsPrevious(
     abgeschlossenMonatCount,
     abgeschlossenVormonatCount,
     'vs. Vormonat'
   )
-  const deltaAbgeschlossenWoche = deltaVsPrevious(
-    abgeschlossenWocheCount,
-    abgeschlossenVorwocheCount,
-    'vs. Vorwoche'
-  )
-  const subDeltaAbgeschlossenWoche =
-    abgeschlossenWocheCount > 0 || abgeschlossenVorwocheCount > 0
-      ? {
-          prefix: `${abgeschlossenWocheCount} diese Woche · `,
-          ...(deltaAbgeschlossenWoche ?? { label: 'kein Vergleich', trend: 'neutral' as const }),
-        }
-      : undefined
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 max-md:pb-mobile-fab-extra md:px-6">
+    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 md:px-6">
       <Begruessing name={vorname} />
 
       <DashboardTodayBar
         offeneAnfragen={offeneAnfragenCount}
-        anfragenUeber24h={anfragenUeber24h}
+        anfragenUeber48h={anfragenUeber48h}
         termineHeute={termineHeute}
         offeneTodos={offeneTodosListe.length}
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section className="space-y-2" aria-label="Kennzahlen">
+        <h2 className="text-sm font-semibold text-bw-text">Kennzahlen</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           zahl={neueAnfragenWocheCount}
           label="Neue Anfragen diese Woche"
@@ -329,50 +264,39 @@ export default async function DashboardPage() {
           href={DASHBOARD_FILTER_LINKS.neueAnfragen}
           farbe="blau"
           delta={deltaNeueAnfragenWoche}
-          subDelta={subDeltaNeueAnfragenMonat}
+          layout="compact"
         />
         <StatCard
           zahl={offeneAngeboteCount}
           label="Offene Angebote"
-          icon={FileText}
           href={DASHBOARD_FILTER_LINKS.offeneAngebote}
           farbe="orange"
+          layout="minimal"
         />
         <StatCard
           zahl={aktiveAuftraegeCount}
           label="Aktive Aufträge"
-          icon={Wrench}
           href={DASHBOARD_FILTER_LINKS.aktiveAuftraege}
           farbe="gruen"
-          delta={
-            auftraegeInArbeitCount > 0
-              ? {
-                  label: `${auftraegeInArbeitCount} in Ausführung`,
-                  trend: 'neutral',
-                }
-              : undefined
-          }
+          layout="minimal"
         />
         <StatCard
           zahl={abgeschlossenMonatCount}
           label="Abgeschlossene Aufträge diesen Monat"
-          icon={CheckCircle2}
           href={DASHBOARD_FILTER_LINKS.abgeschlosseneAuftraege}
           farbe="lila"
           delta={deltaAbgeschlossenMonat}
-          subDelta={subDeltaAbgeschlossenWoche}
+          layout="compact"
         />
-      </div>
+        </div>
+      </section>
 
-      <div className="dashboard-grid-2">
-        <DashboardLetzteAnfragenCard anfragen={anfragenListe} />
-        <DashboardOffeneTodosCard termine={offeneTodosListe} />
-      </div>
-
-      <div className="dashboard-grid-2">
-        <DashboardAuftraegeImLauf auftraege={auftraegeListe} />
-        <DashboardAktivitaetCard items={aktivitaet} />
-      </div>
+      <DashboardDetailsSection
+        anfragen={anfragenListe}
+        angebote={angeboteListe}
+        auftraege={auftraegeListe}
+        aktivitaet={aktivitaet}
+      />
     </div>
   )
 }

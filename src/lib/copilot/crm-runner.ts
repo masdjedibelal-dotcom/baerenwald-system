@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { CRM_ACTION_REGISTRY, listCrmAktionen } from '@/lib/copilot/crm-registry'
+import { formatUnknownError } from '@/lib/copilot/format-unknown-error'
 
 export { listCrmAktionen }
 
@@ -35,7 +36,7 @@ export async function executeCrmAktion(
   try {
     return await entry.handler(params)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+    const msg = formatUnknownError(e)
     return { error: msg, aktion: key }
   }
 }

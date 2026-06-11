@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
@@ -37,7 +38,6 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
-import { AbnahmeprotokollModal } from '@/components/auftraege/AbnahmeprotokollModal'
 import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
 import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
 import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
@@ -54,6 +54,7 @@ import {
   updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
+import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
@@ -65,6 +66,7 @@ import type {
   AuftragDetail,
   FormularTemplate,
   Gewerk,
+  Lead,
   LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
@@ -92,9 +94,19 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
-import { auftragHandwerkerComplianceZeilen } from '@/lib/handwerker/compliance-vertrag-status'
+import type { AngebotHandwerkerRow } from '@/lib/types'
+
+const KundeModal = dynamic(
+  () => import('@/components/kunden/KundeModal').then((mod) => ({ default: mod.KundeModal })),
+  { ssr: false }
+)
 
 type GewerkOpt = { id: string; name: string; slug: string }
+
+type AuftragLeadSnapshot = Pick<
+  Lead,
+  'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
+>
 
 type AuftragDetailTab = 'stammdaten' | 'leistung' | 'schritte' | 'aktivitaet' | 'dokumente' | 'finanzen'
 
@@ -110,6 +122,7 @@ const MOBILE_AUFTRAG_TABS: AuftragDetailTab[] = [
 
 export function AuftragDetailClient({
   detail: initial,
+  lead = null,
   templates,
   gewerke = [],
   preislisten = [],
@@ -124,6 +137,7 @@ export function AuftragDetailClient({
   rahmenVertraegeByHandwerker = {},
 }: {
   detail: AuftragDetail
+  lead?: AuftragLeadSnapshot | null
   templates: FormularTemplate[]
   gewerke?: GewerkOpt[]
   preislisten?: Preisliste[]
@@ -140,7 +154,8 @@ export function AuftragDetailClient({
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
   const isMobile = useIsMobile()
-  const mailCompose = useKundenMailCompose()
+  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
+  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
   const [detail, setDetail] = useState(initial)
   const [err, setErr] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -157,8 +172,6 @@ export function AuftragDetailClient({
   const [projektTitel, setProjektTitel] = useState('')
   const [projektStart, setProjektStart] = useState('')
   const [projektEnde, setProjektEnde] = useState('')
-  const [abnahmeModal, setAbnahmeModal] = useState(false)
-  const [abnahmeModalStep, setAbnahmeModalStep] = useState<1 | 2 | 3 | 4>(1)
   const [abschlussModal, setAbschlussModal] = useState(false)
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
@@ -187,16 +200,9 @@ export function AuftragDetailClient({
     setRechnungWizardOpen(true)
   }, [])
 
-  const openAbnahme = useCallback(
-    (step: 1 | 2 | 3 | 4 = 1) => {
-      if (isMobile) router.push(`/auftraege/${detail.id}/abnahme`)
-      else {
-        setAbnahmeModalStep(step)
-        setAbnahmeModal(true)
-      }
-    },
-    [detail.id, isMobile, router]
-  )
+  const openAbnahme = useCallback(() => {
+    router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+  }, [detail.id, router])
 
   const openAbschluss = useCallback(() => {
     if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
@@ -491,56 +497,46 @@ export function AuftragDetailClient({
   )
 
   const hatAbnahme = Boolean(detail.abnahme_protokoll_url)
+  const hatRechnung = rechnungenListe.length > 0
 
-  const complianceZeilen = useMemo(() => {
-    const rows = detail.auftrag_handwerker ?? []
-    const seen = new Set<string>()
-    const handwerker = rows
-      .filter((z) => {
-        if (!z.handwerker_id || seen.has(z.handwerker_id)) return false
-        seen.add(z.handwerker_id)
-        return true
-      })
-      .map((z) => ({
-        handwerker_id: z.handwerker_id,
-        name: z.handwerker?.name ?? z.handwerker?.firma ?? 'Handwerker',
-        projektvertrag_bestaetigt_am: z.projektvertrag_bestaetigt_am ?? null,
-      }))
-    const rahmenMap = new Map(Object.entries(rahmenVertraegeByHandwerker))
-    return auftragHandwerkerComplianceZeilen({
-      auftragId: detail.id,
-      handwerker,
-      complianceTypen,
-      partnerDokumente,
-      vertraege: vertraegeListe,
-      rahmenVertraegeByHandwerker: rahmenMap,
-    })
-  }, [
-    detail.auftrag_handwerker,
-    detail.id,
-    complianceTypen,
-    partnerDokumente,
-    vertraegeListe,
-    rahmenVertraegeByHandwerker,
-  ])
+  const angebotHandwerker = useMemo((): AngebotHandwerkerRow[] => {
+    const raw = detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null | undefined
+    return raw?.angebot_handwerker ?? []
+  }, [detail.angebote])
 
   const naechsteSchritte = useMemo(
     () =>
       buildAuftragNaechsteSchritte({
         status: detail.status,
         auftragId: detail.id,
+        angebotId: detail.angebot_id,
         hatAbnahme,
-        rechnungenCount: rechnungenListe.length,
-        complianceZeilen,
-        onProjektVertragWizard: () => void openNachunternehmervertrag(),
+        hatRechnung,
+        positionen: detail.auftrag_positionen ?? [],
+        auftragHandwerkerCount: detail.auftrag_handwerker?.length ?? 0,
+        angebotHandwerker,
+        bautagebuchCount: detail.auftrag_bautagebuch?.length ?? 0,
+        onHandwerkerZuweisen: () => setMainTab('leistung'),
+        onBautagebuch: () => setMainTab('leistung'),
+        onHwAngebot: detail.angebot_id
+          ? () => router.push(`/angebote/${detail.angebot_id}`)
+          : undefined,
+        onAbschluss: openAbschluss,
+        onRechnung: openRechnungErstellen,
       }),
     [
       detail.status,
       detail.id,
+      detail.angebot_id,
+      detail.auftrag_positionen,
+      detail.auftrag_handwerker,
+      detail.auftrag_bautagebuch,
       hatAbnahme,
-      rechnungenListe.length,
-      complianceZeilen,
-      openNachunternehmervertrag,
+      hatRechnung,
+      angebotHandwerker,
+      openAbschluss,
+      openRechnungErstellen,
+      router,
     ]
   )
 
@@ -611,10 +607,48 @@ export function AuftragDetailClient({
 
   const stammdatenInhalt = (
     <div className="space-y-3">
+      <KundenStammdatenCard
+        kunde={kunde}
+        fallback={
+          lead
+            ? {
+                plz: lead.plz,
+                kontakt_name: lead.kontakt_name,
+                kontakt_email: lead.kontakt_email,
+                kontakt_telefon: lead.kontakt_telefon,
+                funnel_daten: lead.funnel_daten,
+              }
+            : null
+        }
+        action={
+          kunde ? (
+            <button
+              type="button"
+              onClick={() => setStammdatenModalOpen(true)}
+              className="btn btn-ghost btn-sm"
+              aria-label="Stammdaten bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          ) : null
+        }
+      />
       <AuftragDetailTopCards detail={detail} team={team} />
       <KommunikationCard
         filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
         reloadKey={mailCompose.reloadKey + generation}
+        toolbar={
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))}
+          >
+            <Mail className="h-3.5 w-3.5" aria-hidden />
+            E-Mail schreiben
+          </Button>
+        }
       />
     </div>
   )
@@ -656,16 +690,7 @@ export function AuftragDetailClient({
           onChanged={() => refresh()}
         />
       </Card>
-      <AuftragAbnahmeprotokollCard
-        auftragId={detail.id}
-        kundeName={name}
-        positionen={detail.auftrag_positionen ?? []}
-        angebotPositionen={detail.angebote?.positionen ?? []}
-        gewerke={gewerke}
-        abnahmeProtokollUrl={detail.abnahme_protokoll_url}
-        abnahmeDatum={detail.abnahme_datum}
-        onChanged={() => refresh()}
-      />
+      <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
     </div>
   )
 
@@ -935,18 +960,6 @@ export function AuftragDetailClient({
         ) : null}
       </Modal>
 
-      <AbnahmeprotokollModal
-        open={abnahmeModal}
-        onClose={() => setAbnahmeModal(false)}
-        auftragId={detail.id}
-        positionen={detail.auftrag_positionen ?? []}
-        angebotPositionen={detail.angebote?.positionen ?? []}
-        gewerke={gewerke}
-        kundeName={name}
-        initialStep={abnahmeModalStep}
-        onDone={() => refresh()}
-      />
-
       <AbschlussdokumentationModal
         open={abschlussModal}
         onClose={() => setAbschlussModal(false)}
@@ -1020,6 +1033,22 @@ export function AuftragDetailClient({
         ziele={hwBewertungZiele ?? []}
         onSaved={() => refresh()}
       />
+
+      {kunde ? (
+        <KundeModal
+          open={stammdatenModalOpen}
+          onClose={() => setStammdatenModalOpen(false)}
+          editKunde={kunde}
+          leadFunnelDaten={lead?.funnel_daten}
+          stayOnPage
+          revalidateAnfrageId={lead?.id}
+          onSaved={() => {
+            toast.success('Stammdaten gespeichert')
+            setStammdatenModalOpen(false)
+            refresh()
+          }}
+        />
+      ) : null}
 
       {mailCompose.modal}
     </div>

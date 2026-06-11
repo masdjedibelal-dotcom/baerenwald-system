@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
+import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
@@ -50,15 +51,41 @@ export function AngebotVersandSection({
   bruttoMax,
   positionen,
   gueltigBis,
+  mode = 'full',
+  kundeModalOpen,
+  onKundeModalOpenChange,
+  onKundeSent,
+  auftragId = null,
+  angebotTitel,
+  onAcceptWizard,
 }: {
   detail: AngebotDetail
   bruttoMin: number
   bruttoMax: number
   positionen: AngebotPosition[]
   gueltigBis: string
+  /** full = Kunde + Handwerker; kunde = nur Kunden-Modal; handwerker = nur Handwerker-Block */
+  mode?: 'full' | 'kunde' | 'handwerker'
+  kundeModalOpen?: boolean
+  onKundeModalOpenChange?: (open: boolean) => void
+  onKundeSent?: () => void
+  auftragId?: string | null
+  angebotTitel?: string
+  onAcceptWizard?: (ctx: {
+    auftragId: string
+    handwerkerId: string
+    gewerkId: string
+    zuweisungId: string
+  }) => void
 }) {
   const router = useRouter()
-  const [kundeModal, setKundeModal] = useState(false)
+  const [kundeModalInternal, setKundeModalInternal] = useState(false)
+  const kundeModalControlled = kundeModalOpen !== undefined
+  const kundeModal = kundeModalControlled ? kundeModalOpen : kundeModalInternal
+  const setKundeModal = (open: boolean) => {
+    if (kundeModalControlled) onKundeModalOpenChange?.(open)
+    else setKundeModalInternal(open)
+  }
   const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
   const [hwModal, setHwModal] = useState<{
     id: string
@@ -85,6 +112,10 @@ export function AngebotVersandSection({
     }) ?? (kundeName.split(/\s+/)[0] || kundeName)
 
   const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
+  const titel =
+    angebotTitel?.trim() ||
+    detail.notizen?.trim()?.slice(0, 80) ||
+    (detail.angebotsnr ? `Angebot ${detail.angebotsnr}` : 'Projekt')
 
   const previewHtml = useMemo(() => {
     const posMail = normalizeAngebotPositionen(positionen)
@@ -138,6 +169,7 @@ export function AngebotVersandSection({
       }
       toast.success(`Angebot an ${kundeName} gesendet`)
       setKundeModal(false)
+      onKundeSent?.()
       router.refresh()
     })
   }
@@ -233,16 +265,23 @@ export function AngebotVersandSection({
     })
   }
 
-  return (
-    <section className="mb-6">
-      <h2 className="mb-3 text-lg font-semibold text-ink">Versand</h2>
+  const showKundeBlock = mode === 'full' || mode === 'kunde'
+  const showHandwerkerBlock = mode === 'full' || mode === 'handwerker'
+  const showKundeModalOnly = mode === 'kunde'
 
-      {allHandwerkerAngefragt && rows.length > 0 ? (
+  return (
+    <section className={showKundeModalOnly ? undefined : 'mb-6'}>
+      {!showKundeModalOnly ? (
+        <h2 className="mb-3 text-lg font-semibold text-ink">Versand</h2>
+      ) : null}
+
+      {allHandwerkerAngefragt && rows.length > 0 && showHandwerkerBlock ? (
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
           Alle Handwerker wurden angefragt.
         </div>
       ) : null}
 
+      {showKundeBlock && !showKundeModalOnly ? (
       <Card id="angebot-versand-kunde" className="mb-6 space-y-4 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Kunden senden</h3>
         {kannAnKunde ? (
@@ -259,7 +298,9 @@ export function AngebotVersandSection({
           </p>
         )}
       </Card>
+      ) : null}
 
+      {showHandwerkerBlock ? (
       <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Handwerker senden</h3>
         {rows.length === 0 ? (
@@ -271,50 +312,61 @@ export function AngebotVersandSection({
               const name = z.handwerker?.name ?? '—'
               const gw = z.gewerke?.name ?? 'Gewerk'
               return (
-                <li key={z.id} className="flex flex-col gap-3 py-4 first:pt-0 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-medium text-ink">
-                      {name} — {gw}
-                    </p>
-                    <span
-                      className={cn(
-                        'mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                        hwBadgeClass(z.status as string)
-                      )}
-                    >
-                      {hwStatusLabel(z.status as string)}
-                    </span>
+                <li key={z.id} className="flex flex-col gap-3 py-4 first:pt-0">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium text-ink">
+                        {name} — {gw}
+                      </p>
+                      <span
+                        className={cn(
+                          'mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                          hwBadgeClass(z.status as string)
+                        )}
+                      >
+                        {hwStatusLabel(z.status as string)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending}
+                        title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
+                        onClick={() => openHandwerkerModal(z)}
+                      >
+                        <Mail className="mr-1 inline h-4 w-4" aria-hidden />
+                        Partner-Mail
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending}
+                        title="Partner-Login — Status wird auf „angefragt“ gesetzt"
+                        onClick={() => void sendHandwerker(z, false)}
+                      >
+                        <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
+                        WhatsApp-Link
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending}
-                      title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
-                      onClick={() => openHandwerkerModal(z)}
-                    >
-                      <Mail className="mr-1 inline h-4 w-4" aria-hidden />
-                      Partner-Mail
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending}
-                      title="Partner-Login — Status wird auf „angefragt“ gesetzt"
-                      onClick={() => void sendHandwerker(z, false)}
-                    >
-                      <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
-                      WhatsApp-Link
-                    </Button>
-                  </div>
+                  <HandwerkerEinreichungPruefung
+                    z={z}
+                    angebotId={detail.id}
+                    angebotTitel={titel}
+                    auftragId={auftragId}
+                    onRefresh={() => router.refresh()}
+                    onAcceptWizard={onAcceptWizard}
+                  />
                 </li>
               )
             })}
           </ul>
         )}
       </Card>
+      ) : null}
 
       <Modal
         open={kundeModal}

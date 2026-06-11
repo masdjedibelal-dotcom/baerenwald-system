@@ -17,6 +17,17 @@ export function defaultPortalInviteText(anrede: 'du' | 'sie'): string {
   )
 }
 
+export function defaultPartnerPortalInviteBetreff(): string {
+  return 'Dein Zugang zum Partner-Portal'
+}
+
+export function defaultPartnerPortalInviteText(): string {
+  return (
+    'hier ist dein Zugang zum Partner-Portal von Bärenwald.\n\n' +
+    'Registriere dich mit deiner bei uns hinterlegten E-Mail-Adresse — danach siehst du Anfragen, Aufträge, Angebote und Dokumente.'
+  )
+}
+
 function publicWebsiteBaseUrl(): string {
   return (
     process.env.FRONTEND_URL ??
@@ -30,9 +41,14 @@ export function buildPortalLoginLink(): string {
   return `${publicWebsiteBaseUrl()}/portal/login`
 }
 
-/** Handwerker-Partner-Portal (Website), z. B. WhatsApp-Link */
+/** Partner-Portal-Startseite (Website). Unauthenticated → Middleware leitet zu Login mit next=/partner. */
+export function buildPartnerDashboardLink(): string {
+  return `${publicWebsiteBaseUrl()}/partner`
+}
+
+/** @deprecated Name historisch — nutze buildPartnerDashboardLink(); zeigt auf /partner, nicht /partner/login. */
 export function buildPartnerLoginLink(): string {
-  return `${publicWebsiteBaseUrl()}/partner/login`
+  return buildPartnerDashboardLink()
 }
 
 export function buildPartnerRegisterUrl(): string {
@@ -44,10 +60,15 @@ export function buildPartnerAuftragPortalUrl(auftragId: string): string {
   return `${publicWebsiteBaseUrl()}/partner?section=auftraege&auftrag=${encodeURIComponent(id)}`
 }
 
-/** Login mit Weiterleitung zum Auftrag im Partner-Portal (für E-Mails). */
+/** Auftrags-Zuweisung — Annehmen/Ablehnen unter Anfragen (Listen-ID: auftrag:{id}). */
+export function buildPartnerAuftragAnfragePortalUrl(auftragId: string): string {
+  const id = auftragId.trim()
+  return `${publicWebsiteBaseUrl()}/partner?section=anfragen&id=${encodeURIComponent(`auftrag:${id}`)}`
+}
+
+/** Deep-Link zum Auftrag im Partner-Portal (für E-Mails). */
 export function buildPartnerLoginForAuftragUrl(auftragId: string): string {
-  const next = buildPartnerAuftragPortalUrl(auftragId)
-  return `${buildPartnerLoginLink()}?next=${encodeURIComponent(next)}`
+  return buildPartnerAuftragPortalUrl(auftragId)
 }
 
 /** Angebote-Tab im Partner-Portal (Vertrag + Checkliste nach Übernahme). */
@@ -56,9 +77,9 @@ export function buildPartnerAngebotPortalUrl(anfrageId: string): string {
   return `${publicWebsiteBaseUrl()}/partner?section=angebote&id=${encodeURIComponent(id)}`
 }
 
+/** Deep-Link zum Angebote-Tab (für E-Mails). */
 export function buildPartnerLoginForAngebotUrl(anfrageId: string): string {
-  const next = buildPartnerAngebotPortalUrl(anfrageId)
-  return `${buildPartnerLoginLink()}?next=${encodeURIComponent(next)}`
+  return buildPartnerAngebotPortalUrl(anfrageId)
 }
 
 export function buildPartnerPortalButton(portalLink: string): string {
@@ -71,7 +92,7 @@ export function buildPartnerPortalButton(portalLink: string): string {
   margin:0 0 16px;
   line-height:1.6;
   font-family:Arial,Helvetica,sans-serif;">
-  Mit deiner bei uns hinterlegten E-Mail anmelden oder registrieren — danach siehst du Auftrag und Leistungen.
+  Melde dich mit deiner bei Bärenwald hinterlegten Partner-E-Mail an — danach siehst du Auftrag und Leistungen.
 </p>`
 }
 

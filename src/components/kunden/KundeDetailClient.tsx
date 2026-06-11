@@ -892,7 +892,7 @@ export function KundeDetailClient({
             <div>Nr.</div>
             <div>Anfrage</div>
             <div>Eingegangen</div>
-            <div className="text-right">Budget</div>
+            <div className="text-right">Preisrahmen</div>
             <div>Status</div>
           </div>
           {[...(kunde.leads ?? [])]

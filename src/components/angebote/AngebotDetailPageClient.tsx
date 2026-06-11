@@ -55,8 +55,10 @@ import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbei
 import { previewAuftragsbestaetigungMail } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
+import { KundeModal } from '@/components/kunden/KundeModal'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import {
@@ -81,7 +83,7 @@ import {
   type AngebotPositionBlockGroup,
 } from '@/lib/angebote/angebot-position-blocks'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { kundentypLabel } from '@/lib/lead-display-helpers'
+import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import type { AngebotDetail, AngebotPosition, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
 import type { KiVisualisierung } from '@/lib/visualize/types'
 import { cn, formatDatum, formatDatumZeit } from '@/lib/utils'
@@ -92,7 +94,9 @@ import {
 import { buildAngebotNaechsteSchritte } from '@/lib/naechste-schritte'
 import {
   darfAngebotAnKundeSenden,
+  handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
+import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 function positionNetto(p: AngebotPosition): number {
@@ -256,6 +260,8 @@ export function AngebotDetailPageClient({
     if (raw && raw > heuteYmd()) return raw
     return addDaysYmd(heuteYmd(), 30)
   })
+  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
+  const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
 
   const statusEinfach = resolveStatusEinfach(detail)
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
@@ -337,6 +343,15 @@ export function AngebotDetailPageClient({
 
   const kundeName = kundeNameAusAngebot(detail)
   const summen = useMemo(() => angebotSummenBrutto(detail.positionen ?? []), [detail.positionen])
+  const summenMail = useMemo(
+    () => summenAusPositionen(detail.positionen ?? [], 19),
+    [detail.positionen]
+  )
+  const gueltigBisYmd = detail.gueltig_bis?.slice(0, 10) ?? addDaysYmd(heuteYmd(), 30)
+  const kannAngebotVersenden =
+    (statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
+    darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status) &&
+    Boolean(kunde?.email?.trim())
   const gueltigTone = gueltigBisTone(detail.gueltig_bis)
   const tageRest = daysUntil(detail.gueltig_bis)
   const gesendetAm = gesendetAmWert(detail)
@@ -370,8 +385,23 @@ export function AngebotDetailPageClient({
     setVerlaengernOpen(true)
   }
 
-  const mailCompose = useKundenMailCompose()
+  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail = kunde?.email?.trim() ?? ''
+
+  function openAngebotVersandModal() {
+    if (kannAngebotVersenden) {
+      setKundeVersandOpen(true)
+      return
+    }
+    if (!kundeEmail) {
+      toast.error('Kunden-E-Mail fehlt — Versand nicht möglich.')
+      return
+    }
+    toast.error(
+      handwerkerSendenBlockierHinweis(detail.angebot_handwerker ?? []) ||
+        'Angebot kann derzeit nicht an den Kunden gesendet werden.'
+    )
+  }
 
   function run(action: () => Promise<{ ok: boolean; message?: string }>, okMsg: string) {
     startTransition(async () => {
@@ -526,30 +556,47 @@ export function AngebotDetailPageClient({
     return '—'
   })()
 
-  const adresse = kunde
-    ? [kunde.strasse, kunde.hausnummer, kunde.plz, kunde.ort].filter(Boolean).join(' ')
-    : '—'
+  const kundeCard = (
+    <KundenStammdatenCard
+      kunde={kunde}
+      fallback={
+        lead
+          ? {
+              plz: lead.plz,
+              kontakt_name: lead.kontakt_name,
+              kontakt_email: lead.kontakt_email,
+              kontakt_telefon: lead.kontakt_telefon,
+              funnel_daten: lead.funnel_daten,
+            }
+          : null
+      }
+      action={
+        kunde ? (
+          <button
+            type="button"
+            onClick={() => setStammdatenModalOpen(true)}
+            className="btn btn-ghost btn-sm"
+            aria-label="Stammdaten bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        ) : null
+      }
+    />
+  )
 
   const naechsteSchritte = useMemo(
     () =>
       buildAngebotNaechsteSchritte({
         status: statusEinfach,
         angebotId: detail.id,
-        angebotStatusRaw: detail.status,
-        handwerkerRows: detail.angebot_handwerker ?? [],
-        leadId: detail.lead_id,
         auftragId,
-        onHandwerkerAnfragen: () => {
-          document.getElementById('angebot-versand-handwerker')?.scrollIntoView({ behavior: 'smooth' })
-        },
-        onHandwerkerBestaetigen: () => {
-          document.getElementById('handwerker-partner')?.scrollIntoView({ behavior: 'smooth' })
-        },
-        onSenden:
-          statusEinfach === 'entwurf' && darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)
-            ? () => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')
+        nachgefasst: Boolean(detail.nachgefasst_am),
+        onNachfassen:
+          (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !detail.nachgefasst_am
+            ? () => run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet')
             : undefined,
-        onAnnehmen:
+        onAuftragAnlegen:
           statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
             ? () => {
                 setAufBetreff('')
@@ -560,7 +607,12 @@ export function AngebotDetailPageClient({
               }
             : undefined,
       }),
-    [statusEinfach, detail.id, detail.status, detail.lead_id, detail.angebot_handwerker, auftragId]
+    [
+      statusEinfach,
+      detail.id,
+      detail.nachgefasst_am,
+      auftragId,
+    ]
   )
 
   const offeneSchritteCount = useMemo(
@@ -643,34 +695,6 @@ export function AngebotDetailPageClient({
 
   const formatEur = (n: number) =>
     n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-
-  const kundeCard = (
-    <Card collapsible title="Kunde">
-      <div className="props">
-        <DetailProp label="Name">{kundeName}</DetailProp>
-        <DetailProp label="Telefon">
-          {kunde?.telefon ? (
-            <a href={`tel:${kunde.telefon.replace(/\s/g, '')}`} className="text-bw-link">
-              {kunde.telefon}
-            </a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="E-Mail">
-          {kunde?.email ? (
-            <a href={`mailto:${kunde.email}`} className="text-bw-link">
-              {kunde.email}
-            </a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="Adresse">{adresse || '—'}</DetailProp>
-        <DetailProp label="Kundentyp">{kunde?.typ ? kundentypLabel(kunde.typ) : '—'}</DetailProp>
-      </div>
-    </Card>
-  )
 
   const angebotsdatenCard = (
     <Card collapsible title="Angebotsdaten">
@@ -806,8 +830,58 @@ export function AngebotDetailPageClient({
       {kundeCard}
       {angebotsdatenCard}
       <KommunikationCard
-        filter={{ angebotId: detail.id, kundeId: detail.kunde_id ?? undefined }}
+        filter={{
+          angebotId: detail.id,
+          leadId: detail.lead_id ?? undefined,
+          kundeId: detail.kunde_id ?? undefined,
+        }}
         reloadKey={mailCompose.reloadKey + generation}
+        toolbar={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id))}
+            >
+              <Mail className="h-3.5 w-3.5" aria-hidden />
+              E-Mail schreiben
+            </Button>
+            {statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert' ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="gap-1.5"
+                onClick={openAngebotVersandModal}
+              >
+                <Send className="h-3.5 w-3.5" aria-hidden />
+                Angebot versenden
+              </Button>
+            ) : null}
+          </div>
+        }
+      />
+      <AngebotVersandSection
+        mode="kunde"
+        detail={detail}
+        bruttoMin={summenMail.bruttoMin}
+        bruttoMax={summenMail.bruttoMax}
+        positionen={detail.positionen ?? []}
+        gueltigBis={gueltigBisYmd}
+        kundeModalOpen={kundeVersandOpen}
+        onKundeModalOpenChange={setKundeVersandOpen}
+        onKundeSent={() => refresh()}
+      />
+      <AngebotVersandSection
+        mode="handwerker"
+        detail={detail}
+        bruttoMin={summenMail.bruttoMin}
+        bruttoMax={summenMail.bruttoMax}
+        positionen={detail.positionen ?? []}
+        gueltigBis={gueltigBisYmd}
+        auftragId={auftragId}
       />
     </div>
   )
@@ -1159,6 +1233,22 @@ export function AngebotDetailPageClient({
           </div>
         </div>
       </Modal>
+
+      {kunde ? (
+        <KundeModal
+          open={stammdatenModalOpen}
+          onClose={() => setStammdatenModalOpen(false)}
+          editKunde={kunde}
+          leadFunnelDaten={lead?.funnel_daten}
+          stayOnPage
+          revalidateAnfrageId={lead?.id}
+          onSaved={() => {
+            toast.success('Stammdaten gespeichert')
+            setStammdatenModalOpen(false)
+            refresh()
+          }}
+        />
+      ) : null}
 
       {mailCompose.modal}
     </div>

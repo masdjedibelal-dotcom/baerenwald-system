@@ -30,7 +30,7 @@ function normalizeZuRow(zu: Record<string, unknown>): ZuRow {
 
 /**
  * Status „angefragt“ + optional Partner-Mail (Website-API, nicht CRM-Resend).
- * Link für WhatsApp: Partner-Login (`/partner/login`).
+ * Link für WhatsApp: Partner-Portal-Start (`/partner`).
  */
 export async function sendHandwerkerAnfrageFuerZuweisung(
   detail: AngebotDetail,

@@ -14,8 +14,7 @@ import {
 import type { AngebotPosition, Kunde, RechnungBelegTyp } from '@/lib/types'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import {
-  abschlag35aEur,
-  kundeZeigt35a,
+  rechnungZeigtHinweis35a,
   positionNettoZeile,
 } from '@/lib/rechnung-berechnung'
 import {
@@ -161,7 +160,6 @@ export function RechnungPdfDocument({
   const ustFirma = firm.ust_id?.trim() || firm.steuernummer?.trim() || ''
   const titel = beleg_typ === 'gutschrift' ? 'GUTSCHRIFT' : 'RECHNUNG'
   const lohnAnzeige = berechnung.lohn_netto
-  const abschlag20 = abschlag35aEur(lohnAnzeige)
 
   let posIndex = 0
 
@@ -270,12 +268,12 @@ export function RechnungPdfDocument({
           </View>
         </View>
 
-        {beleg_typ === 'rechnung' && kundeZeigt35a(kunde.typ) && lohnAnzeige > 0 ? (
+        {beleg_typ === 'rechnung' &&
+        rechnungZeigtHinweis35a(kunde.typ, lohnAnzeige, berechnung.kleinunternehmer) ? (
           <View style={styles.box}>
-            <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Hinweis § 35a EStG</Text>
-            <Text>
-              Der Lohnkostenanteil von {eur(lohnAnzeige)} kann nach § 35a EStG steuerlich geltend
-              gemacht werden (20 % = ca. {eur(abschlag20)}).
+            <Text style={{ marginBottom: 4 }}>
+              Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe
+              von {eur(lohnAnzeige)} kann bei der Einkommensteuer geltend gemacht werden.
             </Text>
           </View>
         ) : null}

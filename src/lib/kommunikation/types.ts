@@ -44,6 +44,8 @@ export type KommunikationListeZeile = {
   betreff: string
   created_at: string
   status: string
+  gesendet_von: string | null
+  gesendet_von_name: string | null
 }
 
 /** Versteckter Marker in ausgehenden Mails für Antwort-Zuordnung. */

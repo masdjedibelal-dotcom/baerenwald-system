@@ -277,18 +277,17 @@ function buildModel(
       return { info, primary, secondary, destructive, milestone }
     }
     if (status === 'abnahme') {
-      if (bool(data, 'alle_maengel_behoben')) {
-        primary = { id: 'auftrag.abnahme_abschliessen', label: 'Abnahme abschließen', icon: Check, tier: 'primary' }
-      } else {
-        primary = {
-          id: 'navigate',
-          label: 'Abnahmeprotokoll',
-          icon: ClipboardList,
-          tier: 'primary',
-          href: `/auftraege/${id}/abnahme`,
-        }
-      }
+      primary = { id: 'auftrag.abnahme_abschliessen', label: 'Abnahme abschließen', icon: Check, tier: 'primary' }
       secondary.push(
+        {
+          id: 'navigate',
+          label: str(data, 'abnahme_protokoll_url') ? 'Abnahmeprotokoll' : 'Abnahmeprotokoll erstellen',
+          icon: ClipboardList,
+          tier: 'secondary',
+          href: str(data, 'abnahme_protokoll_url')
+            ? `/auftraege/${id}/abnahme`
+            : `/auftraege/${id}/abnahme/erstellen`,
+        },
         { id: 'auftrag.mangel', label: 'Mangel hinzufügen', icon: Plus, tier: 'secondary' },
         { id: 'auftrag.abnahme_mail', label: 'Abnahme-Termin Mail', icon: Mail, tier: 'secondary' }
       )

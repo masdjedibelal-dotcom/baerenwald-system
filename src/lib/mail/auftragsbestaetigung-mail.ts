@@ -7,6 +7,7 @@ import {
 } from '@/lib/kunde-rechnungsempfaenger'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
+import { buildPortalLoginLink } from '@/lib/portal-utils'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 function esc(s: string): string {
@@ -60,13 +61,13 @@ export function buildAuftragsbestaetigungMail(
 
   const stepsDu = [
     'Wir planen Termine und koordinieren die Gewerke für dich.',
-    'Pro Meilenstein oder abgeschlossenem Gewerk erhältst du per E-Mail ein Update mit Link zu deinem Projekttagebuch — dort findest du auf der Landingpage alle Details, Fotos und den Verlauf.',
+    'Pro Meilenstein oder abgeschlossenem Gewerk erhältst du per E-Mail ein Update — Details, Fotos und Verlauf siehst du in MeinBärenwald.',
     'Wir führen die Arbeiten gemäß Angebot aus.',
     'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
   ]
   const stepsSie = [
     'Wir planen Termine und koordinieren die Gewerke für Sie.',
-    'Pro Meilenstein oder abgeschlossenem Gewerk erhalten Sie per E-Mail ein Update mit Link zu Ihrem Projekttagebuch — dort finden Sie auf der Landingpage alle Details, Fotos und den Verlauf.',
+    'Pro Meilenstein oder abgeschlossenem Gewerk erhalten Sie per E-Mail ein Update — Details, Fotos und Verlauf finden Sie in MeinBärenwald.',
     'Wir führen die Arbeiten gemäß Angebot aus.',
     'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
   ]
@@ -87,22 +88,7 @@ export function buildAuftragsbestaetigungMail(
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:#374151;margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
   })
 
-  const link = data.statusLink?.trim() ?? ''
-  const ctaLabel = anrede === 'du' ? 'Projekttagebuch öffnen' : 'Projekttagebuch öffnen'
-  const ctaHint =
-    anrede === 'du'
-      ? 'Über diesen Link erreichst du jederzeit dein Projekttagebuch. Neue Meilensteine und Gewerk-Updates schicken wir dir zusätzlich per E-Mail.'
-      : 'Über diesen Link erreichen Sie jederzeit Ihr Projekttagebuch. Neue Meilensteine und Gewerk-Updates senden wir Ihnen zusätzlich per E-Mail.'
-  const ctaHtml =
-    link && !data.previewMode
-      ? `<p style="margin:20px 0 8px;">${mailPrimaryButtonHtml(`${ctaLabel} →`, link, { margin: '0', size: 'sm' })}</p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${esc(ctaHint)}</p><p style="font-size:12px;color:#6B7280;margin:0 0 16px;"><a href="${esc(link)}" style="color:#2E7D52;text-decoration:underline;word-break:break-all;">Link zum Projekttagebuch</a></p>`
-      : data.previewMode
-        ? `<p style="font-size:13px;color:#6B7280;margin:16px 0 0;font-style:italic;line-height:1.5;">${
-            anrede === 'du'
-              ? 'Der persönliche Link zum Projekttagebuch wird beim Erstellen des Auftrags erzeugt. Pro Meilenstein bzw. Gewerkabschluss erhältst du zusätzlich eine Update-E-Mail mit Link zur Landingpage.'
-              : 'Der persönliche Link zum Projekttagebuch wird beim Erstellen des Auftrags erzeugt. Pro Meilenstein bzw. Gewerkabschluss erhalten Sie zusätzlich eine Update-E-Mail mit Link zur Landingpage.'
-          }</p>`
-        : ''
+  const portalTopHtml = `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', buildPortalLoginLink(), { margin: '0' })}</p>`
 
   const tel = esc(b.telefon)
   const telHref = tel.replace(/\s/g, '')
@@ -124,17 +110,17 @@ export function buildAuftragsbestaetigungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+      ${portalTopHtml}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       <p style="font-size:14px;font-weight:600;color:#111111;margin:0 0 8px;">${stepsTitle}</p>
       <ol style="margin:0 0 16px;padding-left:20px;">${stepsHtml}</ol>
-      ${ctaHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:14px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     undefined,
-    { anrede, statusLink: link || null }
+    { anrede, skipMeinBaerenwaldPs: true }
   )
 
   return { betreff, html }

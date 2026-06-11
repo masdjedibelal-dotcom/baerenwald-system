@@ -16,13 +16,12 @@ import {
   normalizeFunnelDaten,
 } from '@/lib/lead-funnel-daten'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
-import { kundentypLabel, zeitraumLabel } from '@/lib/lead-display-helpers'
+import { kundentypLabel, resolveLeadPreisAnzeige, zeitraumLabel } from '@/lib/lead-display-helpers'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
 import {
   BEREICH_LABELS,
   KANAL_LABELS,
-  formatAnfragePreisAnzeige,
   formatDatum,
   formatDatumZeit,
 } from '@/lib/utils'
@@ -89,10 +88,14 @@ export function LeadFunnelProjektAnzeige({
     norm.labels.dringlichkeit
   )
 
-  const hatPreis =
-    (lead.preis_min != null && lead.preis_min > 0) ||
-    (lead.preis_max != null && lead.preis_max > 0) ||
-    (lead.budget_ca != null && lead.budget_ca > 0)
+  const budgetAnzeige = resolveLeadPreisAnzeige(
+    lead.kanal,
+    lead.budget_ca,
+    lead.preis_min,
+    lead.preis_max,
+    lead.funnel_daten
+  )
+  const hatPreis = budgetAnzeige !== '—'
 
   const groessenEntries = Object.entries(norm.groessen)
     .filter(([, v]) => v > 0)
@@ -104,14 +107,6 @@ export function LeadFunnelProjektAnzeige({
     norm.labels.kundentyp ||
     kundentypLabel(norm.kundentyp ?? lead.kundentyp) ||
     kundentypLabel(lead.kundentyp)
-
-  const budgetAnzeige = formatAnfragePreisAnzeige(
-    lead.kanal,
-    lead.budget_ca,
-    lead.preis_min,
-    lead.preis_max,
-    lead.funnel_daten
-  )
 
   const bereicheAnzeige =
     norm.labels.bereiche.length > 0
@@ -158,7 +153,7 @@ export function LeadFunnelProjektAnzeige({
 
         {groessenEntries.map(([bereich, wert]) => (
           <FunnelProp key={bereich} label={groessePropLabel(bereich)}>
-            {groesseDisplay(bereich, wert)}
+            {groesseDisplay(bereich, wert, norm.groessen_einheiten[bereich])}
           </FunnelProp>
         ))}
 
@@ -188,7 +183,7 @@ export function LeadFunnelProjektAnzeige({
         {norm.labels.umfang ? (
           <FunnelProp label="Umfang / Rhythmus">{norm.labels.umfang}</FunnelProp>
         ) : null}
-        <FunnelProp label="Budget">
+        <FunnelProp label="Preisrahmen">
           <span className={hatPreis ? 'font-semibold text-bw-primary' : ''}>
             {budgetAnzeige}
           </span>

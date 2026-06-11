@@ -1,5 +1,6 @@
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
+import { isMengeEinheitMengeMalEinheitspreis } from '@/lib/dokument-einheiten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import type { Gewerk, Lead, Preisliste } from '@/lib/types'
 import { BEREICH_LABELS, BEREICH_TO_GEWERK, FACHDETAIL_TO_LEISTUNG } from '@/lib/utils'
@@ -45,14 +46,15 @@ function wizardRowFromPreisliste(
   g: Gewerk,
   pl: Preisliste,
   menge: number,
-  beschreibung: string
+  beschreibung: string,
+  einheitOverride?: string | null
 ): WizardPosition {
   const unit = preislisteEinzelpreis(pl)
   const m = Math.max(menge, 0.01)
-  const fest =
-    pl.einheit === 'm²' || pl.einheit === 'm2'
-      ? Math.round(unit * m * 100) / 100
-      : unit
+  const einheit = einheitOverride?.trim() || pl.einheit
+  const fest = isMengeEinheitMengeMalEinheitspreis(einheit)
+    ? Math.round(unit * m * 100) / 100
+    : unit
   return {
     id: neuePositionsId(),
     gewerk_id: g.id,
@@ -61,7 +63,7 @@ function wizardRowFromPreisliste(
     leistung: pl.leistung,
     beschreibung: beschreibung || pl.leistung,
     menge,
-    einheit: pl.einheit,
+    einheit,
     preis_min: fest,
     preis_max: fest,
     preisliste_id: pl.id,
@@ -116,6 +118,8 @@ export function angebotWizardPositionenFromLead(
   const situation = lead.situation ?? ''
   const fachdetails = funnel.fachdetails ?? {}
   const groessen = funnel.groessen ?? {}
+  const groessenEinheiten =
+    (funnel.groessen_einheiten as Record<string, string> | undefined) ?? {}
   const positionen: WizardPosition[] = []
 
   for (const bereich of bereiche) {
@@ -137,15 +141,18 @@ export function angebotWizardPositionenFromLead(
     if (!pl) continue
 
     const groesseRaw = groessen[bereich]
+    const groesseEinheit = groessenEinheiten[bereich]?.trim() || null
     const menge =
       groesseRaw !== '' && groesseRaw != null && !Number.isNaN(Number(groesseRaw))
         ? Math.max(Number(groesseRaw), 0.01)
-        : pl.einheit === 'm²' || pl.einheit === 'm2'
+        : isMengeEinheitMengeMalEinheitspreis(pl.einheit)
           ? 20
           : 1
 
     const beschreibung = (leistungHint ?? pl.leistung).trim()
-    positionen.push(wizardRowFromPreisliste(g, pl, menge, beschreibung))
+    positionen.push(
+      wizardRowFromPreisliste(g, pl, menge, beschreibung, groesseEinheit ?? pl.einheit)
+    )
   }
 
   if (positionen.length || fromAnfrage.length) {

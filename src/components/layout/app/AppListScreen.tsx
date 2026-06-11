@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-/** Listen-Seiten: grouped background, filter sticky, content scrollt. */
+/** Listen-Seiten: weißer Hintergrund wie Desktop, Filter sticky, Content scrollt. */
 export function AppListScreen({
   children,
   filters,

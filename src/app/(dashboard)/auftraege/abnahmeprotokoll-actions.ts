@@ -294,10 +294,6 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   const stored = await persistPdf(input.auftragId, built.buffer)
   if (!stored.ok) return stored
 
-  const hatMaengel =
-    input.maengel.length > 0 || input.punkte.some((p) => p.status === 'mangel')
-
-  const existing = await loadAbnahmeprotokollSummary(input.auftragId)
   const row = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
@@ -306,23 +302,15 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     pdf_url: stored.publicUrl,
   }
 
-  if (existing) {
-    const { error: upErr } = await supabaseAdmin
-      .from('auftrag_abnahmeprotokolle')
-      .update(row)
-      .eq('id', existing.id)
-    if (upErr) return { ok: false, message: upErr.message }
-  } else {
-    const { error: insErr } = await supabaseAdmin.from('auftrag_abnahmeprotokolle').insert({
-      auftrag_id: input.auftragId,
-      ...row,
-    })
-    if (insErr) {
-      if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
-        return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
-      }
-      return { ok: false, message: insErr.message }
+  const { error: insErr } = await supabaseAdmin.from('auftrag_abnahmeprotokolle').insert({
+    auftrag_id: input.auftragId,
+    ...row,
+  })
+  if (insErr) {
+    if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
+      return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
     }
+    return { ok: false, message: insErr.message }
   }
 
   await supabaseAdmin
@@ -331,7 +319,8 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
       abnahme_protokoll_url: stored.publicUrl,
       abnahme_datum: input.abnahmeDatum.slice(0, 10),
       updated_at: new Date().toISOString(),
-      ...(!hatMaengel ? { status: 'abnahme', fortschritt: 85 } : {}),
+      status: 'abnahme',
+      fortschritt: 85,
     })
     .eq('id', input.auftragId)
 
@@ -340,7 +329,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     auftrag_id: input.auftragId,
     typ: 'abnahmeprotokoll_erstellt',
     titel: 'Abnahmeprotokoll erstellt',
-    beschreibung: 'PDF heruntergeladen und gespeichert.',
+    beschreibung: 'Abnahmeprotokoll als PDF erstellt.',
     erstellt_von: uid,
     sichtbar_fuer_kunde: false,
   })
@@ -353,6 +342,71 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
     publicUrl: stored.publicUrl,
   }
+}
+
+async function syncAuftragAbnahmeDenorm(auftragId: string): Promise<void> {
+  const { data } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .select('abnahme_datum, pdf_url')
+    .eq('auftrag_id', auftragId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  await supabaseAdmin
+    .from('auftraege')
+    .update({
+      abnahme_protokoll_url: (data?.pdf_url as string | null) ?? null,
+      abnahme_datum: (data?.abnahme_datum as string | null) ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', auftragId)
+}
+
+export type AbnahmeprotokollListeEintrag = {
+  id: string
+  abnahme_datum: string
+  notizen: string | null
+  pdf_url: string | null
+  created_at: string
+  an_kunde_gesendet_at: string | null
+}
+
+export async function loadAbnahmeprotokolleListe(
+  auftragId: string
+): Promise<AbnahmeprotokollListeEintrag[]> {
+  const { data, error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .select('id, abnahme_datum, notizen, pdf_url, created_at, an_kunde_gesendet_at')
+    .eq('auftrag_id', auftragId)
+    .order('created_at', { ascending: false })
+
+  if (error || !data?.length) return []
+  return data.map((row) => ({
+    id: row.id as string,
+    abnahme_datum: row.abnahme_datum as string,
+    notizen: (row.notizen as string | null) ?? null,
+    pdf_url: (row.pdf_url as string | null) ?? null,
+    created_at: row.created_at as string,
+    an_kunde_gesendet_at: (row.an_kunde_gesendet_at as string | null) ?? null,
+  }))
+}
+
+export async function deleteAbnahmeprotokoll(
+  protokollId: string,
+  auftragId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .delete()
+    .eq('id', protokollId)
+    .eq('auftrag_id', auftragId)
+
+  if (error) return { ok: false, message: error.message }
+
+  await syncAuftragAbnahmeDenorm(auftragId)
+  revalidatePath(`/auftraege/${auftragId}`)
+  return { ok: true }
 }
 
 export async function loadLetztesAbnahmeprotokoll(auftragId: string): Promise<{

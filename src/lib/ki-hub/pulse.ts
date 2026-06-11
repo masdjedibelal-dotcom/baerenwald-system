@@ -5,7 +5,7 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
   const funnel = data.supabase.cluster.find((c) => c.bereich === 'funnel')
   const fk = funnel?.ergebnis as FunnelOverviewErgebnis | undefined
 
-  const leadsKritisch = data.supabase.leads_offen.filter((l) => l.stunden_offen >= 24).length
+  const leadsKritisch = data.supabase.leads_offen.filter((l) => l.stunden_offen >= 48).length
   const anfragenStatus: KiHubPulseCard['status'] =
     leadsKritisch >= 3 ? 'critical' : leadsKritisch >= 1 ? 'warn' : 'ok'
 
@@ -59,7 +59,7 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
       status: anfragenStatus,
       kpis: [
         { label: 'Offen', value: String(data.supabase.leads_offen.length) },
-        { label: '>24h', value: String(leadsKritisch) },
+        { label: '>48h', value: String(leadsKritisch) },
         {
           label: '30 Tage',
           value: String(data.supabase.leads_30d_count),

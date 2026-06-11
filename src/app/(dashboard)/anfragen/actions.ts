@@ -6,7 +6,6 @@ import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leis
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
-import { insertKalenderAutoTermin, tomorrowYmd } from '@/lib/kalender-auto-termine'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
   bereicheMitLegacyGewerbeSituation,
@@ -88,6 +87,27 @@ export async function updateLeadStatus(
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
   return { ok: true }
+}
+
+/** Nach Kontakt-Aktion (E-Mail, Rückfrage): Status Neu → Kontaktiert. */
+export async function markLeadKontaktiertWennNeu(
+  leadId: string,
+  notiz?: string | null
+): Promise<{ ok: true; geaendert: boolean } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('status')
+    .eq('id', leadId)
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!lead) return { ok: false, message: 'Anfrage nicht gefunden.' }
+  if (lead.status !== 'neu') return { ok: true, geaendert: false }
+
+  const res = await updateLeadStatus(leadId, 'kontaktiert', notiz ?? null)
+  if (!res.ok) return res
+  return { ok: true, geaendert: true }
 }
 
 export async function updateLeadNotizen(
@@ -400,13 +420,6 @@ export async function createAnfrage(
     erstellt_von: actor?.id ?? null,
   })
   if (tlErr) console.warn('lead_timeline created:', tlErr.message)
-
-  await insertKalenderAutoTermin({
-    titel: `Kontakt: ${name}`,
-    datum: tomorrowYmd(),
-    typ: 'sonstiges',
-    lead_id: leadId,
-  })
 
   if (email) {
     const { sendAnfrageBestaetigung } = await import('@/app/actions/mails')
@@ -1036,9 +1049,17 @@ export async function saveLeadTerminVereinbart(input: {
   }
 
   const zeitLabel = `${input.datum} ${input.uhrzeit}`
-  const st = await updateLeadStatus(input.leadId, 'termin', zeitLabel)
-  const statusRes = st.ok ? st : await updateLeadStatus(input.leadId, 'kontaktiert', zeitLabel)
-  if (!statusRes.ok) return statusRes
+  const statusRes = await updateLeadStatus(input.leadId, 'termin', zeitLabel)
+  if (!statusRes.ok) {
+    if (/enum lead_status/i.test(statusRes.message) && /termin/i.test(statusRes.message)) {
+      return {
+        ok: false,
+        message:
+          'Status „Termin“ fehlt in der Datenbank. Bitte Migration supabase/migrations/20260629120000_lead_status_termin.sql im Supabase SQL Editor ausführen.',
+      }
+    }
+    return statusRes
+  }
 
   if (input.mailSenden) {
     const to =
@@ -1082,14 +1103,13 @@ export async function saveLeadRueckfrage(input: {
 
   await insertLeadTimelineEntry(input.leadId, 'rueckfrage', `Warte auf Antwort: ${text}`, null)
 
-  const supabase = createClient()
-  const { data: lead } = await supabase.from('leads').select('status').eq('id', input.leadId).maybeSingle()
-  if (lead?.status === 'neu') {
-    return updateLeadStatus(input.leadId, 'kontaktiert')
-  }
+  const markRes = await markLeadKontaktiertWennNeu(input.leadId)
+  if (!markRes.ok) return markRes
 
-  revalidatePath(`/anfragen/${input.leadId}`)
-  revalidatePath('/anfragen')
+  if (!markRes.geaendert) {
+    revalidatePath(`/anfragen/${input.leadId}`)
+    revalidatePath('/anfragen')
+  }
   return { ok: true }
 }
 
@@ -1098,18 +1118,6 @@ export async function saveLeadNichtErreichbar(input: {
   kontaktName: string
   wiedervorlage: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const kal = await insertKalenderTermin({
-    lead_id: input.leadId,
-    titel: `Wiedervorlage ${input.kontaktName}`,
-    datum: input.wiedervorlage,
-    uhrzeit_von: null,
-    uhrzeit_bis: null,
-    typ: 'sonstiges',
-    adresse: null,
-    beschreibung: 'Nicht erreichbar',
-  })
-  if (!kal.ok) return kal
-
   await insertLeadTimelineEntry(
     input.leadId,
     'kontakt',

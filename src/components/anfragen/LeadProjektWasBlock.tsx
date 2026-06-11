@@ -23,7 +23,11 @@ import { getHinweisForPosition, gewerkById } from '@/lib/gewerke-ausfuehrung'
 import { cn } from '@/lib/utils'
 import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
 
-const EINHEITEN = ['Stück', 'Stk.', 'm²', 'm', 'lfm', 'h', 'Tag', 'pauschal', 'kg']
+import {
+  POSITION_MENGE_EINHEITEN,
+  groesseEinheitLabel,
+  isMengeEinheitMengeMalEinheitspreis,
+} from '@/lib/dokument-einheiten'
 
 function neueLeereZeile(): ProjektWasZeile {
   return {
@@ -252,7 +256,10 @@ function ProjektLeistungAccordion({
     const pl = preislisten.find((p) => p.id === plId)
     const gewerk = gewerkById(gewerke, zeile.gewerk_id ?? pl?.gewerk_id)
     if (!pl || !gewerk) return
-    const menge = pl.einheit === 'm²' || pl.einheit === 'm2' ? 20 : 1
+    const menge =
+      pl.einheit === 'm²' || pl.einheit === 'm2' || isMengeEinheitMengeMalEinheitspreis(pl.einheit)
+        ? 20
+        : 1
     const hinweis = getHinweisForPosition(gewerk.id, gewerke)
     onPatch({
       titel: pl.leistung,
@@ -439,9 +446,9 @@ function ProjektLeistungAccordion({
                   disabled={pending}
                   onChange={(e) => onPatch({ einheit: e.target.value })}
                 >
-                  {EINHEITEN.map((u) => (
+                  {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
-                      {u}
+                      {groesseEinheitLabel(u)}
                     </option>
                   ))}
                 </select>

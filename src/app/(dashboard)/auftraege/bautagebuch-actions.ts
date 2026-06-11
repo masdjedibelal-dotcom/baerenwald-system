@@ -21,7 +21,8 @@ import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { auftragBautagebuchEintragUrl, projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { sendMail } from '@/lib/mail-service'
-import { BAUTAGEBUCH_MAX_FOTOS, bautagebuchFotoUrls } from '@/lib/auftraege/bautagebuch-fotos'
+import { BAUTAGEBUCH_MAX_FOTOS, bautagebuchFotoUrls, resolveBautagebuchFotosForCrm } from '@/lib/auftraege/bautagebuch-fotos'
+import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { normalizeUrlList } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
@@ -95,6 +96,27 @@ function mapEintrag(row: Record<string, unknown>): AuftragBautagebuchEintrag {
   }
 }
 
+async function enrichEintragForCrm(e: AuftragBautagebuchEintrag): Promise<AuftragBautagebuchEintrag> {
+  const foto_display_urls = await resolveBautagebuchFotosForCrm(
+    e.foto_urls,
+    signedHandwerkerUploadUrl
+  )
+  return { ...e, foto_display_urls }
+}
+
+async function enrichEintragForMail(e: AuftragBautagebuchEintrag): Promise<AuftragBautagebuchEintrag> {
+  const foto_display_urls = await resolveBautagebuchFotosForCrm(
+    e.foto_urls,
+    signedHandwerkerUploadUrl,
+    60 * 60 * 24 * 7
+  )
+  return {
+    ...e,
+    foto_urls: foto_display_urls.length ? foto_display_urls : e.foto_urls,
+    foto_display_urls,
+  }
+}
+
 export async function listAuftragBautagebuch(
   auftragId: string
 ): Promise<AuftragBautagebuchEintrag[]> {
@@ -110,7 +132,7 @@ export async function listAuftragBautagebuch(
     console.warn('[listAuftragBautagebuch]', error.message)
     return []
   }
-  return (data ?? []).map((r) => mapEintrag(r as Record<string, unknown>))
+  return Promise.all((data ?? []).map((r) => enrichEintragForCrm(mapEintrag(r as Record<string, unknown>))))
 }
 
 async function syncTimelineFromEintrag(
@@ -352,8 +374,9 @@ export async function getBautagebuchMailDefaults(
   if (!eintragRow) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   const eintrag = mapEintrag(eintragRow as Record<string, unknown>)
+  const eintragMail = await enrichEintragForMail(eintrag)
   const branding = await getMailBranding(supabaseAdmin)
-  const nachricht = defaultBautagebuchKundenNachricht(ctx.anrede, eintrag, ctx.projektTitel)
+  const nachricht = defaultBautagebuchKundenNachricht(ctx.anrede, eintragMail, ctx.projektTitel)
   const { betreff } = renderBautagebuchKundenMail(
     {
       anrede: ctx.anrede,
@@ -362,7 +385,7 @@ export async function getBautagebuchMailDefaults(
       projektTitel: ctx.projektTitel,
       positionen: ctx.positionen,
       gewerke: ctx.gewerke,
-      eintrag,
+      eintrag: eintragMail,
       previewMode: true,
     },
     branding
@@ -428,6 +451,7 @@ async function buildBautagebuchKundenMail(input: {
   if (!eintragRow) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   const eintrag = mapEintrag(eintragRow as Record<string, unknown>)
+  const eintragMail = await enrichEintragForMail(eintrag)
   const token = await ensureKundenTokenForAuftrag(input.auftragId)
   const updateId = eintrag.timeline_id?.trim() || null
   const statusLink = token ? projektUrlFromToken(token, { updateId }) : ''
@@ -441,7 +465,7 @@ async function buildBautagebuchKundenMail(input: {
       projektTitel: ctx.projektTitel,
       positionen: ctx.positionen,
       gewerke: ctx.gewerke,
-      eintrag,
+      eintrag: eintragMail,
       statusLink,
       previewMode: !statusLink,
     },
@@ -525,5 +549,82 @@ export async function sendBautagebuchAnKunde(input: {
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)
+  return { ok: true }
+}
+
+/** CRM: Eintrag auf Kunden-Projektseite live stellen — ohne E-Mail. */
+export async function freigebenBautagebuchEintrag(input: {
+  auftragId: string
+  eintragId: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await assertAuftrag(input.auftragId)
+  if (!gate.ok) return gate
+
+  const { data: row } = await supabaseAdmin
+    .from('auftrag_bautagebuch_eintraege')
+    .select('*')
+    .eq('id', input.eintragId)
+    .eq('auftrag_id', input.auftragId)
+    .maybeSingle()
+  if (!row) return { ok: false, message: 'Eintrag nicht gefunden' }
+
+  let eintrag = mapEintrag(row as Record<string, unknown>)
+  const sync = await syncTimelineFromEintrag(eintrag, gate.userId, true)
+  if (!sync.ok) return sync
+
+  const now = new Date().toISOString()
+  await supabaseAdmin
+    .from('auftrag_bautagebuch_eintraege')
+    .update({
+      fuer_kunde_freigegeben: true,
+      freigegeben_at: now,
+      timeline_id: sync.timelineId,
+      updated_at: now,
+    })
+    .eq('id', input.eintragId)
+
+  await insertAuftragTimelineEvent({
+    auftrag_id: input.auftragId,
+    typ: 'bautagebuch',
+    titel: 'Bautagebuch freigegeben',
+    beschreibung: `${eintrag.titel} — auf Kunden-Projektseite sichtbar (ohne E-Mail).`,
+    sichtbar_fuer_kunde: false,
+    erstellt_von: gate.userId,
+  })
+
+  revalidatePath(`/auftraege/${input.auftragId}`)
+  return { ok: true }
+}
+
+export async function anfrageHandwerkerBautagebuchEintrag(input: {
+  auftragId: string
+  handwerkerId: string
+  notiz?: string | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await assertAuftrag(input.auftragId.trim())
+  if (!gate.ok) return { ok: false, message: gate.message }
+
+  const { sendHandwerkerBautagebuchAnfrage } = await import(
+    '@/lib/auftraege/send-bautagebuch-anfrage-handwerker'
+  )
+
+  const res = await sendHandwerkerBautagebuchAnfrage({
+    auftragId: input.auftragId.trim(),
+    handwerkerId: input.handwerkerId.trim(),
+    notiz: input.notiz,
+    angefordertVonUserId: gate.userId,
+  })
+  if (!res.ok) return res
+
+  await insertAuftragTimelineEvent({
+    auftrag_id: input.auftragId.trim(),
+    typ: 'mail_handwerker',
+    titel: 'Tagebucheintrag angefordert',
+    beschreibung: 'Partner per E-Mail zur Bautagebuch-Dokumentation aufgefordert.',
+    sichtbar_fuer_kunde: false,
+    erstellt_von: gate.userId,
+  })
+
+  revalidatePath(`/auftraege/${input.auftragId.trim()}`)
   return { ok: true }
 }

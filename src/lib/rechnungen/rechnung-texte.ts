@@ -10,7 +10,7 @@ export const RECHNUNG_EINLEITUNG_STANDARD: Record<AngebotMailAnrede, string> = {
 export const RECHNUNG_HINWEISE_STANDARD =
   'Sofern Fachgewerke von Partner-Fachbetrieben ausgeführt wurden, erfolgte die Ausführung unter Projektkoordination von Bärenwald München.'
 
-/** Kurzer Abschluss vor der Bankverbindung. */
+/** Kurzer Abschluss nach Zahlungsbedingungen und Bankverbindung. */
 export const RECHNUNG_SCHLUSS_STANDARD: Record<AngebotMailAnrede, string> = {
   sie: 'Vielen Dank für Ihr Vertrauen und die angenehme Zusammenarbeit.',
   du: 'Vielen Dank für dein Vertrauen und die angenehme Zusammenarbeit.',

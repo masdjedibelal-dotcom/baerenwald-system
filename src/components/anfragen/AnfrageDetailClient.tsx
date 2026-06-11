@@ -19,7 +19,6 @@ import {
   MoreHorizontal,
   StickyNote,
   Mail,
-  PhoneOff,
   Pencil,
   Sparkles,
   Trash2,
@@ -36,7 +35,8 @@ import {
 } from '@/lib/anfragen/normalize-kalender-termine'
 import { istLeadTerminAnzeige } from '@/lib/kalender-internes-todo'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
-import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName, resolveLeadKunde } from '@/lib/lead-display-helpers'
+import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
 import { Timeline } from '@/components/ui/timeline'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
@@ -51,16 +51,14 @@ import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
-import { LeadGptStudioBlock } from '@/components/anfragen/LeadGptStudioBlock'
+import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
-import { kundentypLabel, resolveLeadKunde } from '@/lib/lead-display-helpers'
-import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
-import { istKundeFirmaPflichtTyp, istKundeGewerbeTyp, istKundeNurGewerbeTyp } from '@/lib/kunde-stammdaten'
+import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { fetchKundenObjekte, setLeadKundeObjekt } from '@/app/actions/kunden-objekte'
@@ -94,7 +92,6 @@ import {
   formatRelativeDate,
 } from '@/lib/utils'
 import { isEchterFreitext } from '@/lib/lead-display-helpers'
-import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
 
 type DetailTab = 'stammdaten' | 'projekt' | 'schritte' | 'timeline' | 'notizen' | 'dokumente'
 
@@ -283,25 +280,30 @@ export function AnfrageDetailClient({
     [dokumenteRows.length, angeboteListe.length]
   )
 
-  const kundenStamm = useMemo(
-    () =>
-      kundeRechnungsempfaengerAusStammdaten(kunde, {
+  const stammdatenCard = (
+    <KundenStammdatenCard
+      kunde={kunde}
+      fallback={{
         plz: lead.plz,
         kontakt_name: lead.kontakt_name,
         kontakt_email: lead.kontakt_email,
         kontakt_telefon: lead.kontakt_telefon,
         funnel_daten: lead.funnel_daten,
-      }),
-    [
-      kunde,
-      lead.plz,
-      lead.kontakt_name,
-      lead.kontakt_email,
-      lead.kontakt_telefon,
-      lead.funnel_daten,
-    ]
+      }}
+      action={
+        kunde ? (
+          <button
+            type="button"
+            onClick={() => setStammdatenModalOpen(true)}
+            className="btn btn-ghost btn-sm"
+            aria-label="Stammdaten bearbeiten"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        ) : null
+      }
+    />
   )
-
   const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
   const auftragId = leadStatusData.auftrag_id as string | undefined
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
@@ -405,32 +407,21 @@ export function AnfrageDetailClient({
 
   const naechsteSchritte = useMemo(
     () =>
-      buildLeadNaechsteSchritte(lead.status, {
-        angeboteCount: angeboteListe.length,
+      buildLeadNaechsteSchritte({
         hatTermin,
-        hatAngenommenesAngebot: Boolean(leadStatusData.angebot_angenommen),
-        angenommenAngebotHref: leadStatusData.angebot_href,
-        auftragId,
         handwerkerErledigt: angebotFlowSnapshot?.handwerkerErledigt ?? false,
         angebotAnKundeGesendet: angebotFlowSnapshot?.angebotAnKundeGesendet ?? false,
         angebotHref:
           angebotFlowSnapshot?.angebotHref ??
           (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : undefined),
         onTerminClick: () => setStatusModalKind('termin'),
-        onAngebotVorbereiten: openAngebotErstellen,
         onHandwerkerEinholen: openHandwerkerEinholen,
         onAngebotAnKunde: openAngebotAnKunde,
       }),
     [
-      lead.status,
-      angeboteListe.length,
       angeboteListe,
-      auftragId,
       hatTermin,
-      leadStatusData.angebot_angenommen,
-      leadStatusData.angebot_href,
       angebotFlowSnapshot,
-      openAngebotErstellen,
       openHandwerkerEinholen,
       openAngebotAnKunde,
     ]
@@ -528,13 +519,9 @@ export function AnfrageDetailClient({
         onClick: () => setStatusModalKind('rueckfrage'),
       },
       {
-        label: 'Nicht erreichbar',
-        icon: <PhoneOff className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => setStatusModalKind('nicht_erreichbar'),
-      },
-      {
-        label: 'Abgelehnt',
+        label: 'Verloren',
         icon: <CircleX className="h-[15px] w-[15px]" aria-hidden />,
+        danger: true,
         onClick: () => setStatusModalKind('verloren'),
       },
       'sep',
@@ -573,85 +560,6 @@ export function AnfrageDetailClient({
     </DetailMetaRow>
   )
 
-  const stammdatenCard = (
-    <Card
-      collapsible
-      title="Stammdaten"
-      action={
-        kunde ? (
-          <button
-            type="button"
-            onClick={() => setStammdatenModalOpen(true)}
-            className="btn btn-ghost btn-sm"
-            aria-label="Stammdaten bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        ) : null
-      }
-    >
-      {!kunde ? (
-        <p className="text-[13px] text-bw-text-muted">Kein Kunden-Stammdatensatz verknüpft.</p>
-      ) : (
-        <>
-          {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
-              Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
-            </p>
-          ) : null}
-          <div className="props">
-            {kundenStamm.kundennummer ? (
-              <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
-            ) : null}
-            {kunde && istKundeFirmaPflichtTyp(kunde.typ) ? (
-              <>
-                <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
-                {kundenStamm.vorname ? (
-                  <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
-                ) : null}
-                {kundenStamm.nachname ? (
-                  <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
-                ) : null}
-              </>
-            ) : (
-              <>
-                {kundenStamm.vorname ? (
-                  <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp>
-                ) : null}
-                <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
-              </>
-            )}
-            {kundenStamm.ansprechpartner && kunde && istKundeNurGewerbeTyp(kunde.typ) ? (
-              <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
-            ) : null}
-            <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
-            <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
-            <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
-            <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
-            <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
-            <DetailProp label="Telefon">
-              {kundenStamm.telefon ? (
-                <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
-              ) : (
-                '—'
-              )}
-            </DetailProp>
-            <DetailProp label="E-Mail">
-              {kundenStamm.email ? (
-                <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
-              ) : (
-                '—'
-              )}
-            </DetailProp>
-            {kundenStamm.ust_id ? (
-              <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp>
-            ) : null}
-          </div>
-        </>
-      )}
-    </Card>
-  )
-
   const objekteCard =
     zeigeObjekteCard && kundeIdFuerObjekte ? (
       <KundenObjekteCard
@@ -675,13 +583,11 @@ export function AnfrageDetailClient({
     </>
   )
 
-  const istGptProjekt = isGptProjektStudio(lead.funnel_daten)
+  const hatKiVertrieb = leadHatKiVertriebsDaten(lead)
 
   const projektuebersichtCards = (
     <>
-      {istGptProjekt ? (
-        <LeadGptStudioBlock lead={lead} onUpdated={() => refresh()} />
-      ) : null}
+      {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
       <LeadFunnelProjektAnzeige
         lead={lead}
         gewerke={wizardGewerke}
@@ -725,7 +631,7 @@ export function AnfrageDetailClient({
   )
 
   const schritteInhalt = (
-    <LeadNaechsteSchritteCard steps={naechsteSchritte} onQuickAngebot={openAngebotErstellen} />
+    <LeadNaechsteSchritteCard steps={naechsteSchritte} />
   )
 
   const desktopTabContent =
@@ -765,7 +671,7 @@ export function AnfrageDetailClient({
     ) : null
 
   const kiAnalyseCard =
-    lead.ki_zusammenfassung?.trim() ? (
+    !hatKiVertrieb && lead.ki_zusammenfassung?.trim() ? (
       <details className="group rounded-lg border border-[#2E7D52] bg-[#EAF3DE]">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-[#2E7D52] marker:content-none [&::-webkit-details-marker]:hidden">
           <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -803,17 +709,7 @@ export function AnfrageDetailClient({
         backHref="/anfragen"
         backLabel="Zurück zu Anfragen"
         title={kundenName(lead)}
-        badges={
-          <>
-            <LeadStatusBadge status={lead.status} />
-            {istGptProjekt ? (
-              <span className="badge badge-plain inline-flex items-center gap-1 border border-[#2E7D52]/35 bg-[#EAF3DE] text-[#1A3D2B]">
-                <Sparkles className="h-3 w-3" aria-hidden />
-                KI-Projekt
-              </span>
-            ) : null}
-          </>
-        }
+        badges={<LeadStatusBadge status={lead.status} />}
         meta={headMeta}
         actions={
           <>

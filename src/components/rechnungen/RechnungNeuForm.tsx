@@ -26,9 +26,10 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   berechneRechnung,
+  formatHinweis35aRechnung,
   kundeKannReverseCharge13b,
-  kundeZeigt35a,
   parseKleinunternehmerSetting,
+  rechnungZeigtHinweis35a,
 } from '@/lib/rechnung-berechnung'
 import {
   DEFAULT_MWST_SATZ,
@@ -135,7 +136,11 @@ export function RechnungNeuForm({
   )
 
   const artikelNetto = useMemo(() => summeArtikelNetto(zeilen), [zeilen])
-  const zeigt35a = kundeZeigt35a(kundeAktiv?.typ) && !kleinunternehmer && !reverseCharge13b
+  const zeigtHinweis35a = rechnungZeigtHinweis35a(
+    kundeAktiv?.typ,
+    berechnung.lohn_netto,
+    kleinunternehmer
+  )
   const kann13b = kundeKannReverseCharge13b(kundeAktiv?.typ) && !kleinunternehmer
 
   function syncFaellig(rd: string, zt: string) {
@@ -369,10 +374,9 @@ export function RechnungNeuForm({
             className="mt-3 border-0 bg-transparent px-0 py-0"
           />
 
-          {zeigt35a && berechnung.lohn_netto > 0 ? (
+          {zeigtHinweis35a ? (
             <div className="mt-3 rounded-lg bg-bw-canvas px-3 py-2 text-xs text-bw-text-muted">
-              § 35a EStG: Lohnkostenanteil {formatEurBetrag(berechnung.lohn_netto)} steuerlich
-              absetzbar (20 % = {formatEurBetrag(berechnung.lohn_netto * 0.2)}).
+              {formatHinweis35aRechnung(berechnung.lohn_netto)}
             </div>
           ) : null}
         </Card>

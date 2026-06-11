@@ -22,7 +22,12 @@ import { ListAvatar } from '@/components/ui/ListAvatar'
 import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
-import { leadInAnfragenPipeline } from '@/lib/crm/pipeline-liste-filter'
+import {
+  ANFRAGEN_STATUS_FILTER_ORDER,
+  leadInAnfragenPipeline,
+  leadStatusInAnfragenListe,
+  type AnfragenStatusFilter,
+} from '@/lib/crm/pipeline-liste-filter'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import {
   BEREICH_LABELS,
@@ -30,7 +35,6 @@ import {
   STATUS_LABELS,
   anfragenPreisSpaltenLabel,
   cn,
-  formatAnfragePreisAnzeige,
   formatDatumZeit,
 } from '@/lib/utils'
 import {
@@ -39,8 +43,10 @@ import {
   zeitraumLabel,
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
-import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import type { LeadKanal, LeadStatus, LeadWithAngebote } from '@/lib/types'
+import { LEAD_ABGEBROCHEN_LABEL } from '@/lib/crm-labels'
+
 const ANFRAGEN_GRID_COLS =
   '42px minmax(160px,1.6fr) minmax(120px,1.1fr) minmax(130px,1.2fr) minmax(128px,0.95fr) minmax(72px,0.75fr) 100px 100px'
 
@@ -54,16 +60,11 @@ const KANAL_FILTERS: { value: '' | LeadKanal; label: string }[] = [
   { value: 'sonstiges', label: 'Sonstiges' },
 ]
 
-const STATUS_ORDER: ('' | LeadStatus)[] = [
-  '',
-  'neu',
-  'kontaktiert',
-  'termin',
-  'angebot',
-  'auftrag',
-  'abgeschlossen',
-  'abgebrochen',
-]
+function anfragenStatusFilterLabel(status: AnfragenStatusFilter): string {
+  if (status === '') return 'Alle'
+  if (status === 'abgebrochen') return LEAD_ABGEBROCHEN_LABEL
+  return STATUS_LABELS[status]
+}
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -72,7 +73,7 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'status', label: 'Status' },
   { key: 'kanal', label: 'Kanal' },
   { key: 'bereiche', label: 'Bereiche' },
-  { key: 'preis_anzeige', label: 'Preis / Budget (Anzeige)' },
+  { key: 'preis_anzeige', label: 'Preisrahmen (Anzeige)' },
   { key: 'budget_ca', label: 'budget_ca' },
   { key: 'preis_min', label: 'preis_min' },
   { key: 'preis_max', label: 'preis_max' },
@@ -141,7 +142,7 @@ function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
     status: STATUS_LABELS[lead.status] ?? lead.status,
     kanal: KANAL_LABELS[lead.kanal] ?? lead.kanal,
     bereiche: (lead.bereiche ?? []).map((b) => BEREICH_LABELS[b] ?? b).join(', '),
-    preis_anzeige: formatAnfragePreisAnzeige(
+    preis_anzeige: resolveLeadPreisAnzeige(
       lead.kanal,
       lead.budget_ca,
       lead.preis_min,
@@ -192,9 +193,7 @@ export function AnfragenListeClient({
     if (searchParams.get('neu') === '1') setNeuOpen(true)
   }, [searchParams])
 
-  const [statusFilter, setStatusFilter] = useState<'' | LeadStatus>('')
-  const [pipelineOnly, setPipelineOnly] = useState(true)
-  const [kiProjektOnly, setKiProjektOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<AnfragenStatusFilter>('')
   const [kanal, setKanal] = useState<'' | LeadKanal>('')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
@@ -205,38 +204,42 @@ export function AnfragenListeClient({
   useEffect(() => {
     const st = searchParams.get('status') as LeadStatus | null
     const z = searchParams.get('zeitraum')
-    if (st && STATUS_ORDER.includes(st)) setStatusFilter(st)
+    if (st && ANFRAGEN_STATUS_FILTER_ORDER.includes(st)) setStatusFilter(st)
     if (z === 'heute') setZeitraum('heute')
     if (z === 'diese_woche') setZeitraum('diese_woche')
     if (z === 'dieser_monat') setZeitraum('dieser_monat')
   }, [searchParams])
 
-  const pipelineLeads = useMemo(() => leads.filter(leadInAnfragenPipeline), [leads])
-  const baseLeads = pipelineOnly ? pipelineLeads : leads
+  const anfragenLeads = useMemo(
+    () => leads.filter((l) => leadStatusInAnfragenListe(l.status)),
+    [leads]
+  )
+
+  const pipelineLeads = useMemo(() => anfragenLeads.filter(leadInAnfragenPipeline), [anfragenLeads])
 
   const statusCounts = useMemo(() => {
-    const c: Record<string, number> = { '': baseLeads.length }
-    for (const l of baseLeads) {
+    const c: Record<string, number> = {
+      '': pipelineLeads.length,
+    }
+    for (const l of anfragenLeads) {
       c[l.status] = (c[l.status] ?? 0) + 1
     }
     return c
-  }, [baseLeads])
+  }, [anfragenLeads, pipelineLeads.length])
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
     [zeitraum, customFrom, customTo]
   )
 
-  const kiProjektCount = useMemo(
-    () => baseLeads.filter((l) => isGptProjektStudio(l.funnel_daten)).length,
-    [baseLeads]
-  )
-
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
-    return baseLeads.filter((l) => {
-      if (kiProjektOnly && !isGptProjektStudio(l.funnel_daten)) return false
-      if (statusFilter && l.status !== statusFilter) return false
+    return anfragenLeads.filter((l) => {
+      if (statusFilter) {
+        if (l.status !== statusFilter) return false
+      } else if (!leadInAnfragenPipeline(l)) {
+        return false
+      }
       if (kanal && l.kanal !== kanal) return false
       if (dateRange && !datumInZeitraum(l.created_at, dateRange)) return false
       if (!needle) return true
@@ -245,7 +248,7 @@ export function AnfragenListeClient({
       const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
       return name.includes(needle) || mail.includes(needle) || tel.includes(needle)
     })
-  }, [baseLeads, statusFilter, kanal, debouncedQ, dateRange, kiProjektOnly])
+  }, [anfragenLeads, statusFilter, kanal, debouncedQ, dateRange])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -261,12 +264,10 @@ export function AnfragenListeClient({
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim() || !pipelineOnly || kiProjektOnly)
+  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim())
 
   function resetAllFilters() {
     setStatusFilter('')
-    setPipelineOnly(true)
-    setKiProjektOnly(false)
     setKanal('')
     setQ('')
     setZeitraum('alle')
@@ -294,11 +295,8 @@ export function AnfragenListeClient({
     if (q.trim()) {
       t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
     }
-    if (kiProjektOnly) {
-      t.push({ id: 'ki', label: 'KI-Projekt', onRemove: () => setKiProjektOnly(false) })
-    }
     return t
-  }, [statusFilter, kanal, zeitraum, q, kiProjektOnly])
+  }, [kanal, zeitraum, q])
 
   function openDetail(leadId: string) {
     router.push(`/anfragen/${leadId}`)
@@ -313,32 +311,17 @@ export function AnfragenListeClient({
         <ListFilterSection
           chipGroups={[
             {
-              label: 'Ansicht',
-              options: [
-                { label: 'Pipeline', value: 'pipeline', count: pipelineLeads.length },
-                { label: 'Alle', value: 'all', count: leads.length },
-              ],
-              selected: [pipelineOnly ? 'pipeline' : 'all'],
-              onChange: (v) => setPipelineOnly((v[0] ?? 'pipeline') === 'pipeline'),
-            },
-            {
-              label: 'Status',
-              options: STATUS_ORDER.map((st) => ({
-                label: st === '' ? 'Alle' : STATUS_LABELS[st],
+              label: 'Pipeline',
+              options: ANFRAGEN_STATUS_FILTER_ORDER.map((st) => ({
+                label: anfragenStatusFilterLabel(st),
                 value: st,
-                count: st === '' ? baseLeads.length : statusCounts[st] ?? 0,
+                count:
+                  st === ''
+                    ? pipelineLeads.length
+                    : statusCounts[st] ?? 0,
               })),
               selected: [statusFilter],
-              onChange: (v) => setStatusFilter((v[0] ?? '') as '' | LeadStatus),
-            },
-            {
-              label: 'Typ',
-              options: [
-                { label: 'Alle', value: 'all', count: baseLeads.length },
-                { label: 'KI-Projekt', value: 'ki', count: kiProjektCount },
-              ],
-              selected: [kiProjektOnly ? 'ki' : 'all'],
-              onChange: (v) => setKiProjektOnly((v[0] ?? 'all') === 'ki'),
+              onChange: (v) => setStatusFilter((v[0] ?? '') as AnfragenStatusFilter),
             },
           ]}
         >
@@ -390,21 +373,21 @@ export function AnfragenListeClient({
         <EmptyState
           icon={Inbox}
           title={
-            leads.length === 0
+            anfragenLeads.length === 0
               ? 'Noch keine Anfragen'
-              : pipelineOnly && pipelineLeads.length === 0
+              : pipelineLeads.length === 0 && !statusFilter
                 ? 'Keine Anfragen in der Pipeline'
                 : 'Keine Treffer'
           }
           description={
-            leads.length === 0
+            anfragenLeads.length === 0
               ? 'Anfragen kommen automatisch über die Website oder du legst sie manuell an.'
-              : pipelineOnly && pipelineLeads.length === 0
+              : pipelineLeads.length === 0 && !statusFilter
                 ? 'Sobald ein Angebot erstellt wird, erscheint der Vorgang unter Angebote.'
                 : 'Passe Filter oder Suche an.'
           }
           action={
-            leads.length === 0 ? (
+            anfragenLeads.length === 0 ? (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setNeuOpen(true)}>
                 + Erste Anfrage anlegen
               </button>
@@ -424,7 +407,7 @@ export function AnfragenListeClient({
                 title={leadName(lead)}
                 line2={`${leadSituationText(lead)} · ${leadBereicheText(lead)}`}
                 line3={leadEingegangen(lead)}
-                line4={formatAnfragePreisAnzeige(
+                line4={resolveLeadPreisAnzeige(
                   lead.kanal,
                   lead.budget_ca,
                   lead.preis_min,
@@ -498,7 +481,7 @@ export function AnfragenListeClient({
                 <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{leadEingegangen(lead)}</p>
                 <p className="truncate text-[13px] text-bw-text-muted">{leadRegion(lead)}</p>
                 <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                  {formatAnfragePreisAnzeige(
+                  {resolveLeadPreisAnzeige(
                     lead.kanal,
                     lead.budget_ca,
                     lead.preis_min,
@@ -530,7 +513,7 @@ export function AnfragenListeClient({
         title="Anfragen exportieren"
         fields={EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : leads
+          const source = scope === 'view' ? filtered : anfragenLeads
           const data = source.map(toExportRow)
           const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
           exportToCSV(data, fields, 'anfragen')

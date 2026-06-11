@@ -32,7 +32,6 @@ import { normalizeUrlList } from '@/lib/utils'
 export type AbschlussdokuOptionen = {
   mitBautagebuch: boolean
   mitFotos: boolean
-  mitHandwerker: boolean
   mitPreisen: boolean
 }
 
@@ -132,20 +131,7 @@ export async function loadAbschlussVoraussetzungen(
   }
 }
 
-function validateAbschlussVoraussetzungen(v: AbschlussVoraussetzungen): { ok: false; message: string } | null {
-  if (!v.hasAbnahme) {
-    return {
-      ok: false,
-      message:
-        'Bitte zuerst das Abnahmeprotokoll erstellen (ohne E-Mail speichern reicht).',
-    }
-  }
-  if (!v.hasRechnung || !v.rechnungId) {
-    return {
-      ok: false,
-      message: 'Bitte zuerst eine Rechnung erstellen (ohne E-Mail speichern reicht).',
-    }
-  }
+function validateAbschlussVoraussetzungen(_v: AbschlussVoraussetzungen): { ok: false; message: string } | null {
   return null
 }
 
@@ -187,12 +173,14 @@ async function buildAbschlussMailAnhaenge(
     })
   }
 
-  const rechnungPdf = await persistPdfForRechnung(voraus.rechnungId!)
-  if (!rechnungPdf.ok) return rechnungPdf
-  extraPdfAttachments.push({
-    filename: `Rechnung-${voraus.rechnungsnummer || voraus.rechnungId}.pdf`,
-    content: rechnungPdf.buffer,
-  })
+  if (voraus.rechnungId) {
+    const rechnungPdf = await persistPdfForRechnung(voraus.rechnungId)
+    if (!rechnungPdf.ok) return rechnungPdf
+    extraPdfAttachments.push({
+      filename: `Rechnung-${voraus.rechnungsnummer || voraus.rechnungId}.pdf`,
+      content: rechnungPdf.buffer,
+    })
+  }
 
   return { ok: true, extraPdfAttachments }
 }
@@ -232,15 +220,12 @@ async function buildAbschlussPdf(
   const detail = await loadAuftragDetail(auftragId)
   if (!detail?.kunden) return { ok: false as const, message: 'Auftrag/Kunde nicht gefunden' }
 
-  const bautagebuch = optionen.mitBautagebuch ? await listAuftragBautagebuch(auftragId) : []
-  const fotoUrls = optionen.mitFotos ? await collectFotoUrls(detail, bautagebuch) : []
-
-  const hwZeilen = (detail.auftrag_handwerker ?? []).map((r: NonNullable<AuftragDetail['auftrag_handwerker']>[number]) => {
-    const n = r.handwerker?.name ?? '—'
-    const g = r.gewerke?.name ?? '—'
-    const f = r.handwerker?.firma ?? ''
-    return `${n} — ${g}${f ? ` (${f})` : ''}`
-  })
+  const bautagebuchRaw = optionen.mitBautagebuch ? await listAuftragBautagebuch(auftragId) : []
+  const bautagebuch = bautagebuchRaw
+  const mitBautagebuch = optionen.mitBautagebuch && bautagebuch.length > 0
+  const fotoUrlsRaw = optionen.mitFotos ? await collectFotoUrls(detail, bautagebuchRaw) : []
+  const fotoUrls = fotoUrlsRaw
+  const mitFotos = optionen.mitFotos && fotoUrls.length > 0
 
   const abnahme = detail.abnahme_protokoll_url ? await loadLetztesAbnahmeprotokoll(auftragId) : null
 
@@ -256,13 +241,11 @@ async function buildAbschlussPdf(
     projektTitel: auftragTitel(detail),
     positionen,
     bautagebuch,
-    handwerkerZeilen: hwZeilen,
     fotoUrls,
     abnahmePunkte: abnahme?.punkte ?? null,
     mitPreisen: optionen.mitPreisen,
-    mitBautagebuch: optionen.mitBautagebuch,
-    mitFotos: optionen.mitFotos,
-    mitHandwerker: optionen.mitHandwerker,
+    mitBautagebuch,
+    mitFotos,
   }
   const buffer = await renderAbschlussdokumentationPdfBuffer(
     pdfInput,
@@ -281,7 +264,7 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   hasAbnahme: boolean
   hasRechnung: boolean
   rechnungsnummer: string | null
-  handwerkerCount: number
+  hasKundeEmail: boolean
 }> {
   const detail = await loadAuftragDetail(auftragId)
   const bautagebuch = await listAuftragBautagebuch(auftragId)
@@ -296,7 +279,7 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
     hasAbnahme: voraus.hasAbnahme,
     hasRechnung: voraus.hasRechnung,
     rechnungsnummer: voraus.rechnungsnummer,
-    handwerkerCount: detail?.auftrag_handwerker?.length ?? 0,
+    hasKundeEmail: Boolean(detail?.kunden?.email?.trim()),
   }
 }
 
@@ -329,8 +312,12 @@ export async function getAbschlussdokumentationMailDefaults(auftragId: string): 
 > {
   const ctx = await loadAbschlussMailKontext(auftragId)
   if (!ctx.ok) return ctx
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
   const branding = await getMailBranding(supabaseAdmin)
-  const nachricht = defaultAbschlussdokumentationNachricht(ctx.anrede, ctx.projektTitel)
+  const nachricht = defaultAbschlussdokumentationNachricht(ctx.anrede, ctx.projektTitel, {
+    hasAbnahme: voraus.hasAbnahme,
+    hasRechnung: voraus.hasRechnung,
+  })
   const { betreff } = buildAbschlussdokumentationMail(
     {
       anrede: ctx.anrede,
@@ -442,30 +429,30 @@ export async function sendAbschlussdokumentationAnKunde(
   })
   if (!sent.success) return { ok: false, message: sent.error ?? 'E-Mail fehlgeschlagen' }
 
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
   await markAuftragAbgeschlossen(
     auftragId,
-    'Abschlussdokumentation mit Abnahmeprotokoll und Rechnung per E-Mail an den Kunden gesendet.',
+    built.hasAbnahme && voraus.hasRechnung
+      ? 'Abschlussdokumentation mit Abnahmeprotokoll und Rechnung per E-Mail an den Kunden gesendet.'
+      : built.hasAbnahme
+        ? 'Abschlussdokumentation mit Abnahmeprotokoll per E-Mail an den Kunden gesendet.'
+        : voraus.hasRechnung
+          ? 'Abschlussdokumentation mit Rechnung per E-Mail an den Kunden gesendet.'
+          : 'Abschlussdokumentation per E-Mail an den Kunden gesendet.',
     true
   )
   return { ok: true }
 }
 
-/** Auftrag abschließen ohne E-Mail — PDF nur lokal / für späteren Versand. */
+/** Auftrag abschließen ohne E-Mail — Abschluss-PDF optional separat herunterladen. */
 export async function finalizeAbschlussdokumentationOhneMail(
   auftragId: string,
-  optionen: AbschlussdokuOptionen
+  _optionen?: AbschlussdokuOptionen
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const voraus = await loadAbschlussVoraussetzungen(auftragId)
-  const block = validateAbschlussVoraussetzungen(voraus)
-  if (block) return block
+  const detail = await loadAuftragDetail(auftragId)
+  if (!detail) return { ok: false, message: 'Auftrag nicht gefunden' }
+  if (detail.status === 'abgeschlossen') return { ok: false, message: 'Auftrag ist bereits abgeschlossen.' }
 
-  const built = await buildAbschlussPdf(auftragId, optionen)
-  if (!built.ok) return built
-
-  await markAuftragAbgeschlossen(
-    auftragId,
-    'Auftrag abgeschlossen — Abschlussdokumentation erstellt (ohne E-Mail-Versand).',
-    false
-  )
+  await markAuftragAbgeschlossen(auftragId, 'Auftrag abgeschlossen.', false)
   return { ok: true }
 }

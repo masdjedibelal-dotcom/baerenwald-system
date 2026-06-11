@@ -50,12 +50,11 @@ export function AbschlussdokumentationModal({
     hasAbnahme: false,
     hasRechnung: false,
     rechnungsnummer: null as string | null,
-    handwerkerCount: 0,
+    hasKundeEmail: false,
   })
   const [optionen, setOptionen] = useState<AbschlussdokuOptionen>({
-    mitBautagebuch: true,
-    mitFotos: true,
-    mitHandwerker: true,
+    mitBautagebuch: false,
+    mitFotos: false,
     mitPreisen: false,
   })
   const [anrede, setAnrede] = useState<AngebotMailAnrede>('sie')
@@ -71,12 +70,16 @@ export function AbschlussdokumentationModal({
     if (!active) return
     setPreviewHtml(null)
     setMailReady(false)
-    void getAbschlussdokuVorschau(auftragId).then(setVorschau)
+    void getAbschlussdokuVorschau(auftragId).then((v) => {
+      setVorschau(v)
+      setOptionen((o) => ({
+        ...o,
+        mitBautagebuch: v.bautagebuchCount > 0,
+        mitFotos: v.fotoCount > 0,
+      }))
+    })
     void getAbschlussdokumentationMailDefaults(auftragId).then((r) => {
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
+      if (!r.ok) return
       setAnrede(r.defaultAnrede)
       setBetreff(r.defaultBetreff)
       setNachricht(r.defaultNachricht)
@@ -116,7 +119,12 @@ export function AbschlussdokumentationModal({
 
   function onAnredeChange(next: AngebotMailAnrede) {
     setAnrede(next)
-    setNachricht(defaultAbschlussdokumentationNachricht(next, projektTitel || kundeName))
+    setNachricht(
+      defaultAbschlussdokumentationNachricht(next, projektTitel || kundeName, {
+        hasAbnahme: vorschau.hasAbnahme,
+        hasRechnung: vorschau.hasRechnung,
+      })
+    )
   }
 
   function downloadPdf() {
@@ -131,14 +139,10 @@ export function AbschlussdokumentationModal({
   }
 
   function abschlussBereit(): boolean {
-    return vorschau.hasAbnahme && vorschau.hasRechnung
+    return true
   }
 
   function senden() {
-    if (!abschlussBereit()) {
-      toast.error('Bitte zuerst Abnahmeprotokoll und Rechnung erstellen (jeweils ohne E-Mail möglich).')
-      return
-    }
     if (!betreff.trim() || !nachricht.trim()) {
       toast.error('Bitte Betreff und Nachricht ausfüllen.')
       return
@@ -165,59 +169,87 @@ export function AbschlussdokumentationModal({
   }
 
   function abschliessenOhneMail() {
-    if (!abschlussBereit()) {
-      toast.error('Bitte zuerst Abnahmeprotokoll und Rechnung erstellen.')
-      return
-    }
     startTransition(async () => {
-      const r = await finalizeAbschlussdokumentationOhneMail(auftragId, optionen)
+      const r = await finalizeAbschlussdokumentationOhneMail(auftragId)
       if (!r.ok) toast.error(r.message)
       else {
-        toast.success('Auftrag abgeschlossen (ohne E-Mail)')
+        toast.success('Auftrag abgeschlossen')
         onDone()
         onClose()
       }
     })
   }
 
+  const pdfOptionen = (
+    [
+      vorschau.bautagebuchCount > 0
+        ? (['mitBautagebuch', `${ABSCHLUSS_PROTOKOLL_TITEL} einschließen`] as const)
+        : null,
+      vorschau.fotoCount > 0 ? (['mitFotos', 'Fotos einschließen'] as const) : null,
+      ['mitPreisen', 'Preise anzeigen (intern)'] as const,
+    ] as const
+  ).filter(Boolean) as ReadonlyArray<readonly [keyof AbschlussdokuOptionen, string]>
+
   const checklist = [
     {
+      ok: true,
+      label: '1. Auftrag abschließen',
+      hint: 'Optional: Abschluss-PDF erstellen oder an den Kunden senden',
+    },
+    {
       ok: vorschau.hasAbnahme,
-      label: '1. Abnahmeprotokoll',
-      hint: vorschau.hasAbnahme ? undefined : 'In Schritt Abnahme erstellen (ohne E-Mail speichern)',
+      label: 'Abnahmeprotokoll (optional)',
+      hint: vorschau.hasAbnahme ? undefined : 'Nur bei Bedarf — z. B. über Karte „Abnahmeprotokoll“',
+      muted: !vorschau.hasAbnahme,
     },
     {
       ok: vorschau.hasRechnung,
       label: vorschau.rechnungsnummer
-        ? `2. Rechnung (${vorschau.rechnungsnummer})`
-        : '2. Rechnung',
-      hint: vorschau.hasRechnung ? undefined : 'Rechnung anlegen (ohne E-Mail speichern)',
+        ? `Rechnung (${vorschau.rechnungsnummer}) — nach Abschluss`
+        : 'Rechnung erstellen — nach Abschluss',
+      hint: vorschau.hasRechnung
+        ? 'Wird bei Kundenversand mitgeschickt, falls vorhanden'
+        : 'Als nächster Schritt im Auftrag anlegen',
+      muted: !vorschau.hasRechnung,
     },
-    {
-      ok: abschlussBereit(),
-      label: '3. Abschlussdokumentation + Versand',
-      hint: 'E-Mail mit 3 PDFs: Abnahme → Rechnung → Abschluss',
-    },
+    ...(vorschau.hasKundeEmail
+      ? [
+          {
+            ok: abschlussBereit(),
+            label: 'Abschlussdokumentation per E-Mail (optional)',
+            hint: vorschau.hasRechnung
+              ? vorschau.hasAbnahme
+                ? 'E-Mail mit PDFs: Abnahme → Rechnung → Abschluss'
+                : 'E-Mail mit PDFs: Rechnung → Abschluss'
+              : vorschau.hasAbnahme
+                ? 'E-Mail mit PDFs: Abnahme → Abschluss (Rechnung folgt danach)'
+                : 'E-Mail mit Abschluss-PDF (Rechnung folgt danach)',
+          },
+        ]
+      : []),
     { ok: true, label: 'Projektübersicht im Abschluss-PDF' },
-    {
-      ok: optionen.mitBautagebuch && vorschau.bautagebuchCount > 0,
-      label: `${ABSCHLUSS_PROTOKOLL_TITEL} (${vorschau.bautagebuchCount} Einträge)`,
-      muted: !optionen.mitBautagebuch,
-    },
+    ...(vorschau.bautagebuchCount > 0
+      ? [
+          {
+            ok: optionen.mitBautagebuch,
+            label: `${ABSCHLUSS_PROTOKOLL_TITEL} (${vorschau.bautagebuchCount} Einträge)`,
+            muted: !optionen.mitBautagebuch,
+          },
+        ]
+      : []),
     {
       ok: vorschau.positionenCount > 0,
       label: `Alle Positionen (${vorschau.positionenCount})`,
     },
-    {
-      ok: optionen.mitFotos && vorschau.fotoCount > 0,
-      label: `Fotos (${vorschau.fotoCount})`,
-      muted: !optionen.mitFotos,
-    },
-    {
-      ok: optionen.mitHandwerker && vorschau.handwerkerCount > 0,
-      label: `Handwerker-Übersicht (${vorschau.handwerkerCount})`,
-      muted: !optionen.mitHandwerker,
-    },
+    ...(vorschau.fotoCount > 0
+      ? [
+          {
+            ok: optionen.mitFotos,
+            label: `Fotos (${vorschau.fotoCount})`,
+            muted: !optionen.mitFotos,
+          },
+        ]
+      : []),
   ]
 
   const flowFooter = (
@@ -226,9 +258,18 @@ export function AbschlussdokumentationModal({
       onSubmit={senden}
       submitLabel="Senden & abschließen"
       loading={pending}
-      submitDisabled={!abschlussBereit()}
+      submitDisabled={!abschlussBereit() || !mailReady}
       extra={
         <>
+          <Button
+            type="button"
+            variant="primary"
+            className="w-full md:w-auto"
+            loading={pending}
+            onClick={abschliessenOhneMail}
+          >
+            Abschließen
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -239,16 +280,6 @@ export function AbschlussdokumentationModal({
           >
             PDF herunterladen
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full md:w-auto"
-            loading={pending}
-            disabled={!abschlussBereit()}
-            onClick={abschliessenOhneMail}
-          >
-            Ohne E-Mail abschließen
-          </Button>
         </>
       }
     />
@@ -257,16 +288,10 @@ export function AbschlussdokumentationModal({
   const body = (
     <>
       <p className="mb-3 text-sm text-bw-text-muted">
-        Abschluss für <strong>{kundeName}</strong> — Reihenfolge: Abnahmeprotokoll → Rechnung →
-        Abschlussdokumentation. Der Kundenversand erfolgt hier gesammelt in einer E-Mail (3 PDF-Anhänge).
+        Abschluss für <strong>{kundeName}</strong>. Bautagebuch, Abnahme, Abschluss-PDF und E-Mail sind optional —
+        du kannst den Auftrag auch direkt abschließen. Die Rechnung legst du danach als nächsten Schritt im Auftrag
+        an.
       </p>
-
-      {!abschlussBereit() ? (
-        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
-          Vor dem Abschluss: Abnahmeprotokoll und Rechnung müssen existieren — jeweils auch ohne
-          E-Mail-Versand möglich.
-        </p>
-      ) : null}
 
       <p className="mb-3 text-sm font-semibold text-bw-text">Ablauf & Inhalt</p>
       <ul className="mb-4 space-y-1.5">
@@ -297,14 +322,7 @@ export function AbschlussdokumentationModal({
 
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">PDF-Optionen</p>
       <div className="mb-5 space-y-2">
-        {(
-          [
-            ['mitBautagebuch', `${ABSCHLUSS_PROTOKOLL_TITEL} einschließen`],
-            ['mitFotos', 'Fotos einschließen'],
-            ['mitHandwerker', 'Handwerker-Details'],
-            ['mitPreisen', 'Preise anzeigen (intern)'],
-          ] as const
-        ).map(([key, label]) => (
+        {pdfOptionen.map(([key, label]) => (
           <label key={key} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -316,8 +334,9 @@ export function AbschlussdokumentationModal({
         ))}
       </div>
 
-      <div className="border-t border-bw-border pt-4 space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kunden</p>
+      {mailReady ? (
+        <div className="border-t border-bw-border pt-4 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kunden (optional)</p>
 
         <div className="flex gap-4 text-sm">
           <label className="flex items-center gap-1.5">
@@ -354,7 +373,12 @@ export function AbschlussdokumentationModal({
         ) : mailReady ? (
           <p className="text-center text-[13px] text-bw-text-muted py-4">Vorschau wird geladen…</p>
         ) : null}
-      </div>
+        </div>
+      ) : (
+        <p className="border-t border-bw-border pt-4 text-sm text-bw-text-muted">
+          Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Du kannst den Auftrag trotzdem abschließen.
+        </p>
+      )}
     </>
   )
 

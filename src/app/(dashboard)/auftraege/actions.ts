@@ -12,7 +12,6 @@ import {
   mailUpdateHinweis,
 } from '@/lib/mail-templates'
 import { AUFTRAG_STATUS_LABELS, FORMULAR_PHASE_LABELS, getPublicAppUrl } from '@/lib/utils'
-import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AuftragDetail, AuftragPosition, AuftragStatus, FormularEintrag, Kunde } from '@/lib/types'
 
@@ -97,20 +96,6 @@ async function setAuftragStatus(
       .eq('auftrag_id', auftragId)
       .eq('status', 'einbehalten')
     if (eErr) console.warn('[einbehalte]', eErr.message)
-
-    const kal = await saveKalenderTermin({
-      titel: 'Einbehalt prüfen',
-      typ: 'sonstiges',
-      datum: freigabeStr,
-      uhrzeit_von: null,
-      uhrzeit_bis: null,
-      adresse: null,
-      beschreibung: 'Automatisch: Einbehalte prüfen (nach Auftragsabschluss).',
-      lead_id: null,
-      auftrag_id: auftragId,
-    })
-    if (!kal.ok) console.warn('[kalender]', kal.message)
-    revalidatePath('/kalender')
   }
 
   const uid = await getAuthUserId()
@@ -430,7 +415,7 @@ export async function setAuftragZurAbnahme(auftragId: string) {
   return { ok: true as const }
 }
 
-/** Legacy-Aktion: setzt Auftrag auf abgeschlossen, wenn Abnahmeprotokoll aus dem Wizard existiert. */
+/** Setzt Auftrag auf abgeschlossen (Abnahmeprotokoll optional). */
 export async function completeAuftragAbnahme(auftragId: string) {
   const detail = await fetchAuftragDetail(auftragId)
   if (!detail) {
@@ -438,12 +423,6 @@ export async function completeAuftragAbnahme(auftragId: string) {
   }
   if (detail.status !== 'abnahme') {
     return { ok: false as const, message: 'Nur bei Status „Abnahme“ möglich' }
-  }
-  if (!detail.abnahme_protokoll_url) {
-    return {
-      ok: false as const,
-      message: 'Bitte zuerst ein Abnahmeprotokoll erstellen (Karte „Abnahmeprotokoll“ oder Menü).',
-    }
   }
 
   const st = await setAuftragStatus(auftragId, 'abgeschlossen')
@@ -454,7 +433,9 @@ export async function completeAuftragAbnahme(auftragId: string) {
     auftrag_id: auftragId,
     typ: 'abnahme_abgeschlossen',
     titel: 'Abnahme abgeschlossen',
-    beschreibung: 'Auftrag abgeschlossen (Abnahmeprotokoll liegt vor).',
+    beschreibung: detail.abnahme_protokoll_url
+      ? 'Auftrag abgeschlossen (Abnahmeprotokoll liegt vor).'
+      : 'Auftrag abgeschlossen (ohne Abnahmeprotokoll).',
     erstellt_von: uid,
     sichtbar_fuer_kunde: true,
   })

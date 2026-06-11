@@ -14,6 +14,7 @@ export function DashboardAktivitaetCard({ items }: { items: DashboardAktivitaetE
 
   return (
     <Card
+      collapsible={false}
       title={
         <span className="inline-flex items-center gap-2">
           <Activity className="h-4 w-4 text-bw-text-muted" aria-hidden />
@@ -26,7 +27,7 @@ export function DashboardAktivitaetCard({ items }: { items: DashboardAktivitaetE
         <p className="px-4 py-6 text-sm text-bw-text-muted">Noch keine Aktivität.</p>
       ) : (
         <>
-          <DashboardCardScrollList>
+          <DashboardCardScrollList paginated>
             {pager.pageItems.map((item) => (
               <AppEntityListRow
                 key={item.id}

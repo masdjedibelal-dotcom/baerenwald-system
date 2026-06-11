@@ -27,17 +27,46 @@ function textToHtmlParagraphs(text: string): string {
 /** Standardtext für das Nachrichtenfeld (ohne Begrüßungszeile). */
 export function defaultAbschlussdokumentationNachricht(
   anrede: AngebotMailAnrede,
-  projektTitel?: string | null
+  projektTitel?: string | null,
+  opts?: { hasAbnahme?: boolean; hasRechnung?: boolean }
 ): string {
   const projekt = projektTitel?.trim() || (anrede === 'du' ? 'Dein Projekt' : 'Ihr Projekt')
+  const hasAbnahme = opts?.hasAbnahme === true
+  const hasRechnung = opts?.hasRechnung === true
+
+  const anhaengeDu = (() => {
+    if (hasAbnahme && hasRechnung) {
+      return 'Im Anhang findest du — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.'
+    }
+    if (hasAbnahme) {
+      return 'Im Anhang findest du das Abnahmeprotokoll und die vollständige Abschlussdokumentation.'
+    }
+    if (hasRechnung) {
+      return 'Im Anhang findest du die Rechnung und die vollständige Abschlussdokumentation.'
+    }
+    return 'Im Anhang findest du die vollständige Abschlussdokumentation.'
+  })()
+
+  const anhaengeSie = (() => {
+    if (hasAbnahme && hasRechnung) {
+      return 'Anbei erhalten Sie — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.'
+    }
+    if (hasAbnahme) {
+      return 'Anbei erhalten Sie das Abnahmeprotokoll und die vollständige Abschlussdokumentation.'
+    }
+    if (hasRechnung) {
+      return 'Anbei erhalten Sie die Rechnung und die vollständige Abschlussdokumentation.'
+    }
+    return 'Anbei erhalten Sie die vollständige Abschlussdokumentation.'
+  })()
   if (anrede === 'du') {
-    return `${projekt} ist abgeschlossen. Im Anhang findest du — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.
+    return `${projekt} ist abgeschlossen. ${anhaengeDu}
 
 Wir freuen uns auf die weitere Zusammenarbeit mit dir und würden uns über dein Feedback freuen — sowohl über positive Erfahrungen als auch über Hinweise, wo wir noch besser werden können.
 
 Vielen Dank für dein Vertrauen!`
   }
-  return `${projekt} ist abgeschlossen. Anbei erhalten Sie — in dieser Reihenfolge — das Abnahmeprotokoll, die Rechnung und die vollständige Abschlussdokumentation.
+  return `${projekt} ist abgeschlossen. ${anhaengeSie}
 
 Wir freuen uns auf die weitere Zusammenarbeit mit Ihnen und würden uns über Ihr Feedback freuen — sowohl über positive Erfahrungen als auch über Hinweise, wo wir noch besser werden können.
 

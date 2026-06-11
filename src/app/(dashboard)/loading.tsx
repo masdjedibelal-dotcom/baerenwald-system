@@ -14,9 +14,12 @@ export default function DashboardLoading() {
           <SkeletonCard key={i} />
         ))}
       </div>
-      <div className="dashboard-grid-2">
-        <SkeletonList rows={4} />
-        <SkeletonList rows={4} />
+      <div className="space-y-2">
+        <div className="skeleton h-4 w-16 rounded" />
+        <div className="dashboard-grid-2">
+          <SkeletonList rows={4} />
+          <SkeletonList rows={4} />
+        </div>
       </div>
     </div>
   )

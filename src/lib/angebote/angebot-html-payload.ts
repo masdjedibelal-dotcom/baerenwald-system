@@ -264,7 +264,10 @@ export function buildAngebotHtmlInputAusDetail(
     schlusstext: schlussAusNotizen(detail.notizen),
     dokument_typ: istProjekt ? 'projekt' : 'einfach',
     projektbeschreibung: detail.projektbeschreibung?.trim() ?? null,
-    dokumentation_bilder: istProjekt ? parseProjektFotos(detail.fotos_urls) : undefined,
+    dokumentation_bilder: (() => {
+      const fotos = parseProjektFotos(detail.fotos_urls)
+      return fotos.length > 0 ? fotos : undefined
+    })(),
     variant_block: istProjekt ? null : variant_block,
     variant_erste_ueberschrift: istProjekt
       ? undefined

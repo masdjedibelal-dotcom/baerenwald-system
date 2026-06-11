@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
+  finalizeHandwerkerAcceptWizard,
   finalizeProjektVertrag,
   saveProjektVertragDraft,
 } from '@/app/(dashboard)/vertraege/wizard-actions'
@@ -67,9 +68,17 @@ export function ProjektVertragWizard({
   onClose: () => void
   onDone?: () => void
 }) {
+  const acceptMode = bootstrap.accept_mode
+  const totalSteps = acceptMode ? 4 : 3
+  const pdfStep = acceptMode ? 4 : 3
+  const unterlagenStep = acceptMode ? 3 : null
+
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState(1)
   const [meta, setMeta] = useState<ProjektVertragWizardMeta>(() => bootstrap.meta)
+  const [complianceSlugs, setComplianceSlugs] = useState<string[]>(
+    () => acceptMode?.initial_compliance_slugs ?? []
+  )
   const [vertragId, setVertragId] = useState<string | null>(bootstrap.vertrag_id)
   const [vertragsNr, setVertragsNr] = useState(bootstrap.vertrags_nr?.trim() || 'Entwurf')
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
@@ -154,18 +163,36 @@ export function ProjektVertragWizard({
         return
       }
       await persistDraft()
-      setStep(3)
+      setStep(acceptMode ? 3 : pdfStep)
+      return
     }
+    if (unterlagenStep != null && step === unterlagenStep) {
+      setStep(pdfStep)
+    }
+  }
+
+  const toggleComplianceSlug = (slug: string) => {
+    setComplianceSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    )
   }
 
   const handlePdfErzeugen = async () => {
     setSaving(true)
     try {
-      const res = await finalizeProjektVertrag({
-        vertrag_id: vertragId,
-        auftrag_id: bootstrap.auftrag_id,
-        meta,
-      })
+      const res = acceptMode
+        ? await finalizeHandwerkerAcceptWizard({
+            vertrag_id: vertragId,
+            auftrag_id: bootstrap.auftrag_id,
+            handwerker_id: meta.handwerker_id,
+            meta,
+            compliance_slugs: complianceSlugs,
+          })
+        : await finalizeProjektVertrag({
+            vertrag_id: vertragId,
+            auftrag_id: bootstrap.auftrag_id,
+            meta,
+          })
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -173,7 +200,17 @@ export function ProjektVertragWizard({
       setVertragId(res.vertrag_id)
       setVertragsNr(res.vertrags_nr)
       setPdfUrl(res.pdf_url)
-      toast.success('Vertrag als PDF erzeugt und hochgeladen')
+      if (acceptMode) {
+        const mailTeil =
+          'mailGesendet' in res && res.mailGesendet
+            ? ' Partner per E-Mail informiert.'
+            : 'mailHinweis' in res && res.mailHinweis
+              ? ` (${res.mailHinweis})`
+              : ''
+        toast.success(`Vertrag erzeugt.${mailTeil}`)
+      } else {
+        toast.success('Vertrag als PDF erzeugt und hochgeladen')
+      }
       onDone?.()
     } finally {
       setSaving(false)
@@ -183,7 +220,7 @@ export function ProjektVertragWizard({
   if (!mounted || typeof document === 'undefined') return null
 
   const wizardMobileActions =
-    step < 3 ? (
+    step < pdfStep ? (
       <>
         {step > 1 ? (
           <Button
@@ -224,7 +261,7 @@ export function ProjektVertragWizard({
         onClick={() => void handlePdfErzeugen()}
       >
         <FileText className="h-4 w-4" />
-        PDF erzeugen
+        {acceptMode ? 'Senden' : 'PDF erzeugen'}
       </Button>
     )
 
@@ -232,7 +269,7 @@ export function ProjektVertragWizard({
     <>
       <WizardMobileToolbar
         onClose={onClose}
-        totalSteps={3}
+        totalSteps={totalSteps}
         currentStep={step}
         stepLabel={`Schritt ${step}`}
         actions={wizardMobileActions}
@@ -254,8 +291,19 @@ export function ProjektVertragWizard({
           <Step n={1} label="Partner" active={step === 1} done={step > 1} />
           <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
           <Step n={2} label="Inhalt" active={step === 2} done={step > 2} />
+          {acceptMode ? (
+            <>
+              <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
+              <Step n={3} label="Unterlagen" active={step === 3} done={step > 3} />
+            </>
+          ) : null}
           <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-          <Step n={3} label="PDF" active={step === 3} done={!!pdfUrl} />
+          <Step
+            n={pdfStep}
+            label="PDF"
+            active={step === pdfStep}
+            done={!!pdfUrl}
+          />
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -265,7 +313,7 @@ export function ProjektVertragWizard({
               Zurück
             </Button>
           ) : null}
-          {step < 3 ? (
+          {step < pdfStep ? (
             <>
               <Button
                 variant="secondary"
@@ -284,7 +332,7 @@ export function ProjektVertragWizard({
           ) : (
             <Button disabled={saving} onClick={() => void handlePdfErzeugen()} className="gap-1.5">
               <FileText className="h-4 w-4" aria-hidden />
-              PDF erzeugen & hochladen
+              {acceptMode ? 'Vertrag senden' : 'PDF erzeugen & hochladen'}
             </Button>
           )}
         </div>
@@ -301,11 +349,17 @@ export function ProjektVertragWizard({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner max-w-3xl">
         {step === 1 ? (
-          <Card title="Partner & Gewerk">
+          <Card title={acceptMode ? 'Partner & Gewerk (übernommen)' : 'Partner & Gewerk'}>
             <div className="space-y-4">
+              {acceptMode ? (
+                <p className="text-sm text-bw-text-muted">
+                  Partner und Gewerk sind durch die Angebots-Übernahme festgelegt.
+                </p>
+              ) : null}
               <Select
                 label="Handwerker"
                 required
+                disabled={!!acceptMode}
                 value={meta.handwerker_id}
                 options={[
                   { value: '', label: 'Handwerker wählen…' },
@@ -327,6 +381,7 @@ export function ProjektVertragWizard({
               />
               <Select
                 label="Gewerk"
+                disabled={!!acceptMode}
                 value={meta.gewerk_name}
                 options={gewerkOptions}
                 onChange={(e) => {
@@ -427,12 +482,75 @@ export function ProjektVertragWizard({
           </div>
         ) : null}
 
-        {step === 3 ? (
-          <Card title="PDF erzeugen">
+        {unterlagenStep != null && step === unterlagenStep ? (
+          <Card title="Unterlagen für den Partner">
+            <div className="space-y-4">
+              <p className="text-sm text-bw-text-muted">
+                Wähle aus dem Leistungs-Pool, welche Unterlagen der Handwerker für diesen Auftrag
+                verbindlich einreichen muss. Er kann Stamm-Dokumente aus seinem Profil wiederverwenden
+                oder projektbezogen hochladen.
+              </p>
+              {!acceptMode?.compliance_pool.length ? (
+                <p className="text-sm text-bw-text-muted rounded-lg border border-bw-border bg-bw-bg-soft p-3">
+                  Keine passenden Leistungs-Unterlagen im Pool — der Partner muss nur den
+                  Projektvertrag bestätigen.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {acceptMode.compliance_pool.map((item) => {
+                    const checked = complianceSlugs.includes(item.slug)
+                    return (
+                      <li key={item.slug}>
+                        <label
+                          className={cn(
+                            'flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors',
+                            checked
+                              ? 'border-bw-primary/40 bg-bw-primary/5'
+                              : 'border-bw-border hover:bg-bw-hover/40'
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 shrink-0 accent-bw-primary"
+                            checked={checked}
+                            onChange={() => toggleComplianceSlug(item.slug)}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-bw-text">
+                              {item.bezeichnung}
+                              {item.default_pflicht ? (
+                                <span className="ml-2 text-xs font-normal text-bw-text-muted">
+                                  (Standard-Pflicht)
+                                </span>
+                              ) : null}
+                            </span>
+                            {item.beschreibung?.trim() ? (
+                              <span className="mt-0.5 block text-xs text-bw-text-muted">
+                                {item.beschreibung.trim()}
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <p className="text-xs text-bw-text-muted">
+                Ausgewählt: {complianceSlugs.length} Unterlage(n). Nach dem PDF-Versand erscheinen
+                Vertrag und Checkliste als To-do im Partner-Portal.
+              </p>
+            </div>
+          </Card>
+        ) : null}
+
+        {step === pdfStep ? (
+          <Card title={acceptMode ? 'Vertrag senden' : 'PDF erzeugen'}>
             <div className="space-y-4 text-sm">
               <p className="text-bw-text-muted">
-                Der Vertrag wird im Bärenwald-Design erzeugt und automatisch in den Auftragsdokumenten
-                gespeichert.
+                {acceptMode
+                  ? 'Der Vertrag wird erzeugt und der Partner per E-Mail informiert. Im Portal sieht er den Vertrag zum Download bzw. zur verbindlichen Zustimmung sowie die gewählten Unterlagen.'
+                  : 'Der Vertrag wird im Bärenwald-Design erzeugt und automatisch in den Auftragsdokumenten gespeichert.'}
               </p>
               <dl className="grid gap-2 sm:grid-cols-2">
                 <div>
@@ -447,6 +565,19 @@ export function ProjektVertragWizard({
                   <dt className="text-bw-text-muted">Bauvorhaben</dt>
                   <dd className="font-medium">{meta.bauvorhaben || '—'}</dd>
                 </div>
+                {acceptMode ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-bw-text-muted">Pflicht-Unterlagen</dt>
+                    <dd className="font-medium">
+                      {complianceSlugs.length
+                        ? acceptMode.compliance_pool
+                            .filter((p) => complianceSlugs.includes(p.slug))
+                            .map((p) => p.bezeichnung)
+                            .join(', ')
+                        : 'Keine — nur Projektvertrag'}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
               {pdfUrl ? (
                 <div className="flex flex-wrap gap-2 pt-2">

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Accordion } from '@/components/ui/Accordion'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
@@ -23,7 +24,9 @@ import { AppDetailScreen } from '@/components/layout/app'
 import {
   Briefcase,
   FileSignature,
+  FileText,
   LayoutGrid,
+  MoreHorizontal,
   Phone,
   Mail,
   Pencil,
@@ -48,8 +51,18 @@ import {
 import {
   updateHandwerker,
   updateHandwerkerNotizen,
+  getPartnerPortalLoginHint,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
+import {
+  getPartnerPortalMailDraft,
+  previewPartnerPortalMail,
+  sendPartnerPortalLinkMail,
+} from '@/app/actions/mails'
+import { parseEmailTokens } from '@/lib/email-recipients'
+import {
+  buildPartnerDashboardLink,
+} from '@/lib/portal-utils'
 import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
@@ -120,6 +133,16 @@ export function HandwerkerDetailClient({
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
 
+  const [portalModalOpen, setPortalModalOpen] = useState(false)
+  const [portalSending, setPortalSending] = useState(false)
+  const [portalLink, setPortalLink] = useState('')
+  const [portalTo, setPortalTo] = useState('')
+  const [portalCc, setPortalCc] = useState('')
+  const [portalBetreff, setPortalBetreff] = useState('')
+  const [portalText, setPortalText] = useState('')
+  const [portalHtml, setPortalHtml] = useState('')
+  const [hasPortalAccount, setHasPortalAccount] = useState(false)
+
   const [formName, setFormName] = useState(hw.name)
   const [formFirma, setFormFirma] = useState(hw.firma ?? '')
   const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
@@ -140,6 +163,18 @@ export function HandwerkerDetailClient({
       setErr(null)
     }
   }, [modalOpen, hw])
+
+  useEffect(() => {
+    void (async () => {
+      const hint = await getPartnerPortalLoginHint(hw.id)
+      if (hint.ok) {
+        setPortalLink(hint.loginLink)
+        setHasPortalAccount(hint.hasAuthAccount)
+      } else {
+        setPortalLink(buildPartnerDashboardLink())
+      }
+    })()
+  }, [hw.id])
 
   useEffect(() => {
     if (notizenTimer.current) clearTimeout(notizenTimer.current)
@@ -223,6 +258,69 @@ export function HandwerkerDetailClient({
     hw,
     router,
   ])
+
+  async function openPortalModal() {
+    const draft = await getPartnerPortalMailDraft(hw.id)
+    if (!draft.ok) {
+      toast.error(draft.message)
+      return
+    }
+    setPortalLink(draft.portalLink)
+    setPortalTo(draft.to)
+    setPortalCc(draft.cc.join('; '))
+    setPortalBetreff(draft.betreff)
+    setPortalText(draft.text)
+    setPortalHtml(draft.html)
+    setPortalModalOpen(true)
+  }
+
+  async function sendenPortalLink() {
+    setPortalSending(true)
+    const toList = parseEmailTokens(portalTo)
+    const ccList = parseEmailTokens(portalCc)
+    const toPrimary = toList[0] ?? ''
+    const ccMerged = [...ccList, ...toList.slice(1)].filter(Boolean)
+    const res = await sendPartnerPortalLinkMail({
+      handwerkerId: hw.id,
+      to: toPrimary,
+      cc: ccMerged,
+      betreff: portalBetreff,
+      text: portalText,
+    })
+    setPortalSending(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success('Partner-Portal-Einladung gesendet')
+    setPortalModalOpen(false)
+  }
+
+  useEffect(() => {
+    if (!portalModalOpen) return
+    const timer = setTimeout(() => {
+      void (async () => {
+        const preview = await previewPartnerPortalMail({
+          handwerkerId: hw.id,
+          text: portalText,
+        })
+        if (!preview.ok) return
+        setPortalHtml(preview.html)
+      })()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [portalModalOpen, portalText, hw.id])
+
+  const handwerkerMenuItems = useMemo((): ActionsMenuItem[] => {
+    return [
+      {
+        label: 'Partner-Portal-Einladung',
+        icon: <FileText className="h-4 w-4" aria-hidden />,
+        hint: !hw.email ? 'Keine E-Mail' : undefined,
+        onClick: () => void openPortalModal(),
+      },
+    ]
+  }, [hw.email])
 
   const sidebar = (
     <>
@@ -512,7 +610,12 @@ export function HandwerkerDetailClient({
         }
         badges={<ComplianceBadge status={hw.compliance_status} />}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {hasPortalAccount ? (
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900">
+                Portal-Konto aktiv
+              </span>
+            ) : null}
             <button type="button" className="btn btn-secondary btn-sm" onClick={openRahmenvertrag}>
               <FileSignature className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Rahmenvertrag
@@ -521,6 +624,20 @@ export function HandwerkerDetailClient({
               <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Bearbeiten
             </button>
+            <ActionsMenu
+              trigger={
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                  aria-label="Weitere Aktionen"
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">Mehr</span>
+                </button>
+              }
+              items={handwerkerMenuItems}
+              sheetTitle="Handwerker"
+            />
           </div>
         }
       />
@@ -577,6 +694,59 @@ export function HandwerkerDetailClient({
           </Modal>
         )
       })()}
+
+      <Modal
+        open={portalModalOpen}
+        onClose={() => setPortalModalOpen(false)}
+        title="Partner-Portal-Einladung senden"
+        size="lg"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+              Senden
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            label="An"
+            value={portalTo}
+            onChange={(e) => setPortalTo(e.target.value)}
+            placeholder="partner@beispiel.de; weitere@beispiel.de"
+          />
+          <Input
+            label="CC (optional)"
+            value={portalCc}
+            onChange={(e) => setPortalCc(e.target.value)}
+            placeholder="intern@baerenwald.de; team@baerenwald.de"
+          />
+          <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
+          <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          <div>
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <iframe
+              title="Partner-Portal Mail Vorschau"
+              sandbox="allow-same-origin"
+              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              srcDoc={portalHtml}
+            />
+          </div>
+          <Input
+            label="Partner-Portal Login"
+            value={portalLink}
+            readOnly
+            className="bg-bw-bg-soft"
+          />
+          <p className="text-xs text-bw-text-muted">
+            Der Button in der Mail führt zu <strong>/partner</strong>. Mehrere Adressen in „An“/„CC“ mit Semikolon
+            trennen.
+          </p>
+        </div>
+      </Modal>
 
       {rahmenWizardOpen && rahmenWizardBootstrap ? (
         <ClientOnly>

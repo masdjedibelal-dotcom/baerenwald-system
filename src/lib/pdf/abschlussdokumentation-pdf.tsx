@@ -8,11 +8,9 @@ export type AbschlussdokuPdfInput = {
   projektTitel: string
   positionen: AuftragPosition[]
   bautagebuch: AuftragBautagebuchEintrag[]
-  handwerkerZeilen: string[]
   fotoUrls: string[]
   abnahmePunkte: AbnahmePunkt[] | null
   mitPreisen: boolean
   mitBautagebuch: boolean
   mitFotos: boolean
-  mitHandwerker: boolean
 }

@@ -47,6 +47,19 @@ export type ProjektVertragWizardMeta = {
   notizen: string
 }
 
+export type CompliancePoolItem = {
+  slug: string
+  bezeichnung: string
+  beschreibung: string | null
+  default_pflicht: boolean
+}
+
+export type HandwerkerAcceptWizardContext = {
+  zuweisung_id: string
+  compliance_pool: CompliancePoolItem[]
+  initial_compliance_slugs: string[]
+}
+
 export type ProjektVertragWizardBootstrap = {
   auftrag_id: string
   auftrag_titel: string
@@ -60,6 +73,8 @@ export type ProjektVertragWizardBootstrap = {
   kunde_plz: string | null
   kunde_ort: string | null
   firm: FirmenEinstellungen
+  /** Nach „Annehmen“: Partner/Gewerk gesperrt, Unterlagen-Schritt aktiv */
+  accept_mode?: HandwerkerAcceptWizardContext
 }
 
 export type RahmenVertragWizardBootstrap = {

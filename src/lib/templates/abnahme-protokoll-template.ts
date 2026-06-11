@@ -1,16 +1,17 @@
 /**
- * HTML für Abnahmeprotokoll-PDF (A4, Bärenwald-Layout wie Angebot/Abschluss).
+ * HTML für Abnahmeprotokoll-PDF (A4, Bärenwald-Layout wie Angebot).
  */
 
 import type { AbnahmeGewerkBlock, AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
+  angebotLogoKopfHtml,
+  briefkopfZeileHtml,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
 
 const ACCENT = '#1A3D2B'
-const TINT = '#F3F7F4'
 const TEXT = '#111111'
 const MUTED = '#6B7280'
 const BORDER = '#D1D5DB'
@@ -40,177 +41,6 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function firmennameZeile(p: AbnahmeProtokollHtmlInput): string {
-  const rf = p.firmen_rechtsform?.trim()
-  return rf ? `${p.firmenname.trim()} ${rf}` : p.firmenname.trim()
-}
-
-function logoKopf(p: AbnahmeProtokollHtmlInput): string {
-  const src = p.firmen_logo_url?.trim()
-  if (!src || /^file:/i.test(src)) return ''
-  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  const safeSrc = src.replace(/"/g, '&quot;')
-  return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${ACCENT};">
-    <img src="${safeSrc}" alt="${esc(firmennameZeile(p))}" style="height:72px;width:auto;max-width:300px;object-fit:contain;display:block;" />
-  </div>`
-}
-
-function briefAbsender(p: AbnahmeProtokollHtmlInput): string {
-  const kontakt = p.firmen_kontakt
-    .split(' · ')
-    .map((z) => z.trim())
-    .filter(Boolean)
-    .map((z) => esc(z))
-  const steuer = (p.firmen_steuer_footer ?? '')
-    .split('\n')
-    .map((z) => z.trim())
-    .filter(Boolean)
-    .map((z) => esc(z))
-  const zeilen = [
-    `<strong>${esc(firmennameZeile(p))}</strong>`,
-    ...esc(p.firmen_adresse)
-      .replace(/\n/g, '<br/>')
-      .split('<br/>')
-      .filter(Boolean),
-    ...kontakt,
-    ...steuer,
-  ]
-  return `<div style="font-size:8pt;line-height:1.45;color:${TEXT};font-weight:400;text-align:right;">
-    ${zeilen.join('<br/>')}
-  </div>`
-}
-
-function sectionHeading(title: string): string {
-  return `<h2 style="font-size:11pt;font-weight:700;color:${ACCENT};margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid ${ACCENT};page-break-after:avoid;">${esc(title)}</h2>`
-}
-
-function statusSymbol(status: AbnahmePunkt['status']): string {
-  if (status === 'ok') return '☑'
-  if (status === 'mangel') return '⚠'
-  return '☐'
-}
-
-function checklistBulletHtml(p: AbnahmePunkt): string {
-  const notiz = p.notiz?.trim()
-  return `<li style="margin:0 0 6px;padding-left:2px;font-size:9pt;line-height:1.45;color:${TEXT};list-style:none;">
-    <span style="display:inline-block;width:18px;font-weight:700;color:${ACCENT};">${statusSymbol(p.status)}</span>
-    ${esc(p.beschreibung?.trim() || '—')}
-    ${notiz ? `<span style="display:block;margin:2px 0 0 20px;font-size:8pt;color:${MUTED};">Notiz: ${esc(notiz)}</span>` : ''}
-  </li>`
-}
-
-function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
-  if (!gewerke.length) {
-    return `<p style="font-size:9pt;color:${MUTED};">Keine Abnahmepunkte.</p>`
-  }
-  return gewerke
-    .map((g) => {
-      const leistungen = g.leistungen
-        .map((l) => {
-          const bullets = l.punkte.map((p) => checklistBulletHtml(p)).join('')
-          return `<div style="margin:0 0 12px;padding:10px 12px;background:${TINT};border:1px solid ${BORDER};border-radius:4px;page-break-inside:avoid;">
-            <p style="margin:0 0 6px;font-size:9.5pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>
-            <ul style="margin:0;padding:0;">${bullets}</ul>
-          </div>`
-        })
-        .join('')
-      return `<div style="margin-bottom:16px;page-break-inside:avoid;">
-        <h3 style="margin:0 0 8px;font-size:10.5pt;font-weight:700;color:${ACCENT};">${esc(g.gewerk)}</h3>
-        ${leistungen}
-      </div>`
-    })
-    .join('')
-}
-
-function maengelHtml(maengel: AbnahmeMangel[]): string {
-  if (!maengel.length) return ''
-  const items = maengel
-    .map(
-      (m) =>
-        `<li style="margin:0 0 8px;font-size:9pt;color:${TEXT};">${esc(m.beschreibung)}${
-          m.frist
-            ? `<span style="display:block;font-size:8pt;color:#991B1B;">Frist: ${esc(m.frist.slice(0, 10))}</span>`
-            : ''
-        }</li>`
-    )
-    .join('')
-  return `${sectionHeading('Mängel / offene Punkte')}<ul style="margin:0;padding-left:18px;">${items}</ul>`
-}
-
-function unterschriftBlock(): string {
-  return `<div style="margin-top:28px;padding-top:16px;border-top:1px solid ${BORDER};page-break-inside:avoid;">
-    <table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
-      <tr>
-        <td style="width:50%;padding:8px 12px 0 0;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Datum der Abnahme</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
-        </td>
-        <td style="width:50%;padding:8px 0 0 12px;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift Kunde</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:16px 0 0;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift ${esc('Auftragnehmer')}</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
-        </td>
-      </tr>
-    </table>
-  </div>`
-}
-
-export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string {
-  const meta = `<table style="width:100%;border-collapse:collapse;margin:0 0 16px;font-size:9pt;">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding:0 12px 0 0;">
-        <p style="margin:0 0 4px;font-size:8pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;">Kunde / Objekt</p>
-        <p style="margin:0;font-weight:700;color:${TEXT};">${esc(p.kunde_name)}</p>
-        <p style="margin:4px 0 0;color:${TEXT};white-space:pre-line;">${esc(p.kunde_adresse)}</p>
-      </td>
-      <td style="width:50%;vertical-align:top;padding:0;">
-        <p style="margin:0 0 4px;font-size:8pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;">Projekt</p>
-        <p style="margin:0;font-weight:600;color:${TEXT};">${esc(p.projektTitel)}</p>
-        <p style="margin:6px 0 0;color:${MUTED};">Auftrag ${esc(p.auftragsNr)} · Abnahme ${esc(p.abnahmeDatum)}</p>
-      </td>
-    </tr>
-  </table>`
-
-  const notizen = p.notizen
-    ? `${sectionHeading('Anmerkungen')}<p style="margin:0;font-size:9pt;line-height:1.5;color:${TEXT};white-space:pre-wrap;">${esc(p.notizen)}</p>`
-    : ''
-
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="utf-8"/>
-  <title>Abnahmeprotokoll</title>
-  <style>
-    @page { size: A4; margin: 14mm 14mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 14mm; }
-    body { margin: 0; font-family: Helvetica, Arial, sans-serif; color: ${TEXT}; }
-  </style>
-</head>
-<body>
-  <div style="max-width:100%;">
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
-      <tr>
-        <td style="width:55%;vertical-align:top;">${logoKopf(p)}</td>
-        <td style="width:45%;vertical-align:top;">${briefAbsender(p)}</td>
-      </tr>
-    </table>
-    <h1 style="margin:0 0 6px;font-size:14pt;font-weight:700;color:${ACCENT};">Abnahmeprotokoll</h1>
-    <p style="margin:0 0 14px;font-size:9pt;color:${MUTED};">Checkliste der erbrachten Leistungen zur Abnahme vor Ort.</p>
-    ${meta}
-    ${sectionHeading('Abnahmecheckliste')}
-    ${gewerkeChecklisteHtml(p.gewerke)}
-    ${maengelHtml(p.maengel)}
-    ${notizen}
-    ${unterschriftBlock()}
-  </div>
-</body>
-</html>`
-}
-
 function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput {
   return {
     firmenname: p.firmenname,
@@ -235,6 +65,152 @@ function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput 
     schlusstext: '',
     hinweise: '',
   }
+}
+
+function abnahmeBriefMetaHtml(p: AbnahmeProtokollHtmlInput): string {
+  const zeile = (label: string, value: string) =>
+    `<div style="text-align:right;font-size:8.5pt;line-height:1.55;white-space:nowrap;">
+      <span style="color:${TEXT};">${label}</span>
+      <span style="font-weight:400;margin-left:8px;">${esc(value)}</span>
+    </div>`
+  return `<div style="text-align:right;min-width:200px;">
+    ${zeile('Auftrag:', p.auftragsNr)}
+    ${zeile('Abnahme:', p.abnahmeDatum)}
+    ${zeile('Projekt:', p.projektTitel)}
+  </div>`
+}
+
+function sectionHeading(title: string): string {
+  return `<h2 style="font-size:11pt;font-weight:700;color:${ACCENT};margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid ${ACCENT};page-break-after:avoid;">${esc(title)}</h2>`
+}
+
+function checklistCircleHtml(): string {
+  return `<span style="display:inline-block;width:13px;height:13px;border:1.5pt solid ${TEXT};border-radius:50%;flex-shrink:0;margin-top:2px;"></span>`
+}
+
+function checklistBulletHtml(p: AbnahmePunkt): string {
+  const notiz = p.notiz?.trim()
+  return `<li style="display:flex;align-items:flex-start;gap:8px;margin:0 0 8px;padding:0;font-size:9pt;line-height:1.45;color:${TEXT};list-style:none;">
+    ${checklistCircleHtml()}
+    <span style="flex:1;min-width:0;">
+      ${esc(p.beschreibung?.trim() || '—')}
+      ${notiz ? `<span style="display:block;margin-top:2px;font-size:8pt;color:${MUTED};">Notiz: ${esc(notiz)}</span>` : ''}
+    </span>
+  </li>`
+}
+
+function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
+  if (!gewerke.length) {
+    return `<p style="font-size:9pt;color:${MUTED};">Keine Abnahmepunkte.</p>`
+  }
+  return gewerke
+    .map((g) => {
+      const leistungen = g.leistungen
+        .map((l) => {
+          const bullets = l.punkte.map((p) => checklistBulletHtml(p)).join('')
+          return `<div style="margin:0 0 14px;padding:10px 0 0;border-top:1px solid ${BORDER};page-break-inside:avoid;">
+            <p style="margin:0 0 8px;font-size:9.5pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>
+            <ul style="margin:0;padding:0;">${bullets}</ul>
+          </div>`
+        })
+        .join('')
+      return `<div style="margin-bottom:8px;padding-top:12px;border-top:2px solid ${ACCENT};page-break-inside:avoid;">
+        <h3 style="margin:0 0 4px;font-size:10.5pt;font-weight:700;color:${ACCENT};">${esc(g.gewerk)}</h3>
+        ${leistungen}
+      </div>`
+    })
+    .join('')
+}
+
+function offenePunkteHtml(maengel: AbnahmeMangel[]): string {
+  const inner =
+    maengel.length > 0
+      ? `<ul style="margin:0;padding-left:18px;font-size:9pt;line-height:1.5;color:${TEXT};">
+          ${maengel
+            .map(
+              (m) =>
+                `<li style="margin:0 0 6px;">${esc(m.beschreibung)}${
+                  m.frist
+                    ? `<span style="display:block;font-size:8pt;color:#991B1B;">Frist: ${esc(m.frist.slice(0, 10))}</span>`
+                    : ''
+                }</li>`
+            )
+            .join('')}
+        </ul>`
+      : ''
+  return `${sectionHeading('Offene Punkte / Mängel')}
+    <div style="min-height:110px;border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;margin-top:4px;page-break-inside:avoid;">
+      ${inner}
+    </div>`
+}
+
+function unterschriftBlock(abnahmeDatum: string): string {
+  return `<div style="margin-top:28px;padding-top:16px;border-top:1px solid ${BORDER};page-break-inside:avoid;">
+    <table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
+      <tr>
+        <td style="width:50%;padding:8px 12px 0 0;vertical-align:top;">
+          <p style="margin:0 0 28px;color:${MUTED};">Datum der Abnahme</p>
+          <div style="border-bottom:1px solid ${TEXT};height:1px;margin-bottom:4px;"></div>
+          <p style="margin:0;font-size:8pt;color:${TEXT};">${esc(abnahmeDatum)}</p>
+        </td>
+        <td style="width:50%;padding:8px 0 0 12px;vertical-align:top;">
+          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift Kunde</p>
+          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:16px 0 0;vertical-align:top;">
+          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift Auftragnehmer</p>
+          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
+        </td>
+      </tr>
+    </table>
+  </div>`
+}
+
+function briefEmpfaengerAbnahme(p: AbnahmeProtokollHtmlInput): string {
+  return `<div style="margin:0 0 20px;font-size:10pt;line-height:1.5;color:${TEXT};">
+    <p style="margin:0 0 4px;font-size:8pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;">Kunde / Objekt</p>
+    <p style="margin:0;font-weight:700;">${esc(p.kunde_name)}</p>
+    <p style="margin:4px 0 0;white-space:pre-line;">${esc(p.kunde_adresse)}</p>
+  </div>`
+}
+
+export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string {
+  const footerProps = footerInputFromAbnahme(p)
+  const notizen = p.notizen
+    ? `${sectionHeading('Anmerkungen')}<p style="margin:0;font-size:9pt;line-height:1.5;color:${TEXT};white-space:pre-wrap;">${esc(p.notizen)}</p>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <title>Abnahmeprotokoll</title>
+  <style>
+    @page { size: A4; margin: 14mm 14mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 14mm; }
+    body { margin: 0; font-family: Helvetica, Arial, sans-serif; color: ${TEXT}; }
+  </style>
+</head>
+<body>
+  <div style="max-width:100%;">
+    ${angebotLogoKopfHtml(footerProps)}
+    ${briefkopfZeileHtml(
+      footerProps,
+      'Abnahmeprotokoll',
+      `font-size:18pt;font-weight:700;margin:0 0 8px;color:${TEXT};`,
+      abnahmeBriefMetaHtml(p)
+    )}
+    <p style="margin:0 0 14px;font-size:9pt;color:${MUTED};line-height:1.5;">Checkliste der erbrachten Leistungen zur Abnahme vor Ort.</p>
+    ${briefEmpfaengerAbnahme(p)}
+    ${sectionHeading('Abnahmecheckliste')}
+    ${gewerkeChecklisteHtml(p.gewerke)}
+    ${offenePunkteHtml(p.maengel)}
+    ${notizen}
+    ${unterschriftBlock(p.abnahmeDatum)}
+  </div>
+</body>
+</html>`
 }
 
 export function buildAbnahmeProtokollPdfFooterTemplate(p: AbnahmeProtokollHtmlInput): string {

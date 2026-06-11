@@ -426,13 +426,11 @@ export function emailZahlungserinnerung(
 
   return baseTemplate(
     `
-    <h2 style="margin:0 0 8px;color:#D97706;font-size:20px;">Zahlungserinnerung</h2>
+    <h2 style="margin:0 0 8px;color:#2E7D52;font-size:20px;">Zahlungserinnerung</h2>
     <p>Guten Tag ${escapeHtml(name)},</p>
     <p>unsere Rechnung <strong>${escapeHtml(rechnungsnummer)}</strong> vom <strong>${escapeHtml(faellig_am)}</strong>
       ist seit <strong>${tage_ueberfaellig} Tagen</strong> offen.</p>
-    <div style="background:#FEF3C7;border-radius:8px;padding:16px 20px;margin:20px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>
-    </div>
+    ${greenBox(`<table width="100%" cellpadding="0" cellspacing="0" role="presentation">${rows}</table>`)}
     <p style="font-size:13px;color:#6B6B6B;">Falls Sie bereits gezahlt haben, melden Sie sich bitte bei uns:<br/>
       <a href="tel:[TEL]" style="color:#2E7D52;">[TEL]</a></p>
   `,

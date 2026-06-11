@@ -1,7 +1,30 @@
 import { resolveStatusEinfach, type AngebotStatusEinfach } from '@/lib/angebot-einfach'
-import { leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
+import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { matchesAuftragPhase } from '@/lib/auftraege/auftrag-liste-helpers'
-import type { AngebotListeEintrag, AuftragListeEintrag, LeadWithAngebote } from '@/lib/types'
+import type {
+  AngebotListeEintrag,
+  AuftragListeEintrag,
+  LeadStatus,
+  LeadWithAngebote,
+} from '@/lib/types'
+
+/** Aktive Anfragen-Pipeline: Neu → Kontaktiert → Termin. */
+export const ANFRAGEN_PIPELINE_STATUS: LeadStatus[] = [...LEAD_STATUS_VOR_ANGEBOT]
+
+/** In der Anfragen-Liste sichtbar (+ abgelehnte Anfragen per Filter). */
+export const ANFRAGEN_LISTE_STATUS: LeadStatus[] = [...ANFRAGEN_PIPELINE_STATUS, 'abgebrochen']
+
+export type AnfragenStatusFilter = '' | (typeof ANFRAGEN_LISTE_STATUS)[number]
+
+export const ANFRAGEN_STATUS_FILTER_ORDER: AnfragenStatusFilter[] = [
+  '',
+  ...ANFRAGEN_PIPELINE_STATUS,
+  'abgebrochen',
+]
+
+export function leadStatusInAnfragenListe(status: LeadStatus): boolean {
+  return ANFRAGEN_LISTE_STATUS.includes(status)
+}
 
 /** Anfragen-Pipeline: vor Angebot, ohne verknüpftes Angebot. */
 export function leadInAnfragenPipeline(lead: LeadWithAngebote): boolean {
@@ -37,3 +60,5 @@ export function buildAngebotIdsMitAuftrag(rows: { angebot_id: string | null }[])
   }
   return ids
 }
+
+export { rechnungInRechnungenPipeline } from '@/lib/rechnungen/rechnung-liste-helpers'

@@ -1,21 +1,26 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 
-/** Dashboard: direkter Link zur häufigsten Aktion (keine Dummy-Modals). */
+function showAnfragenFab(pathname: string): boolean {
+  if (!pathname.startsWith('/anfragen')) return false
+  if (pathname === '/anfragen/neu') return false
+  if (pathname.includes('/angebote')) return false
+  return true
+}
+
+/** Mobile: goldener Plus-Button nur auf Anfragen-Screens → Route „Neue Anfrage“. */
 export function FloatingAction() {
   const pathname = usePathname() ?? '/'
   const router = useRouter()
 
-  if (pathname !== '/') return null
+  if (!showAnfragenFab(pathname)) return null
 
   return (
     <button
       type="button"
-      onClick={() => router.push('/anfragen?neu=1')}
+      onClick={() => router.push('/anfragen/neu')}
       className="fab md:hidden"
       aria-label="Neue Anfrage"
     >

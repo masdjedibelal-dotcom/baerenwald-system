@@ -59,6 +59,10 @@ export function resolveAngebotPdfLogoSrc(logoUrlOverride?: string | null): strin
     if (/^https?:\/\//i.test(fromApp)) return fromApp
   }
 
+  /** Öffentliche Website-URL — zuverlässiger in Headless-PDF als localhost. */
+  const websiteLogo = resolveBrandLogoUrl('green', null)
+  if (/^https?:\/\//i.test(websiteLogo)) return websiteLogo
+
   const fromApp = resolvePublicAppUrl(BRAND_LOGO_GREEN)
   if (/^https?:\/\//i.test(fromApp)) return fromApp
 

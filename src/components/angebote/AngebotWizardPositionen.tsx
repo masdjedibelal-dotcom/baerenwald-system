@@ -51,7 +51,7 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Preisliste } from '@/lib/types'
 
-const EINHEITEN = ['Stück', 'Stk.', 'm²', 'm', 'lfm', 'h', 'Tag', 'pauschal', 'kg']
+import { POSITION_MENGE_EINHEITEN, groesseEinheitLabel } from '@/lib/dokument-einheiten'
 
 const MWST_OPTIONS: { value: MwstSatzOption; label: string }[] = [
   { value: 19, label: '19 %' },
@@ -405,7 +405,11 @@ function PositionAccordionItem({
                 </select>
               </WizardField>
             ) : null}
-            <WizardField label="Leistung aus Liste" required>
+            <WizardField
+              label="Leistung aus Liste"
+              required
+              hint="Name der Position im Angebot (PDF) — wird aus der Preisliste übernommen"
+            >
               <select
                 className="input w-full"
                 value={z.preisliste_id ?? ''}
@@ -421,6 +425,18 @@ function PositionAccordionItem({
                   </option>
                 ))}
               </select>
+            </WizardField>
+            <WizardField
+              label="Beschreibung (optional)"
+              full
+              hint="Zusätzlicher Text unter der Leistung im PDF — z. B. Material, Umfang, Hinweise"
+            >
+              <Textarea
+                rows={3}
+                value={z.positionBeschreibung ?? ''}
+                onChange={(e) => onPatch({ positionBeschreibung: e.target.value })}
+                placeholder="z. B. inkl. Grundierung, zwei Anstriche, Endreinigung"
+              />
             </WizardField>
             {!istAnfahrt ? (
               <KostenverteilungField
@@ -447,9 +463,9 @@ function PositionAccordionItem({
                   value={z.einheit}
                   onChange={(e) => onPatch({ einheit: e.target.value })}
                 >
-                  {EINHEITEN.map((u) => (
+                  {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
-                      {u}
+                      {groesseEinheitLabel(u)}
                     </option>
                   ))}
                 </select>
@@ -483,7 +499,12 @@ function PositionAccordionItem({
           </>
         ) : (
           <>
-            <WizardField label="Leistung" required full>
+            <WizardField
+              label="Leistung"
+              required
+              full
+              hint="Positions-Überschrift im Angebot (PDF) — das sieht der Kunde fett über Menge und Preis"
+            >
               <input
                 className="input w-full"
                 value={z.bezeichnung}
@@ -532,7 +553,11 @@ function PositionAccordionItem({
                 onPatch={onPatch}
               />
             ) : null}
-            <WizardField label="Beschreibung" full hint="Details für Kunden & spätere Rechnung">
+            <WizardField
+              label="Beschreibung (optional)"
+              full
+              hint="Zusätzlicher Text unter der Leistung im PDF — sichtbar für den Kunden und auf der Rechnung"
+            >
               <Textarea
                 rows={3}
                 value={z.positionBeschreibung ?? ''}
@@ -557,9 +582,9 @@ function PositionAccordionItem({
                   value={z.einheit}
                   onChange={(e) => onPatch({ einheit: e.target.value })}
                 >
-                  {EINHEITEN.map((u) => (
+                  {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
-                      {u}
+                      {groesseEinheitLabel(u)}
                     </option>
                   ))}
                 </select>
@@ -957,6 +982,20 @@ export function AngebotWizardPositionen({
       ) : null}
 
       <div className="pos-list">
+        {listenZeilen.length > 0 && !isMobile ? (
+          <div className="pos-list-head" aria-hidden>
+            <div className="pos-nr">Nr.</div>
+            <div className="pos-title">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-bw-text-muted">
+                Leistung · Beschreibung
+              </span>
+            </div>
+            <div className="pos-cell menge">Menge</div>
+            <div className="pos-cell preis">Netto</div>
+            <div className="pos-cell steuer">USt.</div>
+            <div className="pos-actions" />
+          </div>
+        ) : null}
         {listenZeilen.length === 0 ? (
           <div className="pos-empty">
             <p className="font-medium text-bw-text-mid">Noch keine Positionen</p>

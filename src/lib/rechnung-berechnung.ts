@@ -131,6 +131,24 @@ export function abschlag35aEur(lohnNetto: number): number {
   return round2(lohnNetto * 0.2)
 }
 
+/** § 35a-Hinweis auf Rechnungen: nur Privatkunde, Lohnkosten in Kostenaufstellung ausgewiesen. */
+export function rechnungZeigtHinweis35a(
+  kundeTyp: string | null | undefined,
+  lohnNettoAusgewiesen: number,
+  kleinunternehmer: boolean
+): boolean {
+  if (kleinunternehmer || lohnNettoAusgewiesen <= 0) return false
+  return kundeZeigt35a(kundeTyp)
+}
+
+export function formatHinweis35aRechnung(lohnNetto: number): string {
+  const betrag = lohnNetto.toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € kann bei der Einkommensteuer geltend gemacht werden.`
+}
+
 export function kundeZeigt35a(typ: string | null | undefined): boolean {
   const t = (typ ?? 'privat').toLowerCase()
   return t === 'privat' || t === '' || t === 'sonstiges'

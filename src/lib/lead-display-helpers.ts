@@ -1,4 +1,6 @@
-import type { Kunde } from '@/lib/types'
+import type { Kunde, LeadKanal } from '@/lib/types'
+import { funnelPositionenGesamt, parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
+import { formatAnfragePreisAnzeige, formatWebsiteLeadPreis } from '@/lib/utils'
 
 /** Lesbare Labels & Freitext-Erkennung für Lead-/Funnel-Anzeige. */
 
@@ -16,7 +18,7 @@ const PREIS_MODUS_MAP: Record<string, string> = {
   komplex: 'Individuell / Komplex',
   fix: 'Festpreis',
   range: 'Preisrahmen',
-  budget: 'Ca.-Budget',
+  budget: 'Ca.-Preisrahmen',
 }
 
 export function zeitraumLabel(v?: string | null): string {
@@ -118,4 +120,60 @@ export function leadKontaktAnzeigeName(
   const kn = lead.kunden?.name?.trim()
   if (kn) return kn
   return fallback
+}
+
+function numPos(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/** Preis/Budget: Lead-Spalten, dann Funnel (GPT/Website), dann GPT-Hinweistext. */
+export function resolveLeadPreisAnzeige(
+  kanal: LeadKanal,
+  budget_ca: number | null | undefined,
+  preis_min: number | null | undefined,
+  preis_max: number | null | undefined,
+  funnel?: unknown
+): string {
+  const direkt = formatAnfragePreisAnzeige(kanal, budget_ca, preis_min, preis_max, funnel)
+  if (direkt !== '—') return direkt
+
+  if (!funnel || typeof funnel !== 'object') return '—'
+  const fd = funnel as Record<string, unknown>
+
+  const fMin = numPos(fd.preis_min ?? fd.preisMin)
+  const fMax = numPos(fd.preis_max ?? fd.preisMax)
+  const fBudget = numPos(fd.budget_ca ?? fd.budgetCa)
+  const ausFunnelFeldern = formatWebsiteLeadPreis(fBudget, fMin, fMax, funnel)
+  if (ausFunnelFeldern !== '—') return ausFunnelFeldern
+
+  if (Array.isArray(fd.breakdown)) {
+    let minSum = 0
+    let maxSum = 0
+    for (const item of fd.breakdown) {
+      if (!item || typeof item !== 'object') continue
+      const b = item as Record<string, unknown>
+      minSum += numPos(b.min) ?? 0
+      maxSum += numPos(b.max) ?? 0
+    }
+    if (minSum > 0 || maxSum > 0) {
+      const ausBreakdown = formatWebsiteLeadPreis(null, minSum || null, maxSum || null, funnel)
+      if (ausBreakdown !== '—') return ausBreakdown
+    }
+  }
+
+  const positionen = parseFunnelPositionen(funnel)
+  if (positionen.length) {
+    const { gesamtMin, gesamtMax } = funnelPositionenGesamt(positionen)
+    const ausPositionen = formatWebsiteLeadPreis(null, gesamtMin || null, gesamtMax || null, funnel)
+    if (ausPositionen !== '—') return ausPositionen
+  }
+
+  const erk = fd.gpt_erklaerung
+  if (erk && typeof erk === 'object') {
+    const hint = (erk as Record<string, unknown>).preis_hinweis_optional
+    if (typeof hint === 'string' && hint.trim()) return hint.trim()
+  }
+
+  return '—'
 }

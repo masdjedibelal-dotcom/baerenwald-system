@@ -1,3 +1,4 @@
+import { ANFRAGEN_LISTE_STATUS } from '@/lib/crm/pipeline-liste-filter'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { countLegacyDemoLeads, filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import type { LeadWithAngebote } from '@/lib/types'
@@ -37,7 +38,12 @@ export async function loadAnfragenListe(): Promise<{
   error: string | null
 }> {
   const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('leads').select(ANFRAGEN_LISTE_SELECT).order('created_at', { ascending: false }).limit(100)
+    db
+      .from('leads')
+      .select(ANFRAGEN_LISTE_SELECT)
+      .in('status', [...ANFRAGEN_LISTE_STATUS])
+      .order('created_at', { ascending: false })
+      .limit(100)
   )
 
   if (error) {

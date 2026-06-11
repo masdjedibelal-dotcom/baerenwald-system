@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft, Bell, Plus } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 
 interface TopBarProps {
   user: User
@@ -91,9 +92,9 @@ export function TopBar({ user }: TopBarProps) {
           <Link
             href="/"
             aria-label="Bärenwald CRM"
-            className="flex h-8 w-8 items-center justify-center rounded-md bg-bw-primary text-sm font-semibold text-white"
+            className="flex shrink-0 items-center"
           >
-            B
+            <BrandLogo variant="green" height={28} priority />
           </Link>
         )}
 

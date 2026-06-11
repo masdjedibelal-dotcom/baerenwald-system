@@ -1,9 +1,7 @@
 import type { KalenderTermin } from '@/lib/types'
+import { istEchterKalenderTermin } from '@/lib/kalender-styles'
 
-/** CRM-internes To-do — erscheint im Dashboard, nicht in der Anfrage-Terminliste. */
+/** Nur echte Termine in der Anfrage-Terminliste. */
 export function istLeadTerminAnzeige(termin: KalenderTermin): boolean {
-  if (termin.typ === 'intern') return false
-  const titel = termin.titel?.trim() ?? ''
-  if (titel.startsWith('Nachfassen:')) return false
-  return true
+  return istEchterKalenderTermin(termin)
 }

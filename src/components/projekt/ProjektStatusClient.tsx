@@ -50,7 +50,7 @@ function aktuellePhaseIndex(leadStatus: LeadStatus | null, aufStatus: AuftragSta
   if (aufStatus === 'storniert') return 0
   if (aufStatus === 'offen' || aufStatus === 'in_arbeit') return 2
   if (leadStatus === 'angebot') return 1
-  if (leadStatus === 'neu' || leadStatus === 'kontaktiert') return 0
+  if (leadStatus === 'neu' || leadStatus === 'kontaktiert' || leadStatus === 'termin') return 0
   if (leadStatus === 'auftrag') return 2
   return 2
 }

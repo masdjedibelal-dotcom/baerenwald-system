@@ -48,7 +48,8 @@ import {
   handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
-import { provisionProjektVertragFuerHandwerker } from '@/lib/vertraege/provision-projektvertrag'
+import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
+import { loadHandwerkerAcceptWizardBootstrap } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadKiVizMailPreviewUrl } from '@/lib/visualize/pdf-data'
 import {
   parseHwPreisEuro,
@@ -78,8 +79,7 @@ import {
   summenKostenaufstellungAusPositionen,
 } from '@/lib/angebot-positionen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
-import { addDaysYmd, insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
-import { planeInternesNachfassTodo } from '@/lib/kalender-auto-termine'
+import { insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
 import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
@@ -828,12 +828,24 @@ export async function crmManuelleHandwerkerEinreichung(
 
 /**
  * CRM-Bestätigung: EK übernehmen (falls Auftrag da), Status „übernommen“, Mail an Handwerker.
+ * Bei vorhandenem Auftrag: Rückgabe für Nachunternehmervertrag-Wizard (Unterlagen + PDF).
  */
 export async function bestaetigeHandwerkerEinreichung(input: {
   angebotId: string
   zuweisungId: string
 }): Promise<
-  | { ok: true; aktualisiert: number; mailGesendet: boolean; mailHinweis?: string }
+  | {
+      ok: true
+      aktualisiert: number
+      mailGesendet: boolean
+      mailHinweis?: string
+      openWizard?: {
+        auftragId: string
+        handwerkerId: string
+        gewerkId: string
+        zuweisungId: string
+      }
+    }
   | { ok: false; message: string }
 > {
   const supabase = createClient()
@@ -887,23 +899,217 @@ export async function bestaetigeHandwerkerEinreichung(input: {
   if (auftrag?.id) {
     const { data: zuHw } = await supabaseAdmin
       .from('angebot_handwerker')
-      .select('handwerker_id')
+      .select('handwerker_id, gewerk_id')
       .eq('id', zuweisungId)
       .maybeSingle()
-    if (zuHw?.handwerker_id) {
-      const pv = await provisionProjektVertragFuerHandwerker(
-        auftrag.id as string,
-        zuHw.handwerker_id as string
-      )
-      if (!pv.ok) {
-        console.warn('[bestaetigeHandwerkerEinreichung] projektvertrag:', pv.message)
-      } else if (pv.created) {
-        revalidatePath(`/auftraege/${auftrag.id}`)
+
+    if (zuHw?.handwerker_id && zuHw?.gewerk_id) {
+      const { data: existingAh } = await supabaseAdmin
+        .from('auftrag_handwerker')
+        .select('id')
+        .eq('auftrag_id', auftrag.id)
+        .eq('handwerker_id', zuHw.handwerker_id)
+        .maybeSingle()
+
+      if (!existingAh?.id) {
+        const { error: ahErr } = await supabaseAdmin.from('auftrag_handwerker').insert({
+          auftrag_id: auftrag.id,
+          handwerker_id: zuHw.handwerker_id,
+          gewerk_id: zuHw.gewerk_id,
+          status: 'zugewiesen',
+        })
+        if (ahErr) {
+          console.warn('[bestaetigeHandwerkerEinreichung] auftrag_handwerker:', ahErr.message)
+        }
+      }
+
+      return {
+        ok: true,
+        aktualisiert,
+        mailGesendet,
+        mailHinweis,
+        openWizard: {
+          auftragId: auftrag.id as string,
+          handwerkerId: zuHw.handwerker_id as string,
+          gewerkId: zuHw.gewerk_id as string,
+          zuweisungId,
+        },
       }
     }
   }
 
   return { ok: true, aktualisiert, mailGesendet, mailHinweis }
+}
+
+export async function openHandwerkerAcceptWizard(input: {
+  auftragId: string
+  handwerkerId: string
+  gewerkId: string
+  zuweisungId: string
+}) {
+  return loadHandwerkerAcceptWizardBootstrap(input)
+}
+
+async function loadHandwerkerEinreichungZuweisung(
+  angebotId: string,
+  zuweisungId: string
+): Promise<
+  | {
+      ok: true
+      row: {
+        id: string
+        hw_eingereicht_at: string | null
+        hw_status: string | null
+        handwerker: { name: string; email: string | null } | null
+        gewerke: { name: string } | null
+      }
+    }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const { data: zu, error } = await supabase
+    .from('angebot_handwerker')
+    .select(
+      `
+      id,
+      hw_eingereicht_at,
+      hw_status,
+      handwerker(name, email),
+      gewerke(name)
+    `
+    )
+    .eq('id', zuweisungId)
+    .eq('angebot_id', angebotId)
+    .maybeSingle()
+
+  if (error || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
+  if (!zu.hw_eingereicht_at?.trim()) {
+    return { ok: false, message: 'Noch keine Einreichung vom Handwerker.' }
+  }
+  const hwSt = (zu.hw_status ?? '').toLowerCase()
+  if (hwSt !== 'eingereicht') {
+    return { ok: false, message: 'Nur eingereichte Angebote können geprüft werden.' }
+  }
+
+  const hwRaw = zu.handwerker as { name: string; email: string | null } | { name: string; email: string | null }[] | null
+  const gwRaw = zu.gewerke as { name: string } | { name: string }[] | null
+  const handwerker = Array.isArray(hwRaw) ? hwRaw[0] ?? null : hwRaw
+  const gewerke = Array.isArray(gwRaw) ? gwRaw[0] ?? null : gwRaw
+
+  return {
+    ok: true,
+    row: {
+      id: zu.id as string,
+      hw_eingereicht_at: zu.hw_eingereicht_at as string | null,
+      hw_status: zu.hw_status as string | null,
+      handwerker,
+      gewerke,
+    },
+  }
+}
+
+/** CRM: Rückfrage zur Handwerker-Einreichung — Partner sieht Text im Portal und kann erneut einreichen. */
+export async function rueckfrageHandwerkerEinreichung(input: {
+  angebotId: string
+  zuweisungId: string
+  crmNotiz: string
+  betreff?: string
+  cc?: string[]
+}): Promise<
+  | { ok: true; mailGesendet: boolean; mailHinweis?: string }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const crmNotiz = input.crmNotiz.trim()
+  if (!crmNotiz) return { ok: false, message: 'Bitte eine Nachricht an den Handwerker eingeben.' }
+
+  const loaded = await loadHandwerkerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
+  if (!loaded.ok) return loaded
+
+  const now = new Date().toISOString()
+  const { error: upErr } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .update({
+      hw_status: 'rueckfrage',
+      hw_crm_notiz: crmNotiz,
+      hw_crm_antwort_at: now,
+    })
+    .eq('id', loaded.row.id)
+    .eq('hw_status', 'eingereicht')
+
+  if (upErr) return { ok: false, message: upErr.message }
+
+  const mail = await notifyPartnerHandwerkerAngebotAntwort({
+    anfrageId: loaded.row.id,
+    typ: 'rueckfrage',
+    crmNotiz,
+    betreff: input.betreff?.trim() || undefined,
+    cc: input.cc?.filter(Boolean),
+  })
+
+  revalidatePath(`/angebote/${input.angebotId.trim()}`)
+  return {
+    ok: true,
+    mailGesendet: mail.ok,
+    mailHinweis: mail.ok ? undefined : mail.error,
+  }
+}
+
+/** CRM: Handwerker-Einreichung ablehnen — Partner kann neues Angebot einreichen. */
+export async function ablehneHandwerkerEinreichung(input: {
+  angebotId: string
+  zuweisungId: string
+  crmNotiz: string
+  betreff?: string
+  cc?: string[]
+}): Promise<
+  | { ok: true; mailGesendet: boolean; mailHinweis?: string }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const crmNotiz = input.crmNotiz.trim()
+  if (!crmNotiz) return { ok: false, message: 'Bitte einen Grund für den Handwerker eingeben.' }
+
+  const loaded = await loadHandwerkerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
+  if (!loaded.ok) return loaded
+
+  const now = new Date().toISOString()
+  const { error: upErr } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .update({
+      hw_status: 'abgelehnt',
+      hw_crm_notiz: crmNotiz,
+      hw_crm_antwort_at: now,
+    })
+    .eq('id', loaded.row.id)
+    .eq('hw_status', 'eingereicht')
+
+  if (upErr) return { ok: false, message: upErr.message }
+
+  const mail = await notifyPartnerHandwerkerAngebotAntwort({
+    anfrageId: loaded.row.id,
+    typ: 'abgelehnt',
+    crmNotiz,
+    betreff: input.betreff?.trim() || undefined,
+    cc: input.cc?.filter(Boolean),
+  })
+
+  revalidatePath(`/angebote/${input.angebotId.trim()}`)
+  return {
+    ok: true,
+    mailGesendet: mail.ok,
+    mailHinweis: mail.ok ? undefined : mail.error,
+  }
 }
 
 export async function acceptHandwerker(angebotId: string) {
@@ -1070,15 +1276,6 @@ export async function sendAngebotToKunde(
     if (!tl.ok) console.warn('[sendAngebotToKunde] timeline:', tl.message)
     revalidatePath(`/anfragen/${detail.lead_id}`)
   }
-
-  const angebotRef = detail.angebotsnr?.trim() || angebotId.slice(0, 8).toUpperCase()
-  const nachfassDatum = addDaysYmd(new Date().toISOString().slice(0, 10), 7)
-  await planeInternesNachfassTodo({
-    leadId: detail.lead_id,
-    datum: nachfassDatum,
-    kundeName: detail.kunden?.name?.trim() || 'Kunde',
-    angebotRef,
-  })
 
   return { ok: true as const }
 }
@@ -1507,14 +1704,6 @@ export async function createAuftragFromAngebot(
     await Promise.all(postInsertTasks)
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Auftrag-Anlage fehlgeschlagen' }
-  }
-
-  for (const h of angebot.angebot_handwerker ?? []) {
-    if (!eingereichtIds.includes(h.id)) continue
-    const pv = await provisionProjektVertragFuerHandwerker(auftragId, h.handwerker_id)
-    if (!pv.ok) {
-      console.warn('[createAuftragFromAngebot] projektvertrag:', pv.message)
-    }
   }
 
   const branding = await brandingPromise

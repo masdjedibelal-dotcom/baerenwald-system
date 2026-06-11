@@ -1,150 +1,131 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { ClipboardCheck, ExternalLink, Pencil, Smartphone } from 'lucide-react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { ClipboardCheck, Download, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { AbnahmeprotokollModal } from '@/components/auftraege/AbnahmeprotokollModal'
-import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
-import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
+import { toast } from '@/components/ui/app-toast'
+import {
+  deleteAbnahmeprotokoll,
+  loadAbnahmeprotokolleListe,
+  type AbnahmeprotokollListeEintrag,
+} from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { formatDatum } from '@/lib/utils'
 
 export function AuftragAbnahmeprotokollCard({
   auftragId,
-  kundeName,
-  positionen,
-  angebotPositionen,
-  gewerke = [],
-  abnahmeProtokollUrl,
-  abnahmeDatum,
   onChanged,
 }: {
   auftragId: string
-  kundeName: string
-  positionen: AuftragPosition[]
-  angebotPositionen?: AngebotPosition[] | null
-  gewerke?: Pick<Gewerk, 'id' | 'name' | 'slug'>[]
-  abnahmeProtokollUrl: string | null
-  abnahmeDatum: string | null
-  onChanged: () => void
+  onChanged?: () => void
 }) {
-  const [summary, setSummary] = useState<Awaited<ReturnType<typeof loadAbnahmeprotokollSummary>>>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [initialStep, setInitialStep] = useState<1 | 2 | 3 | 4>(1)
+  const router = useRouter()
+  const [liste, setListe] = useState<AbnahmeprotokollListeEintrag[]>([])
+  const [pending, startTransition] = useTransition()
 
   const reload = useCallback(() => {
-    void loadAbnahmeprotokollSummary(auftragId).then(setSummary)
+    void loadAbnahmeprotokolleListe(auftragId).then(setListe)
   }, [auftragId])
 
   useEffect(() => {
     reload()
-  }, [reload, abnahmeProtokollUrl, abnahmeDatum])
+  }, [reload])
 
-  function openWizard(step: 1 | 2 | 3 | 4) {
-    setInitialStep(step)
-    setModalOpen(true)
+  function loeschen(id: string) {
+    if (!window.confirm('Abnahmeprotokoll wirklich löschen?')) return
+    startTransition(async () => {
+      const r = await deleteAbnahmeprotokoll(id, auftragId)
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Protokoll gelöscht')
+        reload()
+        onChanged?.()
+        router.refresh()
+      }
+    })
   }
 
-  const hasProtokoll = Boolean(summary?.punkte.length || abnahmeProtokollUrl)
-  const pdfUrl = summary?.pdf_url ?? abnahmeProtokollUrl
-
   return (
-    <>
-      <Card
-        id="auftrag-abnahmeprotokoll"
-        title="Abnahmeprotokoll"
-        className="scroll-mt-24"
-        bodyClassName="p-4"
-        action={
-          hasProtokoll && summary ? (
-            <span className="text-[12px] tabular-nums text-bw-text-muted">
-              {summary.statistik.ok}/{summary.statistik.gesamt} OK
-              {summary.statistik.mangel > 0 ? ` · ${summary.statistik.mangel} Mangel` : ''}
-            </span>
-          ) : null
-        }
-      >
-        {!hasProtokoll ? (
-          <div className="space-y-3">
-            <p className="text-sm text-bw-text-muted">
-              Checkliste aus Gewerken und Leistungen des Auftrags — PDF zum Ausdrucken oder digital vor Ort
-              abhaken.
-            </p>
-            <Button type="button" variant="primary" size="sm" onClick={() => openWizard(1)}>
-              <ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />
-              Abnahmeprotokoll erstellen
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-bw-text">
-              <span>
-                Abnahme:{' '}
-                <strong>
-                  {formatDatum(summary?.abnahme_datum ?? abnahmeDatum ?? '')}
-                </strong>
-              </span>
-              {summary?.an_kunde_gesendet_at ? (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                  An Kunde gesendet
-                </span>
-              ) : (
-                <span className="rounded-full bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-                  Entwurf / lokal
-                </span>
-              )}
-            </div>
-            <div className="abnahme-card-actions">
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                className="abnahme-card-actions__primary"
-                onClick={() => openWizard(2)}
-              >
-                <Smartphone className="mr-1.5 h-4 w-4" aria-hidden />
-                Vor Ort (Abhaken)
-              </Button>
-              <div className="abnahme-card-actions__secondary">
-                <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(1)}>
-                  <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
-                  Checkliste bearbeiten
-                </Button>
-                {pdfUrl ? (
-                  <a
-                    href={pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-secondary btn-sm abnahme-card-actions__link"
-                  >
-                    <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-                    PDF
-                  </a>
-                ) : (
-                  <Button type="button" variant="secondary" size="sm" onClick={() => openWizard(4)}>
-                    PDF erstellen
-                  </Button>
-                )}
+    <Card
+      id="auftrag-abnahmeprotokoll"
+      title="Abnahmeprotokoll"
+      className="scroll-mt-24"
+      bodyClassName="p-4"
+      action={
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
+        >
+          <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+          Neu
+        </Button>
+      }
+    >
+      {liste.length === 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-bw-text-muted">
+            Checkliste aus Gewerken und Leistungen — PDF zum Ausdrucken oder digital vor Ort ausfüllen.
+          </p>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
+          >
+            <ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />
+            Abnahmeprotokoll erstellen
+          </Button>
+        </div>
+      ) : (
+        <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+          {liste.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-bw-text">
+                  Abnahme {formatDatum(p.abnahme_datum)}
+                </p>
+                <p className="text-[12px] text-bw-text-muted">
+                  Erstellt {formatDatum(p.created_at.slice(0, 10))}
+                  {p.an_kunde_gesendet_at ? ' · An Kunde gesendet' : ''}
+                </p>
               </div>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <AbnahmeprotokollModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        auftragId={auftragId}
-        positionen={positionen}
-        angebotPositionen={angebotPositionen}
-        gewerke={gewerke}
-        kundeName={kundeName}
-        initialStep={initialStep}
-        onDone={() => {
-          reload()
-          onChanged()
-        }}
-      />
-    </>
+              <div className="flex flex-wrap gap-2">
+                {p.pdf_url ? (
+                  <>
+                    <a
+                      href={p.pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary btn-sm"
+                    >
+                      <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
+                      PDF öffnen
+                    </a>
+                    <a href={p.pdf_url} download className="btn btn-secondary btn-sm">
+                      <Download className="mr-1.5 h-4 w-4" aria-hidden />
+                      Download
+                    </a>
+                  </>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700"
+                  loading={pending}
+                  onClick={() => loeschen(p.id)}
+                  aria-label="Protokoll löschen"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

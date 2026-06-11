@@ -7,7 +7,7 @@ export default async function AnfragenLayout({ children }: { children: React.Rea
   const { leads, legacyDemoCount, error } = await loadAnfragenListe()
 
   return (
-    <>
+    <div className="max-md:pb-mobile-fab-extra">
       <LegacyDemoAnfragenBanner count={legacyDemoCount} />
       {error ? (
         <div className="rounded-lg border border-status-cancel-bg bg-status-cancel-bg/30 p-4 text-sm text-status-cancel-text">
@@ -17,6 +17,6 @@ export default async function AnfragenLayout({ children }: { children: React.Rea
       ) : (
         <AnfragenMasterDetailShell leads={leads}>{children}</AnfragenMasterDetailShell>
       )}
-    </>
+    </div>
   )
 }

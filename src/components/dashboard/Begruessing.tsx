@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Plus } from 'lucide-react'
 
 export function Begruessing({ name }: { name: string }) {
   const [gruss, setGruss] = useState('Guten Tag')
@@ -26,20 +24,11 @@ export function Begruessing({ name }: { name: string }) {
   }, [])
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="text-xs text-bw-text-muted">{datum}</p>
-        <h1 className="mt-0.5 text-lg font-semibold leading-tight text-bw-text">
-          {gruss}, {name}
-        </h1>
-      </div>
-      <Link
-        href="/anfragen?neu=1"
-        className="btn btn-primary btn-sm inline-flex shrink-0 items-center justify-center gap-1.5"
-      >
-        <Plus className="h-4 w-4" aria-hidden />
-        Neue Anfrage
-      </Link>
+    <div>
+      <p className="text-xs text-bw-text-muted">{datum}</p>
+      <h1 className="mt-0.5 text-lg font-semibold leading-tight text-bw-text">
+        {gruss}, {name}
+      </h1>
     </div>
   )
 }

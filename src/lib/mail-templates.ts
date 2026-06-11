@@ -946,16 +946,16 @@ export function buildZahlungserinnerungMail(
     betreff: zahlungserinnerungBetreff(data.stufe, data.nummer),
     html: mailHtmlBase(
       `
-      <h2 style="color:#C4922A;margin:0 0 16px;">${stufeTitel}</h2>
+      <h2 style="color:#2E7D52;margin:0 0 16px;">${stufeTitel}</h2>
       <p>${begruessung}</p>
       <p>${einleitung}</p>
       <p>${bitte}</p>
-      <div style="background:#FEF3E3;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px;">
+      <div style="background:#EAF3DE;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px;">
         <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="color:#C4922A;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;">${bruttoFmt} €</td></tr>
-        <tr><td style="color:#C4922A;padding:4px 0;">Zahlbar bis:</td><td><strong>${zahlbarBis}</strong></td></tr>
-        <tr><td style="color:#C4922A;padding:4px 0;">IBAN:</td><td>${esc(iban)}</td></tr>
-        <tr><td style="color:#C4922A;padding:4px 0;">Verwendungszweck:</td><td>${nr}</td></tr>
+        <tr><td style="color:#2E7D52;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;color:#1A3D2B;">${bruttoFmt} €</td></tr>
+        <tr><td style="color:#2E7D52;padding:4px 0;">Zahlbar bis:</td><td style="font-weight:600;color:#1A3D2B;"><strong>${zahlbarBis}</strong></td></tr>
+        <tr><td style="color:#2E7D52;padding:4px 0;">IBAN:</td><td style="color:#1A3D2B;">${esc(iban)}</td></tr>
+        <tr><td style="color:#2E7D52;padding:4px 0;">Verwendungszweck:</td><td style="color:#1A3D2B;">${nr}</td></tr>
         </table>
       </div>
       <p style="font-size:13px;color:#6B7280;">${bereits}</p>
@@ -1139,6 +1139,39 @@ export function mailHandwerkerAnfrage(
       <p style="font-size:13px;color:#6B7280;">Link:<br/><a href="${esc(data.link)}" style="color:#2E7D52;word-break:break-all;">${esc(data.link)}</a></p>
     `,
       `Neue Anfrage: ${data.gewerk}`,
+      b,
+      undefined,
+      { skipMeinBaerenwaldPs: true }
+    ),
+  }
+}
+
+export function mailHandwerkerBautagebuchAnfrage(
+  data: {
+    name: string
+    auftragTitel: string
+    portalLink: string
+    notiz?: string | null
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const name = esc(data.name)
+  const titel = esc(data.auftragTitel)
+  const notizBlock = data.notiz?.trim()
+    ? `<p style="font-size:14px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
+    : ''
+  return {
+    betreff: `Tagebucheintrag angefordert: ${data.auftragTitel} — Bärenwald Partner`,
+    html: mailHtmlBase(
+      `
+      <h2 style="color:#2E7D52;margin:0 0 16px;">Tagebucheintrag angefordert</h2>
+      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
+      <p style="margin:0 0 16px;">Bärenwald bittet dich um einen <strong>Bautagebuch-Eintrag</strong> zum Auftrag <strong>${titel}</strong>.</p>
+      ${notizBlock}
+      ${btnSecondary('Zum Auftrag im Partner-Portal →', data.portalLink)}
+      <p style="font-size:13px;color:#6B7280;margin:16px 0 0;">Die Aufgabe findest du unter Planer → Aufgaben oder direkt beim Auftrag im Bautagebuch.</p>
+    `,
+      `Tagebucheintrag: ${data.auftragTitel}`,
       b,
       undefined,
       { skipMeinBaerenwaldPs: true }

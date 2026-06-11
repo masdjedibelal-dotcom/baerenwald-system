@@ -17,4 +17,4 @@ export const CTA = {
 } as const
 
 /** Lead-Status `abgebrochen` → Vertriebs-Sprache. */
-export const LEAD_ABGEBROCHEN_LABEL = 'Abgelehnt'
+export const LEAD_ABGEBROCHEN_LABEL = 'Verloren'
