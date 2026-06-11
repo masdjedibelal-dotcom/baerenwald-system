@@ -25,6 +25,7 @@ import {
   hatAnfrageAdresse,
   kundeAdresseDbFelder,
 } from '@/lib/anfrage-adresse'
+import { ensureLeadVertriebsAnalyse as ensureLeadVertriebsAnalyseAction } from './lead-vertriebs-analyse-action'
 
 export async function updateLeadStatus(
   leadId: string,
@@ -1147,4 +1148,9 @@ export async function saveLeadAlsVerloren(input: {
   return updateLeadStatus(input.leadId, 'abgebrochen', beschreibung || grundLabel)
 }
 
-export { ensureLeadVertriebsAnalyse } from './lead-vertriebs-analyse-action'
+export async function ensureLeadVertriebsAnalyse(
+  leadId: string,
+  options?: { force?: boolean }
+) {
+  return ensureLeadVertriebsAnalyseAction(leadId, options)
+}
