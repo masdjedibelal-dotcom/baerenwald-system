@@ -60,3 +60,48 @@ export async function clearCopilotHistory(): Promise<void> {
     throw new Error(`Supabase copilot_messages (löschen): ${error.message}`)
   }
 }
+
+const RESET_COMMANDS = new Set([
+  '/reset',
+  '/clear',
+  '/neustart',
+  '/start',
+  'reset',
+  'neustart',
+  'verlauf löschen',
+  'chat löschen',
+  'chat reset',
+  'chat zurücksetzen',
+  'zurücksetzen',
+  'verlauf reset',
+])
+
+export function isCopilotResetCommand(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  if (!t) return false
+  if (RESET_COMMANDS.has(t)) return true
+  return /^(bitte\s+)?(chat\s+)?(zurück)?setzen$/.test(t)
+}
+
+/** Letzte User-Nachricht entfernen (z. B. nach Fehler, bevor Verlauf komplett leer ist). */
+export async function rollbackLastUserMessage(): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from('copilot_messages')
+    .select('id, role')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) {
+    throw new Error(`Supabase copilot_messages (rollback): ${error.message}`)
+  }
+  if (!data || data.role !== 'user') return false
+  const { error: delError } = await supabaseAdmin.from('copilot_messages').delete().eq('id', data.id)
+  if (delError) {
+    throw new Error(`Supabase copilot_messages (rollback löschen): ${delError.message}`)
+  }
+  return true
+}
+
+export async function resetCopilotChat(): Promise<void> {
+  await clearCopilotHistory()
+}

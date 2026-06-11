@@ -1,5 +1,12 @@
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
+import {
+  mailHtmlBase,
+  mailKundenContactLine,
+  mailKundenGruss,
+  mailKundenPortalTop,
+  mailKundenStandardOptions,
+  mailSummaryBlock,
+} from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 function esc(s: string): string {
@@ -60,17 +67,8 @@ export function buildZahlungsbestaetigungMail(
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Bezahlt am:</strong> ${bezahltAm}</p>`,
   })
 
-  const tel = esc(b.telefon)
-  const telHref = tel.replace(/\s/g, '')
-  const contact =
-    anrede === 'du'
-      ? `Bei Rückfragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-      : `Bei Rückfragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-
-  const gruss =
-    anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+  const contact = mailKundenContactLine(anrede, b.telefon)
+  const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
     anrede === 'du'
@@ -81,6 +79,7 @@ export function buildZahlungsbestaetigungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+      ${mailKundenPortalTop()}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${esc(abschlussHinweis)}</p>
@@ -89,7 +88,7 @@ export function buildZahlungsbestaetigungMail(
     preheader,
     b,
     disclaimer,
-    { anrede }
+    mailKundenStandardOptions(anrede)
   )
 
   return {

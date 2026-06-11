@@ -6,6 +6,7 @@ import { AppListScreen } from '@/components/layout/app'
 import { RechnungAuswahlPanel, type RechnungAuswahlZeile } from '@/components/rechnungen/RechnungAuswahlPanel'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { loadRechnungWizardBootstrapFromAuftrag } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { loadRechnungWizardBootstrapFromAuftragAbschlag } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Preisliste } from '@/lib/types'
@@ -54,6 +55,17 @@ export function RechnungAuswahlPageClient({
     })
   }, [auftragId, openWizard])
 
+  const neueAbschlagsrechnung = useCallback(() => {
+    startTransition(async () => {
+      const res = await loadRechnungWizardBootstrapFromAuftragAbschlag(auftragId)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      openWizard(res.bootstrap)
+    })
+  }, [auftragId, openWizard])
+
   return (
     <AppListScreen>
       <div className="px-1 pb-6">
@@ -62,6 +74,7 @@ export function RechnungAuswahlPageClient({
           auftragId={auftragId}
           rechnungen={rechnungen}
           onNeueRechnung={neueRechnung}
+          onNeueAbschlagsrechnung={neueAbschlagsrechnung}
           onWeiterbearbeiten={openWizard}
         />
       </div>

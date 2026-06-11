@@ -7,12 +7,16 @@ import {
 import { normalizeLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
-import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
-import { mailHtmlBase } from '@/lib/mail-templates'
-import { buildPortalLoginLink } from '@/lib/portal-utils'
+import {
+  mailHtmlBase,
+  mailKundenContactLine,
+  mailKundenGruss,
+  mailKundenPortalTop,
+  mailKundenStandardOptions,
+  mailSummaryBlock,
+} from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
-import { BAUTAGEBUCH_MAX_FOTOS } from '@/lib/auftraege/bautagebuch-fotos'
 import { formatDatum } from '@/lib/utils'
 
 function esc(s: string): string {
@@ -104,28 +108,18 @@ function updateBlock(
     ? `<div style="font-size:14px;color:#374151;line-height:1.6;margin:8px 0 0;">${richTextToSafePdfHtml(eintrag.beschreibung)}</div>`
     : ''
   const fotos = (eintrag.foto_urls ?? []).filter(Boolean)
-  const fotoRows: string[] = []
-  for (let i = 0; i < Math.min(fotos.length, BAUTAGEBUCH_MAX_FOTOS); i += 2) {
-    const u1 = esc(fotos[i]!)
-    const u2Cell = fotos[i + 1]
-      ? `<td width="50%" style="padding:2px;"><img src="${esc(fotos[i + 1]!)}" alt="" width="100%" style="display:block;width:100%;height:88px;object-fit:cover;border-radius:6px;border:0;"/></td>`
-      : '<td width="50%" style="padding:2px;"></td>'
-    fotoRows.push(
-      `<tr><td width="50%" style="padding:2px;"><img src="${u1}" alt="" width="100%" style="display:block;width:100%;height:88px;object-fit:cover;border-radius:6px;border:0;"/></td>${u2Cell}</tr>`
-    )
-  }
-  const fotoHtml =
-    fotoRows.length > 0
-      ? `<table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:12px 0 0;border-collapse:collapse;">${fotoRows.join('')}</table>`
+  const fotoHinweis =
+    fotos.length > 0
+      ? anrede === 'du'
+        ? `<p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
+        : `<p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
       : ''
 
-  return `<div style="background:#FFFFFF;border-radius:8px;padding:14px;border:1px solid #E5E7EB;margin:0 0 20px;">
-    <p style="font-size:10px;font-weight:600;color:#2E7D52;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">${label}</p>
-    <p style="font-size:12px;color:#6B7280;margin:0 0 6px;">${datum}</p>
-    <p style="font-size:16px;font-weight:700;color:#1A3D2B;margin:0;line-height:1.35;">${titel}</p>
-    ${beschreibungHtml}
-    ${fotoHtml}
-  </div>`
+  return `${mailSummaryBlock({
+    label,
+    title: titel,
+    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Datum:</strong> ${datum}</p>`,
+  })}${beschreibungHtml}${fotoHinweis}`
 }
 
 function projektUebersichtBlock(
@@ -185,19 +179,9 @@ export function buildBautagebuchKundenMail(
   const nachrichtHtml = textToHtmlParagraphs(data.nachricht)
   const uebersicht = projektUebersichtBlock(data.positionen, data.gewerke, data.eintrag, anrede)
 
-  const portalTopHtml = `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', buildPortalLoginLink(), { margin: '0' })}</p>`
-
-  const tel = esc(b.telefon)
-  const telHref = tel.replace(/\s/g, '')
-  const contact =
-    anrede === 'du'
-      ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-      : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-
-  const gruss =
-    anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+  const portalTopHtml = mailKundenPortalTop(data.statusLink)
+  const contact = mailKundenContactLine(anrede, b.telefon)
+  const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
     anrede === 'du'
@@ -216,7 +200,7 @@ export function buildBautagebuchKundenMail(
     preheader,
     b,
     disclaimer,
-    { anrede, skipMeinBaerenwaldPs: true }
+    mailKundenStandardOptions(anrede)
   )
 
   return {

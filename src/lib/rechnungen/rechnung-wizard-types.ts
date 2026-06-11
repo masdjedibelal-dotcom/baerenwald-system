@@ -1,3 +1,5 @@
+import type { RechnungArt } from '@/lib/rechnungen/zahlungsplan'
+import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import {
@@ -9,11 +11,24 @@ import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 export type RechnungWizardMeta = {
   einleitung: string
   hinweise: string
+  mail_einleitung: string
+  mail_betreff: string
   reverse_charge_13b: boolean
   rechnungsdatum: string
   leistungszeitraum_von: string
   leistungszeitraum_bis: string
   faellig_am: string
+}
+
+export type RechnungWizardAbschlagKontext = {
+  zeileId: string
+  zeileIndex: number
+  zeileTitel: string
+  rechnungArt: RechnungArt
+  istSchluss: boolean
+  gesamtNetto: number
+  gesamtBrutto: number
+  bereitsGestelltBrutto: number
 }
 
 export type RechnungWizardBootstrap = {
@@ -43,6 +58,10 @@ export type RechnungWizardBootstrap = {
   meta: RechnungWizardMeta
   auftragsReferenz: string
   projektTitel?: string | null
+  modus?: 'voll' | 'abschlag'
+  abschlag?: RechnungWizardAbschlagKontext | null
+  zahlungsplan?: Zahlungsplan | null
+  zahlungsplanBearbeiten?: boolean
 }
 
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
@@ -79,6 +98,8 @@ export function defaultRechnungWizardMeta(
   return {
     einleitung,
     hinweise,
+    mail_einleitung: '',
+    mail_betreff: '',
     reverse_charge_13b: false,
     rechnungsdatum: heute,
     leistungszeitraum_von: von,
@@ -96,4 +117,7 @@ export type RechnungAuswahlZeile = {
   faellig_am: string | null
   pdf_url?: string | null
   gesendet_at?: string | null
+  rechnung_art?: string | null
+  abschlag_index?: number | null
+  zahlungsplan_abschlag_id?: string | null
 }

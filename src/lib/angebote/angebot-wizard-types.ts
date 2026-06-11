@@ -11,6 +11,7 @@ import {
   type FirmenEinstellungen,
 } from '@/lib/einstellungen-keys'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
+import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, AngebotStatus } from '@/lib/types'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import {
@@ -85,6 +86,7 @@ export type AngebotWizardZahlungsbedingung =
   | '14_tage'
   | '30_tage'
   | 'anzahlung_50'
+  | 'abschlagsplan'
   | 'individuell'
 
 export const ZAHLUNGSBEDINGUNGEN_LABELS: Record<AngebotWizardZahlungsbedingung, string> = {
@@ -93,6 +95,7 @@ export const ZAHLUNGSBEDINGUNGEN_LABELS: Record<AngebotWizardZahlungsbedingung, 
   '30_tage': 'Zahlbar innerhalb von 30 Tagen nach Rechnungsstellung.',
   anzahlung_50:
     '50 % Anzahlung bei Auftragserteilung, 50 % nach Fertigstellung innerhalb von 7 Tagen.',
+  abschlagsplan: 'Abschlagsplan (individuelle Teilzahlungen)',
   individuell: 'Gemäß individueller Vereinbarung.',
 }
 
@@ -155,6 +158,7 @@ export type AngebotWizardBootstrap = {
   wichtige_hinweise?: string | null
   /** Angebot wurde bereits an den Kunden versendet (Korrektur-Mail/Vorschau). */
   bereitsGesendet?: boolean
+  zahlungsplan?: Zahlungsplan | null
 }
 
 /** Für Kopien: angehängte Nummer „(2)“, „(3)“, … am Angebotstitel. */

@@ -2,7 +2,14 @@ import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
+import {
+  mailHtmlBase,
+  mailKundenContactLine,
+  mailKundenGruss,
+  mailKundenPortalTop,
+  mailKundenStandardOptions,
+  mailSummaryBlock,
+} from '@/lib/mail-templates'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 
@@ -296,9 +303,6 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     istKorrektur,
   } = data
 
-  const tel = esc(branding.telefon)
-  const telHref = tel.replace(/\s/g, '')
-
   const formatEur = (n: number) =>
     n.toLocaleString('de-DE', {
       minimumFractionDigits: 2,
@@ -341,24 +345,22 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     ? mailKiVisualisierungBlock(anrede, data.visualisierung_vorschau_url)
     : ''
 
+  const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const content = `
-      <p style="font-size:15px;color:#374151;margin:0 0 8px;line-height:1.6;">${anredeText}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${anredeText}</p>
+      ${mailKundenPortalTop(data.portalLink)}
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
+      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
         ${anrede === 'du' ? ctaDu : ctaSie}
       </p>
       ${grussHtml}
-      <p style="font-size:13px;color:#6B7280;margin:16px 0 0;line-height:1.6;">
-        ${pdfHinweis}
-        Bei Fragen: <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>
-      </p>`
+      <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
-  return mailHtmlBase(content, preheader, branding, disclaimer, {
-    anrede: anrede === 'sie' ? 'sie' : 'du',
-  })
+  return mailHtmlBase(content, preheader, branding, disclaimer, mailKundenStandardOptions(anredeKey))
 }
 
 export type NachfassMailInput = AngebotMailInput

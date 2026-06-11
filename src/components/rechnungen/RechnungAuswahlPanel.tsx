@@ -28,6 +28,7 @@ export function RechnungAuswahlPanel({
   rechnungen,
   onClose,
   onNeueRechnung,
+  onNeueAbschlagsrechnung,
   onWeiterbearbeiten,
   variant = 'modal',
 }: {
@@ -35,6 +36,7 @@ export function RechnungAuswahlPanel({
   rechnungen: RechnungAuswahlZeile[]
   onClose?: () => void
   onNeueRechnung: () => void
+  onNeueAbschlagsrechnung?: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
   variant?: 'modal' | 'page'
 }) {
@@ -136,6 +138,17 @@ export function RechnungAuswahlPanel({
         <Plus className="h-3.5 w-3.5" aria-hidden />
         Neue Rechnung
       </button>
+      {onNeueAbschlagsrechnung ? (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm inline-flex gap-1.5"
+          onClick={onNeueAbschlagsrechnung}
+          disabled={pending}
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+          Abschlagsrechnung
+        </button>
+      ) : null}
     </div>
   )
 
@@ -210,7 +223,13 @@ export function RechnungAuswahlPanel({
               <li key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-bw-text">Rechnung</span>
+                    <span className="text-[13px] font-medium text-bw-text">
+                      {r.rechnung_art === 'schluss'
+                        ? 'Schlussrechnung'
+                        : r.rechnung_art === 'abschlag'
+                          ? `Abschlag ${r.abschlag_index ?? ''}`.trim()
+                          : 'Rechnung'}
+                    </span>
                     <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
                       {label}
                     </span>

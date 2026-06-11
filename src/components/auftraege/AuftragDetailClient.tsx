@@ -28,6 +28,7 @@ import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { AuftragFinanzenClient } from '@/components/auftraege/AuftragFinanzenClient'
+import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
 import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
@@ -81,6 +82,7 @@ import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
 import {
   loadRechnungWizardBootstrapFromAuftrag,
+  loadRechnungWizardBootstrapFromAuftragAbschlag,
   type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
@@ -88,6 +90,8 @@ import {
   type ProjektVertragWizardBootstrap,
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -720,16 +724,52 @@ export function AuftragDetailClient({
 
   const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
 
-  const finanzenInhalt = finanzenPayload ? (
-    <AuftragFinanzenClient
-      embedded
-      auftragId={detail.id}
-      projektTitel={detail.titel}
-      kundeName={detail.kunden?.name ?? null}
-      {...finanzenPayload}
-    />
-  ) : (
-    <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
+  const auftragNettoSumme = useMemo(() => {
+    const ap = detail.auftrag_positionen ?? []
+    if (ap.length) {
+      return auftragSummenAusPositionen(
+        ap.map((p) => ({
+          id: p.id,
+          gewerk_id: '',
+          gewerk_slug: p.gewerk_slug ?? '',
+          gewerk_name: p.gewerk_name ?? '',
+          leistung: p.leistung_name ?? '',
+          beschreibung: p.beschreibung ?? '',
+          menge: p.menge ?? 1,
+          einheit: p.einheit ?? '',
+          lohn_netto: p.lohn_fix ?? 0,
+          material_netto: p.material_fix ?? 0,
+          gesamt_min: p.preis_fix ?? 0,
+          gesamt_max: p.preis_fix ?? 0,
+          preis_typ: 'fix' as const,
+        }))
+      ).netto
+    }
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    const raw = (ang as { positionen?: unknown } | null)?.positionen
+    return auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
+  }, [detail.auftrag_positionen, detail.angebote])
+
+  const finanzenInhalt = (
+    <div className="space-y-4">
+      <AuftragZahlungsplanSection
+        auftragId={detail.id}
+        zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
+        gesamtNetto={auftragNettoSumme}
+        rechnungen={rechnungenListe}
+      />
+      {finanzenPayload ? (
+        <AuftragFinanzenClient
+          embedded
+          auftragId={detail.id}
+          projektTitel={detail.titel}
+          kundeName={detail.kunden?.name ?? null}
+          {...finanzenPayload}
+        />
+      ) : (
+        <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
+      )}
+    </div>
   )
 
   const desktopTabContent =
@@ -994,6 +1034,17 @@ export function AuftragDetailClient({
           setRechnungAuswahlOpen(false)
           startTransition(async () => {
             const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            openRechnungWizard(res.bootstrap)
+          })
+        }}
+        onNeueAbschlagsrechnung={() => {
+          setRechnungAuswahlOpen(false)
+          startTransition(async () => {
+            const res = await loadRechnungWizardBootstrapFromAuftragAbschlag(detail.id)
             if (!res.ok) {
               toast.error(res.message)
               return

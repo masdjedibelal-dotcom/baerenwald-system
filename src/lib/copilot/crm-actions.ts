@@ -20,6 +20,74 @@ function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
 }
 
+function kundeSuchbegriffe(raw: string): string[] {
+  const t = raw.trim()
+  if (!t) return []
+  const ausSlug = t.replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
+  const teile = ausSlug.split(' ').filter(Boolean)
+  const varianten = new Set<string>([t, ausSlug])
+  if (teile.length === 2) {
+    varianten.add(`${teile[1]} ${teile[0]}`)
+  }
+  return Array.from(varianten).filter((v) => v.length >= 2)
+}
+
+export async function resolveKundeId(input: {
+  kunde_id?: string
+  suche?: string
+}): Promise<{ id: string; name: string | null } | { error: string; treffer?: CrmSearchHit[] }> {
+  const raw = (input.kunde_id ?? input.suche ?? '').trim()
+  if (!raw) return { error: 'kunde_id oder suche erforderlich' }
+
+  if (isUuid(raw)) {
+    const { data } = await supabaseAdmin.from('kunden').select('id, name').eq('id', raw).maybeSingle()
+    if (data) return { id: data.id, name: data.name }
+    return { error: 'Kunde nicht gefunden' }
+  }
+
+  const byNr = await supabaseAdmin
+    .from('kunden')
+    .select('id, name')
+    .ilike('kundennummer', raw)
+    .limit(2)
+  if (byNr.data?.length === 1) {
+    return { id: byNr.data[0].id, name: byNr.data[0].name }
+  }
+  if ((byNr.data?.length ?? 0) > 1) {
+    return {
+      error: 'Mehrere Kunden mit dieser Nummer — bitte genauer angeben',
+      treffer: byNr.data!.map((r) => ({
+        typ: 'kunde' as const,
+        id: r.id,
+        titel: r.name ?? 'Kunde',
+      })),
+    }
+  }
+
+  let lastHits: CrmSearchHit[] = []
+  for (const q of kundeSuchbegriffe(raw)) {
+    const hits = await searchCrm(q, ['kunde'])
+    lastHits = hits
+    if (hits.length === 1) {
+      return { id: hits[0].id, name: hits[0].titel }
+    }
+    if (hits.length > 1) {
+      return {
+        error: `Mehrere Kunden für „${raw}" — bitte Name oder Kundennummer genauer nennen`,
+        treffer: hits,
+      }
+    }
+  }
+
+  if (lastHits.length > 1) {
+    return { error: `Mehrere Kunden für „${raw}"`, treffer: lastHits }
+  }
+
+  return {
+    error: `Kein Kunde gefunden für „${raw}". Zuerst search_crm nutzen, dann die echte UUID verwenden.`,
+  }
+}
+
 // ── Termine ──
 
 export async function getTermine(von: string, bis: string) {
@@ -98,8 +166,10 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
       (async () => {
         const { data } = await supabaseAdmin
           .from('kunden')
-          .select('id, name, email, telefon, plz')
-          .or(`name.ilike.${pattern},email.ilike.${pattern},telefon.ilike.${pattern}`)
+          .select('id, name, email, telefon, plz, kundennummer')
+          .or(
+            `name.ilike.${pattern},email.ilike.${pattern},telefon.ilike.${pattern},kundennummer.ilike.${pattern}`
+          )
           .order('created_at', { ascending: false })
           .limit(8)
         for (const row of data ?? []) {
@@ -215,10 +285,16 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
       return data ?? { error: 'Lead nicht gefunden' }
     }
     case 'kunde': {
+      let kundeId = id
+      if (!isUuid(id)) {
+        const resolved = await resolveKundeId({ kunde_id: id })
+        if ('error' in resolved) return resolved
+        kundeId = resolved.id
+      }
       const { data, error } = await supabaseAdmin
         .from('kunden')
-        .select('id, name, email, telefon, typ, plz, ort, adresse, notizen, created_at')
-        .eq('id', id)
+        .select('id, name, email, telefon, typ, plz, ort, adresse, notizen, kundennummer, created_at')
+        .eq('id', kundeId)
         .maybeSingle()
       if (error) throw error
       return data ?? { error: 'Kunde nicht gefunden' }
@@ -333,6 +409,12 @@ export async function createAngebotEntwurfCopilot(input: {
 }) {
   let kundeId = input.kunde_id?.trim() || null
   let leadId = input.lead_id?.trim() || null
+
+  if (kundeId && !isUuid(kundeId)) {
+    const resolved = await resolveKundeId({ kunde_id: kundeId })
+    if ('error' in resolved) throw new Error(resolved.error)
+    kundeId = resolved.id
+  }
 
   if (!kundeId && leadId) {
     const { data: lead } = await supabaseAdmin

@@ -32,7 +32,12 @@ import {
   startAuftragArbeit,
   updateAuftragStatusFromUi,
 } from '@/app/(dashboard)/auftraege/actions'
-import { resolveAngebotId, previewSendAngebot, createKundeCopilot } from '@/lib/copilot/crm-actions'
+import {
+  resolveAngebotId,
+  resolveKundeId,
+  previewSendAngebot,
+  createKundeCopilot,
+} from '@/lib/copilot/crm-actions'
 import { sendMailKunde } from '@/lib/copilot/tools'
 import {
   listHandwerkerFuerGewerkCopilot,
@@ -439,6 +444,12 @@ export const CRM_ACTION_REGISTRY: Record<
         ort: optionalStr(p, 'ort'),
       }
       if (id) {
+        let kundeId = id
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+          const resolved = await resolveKundeId({ kunde_id: id })
+          if ('error' in resolved) return resolved
+          kundeId = resolved.id
+        }
         const { error } = await supabaseAdmin
           .from('kunden')
           .update({
@@ -450,9 +461,9 @@ export const CRM_ACTION_REGISTRY: Record<
             ort: patch.ort ?? null,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', id)
+          .eq('id', kundeId)
         if (error) return { error: error.message }
-        return { ok: true, id }
+        return { ok: true, id: kundeId }
       }
       return createKundeCopilot(patch)
     },

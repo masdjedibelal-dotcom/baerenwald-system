@@ -49,12 +49,16 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'get_entity',
-    description: 'Einzelnen Datensatz laden (lead, kunde, angebot, termin, rechnung)',
+    description:
+      'Einzelnen Datensatz laden (lead, kunde, angebot, termin, rechnung). Bei Kunden: UUID, Kundennummer (KD-…) oder Name — kein erfundener Slug.',
     input_schema: {
       type: 'object',
       properties: {
         typ: { type: 'string' },
-        id: { type: 'string' },
+        id: {
+          type: 'string',
+          description: 'UUID aus search_crm. Bei Kunden alternativ Kundennummer oder voller Name.',
+        },
       },
       required: ['typ', 'id'],
       additionalProperties: false,

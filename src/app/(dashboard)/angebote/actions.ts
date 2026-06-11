@@ -49,6 +49,7 @@ import {
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
+import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { loadHandwerkerAcceptWizardBootstrap } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadKiVizMailPreviewUrl } from '@/lib/visualize/pdf-data'
 import {
@@ -214,6 +215,7 @@ export type CreateAngebotInput = {
   kunde_objekt_id?: string | null
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
+  zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
 }
 
 async function zahlungsbedingungenFuerSpeichern(
@@ -277,6 +279,7 @@ export async function createAngebot(
       hinweise: input.hinweise?.trim() || null,
       zahlungsbedingungen,
       gueltig_bis: input.gueltig_bis?.trim() || null,
+      zahlungsplan: input.zahlungsplan ?? null,
       dokument_typ: input.dokument_typ ?? 'einfach',
       projektbeschreibung: input.projektbeschreibung?.trim() || null,
       fotos_urls: Array.isArray(input.fotos_urls) && input.fotos_urls.length > 0 ? input.fotos_urls : [],
@@ -434,6 +437,7 @@ export async function updateAngebot(
       hinweise: input.hinweise?.trim() ?? null,
       zahlungsbedingungen,
       gueltig_bis: input.gueltig_bis?.trim() || null,
+      ...(input.zahlungsplan !== undefined ? { zahlungsplan: input.zahlungsplan } : {}),
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
         : {}),
@@ -1589,6 +1593,12 @@ export async function createAuftragFromAngebot(
 
   const kundenToken = randomBytes(32).toString('hex')
 
+  const zahlungsplanRaw = (angebot as { zahlungsplan?: unknown }).zahlungsplan
+  let zahlungsplan = parseZahlungsplan(zahlungsplanRaw)
+  if (!zahlungsplan && angebot.zahlungsbedingungen === 'anzahlung_50') {
+    zahlungsplan = zahlungsplanVorlage50_50()
+  }
+
   const supabaseAuth = createClient()
   const {
     data: { user: authUser },
@@ -1610,6 +1620,7 @@ export async function createAuftragFromAngebot(
       kunden_token: kundenToken,
       fortschritt: 0,
       betreuer_id: authUser?.id ?? null,
+      zahlungsplan: zahlungsplan ?? null,
     })
     .select('id, kunden_token')
     .single()

@@ -23,6 +23,26 @@ import {
   type RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
+import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import {
+  abschlagTextKontextFromWizard,
+  defaultAbschlagMailBetreff,
+  defaultAbschlagMailEinleitung,
+  defaultAbschlagPdfEinleitung,
+} from '@/lib/rechnungen/zahlungsplan-texte'
+import {
+  auftragSummenAusPositionen,
+  berechneBereitsGestellt,
+  berechneZahlungsplan,
+  buildAbschlagPauschalPosition,
+  naechsteOffeneAbschlagZeile,
+  parseZahlungsplan,
+  rechnungArtFuerZeile,
+  resolveAnredeKey,
+  zahlungsplanVorlage50_50,
+  type Zahlungsplan,
+} from '@/lib/rechnungen/zahlungsplan'
+import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { maybeUpgradeLegacyRechnungsnummer } from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
@@ -37,6 +57,14 @@ export type SaveRechnungWizardDraftPayload = {
   kunde_id: string
   positionen: AngebotPosition[]
   meta: RechnungWizardMeta
+  modus?: 'voll' | 'abschlag'
+  abschlag?: {
+    zeileId: string
+    zeileIndex: number
+    rechnungArt: 'abschlag' | 'schluss'
+  } | null
+  zahlungsplan?: Zahlungsplan | null
+  zahlungsplanSpeichern?: boolean
 }
 
 async function positionenAusAuftrag(
@@ -50,6 +78,9 @@ async function positionenAusAuftrag(
   projektTitel: string | null
   leistungszeitraum_von: string | null
   leistungszeitraum_bis: string | null
+  zahlungsplan: Zahlungsplan | null
+  gesamtNetto: number
+  gesamtBrutto: number
 }> {
   const gewerke = await loadGewerkeAusfuehrung(supabase)
 
@@ -64,7 +95,8 @@ async function positionenAusAuftrag(
       titel,
       start_datum,
       end_datum,
-      angebote(id, positionen, leistungsumfang, notizen),
+      zahlungsplan,
+      angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan),
       auftrag_positionen(*)
     `
     )
@@ -110,6 +142,15 @@ async function positionenAusAuftrag(
       auftragTitel: (auf.titel as string | null) ?? null,
     }) || null
 
+  const angZahlung = angJoin as { zahlungsbedingungen?: string | null; zahlungsplan?: unknown } | null
+  let zahlungsplan = parseZahlungsplan(auf.zahlungsplan) ?? parseZahlungsplan(angZahlung?.zahlungsplan)
+  if (!zahlungsplan && angZahlung?.zahlungsbedingungen === 'anzahlung_50') {
+    zahlungsplan = zahlungsplanVorlage50_50()
+  }
+
+  const summen = auftragSummenAusPositionen(positionen)
+  const kontext = zahlungsplan ? berechneZahlungsplan(zahlungsplan, summen.netto) : null
+
   return {
     positionen,
     angebot_id: (auf.angebot_id as string | null) ?? null,
@@ -118,6 +159,56 @@ async function positionenAusAuftrag(
     projektTitel,
     leistungszeitraum_von: (auf.start_datum as string | null) ?? null,
     leistungszeitraum_bis: (auf.end_datum as string | null) ?? null,
+    zahlungsplan,
+    gesamtNetto: summen.netto,
+    gesamtBrutto: kontext?.gesamtBrutto ?? summen.brutto,
+  }
+}
+
+async function rechnungenAbschlagLinks(
+  supabase: ReturnType<typeof createClient>,
+  auftragId: string
+) {
+  const { data } = await supabase
+    .from('rechnungen')
+    .select('id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto')
+    .eq('auftrag_id', auftragId)
+  return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
+}
+
+function abschlagMetaDefaults(
+  basis: Awaited<ReturnType<typeof positionenAusAuftrag>>,
+  zeile: import('@/lib/rechnungen/zahlungsplan').ZahlungsplanZeileBerechnet,
+  bereitsGestelltBrutto: number,
+  kundeTyp?: string | null,
+  rechnungsnummerPlaceholder?: string | null
+): RechnungWizardMeta {
+  const anrede = resolveAnredeKey(mailAnredeFromKundeTyp(kundeTyp))
+  const ctx = abschlagTextKontextFromWizard({
+    anrede,
+    zeile,
+    projektTitel: basis.projektTitel ?? '',
+    auftragsReferenz: basis.auftragsReferenz,
+    gesamtNetto: basis.gesamtNetto,
+    gesamtBrutto: basis.gesamtBrutto,
+    bereitsGestelltBrutto,
+  })
+  const pdfVorlage = zeile.pdf_einleitung_vorlage?.trim()
+  const mailVorlage = zeile.mail_einleitung_vorlage?.trim()
+  const betreffVorlage = zeile.mail_betreff_vorlage?.trim()
+
+  return {
+    einleitung: pdfVorlage || defaultAbschlagPdfEinleitung(ctx),
+    hinweise: '',
+    mail_einleitung: mailVorlage || defaultAbschlagMailEinleitung(ctx),
+    mail_betreff:
+      betreffVorlage ||
+      defaultAbschlagMailBetreff(ctx, 'Bärenwald', rechnungsnummerPlaceholder?.trim() || 'Rechnung'),
+    reverse_charge_13b: false,
+    rechnungsdatum: new Date().toISOString().slice(0, 10),
+    leistungszeitraum_von: basis.leistungszeitraum_von?.trim() || new Date().toISOString().slice(0, 10),
+    leistungszeitraum_bis: basis.leistungszeitraum_bis?.trim() || new Date().toISOString().slice(0, 10),
+    faellig_am: '',
   }
 }
 
@@ -155,11 +246,130 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         }),
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
+        modus: 'voll',
       },
     }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Laden fehlgeschlagen' }
   }
+}
+
+export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
+  auftragId: string
+): Promise<{ ok: true; bootstrap: RechnungWizardBootstrap } | { ok: false; message: string }> {
+  try {
+    const supabase = createClient()
+    const basis = await positionenAusAuftrag(supabase, auftragId)
+    const rechnungen = await rechnungenAbschlagLinks(supabase, auftragId)
+    const { data: kunde, error: kundeErr } = await loadKundeFuerRechnung(supabase, basis.kunde_id)
+    if (kundeErr) return { ok: false, message: kundeErr.message }
+
+    const firm = await fetchFirmenEinstellungen(supabase)
+    const zt = Math.max(
+      1,
+      parseInt(firm.zahlungsziel_tage, 10) || defaultZahlungszielTage(kunde?.typ)
+    )
+
+    const plan = basis.zahlungsplan
+    const zahlungsplanBearbeiten = !plan?.zeilen.length
+
+    if (!plan?.zeilen.length) {
+      const metaDefaults = defaultRechnungWizardMeta(zt, {
+        leistungszeitraum_von: basis.leistungszeitraum_von,
+        leistungszeitraum_bis: basis.leistungszeitraum_bis,
+        projektTitel: basis.projektTitel,
+        kundeTyp: kunde?.typ,
+      })
+      return {
+        ok: true,
+        bootstrap: {
+          rechnungId: null,
+          rechnungsnummer: null,
+          auftragId,
+          angebotId: basis.angebot_id,
+          kundeId: basis.kunde_id,
+          kunde: kunde ?? null,
+          positionen: basis.positionen,
+          meta: metaDefaults,
+          auftragsReferenz: basis.auftragsReferenz,
+          projektTitel: basis.projektTitel,
+          modus: 'abschlag',
+          abschlag: {
+            zeileId: '',
+            zeileIndex: 0,
+            zeileTitel: '',
+            rechnungArt: 'abschlag',
+            istSchluss: false,
+            gesamtNetto: basis.gesamtNetto,
+            gesamtBrutto: basis.gesamtBrutto,
+            bereitsGestelltBrutto: 0,
+          },
+          zahlungsplan: zahlungsplanVorlage50_50(),
+          zahlungsplanBearbeiten: true,
+        },
+      }
+    }
+
+    const kontext = berechneZahlungsplan(plan, basis.gesamtNetto)
+    const naechste = naechsteOffeneAbschlagZeile(plan, kontext, rechnungen)
+    if (!naechste) {
+      return { ok: false, message: 'Alle Abschläge sind bereits abgerechnet.' }
+    }
+
+    const bereits = berechneBereitsGestellt(rechnungen)
+    const abschlagPosition = buildAbschlagPauschalPosition({
+      zeile: naechste,
+      gesamtNetto: basis.gesamtNetto,
+      auftragsReferenz: basis.auftragsReferenz,
+      projektTitel: basis.projektTitel ?? '',
+      bereitsGestelltBrutto: bereits.brutto,
+    })
+
+    const metaPartial = abschlagMetaDefaults(basis, naechste, bereits.brutto, kunde?.typ)
+    const heute = new Date().toISOString().slice(0, 10)
+    const meta: RechnungWizardMeta = {
+      ...metaPartial,
+      rechnungsdatum: heute,
+      faellig_am: metaPartial.faellig_am || addDaysIsoLocal(heute, zt),
+    }
+
+    return {
+      ok: true,
+      bootstrap: {
+        rechnungId: null,
+        rechnungsnummer: null,
+        auftragId,
+        angebotId: basis.angebot_id,
+        kundeId: basis.kunde_id,
+        kunde: kunde ?? null,
+        positionen: [abschlagPosition],
+        meta,
+        auftragsReferenz: basis.auftragsReferenz,
+        projektTitel: basis.projektTitel,
+        modus: 'abschlag',
+        abschlag: {
+          zeileId: naechste.id,
+          zeileIndex: naechste.index,
+          zeileTitel: naechste.titel,
+          rechnungArt: rechnungArtFuerZeile(naechste),
+          istSchluss: naechste.istSchluss,
+          gesamtNetto: basis.gesamtNetto,
+          gesamtBrutto: basis.gesamtBrutto,
+          bereitsGestelltBrutto: bereits.brutto,
+        },
+        zahlungsplan: plan,
+        zahlungsplanBearbeiten: false,
+      },
+    }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Laden fehlgeschlagen' }
+  }
+}
+
+function addDaysIsoLocal(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 export async function loadRechnungWizardBootstrap(
@@ -228,12 +438,17 @@ export async function loadRechnungWizardBootstrap(
   const meta: RechnungWizardMeta = {
     einleitung: String(rec.einleitung ?? '').trim() || metaDefaults.einleitung,
     hinweise: String(rec.hinweise ?? '').trim() || metaDefaults.hinweise,
+    mail_einleitung: String(rec.mail_einleitung ?? '').trim() || metaDefaults.mail_einleitung,
+    mail_betreff: String(rec.mail_betreff ?? '').trim() || metaDefaults.mail_betreff,
     reverse_charge_13b: Boolean(rec.reverse_charge_13b),
     rechnungsdatum: String(rec.rechnungsdatum ?? new Date().toISOString().slice(0, 10)),
     leistungszeitraum_von: String(rec.leistungszeitraum_von ?? basis.leistungszeitraum_von ?? ''),
     leistungszeitraum_bis: String(rec.leistungszeitraum_bis ?? basis.leistungszeitraum_bis ?? ''),
     faellig_am: String(rec.faellig_am ?? ''),
   }
+
+  const rechnungArt = String(rec.rechnung_art ?? 'voll')
+  const modus = rechnungArt === 'abschlag' || rechnungArt === 'schluss' ? 'abschlag' : 'voll'
 
   return {
     ok: true,
@@ -248,6 +463,21 @@ export async function loadRechnungWizardBootstrap(
       meta,
       auftragsReferenz: basis.auftragsReferenz,
       projektTitel: basis.projektTitel,
+      modus,
+      zahlungsplan: basis.zahlungsplan,
+      abschlag:
+        modus === 'abschlag'
+          ? {
+              zeileId: String(rec.zahlungsplan_abschlag_id ?? ''),
+              zeileIndex: Number(rec.abschlag_index ?? 0),
+              zeileTitel: '',
+              rechnungArt: rechnungArt as 'abschlag' | 'schluss',
+              istSchluss: rechnungArt === 'schluss',
+              gesamtNetto: basis.gesamtNetto,
+              gesamtBrutto: basis.gesamtBrutto,
+              bereitsGestelltBrutto: 0,
+            }
+          : null,
     },
   }
 }
@@ -262,6 +492,11 @@ export async function saveRechnungWizardDraft(
     return { ok: false, message: 'Mindestens eine Position erforderlich.' }
   }
 
+  if (input.zahlungsplanSpeichern && input.zahlungsplan?.zeilen.length) {
+    const planSave = await saveAuftragZahlungsplan(input.auftrag_id, input.zahlungsplan)
+    if (!planSave.ok) return planSave
+  }
+
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(positionen))
 
   const payload = {
@@ -273,6 +508,14 @@ export async function saveRechnungWizardDraft(
     reverse_charge_13b: input.meta.reverse_charge_13b,
     einleitung: input.meta.einleitung || null,
     hinweise: input.meta.hinweise || null,
+    mail_einleitung: input.meta.mail_einleitung || null,
+    mail_betreff: input.meta.mail_betreff || null,
+    rechnung_art:
+      input.modus === 'abschlag'
+        ? (input.abschlag?.rechnungArt ?? 'abschlag')
+        : ('voll' as const),
+    abschlag_index: input.abschlag?.zeileIndex ?? null,
+    zahlungsplan_abschlag_id: input.abschlag?.zeileId ?? null,
   }
 
   if (input.rechnungId) {

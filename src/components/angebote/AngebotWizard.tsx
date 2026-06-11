@@ -51,6 +51,10 @@ import {
   type WizardPosition,
 } from '@/lib/angebote/angebot-wizard-types'
 import { summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
+import {
+  zahlungsplanVorlage50_50,
+  type Zahlungsplan,
+} from '@/lib/rechnungen/zahlungsplan'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   kannHinweis13bAngebot,
@@ -271,6 +275,9 @@ export function AngebotWizard({
     () => bootstrap?.varianten ?? null
   )
   const [wichtigeHinweisePersist] = useState(() => bootstrap?.wichtige_hinweise?.trim() ?? '')
+  const [zahlungsplan, setZahlungsplan] = useState<Zahlungsplan | null>(
+    () => bootstrap?.zahlungsplan ?? null
+  )
   const [projektUploading, setProjektUploading] = useState(false)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const [completedAngebotId, setCompletedAngebotId] = useState<string | null>(null)
@@ -314,8 +321,9 @@ export function AngebotWizard({
         projektbeschreibung,
         projektFotos,
         mitAnfahrt,
+        zahlungsplan,
       }),
-    [zeilen, meta, dokumentTyp, projektbeschreibung, projektFotos, mitAnfahrt]
+    [zeilen, meta, dokumentTyp, projektbeschreibung, projektFotos, mitAnfahrt, zahlungsplan]
   )
 
   draftSnapshotRef.current = draftSnapshot
@@ -454,6 +462,11 @@ export function AngebotWizard({
         varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
         handwerker_zuweisungen: [],
         handwerker_aufgabe_notizen: {},
+        zahlungsplan:
+          meta.zahlungsbedingungen === 'abschlagsplan' ||
+          meta.zahlungsbedingungen === 'anzahlung_50'
+            ? zahlungsplan
+            : null,
       })
       setSaving(false)
       if (!res.ok) {
@@ -1070,6 +1083,9 @@ export function AngebotWizard({
                   onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
                   dokumentTyp={dokumentTyp}
                   todayYmd={todayYmd}
+                  zahlungsplan={zahlungsplan}
+                  onZahlungsplanChange={setZahlungsplan}
+                  gesamtNetto={mailSummen.nettoMin}
                 />
 
                 <WizardProjektDivider />

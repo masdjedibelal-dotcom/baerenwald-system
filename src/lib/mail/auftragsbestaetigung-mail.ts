@@ -5,9 +5,14 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
   type KundeRechnungsempfaenger,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
-import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
-import { buildPortalLoginLink } from '@/lib/portal-utils'
+import {
+  mailHtmlBase,
+  mailKundenContactLine,
+  mailKundenGruss,
+  mailKundenPortalTop,
+  mailKundenStandardOptions,
+  mailSummaryBlock,
+} from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 function esc(s: string): string {
@@ -88,19 +93,9 @@ export function buildAuftragsbestaetigungMail(
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:#374151;margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
   })
 
-  const portalTopHtml = `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', buildPortalLoginLink(), { margin: '0' })}</p>`
-
-  const tel = esc(b.telefon)
-  const telHref = tel.replace(/\s/g, '')
-  const contact =
-    anrede === 'du'
-      ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-      : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-
-  const gruss =
-    anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+  const portalTopHtml = mailKundenPortalTop(data.statusLink)
+  const contact = mailKundenContactLine(anrede, b.telefon)
+  const gruss = mailKundenGruss(anrede)
 
   const betreff = auftragsbestaetigungMailBetreff(anrede, data.leistungsumfang, b.firmenname)
   const preheader =
@@ -120,7 +115,7 @@ export function buildAuftragsbestaetigungMail(
     preheader,
     b,
     undefined,
-    { anrede, skipMeinBaerenwaldPs: true }
+    mailKundenStandardOptions(anrede)
   )
 
   return { betreff, html }

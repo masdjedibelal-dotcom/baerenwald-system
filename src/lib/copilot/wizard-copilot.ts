@@ -22,6 +22,7 @@ import {
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
+import { resolveKundeId } from '@/lib/copilot/crm-actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { loadWizardContext } from '@/lib/wizard-context'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -287,6 +288,11 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
   let kundeId = input.kunde_id?.trim() || leadRow.kunde_id
   const kunde = Array.isArray(leadRow.kunden) ? leadRow.kunden[0] : leadRow.kunden
   if (!kundeId && kunde?.id) kundeId = kunde.id
+  if (kundeId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(kundeId)) {
+    const resolved = await resolveKundeId({ kunde_id: kundeId })
+    if ('error' in resolved) return resolved
+    kundeId = resolved.id
+  }
   if (!kundeId) {
     return {
       error: 'kunde_id fehlt',

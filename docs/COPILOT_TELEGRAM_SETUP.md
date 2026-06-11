@@ -64,6 +64,26 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DEINE-NETLIFY-URL>/a
 - Nachricht an den Bot senden (nur `TELEGRAM_CHAT_ID` wird akzeptiert)
 - Manuell Briefing: `GET /api/cron/copilot-briefing` mit Header `Authorization: Bearer <CRON_SECRET>`
 
+### Chat zurücksetzen (wenn der Bot „hängt“)
+
+Telegram an den Bot:
+
+- `/reset` oder `neustart` — löscht den gespeicherten Verlauf (`copilot_messages`)
+- `/start` — gleich wie Reset (frischer Start)
+- `/help` — Kurzbefehle
+
+Nach einem Fehler wird die fehlgeschlagene User-Nachricht automatisch aus dem Verlauf entfernt; bei weiterem Hänger `/reset` senden.
+
+## 8b. Telegram-Befehle (optional im BotFather)
+
+Im [@BotFather](https://t.me/BotFather) → Bot → Edit Commands:
+
+```
+start - Chat zurücksetzen
+reset - Verlauf löschen
+help - Hilfe
+```
+
 ## 9. Fehlerbehebung
 
 ### `401 status code (no body)` im Bot

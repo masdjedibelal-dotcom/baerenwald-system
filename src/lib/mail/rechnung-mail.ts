@@ -1,5 +1,12 @@
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
+import {
+  mailHtmlBase,
+  mailKundenContactLine,
+  mailKundenGruss,
+  mailKundenPortalTop,
+  mailKundenStandardOptions,
+  mailSummaryBlock,
+} from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 function esc(s: string): string {
@@ -22,6 +29,8 @@ export type RechnungMailInput = {
   faelligAm: string
   /** z. B. Leistungsumfang aus Angebot — sonst nur Rechnungsnummer in der Box */
   projektTitel?: string | null
+  mailEinleitung?: string | null
+  mailBetreff?: string | null
 }
 
 export function rechnungMailBetreff(
@@ -44,10 +53,12 @@ export function buildRechnungMail(
   const faellig = esc(data.faelligAm)
   const titel = esc(data.projektTitel?.trim() || data.rechnungsnummer)
 
-  const intro =
-    anrede === 'du'
+  const introRaw =
+    data.mailEinleitung?.trim() ||
+    (anrede === 'du'
       ? 'anbei findest du deine Rechnung als PDF — kurz zur Übersicht:'
-      : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:'
+      : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:')
+  const intro = esc(introRaw)
 
   const pdfHinweis =
     anrede === 'du'
@@ -61,17 +72,8 @@ export function buildRechnungMail(
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
-  const tel = esc(b.telefon)
-  const telHref = tel.replace(/\s/g, '')
-  const contact =
-    anrede === 'du'
-      ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-      : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-
-  const gruss =
-    anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+  const contact = mailKundenContactLine(anrede, b.telefon)
+  const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
     anrede === 'du'
@@ -82,6 +84,7 @@ export function buildRechnungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+      ${mailKundenPortalTop()}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
@@ -90,11 +93,12 @@ export function buildRechnungMail(
     preheader,
     b,
     disclaimer,
-    { anrede }
+    mailKundenStandardOptions(anrede)
   )
 
-  return {
-    betreff: rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname),
-    html,
-  }
+  const betreff =
+    data.mailBetreff?.trim() ||
+    rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+
+  return { betreff, html }
 }

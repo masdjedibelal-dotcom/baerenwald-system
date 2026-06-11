@@ -4,25 +4,48 @@ import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
+import { ZahlungsplanEditor } from '@/components/rechnungen/ZahlungsplanEditor'
 import {
   ZAHLUNGSBEDINGUNGEN_LABELS,
   type AngebotWizardMeta,
 } from '@/lib/angebote/angebot-wizard-types'
-import { formatDatum } from '@/lib/utils'
+import {
+  zahlungsplanVorlage50_50,
+  zahlungsplanLabelFuerAngebot,
+  type Zahlungsplan,
+} from '@/lib/rechnungen/zahlungsplan'
 
 export function AngebotWizardAngebotDetailsCard({
   meta,
   onMetaChange,
   dokumentTyp,
   todayYmd,
+  zahlungsplan,
+  onZahlungsplanChange,
+  gesamtNetto,
 }: {
   meta: AngebotWizardMeta
   onMetaChange: (patch: Partial<AngebotWizardMeta>) => void
   dokumentTyp: 'einfach' | 'projekt'
   todayYmd: string
+  zahlungsplan?: Zahlungsplan | null
+  onZahlungsplanChange?: (plan: Zahlungsplan) => void
+  gesamtNetto?: number
 }) {
   const zahlungLabel =
     ZAHLUNGSBEDINGUNGEN_LABELS[meta.zahlungsbedingungen] ?? meta.zahlungsbedingungen
+
+  const planLabel = zahlungsplan ? zahlungsplanLabelFuerAngebot(zahlungsplan) : ''
+
+  function handleZahlungChange(value: AngebotWizardMeta['zahlungsbedingungen']) {
+    onMetaChange({ zahlungsbedingungen: value })
+    if (value === 'abschlagsplan' && onZahlungsplanChange && !zahlungsplan?.zeilen.length) {
+      onZahlungsplanChange(zahlungsplanVorlage50_50())
+    }
+    if (value === 'anzahlung_50' && onZahlungsplanChange) {
+      onZahlungsplanChange(zahlungsplanVorlage50_50())
+    }
+  }
 
   const form = (
     <div className="space-y-2.5">
@@ -53,15 +76,29 @@ export function AngebotWizardAngebotDetailsCard({
         name="zahlung"
         value={meta.zahlungsbedingungen}
         onChange={(e) =>
-          onMetaChange({
-            zahlungsbedingungen: e.target.value as AngebotWizardMeta['zahlungsbedingungen'],
-          })
+          handleZahlungChange(e.target.value as AngebotWizardMeta['zahlungsbedingungen'])
         }
         options={Object.entries(ZAHLUNGSBEDINGUNGEN_LABELS).map(([value, label]) => ({
           value,
           label,
         }))}
       />
+      {(meta.zahlungsbedingungen === 'abschlagsplan' ||
+        meta.zahlungsbedingungen === 'anzahlung_50') &&
+      onZahlungsplanChange &&
+      zahlungsplan &&
+      gesamtNetto != null &&
+      gesamtNetto > 0 ? (
+        <div className="rounded-lg border border-bw-border p-3">
+          <p className="mb-2 text-sm font-medium text-bw-text">Abschlagsplan</p>
+          <ZahlungsplanEditor
+            plan={zahlungsplan}
+            onChange={onZahlungsplanChange}
+            gesamtNetto={gesamtNetto}
+            compact={meta.zahlungsbedingungen === 'anzahlung_50'}
+          />
+        </div>
+      ) : null}
       {dokumentTyp === 'einfach' ? (
         <label>
           <span className="input-label">Hinweise (optional)</span>
@@ -84,6 +121,7 @@ export function AngebotWizardAngebotDetailsCard({
         value={meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}
       />
       <MobileOverviewField label="Zahlungsbedingungen" value={zahlungLabel} />
+      {planLabel ? <MobileOverviewField label="Abschlagsplan" value={planLabel} /> : null}
       {dokumentTyp === 'einfach' ? (
         <MobileOverviewField label="Hinweise" value={meta.hinweise.trim() || '—'} />
       ) : null}

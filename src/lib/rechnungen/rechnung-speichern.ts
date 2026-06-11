@@ -56,6 +56,11 @@ const COMPLIANCE_COLUMN_MARKERS = [
   'ust_id',
   'einleitung',
   'hinweise',
+  'rechnung_art',
+  'abschlag_index',
+  'zahlungsplan_abschlag_id',
+  'mail_einleitung',
+  'mail_betreff',
 ] as const
 
 /** PostgREST-Schema-Cache: Migration 20260521120000_rechnungen_compliance fehlt. */
@@ -116,9 +121,29 @@ export async function rechnungInsertMitSchemaFallback(
   berechnung: RechnungBerechnung,
   extra: RechnungBerechnungExtra
 ): Promise<{ data: { id: string } | null; error: { message: string } | null }> {
-  const build = (ohneCompliance: boolean, ohneTexte = false) => {
-    const { einleitung, hinweise, ...restRow } = row
-    const base = ohneTexte ? restRow : row
+  const build = (ohneCompliance: boolean, ohneTexte = false, ohneAbschlag = false) => {
+    const {
+      einleitung,
+      hinweise,
+      mail_einleitung,
+      mail_betreff,
+      rechnung_art,
+      abschlag_index,
+      zahlungsplan_abschlag_id,
+      ...restRow
+    } = row
+    let base = ohneTexte ? restRow : row
+    if (ohneAbschlag) {
+      const {
+        mail_einleitung: _m1,
+        mail_betreff: _m2,
+        rechnung_art: _r,
+        abschlag_index: _a,
+        zahlungsplan_abschlag_id: _z,
+        ...restAbschlag
+      } = base as Record<string, unknown>
+      base = restAbschlag
+    }
     return {
       ...base,
       ...dbFelderAusBerechnung(berechnung, extra, { ohneCompliance }),
@@ -131,6 +156,9 @@ export async function rechnungInsertMitSchemaFallback(
   }
   if (result.error && isRechnungComplianceSchemaError(result.error.message)) {
     result = await supabase.from('rechnungen').insert(build(true, true)).select('id').single()
+  }
+  if (result.error && isRechnungComplianceSchemaError(result.error.message)) {
+    result = await supabase.from('rechnungen').insert(build(true, true, true)).select('id').single()
   }
 
   if (result.error) {
@@ -147,9 +175,29 @@ export async function rechnungUpdateMitSchemaFallback(
   berechnung: RechnungBerechnung,
   extra: RechnungBerechnungExtra
 ): Promise<{ error: { message: string } | null }> {
-  const build = (ohneCompliance: boolean, ohneTexte = false) => {
-    const { einleitung, hinweise, ...restRow } = row
-    const base = ohneTexte ? restRow : row
+  const build = (ohneCompliance: boolean, ohneTexte = false, ohneAbschlag = false) => {
+    const {
+      einleitung,
+      hinweise,
+      mail_einleitung,
+      mail_betreff,
+      rechnung_art,
+      abschlag_index,
+      zahlungsplan_abschlag_id,
+      ...restRow
+    } = row
+    let base = ohneTexte ? restRow : row
+    if (ohneAbschlag) {
+      const {
+        mail_einleitung: _m1,
+        mail_betreff: _m2,
+        rechnung_art: _r,
+        abschlag_index: _a,
+        zahlungsplan_abschlag_id: _z,
+        ...restAbschlag
+      } = base as Record<string, unknown>
+      base = restAbschlag
+    }
     return {
       ...base,
       ...dbFelderAusBerechnung(berechnung, extra, { ohneCompliance }),
@@ -162,6 +210,9 @@ export async function rechnungUpdateMitSchemaFallback(
   }
   if (result.error && isRechnungComplianceSchemaError(result.error.message)) {
     result = await supabase.from('rechnungen').update(build(true, true)).eq('id', id)
+  }
+  if (result.error && isRechnungComplianceSchemaError(result.error.message)) {
+    result = await supabase.from('rechnungen').update(build(true, true, true)).eq('id', id)
   }
 
   if (result.error) {

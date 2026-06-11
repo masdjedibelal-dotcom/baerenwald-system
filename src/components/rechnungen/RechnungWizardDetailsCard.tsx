@@ -12,11 +12,13 @@ export function RechnungWizardDetailsCard({
   onMetaChange,
   onRechnungsdatumChange,
   zeigt13b,
+  showMailFields = false,
 }: {
   meta: RechnungWizardMeta
   onMetaChange: (patch: Partial<RechnungWizardMeta>) => void
   onRechnungsdatumChange: (value: string) => void
   zeigt13b: boolean
+  showMailFields?: boolean
 }) {
   const form = (
     <div className="space-y-4">
@@ -81,6 +83,25 @@ export function RechnungWizardDetailsCard({
           onChange={(e) => onMetaChange({ hinweise: e.target.value })}
         />
       </label>
+      {showMailFields ? (
+        <>
+          <label className="field">
+            <span className="field-l">Mail-Einleitung</span>
+            <Textarea
+              rows={3}
+              value={meta.mail_einleitung}
+              onChange={(e) => onMetaChange({ mail_einleitung: e.target.value })}
+            />
+          </label>
+          <label className="field">
+            <span className="field-l">Mail-Betreff</span>
+            <Input
+              value={meta.mail_betreff}
+              onChange={(e) => onMetaChange({ mail_betreff: e.target.value })}
+            />
+          </label>
+        </>
+      ) : null}
     </div>
   )
 
@@ -126,6 +147,19 @@ export function RechnungWizardDetailsCard({
           </span>
         }
       />
+      {showMailFields ? (
+        <>
+          <MobileOverviewField
+            label="Mail-Einleitung"
+            value={
+              <span className="whitespace-pre-wrap text-bw-text-muted">
+                {meta.mail_einleitung.trim() || '—'}
+              </span>
+            }
+          />
+          <MobileOverviewField label="Mail-Betreff" value={meta.mail_betreff.trim() || '—'} />
+        </>
+      ) : null}
     </dl>
   )
 

@@ -52,6 +52,11 @@ export type RechnungEntwurfPayload = {
   reverse_charge_13b?: boolean
   einleitung?: string | null
   hinweise?: string | null
+  mail_einleitung?: string | null
+  mail_betreff?: string | null
+  rechnung_art?: 'voll' | 'abschlag' | 'schluss'
+  abschlag_index?: number | null
+  zahlungsplan_abschlag_id?: string | null
   mwst_satz?: number
 }
 
@@ -124,6 +129,11 @@ export async function createRechnungEntwurf(input: {
       rechnungsdatum,
       einleitung: input.einleitung?.trim() || null,
       hinweise: input.hinweise?.trim() || null,
+      mail_einleitung: input.mail_einleitung?.trim() || null,
+      mail_betreff: input.mail_betreff?.trim() || null,
+      rechnung_art: input.rechnung_art ?? 'voll',
+      abschlag_index: input.abschlag_index ?? null,
+      zahlungsplan_abschlag_id: input.zahlungsplan_abschlag_id ?? null,
       pdf_url: null,
       erstellt_von: user?.id ?? null,
     },
@@ -166,6 +176,13 @@ export async function updateRechnungEntwurf(
       faellig_am: input.faellig_am,
       einleitung: input.einleitung?.trim() || null,
       hinweise: input.hinweise?.trim() || null,
+      mail_einleitung: input.mail_einleitung?.trim() || null,
+      mail_betreff: input.mail_betreff?.trim() || null,
+      ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
+      ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
+      ...(input.zahlungsplan_abschlag_id
+        ? { zahlungsplan_abschlag_id: input.zahlungsplan_abschlag_id }
+        : {}),
       ...(rechnungsdatum ? { rechnungsdatum } : {}),
       updated_at: new Date().toISOString(),
     },
@@ -437,6 +454,9 @@ export async function sendRechnung(
     kunde_id: string | null
     faellig_am: string | null
     brutto: number | null
+    mail_einleitung?: string | null
+    mail_betreff?: string | null
+    rechnung_art?: string | null
     kunden: Kunde | Kunde[] | null
     angebote: unknown
     auftraege: unknown
@@ -454,6 +474,9 @@ export async function sendRechnung(
       kunde_id,
       faellig_am,
       brutto,
+      mail_einleitung,
+      mail_betreff,
+      rechnung_art,
       kunden(name, email, typ, vorname, nachname),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
@@ -510,6 +533,8 @@ export async function sendRechnung(
       brutto: Number(rec.brutto ?? 0),
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       projektTitel: projektTitel || null,
+      mailEinleitung: (rec.mail_einleitung as string | null)?.trim() || null,
+      mailBetreff: (rec.mail_betreff as string | null)?.trim() || null,
     },
     branding
   )

@@ -174,6 +174,30 @@ ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` :
 </body></html>`
 }
 
+/** Layout wie Auftragsbestätigung: Portal-Button oben, kein P.S.-Footer unten. */
+export function mailKundenStandardOptions(anrede: 'du' | 'sie'): MailHtmlBaseOptions {
+  return { anrede, skipMeinBaerenwaldPs: true }
+}
+
+export function mailKundenPortalTop(link?: string | null): string {
+  const url = link?.trim() || buildPortalLoginLink()
+  return `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', url, { margin: '0' })}</p>`
+}
+
+export function mailKundenContactLine(anrede: 'du' | 'sie', telefon: string): string {
+  const tel = esc(telefon)
+  const telHref = tel.replace(/\s/g, '')
+  return anrede === 'du'
+    ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
+    : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
+}
+
+export function mailKundenGruss(anrede: 'du' | 'sie'): string {
+  return anrede === 'du'
+    ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
+    : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+}
+
 function btn(text: string, url: string): string {
   return mailPrimaryButtonHtml(text, url)
 }
@@ -431,44 +455,40 @@ export function mailAngebot(
   b: MailBranding
 ): { betreff: string; html: string } {
   const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
+  const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const istRange = data.gesamt_min !== data.gesamt_max
   const betragText = istRange
     ? `${data.gesamt_min.toLocaleString('de-DE')} – ${data.gesamt_max.toLocaleString('de-DE')} €`
     : `${data.gesamt_min.toLocaleString('de-DE')} €`
-  const tel = esc(b.telefon)
-  const rows = data.positionen
-    .map((p) => {
-      const txt = esc(String(p.beschreibung || p.leistung || 'Position').trim())
-      const g = Number(p.gesamt_fix ?? p.gesamt_min ?? p.gesamt_max ?? 0)
-      return `<tr style="border-bottom:1px solid #E2E8E2;">
-        <td style="padding:8px 0;">${txt}</td>
-        <td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2E7D52;font-weight:500;">${g.toLocaleString('de-DE')} €</td>
-      </tr>`
-    })
-    .join('')
   const steuer = Math.round(data.lohn_gesamt * 0.2)
-  const h2 = mailText(anrede, 'Dein persönliches Angebot', 'Ihr persönliches Angebot')
   const body1 = mailText(
     anrede,
-    'anbei findest du dein Angebot. Das detaillierte Dokument findest du im Anhang.',
-    'anbei finden Sie Ihr Angebot. Das detaillierte Dokument finden Sie im Anhang.'
+    'anbei findest du dein Angebot — Details und Preise im PDF-Anhang:',
+    'anbei finden Sie Ihr Angebot — Details und Preise im PDF-Anhang:'
   )
   const hint35a =
-    anrede === 'du' && data.lohn_gesamt > 0
-      ? `<p style="font-size:13px;color:#6B7280;">Hinweis: Als Privatperson kannst du den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).</p>`
-      : anrede === 'sie' && data.lohn_gesamt > 0
-        ? `<p style="font-size:13px;color:#6B7280;">Hinweis: Als Privatperson können Sie den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).</p>`
-        : ''
-  const gueltig = mailText(
+    data.lohn_gesamt > 0
+      ? `<p style="font-size:13px;color:#6B7280;margin:0 0 16px;line-height:1.6;">${mailText(
+          anrede,
+          `Hinweis: Als Privatperson kannst du den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).`,
+          `Hinweis: Als Privatperson können Sie den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).`
+        )}</p>`
+      : ''
+  const titel =
+    data.positionen[0]?.beschreibung?.trim() ||
+    data.positionen[0]?.leistung?.trim() ||
+    mailText(anrede, 'dein Projekt', 'Ihr Projekt')
+  const summaryHtml = mailSummaryBlock({
+    label: mailText(anrede, 'DEIN ANGEBOT', 'IHR ANGEBOT'),
+    title: esc(titel),
+    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(betragText)} <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
+    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Gültig bis:</strong> ${esc(data.gueltig_bis)}</p>`,
+  })
+  const disclaimer = mailText(
     anrede,
-    `Gültig bis: <strong>${esc(data.gueltig_bis)}</strong>`,
-    `Gültig bis: <strong>${esc(data.gueltig_bis)}</strong>`
-  )
-  const fragen = mailText(
-    anrede,
-    `Bei Fragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a>`,
-    `Bei Fragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a>`
+    'Du erhältst diese Mail, weil du ein Angebot von uns erhalten hast.',
+    'Sie erhalten diese Mail, weil Sie ein Angebot von uns erhalten haben.'
   )
   const betreff = mailText(
     anrede,
@@ -478,25 +498,18 @@ export function mailAngebot(
   return {
     betreff,
     html: mailHtmlBase(
-      `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">${h2}</h2>
-      <p>${begruessung}</p>
-      <p>${body1}</p>
-      ${greenBox(`
-        <p style="margin:0;font-size:12px;color:#2E7D52;">Gesamtbetrag inkl. MwSt.</p>
-        <p style="margin:4px 0 0;font-size:24px;font-weight:700;color:#1A3D2B;">${esc(betragText)}</p>
-      `)}
-      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:16px 0;">${rows}</table>
+      `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
+      ${mailKundenPortalTop(data.statusLink)}
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${body1}</p>
+      ${summaryHtml}
       ${hint35a}
-      ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anrede, data.visualisierung_vorschau_url) : ''}
-      <p style="font-size:13px;color:#6B7280;">${gueltig}</p>
-      ${btn(mailText(anrede, 'Projektstatus ansehen →', 'Projektstatus ansehen →'), data.statusLink)}
-      <p>${fragen}</p>
-    `,
+      ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
+      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
+      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),
       b,
-      undefined,
-      { anrede, statusLink: data.statusLink }
+      disclaimer,
+      mailKundenStandardOptions(anredeKey)
     ),
   }
 }
@@ -711,50 +724,67 @@ export type MailProjektUpdateInput = {
 
 export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBranding): { betreff: string; html: string } {
   const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
+  const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const titel = esc(data.updateTitel)
   const text = esc(data.updateText.trim()).replace(/\n/g, '<br/>')
   const projekt = esc(data.projektTitel)
   const status = esc(data.statusLabel)
+  const fotoCount = data.fotoLinks?.length ?? 0
 
-  const fotoBlock =
-    !data.minimalBody && (data.fotoLinks?.length ?? 0) > 0
-      ? `<p style="font-size:13px;color:#6B7280;margin:16px 0 8px;">Fortschrittsfotos (${data.fotoLinks!.length}):</p>
-         <p style="font-size:13px;line-height:1.8;">${data.fotoLinks!.map((u) => `<a href="${esc(u)}" style="color:#2E7D52;">Foto ansehen</a>`).join(' · ')}</p>
-         <p style="font-size:12px;color:#9CA3AF;margin-top:8px;">${mailText(anrede, 'Alle Bilder findest du auch auf deiner Projekt-Statusseite.', 'Alle Bilder finden Sie auch auf Ihrer Projekt-Statusseite.')}</p>`
-      : data.minimalBody && (data.fotoLinks?.length ?? 0) > 0
-        ? `<p style="font-size:13px;color:#6B7280;margin:12px 0;">${mailText(anrede, 'Neue Fotos und Details findest du auf deiner Projekt-Statusseite.', 'Neue Fotos und Details finden Sie auf Ihrer Projekt-Statusseite.')}</p>`
-        : ''
+  const intro = mailText(
+    anrede,
+    'es gibt ein neues Update zu deinem Projekt — kurz zur Übersicht:',
+    'es gibt ein neues Update zu Ihrem Projekt — kurz zur Übersicht:'
+  )
 
-  const bodyBlock = data.minimalBody
-    ? `<p style="font-size:15px;color:#374151;margin:0 0 16px;">${mailText(anrede, 'Es gibt ein neues Update zu deinem Projekt.', 'Es gibt ein neues Update zu Ihrem Projekt.')}</p>`
-    : `<div style="background:#F7F6F3;border-radius:8px;padding:16px;margin:16px 0;">
-        <p style="margin:0 0 8px;font-size:15px;font-weight:600;color:#1A3D2B;">${titel}</p>
-        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${text}</p>
-      </div>`
+  const summaryHtml = mailSummaryBlock({
+    label: mailText(anrede, 'PROJEKT-UPDATE', 'PROJEKT-UPDATE'),
+    title: titel,
+    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Projekt:</strong> ${projekt}</p>
+      <p style="font-size:13px;color:#374151;margin:4px 0 0;"><strong>Stand:</strong> ${status}</p>`,
+  })
+
+  const detailHtml =
+    !data.minimalBody && data.updateText.trim()
+      ? `<p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
+      : ''
+
+  const fotoHinweis =
+    fotoCount > 0
+      ? `<p style="font-size:13px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${mailText(
+          anrede,
+          `${fotoCount} Foto${fotoCount === 1 ? '' : 's'} im Update — Details und Bilder in MeinBärenwald.`,
+          `${fotoCount} Foto${fotoCount === 1 ? '' : 's'} im Update — Details und Bilder in MeinBärenwald.`
+        )}</p>`
+      : ''
 
   const naechster = data.naechsterSchritt?.trim()
-    ? `<p style="font-size:13px;color:#374151;margin:16px 0 0;"><strong>Nächster Schritt:</strong> ${esc(data.naechsterSchritt.trim())}</p>`
+    ? `<p style="font-size:13px;color:#374151;margin:0 0 16px;line-height:1.6;"><strong>Nächster Schritt:</strong> ${esc(data.naechsterSchritt.trim())}</p>`
     : ''
 
+  const disclaimer = mailText(
+    anrede,
+    'Du erhältst diese Mail, weil es ein neues Update zu deinem Projekt gibt.',
+    'Sie erhalten diese Mail, weil es ein neues Update zu Ihrem Projekt gibt.'
+  )
+
   return {
-    betreff: `Projekt-Update: ${data.updateTitel} — Bärenwald München`,
+    betreff: `Projekt-Update — ${data.updateTitel} · ${data.projektTitel.trim() || 'Ihr Projekt'} · ${b.firmenname}`,
     html: mailHtmlBase(
-      `
-      <p>${begruessung}</p>
-      <p style="font-size:14px;color:#6B7280;margin:0 0 4px;">${projekt}</p>
-      <p style="font-size:13px;color:#2E7D52;font-weight:600;margin:0 0 8px;">${mailText(anrede, 'Aktueller Stand:', 'Aktueller Stand:')} ${status}</p>
-      ${data.phaseStepsHtml}
-      ${bodyBlock}
-      ${fotoBlock}
+      `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
+      ${mailKundenPortalTop(data.statusLink)}
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
+      ${summaryHtml}
+      ${detailHtml}
+      ${fotoHinweis}
       ${naechster}
-      ${btn(mailText(anrede, 'Projekt-Status ansehen →', 'Projekt-Status ansehen →'), data.statusLink)}
-      <p style="font-size:12px;color:#9CA3AF;margin-top:16px;">${mailText(anrede, 'Diese E-Mail enthält eine Zusammenfassung — alle Details und Bilder sind jederzeit online abrufbar.', 'Diese E-Mail enthält eine Zusammenfassung — alle Details und Bilder sind jederzeit online abrufbar.')}</p>
-    `,
+      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
+      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       data.updateTitel,
       b,
-      undefined,
-      { anrede, statusLink: data.statusLink }
+      disclaimer,
+      mailKundenStandardOptions(anredeKey)
     ),
   }
 }

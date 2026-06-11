@@ -3,7 +3,13 @@ import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey, getC
 import { COPILOT_CLAUDE_TOOLS } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
 import { formatUnknownError } from '@/lib/copilot/format-unknown-error'
-import { clearCopilotHistory, loadHistory, saveMessage } from '@/lib/copilot/memory'
+import {
+  isCopilotResetCommand,
+  loadHistory,
+  resetCopilotChat,
+  rollbackLastUserMessage,
+  saveMessage,
+} from '@/lib/copilot/memory'
 import {
   COPILOT_HISTORY_TURNS,
   normalizeCopilotUserMessage,
@@ -47,9 +53,19 @@ async function transcribeVoice(_fileId: string): Promise<string | null> {
   return null
 }
 
+const COPILOT_HELP_TEXT = `🤖 <b>Bärenwald Copilot</b>
+
+Kurz schreiben, was du brauchst — Angebote, Kunden, Termine, CRM-Aktionen.
+
+<b>Befehle</b>
+/reset — Chat-Verlauf löschen (wenn etwas hängt)
+/help — diese Hilfe
+/start — Neustart (wie /reset)
+
+Bei Fehlern zuerst <code>/reset</code>, dann Anfrage neu formulieren.`
+
 async function runClaudeChat(userText: string): Promise<string> {
   const history = await loadHistory(COPILOT_HISTORY_TURNS)
-  await saveMessage('user', userText)
 
   const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userText }]
 
@@ -105,6 +121,7 @@ async function runClaudeChat(userText: string): Promise<string> {
     .join('')
     .trim()
 
+  await saveMessage('user', userText)
   await saveMessage('assistant', assistantText)
   return assistantText || '✅ Erledigt.'
 }
@@ -155,9 +172,16 @@ export async function POST(req: Request) {
     if (!userText) return Response.json({ ok: true })
 
     const lower = userText.toLowerCase()
-    if (lower === '/reset' || lower === '/clear' || lower === 'verlauf löschen') {
-      await clearCopilotHistory()
-      await sendTelegram('🧹 Chat-Verlauf gelöscht. Du kannst wieder mit kurzen Nachrichten starten.')
+    if (lower === '/help' || lower === 'hilfe' || lower === '/hilfe') {
+      await sendTelegram(COPILOT_HELP_TEXT)
+      return Response.json({ ok: true })
+    }
+
+    if (isCopilotResetCommand(userText)) {
+      await resetCopilotChat()
+      await sendTelegram(
+        '🧹 <b>Chat zurückgesetzt.</b>\nVerlauf gelöscht — du kannst die Anfrage neu und kurz formulieren.\n\nTipp: Bei Kunden zuerst <code>search_crm</code> nutzen lassen (z. B. „Suche Kunde Müller").'
+      )
       return Response.json({ ok: true })
     }
 
@@ -176,8 +200,15 @@ export async function POST(req: Request) {
     const reply = await runClaudeChat(userText)
     await sendTelegramLong(reply)
   } catch (e) {
+    try {
+      await rollbackLastUserMessage()
+    } catch {
+      // Verlauf ggf. schon leer — Reset-Hinweis trotzdem senden
+    }
     const msg = formatCopilotError(e)
-    await sendTelegram(`❌ Copilot-Fehler: ${msg.slice(0, 500)}`).catch(() => undefined)
+    await sendTelegram(
+      `❌ <b>Copilot-Fehler:</b> ${msg.slice(0, 450)}\n\n🧹 Chat hängt? Schick <code>/reset</code> oder <code>neustart</code> — dann neu anfangen.`
+    ).catch(() => undefined)
   }
 
   return Response.json({ ok: true })

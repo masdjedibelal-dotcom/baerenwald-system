@@ -184,7 +184,9 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('rechnungen')
-    .select('id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at')
+    .select(
+      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id'
+    )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
 

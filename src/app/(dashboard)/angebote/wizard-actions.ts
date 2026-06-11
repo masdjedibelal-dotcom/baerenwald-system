@@ -24,6 +24,7 @@ import {
   type AngebotVariantenPersistJson,
   angebotDarfImWizardBearbeitetWerden,
 } from '@/lib/angebote/angebot-wizard-types'
+import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
   mergeHandwerkerQueuesIntoPositionen,
@@ -58,9 +59,11 @@ export type SaveAngebotWizardDraftPayload = {
   varianten?: AngebotVariantenPersistJson | null
   /** Artikel-Zeilen für Übernahme freier Leistungen in preislisten */
   artikelFuerPreislisteSync?: DokumentArtikelZeile[]
+  kunde_objekt_id?: string | null
   /** Handwerker-Zuordnung pro Gewerk (Schritt 3) */
   handwerker_zuweisungen?: { gewerk_id: string; handwerker_id: string }[]
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
+  zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
 }
 
 export async function saveAngebotWizardDraft(
@@ -147,6 +150,11 @@ export async function saveAngebotWizardDraft(
       hinweise: projektFelder.hinweise,
       zahlungsbedingungen: input.meta.zahlungsbedingungen,
       gueltig_bis: input.meta.gueltig_bis,
+      zahlungsplan:
+        input.meta.zahlungsbedingungen === 'abschlagsplan' ||
+        input.meta.zahlungsbedingungen === 'anzahlung_50'
+          ? input.zahlungsplan ?? null
+          : null,
       dokument_typ: projektFelder.dokument_typ,
       projektbeschreibung: projektFelder.projektbeschreibung,
       fotos_urls: projektFelder.fotos_urls,
@@ -178,6 +186,11 @@ export async function saveAngebotWizardDraft(
     hinweise: projektFelder.hinweise,
     zahlungsbedingungen: input.meta.zahlungsbedingungen,
     gueltig_bis: input.meta.gueltig_bis,
+    zahlungsplan:
+      input.meta.zahlungsbedingungen === 'abschlagsplan' ||
+      input.meta.zahlungsbedingungen === 'anzahlung_50'
+        ? input.zahlungsplan ?? null
+        : null,
     dokument_typ: projektFelder.dokument_typ,
     projektbeschreibung: projektFelder.projektbeschreibung,
     fotos_urls: projektFelder.fotos_urls,
@@ -256,6 +269,7 @@ export async function loadAngebotWizardBootstrap(
       leistungsumfang,
       gueltig_bis,
       zahlungsbedingungen,
+      zahlungsplan,
       hinweise,
       varianten,
       kunde_objekt_id,
@@ -286,6 +300,7 @@ export async function loadAngebotWizardBootstrap(
     leistungsumfang: string | null
     gueltig_bis: string | null
     zahlungsbedingungen: string | null
+    zahlungsplan?: unknown
     hinweise: string | null
     varianten?: unknown
     gesendet_kunde_at?: string | null
@@ -332,6 +347,11 @@ export async function loadAngebotWizardBootstrap(
     kunde_objekt_id: angObjektId?.trim() || metaParsed.kunde_objekt_id || null,
   }
 
+  const zahlungsplanParsed = parseZahlungsplan(ang.zahlungsplan)
+  const zahlungsplan =
+    zahlungsplanParsed ??
+    (meta.zahlungsbedingungen === 'anzahlung_50' ? zahlungsplanVorlage50_50() : null)
+
   const dokumentTyp =
     ang.dokument_typ === 'projekt' ? ('projekt' as const) : ('einfach' as const)
 
@@ -351,6 +371,7 @@ export async function loadAngebotWizardBootstrap(
     varianten: variantenPersist,
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
     bereitsGesendet: Boolean(ang.gesendet_kunde_at),
+    zahlungsplan,
   }
 
   return { ok: true, bootstrap }
@@ -380,6 +401,7 @@ export async function loadAngebotWizardBootstrapKopie(
       leistungsumfang,
       gueltig_bis,
       zahlungsbedingungen,
+      zahlungsplan,
       hinweise,
       varianten,
       kunde_objekt_id,
@@ -408,6 +430,7 @@ export async function loadAngebotWizardBootstrapKopie(
     leistungsumfang: string | null
     gueltig_bis: string | null
     zahlungsbedingungen: string | null
+    zahlungsplan?: unknown
     hinweise: string | null
     varianten?: unknown
     leads?: {
@@ -454,6 +477,11 @@ export async function loadAngebotWizardBootstrapKopie(
       ang.kunde_objekt_id?.trim() || metaParsed.kunde_objekt_id || null,
   }
 
+  const zahlungsplanParsed = parseZahlungsplan(ang.zahlungsplan)
+  const zahlungsplan =
+    zahlungsplanParsed ??
+    (meta.zahlungsbedingungen === 'anzahlung_50' ? zahlungsplanVorlage50_50() : null)
+
   const dokumentTyp =
     ang.dokument_typ === 'projekt' ? ('projekt' as const) : ('einfach' as const)
 
@@ -479,6 +507,7 @@ export async function loadAngebotWizardBootstrapKopie(
     projektFotos: parseProjektFotos(ang.fotos_urls),
     varianten: variantenPersist,
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
+    zahlungsplan,
   }
 
   return { ok: true, bootstrap }
