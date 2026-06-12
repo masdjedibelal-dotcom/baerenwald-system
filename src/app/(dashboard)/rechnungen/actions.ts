@@ -34,6 +34,7 @@ import {
 } from '@/lib/rechnungen/rechnung-speichern'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
+import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
@@ -60,6 +61,8 @@ export type RechnungEntwurfPayload = {
   abschlag_index?: number | null
   zahlungsplan_abschlag_id?: string | null
   mwst_satz?: number
+  /** Listenbetrag (z. B. Abschlagsrate); Positionen/PDF bleiben unverändert. */
+  liste_berechnung?: RechnungBerechnung | null
 }
 
 async function validateVorSpeichern(
@@ -99,10 +102,14 @@ export async function createRechnungEntwurf(input: {
 
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(input.positionen))
 
-  const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(supabase, {
-    positionen: input.positionen,
-    reverse_charge_13b: input.reverse_charge_13b,
-  })
+  const { positionen, berechnung: berechnungVoll } = await berechneRechnungMitFirmeneinstellungen(
+    supabase,
+    {
+      positionen: input.positionen,
+      reverse_charge_13b: input.reverse_charge_13b,
+    }
+  )
+  const berechnung = input.liste_berechnung ?? berechnungVoll
 
   const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
   if (!numRes.ok) return { ok: false, message: numRes.message }
@@ -162,10 +169,14 @@ export async function updateRechnungEntwurf(
 
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(input.positionen))
 
-  const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(supabase, {
-    positionen: input.positionen,
-    reverse_charge_13b: input.reverse_charge_13b,
-  })
+  const { positionen, berechnung: berechnungVoll } = await berechneRechnungMitFirmeneinstellungen(
+    supabase,
+    {
+      positionen: input.positionen,
+      reverse_charge_13b: input.reverse_charge_13b,
+    }
+  )
+  const berechnung = input.liste_berechnung ?? berechnungVoll
 
   const rechnungsdatum =
     (input.rechnungsdatum && input.rechnungsdatum.trim()) || undefined

@@ -53,6 +53,7 @@ import {
   berechneZahlungsplan,
   naechsteOffeneAbschlagZeile,
   rechnungArtFuerZeile,
+  rechnungBerechnungFuerListe,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
@@ -221,11 +222,25 @@ export function RechnungWizard({
   const aktuelleAbschlagZeile = useMemo(() => {
     if (!istAbschlag || gesamtNettoBasis <= 0) return null
     const kontext = berechneZahlungsplan(zahlungsplan, gesamtNettoBasis)
+    const rechnungenFuerPlan = rechnungenAbschlag.filter((r) => r.id !== rechnungId)
     return (
       kontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      naechsteOffeneAbschlagZeile(zahlungsplan, kontext, rechnungenAbschlag)
+      naechsteOffeneAbschlagZeile(zahlungsplan, kontext, rechnungenFuerPlan)
     )
-  }, [istAbschlag, zahlungsplan, gesamtNettoBasis, meta.abschlag_zeile_id, rechnungenAbschlag])
+  }, [
+    istAbschlag,
+    zahlungsplan,
+    gesamtNettoBasis,
+    meta.abschlag_zeile_id,
+    rechnungenAbschlag,
+    rechnungId,
+  ])
+
+  const berechnungListe = useMemo(() => {
+    if (!istAbschlag || !aktuelleAbschlagZeile) return berechnung
+    const art = rechnungArtFuerZeile(aktuelleAbschlagZeile)
+    return rechnungBerechnungFuerListe(berechnung, aktuelleAbschlagZeile, art)
+  }, [berechnung, istAbschlag, aktuelleAbschlagZeile])
 
   useEffect(() => {
     setMounted(true)
@@ -607,13 +622,33 @@ export function RechnungWizard({
               <Card title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
-                    <span className="text-bw-text-muted">Netto</span>
+                    <span className="text-bw-text-muted">
+                      {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss
+                        ? 'Auftrag netto'
+                        : 'Netto'}
+                    </span>
                     <p className="font-medium tabular-nums">{formatEurBetrag(berechnung.netto)}</p>
                   </div>
                   <div>
-                    <span className="text-bw-text-muted">Brutto</span>
+                    <span className="text-bw-text-muted">
+                      {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss
+                        ? 'Auftrag brutto'
+                        : 'Brutto'}
+                    </span>
                     <p className="font-medium tabular-nums">{formatEurBetrag(berechnung.brutto)}</p>
                   </div>
+                  {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss ? (
+                    <>
+                      <div className="sm:col-span-2 border-t border-bw-border pt-2">
+                        <span className="text-bw-text-muted">
+                          In Rechnungsliste (Abschlag {aktuelleAbschlagZeile.index})
+                        </span>
+                        <p className="font-medium tabular-nums text-bw-primary">
+                          {formatEurBetrag(berechnungListe.brutto)} brutto
+                        </p>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </Card>
             </div>
@@ -630,6 +665,7 @@ export function RechnungWizard({
                 zahlungszielTage={zahlungszielTage}
                 rechnungen={rechnungenAbschlag}
                 aktuelleZeile={aktuelleAbschlagZeile}
+                rechnungId={rechnungId}
               />
               <RechnungWizardDetailsCard
                 meta={meta}

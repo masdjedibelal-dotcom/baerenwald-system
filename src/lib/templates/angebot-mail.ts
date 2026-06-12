@@ -348,7 +348,6 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
   const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const content = `
       <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${anredeText}</p>
-      ${mailKundenPortalTop(data.portalLink)}
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
@@ -356,6 +355,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
         ${anrede === 'du' ? ctaDu : ctaSie}
       </p>
+      ${mailKundenPortalTop(data.portalLink)}
       ${grussHtml}
       <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 

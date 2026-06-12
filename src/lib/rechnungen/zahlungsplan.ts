@@ -1,4 +1,5 @@
-import { summenAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
@@ -179,12 +180,34 @@ export function rechnungArtFuerZeile(zeile: ZahlungsplanZeileBerechnet): Rechnun
   return zeile.istSchluss ? 'schluss' : 'abschlag'
 }
 
+export function istAbschlagPauschalPosition(p: AngebotPosition): boolean {
+  const slug = (p.gewerk_slug ?? '').toLowerCase()
+  const leistung = (p.leistung ?? '').toLowerCase()
+  return slug === 'abschlag' || leistung.startsWith('abschlag ') || leistung.startsWith('schlussrechnung')
+}
+
+/** Alte Entwürfe hatten nur eine Abschlag-Pauschalposition — Auftragspositionen wiederherstellen. */
+export function rechnungPositionenMitAuftrag(
+  gespeichert: AngebotPosition[],
+  auftragPositionen: AngebotPosition[]
+): AngebotPosition[] {
+  const norm = normalizeAngebotPositionen(gespeichert)
+  const auftrag = normalizeAngebotPositionen(auftragPositionen)
+  if (!auftrag.length) return norm
+  if (norm.length === 0) return auftrag
+  if (norm.length === 1 && istAbschlagPauschalPosition(norm[0]!)) return auftrag
+  if (norm.every(istAbschlagPauschalPosition)) return auftrag
+  return norm
+}
+
 export function abschlagBereitsAbgerechnet(
   zeileId: string,
-  rechnungen: RechnungAbschlagLink[]
+  rechnungen: RechnungAbschlagLink[],
+  ausserRechnungId?: string | null
 ): boolean {
   return rechnungen.some(
     (r) =>
+      r.id !== ausserRechnungId &&
       r.zahlungsplan_abschlag_id === zeileId &&
       r.status !== 'storniert' &&
       (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
@@ -262,7 +285,8 @@ export function standardRechnungZahlungstext(zahlungszielTage: number): string {
 export function abschlagZahlungstextFuerRechnung(
   plan: Zahlungsplan,
   gesamtNetto: number,
-  zahlungszielTage: number
+  zahlungszielTage: number,
+  aktuelleZeile?: ZahlungsplanZeileBerechnet | null
 ): string {
   const kontext = berechneZahlungsplan(plan, gesamtNetto)
   const zeilenText = kontext.zeilen.map((z) => {
@@ -276,9 +300,42 @@ export function abschlagZahlungstextFuerRechnung(
     return `${label}: ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
   })
 
+  const fälligIntro = aktuelleZeile
+    ? aktuelleZeile.istSchluss
+      ? `Mit dieser Rechnung wird der Restbetrag in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig.\n\n`
+      : `Mit dieser Rechnung wird Abschlag ${aktuelleZeile.index} in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig.\n\n`
+    : ''
+
   const planBlock = `Die Auftragssumme ist in folgende Abschläge zu zahlen:\n${zeilenText.join('\n')}`
   const zahlungsziel = `\n\n${standardRechnungZahlungstext(zahlungszielTage)}`
-  return planBlock + zahlungsziel
+  return fälligIntro + planBlock + zahlungsziel
+}
+
+/** Listen-/Zahlungsbetrag in rechnungen: Abschlag = Ratenbetrag, Schluss = volle Summe. */
+export function rechnungBerechnungFuerListe(
+  voll: RechnungBerechnung,
+  zeile: ZahlungsplanZeileBerechnet | null,
+  rechnungArt: 'voll' | 'abschlag' | 'schluss'
+): RechnungBerechnung {
+  if (rechnungArt !== 'abschlag' || !zeile) return voll
+  const ratio = voll.netto > 0 ? zeile.netto / voll.netto : 0
+  const mwst_betrag = Math.round((zeile.brutto - zeile.netto) * 100) / 100
+  return {
+    ...voll,
+    netto: zeile.netto,
+    brutto: zeile.brutto,
+    mwst_betrag,
+    lohn_netto: Math.round(voll.lohn_netto * ratio * 100) / 100,
+    material_netto: Math.round(voll.material_netto * ratio * 100) / 100,
+    mwst_aufschluesselung:
+      voll.mwst_aufschluesselung.length && ratio > 0
+        ? voll.mwst_aufschluesselung.map((z) => ({
+            satz: z.satz,
+            netto: Math.round(z.netto * ratio * 100) / 100,
+            mwst: Math.round(z.mwst * ratio * 100) / 100,
+          }))
+        : voll.mwst_aufschluesselung,
+  }
 }
 
 function formatEur(n: number): string {

@@ -26,6 +26,7 @@ export function RechnungWizardZahlungCard({
   zahlungszielTage,
   rechnungen,
   aktuelleZeile,
+  rechnungId,
 }: {
   meta: RechnungWizardMeta
   onMetaChange: (patch: Partial<RechnungWizardMeta>) => void
@@ -35,7 +36,14 @@ export function RechnungWizardZahlungCard({
   zahlungszielTage: number
   rechnungen: RechnungAbschlagLink[]
   aktuelleZeile: ZahlungsplanZeileBerechnet | null
+  rechnungId?: string | null
 }) {
+  function zahlungstextFuerZeile(zeile: ZahlungsplanZeileBerechnet | null): string {
+    if (zeile?.istSchluss) {
+      return standardRechnungZahlungstext(zahlungszielTage)
+    }
+    return abschlagZahlungstextFuerRechnung(zahlungsplan, gesamtNetto, zahlungszielTage, zeile)
+  }
   const kontext = berechneZahlungsplan(zahlungsplan, gesamtNetto)
 
   function setZahlungsart(art: RechnungWizardZahlungsart) {
@@ -49,28 +57,21 @@ export function RechnungWizardZahlungCard({
     }
     const zeile =
       kontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      kontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen)) ??
+      kontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId)) ??
       kontext.zeilen[0] ??
       null
     onMetaChange({
       zahlungsart: 'abschlaege',
       abschlag_zeile_id: zeile?.id ?? null,
-      zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
-        zahlungsplan,
-        gesamtNetto,
-        zahlungszielTage
-      ),
+      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
     })
   }
 
   function setAbschlagZeile(zeileId: string) {
+    const zeile = kontext.zeilen.find((z) => z.id === zeileId) ?? null
     onMetaChange({
       abschlag_zeile_id: zeileId,
-      zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
-        zahlungsplan,
-        gesamtNetto,
-        zahlungszielTage
-      ),
+      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
     })
   }
 
@@ -80,19 +81,20 @@ export function RechnungWizardZahlungCard({
     const nextKontext = berechneZahlungsplan(plan, gesamtNetto)
     const zeile =
       nextKontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      nextKontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen)) ??
+      nextKontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId)) ??
       nextKontext.zeilen[0] ??
       null
     onMetaChange({
       abschlag_zeile_id: zeile?.id ?? null,
-      zahlungsbedingungen: abschlagZahlungstextFuerRechnung(plan, gesamtNetto, zahlungszielTage),
+      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
     })
   }
 
   const abschlagOptions = kontext.zeilen
     .filter(
       (z) =>
-        !abschlagBereitsAbgerechnet(z.id, rechnungen) || z.id === meta.abschlag_zeile_id
+        !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId) ||
+        z.id === meta.abschlag_zeile_id
     )
     .map((z) => ({
       value: z.id,
@@ -118,8 +120,9 @@ export function RechnungWizardZahlungCard({
       {meta.zahlungsart === 'abschlaege' ? (
         <>
           <p className="text-sm text-bw-text-muted">
-            Die Leistungspositionen bleiben unverändert. Der Abschlagsplan erscheint unten auf der
-            Rechnung statt des Standard-Zahlungstextes.
+            Alle Leistungen vom Auftrag bleiben auf der Rechnung. Wähle, welcher Abschlag mit dieser
+            Rechnung rausgeht — jeder Abschlag erscheint separat unter Rechnungen (bezahlbar
+            markierbar). Schlussrechnung = normale Rechnung mit allen Positionen.
           </p>
           {gesamtNetto > 0 ? (
             <ZahlungsplanEditor
@@ -129,7 +132,7 @@ export function RechnungWizardZahlungCard({
             />
           ) : null}
           <label className="field">
-            <span className="field-l">Diese Rechnung stellt dar</span>
+            <span className="field-l">Dieser Abschlag wird jetzt verschickt</span>
             <Select
               value={meta.abschlag_zeile_id ?? ''}
               onChange={(e) => setAbschlagZeile(e.target.value)}

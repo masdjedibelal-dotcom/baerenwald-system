@@ -499,11 +499,11 @@ export function mailAngebot(
     betreff,
     html: mailHtmlBase(
       `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
-      ${mailKundenPortalTop(data.statusLink)}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${body1}</p>
       ${summaryHtml}
       ${hint35a}
       ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
+      ${mailKundenPortalTop(data.statusLink)}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
       <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),
