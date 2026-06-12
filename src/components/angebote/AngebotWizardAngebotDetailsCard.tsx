@@ -14,6 +14,7 @@ import {
   zahlungsplanLabelFuerAngebot,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
+import { formatDatum } from '@/lib/utils'
 
 export function AngebotWizardAngebotDetailsCard({
   meta,

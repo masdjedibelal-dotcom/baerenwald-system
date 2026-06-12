@@ -18,6 +18,7 @@ import {
   inviteBenutzer,
   loadBenutzerListe,
   setBenutzerAktiv,
+  syncBenutzerPartnerPortal,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import { useRouter } from 'next/navigation'
@@ -48,7 +49,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         toast.error(r.message)
         return
       }
-      toast.success('Einladung versendet')
+      toast.success(r.message ?? 'Einladung versendet')
       setInviteOpen(false)
       setInviteEmail('')
       setInviteName('')
@@ -103,6 +104,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                 <EinstellungenListMeta className="mt-0.5">
                   {u.rolle === 'admin' ? 'Admin' : 'Manager'}
                   {u.telefon ? ` · ${u.telefon}` : ' · Kein Handy'}
+                  {u.partnerPortal ? ' · Partner-Portal' : ' · Nur CRM'}
                 </EinstellungenListMeta>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -125,6 +127,31 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                   <Pencil className="h-4 w-4" aria-hidden />
                   Bearbeiten
                 </Button>
+                {!u.partnerPortal ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => {
+                      startTransition(async () => {
+                        const r = await syncBenutzerPartnerPortal(u.id)
+                        if (!r.ok) {
+                          toast.error(r.message)
+                          return
+                        }
+                        toast.success(
+                          r.handwerkerName
+                            ? `Partner-Portal verknüpft (${r.handwerkerName})`
+                            : 'Kein Handwerker-Stamm mit dieser E-Mail gefunden'
+                        )
+                        await refresh()
+                      })
+                    }}
+                  >
+                    Portal verknüpfen
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant={u.aktiv ? 'danger' : 'secondary'}
@@ -163,6 +190,10 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             onChange={(e) => setInviteEmail(e.target.value)}
           />
           <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
+          <p className="text-xs text-bw-text-muted">
+            Nutze dieselbe E-Mail wie im Handwerker-Stamm — dann funktioniert ein Login für CRM und
+            Partner-Portal.
+          </p>
           <div>
             <label className="input-label" htmlFor="invite-rolle">
               Rolle

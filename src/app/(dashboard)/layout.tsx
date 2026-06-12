@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { ensureUnifiedTeamAccount } from '@/lib/auth/unified-team-account'
 import { ensureStandardTemplates } from '@/lib/standard-templates'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -32,6 +34,35 @@ export default async function DashboardLayout({
 
     if (!user) {
       redirect('/login')
+    }
+
+    let { data: crmProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!crmProfile) {
+      const meta = (user.user_metadata ?? {}) as { name?: string; role?: string }
+      const rolle = meta.role === 'admin' ? 'admin' : meta.role === 'manager' ? 'manager' : null
+      if (rolle && user.email) {
+        await ensureUnifiedTeamAccount(supabaseAdmin, {
+          authUserId: user.id,
+          email: user.email,
+          name: meta.name?.trim() || user.email.split('@')[0] || 'Team',
+          rolle,
+        })
+        const refetch = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle()
+        crmProfile = refetch.data
+      }
+    }
+
+    if (!crmProfile) {
+      redirect('/login?error=portal_only')
     }
 
     await ensureStandardTemplates()
