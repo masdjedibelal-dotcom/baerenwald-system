@@ -97,7 +97,7 @@ export type RouteMetaDef = {
 /** TopBar-Titel und CTAs pro Listen-Route. */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
-  '/anfragen': { title: 'Anfragen' },
+  '/anfragen': { title: 'Anfragen', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
   '/auftraege': { title: 'Aufträge' },
   '/rechnungen': { title: 'Rechnungen', cta: { label: 'Neue Rechnung', href: '/rechnungen/neu' } },
   '/handwerker': { title: 'Handwerker', cta: { label: 'Neuer Handwerker', href: '/handwerker?neu=1' } },

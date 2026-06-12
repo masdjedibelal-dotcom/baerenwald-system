@@ -233,23 +233,12 @@ export function AuftragDetailClient({
   }, [detail.id, openVertragWizard])
 
   const openRechnungErstellen = useCallback(() => {
-    if (rechnungenListe.length === 0) {
-      startTransition(async () => {
-        const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        openRechnungWizard(res.bootstrap)
-      })
-      return
-    }
     if (isMobile) {
       router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
       return
     }
     setRechnungAuswahlOpen(true)
-  }, [rechnungenListe.length, detail.id, isMobile, openRechnungWizard, router])
+  }, [detail.id, isMobile, router])
 
   useEffect(() => {
     setDetail(initial)

@@ -1,7 +1,13 @@
-import { randomUUID } from 'crypto'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+
+function neueZahlungsplanId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+}
 
 export type ZahlungsplanAbschlagTyp = 'prozent' | 'betrag' | 'rest'
 
@@ -51,7 +57,7 @@ export function emptyZahlungsplan(): Zahlungsplan {
 
 export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): ZahlungsplanZeile {
   return {
-    id: randomUUID(),
+    id: neueZahlungsplanId(),
     titel: partial?.titel?.trim() || 'Abschlag',
     typ: partial?.typ ?? 'prozent',
     wert: partial?.wert ?? 50,
@@ -68,7 +74,7 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
   const zeilen = o.zeilen
     .filter((z) => z && typeof z === 'object')
     .map((z) => ({
-      id: String(z.id || randomUUID()),
+      id: String(z.id || neueZahlungsplanId()),
       titel: String(z.titel ?? 'Abschlag').trim() || 'Abschlag',
       typ: (['prozent', 'betrag', 'rest'].includes(String(z.typ))
         ? z.typ
@@ -90,10 +96,10 @@ export function zahlungsplanAusAnzahlung50(gesamtNetto: number): Zahlungsplan {
   return {
     modus: 'abschlagsplan',
     zeilen: [
-      { ...neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 50 }), id: randomUUID() },
+      { ...neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 50 }), id: neueZahlungsplanId() },
       {
         ...neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0 }),
-        id: randomUUID(),
+        id: neueZahlungsplanId(),
       },
     ],
   }
@@ -225,7 +231,7 @@ export function buildAbschlagPauschalPosition(input: {
   void bereitsGestelltBrutto
 
   return {
-    id: randomUUID(),
+    id: neueZahlungsplanId(),
     gewerk_id: '',
     gewerk_slug: '__freitext__',
     gewerk_name: 'Abschlag',
