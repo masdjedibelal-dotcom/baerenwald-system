@@ -75,7 +75,7 @@ export function AuftragZahlungsplanSection({
       <p className="mb-3 text-sm text-bw-text-muted">
         Abschlagsrechnungen orientieren sich an diesem Plan. Bereits gestellte Abschläge sind markiert.
       </p>
-      <ZahlungsplanEditor plan={plan} onChange={setPlan} gesamtNetto={gesamtNetto} />
+      <ZahlungsplanEditor plan={plan} onChange={setPlan} gesamtNetto={gesamtNetto} showVorlagen />
       <ul className="mt-4 space-y-1.5 border-t border-bw-border pt-3 text-sm">
         {kontext.zeilen.map((z) => {
           const erledigt = abschlagBereitsAbgerechnet(z.id, rechnungen)

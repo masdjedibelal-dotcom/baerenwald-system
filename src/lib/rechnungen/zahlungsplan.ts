@@ -1,5 +1,5 @@
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
-import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
+import { berechneRechnung, type RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
@@ -18,6 +18,8 @@ export type ZahlungsplanZeile = {
   typ: ZahlungsplanAbschlagTyp
   /** Prozent (0–100) oder Festbetrag netto; bei rest ignoriert */
   wert: number
+  /** Auftragspositionen, die dieser Abschlagsrechnung zugeordnet sind (Schluss = Rest automatisch) */
+  position_ids?: string[]
   pdf_einleitung_vorlage?: string | null
   mail_einleitung_vorlage?: string | null
   mail_betreff_vorlage?: string | null
@@ -62,6 +64,7 @@ export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): Zah
     titel: partial?.titel?.trim() || 'Abschlag',
     typ: partial?.typ ?? 'prozent',
     wert: partial?.wert ?? 50,
+    position_ids: partial?.position_ids?.length ? [...partial.position_ids] : [],
     pdf_einleitung_vorlage: partial?.pdf_einleitung_vorlage ?? null,
     mail_einleitung_vorlage: partial?.mail_einleitung_vorlage ?? null,
     mail_betreff_vorlage: partial?.mail_betreff_vorlage ?? null,
@@ -81,6 +84,9 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
         ? z.typ
         : 'prozent') as ZahlungsplanAbschlagTyp,
       wert: Number(z.wert) || 0,
+      position_ids: Array.isArray(z.position_ids)
+        ? z.position_ids.map((id) => String(id)).filter(Boolean)
+        : [],
       pdf_einleitung_vorlage: z.pdf_einleitung_vorlage?.trim() || null,
       mail_einleitung_vorlage: z.mail_einleitung_vorlage?.trim() || null,
       mail_betreff_vorlage: z.mail_betreff_vorlage?.trim() || null,
@@ -178,6 +184,52 @@ export function berechneZahlungsplan(
 
 export function rechnungArtFuerZeile(zeile: ZahlungsplanZeileBerechnet): RechnungArt {
   return zeile.istSchluss ? 'schluss' : 'abschlag'
+}
+
+export function positionAnzeigeLabel(p: AngebotPosition): string {
+  const name = (p.leistung_name || p.beschreibung || p.leistung || 'Position').trim()
+  const gewerk = p.gewerk_name?.trim()
+  return gewerk ? `${gewerk}: ${name}` : name
+}
+
+/** Positionen, die bereits anderen Abschlagszeilen zugeordnet sind. */
+export function positionIdsBelegt(plan: Zahlungsplan, ausserZeileId?: string | null): Set<string> {
+  const belegt = new Set<string>()
+  for (const z of plan.zeilen) {
+    if (z.typ === 'rest' || z.id === ausserZeileId) continue
+    for (const id of z.position_ids ?? []) belegt.add(id)
+  }
+  return belegt
+}
+
+/** Leistungen pro Planzeile — Schlussrechnung erhält alle nicht zugeordneten Positionen. */
+export function positionenFuerZahlungsplanZeile(
+  zeile: ZahlungsplanZeile,
+  allePositionen: AngebotPosition[],
+  plan: Zahlungsplan
+): AngebotPosition[] {
+  const norm = normalizeAngebotPositionen(allePositionen).filter(
+    (p) => p.gewerk_slug !== '__freitext__' || p.lohn_netto !== 0 || p.material_netto !== 0
+  )
+  if (zeile.typ === 'rest') {
+    const belegt = positionIdsBelegt(plan)
+    return norm.filter((p) => !belegt.has(p.id))
+  }
+  const ids = zeile.position_ids ?? []
+  if (!ids.length) return []
+  const idSet = new Set(ids)
+  return norm.filter((p) => idSet.has(p.id))
+}
+
+export function rechnungDokumentBezeichnung(
+  rechnungArt: RechnungArt | string | null | undefined,
+  abschlagIndex?: number | null
+): string {
+  if (rechnungArt === 'schluss') return 'Schlussrechnung'
+  if (rechnungArt === 'abschlag') {
+    return abschlagIndex && abschlagIndex > 0 ? `Abschlagsrechnung ${abschlagIndex}` : 'Abschlagsrechnung'
+  }
+  return 'Rechnung'
 }
 
 export function istAbschlagPauschalPosition(p: AngebotPosition): boolean {
@@ -292,26 +344,52 @@ export function abschlagZahlungstextFuerRechnung(
   const zeilenText = kontext.zeilen.map((z) => {
     const label = z.istSchluss ? z.titel : `Abschlag ${z.index} (${z.titel})`
     if (z.typ === 'prozent') {
-      return `${label}: ${z.wert} % — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+      return `${label}: ${z.wert} % (Plan) — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
     }
     if (z.typ === 'rest') {
-      return `${label}: Restbetrag — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+      return `${label}: Restbetrag (Plan) — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
     }
-    return `${label}: ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+    return `${label} (Plan): ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
   })
 
-  const fälligIntro = aktuelleZeile
-    ? aktuelleZeile.istSchluss
-      ? `Mit dieser Rechnung wird der Restbetrag in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig.\n\n`
-      : `Mit dieser Rechnung wird Abschlag ${aktuelleZeile.index} in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig.\n\n`
-    : ''
-
-  const planBlock = `Die Auftragssumme ist in folgende Abschläge zu zahlen:\n${zeilenText.join('\n')}`
+  const planBlock = `Zahlungsplan (Info — Rechnungsbeträge ergeben sich aus den zugeordneten Leistungen):\n${zeilenText.join('\n')}`
   const zahlungsziel = `\n\n${standardRechnungZahlungstext(zahlungszielTage)}`
-  return fälligIntro + planBlock + zahlungsziel
+  if (!aktuelleZeile) return planBlock + zahlungsziel
+  return planBlock + zahlungsziel
 }
 
-/** Listen-/Zahlungsbetrag in rechnungen: Abschlag = Ratenbetrag, Schluss = volle Summe. */
+function leereRechnungBerechnung(voll: RechnungBerechnung): RechnungBerechnung {
+  return {
+    ...voll,
+    netto: 0,
+    brutto: 0,
+    mwst_betrag: 0,
+    lohn_netto: 0,
+    material_netto: 0,
+    mwst_aufschluesselung: [],
+  }
+}
+
+/** Rechnungsbetrag = Summe der zugeordneten Leistungen. Plan-Prozente sind nur Info. */
+export function rechnungBerechnungFuerAbschlagZeile(
+  voll: RechnungBerechnung,
+  _zeile: ZahlungsplanZeileBerechnet | null,
+  rechnungArt: RechnungArt,
+  positionen: AngebotPosition[],
+  opts?: { reverseCharge13b?: boolean; kleinunternehmer?: boolean; defaultMwstSatz?: number }
+): RechnungBerechnung {
+  if (rechnungArt === 'voll') return voll
+  if (positionen.length > 0) {
+    return berechneRechnung(positionen, {
+      kleinunternehmer: opts?.kleinunternehmer ?? false,
+      reverseCharge13b: opts?.reverseCharge13b ?? false,
+      defaultMwstSatz: opts?.defaultMwstSatz ?? 19,
+    })
+  }
+  return leereRechnungBerechnung(voll)
+}
+
+/** @deprecated Plan-Prozent als Listenbetrag — nicht mehr für Abschlagsrechnungen genutzt. */
 export function rechnungBerechnungFuerListe(
   voll: RechnungBerechnung,
   zeile: ZahlungsplanZeileBerechnet | null,

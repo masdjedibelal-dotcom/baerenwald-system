@@ -18,6 +18,7 @@ export async function saveAuftragZahlungsplan(
     zeilen: plan.zeilen.map((z) => ({
       ...z,
       titel: z.titel.trim() || 'Abschlag',
+      position_ids: z.position_ids?.length ? [...z.position_ids] : [],
     })),
   }
 

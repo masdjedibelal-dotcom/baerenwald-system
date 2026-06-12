@@ -19,6 +19,7 @@ import {
   Sparkles,
   CircleX,
   Send,
+  Trash2,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailResponsiveTabs } from '@/components/layout/app'
@@ -52,7 +53,7 @@ import {
 import { extendAngebotGueltigkeit } from '@/app/(dashboard)/angebote/extend-gueltigkeit-action'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
-import { previewAuftragsbestaetigungMail } from '@/app/(dashboard)/angebote/actions'
+import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
@@ -473,15 +474,39 @@ export function AngebotDetailPageClient({
       onClick: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
     })
 
+    if (!auftragId) {
+      items.push('sep', {
+        label: 'Löschen',
+        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+        danger: true,
+        onClick: () => {
+          if (!window.confirm('Angebot wirklich löschen?')) return
+          startTransition(async () => {
+            const r = await deleteAngebot(detail.id)
+            if ('error' in r) {
+              toast.error(r.error)
+              return
+            }
+            toast.success('Angebot gelöscht')
+            if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
+            else router.push('/angebote')
+          })
+        },
+      })
+    }
+
     return items
   }, [
     kannBearbeiten,
     kundeEmail,
     detail.id,
+    detail.lead_id,
     detail.nachgefasst_am,
     kannVerlaengern,
     statusEinfach,
     mailCompose,
+    auftragId,
+    router,
   ])
 
   const detailPrimaryBtnClass =

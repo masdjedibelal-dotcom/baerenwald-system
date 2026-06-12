@@ -19,24 +19,89 @@ import {
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { DetailAccordion } from '@/components/ui/DetailAccordion'
+import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import { toast } from '@/components/ui/app-toast'
 
 export type { RechnungAuswahlZeile }
 
+function rechnungListenTitel(r: RechnungAuswahlZeile): string {
+  if (r.rechnung_art === 'schluss') return 'Schlussrechnung'
+  if (r.rechnung_art === 'abschlag') {
+    return rechnungDokumentBezeichnung('abschlag', r.abschlag_index)
+  }
+  return 'Rechnung'
+}
+
+function RechnungListenZeile({
+  r,
+  loading,
+  pending,
+  menuItems,
+}: {
+  r: RechnungAuswahlZeile
+  loading: boolean
+  pending: boolean
+  menuItems: (r: RechnungAuswahlZeile) => ActionsMenuItem[]
+}) {
+  const label = RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status
+  const titel = rechnungListenTitel(r)
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-medium text-bw-text">{titel}</span>
+          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
+            {label}
+          </span>
+        </div>
+        <p className="mt-0.5 text-[13px] text-bw-text-muted">
+          {r.rechnungsnummer?.trim() ? `${r.rechnungsnummer} · ` : ''}
+          {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
+          {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
+        </p>
+      </div>
+      <span className="text-[13px] font-medium tabular-nums text-bw-text">
+        {formatEurBetrag(r.brutto ?? 0)}
+      </span>
+      <div className="flex shrink-0 items-center">
+        {loading ? (
+          <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Bitte warten…
+          </span>
+        ) : (
+          <ActionsMenu
+            align="right"
+            trigger={
+              <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
+                Aktionen
+              </button>
+            }
+            items={menuItems(r)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function RechnungAuswahlPanel({
   auftragId,
   rechnungen,
+  auftragsReferenz,
   onClose,
   onNeueRechnung,
-  onNeueAbschlagsrechnung,
   onWeiterbearbeiten,
   variant = 'modal',
 }: {
   auftragId: string
   rechnungen: RechnungAuswahlZeile[]
+  auftragsReferenz?: string | null
   onClose?: () => void
   onNeueRechnung: () => void
-  onNeueAbschlagsrechnung?: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
   variant?: 'modal' | 'page'
 }) {
@@ -118,6 +183,10 @@ export function RechnungAuswahlPanel({
     return items
   }
 
+  const abschlagRows = rows.filter((r) => r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
+  const andereRows = rows.filter((r) => r.rechnung_art !== 'abschlag' && r.rechnung_art !== 'schluss')
+  const gruppiert = abschlagRows.length > 0
+
   const footer = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {variant === 'modal' && onClose ? (
@@ -138,17 +207,6 @@ export function RechnungAuswahlPanel({
         <Plus className="h-3.5 w-3.5" aria-hidden />
         Neue Rechnung
       </button>
-      {onNeueAbschlagsrechnung ? (
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm inline-flex gap-1.5"
-          onClick={onNeueAbschlagsrechnung}
-          disabled={pending}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Abschlagsrechnung
-        </button>
-      ) : null}
     </div>
   )
 
@@ -214,57 +272,56 @@ export function RechnungAuswahlPanel({
           })}
         </ul>
       ) : (
-        <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
-          {rows.map((r) => {
+        <div className="space-y-3">
+          {andereRows.map((r) => {
             const loading = pending && loadingId === r.id
-            const label = RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status
-
             return (
-              <li key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-bw-text">
-                      {r.rechnung_art === 'schluss'
-                        ? 'Schlussrechnung'
-                        : r.rechnung_art === 'abschlag'
-                          ? `Abschlag ${r.abschlag_index ?? ''}`.trim()
-                          : 'Rechnung'}
-                    </span>
-                    <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-                      {label}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[13px] text-bw-text-muted">
-                    {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
-                    {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
-                  </p>
-                </div>
-                <span className="text-[13px] font-medium tabular-nums text-bw-text">
-                  {formatEurBetrag(r.brutto ?? 0)}
-                </span>
-                <div className="flex shrink-0 items-center">
-                  {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      Bitte warten…
-                    </span>
-                  ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
-                      }
-                      items={menuItems(r)}
-                    />
-                  )}
-                </div>
-              </li>
+              <div key={r.id} className="rounded-lg border border-bw-border">
+                <RechnungListenZeile r={r} loading={loading} pending={pending} menuItems={menuItems} />
+              </div>
             )
           })}
-        </ul>
+
+          {gruppiert ? (
+            <DetailAccordion
+              sections={[
+                {
+                  id: 'abschlag-plan',
+                  title: `Abschlagsrechnungen${auftragsReferenz ? ` · ${auftragsReferenz}` : ''}`,
+                  defaultOpen: true,
+                  content: (
+                    <ul className="divide-y divide-bw-border">
+                      {abschlagRows.map((r) => {
+                        const loading = pending && loadingId === r.id
+                        return (
+                          <li key={r.id}>
+                            <RechnungListenZeile
+                              r={r}
+                              loading={loading}
+                              pending={pending}
+                              menuItems={menuItems}
+                            />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ),
+                },
+              ]}
+            />
+          ) : null}
+
+          {!gruppiert
+            ? rows.map((r) => {
+                const loading = pending && loadingId === r.id
+                return (
+                  <div key={r.id} className="rounded-lg border border-bw-border">
+                    <RechnungListenZeile r={r} loading={loading} pending={pending} menuItems={menuItems} />
+                  </div>
+                )
+              })
+            : null}
+        </div>
       )}
 
       {footer}

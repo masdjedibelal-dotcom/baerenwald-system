@@ -61,7 +61,7 @@ export type RechnungEntwurfPayload = {
   abschlag_index?: number | null
   zahlungsplan_abschlag_id?: string | null
   mwst_satz?: number
-  /** Listenbetrag (z. B. Abschlagsrate); Positionen/PDF bleiben unverändert. */
+  /** Listenbetrag = Summe zugeordneter Leistungen (Plan-Prozente nur Info). */
   liste_berechnung?: RechnungBerechnung | null
 }
 
@@ -79,11 +79,15 @@ async function validateVorSpeichern(
     (p) => p.gewerk_slug !== '__freitext__' && (p.lohn_netto !== 0 || p.material_netto !== 0)
   ).length
 
+  const abschlagEntwurfOhnePositionen =
+    (payload.rechnung_art === 'abschlag' || payload.rechnung_art === 'schluss') &&
+    artikelCount === 0
+
   const msg = validateRechnungPflichtangaben(firm, kunde as Kunde, {
     leistungszeitraum_von: payload.leistungszeitraum_von,
     leistungszeitraum_bis: payload.leistungszeitraum_bis,
     rechnungsdatum: payload.rechnungsdatum ?? new Date().toISOString().slice(0, 10),
-    positionenCount: artikelCount,
+    positionenCount: abschlagEntwurfOhnePositionen ? 1 : artikelCount,
   })
   if (msg) return { ok: false, message: msg }
 

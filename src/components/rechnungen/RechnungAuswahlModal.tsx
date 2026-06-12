@@ -14,16 +14,16 @@ export function RechnungAuswahlModal({
   onClose,
   auftragId,
   rechnungen,
+  auftragsReferenz,
   onNeueRechnung,
-  onNeueAbschlagsrechnung,
   onWeiterbearbeiten,
 }: {
   open: boolean
   onClose: () => void
   auftragId: string
   rechnungen: RechnungAuswahlZeile[]
+  auftragsReferenz?: string | null
   onNeueRechnung: () => void
-  onNeueAbschlagsrechnung?: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
 }) {
   return (
@@ -32,9 +32,9 @@ export function RechnungAuswahlModal({
         variant="modal"
         auftragId={auftragId}
         rechnungen={rechnungen}
+        auftragsReferenz={auftragsReferenz}
         onClose={onClose}
         onNeueRechnung={onNeueRechnung}
-        onNeueAbschlagsrechnung={onNeueAbschlagsrechnung}
         onWeiterbearbeiten={onWeiterbearbeiten}
       />
     </Modal>

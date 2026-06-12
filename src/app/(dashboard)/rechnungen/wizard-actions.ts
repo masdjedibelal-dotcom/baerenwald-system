@@ -21,6 +21,7 @@ import {
   rechnungDarfImWizardBearbeitetWerden,
   type RechnungWizardBootstrap,
   type RechnungWizardMeta,
+  type AbschlagRechnungEntwurf,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
@@ -39,8 +40,9 @@ import {
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
+  positionenFuerZahlungsplanZeile,
   rechnungArtFuerZeile,
-  rechnungBerechnungFuerListe,
+  rechnungBerechnungFuerAbschlagZeile,
   rechnungPositionenMitAuftrag,
   resolveAnredeKey,
   standardRechnungZahlungstext,
@@ -71,6 +73,7 @@ export type SaveRechnungWizardDraftPayload = {
   } | null
   zahlungsplan?: Zahlungsplan | null
   zahlungsplanSpeichern?: boolean
+  versandZeileId?: string | null
 }
 
 async function positionenAusAuftrag(
@@ -505,7 +508,16 @@ export async function saveRechnungWizardDraft(
         message: 'Für diesen Abschlag existiert bereits eine Rechnung. Bitte andere Rate wählen.',
       }
     }
-    liste_berechnung = rechnungBerechnungFuerListe(berechnungVoll, zeile, rechnungArt)
+    const zeilenPos = zeile
+      ? positionenFuerZahlungsplanZeile(zeile, positionen, input.zahlungsplan)
+      : positionen
+    liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
+      berechnungVoll,
+      zeile,
+      rechnungArt,
+      zeilenPos,
+      { reverseCharge13b: input.meta.reverse_charge_13b }
+    )
   }
 
   const payload = {
@@ -581,6 +593,192 @@ export async function saveRechnungWizardDraft(
     rechnungId: created.id,
     rechnungsnummer: String(nr?.rechnungsnummer ?? ''),
   }
+}
+
+function entwurfPayloadAusWizardMeta(
+  input: SaveRechnungWizardDraftPayload,
+  positionen: AngebotPosition[],
+  liste_berechnung: import('@/lib/rechnung-berechnung').RechnungBerechnung,
+  rechnungArt: 'voll' | 'abschlag' | 'schluss',
+  zeile: ZahlungsplanZeileBerechnet | null,
+  zeileId: string | null
+) {
+  return {
+    positionen,
+    leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
+    leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
+    faellig_am: input.meta.faellig_am || null,
+    rechnungsdatum: input.meta.rechnungsdatum || null,
+    reverse_charge_13b: input.meta.reverse_charge_13b,
+    hinweis_35a: input.meta.hinweis_35a,
+    einleitung: input.meta.einleitung || null,
+    hinweise: input.meta.hinweise || null,
+    mail_einleitung: input.meta.mail_einleitung || null,
+    mail_betreff: input.meta.mail_betreff || null,
+    zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+    rechnung_art: rechnungArt,
+    abschlag_index: zeile?.index ?? null,
+    zahlungsplan_abschlag_id: zeileId,
+    liste_berechnung,
+  }
+}
+
+/** Alle Abschlags- und Schlussrechnungen als Entwürfe anlegen (Schritt 2 → 3). */
+export async function createAllAbschlagRechnungenFromWizard(
+  input: SaveRechnungWizardDraftPayload
+): Promise<
+  | { ok: true; rechnungen: AbschlagRechnungEntwurf[]; versandRechnungId: string }
+  | { ok: false; message: string }
+> {
+  if (input.meta.zahlungsart !== 'abschlaege' || !input.zahlungsplan?.zeilen.length) {
+    return { ok: false, message: 'Kein Abschlagsplan konfiguriert.' }
+  }
+
+  const planSave = await saveAuftragZahlungsplan(input.auftrag_id, input.zahlungsplan)
+  if (!planSave.ok) return planSave
+
+  const allePositionen = repairAngebotPositionen(normalizeAngebotPositionen(input.positionen))
+  await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(allePositionen))
+
+  const supabase = createClient()
+  const { berechnung: berechnungVoll } = await berechneRechnungMitFirmeneinstellungen(supabase, {
+    positionen: allePositionen,
+    reverse_charge_13b: input.meta.reverse_charge_13b,
+  })
+
+  const gesamtNetto = auftragSummenAusPositionen(allePositionen).netto
+  const kontext = berechneZahlungsplan(input.zahlungsplan, gesamtNetto)
+  const bestehend = await rechnungenAbschlagLinks(supabase, input.auftrag_id)
+
+  const erstellt: AbschlagRechnungEntwurf[] = []
+
+  for (const zeile of kontext.zeilen) {
+    const rechnungArt = rechnungArtFuerZeile(zeile) as 'abschlag' | 'schluss'
+    const zeilenPos = positionenFuerZahlungsplanZeile(zeile, allePositionen, input.zahlungsplan!)
+    const liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
+      berechnungVoll,
+      zeile,
+      rechnungArt,
+      zeilenPos,
+      { reverseCharge13b: input.meta.reverse_charge_13b }
+    )
+
+    const existing = bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)
+    if (existing && existing.status !== 'entwurf') {
+      const { data: nrRec } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', existing.id)
+        .maybeSingle()
+      erstellt.push({
+        id: existing.id,
+        rechnungsnummer: String(nrRec?.rechnungsnummer ?? ''),
+        zeileId: zeile.id,
+        index: zeile.index,
+        titel: zeile.titel,
+        rechnungArt,
+        brutto: Number(existing.brutto ?? liste_berechnung.brutto),
+        status: String(existing.status ?? 'entwurf'),
+      })
+      continue
+    }
+
+    const payload = entwurfPayloadAusWizardMeta(
+      input,
+      zeilenPos,
+      liste_berechnung,
+      rechnungArt,
+      zeile,
+      zeile.id
+    )
+
+    let rechnungId = existing?.id ?? null
+    let rechnungsnummer = ''
+
+    if (rechnungId) {
+      const upd = await updateRechnungEntwurf(rechnungId, {
+        kunde_id: input.kunde_id,
+        ...payload,
+      })
+      if (!upd.ok) return upd
+      const { data: nr } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      rechnungsnummer = String(nr?.rechnungsnummer ?? '')
+    } else {
+      const created = await createRechnungEntwurf({
+        angebot_id: input.angebot_id,
+        auftrag_id: input.auftrag_id,
+        kunde_id: input.kunde_id,
+        ...payload,
+      })
+      if (!created.ok) return created
+      rechnungId = created.id
+      const { data: nr } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      rechnungsnummer = String(nr?.rechnungsnummer ?? '')
+    }
+
+    erstellt.push({
+      id: rechnungId!,
+      rechnungsnummer,
+      zeileId: zeile.id,
+      index: zeile.index,
+      titel: zeile.titel,
+      rechnungArt,
+      brutto: liste_berechnung.brutto,
+      status: 'entwurf',
+    })
+  }
+
+  const versandZeileId = input.versandZeileId?.trim() || null
+  const versand =
+    erstellt.find((r) => r.zeileId === versandZeileId && r.status === 'entwurf') ??
+    erstellt.find((r) => r.status === 'entwurf') ??
+    erstellt[0]
+
+  if (!versand) {
+    return { ok: false, message: 'Keine Rechnung zum Versand verfügbar.' }
+  }
+
+  revalidatePath('/rechnungen')
+  revalidatePath(`/auftraege/${input.auftrag_id}`)
+
+  return { ok: true, rechnungen: erstellt, versandRechnungId: versand.id }
+}
+
+export async function syncRechnungWizardMetaToEntwurf(
+  rechnungId: string,
+  input: Pick<SaveRechnungWizardDraftPayload, 'kunde_id' | 'meta'>
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({
+      kunde_id: input.kunde_id,
+      leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
+      leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
+      faellig_am: input.meta.faellig_am || null,
+      rechnungsdatum: input.meta.rechnungsdatum || null,
+      reverse_charge_13b: input.meta.reverse_charge_13b,
+      hinweis_35a: input.meta.hinweis_35a,
+      einleitung: input.meta.einleitung || null,
+      hinweise: input.meta.hinweise || null,
+      mail_einleitung: input.meta.mail_einleitung || null,
+      mail_betreff: input.meta.mail_betreff || null,
+      zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', rechnungId)
+
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/rechnungen/${rechnungId}`)
+  return { ok: true }
 }
 
 export async function sendRechnungWizard(input: {

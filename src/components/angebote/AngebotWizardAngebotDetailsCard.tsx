@@ -97,6 +97,7 @@ export function AngebotWizardAngebotDetailsCard({
             onChange={onZahlungsplanChange}
             gesamtNetto={gesamtNetto}
             compact={meta.zahlungsbedingungen === 'anzahlung_50'}
+            showVorlagen={meta.zahlungsbedingungen !== 'anzahlung_50'}
           />
         </div>
       ) : null}

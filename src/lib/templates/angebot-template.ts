@@ -139,6 +139,9 @@ export type AngebotHtmlInput = {
   projekt_hat_varianten?: boolean
   /** KI-Visualisierung (ins Angebot übernommen) */
   ki_visualisierungen?: KiVizPdfPage[] | null
+  /** Rechnung: voll | abschlag | schluss — steuert PDF-Überschrift */
+  rechnung_typ?: 'voll' | 'abschlag' | 'schluss' | null
+  rechnung_abschlag_index?: number | null
 }
 
 function esc(s: string): string {
@@ -496,10 +499,18 @@ function rechnungBriefkopfHtml(props: AngebotHtmlInput): string {
   const projektTitel =
     props.projekt_titel?.trim() || props.leistungsumfang?.trim() || 'Rechnung'
   const teamLabel = `${firmennameZeile(props)} Team`
+  const dokumentLabel =
+    props.rechnung_typ === 'schluss'
+      ? 'Schlussrechnung'
+      : props.rechnung_typ === 'abschlag'
+        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
+          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
+          : 'Abschlagsrechnung'
+        : 'Rechnung'
   return `<header style="border-bottom:3px solid ${PROJEKT_ACCENT};padding-bottom:14px;margin-bottom:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:9pt;color:${TEXT_PRIMARY};text-transform:uppercase;letter-spacing:0.06em;font-weight:400;">Rechnung</div>
+        <div style="font-size:9pt;color:${TEXT_PRIMARY};text-transform:uppercase;letter-spacing:0.06em;font-weight:400;">${esc(dokumentLabel)}</div>
         <h1 style="font-size:15pt;font-weight:700;color:${PROJEKT_ACCENT};margin:6px 0 0;line-height:1.3;">
           ${esc(projektTitel)}
         </h1>
@@ -1018,7 +1029,16 @@ export function buildAngebotHtml(
   }
 
   const istRechnung = props.dokument_art === 'rechnung'
-  const dokumentTitel = istRechnung ? 'Rechnung' : 'Angebot'
+  const dokumentTitel =
+    props.rechnung_typ === 'schluss'
+      ? 'Schlussrechnung'
+      : props.rechnung_typ === 'abschlag'
+        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
+          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
+          : 'Abschlagsrechnung'
+        : istRechnung
+          ? 'Rechnung'
+          : 'Angebot'
 
   const einl = richTextToSafePdfHtml(props.einleitung?.trim() || '')
   const begr = esc(props.begruessung.trim() || 'Guten Tag,')

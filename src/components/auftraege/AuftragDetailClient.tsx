@@ -62,7 +62,7 @@ import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
-import { auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
+import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
@@ -82,7 +82,6 @@ import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
 import {
   loadRechnungWizardBootstrapFromAuftrag,
-  loadRechnungWizardBootstrapFromAuftragAbschlag,
   type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
@@ -1019,21 +1018,11 @@ export function AuftragDetailClient({
         onClose={() => setRechnungAuswahlOpen(false)}
         auftragId={detail.id}
         rechnungen={rechnungenListe}
+        auftragsReferenz={formatAuftragsNr(detail)}
         onNeueRechnung={() => {
           setRechnungAuswahlOpen(false)
           startTransition(async () => {
             const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
-            if (!res.ok) {
-              toast.error(res.message)
-              return
-            }
-            openRechnungWizard(res.bootstrap)
-          })
-        }}
-        onNeueAbschlagsrechnung={() => {
-          setRechnungAuswahlOpen(false)
-          startTransition(async () => {
-            const res = await loadRechnungWizardBootstrapFromAuftragAbschlag(detail.id)
             if (!res.ok) {
               toast.error(res.message)
               return

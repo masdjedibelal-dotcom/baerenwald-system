@@ -20,15 +20,22 @@ import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { RechnungWizardDetailsCard } from '@/components/rechnungen/RechnungWizardDetailsCard'
-import { RechnungWizardZahlungCard } from '@/components/rechnungen/RechnungWizardZahlungCard'
+import { RechnungWizardZahlungCard, RechnungWizardVersandAuswahlCard } from '@/components/rechnungen/RechnungWizardZahlungCard'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import {
+  createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
   saveRechnungWizardDraft,
   sendRechnungWizard,
+  syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
-import type { RechnungWizardBootstrap, RechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
+import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
+import type {
+  AbschlagRechnungEntwurf,
+  RechnungWizardBootstrap,
+  RechnungWizardMeta,
+} from '@/lib/rechnungen/rechnung-wizard-types'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   angebotPositionenToDokumentZeilen,
@@ -50,10 +57,7 @@ import { isValidEmail } from '@/lib/email-recipients'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { cn } from '@/lib/utils'
 import {
-  berechneZahlungsplan,
-  naechsteOffeneAbschlagZeile,
-  rechnungArtFuerZeile,
-  rechnungBerechnungFuerListe,
+  rechnungDokumentBezeichnung,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
@@ -136,7 +140,6 @@ export function RechnungWizard({
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const modus = bootstrap.modus ?? 'voll'
-  const rechnungenAbschlag = bootstrap.rechnungenAbschlag ?? []
   const [zahlungsplan, setZahlungsplan] = useState<Zahlungsplan>(
     () => bootstrap.zahlungsplan?.zeilen.length ? bootstrap.zahlungsplan : zahlungsplanVorlage50_50()
   )
@@ -175,6 +178,8 @@ export function RechnungWizard({
   })
   const istAbschlag = meta.zahlungsart === 'abschlaege'
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
+  const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
+  const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
     bootstrap.rechnungsnummer?.trim() || 'Entwurf'
   )
@@ -219,28 +224,16 @@ export function RechnungWizard({
   const hinweis35aErlaubt = kannHinweis35aAngebot(kunde?.typ, firm, berechnung.lohn_netto)
   const zeigt13b = kundeKannReverseCharge13b(kunde?.typ)
 
-  const aktuelleAbschlagZeile = useMemo(() => {
-    if (!istAbschlag || gesamtNettoBasis <= 0) return null
-    const kontext = berechneZahlungsplan(zahlungsplan, gesamtNettoBasis)
-    const rechnungenFuerPlan = rechnungenAbschlag.filter((r) => r.id !== rechnungId)
-    return (
-      kontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      naechsteOffeneAbschlagZeile(zahlungsplan, kontext, rechnungenFuerPlan)
-    )
-  }, [
-    istAbschlag,
-    zahlungsplan,
-    gesamtNettoBasis,
-    meta.abschlag_zeile_id,
-    rechnungenAbschlag,
-    rechnungId,
-  ])
+  const aktiveVersandRechnung = useMemo(
+    () => abschlagRechnungen.find((r) => r.id === versandRechnungId) ?? null,
+    [abschlagRechnungen, versandRechnungId]
+  )
 
-  const berechnungListe = useMemo(() => {
-    if (!istAbschlag || !aktuelleAbschlagZeile) return berechnung
-    const art = rechnungArtFuerZeile(aktuelleAbschlagZeile)
-    return rechnungBerechnungFuerListe(berechnung, aktuelleAbschlagZeile, art)
-  }, [berechnung, istAbschlag, aktuelleAbschlagZeile])
+  const previewRechnungId = istAbschlag ? versandRechnungId : rechnungId
+  const previewRechnungsnummer =
+    aktiveVersandRechnung?.rechnungsnummer?.trim() ||
+    rechnungsnummer.trim() ||
+    'Entwurf'
 
   useEffect(() => {
     setMounted(true)
@@ -266,6 +259,25 @@ export function RechnungWizard({
         return null
       }
 
+      if (istAbschlag) {
+        if (!zahlungsplan.zeilen.length) {
+          toast.error('Bitte Abschlagsplan mit mindestens einer Zeile anlegen.')
+          return null
+        }
+        setSaving(true)
+        const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, zahlungsplan)
+        setSaving(false)
+        if (!planSave.ok) {
+          toast.error(planSave.message)
+          return null
+        }
+        savedSnapshotRef.current = draftSnapshot
+        setDraftDirty(false)
+        setLastSavedAt(new Date())
+        if (opts?.notify) toast.success('Abschlagsplan gespeichert')
+        return versandRechnungId ?? rechnungId
+      }
+
       setSaving(true)
       const res = await saveRechnungWizardDraft({
         rechnungId,
@@ -274,20 +286,9 @@ export function RechnungWizard({
         kunde_id: bootstrap.kundeId,
         positionen: positionenBerechnet,
         meta,
-        modus: istAbschlag ? 'abschlag' : modus,
-        abschlag:
-          istAbschlag && aktuelleAbschlagZeile
-            ? {
-                zeileId: aktuelleAbschlagZeile.id,
-                zeileIndex: aktuelleAbschlagZeile.index,
-                rechnungArt:
-                  rechnungArtFuerZeile(aktuelleAbschlagZeile) === 'schluss'
-                    ? ('schluss' as const)
-                    : ('abschlag' as const),
-              }
-            : null,
-        zahlungsplan: istAbschlag ? zahlungsplan : null,
-        zahlungsplanSpeichern: istAbschlag && Boolean(zahlungsplan.zeilen.length),
+        modus,
+        zahlungsplan: null,
+        zahlungsplanSpeichern: false,
       })
       setSaving(false)
       if (!res.ok) {
@@ -295,6 +296,7 @@ export function RechnungWizard({
         return null
       }
       setRechnungId(res.rechnungId)
+      setVersandRechnungId(res.rechnungId)
       if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
@@ -312,6 +314,7 @@ export function RechnungWizard({
       zeilen,
       meta,
       rechnungId,
+      versandRechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
       bootstrap.kundeId,
@@ -319,10 +322,45 @@ export function RechnungWizard({
       draftSnapshot,
       modus,
       istAbschlag,
-      aktuelleAbschlagZeile,
       zahlungsplan,
     ]
   )
+
+  const createAbschlagEntwuerfe = useCallback(async (): Promise<boolean> => {
+    setSaving(true)
+    const res = await createAllAbschlagRechnungenFromWizard({
+      auftrag_id: bootstrap.auftragId,
+      angebot_id: bootstrap.angebotId,
+      kunde_id: bootstrap.kundeId,
+      positionen: positionenBerechnet,
+      meta,
+      zahlungsplan,
+      versandZeileId: meta.abschlag_zeile_id,
+    })
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return false
+    }
+    setAbschlagRechnungen(res.rechnungen)
+    setVersandRechnungId(res.versandRechnungId)
+    setRechnungId(res.versandRechnungId)
+    const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
+    if (nr?.trim()) setRechnungsnummer(nr.trim())
+    savedSnapshotRef.current = draftSnapshot
+    setDraftDirty(false)
+    setLastSavedAt(new Date())
+    toast.success(`${res.rechnungen.length} Rechnungen erstellt`)
+    return true
+  }, [
+    bootstrap.auftragId,
+    bootstrap.angebotId,
+    bootstrap.kundeId,
+    positionenBerechnet,
+    meta,
+    zahlungsplan,
+    draftSnapshot,
+  ])
 
   async function handleWeiter() {
     if (step === 1) {
@@ -336,8 +374,16 @@ export function RechnungWizard({
         return
       }
     }
-    if (step === 2 && istAbschlag && !meta.abschlag_zeile_id) {
-      toast.error('Bitte wählen, welchen Abschlag diese Rechnung stellt.')
+    if (step === 2 && istAbschlag) {
+      const ok = await createAbschlagEntwuerfe()
+      if (!ok) return
+      setStep(3)
+      return
+    }
+    if (step === 2) {
+      const id = await persistDraft({ notify: true })
+      if (!id) return
+      setStep(3)
       return
     }
     const id = await persistDraft({ notify: true })
@@ -346,7 +392,7 @@ export function RechnungWizard({
   }
 
   async function handlePdf() {
-    const id = rechnungId ?? (await persistDraft())
+    const id = previewRechnungId ?? rechnungId ?? (await persistDraft())
     if (!id) return
     try {
       const res = await fetch('/api/rechnung-pdf', {
@@ -369,7 +415,10 @@ export function RechnungWizard({
       const u = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = u
-      a.download = `Rechnung_${rechnungsnummer.replace(/\s+/g, '_')}.pdf`
+      const docLabel = aktiveVersandRechnung
+        ? rechnungDokumentBezeichnung(aktiveVersandRechnung.rechnungArt, aktiveVersandRechnung.index)
+        : 'Rechnung'
+      a.download = `${docLabel.replace(/\s+/g, '_')}_${previewRechnungsnummer.replace(/\s+/g, '_')}.pdf`
       a.click()
       URL.revokeObjectURL(u)
       toast.success('PDF heruntergeladen')
@@ -383,9 +432,21 @@ export function RechnungWizard({
       toast.error('Bitte mindestens eine E-Mail-Adresse angeben.')
       return
     }
-    const id = await persistDraft()
-    if (!id) return
+    const id = previewRechnungId ?? rechnungId
+    if (!id) {
+      toast.error('Keine Rechnung zum Versand ausgewählt.')
+      return
+    }
     setSaving(true)
+    const sync = await syncRechnungWizardMetaToEntwurf(id, {
+      kunde_id: bootstrap.kundeId,
+      meta,
+    })
+    if (!sync.ok) {
+      setSaving(false)
+      toast.error(sync.message)
+      return
+    }
     const res = await sendRechnungWizard({
       rechnungId: id,
       mailTo,
@@ -403,9 +464,13 @@ export function RechnungWizard({
   }
 
   async function handleSaveWithoutMail() {
-    const id = await persistDraft()
+    const id = previewRechnungId ?? rechnungId ?? (await persistDraft())
     if (!id) return
     setSaving(true)
+    await syncRechnungWizardMetaToEntwurf(id, {
+      kunde_id: bootstrap.kundeId,
+      meta,
+    })
     const res = await finalizeRechnungWizardWithoutMail(id)
     setSaving(false)
     if (!res.ok) {
@@ -422,17 +487,15 @@ export function RechnungWizard({
     router.refresh()
   }
 
-  const previewSrc = rechnungId
-    ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(rechnungId)}&preview=html`
+  const previewSrc = previewRechnungId
+    ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(previewRechnungId)}&preview=html`
     : null
 
-  const pdfName = `Rechnung-${rechnungsnummer}.pdf`
+  const pdfName = aktiveVersandRechnung
+    ? `${rechnungDokumentBezeichnung(aktiveVersandRechnung.rechnungArt, aktiveVersandRechnung.index)}-${previewRechnungsnummer}.pdf`
+    : `Rechnung-${previewRechnungsnummer}.pdf`
   const projektTitel = bootstrap.projektTitel?.trim() || bootstrap.auftragsReferenz
-  const wizardTitel = istAbschlag
-    ? aktuelleAbschlagZeile?.istSchluss
-      ? 'Schlussrechnung erstellen'
-      : `Abschlag ${aktuelleAbschlagZeile?.index ?? ''} erstellen`.trim()
-    : 'Rechnung erstellen'
+  const wizardTitel = istAbschlag ? 'Abschlagsrechnungen erstellen' : 'Rechnung erstellen'
 
   useEffect(() => {
     if (step !== 3) return
@@ -613,42 +676,18 @@ export function RechnungWizard({
                 preislisten={preislisten}
                 firm={firm}
                 titel="Rechnungspositionen"
-                untertitel={
-                  istAbschlag
-                    ? 'Positionen vom Auftrag — unverändert. Abschlagsplan nur in Schritt 2.'
-                    : 'Positionen aus Auftrag/Angebot — bei Bedarf anpassen.'
-                }
+                untertitel="Positionen aus Auftrag — Leistungszuordnung pro Abschlag in Schritt 2."
               />
               <Card title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
-                    <span className="text-bw-text-muted">
-                      {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss
-                        ? 'Auftrag netto'
-                        : 'Netto'}
-                    </span>
+                    <span className="text-bw-text-muted">Netto</span>
                     <p className="font-medium tabular-nums">{formatEurBetrag(berechnung.netto)}</p>
                   </div>
                   <div>
-                    <span className="text-bw-text-muted">
-                      {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss
-                        ? 'Auftrag brutto'
-                        : 'Brutto'}
-                    </span>
+                    <span className="text-bw-text-muted">Brutto</span>
                     <p className="font-medium tabular-nums">{formatEurBetrag(berechnung.brutto)}</p>
                   </div>
-                  {istAbschlag && aktuelleAbschlagZeile && !aktuelleAbschlagZeile.istSchluss ? (
-                    <>
-                      <div className="sm:col-span-2 border-t border-bw-border pt-2">
-                        <span className="text-bw-text-muted">
-                          In Rechnungsliste (Abschlag {aktuelleAbschlagZeile.index})
-                        </span>
-                        <p className="font-medium tabular-nums text-bw-primary">
-                          {formatEurBetrag(berechnungListe.brutto)} brutto
-                        </p>
-                      </div>
-                    </>
-                  ) : null}
                 </div>
               </Card>
             </div>
@@ -663,9 +702,7 @@ export function RechnungWizard({
                 onZahlungsplanChange={setZahlungsplan}
                 gesamtNetto={gesamtNettoBasis}
                 zahlungszielTage={zahlungszielTage}
-                rechnungen={rechnungenAbschlag}
-                aktuelleZeile={aktuelleAbschlagZeile}
-                rechnungId={rechnungId}
+                positionen={positionenBerechnet}
               />
               <RechnungWizardDetailsCard
                 meta={meta}
@@ -680,14 +717,25 @@ export function RechnungWizard({
                 zeigt13b={zeigt13b}
                 hinweis35aErlaubt={hinweis35aErlaubt}
                 lohnNettoPdf={berechnung.lohn_netto}
-                showMailFields={istAbschlag}
               />
             </div>
           ) : null}
 
           {step === 3 ? (
             <div>
-              <p className="mb-4 rounded-lg border border-bw-border bg-bw-hover/50 px-3 py-2 text-[13px] text-bw-text-muted">
+              {istAbschlag && abschlagRechnungen.length > 0 ? (
+                <RechnungWizardVersandAuswahlCard
+                  rechnungen={abschlagRechnungen.filter((r) => r.status === 'entwurf')}
+                  versandRechnungId={versandRechnungId}
+                  onVersandRechnungChange={(id) => {
+                    setVersandRechnungId(id)
+                    setRechnungId(id)
+                    const nr = abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer
+                    if (nr?.trim()) setRechnungsnummer(nr.trim())
+                  }}
+                />
+              ) : null}
+              <p className="mb-4 mt-4 rounded-lg border border-bw-border bg-bw-hover/50 px-3 py-2 text-[13px] text-bw-text-muted">
                 Optional: Rechnung ohne E-Mail speichern — der Versand an den Kunden erfolgt gesammelt
                 in der Abschlussdokumentation (Abnahmeprotokoll → Rechnung → Abschluss-PDF).
               </p>
@@ -731,7 +779,14 @@ export function RechnungWizard({
                   mailCc={mailCc}
                   onMailCcChange={setMailCc}
                   disabled={saving}
-                  dokumentLabel="Rechnung"
+                  dokumentLabel={
+                    aktiveVersandRechnung
+                      ? rechnungDokumentBezeichnung(
+                          aktiveVersandRechnung.rechnungArt,
+                          aktiveVersandRechnung.index
+                        )
+                      : 'Rechnung'
+                  }
                 />
               </div>
 
@@ -745,7 +800,7 @@ export function RechnungWizard({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={!rechnungId || saving}
+                    disabled={!previewRechnungId || saving}
                     onClick={() => void handlePdf()}
                   >
                     <Download className="h-4 w-4" />

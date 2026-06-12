@@ -126,6 +126,8 @@ export function buildRechnungHtmlInput(
         : rechnungsdatumDe
 
   const projektTitel = projektTitelAusRechnungDetail(row)
+  const rechnungArt = String((row as { rechnung_art?: string }).rechnung_art ?? 'voll')
+  const abschlagIndex = Number((row as { abschlag_index?: number }).abschlag_index ?? 0) || null
 
   const einleitung = resolveRechnungEinleitung(row.einleitung, anrede)
 
@@ -195,6 +197,9 @@ export function buildRechnungHtmlInput(
       hinweis_13b: Boolean(row.reverse_charge_13b),
     },
     dokument_typ: 'einfach',
+    rechnung_typ:
+      rechnungArt === 'schluss' ? 'schluss' : rechnungArt === 'abschlag' ? 'abschlag' : 'voll',
+    rechnung_abschlag_index: abschlagIndex,
   }
 }
 

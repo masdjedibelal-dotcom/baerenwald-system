@@ -142,3 +142,14 @@ export type RechnungAuswahlZeile = {
   abschlag_index?: number | null
   zahlungsplan_abschlag_id?: string | null
 }
+
+export type AbschlagRechnungEntwurf = {
+  id: string
+  rechnungsnummer: string
+  zeileId: string
+  index: number
+  titel: string
+  rechnungArt: 'abschlag' | 'schluss'
+  brutto: number
+  status: string
+}

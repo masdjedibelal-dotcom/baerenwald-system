@@ -8,14 +8,10 @@ import { ZahlungsplanEditor } from '@/components/rechnungen/ZahlungsplanEditor'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { RechnungWizardMeta, RechnungWizardZahlungsart } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  abschlagBereitsAbgerechnet,
-  abschlagZahlungstextFuerRechnung,
-  berechneZahlungsplan,
   standardRechnungZahlungstext,
-  type RechnungAbschlagLink,
   type Zahlungsplan,
-  type ZahlungsplanZeileBerechnet,
 } from '@/lib/rechnungen/zahlungsplan'
+import type { AngebotPosition } from '@/lib/types'
 
 export function RechnungWizardZahlungCard({
   meta,
@@ -24,9 +20,7 @@ export function RechnungWizardZahlungCard({
   onZahlungsplanChange,
   gesamtNetto,
   zahlungszielTage,
-  rechnungen,
-  aktuelleZeile,
-  rechnungId,
+  positionen,
 }: {
   meta: RechnungWizardMeta
   onMetaChange: (patch: Partial<RechnungWizardMeta>) => void
@@ -34,18 +28,8 @@ export function RechnungWizardZahlungCard({
   onZahlungsplanChange: (plan: Zahlungsplan) => void
   gesamtNetto: number
   zahlungszielTage: number
-  rechnungen: RechnungAbschlagLink[]
-  aktuelleZeile: ZahlungsplanZeileBerechnet | null
-  rechnungId?: string | null
+  positionen: AngebotPosition[]
 }) {
-  function zahlungstextFuerZeile(zeile: ZahlungsplanZeileBerechnet | null): string {
-    if (zeile?.istSchluss) {
-      return standardRechnungZahlungstext(zahlungszielTage)
-    }
-    return abschlagZahlungstextFuerRechnung(zahlungsplan, gesamtNetto, zahlungszielTage, zeile)
-  }
-  const kontext = berechneZahlungsplan(zahlungsplan, gesamtNetto)
-
   function setZahlungsart(art: RechnungWizardZahlungsart) {
     if (art === 'standard') {
       onMetaChange({
@@ -55,53 +39,11 @@ export function RechnungWizardZahlungCard({
       })
       return
     }
-    const zeile =
-      kontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      kontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId)) ??
-      kontext.zeilen[0] ??
-      null
     onMetaChange({
       zahlungsart: 'abschlaege',
-      abschlag_zeile_id: zeile?.id ?? null,
-      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
+      abschlag_zeile_id: null,
     })
   }
-
-  function setAbschlagZeile(zeileId: string) {
-    const zeile = kontext.zeilen.find((z) => z.id === zeileId) ?? null
-    onMetaChange({
-      abschlag_zeile_id: zeileId,
-      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
-    })
-  }
-
-  function onPlanChange(plan: Zahlungsplan) {
-    onZahlungsplanChange(plan)
-    if (meta.zahlungsart !== 'abschlaege') return
-    const nextKontext = berechneZahlungsplan(plan, gesamtNetto)
-    const zeile =
-      nextKontext.zeilen.find((z) => z.id === meta.abschlag_zeile_id) ??
-      nextKontext.zeilen.find((z) => !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId)) ??
-      nextKontext.zeilen[0] ??
-      null
-    onMetaChange({
-      abschlag_zeile_id: zeile?.id ?? null,
-      zahlungsbedingungen: zahlungstextFuerZeile(zeile),
-    })
-  }
-
-  const abschlagOptions = kontext.zeilen
-    .filter(
-      (z) =>
-        !abschlagBereitsAbgerechnet(z.id, rechnungen, rechnungId) ||
-        z.id === meta.abschlag_zeile_id
-    )
-    .map((z) => ({
-      value: z.id,
-      label: z.istSchluss
-        ? `Schlussrechnung — ${z.titel} (${formatEurBetrag(z.brutto)} brutto)`
-        : `Abschlag ${z.index} — ${z.titel} (${formatEurBetrag(z.brutto)} brutto)`,
-    }))
 
   const form = (
     <div className="space-y-4">
@@ -118,54 +60,24 @@ export function RechnungWizardZahlungCard({
       </label>
 
       {meta.zahlungsart === 'abschlaege' ? (
-        <>
-          <p className="text-sm text-bw-text-muted">
-            Alle Leistungen vom Auftrag bleiben auf der Rechnung. Wähle, welcher Abschlag mit dieser
-            Rechnung rausgeht — jeder Abschlag erscheint separat unter Rechnungen (bezahlbar
-            markierbar). Schlussrechnung = normale Rechnung mit allen Positionen.
-          </p>
-          {gesamtNetto > 0 ? (
-            <ZahlungsplanEditor
-              plan={zahlungsplan}
-              onChange={onPlanChange}
-              gesamtNetto={gesamtNetto}
-            />
-          ) : null}
-          <label className="field">
-            <span className="field-l">Dieser Abschlag wird jetzt verschickt</span>
-            <Select
-              value={meta.abschlag_zeile_id ?? ''}
-              onChange={(e) => setAbschlagZeile(e.target.value)}
-              options={
-                abschlagOptions.length
-                  ? abschlagOptions
-                  : [{ value: '', label: 'Kein Abschlag verfügbar' }]
-              }
-            />
-          </label>
-          {aktuelleZeile ? (
-            <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-2 text-sm">
-              <p className="font-medium text-bw-text">
-                {aktuelleZeile.istSchluss
-                  ? `Schlussrechnung — ${aktuelleZeile.titel}`
-                  : `Abschlag ${aktuelleZeile.index} — ${aktuelleZeile.titel}`}
-              </p>
-              <p className="mt-0.5 tabular-nums text-bw-text-muted">
-                Plan: {formatEurBetrag(aktuelleZeile.netto)} netto /{' '}
-                {formatEurBetrag(aktuelleZeile.brutto)} brutto · Auftragssumme{' '}
-                {formatEurBetrag(gesamtNetto)} netto
-              </p>
-            </div>
-          ) : null}
-        </>
+        gesamtNetto > 0 ? (
+          <ZahlungsplanEditor
+            plan={zahlungsplan}
+            onChange={onZahlungsplanChange}
+            gesamtNetto={gesamtNetto}
+            showLeistungsAuswahl
+            positionen={positionen}
+          />
+        ) : null
       ) : null}
 
       <label className="field">
-        <span className="field-l">Zahlungsbedingungen (auf der Rechnung)</span>
+        <span className="field-l">Zahlungsbedingungen / Beschreibung (auf der Rechnung)</span>
         <Textarea
           rows={meta.zahlungsart === 'abschlaege' ? 6 : 2}
           value={meta.zahlungsbedingungen}
           onChange={(e) => onMetaChange({ zahlungsbedingungen: e.target.value })}
+          placeholder="Beschreibung der Leistung und Zahlungsmodalitäten…"
         />
       </label>
     </div>
@@ -177,12 +89,6 @@ export function RechnungWizardZahlungCard({
         label="Zahlungsweise"
         value={meta.zahlungsart === 'abschlaege' ? 'Abschläge' : `Zahlungsziel ${zahlungszielTage} Tage`}
       />
-      {aktuelleZeile && meta.zahlungsart === 'abschlaege' ? (
-        <MobileOverviewField
-          label="Rechnungsbetrag"
-          value={`${formatEurBetrag(aktuelleZeile.brutto)} brutto`}
-        />
-      ) : null}
       <MobileOverviewField
         label="Zahlungsbedingungen"
         value={
@@ -199,6 +105,45 @@ export function RechnungWizardZahlungCard({
       <MobileEditableBlock sheetTitle="Zahlungsbedingungen" overview={overview}>
         {form}
       </MobileEditableBlock>
+    </Card>
+  )
+}
+
+/** Versand-Schritt: Auswahl welche Abschlagsrechnung verschickt wird. */
+export function RechnungWizardVersandAuswahlCard({
+  rechnungen,
+  versandRechnungId,
+  onVersandRechnungChange,
+}: {
+  rechnungen: Array<{
+    id: string
+    rechnungsnummer: string
+    rechnungArt: 'abschlag' | 'schluss'
+    index: number
+    titel: string
+    brutto: number
+  }>
+  versandRechnungId: string | null
+  onVersandRechnungChange: (id: string) => void
+}) {
+  if (!rechnungen.length) return null
+
+  return (
+    <Card title="Rechnung zum Versand">
+      <label className="field">
+        <span className="field-l">Diese Rechnung wird jetzt verschickt</span>
+        <Select
+          value={versandRechnungId ?? ''}
+          onChange={(e) => onVersandRechnungChange(e.target.value)}
+          options={rechnungen.map((r) => ({
+            value: r.id,
+            label:
+              r.rechnungArt === 'schluss'
+                ? `Schlussrechnung — ${r.titel} (${formatEurBetrag(r.brutto)} brutto)`
+                : `Abschlagsrechnung ${r.index} — ${r.titel} (${formatEurBetrag(r.brutto)} brutto)`,
+          }))}
+        />
+      </label>
     </Card>
   )
 }
