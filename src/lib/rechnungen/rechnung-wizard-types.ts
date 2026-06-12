@@ -1,5 +1,5 @@
-import type { RechnungArt } from '@/lib/rechnungen/zahlungsplan'
-import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
+import type { RechnungArt, RechnungAbschlagLink, Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
+import { standardRechnungZahlungstext } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import {
@@ -7,6 +7,8 @@ import {
   defaultRechnungHinweise,
 } from '@/lib/rechnungen/rechnung-texte'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+
+export type RechnungWizardZahlungsart = 'standard' | 'abschlaege'
 
 export type RechnungWizardMeta = {
   einleitung: string
@@ -18,6 +20,12 @@ export type RechnungWizardMeta = {
   leistungszeitraum_von: string
   leistungszeitraum_bis: string
   faellig_am: string
+  /** standard = Zahlungsziel-Text; abschlaege = Abschlagsplan auf der Rechnung */
+  zahlungsart: RechnungWizardZahlungsart
+  /** Textblock „Zahlungsbedingungen“ im PDF */
+  zahlungsbedingungen: string
+  /** Welche Planzeile diese Rechnung abrechnet (bei abschlaege) */
+  abschlag_zeile_id: string | null
 }
 
 export type RechnungWizardAbschlagKontext = {
@@ -62,6 +70,8 @@ export type RechnungWizardBootstrap = {
   abschlag?: RechnungWizardAbschlagKontext | null
   zahlungsplan?: Zahlungsplan | null
   zahlungsplanBearbeiten?: boolean
+  gesamtNetto?: number
+  rechnungenAbschlag?: RechnungAbschlagLink[]
 }
 
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
@@ -105,6 +115,9 @@ export function defaultRechnungWizardMeta(
     leistungszeitraum_von: von,
     leistungszeitraum_bis: bis,
     faellig_am: addDaysYmd(heute, zahlungszielTage),
+    zahlungsart: 'standard',
+    zahlungsbedingungen: standardRechnungZahlungstext(zahlungszielTage),
+    abschlag_zeile_id: null,
   }
 }
 

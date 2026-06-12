@@ -1009,6 +1009,7 @@ export type Rechnung = {
   leistungszeitraum_bis: string | null
   einleitung?: string | null
   hinweise?: string | null
+  zahlungsbedingungen?: string | null
   faellig_am: string | null
   pdf_url: string | null
   rechnungsdatum: string

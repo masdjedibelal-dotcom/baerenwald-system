@@ -224,27 +224,68 @@ export function buildAbschlagPauschalPosition(input: {
 }): AngebotPosition {
   const { zeile, gesamtNetto, auftragsReferenz, projektTitel, bereitsGestelltBrutto } = input
   const artLabel = zeile.istSchluss ? 'Schlussrechnung' : `Abschlag ${zeile.index}`
+  const leistung = `${artLabel} — ${zeile.titel}`
+  const prozentTeil =
+    zeile.typ === 'prozent'
+      ? `${zeile.wert} % von ${formatEur(gesamtNetto)} netto`
+      : `${formatEur(zeile.netto)} netto`
   const beschreibung = zeile.istSchluss
-    ? `${artLabel} — ${zeile.titel} (Rest aus ${projektTitel || auftragsReferenz})`
-    : `${artLabel} — ${zeile.titel} (${zeile.typ === 'prozent' ? `${zeile.wert} %` : formatEur(zeile.netto)} von ${formatEur(gesamtNetto)} netto, ${auftragsReferenz})`
-
-  void bereitsGestelltBrutto
+    ? `${projektTitel || auftragsReferenz}${
+        bereitsGestelltBrutto > 0
+          ? ` · bereits abgerechnet ${formatEur(bereitsGestelltBrutto)} brutto`
+          : ''
+      }`
+    : `${prozentTeil}, ${auftragsReferenz}`
 
   return {
     id: neueZahlungsplanId(),
     gewerk_id: '',
-    gewerk_slug: '__freitext__',
+    gewerk_slug: 'abschlag',
     gewerk_name: 'Abschlag',
-    leistung: 'abschlag',
+    leistung,
     beschreibung,
     menge: 1,
-    einheit: 'psch.',
+    einheit: 'Pauschale',
     lohn_netto: zeile.netto,
     material_netto: 0,
     gesamt_min: zeile.netto,
     gesamt_max: zeile.netto,
     preis_typ: 'fix',
   }
+}
+
+export function standardRechnungZahlungstext(zahlungszielTage: number): string {
+  const tage = Math.max(1, zahlungszielTage)
+  return `Zahlbar innerhalb von ${tage} Tagen nach Rechnungserhalt ohne Abzug.`
+}
+
+export function abschlagZahlungstextFuerRechnung(
+  plan: Zahlungsplan,
+  gesamtNetto: number,
+  aktuelleZeile: ZahlungsplanZeileBerechnet | null,
+  zahlungszielTage: number
+): string {
+  const kontext = berechneZahlungsplan(plan, gesamtNetto)
+  const zeilenText = kontext.zeilen.map((z) => {
+    const label = z.istSchluss ? z.titel : `Abschlag ${z.index} (${z.titel})`
+    if (z.typ === 'prozent') {
+      return `${label}: ${z.wert} % — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+    }
+    if (z.typ === 'rest') {
+      return `${label}: Restbetrag — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+    }
+    return `${label}: ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+  })
+
+  const intro = aktuelleZeile
+    ? aktuelleZeile.istSchluss
+      ? `Mit dieser Rechnung wird die Schlussrechnung in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig. `
+      : `Mit dieser Rechnung wird Abschlag ${aktuelleZeile.index} in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig. `
+    : ''
+
+  const planBlock = `Die Auftragssumme ist in folgende Abschläge zu zahlen:\n${zeilenText.join('\n')}`
+  const zahlungsziel = `\n\n${standardRechnungZahlungstext(zahlungszielTage)}`
+  return intro + planBlock + zahlungsziel
 }
 
 function formatEur(n: number): string {

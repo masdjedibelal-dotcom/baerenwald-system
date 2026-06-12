@@ -175,7 +175,7 @@ export function buildRechnungHtmlInput(
       projektTitel && projektTitel !== 'Rechnung' ? projektTitel : undefined,
     begruessung: angebotPdfBegruessung(anrede, anredeCtx),
     einleitung,
-    zahlungsbedingungen: zahlungstext(firm),
+    zahlungsbedingungen: row.zahlungsbedingungen?.trim() || zahlungstext(firm),
     hinweise: hinweiseParts.length ? hinweiseParts.join('\n\n') : null,
     positionen: mapAngebotPositionenToTemplateRows(positionen, gewerke),
     summen: {
