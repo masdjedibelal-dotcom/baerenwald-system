@@ -50,6 +50,7 @@ export type RechnungEntwurfPayload = {
   faellig_am: string | null
   rechnungsdatum?: string | null
   reverse_charge_13b?: boolean
+  hinweis_35a?: boolean | null
   einleitung?: string | null
   hinweise?: string | null
   mail_einleitung?: string | null
@@ -136,6 +137,7 @@ export async function createRechnungEntwurf(input: {
       rechnung_art: input.rechnung_art ?? 'voll',
       abschlag_index: input.abschlag_index ?? null,
       zahlungsplan_abschlag_id: input.zahlungsplan_abschlag_id ?? null,
+      hinweis_35a: input.hinweis_35a ?? null,
       pdf_url: null,
       erstellt_von: user?.id ?? null,
     },
@@ -181,6 +183,7 @@ export async function updateRechnungEntwurf(
       mail_einleitung: input.mail_einleitung?.trim() || null,
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
+      hinweis_35a: input.hinweis_35a ?? null,
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id

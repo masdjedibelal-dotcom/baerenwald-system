@@ -58,20 +58,17 @@ export function RechnungWizardZahlungCard({
       zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
         zahlungsplan,
         gesamtNetto,
-        zeile,
         zahlungszielTage
       ),
     })
   }
 
   function setAbschlagZeile(zeileId: string) {
-    const zeile = kontext.zeilen.find((z) => z.id === zeileId) ?? null
     onMetaChange({
       abschlag_zeile_id: zeileId,
       zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
         zahlungsplan,
         gesamtNetto,
-        zeile,
         zahlungszielTage
       ),
     })
@@ -88,12 +85,7 @@ export function RechnungWizardZahlungCard({
       null
     onMetaChange({
       abschlag_zeile_id: zeile?.id ?? null,
-      zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
-        plan,
-        gesamtNetto,
-        zeile,
-        zahlungszielTage
-      ),
+      zahlungsbedingungen: abschlagZahlungstextFuerRechnung(plan, gesamtNetto, zahlungszielTage),
     })
   }
 
@@ -126,8 +118,8 @@ export function RechnungWizardZahlungCard({
       {meta.zahlungsart === 'abschlaege' ? (
         <>
           <p className="text-sm text-bw-text-muted">
-            Abschlagsplan für den Auftrag — erscheint auf der Rechnung. Wähle, welchen Abschlag
-            diese Rechnung stellt.
+            Die Leistungspositionen bleiben unverändert. Der Abschlagsplan erscheint unten auf der
+            Rechnung statt des Standard-Zahlungstextes.
           </p>
           {gesamtNetto > 0 ? (
             <ZahlungsplanEditor
@@ -151,11 +143,14 @@ export function RechnungWizardZahlungCard({
           {aktuelleZeile ? (
             <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-2 text-sm">
               <p className="font-medium text-bw-text">
-                Rechnungsbetrag: {formatEurBetrag(aktuelleZeile.netto)} netto /{' '}
-                {formatEurBetrag(aktuelleZeile.brutto)} brutto
+                {aktuelleZeile.istSchluss
+                  ? `Schlussrechnung — ${aktuelleZeile.titel}`
+                  : `Abschlag ${aktuelleZeile.index} — ${aktuelleZeile.titel}`}
               </p>
-              <p className="mt-0.5 text-bw-text-muted">
-                Auftragssumme {formatEurBetrag(gesamtNetto)} netto
+              <p className="mt-0.5 tabular-nums text-bw-text-muted">
+                Plan: {formatEurBetrag(aktuelleZeile.netto)} netto /{' '}
+                {formatEurBetrag(aktuelleZeile.brutto)} brutto · Auftragssumme{' '}
+                {formatEurBetrag(gesamtNetto)} netto
               </p>
             </div>
           ) : null}

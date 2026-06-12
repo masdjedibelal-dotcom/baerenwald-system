@@ -262,7 +262,6 @@ export function standardRechnungZahlungstext(zahlungszielTage: number): string {
 export function abschlagZahlungstextFuerRechnung(
   plan: Zahlungsplan,
   gesamtNetto: number,
-  aktuelleZeile: ZahlungsplanZeileBerechnet | null,
   zahlungszielTage: number
 ): string {
   const kontext = berechneZahlungsplan(plan, gesamtNetto)
@@ -277,15 +276,9 @@ export function abschlagZahlungstextFuerRechnung(
     return `${label}: ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
   })
 
-  const intro = aktuelleZeile
-    ? aktuelleZeile.istSchluss
-      ? `Mit dieser Rechnung wird die Schlussrechnung in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig. `
-      : `Mit dieser Rechnung wird Abschlag ${aktuelleZeile.index} in Höhe von ${formatEur(aktuelleZeile.brutto)} brutto fällig. `
-    : ''
-
   const planBlock = `Die Auftragssumme ist in folgende Abschläge zu zahlen:\n${zeilenText.join('\n')}`
   const zahlungsziel = `\n\n${standardRechnungZahlungstext(zahlungszielTage)}`
-  return intro + planBlock + zahlungsziel
+  return planBlock + zahlungsziel
 }
 
 function formatEur(n: number): string {

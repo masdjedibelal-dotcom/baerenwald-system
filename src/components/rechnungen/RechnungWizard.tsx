@@ -39,24 +39,18 @@ import {
 } from '@/lib/dokument-zeilen'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
+import { kannHinweis35aAngebot } from '@/lib/angebote/angebot-rechtshinweise'
 import {
   berechneRechnung,
   kundeKannReverseCharge13b,
   parseKleinunternehmerSetting,
-  rechnungZeigtHinweis35a,
 } from '@/lib/rechnung-berechnung'
-import {
-  DEFAULT_MWST_SATZ,
-  HINWEIS_KLEINUNTERNEHMER,
-  HINWEIS_REVERSE_CHARGE_13B,
-} from '@/lib/rechnung-config'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { cn } from '@/lib/utils'
 import {
-  berechneBereitsGestellt,
   berechneZahlungsplan,
-  buildAbschlagPauschalPosition,
   naechsteOffeneAbschlagZeile,
   rechnungArtFuerZeile,
   zahlungsplanVorlage50_50,
@@ -145,7 +139,6 @@ export function RechnungWizard({
   const [zahlungsplan, setZahlungsplan] = useState<Zahlungsplan>(
     () => bootstrap.zahlungsplan?.zeilen.length ? bootstrap.zahlungsplan : zahlungsplanVorlage50_50()
   )
-  const [abschlagSave, setAbschlagSave] = useState(() => bootstrap.abschlag ?? null)
   const gesamtNettoBasis =
     bootstrap.gesamtNetto ??
     bootstrap.abschlag?.gesamtNetto ??
@@ -222,11 +215,7 @@ export function RechnungWizard({
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
   )
 
-  const zeigtHinweis35a = rechnungZeigtHinweis35a(
-    kunde?.typ,
-    berechnung.lohn_netto,
-    kleinunternehmer
-  )
+  const hinweis35aErlaubt = kannHinweis35aAngebot(kunde?.typ, firm, berechnung.lohn_netto)
   const zeigt13b = kundeKannReverseCharge13b(kunde?.typ)
 
   const aktuelleAbschlagZeile = useMemo(() => {
@@ -237,40 +226,6 @@ export function RechnungWizard({
       naechsteOffeneAbschlagZeile(zahlungsplan, kontext, rechnungenAbschlag)
     )
   }, [istAbschlag, zahlungsplan, gesamtNettoBasis, meta.abschlag_zeile_id, rechnungenAbschlag])
-
-  useEffect(() => {
-    if (!istAbschlag || gesamtNettoBasis <= 0 || !aktuelleAbschlagZeile) return
-    const bereits = berechneBereitsGestellt(rechnungenAbschlag)
-    const kontext = berechneZahlungsplan(zahlungsplan, gesamtNettoBasis)
-    const pos = buildAbschlagPauschalPosition({
-      zeile: aktuelleAbschlagZeile,
-      gesamtNetto: gesamtNettoBasis,
-      auftragsReferenz: bootstrap.auftragsReferenz,
-      projektTitel: bootstrap.projektTitel ?? '',
-      bereitsGestelltBrutto: bereits.brutto,
-    })
-    setZeilen(angebotPositionenToWizardZeilen([pos], preislisten, gewerke))
-    setAbschlagSave({
-      zeileId: aktuelleAbschlagZeile.id,
-      zeileIndex: aktuelleAbschlagZeile.index,
-      zeileTitel: aktuelleAbschlagZeile.titel,
-      rechnungArt: rechnungArtFuerZeile(aktuelleAbschlagZeile),
-      istSchluss: aktuelleAbschlagZeile.istSchluss,
-      gesamtNetto: gesamtNettoBasis,
-      gesamtBrutto: kontext.gesamtBrutto,
-      bereitsGestelltBrutto: bereits.brutto,
-    })
-  }, [
-    istAbschlag,
-    aktuelleAbschlagZeile,
-    gesamtNettoBasis,
-    zahlungsplan,
-    bootstrap.auftragsReferenz,
-    bootstrap.projektTitel,
-    preislisten,
-    gewerke,
-    rechnungenAbschlag,
-  ])
 
   useEffect(() => {
     setMounted(true)
@@ -305,16 +260,17 @@ export function RechnungWizard({
         positionen: positionenBerechnet,
         meta,
         modus: istAbschlag ? 'abschlag' : modus,
-        abschlag: abschlagSave?.zeileId
-          ? {
-              zeileId: abschlagSave.zeileId,
-              zeileIndex: abschlagSave.zeileIndex,
-              rechnungArt:
-                abschlagSave.rechnungArt === 'schluss'
-                  ? ('schluss' as const)
-                  : ('abschlag' as const),
-            }
-          : null,
+        abschlag:
+          istAbschlag && aktuelleAbschlagZeile
+            ? {
+                zeileId: aktuelleAbschlagZeile.id,
+                zeileIndex: aktuelleAbschlagZeile.index,
+                rechnungArt:
+                  rechnungArtFuerZeile(aktuelleAbschlagZeile) === 'schluss'
+                    ? ('schluss' as const)
+                    : ('abschlag' as const),
+              }
+            : null,
         zahlungsplan: istAbschlag ? zahlungsplan : null,
         zahlungsplanSpeichern: istAbschlag && Boolean(zahlungsplan.zeilen.length),
       })
@@ -348,29 +304,21 @@ export function RechnungWizard({
       draftSnapshot,
       modus,
       istAbschlag,
-      bootstrap.abschlag,
-      abschlagSave,
+      aktuelleAbschlagZeile,
       zahlungsplan,
     ]
   )
 
   async function handleWeiter() {
     if (step === 1) {
-      if (istAbschlag) {
-        if (!aktuelleAbschlagZeile) {
-          toast.error('Bitte einen offenen Abschlag in Schritt 2 wählen.')
-          return
-        }
-        if (gesamtNettoBasis <= 0) {
-          toast.error('Auftragssumme fehlt — zuerst Positionen am Auftrag pflegen.')
-          return
-        }
-      } else {
-        const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-        if (!artikel.length) {
-          toast.error('Bitte mindestens eine Position anlegen.')
-          return
-        }
+      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      if (!artikel.length) {
+        toast.error('Bitte mindestens eine Position anlegen.')
+        return
+      }
+      if (artikel.some((z) => !z.bezeichnung.trim())) {
+        toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
+        return
       }
     }
     if (step === 2 && istAbschlag && !meta.abschlag_zeile_id) {
@@ -468,7 +416,7 @@ export function RechnungWizard({
   const wizardTitel = istAbschlag
     ? aktuelleAbschlagZeile?.istSchluss
       ? 'Schlussrechnung erstellen'
-      : `Abschlag ${aktuelleAbschlagZeile?.index ?? abschlagSave?.zeileIndex ?? ''} erstellen`.trim()
+      : `Abschlag ${aktuelleAbschlagZeile?.index ?? ''} erstellen`.trim()
     : 'Rechnung erstellen'
 
   useEffect(() => {
@@ -643,44 +591,19 @@ export function RechnungWizard({
                   ) : null
                 }
               />
-              {istAbschlag ? (
-                <Card title="Rechnungsbetrag">
-                  <p className="text-sm text-bw-text-muted">
-                    Betrag und Position werden aus dem Abschlagsplan berechnet. Plan und Prozente
-                    legst du in Schritt 2 fest.
-                  </p>
-                  {aktuelleAbschlagZeile ? (
-                    <div className="mt-3 space-y-1 text-sm">
-                      <p className="font-medium text-bw-text">
-                        {aktuelleAbschlagZeile.istSchluss
-                          ? `Schlussrechnung — ${aktuelleAbschlagZeile.titel}`
-                          : `Abschlag ${aktuelleAbschlagZeile.index} — ${aktuelleAbschlagZeile.titel}`}
-                      </p>
-                      <p className="tabular-nums text-bw-text">
-                        {formatEurBetrag(aktuelleAbschlagZeile.netto)} netto ·{' '}
-                        {formatEurBetrag(aktuelleAbschlagZeile.brutto)} brutto
-                      </p>
-                      <p className="text-bw-text-muted">
-                        Auftragssumme {formatEurBetrag(gesamtNettoBasis)} netto
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-amber-800">
-                      In Schritt 2 „Zahlung in Abschlägen“ wählen und Abschlag festlegen.
-                    </p>
-                  )}
-                </Card>
-              ) : (
-                <AngebotWizardPositionenByGewerk
-                  zeilen={zeilen}
-                  onChange={setZeilen}
-                  gewerke={gewerke}
-                  preislisten={preislisten}
-                  firm={firm}
-                  titel="Rechnungspositionen"
-                  untertitel="Positionen aus Auftrag/Angebot — bei Bedarf anpassen."
-                />
-              )}
+              <AngebotWizardPositionenByGewerk
+                zeilen={zeilen}
+                onChange={setZeilen}
+                gewerke={gewerke}
+                preislisten={preislisten}
+                firm={firm}
+                titel="Rechnungspositionen"
+                untertitel={
+                  istAbschlag
+                    ? 'Positionen vom Auftrag — unverändert. Abschlagsplan nur in Schritt 2.'
+                    : 'Positionen aus Auftrag/Angebot — bei Bedarf anpassen.'
+                }
+              />
               <Card title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
@@ -719,20 +642,10 @@ export function RechnungWizard({
                   }))
                 }
                 zeigt13b={zeigt13b}
+                hinweis35aErlaubt={hinweis35aErlaubt}
+                lohnNettoPdf={berechnung.lohn_netto}
                 showMailFields={istAbschlag}
               />
-              <Card title="Rechtliche Hinweise (automatisch)" className="mt-4">
-                <ul className="list-disc space-y-1 pl-5 text-sm text-bw-text-muted">
-                  {kleinunternehmer ? <li>{HINWEIS_KLEINUNTERNEHMER}</li> : null}
-                  {meta.reverse_charge_13b ? <li>{HINWEIS_REVERSE_CHARGE_13B}</li> : null}
-                  {zeigtHinweis35a ? (
-                    <li>
-                      Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG zum ausgewiesenen Lohnkostenanteil
-                      erscheint unten auf der Rechnung.
-                    </li>
-                  ) : null}
-                </ul>
-              </Card>
             </div>
           ) : null}
 

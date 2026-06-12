@@ -51,6 +51,7 @@ const COMPLIANCE_COLUMN_MARKERS = [
   'beleg_typ',
   'bezug_rechnung_id',
   'reverse_charge_13b',
+  'hinweis_35a',
   'mwst_aufschluesselung',
   'generate_beleg_nummer',
   'ust_id',
@@ -61,6 +62,7 @@ const COMPLIANCE_COLUMN_MARKERS = [
   'zahlungsplan_abschlag_id',
   'mail_einleitung',
   'mail_betreff',
+  'zahlungsbedingungen',
 ] as const
 
 /** PostgREST-Schema-Cache: Migration 20260521120000_rechnungen_compliance fehlt. */
@@ -127,12 +129,23 @@ export async function rechnungInsertMitSchemaFallback(
       hinweise,
       mail_einleitung,
       mail_betreff,
+      zahlungsbedingungen,
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
+    if (ohneTexte && zahlungsbedingungen) {
+      const zb = String(zahlungsbedingungen).trim()
+      const prev = String(hinweise ?? (restRow as { hinweise?: string }).hinweise ?? '').trim()
+      if (zb) {
+        base = {
+          ...base,
+          hinweise: prev ? `${prev}\n\n${zb}` : zb,
+        }
+      }
+    }
     if (ohneAbschlag) {
       const {
         mail_einleitung: _m1,
@@ -181,12 +194,23 @@ export async function rechnungUpdateMitSchemaFallback(
       hinweise,
       mail_einleitung,
       mail_betreff,
+      zahlungsbedingungen,
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
+    if (ohneTexte && zahlungsbedingungen) {
+      const zb = String(zahlungsbedingungen).trim()
+      const prev = String(hinweise ?? (restRow as { hinweise?: string }).hinweise ?? '').trim()
+      if (zb) {
+        base = {
+          ...base,
+          hinweise: prev ? `${prev}\n\n${zb}` : zb,
+        }
+      }
+    }
     if (ohneAbschlag) {
       const {
         mail_einleitung: _m1,

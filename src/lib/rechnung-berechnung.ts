@@ -141,6 +141,17 @@ export function rechnungZeigtHinweis35a(
   return kundeZeigt35a(kundeTyp)
 }
 
+/** Gespeicherter Wizard-Wert oder automatische Voreinstellung (ältere Rechnungen ohne Spalte). */
+export function resolveRechnungHinweis35a(
+  stored: boolean | null | undefined,
+  kundeTyp: string | null | undefined,
+  lohnNettoAusgewiesen: number,
+  kleinunternehmer: boolean
+): boolean {
+  if (typeof stored === 'boolean') return stored
+  return rechnungZeigtHinweis35a(kundeTyp, lohnNettoAusgewiesen, kleinunternehmer)
+}
+
 export function formatHinweis35aRechnung(lohnNetto: number): string {
   const betrag = lohnNetto.toLocaleString('de-DE', {
     minimumFractionDigits: 2,

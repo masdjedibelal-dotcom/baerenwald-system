@@ -52,10 +52,19 @@ export function serializeEditorHtml(html: string): string {
   return t
 }
 
+function stripTagAttributes(html: string): string {
+  return html.replace(/<([a-z][a-z0-9]*)\b[^>]*>/gi, (full, tag: string) => {
+    if (!ALLOWED_TAGS.has(tag.toLowerCase())) return full
+    return `<${tag.toLowerCase()}>`
+  })
+}
+
 function stripDisallowedTags(html: string): string {
   if (typeof document === 'undefined') {
-    return html.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (full, tag: string) =>
-      ALLOWED_TAGS.has(tag.toLowerCase()) ? full : ''
+    return stripTagAttributes(
+      html.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (full, tag: string) =>
+        ALLOWED_TAGS.has(tag.toLowerCase()) ? full : ''
+      )
     )
   }
   const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -87,6 +96,19 @@ export function sanitizeRichTextHtml(html: string | null | undefined): string {
     return escapeHtml(raw).replace(/\n/g, '<br>')
   }
   return stripDisallowedTags(raw)
+}
+
+/** Plain-Text (auch mit eingebettetem HTML) → sicheres PDF-HTML mit Absätzen/Zeilenumbrüchen. */
+export function plainTextToPdfHtml(text: string | null | undefined): string {
+  const plain = richTextToPlain(text).trim()
+  if (!plain) return ''
+  const paras = plain.split(/\n\n+/)
+  if (paras.length <= 1) {
+    return escapeHtml(plain).replace(/\n/g, '<br/>')
+  }
+  return paras
+    .map((p) => `<p style="margin:0 0 8px;">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('')
 }
 
 /** Plain oder Rich → sicheres HTML für Angebots-PDF (ohne esc()). */

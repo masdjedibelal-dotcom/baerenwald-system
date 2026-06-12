@@ -2,6 +2,8 @@ import type { RechnungArt, RechnungAbschlagLink, Zahlungsplan } from '@/lib/rech
 import { standardRechnungZahlungstext } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
   defaultRechnungEinleitung,
   defaultRechnungHinweise,
@@ -16,6 +18,8 @@ export type RechnungWizardMeta = {
   mail_einleitung: string
   mail_betreff: string
   reverse_charge_13b: boolean
+  /** § 35a EStG — Lohnkosten-Hinweis neben der Summenaufstellung */
+  hinweis_35a: boolean
   rechnungsdatum: string
   leistungszeitraum_von: string
   leistungszeitraum_bis: string
@@ -96,6 +100,7 @@ export function defaultRechnungWizardMeta(
     leistungszeitraum_bis?: string | null
     projektTitel?: string | null
     kundeTyp?: string | null
+    firm?: FirmenEinstellungen | null
   }
 ): RechnungWizardMeta {
   const heute = opts?.rechnungsdatum ?? new Date().toISOString().slice(0, 10)
@@ -104,6 +109,8 @@ export function defaultRechnungWizardMeta(
   const anrede: AngebotMailAnrede = istPrivatKundeTyp(opts?.kundeTyp) ? 'du' : 'sie'
   const einleitung = defaultRechnungEinleitung(anrede)
   const hinweise = defaultRechnungHinweise()
+  const klein = opts?.firm ? parseKleinunternehmerSetting(opts.firm.kleinunternehmer) : false
+  const hinweis_35a = kundeZeigt35a(opts?.kundeTyp) && !klein
 
   return {
     einleitung,
@@ -111,6 +118,7 @@ export function defaultRechnungWizardMeta(
     mail_einleitung: '',
     mail_betreff: '',
     reverse_charge_13b: false,
+    hinweis_35a,
     rechnungsdatum: heute,
     leistungszeitraum_von: von,
     leistungszeitraum_bis: bis,

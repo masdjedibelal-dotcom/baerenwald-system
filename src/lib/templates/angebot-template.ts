@@ -17,7 +17,12 @@ import { mapAngebotPositionenToTemplateRows } from '@/lib/angebote/angebot-proje
 import type { AngebotProjektPdfBlock } from '@/lib/angebote/angebot-projekt-pdf-blocks'
 import type { AngebotPosition } from '@/lib/types'
 import { RECHNUNG_SCHLUSS_STANDARD } from '@/lib/rechnungen/rechnung-texte'
-import { looksLikeHtml, richTextToPlain, richTextToSafePdfHtml } from '@/lib/rich-text'
+import {
+  looksLikeHtml,
+  plainTextToPdfHtml,
+  richTextToPlain,
+  richTextToSafePdfHtml,
+} from '@/lib/rich-text'
 import { kiVisualisierungPdfHtml } from '@/lib/visualize/pdf-html'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
 
@@ -992,7 +997,7 @@ function buildAngebotProjektHtml(
   ${gesamtSumme}
   ${abschlussKostenRecht}
 
-  <p class="avoid-fuss-overlap" style="margin-top:16px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${esc(props.zahlungsbedingungen)}</p>
+  <div class="avoid-fuss-overlap" style="margin-top:16px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${plainTextToPdfHtml(props.zahlungsbedingungen)}</div>
   ${bankverbindungHtml(props, props.angebotsnr)}
   ${hinweise}
   ${ende}
@@ -1071,7 +1076,7 @@ export function buildAngebotHtml(
   ${fotosBlock}
   ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise)}
   ${variantBlock}
-  <p style="margin-top:18px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${esc(props.zahlungsbedingungen)}</p>
+  <div style="margin-top:18px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${plainTextToPdfHtml(props.zahlungsbedingungen)}</div>
   ${istRechnung ? bankBlock : ''}
   ${hinweisBlock}
   ${schlussBlock}

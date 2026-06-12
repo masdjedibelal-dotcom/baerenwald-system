@@ -34,7 +34,6 @@ import {
   auftragSummenAusPositionen,
   berechneBereitsGestellt,
   berechneZahlungsplan,
-  buildAbschlagPauschalPosition,
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
@@ -183,7 +182,8 @@ function abschlagMetaDefaults(
   plan: Zahlungsplan,
   bereitsGestelltBrutto: number,
   zahlungszielTage: number,
-  kundeTyp?: string | null,
+  kundeTyp: string | null | undefined,
+  firm: import('@/lib/einstellungen-keys').FirmenEinstellungen,
   rechnungsnummerPlaceholder?: string | null
 ): RechnungWizardMeta {
   const base = defaultRechnungWizardMeta(zahlungszielTage, {
@@ -191,6 +191,7 @@ function abschlagMetaDefaults(
     leistungszeitraum_bis: basis.leistungszeitraum_bis,
     projektTitel: basis.projektTitel,
     kundeTyp,
+    firm,
   })
   const anrede = resolveAnredeKey(mailAnredeFromKundeTyp(kundeTyp))
   const ctx = abschlagTextKontextFromWizard({
@@ -209,7 +210,6 @@ function abschlagMetaDefaults(
   return {
     ...base,
     einleitung: pdfVorlage || defaultAbschlagPdfEinleitung(ctx),
-    hinweise: '',
     mail_einleitung: mailVorlage || defaultAbschlagMailEinleitung(ctx),
     mail_betreff:
       betreffVorlage ||
@@ -219,7 +219,6 @@ function abschlagMetaDefaults(
     zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
       plan,
       basis.gesamtNetto,
-      zeile,
       zahlungszielTage
     ),
   }
@@ -257,6 +256,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           leistungszeitraum_bis: basis.leistungszeitraum_bis,
           projektTitel: basis.projektTitel,
           kundeTyp: kunde?.typ,
+          firm,
         }),
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
@@ -300,6 +300,7 @@ export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
         leistungszeitraum_bis: basis.leistungszeitraum_bis,
         projektTitel: basis.projektTitel,
         kundeTyp: kunde?.typ,
+        firm,
       })
       return {
         ok: true,
@@ -318,7 +319,6 @@ export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
             zahlungsbedingungen: abschlagZahlungstextFuerRechnung(
               planResolved,
               basis.gesamtNetto,
-              erste,
               zt
             ),
           },
@@ -340,13 +340,6 @@ export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
     }
 
     const bereits = berechneBereitsGestellt(rechnungen)
-    const abschlagPosition = buildAbschlagPauschalPosition({
-      zeile: naechste,
-      gesamtNetto: basis.gesamtNetto,
-      auftragsReferenz: basis.auftragsReferenz,
-      projektTitel: basis.projektTitel ?? '',
-      bereitsGestelltBrutto: bereits.brutto,
-    })
 
     const metaPartial = abschlagMetaDefaults(
       basis,
@@ -354,7 +347,8 @@ export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
       plan,
       bereits.brutto,
       zt,
-      kunde?.typ
+      kunde?.typ,
+      firm
     )
     const heute = new Date().toISOString().slice(0, 10)
     const meta: RechnungWizardMeta = {
@@ -372,7 +366,7 @@ export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
         angebotId: basis.angebot_id,
         kundeId: basis.kunde_id,
         kunde: kunde ?? null,
-        positionen: [abschlagPosition],
+        positionen: basis.positionen,
         meta,
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
@@ -465,6 +459,7 @@ export async function loadRechnungWizardBootstrap(
     leistungszeitraum_von: basis.leistungszeitraum_von,
     leistungszeitraum_bis: basis.leistungszeitraum_bis,
     kundeTyp: (kunde as { typ?: string } | null)?.typ,
+    firm,
   })
 
   const rechnungArt = String(rec.rechnung_art ?? 'voll')
@@ -477,6 +472,8 @@ export async function loadRechnungWizardBootstrap(
     mail_einleitung: String(rec.mail_einleitung ?? '').trim() || metaDefaults.mail_einleitung,
     mail_betreff: String(rec.mail_betreff ?? '').trim() || metaDefaults.mail_betreff,
     reverse_charge_13b: Boolean(rec.reverse_charge_13b),
+    hinweis_35a:
+      typeof rec.hinweis_35a === 'boolean' ? rec.hinweis_35a : metaDefaults.hinweis_35a,
     rechnungsdatum: String(rec.rechnungsdatum ?? new Date().toISOString().slice(0, 10)),
     leistungszeitraum_von: String(rec.leistungszeitraum_von ?? basis.leistungszeitraum_von ?? ''),
     leistungszeitraum_bis: String(rec.leistungszeitraum_bis ?? basis.leistungszeitraum_bis ?? ''),
@@ -548,6 +545,7 @@ export async function saveRechnungWizardDraft(
     faellig_am: input.meta.faellig_am || null,
     rechnungsdatum: input.meta.rechnungsdatum || null,
     reverse_charge_13b: input.meta.reverse_charge_13b,
+    hinweis_35a: input.meta.hinweis_35a,
     einleitung: input.meta.einleitung || null,
     hinweise: input.meta.hinweise || null,
     mail_einleitung: input.meta.mail_einleitung || null,

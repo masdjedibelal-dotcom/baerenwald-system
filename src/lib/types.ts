@@ -996,6 +996,7 @@ export type Rechnung = {
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
   reverse_charge_13b?: boolean
+  hinweis_35a?: boolean | null
   mwst_aufschluesselung?: MwstAufschluesselungJson[] | null
   status: RechnungStatus
   positionen: RechnungPosition[]

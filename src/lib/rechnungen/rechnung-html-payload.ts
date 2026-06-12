@@ -24,7 +24,7 @@ import {
 import {
   berechneRechnung,
   parseKleinunternehmerSetting,
-  rechnungZeigtHinweis35a,
+  resolveRechnungHinweis35a,
 } from '@/lib/rechnung-berechnung'
 import {
   DEFAULT_MWST_SATZ,
@@ -135,7 +135,8 @@ export function buildRechnungHtmlInput(
   if (kleinunternehmer) hinweiseParts.push(HINWEIS_KLEINUNTERNEHMER)
   if (row.reverse_charge_13b) hinweiseParts.push(HINWEIS_REVERSE_CHARGE_13B)
 
-  const hinweis35a = rechnungZeigtHinweis35a(
+  const hinweis35a = resolveRechnungHinweis35a(
+    row.hinweis_35a,
     row.kunden.typ,
     berechnung.lohn_netto,
     kleinunternehmer
