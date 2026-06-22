@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Bärenwald CRM — UI-Dokumentation</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    :root {
+      --text: #1a1a1a;
+      --muted: #666;
+      --border: #ddd;
+      --green: #2d5016;
+      --bg: #fafafa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      line-height: 1.45;
+      margin: 0;
+      background: white;
+    }
+    .cover {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px;
+      page-break-after: always;
+      background: linear-gradient(160deg, #f4f7f0 0%, #fff 55%);
+    }
+    .cover h1 { font-size: 2rem; color: var(--green); margin: 0 0 8px; }
+    .cover p { color: var(--muted); margin: 4px 0; }
+    .cover .stats { margin-top: 24px; font-size: 0.95rem; }
+    nav.toc {
+      padding: 32px 40px;
+      page-break-after: always;
+    }
+    nav.toc h2 { margin-top: 0; color: var(--green); }
+    nav.toc ul { columns: 2; gap: 24px; padding-left: 20px; }
+    nav.toc a { color: var(--green); text-decoration: none; }
+    .muted { color: var(--muted); }
+    section.category { padding: 24px 32px 8px; page-break-before: always; }
+    section.category h2 {
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--green);
+      color: var(--green);
+    }
+    .grid { display: grid; gap: 20px; }
+    .shot {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--bg);
+      page-break-inside: avoid;
+    }
+    .shot-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+    .shot h3 { margin: 0; font-size: 0.95rem; }
+    .meta { margin: 4px 0 0; font-size: 0.78rem; color: var(--muted); }
+    .meta code { font-size: 0.75rem; }
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .badge.desktop { background: #eef2ff; color: #3730a3; }
+    .badge.mobile { background: #ecfdf5; color: #047857; }
+    .shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: white;
+    }
+    .missing { padding: 16px; color: #b91c1c; }
+    section.failed ul { font-size: 0.85rem; color: #7f1d1d; }
+    @media print {
+      section.category { padding: 0 0 12px; }
+      .shot { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <p>Bärenwald CRM Dashboard</p>
+    <h1>UI-Dokumentation</h1>
+    <p>Automatisch erzeugte Screenshots aller konfigurierten Ansichten</p>
+    <p>Basis-URL: <code>http://127.0.0.1:3001</code></p>
+    <p>Erstellt: 7.6.2026, 23:42:32</p>
+    <div class="stats">
+      <p><strong>144</strong> Screenshots erfolgreich</p>
+      <p><strong>14</strong> Kategorien · Desktop &amp; Mobile</p>
+      <p><strong>5</strong> fehlgeschlagen (siehe Anhang)</p>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <h2>Inhalt</h2>
+    <ul><li><a href="#cat-auth">Auth</a> <span class="muted">(2)</span></li>
+<li><a href="#cat-einstellungen">Einstellungen</a> <span class="muted">(27)</span></li>
+<li><a href="#cat-formulare">Formulare</a> <span class="muted">(4)</span></li>
+<li><a href="#cat-formulare-detail">Formulare — Detail</a> <span class="muted">(2)</span></li>
+<li><a href="#cat-mobile-sheets-auftrag">Mobile Sheets — Auftrag</a> <span class="muted">(1)</span></li>
+<li><a href="#cat-mobile-sheets-listen">Mobile Sheets — Listen</a> <span class="muted">(1)</span></li>
+<li><a href="#cat-pipeline">Pipeline</a> <span class="muted">(12)</span></li>
+<li><a href="#cat-pipeline-detail">Pipeline — Detail</a> <span class="muted">(52)</span></li>
+<li><a href="#cat-planung">Planung</a> <span class="muted">(2)</span></li>
+<li><a href="#cat-stammdaten">Stammdaten</a> <span class="muted">(8)</span></li>
+<li><a href="#cat-stammdaten-detail">Stammdaten — Detail</a> <span class="muted">(17)</span></li>
+<li><a href="#cat--bersicht">Übersicht</a> <span class="muted">(2)</span></li>
+<li><a href="#cat-wizard-angebot">Wizard — Angebot</a> <span class="muted">(12)</span></li>
+<li><a href="#cat-wizard-rechnung">Wizard — Rechnung</a> <span class="muted">(2)</span></li></ul>
+  </nav>
+
+  
+    <section id="cat-auth" class="category">
+      <h2>Auth</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Login</h3>
+              <p class="meta">Desktop (1440×900) · <code>/login</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/login.png" alt="Login" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Login</h3>
+              <p class="meta">Mobile (390×844) · <code>/login</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/login.png" alt="Login" />
+        </article></div>
+    </section>
+
+    <section id="cat-einstellungen" class="category">
+      <h2>Einstellungen</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Einstellungen — Übersicht</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen.png" alt="Einstellungen — Übersicht" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Firmeneinstellungen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/firma</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-firma.png" alt="Firmeneinstellungen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Profil</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/profil</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-profil.png" alt="Profil" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Benutzer</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/benutzer</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-benutzer.png" alt="Benutzer" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Preise</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/preise</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-preise.png" alt="Preise" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Preisliste bearbeiten</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/preisliste</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-preisliste.png" alt="Preisliste bearbeiten" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Vorlagen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/vorlagen</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-vorlagen.png" alt="Vorlagen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Vorlage</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/vorlagen/neu</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-vorlagen-neu.png" alt="Neue Vorlage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>E-Mail</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/email</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-email.png" alt="E-Mail" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kommunikation</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/kommunikation</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-kommunikation.png" alt="Kommunikation" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formular-Einstellungen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/formulare</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-formulare.png" alt="Formular-Einstellungen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Felder</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/felder</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-felder.png" alt="Felder" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Compliance</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/compliance</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-compliance.png" alt="Compliance" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Datenschutz</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/datenschutz</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-datenschutz.png" alt="Datenschutz" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Integration</h3>
+              <p class="meta">Desktop (1440×900) · <code>/einstellungen/integration</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/einstellungen-integration.png" alt="Integration" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Firmeneinstellungen</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/firma</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-firma.png" alt="Firmeneinstellungen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Profil</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/profil</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-profil.png" alt="Profil" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Benutzer</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/benutzer</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-benutzer.png" alt="Benutzer" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Gewerke</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/gewerke</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-gewerke.png" alt="Gewerke" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Preise</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/preise</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-preise.png" alt="Preise" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Vorlage</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/vorlagen/neu</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-vorlagen-neu.png" alt="Neue Vorlage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>E-Mail</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/email</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-email.png" alt="E-Mail" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kommunikation</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/kommunikation</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-kommunikation.png" alt="Kommunikation" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formular-Einstellungen</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/formulare</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-formulare.png" alt="Formular-Einstellungen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Compliance</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/compliance</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-compliance.png" alt="Compliance" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Datenschutz</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/datenschutz</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-datenschutz.png" alt="Datenschutz" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Integration</h3>
+              <p class="meta">Mobile (390×844) · <code>/einstellungen/integration</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/einstellungen-integration.png" alt="Integration" />
+        </article></div>
+    </section>
+
+    <section id="cat-formulare" class="category">
+      <h2>Formulare</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formulare — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/formulare</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/formulare.png" alt="Formulare — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neues Formular</h3>
+              <p class="meta">Desktop (1440×900) · <code>/formulare/neu</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/formulare-neu.png" alt="Neues Formular" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formulare — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/formulare</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/formulare.png" alt="Formulare — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neues Formular</h3>
+              <p class="meta">Mobile (390×844) · <code>/formulare/neu</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/formulare-neu.png" alt="Neues Formular" />
+        </article></div>
+    </section>
+
+    <section id="cat-formulare-detail" class="category">
+      <h2>Formulare — Detail</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formular — Bearbeiten</h3>
+              <p class="meta">Desktop (1440×900) · <code>/formulare/dc465c8a-d088-4b06-acef-cbcaf4c2ec26/bearbeiten</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/formulare-dc465c8a-d088-4b06-acef-cbcaf4c2ec26-bearbeiten.png" alt="Formular — Bearbeiten" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Formular — Bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/formulare/dc465c8a-d088-4b06-acef-cbcaf4c2ec26/bearbeiten</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/formulare-dc465c8a-d088-4b06-acef-cbcaf4c2ec26-bearbeiten.png" alt="Formular — Bearbeiten" />
+        </article></div>
+    </section>
+
+    <section id="cat-mobile-sheets-auftrag" class="category">
+      <h2>Mobile Sheets — Auftrag</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Leistung — Sheet — Gewerk bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--sheet-gewerk-bearbeiten.png" alt="Auftrag — Leistung" />
+        </article></div>
+    </section>
+
+    <section id="cat-mobile-sheets-listen" class="category">
+      <h2>Mobile Sheets — Listen</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfragen — Filter — Sheet — Filter</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen--sheet-filter.png" alt="Anfragen — Filter" />
+        </article></div>
+    </section>
+
+    <section id="cat-pipeline" class="category">
+      <h2>Pipeline</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfragen — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen.png" alt="Anfragen — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Anfrage</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen/neu</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen-neu.png" alt="Neue Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebote — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote.png" alt="Angebote — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Aufträge — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege.png" alt="Aufträge — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnungen — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen.png" alt="Rechnungen — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Rechnung</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen/neu</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen-neu.png" alt="Neue Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfragen — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen.png" alt="Anfragen — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Anfrage</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/neu</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-neu.png" alt="Neue Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebote — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote.png" alt="Angebote — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Aufträge — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege.png" alt="Aufträge — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnungen — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen.png" alt="Rechnungen — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Neue Rechnung</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/neu</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-neu.png" alt="Neue Rechnung" />
+        </article></div>
+    </section>
+
+    <section id="cat-pipeline-detail" class="category">
+      <h2>Pipeline — Detail</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Verlauf1“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--verlauf1.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Notizen“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--notizen.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Dokumente“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--dokumente.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Positionen10“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--positionen10.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Verlauf5“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--verlauf5.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Dokumente1“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--dokumente1.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Verlauf8“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--verlauf8.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Dokumente1“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--dokumente1.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Finanzen“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--finanzen.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Verlauf8“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--verlauf8.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Dokumente1“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--dokumente1.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Finanzen“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--finanzen.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Positionen3“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--positionen3.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Aktivität“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--aktivita-t.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Dokumente“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--dokumente.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Finanzen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/finanzen</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-finanzen.png" alt="Auftrag — Finanzen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Abnahme</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/abnahme</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-abnahme.png" alt="Auftrag — Abnahme" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Abschluss</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/abschluss</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-abschluss.png" alt="Auftrag — Abschluss" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Rechnungen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/rechnungen-auswahl</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-rechnungen-auswahl.png" alt="Auftrag — Rechnungen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Projekt“</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--projekt.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Nächste Schritte6“</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--na-chste-schritte6.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Verlauf1“</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--verlauf1.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Notizen“</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--notizen.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Anfrage — Tab „Dokumente“</h3>
+              <p class="meta">Mobile (390×844) · <code>/anfragen/5725fe5f-bde6-4a5d-a4a4-1a67682011f2</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/anfragen-5725fe5f-bde6-4a5d-a4a4-1a67682011f2--dokumente.png" alt="Anfrage" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Leistungsübersicht10“</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--leistungsu-bersicht10.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Nächste Schritte4“</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--na-chste-schritte4.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Verlauf7“</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--verlauf7.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot — Tab „Dokumente1“</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--dokumente1.png" alt="Angebot" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Leistungsübersicht“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--leistungsu-bersicht.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Nächste Schritte3“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--na-chste-schritte3.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Verlauf8“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--verlauf8.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Dokumente1“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--dokumente1.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Finanzen“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--finanzen.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Verlauf8“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--verlauf8.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Dokumente1“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--dokumente1.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Tab „Finanzen“</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6--finanzen.png" alt="Auftrag" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Leistungsübersicht3“</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--leistungsu-bersicht3.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Nächste Schritte“</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--na-chste-schritte.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Aktivität“</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--aktivita-t.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung — Tab „Dokumente“</h3>
+              <p class="meta">Mobile (390×844) · <code>/rechnungen/419abcf5-b026-4cae-b10c-29a81a36ea40</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/rechnungen-419abcf5-b026-4cae-b10c-29a81a36ea40--dokumente.png" alt="Rechnung" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Finanzen</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/finanzen</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-finanzen.png" alt="Auftrag — Finanzen" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Abnahme</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/abnahme</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-abnahme.png" alt="Auftrag — Abnahme" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Abschluss</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/abschluss</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-abschluss.png" alt="Auftrag — Abschluss" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Auftrag — Rechnungen</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/rechnungen-auswahl</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-rechnungen-auswahl.png" alt="Auftrag — Rechnungen" />
+        </article></div>
+    </section>
+
+    <section id="cat-planung" class="category">
+      <h2>Planung</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kalender</h3>
+              <p class="meta">Desktop (1440×900) · <code>/kalender</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/kalender.png" alt="Kalender" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kalender</h3>
+              <p class="meta">Mobile (390×844) · <code>/kalender</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kalender.png" alt="Kalender" />
+        </article></div>
+    </section>
+
+    <section id="cat-stammdaten" class="category">
+      <h2>Stammdaten</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunden — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/kunden</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/kunden.png" alt="Kunden — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/handwerker</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/handwerker.png" alt="Handwerker — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Partner — Liste</h3>
+              <p class="meta">Desktop (1440×900) · <code>/partner</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/partner.png" alt="Partner — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Preislisten</h3>
+              <p class="meta">Desktop (1440×900) · <code>/preislisten</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/preislisten.png" alt="Preislisten" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunden — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/kunden</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kunden.png" alt="Kunden — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/handwerker</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/handwerker.png" alt="Handwerker — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Partner — Liste</h3>
+              <p class="meta">Mobile (390×844) · <code>/partner</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/partner.png" alt="Partner — Liste" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Preislisten</h3>
+              <p class="meta">Mobile (390×844) · <code>/preislisten</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/preislisten.png" alt="Preislisten" />
+        </article></div>
+    </section>
+
+    <section id="cat-stammdaten-detail" class="category">
+      <h2>Stammdaten — Detail</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde</h3>
+              <p class="meta">Desktop (1440×900) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde — Tab „Aktivität“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17--aktivita-t.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde — Tab „Dokumente“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17--dokumente.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker</h3>
+              <p class="meta">Desktop (1440×900) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Aufträge“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--auftra-ge.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Notizen“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--notizen.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Compliance“</h3>
+              <p class="meta">Desktop (1440×900) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--compliance.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Partner</h3>
+              <p class="meta">Desktop (1440×900) · <code>/partner/cbac20b2-ff93-4466-ab33-330914db89dc</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/partner-cbac20b2-ff93-4466-ab33-330914db89dc.png" alt="Partner" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde</h3>
+              <p class="meta">Mobile (390×844) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde — Tab „Vorgänge“</h3>
+              <p class="meta">Mobile (390×844) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17--vorga-nge.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde — Tab „Aktivität“</h3>
+              <p class="meta">Mobile (390×844) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17--aktivita-t.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Kunde — Tab „Dokumente“</h3>
+              <p class="meta">Mobile (390×844) · <code>/kunden/4a6e75a5-cb5a-49b4-b09d-97f4785fea17</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/kunden-4a6e75a5-cb5a-49b4-b09d-97f4785fea17--dokumente.png" alt="Kunde" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker</h3>
+              <p class="meta">Mobile (390×844) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Aufträge“</h3>
+              <p class="meta">Mobile (390×844) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--auftra-ge.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Notizen“</h3>
+              <p class="meta">Mobile (390×844) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--notizen.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Handwerker — Tab „Compliance“</h3>
+              <p class="meta">Mobile (390×844) · <code>/handwerker/a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/handwerker-a15af90e-b5bf-4b2c-bbd6-bcf01c42d8c5--compliance.png" alt="Handwerker" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Partner</h3>
+              <p class="meta">Mobile (390×844) · <code>/partner/cbac20b2-ff93-4466-ab33-330914db89dc</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/partner-cbac20b2-ff93-4466-ab33-330914db89dc.png" alt="Partner" />
+        </article></div>
+    </section>
+
+    <section id="cat--bersicht" class="category">
+      <h2>Übersicht</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Dashboard</h3>
+              <p class="meta">Desktop (1440×900) · <code>/</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/dashboard.png" alt="Dashboard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Dashboard</h3>
+              <p class="meta">Mobile (390×844) · <code>/</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/dashboard.png" alt="Dashboard" />
+        </article></div>
+    </section>
+
+    <section id="cat-wizard-angebot" class="category">
+      <h2>Wizard — Angebot</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 1 — Leistungen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-1-leistungen.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 2 — Finalisieren</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-2-finalisieren.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 3 — Handwerker</h3>
+              <p class="meta">Desktop (1440×900) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-3-handwerker.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 1 — Leistungen</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-1-leistungen.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Position bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-position-bearbeiten.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-bearbeiten.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Gewerk bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-gewerk-bearbeiten.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 2 — Finalisieren</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-2-finalisieren.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-bearbeiten.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Text bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-text-bearbeiten.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Schritt 3 — Handwerker</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--schritt-3-handwerker.png" alt="Angebot-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Angebot-Wizard — Sheet — Zuweisung bearbeiten</h3>
+              <p class="meta">Mobile (390×844) · <code>/angebote/1f54acc4-05ff-4fbb-97a0-9813b06e1204</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/angebote-1f54acc4-05ff-4fbb-97a0-9813b06e1204--sheet-zuweisung-bearbeiten.png" alt="Angebot-Wizard" />
+        </article></div>
+    </section>
+
+    <section id="cat-wizard-rechnung" class="category">
+      <h2>Wizard — Rechnung</h2>
+      <div class="grid">
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung-Wizard — Schritt 1 — Leistungen</h3>
+              <p class="meta">Desktop (1440×900) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/rechnungen-auswahl</code></p>
+            </div>
+            <span class="badge desktop">desktop</span>
+          </header>
+          <img src="screenshots/desktop/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-rechnungen-auswahl--schritt-1-leistungen.png" alt="Rechnung-Wizard" />
+        </article>
+
+        <article class="shot">
+          <header class="shot-head">
+            <div>
+              <h3>Rechnung-Wizard — Schritt 1 — Leistungen</h3>
+              <p class="meta">Mobile (390×844) · <code>/auftraege/eccad417-0c73-42cb-85ab-6b1579e0b0e6/rechnungen-auswahl</code></p>
+            </div>
+            <span class="badge mobile">mobile</span>
+          </header>
+          <img src="screenshots/mobile/auftraege-eccad417-0c73-42cb-85ab-6b1579e0b0e6-rechnungen-auswahl--schritt-1-leistungen.png" alt="Rechnung-Wizard" />
+        </article></div>
+    </section>
+  
+    <section class="category failed">
+      <h2>Fehlgeschlagene Aufnahmen (5)</h2>
+      <ul><li><code>/einstellungen/gewerke</code> (desktop) — Execution context was destroyed, most likely because of a navigation.</li><li><code>/einstellungen</code> (mobile) — Execution context was destroyed, most likely because of a navigation.</li><li><code>/einstellungen/preisliste</code> (mobile) — Execution context was destroyed, most likely because of a navigation.</li><li><code>/einstellungen/vorlagen</code> (mobile) — Execution context was destroyed, most likely because of a navigation.</li><li><code>/einstellungen/felder</code> (mobile) — Execution context was destroyed, most likely because of a navigation.</li></ul>
+    </section>
+</body>
+</html>
