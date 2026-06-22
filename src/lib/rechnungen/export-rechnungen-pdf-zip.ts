@@ -1,9 +1,11 @@
+import 'server-only'
+
 import { PassThrough } from 'stream'
-import archiver from 'archiver'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildRechnungPdfBuffer } from '@/lib/rechnungen/persist-pdf'
+import { RECHNUNGEN_PDF_ZIP_MAX } from '@/lib/rechnungen/export-constants'
 
-export const RECHNUNGEN_PDF_ZIP_MAX = 500
+export { RECHNUNGEN_PDF_ZIP_MAX } from '@/lib/rechnungen/export-constants'
 
 type RechnungExportRow = {
   id: string
@@ -37,7 +39,18 @@ async function loadRechnungPdfBuffer(
   return { ok: true, buffer: built.buffer }
 }
 
+type ArchiverFactory = (
+  format: 'zip',
+  options?: { zlib?: { level?: number } }
+) => {
+  pipe: (dest: NodeJS.WritableStream) => void
+  append: (source: Buffer, data: { name: string }) => void
+  finalize: () => Promise<void>
+  on: (event: 'error', cb: (err: Error) => void) => void
+}
+
 async function zipBuffers(files: { name: string; buffer: Buffer }[]): Promise<Buffer> {
+  const archiver = (await import('archiver')) as unknown as ArchiverFactory
   return new Promise((resolve, reject) => {
     const archive = archiver('zip', { zlib: { level: 6 } })
     const stream = new PassThrough()

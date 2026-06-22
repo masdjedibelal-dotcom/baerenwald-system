@@ -23,6 +23,7 @@ import {
 } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
+import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
   CompliancePoolItem,
@@ -630,12 +631,6 @@ export async function listVertraegeFuerAuftrag(auftragId: string): Promise<Handw
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
   return (data ?? []) as HandwerkerVertragRow[]
-}
-
-export function istHauptvertragFuerNachtrag(v: HandwerkerVertragRow): boolean {
-  if (v.typ !== 'projekt') return false
-  if (v.dokument_art === 'ergaenzung' || v.parent_vertrag_id) return false
-  return v.status === 'pdf_erzeugt' || v.status === 'unterschrieben'
 }
 
 export async function listHauptvertraegeFuerNachtrag(

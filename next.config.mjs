@@ -18,12 +18,12 @@ const nextConfig = {
       '@': path.join(__dirname, 'src'),
     }
     if (isServer) {
-      config.externals = [...(config.externals || []), 'puppeteer-core', '@puppeteer/browsers']
+      config.externals = [...(config.externals || []), 'puppeteer-core', '@puppeteer/browsers', 'archiver']
     }
     return config
   },
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@puppeteer/browsers', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@puppeteer/browsers', '@sparticuz/chromium', 'archiver'],
     /** Sparticuz-Binaries für Angebot-PDF auf Netlify/Lambda mit deployen */
     outputFileTracingIncludes: {
       '/**': [

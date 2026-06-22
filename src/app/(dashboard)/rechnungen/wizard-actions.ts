@@ -245,29 +245,6 @@ function revalidateAuftragPfad(auftragId: string | null | undefined) {
   if (auftragId?.trim()) revalidatePath(`/auftraege/${auftragId.trim()}`)
 }
 
-/** Direktrechnung ohne Auftrag — leerer Bootstrap (Kunde in Schritt 1 wählen). */
-export function buildStandaloneRechnungWizardBootstrap(
-  firm: import('@/lib/einstellungen-keys').FirmenEinstellungen
-): RechnungWizardBootstrap {
-  const zt = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || defaultZahlungszielTage())
-  return {
-    rechnungId: null,
-    rechnungsnummer: null,
-    auftragId: null,
-    angebotId: null,
-    kundeId: '',
-    kunde: null,
-    positionen: [],
-    meta: defaultRechnungWizardMeta(zt, { firm }),
-    auftragsReferenz: '',
-    projektTitel: null,
-    modus: 'voll',
-    standalone: true,
-    zahlungsplan: null,
-    gesamtNetto: 0,
-  }
-}
-
 export async function loadRechnungWizardKunde(
   kundeId: string
 ): Promise<

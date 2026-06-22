@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
-import { buildStandaloneRechnungWizardBootstrap } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { buildStandaloneRechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-bootstrap-helpers'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultZahlungszielTage } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { Gewerk, Preisliste } from '@/lib/types'

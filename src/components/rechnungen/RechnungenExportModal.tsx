@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/app-toast'
 import type { ExportField } from '@/hooks/useExport'
 import { getZeitraumRange, type ZeitraumPreset } from '@/lib/listZeitraum'
-import { RECHNUNGEN_PDF_ZIP_MAX } from '@/lib/rechnungen/export-rechnungen-pdf-zip'
+import { RECHNUNGEN_PDF_ZIP_MAX } from '@/lib/rechnungen/export-constants'
 
 type ExportMode = 'csv' | 'pdf_zip'
 
