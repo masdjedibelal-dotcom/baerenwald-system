@@ -17,6 +17,7 @@ import {
   rechnungZeigtHinweis35a,
   positionNettoZeile,
 } from '@/lib/rechnung-berechnung'
+import { summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
   HINWEIS_KLEINUNTERNEHMER,
   HINWEIS_REVERSE_CHARGE_13B,
@@ -159,7 +160,10 @@ export function RechnungPdfDocument({
   const adr = [firm.strasse, [firm.plz, firm.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
   const ustFirma = firm.ust_id?.trim() || firm.steuernummer?.trim() || ''
   const titel = beleg_typ === 'gutschrift' ? 'GUTSCHRIFT' : 'RECHNUNG'
-  const lohnAnzeige = berechnung.lohn_netto
+  const kostenaufstellung = summenKostenaufstellungAusPositionen(positionen)
+  const lohnAnzeige = kostenaufstellung?.lohn_netto ?? 0
+  const materialAnzeige = kostenaufstellung?.material_netto ?? 0
+  const zeigtKostenaufstellung = Boolean(kostenaufstellung)
 
   let posIndex = 0
 
@@ -228,14 +232,18 @@ export function RechnungPdfDocument({
           <Text style={{ fontSize: 10, fontWeight: 'bold', color: GRUEN, marginBottom: 6 }}>
             Gesamtübersicht
           </Text>
-          <View style={styles.summenGruenZeile}>
-            <Text style={styles.summenGruenLabel}>Arbeitskosten (netto)</Text>
-            <Text style={styles.summenGruenWert}>{eur(berechnung.lohn_netto)}</Text>
-          </View>
-          <View style={styles.summenGruenZeile}>
-            <Text style={styles.summenGruenLabel}>Materialkosten (netto)</Text>
-            <Text style={styles.summenGruenWert}>{eur(berechnung.material_netto)}</Text>
-          </View>
+          {zeigtKostenaufstellung && lohnAnzeige > 0 ? (
+            <View style={styles.summenGruenZeile}>
+              <Text style={styles.summenGruenLabel}>Arbeitskosten (netto)</Text>
+              <Text style={styles.summenGruenWert}>{eur(lohnAnzeige)}</Text>
+            </View>
+          ) : null}
+          {zeigtKostenaufstellung && materialAnzeige > 0 ? (
+            <View style={styles.summenGruenZeile}>
+              <Text style={styles.summenGruenLabel}>Materialkosten (netto)</Text>
+              <Text style={styles.summenGruenWert}>{eur(materialAnzeige)}</Text>
+            </View>
+          ) : null}
           <View style={styles.summenGruenZeile}>
             <Text style={styles.summenGruenLabel}>Netto gesamt</Text>
             <Text style={styles.summenGruenWert}>{eur(berechnung.netto)}</Text>

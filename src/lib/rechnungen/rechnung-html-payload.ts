@@ -1,5 +1,5 @@
 import { formatKundennr } from '@/lib/angebot-utils'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
   firmenBankverbindungZeilen,
   firmenSteuerFooterZeilen,
@@ -112,6 +112,7 @@ export function buildRechnungHtmlInput(
     reverseCharge13b: Boolean(row.reverse_charge_13b),
     defaultMwstSatz: defaultMwst,
   })
+  const kostenaufstellung = summenKostenaufstellungAusPositionen(positionen)
 
   const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden)
   const empfaenger = formatKundeEmpfaengerFuerDokument(row.kunden)
@@ -140,7 +141,7 @@ export function buildRechnungHtmlInput(
   const hinweis35a = resolveRechnungHinweis35a(
     row.hinweis_35a,
     row.kunden.typ,
-    berechnung.lohn_netto,
+    kostenaufstellung?.lohn_netto ?? 0,
     kleinunternehmer
   )
 
@@ -187,10 +188,7 @@ export function buildRechnungHtmlInput(
       mwst_betrag: berechnung.mwst_betrag,
       brutto: berechnung.brutto,
     },
-    kostenaufstellung: {
-      lohn_netto: berechnung.lohn_netto,
-      material_netto: berechnung.material_netto,
-    },
+    kostenaufstellung,
     rechtshinweise: {
       hinweis_35a: hinweis35a,
       hinweis_19: kleinunternehmer,

@@ -49,7 +49,7 @@ import {
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { kannHinweis35aAngebot } from '@/lib/angebote/angebot-rechtshinweise'
 import {
@@ -234,7 +234,13 @@ export function RechnungWizard({
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
   )
 
-  const hinweis35aErlaubt = kannHinweis35aAngebot(kunde?.typ, firm, berechnung.lohn_netto)
+  const kostenaufstellungPdf = useMemo(
+    () => summenKostenaufstellungAusPositionen(positionenBerechnet),
+    [positionenBerechnet]
+  )
+  const lohnNettoPdf = kostenaufstellungPdf?.lohn_netto ?? 0
+
+  const hinweis35aErlaubt = kannHinweis35aAngebot(kunde?.typ, firm, lohnNettoPdf)
   const zeigt13b = kundeKannReverseCharge13b(kunde?.typ)
 
   const aktiveVersandRechnung = useMemo(
@@ -883,7 +889,7 @@ export function RechnungWizard({
                 }
                 zeigt13b={zeigt13b}
                 hinweis35aErlaubt={hinweis35aErlaubt}
-                lohnNettoPdf={berechnung.lohn_netto}
+                lohnNettoPdf={lohnNettoPdf}
               />
             </div>
           ) : null}

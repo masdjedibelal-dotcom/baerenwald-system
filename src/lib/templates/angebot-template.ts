@@ -320,11 +320,22 @@ function kostenaufstellungPlain(
   ka: AngebotKostenaufstellung | null | undefined,
   inSummenSpalte = false
 ): string {
-  if (!ka || (ka.lohn_netto <= 0 && ka.material_netto <= 0)) return ''
+  if (!ka) return ''
+  const rows: string[] = []
+  if (ka.lohn_netto > 0) {
+    rows.push(
+      `<div style="display:flex;justify-content:space-between;"><span>Arbeitskosten (netto)</span><span>${euro(ka.lohn_netto)}</span></div>`
+    )
+  }
+  if (ka.material_netto > 0) {
+    rows.push(
+      `<div style="display:flex;justify-content:space-between;"><span>Materialkosten (netto)</span><span>${euro(ka.material_netto)}</span></div>`
+    )
+  }
+  if (!rows.length) return ''
   const width = inSummenSpalte ? 'width:100%;' : 'max-width:280px;margin-left:auto;'
-  return `<div style="font-size:9pt;color:${TEXT_PRIMARY};line-height:1.7;font-weight:400;${inSummenSpalte ? 'margin-bottom:8px;' : 'margin-top:14px;'}">
-    <div style="display:flex;justify-content:space-between;${width}"><span>Arbeitskosten (netto)</span><span>${euro(ka.lohn_netto)}</span></div>
-    <div style="display:flex;justify-content:space-between;${width}"><span>Materialkosten (netto)</span><span>${euro(ka.material_netto)}</span></div>
+  return `<div style="font-size:9pt;color:${TEXT_PRIMARY};line-height:1.7;font-weight:400;${inSummenSpalte ? 'margin-bottom:8px;' : 'margin-top:14px;'}${width}">
+    ${rows.join('')}
   </div>`
 }
 
