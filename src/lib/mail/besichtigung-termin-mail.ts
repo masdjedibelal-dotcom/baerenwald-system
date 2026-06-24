@@ -77,7 +77,7 @@ export async function buildBesichtigungTerminMail(
   const { data: lead, error } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kunde_id, plz, funnel_daten, kundentyp, kunden(adresse, strasse, hausnummer, plz, ort, typ)'
+      'id, kunde_id, plz, funnel_daten, kundentyp, kunden!kunde_id(adresse, strasse, hausnummer, plz, ort, typ)'
     )
     .eq('id', input.leadId)
     .maybeSingle()

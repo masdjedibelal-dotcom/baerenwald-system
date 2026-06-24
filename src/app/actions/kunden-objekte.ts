@@ -128,7 +128,7 @@ export async function setLeadKundeObjekt(
 
   const { data: lead, error: leadErr } = await supabase
     .from('leads')
-    .select('kunde_id, kunden(id)')
+    .select('kunde_id, kunden!kunde_id(id)')
     .eq('id', leadId)
     .maybeSingle()
 

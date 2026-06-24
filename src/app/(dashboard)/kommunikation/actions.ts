@@ -417,7 +417,7 @@ export async function mailComposeContextFromLead(
 ): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
   const { data, error } = await supabaseAdmin
     .from('leads')
-    .select('id, kontakt_email, kontakt_name, kunde_id, kundentyp, kunden(id, name, email, typ)')
+    .select('id, kontakt_email, kontakt_name, kunde_id, kundentyp, kunden!kunde_id(id, name, email, typ)')
     .eq('id', leadId)
     .maybeSingle()
   if (error || !data) return { ok: false, message: 'Anfrage nicht gefunden' }

@@ -11,7 +11,7 @@ export default async function LeadStatusPublicPage({ params }: { params: { id: s
 
   const { data: lead } = await supabaseAdmin
     .from('leads')
-    .select('id, kontakt_name, status, kunden(name)')
+    .select('id, kontakt_name, status, kunden!kunde_id(name)')
     .eq('id', params.id)
     .maybeSingle()
 

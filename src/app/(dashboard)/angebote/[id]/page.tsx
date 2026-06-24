@@ -23,7 +23,7 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
         kontakt_name,
         situation,
         bereiche,
-        kunden(*)
+        kunden!kunde_id(*)
       ),
       angebot_handwerker(
         *,

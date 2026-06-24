@@ -296,7 +296,7 @@ export async function loadAngebotWizardBootstrap(
       varianten,
       kunde_objekt_id,
       gesendet_kunde_at,
-      leads(plz, bereiche, situation, kundentyp, kunden(typ))
+      leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ))
     `
     )
     .eq('id', angebotId)
@@ -427,7 +427,7 @@ export async function loadAngebotWizardBootstrapKopie(
       hinweise,
       varianten,
       kunde_objekt_id,
-      leads(plz, bereiche, situation, kundentyp, kunden(typ)),
+      leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ)),
       angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
     )

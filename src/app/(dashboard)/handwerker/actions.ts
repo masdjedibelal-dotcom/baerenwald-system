@@ -103,7 +103,6 @@ export async function updateHandwerker(
       iban: input.iban?.replace(/\s+/g, '') || null,
       aktiv: input.aktiv,
       notizen: input.notizen?.trim() || null,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', id)
 
@@ -120,7 +119,7 @@ export async function updateHandwerkerNotizen(
   const supabase = createClient()
   const { error } = await supabase
     .from('handwerker')
-    .update({ notizen: notizen?.trim() || null, updated_at: new Date().toISOString() })
+    .update({ notizen: notizen?.trim() || null })
     .eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/handwerker/${id}`)

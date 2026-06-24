@@ -173,7 +173,7 @@ export default async function DashboardPage() {
         bereiche, preis_min, preis_max,
         kontakt_name, kontakt_email, kontakt_telefon,
         plz, created_at,
-        kunden(id, name, email, telefon)
+        kunden!kunde_id(id, name, email, telefon)
       `
           )
           .order('created_at', { ascending: false })

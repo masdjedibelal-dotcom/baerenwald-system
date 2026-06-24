@@ -985,7 +985,7 @@ export async function saveLeadTerminVereinbart(input: {
     const supabase = createClient()
     const { data: lead } = await supabase
       .from('leads')
-      .select('plz, funnel_daten, kunden(adresse, plz, ort)')
+      .select('plz, funnel_daten, kunden!kunde_id(adresse, plz, ort)')
       .eq('id', input.leadId)
       .maybeSingle()
     if (lead) {

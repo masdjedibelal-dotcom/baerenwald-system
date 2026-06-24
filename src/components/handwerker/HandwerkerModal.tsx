@@ -9,7 +9,9 @@ import {
   createHandwerker,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
+import { findStammdatenDuplikate } from '@/app/actions/stammdaten-kontakt'
 import { normalizeHandwerkerNamen, validateHandwerkerStammPflicht } from '@/lib/handwerker-stammdaten'
+import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
 import type { GewerkOption } from '@/components/handwerker/HandwerkerListeClient'
 
 export function HandwerkerModal({
@@ -33,6 +35,7 @@ export function HandwerkerModal({
   const [slugs, setSlugs] = useState<Set<string>>(() => new Set())
   const [notizen, setNotizen] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [dupes, setDupes] = useState<StammdatenKontaktTreffer[]>([])
 
   useEffect(() => {
     if (!open) return
@@ -46,7 +49,19 @@ export function HandwerkerModal({
     setSlugs(new Set())
     setNotizen('')
     setErr(null)
+    setDupes([])
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      void (async () => {
+        const d = await findStammdatenDuplikate('handwerker', { email, telefon })
+        setDupes(d)
+      })()
+    }, 400)
+    return () => clearTimeout(t)
+  }, [open, email, telefon])
 
   const toggleGewerk = (slug: string) => {
     setSlugs((prev) => {
@@ -113,6 +128,23 @@ export function HandwerkerModal({
     >
       <div className="space-y-4">
         {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
+
+        {dupes.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <p className="font-medium">Bereits als Handwerker vorhanden</p>
+            <ul className="mt-1 list-inside list-disc">
+              {dupes.map((d) => (
+                <li key={d.id}>
+                  {d.name} · {d.telefon ?? '—'} · {d.email ?? '—'}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs">
+              Nur Hinweis auf bestehende Handwerker-Datensätze. Kunden/Partner mit gleichen Kontaktdaten sind
+              erlaubt und bleiben getrennt.
+            </p>
+          </div>
+        ) : null}
 
         <Input label="Firmenname *" value={firma} onChange={(e) => setFirma(e.target.value)} />
         <div className="form-grid-2 grid gap-3 md:grid-cols-2">

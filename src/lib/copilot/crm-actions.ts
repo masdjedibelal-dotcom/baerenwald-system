@@ -192,7 +192,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
           .select(
             `
             id, angebotsnr, leistungsumfang, status_einfach, gesamt_fix,
-            leads(kontakt_name, kunden(name))
+            leads(kontakt_name, kunden!kunde_id(name))
           `
           )
           .or(`angebotsnr.ilike.${pattern},leistungsumfang.ilike.${pattern}`)
@@ -276,7 +276,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
           `
           id, kontakt_name, kontakt_email, kontakt_telefon, kontakt_nachricht,
           status, situation, bereiche, plz, preis_min, preis_max, created_at,
-          kunde_id, kunden(name, email, telefon)
+          kunde_id, kunden!kunde_id(name, email, telefon)
         `
         )
         .eq('id', id)

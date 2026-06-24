@@ -154,7 +154,7 @@ export async function prepareAngebotWizardCopilot(input: PrepareAngebotWizardInp
     .select(
       `
       *,
-      kunden(id, name, email, telefon, typ)
+      kunden!kunde_id(id, name, email, telefon, typ)
     `
     )
     .eq('id', leadId)
@@ -280,7 +280,7 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
   const leadId = input.lead_id.trim()
   const { data: leadRow } = await supabaseAdmin
     .from('leads')
-    .select('id, kunde_id, kontakt_name, kundentyp, bereiche, situation, kunden(id, name, typ)')
+    .select('id, kunde_id, kontakt_name, kundentyp, bereiche, situation, kunden!kunde_id(id, name, typ)')
     .eq('id', leadId)
     .maybeSingle()
   if (!leadRow) return { error: 'Lead nicht gefunden' }

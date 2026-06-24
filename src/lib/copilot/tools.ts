@@ -41,7 +41,7 @@ export async function getNeueAnfragen() {
       id, kontakt_name, kontakt_email, kontakt_telefon,
       situation, bereiche, preis_min, preis_max,
       status, created_at, plz,
-      kunden(name)
+      kunden!kunde_id(name)
     `
     )
     .eq('status', 'neu')
@@ -76,7 +76,7 @@ export async function getOffeneAngebote() {
       gesamt_fix, gesamt_min, gesamt_max,
       status_einfach, gueltig_bis, created_at,
       gesendet_am, gesendet_kunde_at,
-      leads(kontakt_name, kunden(name))
+      leads(kontakt_name, kunden!kunde_id(name))
     `
     )
     .in('status_einfach', ['entwurf', 'gesendet'])
@@ -124,7 +124,7 @@ export async function getHandwerkerOffen() {
       `
       id, hw_status, hw_eingereicht_at, created_at,
       handwerker(name),
-      angebote(leistungsumfang, leads(kontakt_name, kunden(name)))
+      angebote(leistungsumfang, leads(kontakt_name, kunden!kunde_id(name)))
     `
     )
     .in('hw_status', ['eingereicht', 'offen'])

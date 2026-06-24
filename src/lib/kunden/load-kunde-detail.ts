@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { kundeAuftraggeberLeadsEmbed, kundeLeadsEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { Kunde, KundenDokumentRow, KundenNotizRow, Lead, AuftragStatus } from '@/lib/types'
 
 export type KundeDetailPayload = Kunde & {
@@ -98,15 +99,11 @@ type AngebotKurz = {
   pdf_url: string | null
 }
 
-const KUNDE_DETAIL_SELECT = `
-      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
-      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
-      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
-      portal_modus, org_kennung, org_anzeigename, org_logo_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
-      leads(
-        id, status, situation, bereiche, created_at, budget_ca
-      ),
+const LEAD_KURZ_SELECT = 'id, status, situation, bereiche, created_at, budget_ca'
+
+const KUNDE_DETAIL_RELATIONS = `
+      melder_leads:${kundeLeadsEmbed(LEAD_KURZ_SELECT)},
+      auftraggeber_leads:${kundeAuftraggeberLeadsEmbed(LEAD_KURZ_SELECT)},
       auftraege(
         id, titel, status, fortschritt, start_datum, end_datum, created_at
       ),
@@ -121,11 +118,68 @@ const KUNDE_DETAIL_SELECT = `
       )
     `
 
-export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | null> {
-  const supabase = createClient()
-  const kundeRes = await withCrmReadFallback(async (db) =>
+const KUNDE_DETAIL_SELECT_BASE = `
+      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
+      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
+      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
+      ${KUNDE_DETAIL_RELATIONS}
+    `
+
+const KUNDE_ORG_FIELDS = `
+      portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
+    `
+
+const KUNDE_DETAIL_SELECT = `
+      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
+      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
+      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
+      ${KUNDE_ORG_FIELDS}
+      ${KUNDE_DETAIL_RELATIONS}
+    `
+
+function isMissingKundeColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  const msg = (error.message ?? '').toLowerCase()
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find') ||
+    (msg.includes('column') && msg.includes('schema cache'))
+  )
+}
+
+async function fetchKundeDetailRow(
+  id: string
+): Promise<{ data: KundeDetailPayload | null; error: { message: string } | null }> {
+  const full = await withCrmReadFallback(async (db) =>
     db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle()
   )
+  if (!full.error) {
+    return { data: (full.data as KundeDetailPayload | null) ?? null, error: null }
+  }
+
+  if (isMissingKundeColumnError(full.error)) {
+    console.warn(
+      '[loadKundeDetail] Optionale Spalten fehlen — Fallback ohne Org-Portal-Felder:',
+      full.error.message
+    )
+    const fallback = await withCrmReadFallback(async (db) =>
+      db.from('kunden').select(KUNDE_DETAIL_SELECT_BASE).eq('id', id).maybeSingle()
+    )
+    return {
+      data: (fallback.data as KundeDetailPayload | null) ?? null,
+      error: fallback.error ? { message: fallback.error.message } : null,
+    }
+  }
+
+  return { data: null, error: { message: full.error.message } }
+}
+
+export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | null> {
+  const supabase = createClient()
+  const kundeRes = await fetchKundeDetailRow(id)
   const data = kundeRes.data
   const error = kundeRes.error
 
@@ -134,9 +188,16 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     return null
   }
 
-  const row = data as KundeDetailPayload
+  const row = data as KundeDetailPayload & {
+    melder_leads?: Lead[] | null
+    auftraggeber_leads?: Lead[] | null
+  }
 
-  const leadIds = (row.leads ?? []).map((l) => l.id).filter(Boolean)
+  const leadsMergedSource = [...(row.melder_leads ?? []), ...(row.auftraggeber_leads ?? [])].filter(
+    (lead, index, arr) => arr.findIndex((x) => x.id === lead.id) === index
+  )
+
+  const leadIds = leadsMergedSource.map((l) => l.id).filter(Boolean)
   const auftragIds = (row.auftraege ?? []).map((a) => a.id).filter(Boolean)
 
   const angeboteByLead = new Map<string, AngebotKurz[]>()
@@ -219,7 +280,7 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
   const sortAngebote = (list: AngebotKurz[]) =>
     [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-  const leadsMerged = (row.leads ?? []).map((l) => ({
+  const leadsMerged = leadsMergedSource.map((l) => ({
     ...l,
     angebote: sortAngebote(angeboteByLead.get(l.id) ?? []).map((x) => ({
       id: x.id,
@@ -294,8 +355,10 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
+  const { melder_leads: _melderLeads, auftraggeber_leads: _auftraggeberLeads, ...kundeBase } = row
+
   return {
-    ...row,
+    ...kundeBase,
     leads: leadsMerged,
     auftraege: auftraegeMerged,
     rechnungen: rechnungenMerged,

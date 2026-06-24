@@ -72,6 +72,8 @@ import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { BEREICH_LABELS, formatAnfragePreisAnzeige, formatDatum, formatRelativeDate } from '@/lib/utils'
 import { parseEmailTokens } from '@/lib/email-recipients'
+import { StammdatenVerknuepfungen } from '@/components/stammdaten/StammdatenVerknuepfungen'
+import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 const QUELLE_LABELS: Record<string, string> = {
@@ -167,11 +169,13 @@ export function KundeDetailClient({
   customFieldDefs,
   customValues: initialValues,
   kundenObjekte = [],
+  verwandteStammdaten = [],
 }: {
   kunde: KundeDetailPayload
   customFieldDefs: CustomFieldDefinition[]
   customValues: CustomFieldValueRow[]
   kundenObjekte?: KundenObjekt[]
+  verwandteStammdaten?: StammdatenKontaktTreffer[]
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -725,6 +729,7 @@ export function KundeDetailClient({
   const fixedOverview = (
     <div className="space-y-3">
       {stammdatenCard}
+      <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
       {zusatzfelderCard}
       {istKundeGewerbeTyp(kunde.typ) ? (
         <KundenObjekteCard

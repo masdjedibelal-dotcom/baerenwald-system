@@ -60,6 +60,8 @@ import {
   normalizeHandwerkerNamen,
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
+import { StammdatenVerknuepfungen } from '@/components/stammdaten/StammdatenVerknuepfungen'
+import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
 import {
   getPartnerPortalMailDraft,
   previewPartnerPortalMail,
@@ -106,12 +108,14 @@ export function HandwerkerDetailClient({
   gewerke = [],
   complianceTypen,
   rahmenVertrag = null,
+  verwandteStammdaten = [],
 }: {
   payload: HandwerkerDetailPayload
   gewerkeSlugs: { slug: string; name: string }[]
   gewerke?: Gewerk[]
   complianceTypen: ComplianceDokumentTyp[]
   rahmenVertrag?: HandwerkerVertragRow | null
+  verwandteStammdaten?: StammdatenKontaktTreffer[]
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -386,6 +390,8 @@ export function HandwerkerDetailClient({
           <PropertyRow label="Adresse" value={hw.adresse || '—'} editable={false} />
         </div>
       </Card>
+
+      <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
 
       <Card title="Gewerke">
         <div className="flex flex-wrap gap-2">

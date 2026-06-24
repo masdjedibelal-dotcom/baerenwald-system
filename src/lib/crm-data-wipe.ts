@@ -77,7 +77,7 @@ export async function purgeLegacyDemoRecords(
   const { data: rows, error: loadErr } = await admin
     .from('leads')
     .select(
-      'id, kunde_id, kontakt_email, kontakt_name, kontakt_telefon, notizen, funnel_daten, kunden(email, name)'
+      'id, kunde_id, kontakt_email, kontakt_name, kontakt_telefon, notizen, funnel_daten, kunden!kunde_id(email, name)'
     )
 
   if (loadErr) {

@@ -1,4 +1,5 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { AngebotListeEintrag } from '@/lib/types'
 
 export const ANGEBOTE_LISTE_SELECT = `
@@ -22,7 +23,7 @@ export const ANGEBOTE_LISTE_SELECT = `
         situation,
         bereiche,
         plz,
-        kunden(id, name, vorname, nachname, typ)
+        ${leadKundeEmbed('id, name, vorname, nachname, typ')}
       ),
       kunden(id, name, email, plz, ort, vorname, nachname, typ)
     `

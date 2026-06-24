@@ -203,7 +203,7 @@ export function KundeModal({
 
         {!editKunde && dupes.length > 0 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            <p className="font-medium">Mögliches Duplikat</p>
+            <p className="font-medium">Bereits als Kunde vorhanden</p>
             <ul className="mt-1 list-inside list-disc">
               {dupes.map((d) => (
                 <li key={d.id}>
@@ -211,7 +211,10 @@ export function KundeModal({
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs">Trotzdem speichern legt einen neuen Datensatz an.</p>
+            <p className="mt-2 text-xs">
+              Nur Hinweis auf bestehende Kunden-Datensätze. Handwerker/Partner mit gleichen Kontaktdaten sind
+              erlaubt und bleiben getrennt — trotzdem speichern legt einen neuen Kunden an.
+            </p>
           </div>
         ) : null}
 

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   ListFilterSection,
@@ -308,16 +308,7 @@ export function HandwerkerListeClient({
                 onSort: (f) => (f ? handleSort(f) : resetSort()),
               }}
               toolbarEnd={
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm hidden shrink-0 gap-1 md:inline-flex"
-                    onClick={openNeuModal}
-                  >
-                    <Plus className="h-4 w-4" aria-hidden />
-                    Neuer Handwerker
-                  </button>
-                  <select
+                <select
                   aria-label="Sortieren"
                   value={field ?? ''}
                   onChange={(e) => (e.target.value ? handleSort(e.target.value) : resetSort())}
@@ -330,7 +321,6 @@ export function HandwerkerListeClient({
                     </option>
                   ))}
                 </select>
-                </>
               }
             />
           </ListFilterSection>
@@ -400,10 +390,17 @@ export function HandwerkerListeClient({
               />
             </div>
             {sorted.map(({ row: h }) => (
-              <Link
+              <div
                 key={h.id}
-                href={`/handwerker/${h.id}`}
-                onClick={isPane ? (e) => e.preventDefault() : undefined}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDetail(h.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDetail(h.id)
+                  }
+                }}
                 className={cn(
                   'list-row-grid',
                   selectedId === h.id && isPane && 'ring-2 ring-bw-primary/40'
@@ -424,7 +421,7 @@ export function HandwerkerListeClient({
                   {(h.gewerk_namen ?? []).join(' · ') || '—'}
                 </p>
                 <ComplianceBadge status={h.compliance_status} />
-              </Link>
+              </div>
             ))}
           </ListGridShell>
         </>

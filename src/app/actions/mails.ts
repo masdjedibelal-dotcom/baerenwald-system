@@ -38,7 +38,7 @@ export async function sendAnfrageBestaetigung(
   const { data: lead, error } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kanal, anlass, kontakt_email, kontakt_name, bereiche, situation, plz, preis_min, preis_max, kunde_id, kundentyp, kunden(name, typ), kunden_objekte(titel)'
+      'id, kanal, anlass, kontakt_email, kontakt_name, bereiche, situation, plz, preis_min, preis_max, kunde_id, kundentyp, kunden!kunde_id(name, typ), kunden_objekte(titel)'
     )
     .eq('id', leadId)
     .maybeSingle()

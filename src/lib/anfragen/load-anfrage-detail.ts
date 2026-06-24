@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { enrichLeadDetailUserNames } from '@/lib/anfragen/enrich-lead-user-names'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
@@ -13,7 +14,7 @@ import type {
 
 const SELECT_FULL = `
   *,
-  kunden(*),
+  ${leadKundeEmbed('*')},
   angebote(
     id,
     status,
@@ -33,7 +34,7 @@ const SELECT_FULL = `
 
 const SELECT_WITHOUT_ANGEBOTE = `
   *,
-  kunden(*),
+  ${leadKundeEmbed('*')},
   leads_status_history(*),
   kalender_termine(*),
   lead_notizen(*)
@@ -41,7 +42,7 @@ const SELECT_WITHOUT_ANGEBOTE = `
 
 const SELECT_MINIMAL = `
   *,
-  kunden(*)
+  ${leadKundeEmbed('*')}
 `
 
 async function loadLeadTimelineOptional(

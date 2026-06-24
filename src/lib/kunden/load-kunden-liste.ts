@@ -25,7 +25,7 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
   }
 
   const supabase = createClient()
-  const { data: leadRows } = await supabase.from('leads').select('kunde_id')
+  const { data: leadRows } = await supabase.from('leads').select('kunde_id, auftraggeber_kunde_id')
   const { data: aufRows } = await supabase.from('auftraege').select('kunde_id')
   const { data: reRows } = await supabase
     .from('rechnungen')
@@ -34,9 +34,12 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
 
   const leadCount = new Map<string, number>()
   for (const r of leadRows ?? []) {
-    const id = r.kunde_id as string | null
-    if (!id) continue
-    leadCount.set(id, (leadCount.get(id) ?? 0) + 1)
+    const kundeId = r.kunde_id as string | null
+    const auftraggeberId = r.auftraggeber_kunde_id as string | null
+    if (kundeId) leadCount.set(kundeId, (leadCount.get(kundeId) ?? 0) + 1)
+    if (auftraggeberId && auftraggeberId !== kundeId) {
+      leadCount.set(auftraggeberId, (leadCount.get(auftraggeberId) ?? 0) + 1)
+    }
   }
 
   const aufCount = new Map<string, number>()

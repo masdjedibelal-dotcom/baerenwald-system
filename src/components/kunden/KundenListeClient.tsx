@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   ListFilterSection,
@@ -265,16 +264,6 @@ export function KundenListeClient({
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
           resultCount={filtered.length}
-          toolbarEnd={
-            <button
-              type="button"
-              className="btn btn-primary btn-sm hidden shrink-0 gap-1 md:inline-flex"
-              onClick={openNeuModal}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              Neuer Kunde
-            </button>
-          }
           sort={{
             options: [
               { field: 'name', label: 'Kunde' },
@@ -359,10 +348,17 @@ export function KundenListeClient({
               <div>Status</div>
             </div>
               {sorted.map(({ row: k }) => (
-              <Link
+              <div
                 key={k.id}
-                href={`/kunden/${k.id}`}
-                onClick={isPane ? (e) => e.preventDefault() : undefined}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDetail(k.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDetail(k.id)
+                  }
+                }}
                 className={cn('list-row-grid', selectedId === k.id && isPane && 'ring-2 ring-bw-primary/40')}
                 style={{ gridTemplateColumns: KUNDEN_GRID_COLS }}
               >
@@ -390,7 +386,7 @@ export function KundenListeClient({
                   {formatEur(k.gesamt_umsatz)}
                 </p>
                 {kundeListStatusBadge(k)}
-              </Link>
+              </div>
             ))}
           </ListGridShell>
         </>

@@ -1,4 +1,5 @@
 import { ANFRAGEN_LISTE_STATUS } from '@/lib/crm/pipeline-liste-filter'
+import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { countLegacyDemoLeads, filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import type { LeadWithAngebote } from '@/lib/types'
@@ -33,7 +34,7 @@ export const ANFRAGEN_LISTE_SELECT = `
       einladung_status,
       auftraggeber_kunde_id,
       erfassung_von,
-      kunden(id, name, email, telefon, vorname, nachname, typ),
+      ${leadKundeEmbed('id, name, email, telefon, vorname, nachname, typ')},
       angebote(id, status, gesamt_fix, gesamt_min, gesamt_max, created_at)
     `
 

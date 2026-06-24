@@ -171,32 +171,22 @@ export async function saveKundeCustomFieldValue(
 
 export async function findKundenDuplikate(
   telefon: string | null,
-  email: string | null
+  email: string | null,
+  excludeKundeId?: string
 ): Promise<Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>[]> {
-  const tel = telefon?.trim()
-  const em = email?.trim()
-  if ((!tel || tel.length < 4) && (!em || em.length < 4)) return []
-
-  const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>>()
-
-  if (em && em.length >= 4) {
-    const { data, error } = await withCrmReadFallback(async (db) =>
-      db.from('kunden').select('id, name, telefon, email').ilike('email', `%${em}%`).limit(8)
-    )
-    if (error) console.warn('findKundenDuplikate email', error.message)
-    for (const r of data ?? []) byId.set(r.id as string, r as Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>)
-  }
-
-  if (tel && tel.replace(/\s/g, '').length >= 6) {
-    const digits = tel.replace(/\s/g, '')
-    const { data, error } = await withCrmReadFallback(async (db) =>
-      db.from('kunden').select('id, name, telefon, email').ilike('telefon', `%${digits}%`).limit(8)
-    )
-    if (error) console.warn('findKundenDuplikate tel', error.message)
-    for (const r of data ?? []) byId.set(r.id as string, r as Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>)
-  }
-
-  return Array.from(byId.values())
+  const { findStammdatenDuplikate } = await import('@/app/actions/stammdaten-kontakt')
+  const rows = await findStammdatenDuplikate('kunde', {
+    email,
+    telefon,
+    excludeTyp: 'kunde',
+    excludeId: excludeKundeId,
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    telefon: r.telefon,
+    email: r.email,
+  }))
 }
 
 /** Portal-Zugang: Kunde registriert sich mit derselben E-Mail unter /portal/login */
