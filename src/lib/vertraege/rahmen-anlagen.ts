@@ -1,6 +1,6 @@
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { VertragHandwerkerSnapshot } from '@/lib/vertraege/types'
-import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
+import { handwerkerAnzeigename, handwerkerVertreterName } from '@/lib/vertraege/build-vertrag-texte'
 import type { VertragParagraph } from '@/lib/vertraege/klauseln'
 
 /** Platzhalter für RV-Anlagen (Firmen- + Partnerdaten aus PDF-Payload). */
@@ -18,7 +18,7 @@ export function rahmenVertragPlatzhalter(
     auftraggeber_vertreter: firm.geschaeftsfuehrer?.trim() || firm.firmenname?.trim() || 'Geschäftsführung',
     partner: handwerkerAnzeigename(hw),
     partner_adresse: hw.adresse?.trim() || '—',
-    partner_vertreter: hw.name?.trim() || handwerkerAnzeigename(hw),
+    partner_vertreter: handwerkerVertreterName(hw),
   }
 }
 

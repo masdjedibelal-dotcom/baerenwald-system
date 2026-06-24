@@ -40,7 +40,7 @@ export async function loadHandwerkerListe(): Promise<HandwerkerListeData> {
       supabase
         .from('handwerker')
         .select(
-          'id, name, firma, email, telefon, gewerke, compliance_status, ist_fachbetrieb, aktiv, created_at'
+          'id, name, firma, vorname, nachname, email, telefon, gewerke, compliance_status, ist_fachbetrieb, aktiv, created_at'
         )
         .eq('aktiv', true)
         .order('name', { ascending: true }),

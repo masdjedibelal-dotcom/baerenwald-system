@@ -1,7 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Building2,
   Circle,
   Globe,
+  Link2,
   Mail,
   MapPin,
   MessageCircle,
@@ -34,6 +36,11 @@ const kanalIcon: Record<LeadKanal, LucideIcon> = {
   whatsapp: MessageCircle,
   email: Mail,
   vor_ort: MapPin,
+  hv_melder_link: Link2,
+  hv_einladung: Mail,
+  org_portal: Building2,
+  org_funnel: Building2,
+  org_service: Building2,
   sonstiges: Circle,
 }
 

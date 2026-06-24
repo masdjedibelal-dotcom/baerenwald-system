@@ -7,6 +7,7 @@ import { DashboardDetailsSection } from '@/components/dashboard/DashboardDetails
 import { buildDashboardAktivitaet } from '@/lib/dashboard-aktivitaet'
 import { deltaVsPrevious } from '@/lib/dashboard-delta'
 import { dashboardLeadPeriodBoundaries } from '@/lib/dashboard-periods'
+import { loadOrgDashboardKpis } from '@/lib/dashboard-org-kpis'
 import { DASHBOARD_FILTER_LINKS } from '@/lib/dashboard-filters'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotListeEintrag, AngebotPosition, KalenderTermin, LeadWithAngebote } from '@/lib/types'
@@ -102,6 +103,7 @@ export default async function DashboardPage() {
     letzteAnfragen,
     letzteAngebote,
     letzteAuftraege,
+    orgKpis,
   ] = await Promise.all([
     safeCount(() =>
       supabase
@@ -211,6 +213,7 @@ export default async function DashboardPage() {
           .limit(64)
       )
     ),
+    loadOrgDashboardKpis(supabase, leadPeriods.weekStartIso),
   ])
 
   const anfragenListe = filterOutLegacyDemoLeads(letzteAnfragen as unknown as LeadWithAngebote[])
@@ -288,6 +291,33 @@ export default async function DashboardPage() {
           delta={deltaAbgeschlossenMonat}
           layout="compact"
         />
+        </div>
+      </section>
+
+      <section className="space-y-2" aria-label="Auftraggeber-Portal">
+        <h2 className="text-sm font-semibold text-bw-text">Auftraggeber-Portal</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <StatCard
+            zahl={orgKpis.meldungenWoche}
+            label="Meldungen diese Woche"
+            href="/anfragen"
+            farbe="blau"
+            layout="minimal"
+          />
+          <StatCard
+            zahl={orgKpis.wartetFreigabe}
+            label="Wartet auf Org-Freigabe"
+            href="/anfragen"
+            farbe="orange"
+            layout="minimal"
+          />
+          <StatCard
+            zahl={orgKpis.orgPortalLeads}
+            label="Org-Portal-Leads (Woche)"
+            href="/anfragen"
+            farbe="gruen"
+            layout="minimal"
+          />
         </div>
       </section>
 

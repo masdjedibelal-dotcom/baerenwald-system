@@ -22,6 +22,20 @@ export type LeadKanal =
   | 'email'
   | 'vor_ort'
   | 'sonstiges'
+  | 'hv_melder_link'
+  | 'hv_einladung'
+  | 'org_portal'
+  | 'org_funnel'
+  | 'org_service'
+
+export type PortalModus = 'privat' | 'organisation'
+export type FreigabeModus = 'direkt' | 'freigabe'
+export type LeadAnlass = 'meldung' | 'projekt' | 'servicepaket' | 'sonstiges'
+export type LeadErfassungVon = 'melder' | 'organisation' | 'crm'
+export type EinladungStatus = 'offen' | 'ergaenzt' | 'entfallen'
+export type OrgFreigabeStatus = 'nicht_noetig' | 'ausstehend' | 'freigegeben' | 'abgelehnt'
+export type ServiceModus = 'paket' | 'einzeln'
+export type OrgFreigabeAktion = 'angefordert' | 'freigegeben' | 'abgelehnt'
 
 export type LeadStatusHistory = {
   id: string
@@ -63,6 +77,15 @@ export type Kunde = {
   ust_id?: string | null
   /** Supabase Auth User des Kundenportals (MeinBärenwald) */
   auth_user_id?: string | null
+  /** privat = Standard-Portal; organisation = Auftraggeber-Portal */
+  portal_modus?: PortalModus | null
+  /** URL-Slug → /melden/{org_kennung} */
+  org_kennung?: string | null
+  org_anzeigename?: string | null
+  org_logo_url?: string | null
+  freigabe_modus?: FreigabeModus | null
+  freigabe_schwelle_eur?: number | null
+  notfall_direkt?: boolean | null
 }
 
 /** WEG / Gebäude unter Gewerbe- oder Hausverwaltungs-Kunden */
@@ -76,6 +99,11 @@ export type KundenObjekt = {
   ort: string | null
   created_at: string
   updated_at: string
+  melde_slug?: string | null
+  melde_aktiv?: boolean | null
+  einheiten_hinweis?: string | null
+  notizen_intern?: string | null
+  created_by?: 'crm' | 'portal' | null
 }
 
 export type KundenNotizRow = {
@@ -167,6 +195,17 @@ export type Lead = {
   kontakt_telefon: string | null
   kontakt_nachricht: string | null
   notizen: string | null
+  auftraggeber_kunde_id?: string | null
+  anlass?: LeadAnlass | null
+  erfassung_von?: LeadErfassungVon | null
+  melder_name?: string | null
+  melder_einheit?: string | null
+  melder_telefon?: string | null
+  melder_email?: string | null
+  einladung_token?: string | null
+  einladung_status?: EinladungStatus | null
+  org_freigabe_status?: OrgFreigabeStatus | null
+  service_modus?: ServiceModus | null
   /** Bauprojekt — erweiterte Unterlagen & Bautagesberichte */
   ist_bauprojekt?: boolean
   ki_session_id?: string | null
@@ -194,9 +233,29 @@ export type LeadTimelineRow = {
   erstellt_von?: string | null
 }
 
+export type OrgFreigabeLogRow = {
+  id: string
+  lead_id: string | null
+  angebot_id: string | null
+  auftraggeber_kunde_id: string
+  aktion: OrgFreigabeAktion
+  betrag_eur: number | null
+  notiz: string | null
+  erstellt_von: string | null
+  created_at: string
+}
+
+export type LeadAuftraggeberEmbed = Pick<
+  Kunde,
+  'id' | 'name' | 'email' | 'org_anzeigename' | 'org_kennung'
+>
+
 /** Lead inkl. Status-Historie (Detailansicht) */
 export type LeadDetail = Lead & {
   kunden?: Kunde | null
+  auftraggeber?: LeadAuftraggeberEmbed | null
+  kunden_objekte?: KundenObjekt | null
+  org_freigabe_log?: OrgFreigabeLogRow[] | null
   leads_status_history?: LeadStatusHistory[] | null
   vorab_formulare?: VorabFormular[] | null
   lead_timeline?: LeadTimelineRow[] | null
@@ -840,6 +899,8 @@ export type Handwerker = {
   id: string
   name: string
   firma: string | null
+  vorname: string | null
+  nachname: string | null
   email: string | null
   telefon: string | null
   whatsapp: string | null

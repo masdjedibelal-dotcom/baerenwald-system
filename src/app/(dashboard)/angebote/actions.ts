@@ -61,6 +61,7 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import { leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
+import { syncOrgFreigabeNachAngebot } from '@/lib/org/org-freigabe-logic'
 import { resolveStatusEinfach } from '@/lib/angebot-einfach'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { auftragsbestaetigungMailFromEmpfaenger } from '@/lib/mail/auftragsbestaetigung-mail'
@@ -374,6 +375,13 @@ export async function createAngebot(
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
+    void syncOrgFreigabeNachAngebot({
+      leadId: input.lead_id,
+      angebotId: id,
+      gesamtFix: summen.nettoMax,
+      gesamtMax: summen.nettoMax,
+    })
+
     const { data: leadRow } = await supabase
       .from('leads')
       .select('status')
@@ -573,6 +581,12 @@ export async function updateAngebot(
   if (leadId) {
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
+    void syncOrgFreigabeNachAngebot({
+      leadId,
+      angebotId,
+      gesamtFix: summen.nettoMax,
+      gesamtMax: summen.nettoMax,
+    })
   }
 
   if (!opts?.asSystem) {
@@ -1192,9 +1206,11 @@ export async function sendAngebotToKunde(
     return { ok: false as const, message: 'Angebot nicht gefunden' }
   }
   if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
+    const orgStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
+      ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
     return {
       ok: false as const,
-      message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker),
+      message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker, orgStatus),
     }
   }
   const istKorrektur = Boolean(detail.gesendet_kunde_at)

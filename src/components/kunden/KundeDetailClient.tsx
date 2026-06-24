@@ -31,6 +31,7 @@ import {
   kundeDisplayName,
 } from '@/lib/kunde-stammdaten'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenVorgaengeBaum } from '@/components/kunden/KundenVorgaengeBaum'
 import type { KundenObjekt } from '@/lib/types'
 import { DetailHead } from '@/components/layout/DetailHead'
@@ -43,6 +44,7 @@ import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/act
 import {
   AlertTriangle,
   Briefcase,
+  Building2,
   FileText,
   LayoutGrid,
   Mail,
@@ -155,10 +157,10 @@ function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) 
   return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
 }
 
-type KundeDetailTab = 'stammdaten' | 'vorgaenge' | 'aktivitaet' | 'dokumente'
+type KundeDetailTab = 'stammdaten' | 'organisation' | 'vorgaenge' | 'aktivitaet' | 'dokumente'
 
-const DESKTOP_KUNDE_TABS: KundeDetailTab[] = ['vorgaenge', 'aktivitaet', 'dokumente']
-const MOBILE_KUNDE_TABS: KundeDetailTab[] = ['stammdaten', 'vorgaenge', 'aktivitaet', 'dokumente']
+const DESKTOP_KUNDE_TABS_BASE: KundeDetailTab[] = ['vorgaenge', 'aktivitaet', 'dokumente']
+const MOBILE_KUNDE_TABS_BASE: KundeDetailTab[] = ['stammdaten', 'vorgaenge', 'aktivitaet', 'dokumente']
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -426,43 +428,68 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
+  const zeigtOrganisationTab = istKundeGewerbeTyp(kunde.typ) || kunde.portal_modus === 'organisation'
+
+  const desktopKundeTabIds = useMemo((): KundeDetailTab[] => {
+    if (!zeigtOrganisationTab) return DESKTOP_KUNDE_TABS_BASE
+    return ['organisation', ...DESKTOP_KUNDE_TABS_BASE]
+  }, [zeigtOrganisationTab])
+
+  const mobileKundeTabIds = useMemo((): KundeDetailTab[] => {
+    if (!zeigtOrganisationTab) return MOBILE_KUNDE_TABS_BASE
+    const rest = MOBILE_KUNDE_TABS_BASE.filter((t) => t !== 'stammdaten')
+    return ['stammdaten', 'organisation', ...rest]
+  }, [zeigtOrganisationTab])
+
   const desktopDetailTabs = useMemo(
-    () => [
-      {
-        id: 'vorgaenge',
-        label: 'Vorgänge',
-        icon: Briefcase,
-        count: vorgaengeCount || undefined,
-      },
-      { id: 'aktivitaet', label: 'Aktivität', icon: Mail },
-      {
-        id: 'dokumente',
-        label: 'Dokumente',
-        icon: FileText,
-        count: dokumenteCount || undefined,
-      },
-    ],
-    [dokumenteCount, vorgaengeCount]
+    () => {
+      const tabs = [
+        ...(zeigtOrganisationTab
+          ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
+          : []),
+        {
+          id: 'vorgaenge' as const,
+          label: 'Vorgänge',
+          icon: Briefcase,
+          count: vorgaengeCount || undefined,
+        },
+        { id: 'aktivitaet' as const, label: 'Aktivität', icon: Mail },
+        {
+          id: 'dokumente' as const,
+          label: 'Dokumente',
+          icon: FileText,
+          count: dokumenteCount || undefined,
+        },
+      ]
+      return tabs
+    },
+    [dokumenteCount, vorgaengeCount, zeigtOrganisationTab]
   )
 
   const mobileDetailTabs = useMemo(
-    () => [
-      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
-      {
-        id: 'vorgaenge',
-        label: 'Vorgänge',
-        icon: Briefcase,
-        count: vorgaengeCount || undefined,
-      },
-      { id: 'aktivitaet', label: 'Aktivität', icon: Mail },
-      {
-        id: 'dokumente',
-        label: 'Dokumente',
-        icon: FileText,
-        count: dokumenteCount || undefined,
-      },
-    ],
-    [dokumenteCount, vorgaengeCount]
+    () => {
+      const tabs = [
+        { id: 'stammdaten' as const, label: 'Stammdaten', icon: LayoutGrid },
+        ...(zeigtOrganisationTab
+          ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
+          : []),
+        {
+          id: 'vorgaenge' as const,
+          label: 'Vorgänge',
+          icon: Briefcase,
+          count: vorgaengeCount || undefined,
+        },
+        { id: 'aktivitaet' as const, label: 'Aktivität', icon: Mail },
+        {
+          id: 'dokumente' as const,
+          label: 'Dokumente',
+          icon: FileText,
+          count: dokumenteCount || undefined,
+        },
+      ]
+      return tabs
+    },
+    [dokumenteCount, vorgaengeCount, zeigtOrganisationTab]
   )
 
   const ueberfaellig = useMemo(() => {
@@ -700,7 +727,12 @@ export function KundeDetailClient({
       {stammdatenCard}
       {zusatzfelderCard}
       {istKundeGewerbeTyp(kunde.typ) ? (
-        <KundenObjekteCard kundeId={kunde.id} objekte={kundenObjekte} onChanged={() => refresh()} />
+        <KundenObjekteCard
+          kundeId={kunde.id}
+          objekte={kundenObjekte}
+          orgKennung={kunde.org_kennung}
+          onChanged={() => refresh()}
+        />
       ) : null}
       {kpiRow}
       <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
@@ -1167,19 +1199,36 @@ export function KundeDetailClient({
     ]
   }, [kunde.email])
 
+  const tabOrganisation = zeigtOrganisationTab ? (
+    <KundenOrganisationTab
+      kunde={kunde}
+      hasPortalAccount={hasPortalAccount}
+      onInvitePortal={() => void openPortalModal()}
+      onSaved={() => refresh()}
+    />
+  ) : null
+
   const stammdatenInhalt = fixedOverview
 
   const desktopTabContent =
-    tab === 'vorgaenge' ? tabVorgaenge : tab === 'aktivitaet' ? tabAktivitaet : tabDokumenteInhalt
-
-  const mobileTabContent =
-    tab === 'stammdaten'
-      ? stammdatenInhalt
+    tab === 'organisation'
+      ? tabOrganisation
       : tab === 'vorgaenge'
         ? tabVorgaenge
         : tab === 'aktivitaet'
           ? tabAktivitaet
           : tabDokumenteInhalt
+
+  const mobileTabContent =
+    tab === 'stammdaten'
+      ? stammdatenInhalt
+      : tab === 'organisation'
+        ? tabOrganisation
+        : tab === 'vorgaenge'
+          ? tabVorgaenge
+          : tab === 'aktivitaet'
+            ? tabAktivitaet
+            : tabDokumenteInhalt
 
   return (
     <div className="space-y-4 pb-6">
@@ -1240,8 +1289,8 @@ export function KundeDetailClient({
         mobileTabContent={mobileTabContent}
         mobileDefaultTab="stammdaten"
         desktopDefaultTab="vorgaenge"
-        mobileTabIds={MOBILE_KUNDE_TABS}
-        desktopTabIds={DESKTOP_KUNDE_TABS}
+        mobileTabIds={mobileKundeTabIds}
+        desktopTabIds={desktopKundeTabIds}
       />
 
       <Modal
@@ -1280,8 +1329,14 @@ export function KundeDetailClient({
             onChange={(e) => {
               const next = e.target.value === 'du' ? 'du' : 'sie'
               setPortalAnrede(next)
-              setPortalBetreff(defaultPortalInviteBetreff(next))
-              setPortalText(defaultPortalInviteText(next))
+              const istOrg = kunde.portal_modus === 'organisation'
+              setPortalBetreff(defaultPortalInviteBetreff(next, { organisation: istOrg }))
+              setPortalText(
+                defaultPortalInviteText(next, {
+                  organisation: istOrg,
+                  orgName: kunde.org_anzeigename ?? kunde.name,
+                })
+              )
             }}
             options={[
               { value: 'du', label: 'Du' },

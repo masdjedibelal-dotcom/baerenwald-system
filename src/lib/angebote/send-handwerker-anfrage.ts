@@ -4,6 +4,7 @@ import { mailHandwerkerAnfrage } from '@/lib/mail-templates'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail } from '@/lib/types'
 import { buildPartnerLoginLink } from '@/lib/portal-utils'
+import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
 import { notifyPartnerHandwerkerAnfrage } from '@/lib/partner/notify-partner-anfrage'
 
 type ZuRow = {
@@ -56,6 +57,17 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
 > {
   const row = normalizeZuRow(zuRaw)
   const link = buildPartnerLoginLink()
+
+  const lead = detail.leads
+  const orgStatus = (lead as { org_freigabe_status?: string } | null | undefined)?.org_freigabe_status
+  if (orgFreigabeBlockiertPartner(orgStatus as never)) {
+    const msg =
+      orgStatus === 'abgelehnt'
+        ? 'Organisation hat die Freigabe abgelehnt — Partner-Anfrage ist blockiert.'
+        : 'Wartet auf Org-Freigabe — Partner-Anfrage kann erst nach Freigabe gesendet werden.'
+    return { ok: false, message: msg, link }
+  }
+
   const posAll = normalizeAngebotPositionen(detail.positionen)
   const posFiltered = posAll.filter((p) => p.gewerk_id === row.gewerk_id)
   const hwName = row.handwerker?.name ?? 'Handwerkerin'

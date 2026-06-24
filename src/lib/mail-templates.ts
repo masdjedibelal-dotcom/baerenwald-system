@@ -21,6 +21,7 @@ import {
 } from '@/lib/mail/anrede'
 import { BEREICH_LABELS } from '@/lib/utils'
 import { filterAdressRueckfragen, type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
+import { anfrageBetreffNachAnlass } from '@/lib/email/meldung-mail-templates'
 
 function esc(s: string): string {
   return s
@@ -93,7 +94,9 @@ export type MailHtmlBaseOptions = {
   /** Kunden-Mails: P.S. MeinBärenwald (Standard: an) */
   skipMeinBaerenwaldPs?: boolean
   anrede?: 'du' | 'sie'
-  /** @deprecated Wird nicht mehr in Mails angezeigt (nur Portal-Login). */
+  /** Link für P.S.-Block / MeinBärenwald-Button (Standard: /portal/login). */
+  portalLink?: string | null
+  /** @deprecated Alias für portalLink. */
   statusLink?: string | null
 }
 
@@ -131,11 +134,16 @@ export function mailHtmlBase(
   const disclaimerHtml = footerDisclaimer?.trim()
     ? `<p style="font-size:11px;color:#D1D5DB;margin:4px 0 0;line-height:1.5;">${esc(footerDisclaimer.trim())}</p>`
     : ''
+  const portalLink =
+    options?.portalLink?.trim() ||
+    options?.statusLink?.trim() ||
+    undefined
   const psHtml =
     options?.skipMeinBaerenwaldPs === true
       ? ''
       : mailMeinBaerenwaldPsFooter({
           anrede: options?.anrede ?? 'du',
+          portalLink,
         })
 
   return `<!DOCTYPE html>
@@ -174,11 +182,15 @@ ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` :
 </body></html>`
 }
 
-/** Layout wie Auftragsbestätigung: Portal-Button oben, kein P.S.-Footer unten. */
-export function mailKundenStandardOptions(anrede: 'du' | 'sie'): MailHtmlBaseOptions {
-  return { anrede, skipMeinBaerenwaldPs: true }
+/** Standard-Fuß: P.S. mit MeinBärenwald-Button unten (nach Gruß & Inhalt). */
+export function mailKundenStandardOptions(
+  anrede: 'du' | 'sie',
+  portalLink?: string | null
+): MailHtmlBaseOptions {
+  return { anrede, portalLink: portalLink?.trim() || undefined }
 }
 
+/** @deprecated Portal-Button gehört in den P.S.-Footer — nutze mailKundenStandardOptions(). */
 export function mailKundenPortalTop(link?: string | null): string {
   const url = link?.trim() || buildPortalLoginLink()
   return `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', url, { margin: '0' })}</p>`
@@ -374,6 +386,8 @@ export function mailAnfrageBestaetigung(
     quelle?: 'website' | 'crm'
     anrede?: MailAnrede
     kundeTyp?: string | null
+    anlass?: import('@/lib/types').LeadAnlass | null
+    objektTitel?: string | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
@@ -419,11 +433,13 @@ export function mailAnfrageBestaetigung(
       <p style="font-size:15px;color:#374151;margin:0 0 4px;line-height:1.6;">${abschluss}</p>
       <p style="font-size:15px;color:#374151;margin:16px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>`
 
-  const betreff = mailText(
-    anrede,
-    `Danke für deine Anfrage — ${b.firmenname}`,
-    `Vielen Dank für Ihre Anfrage — ${b.firmenname}`
-  )
+  const betreff = data.anlass
+    ? anfrageBetreffNachAnlass(data.anlass, data.objektTitel ?? projektTitel.replace(/<[^>]+>/g, ''))
+    : mailText(
+        anrede,
+        `Danke für deine Anfrage — ${b.firmenname}`,
+        `Vielen Dank für Ihre Anfrage — ${b.firmenname}`
+      )
 
   return {
     betreff,
@@ -503,13 +519,12 @@ export function mailAngebot(
       ${summaryHtml}
       ${hint35a}
       ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
-      ${mailKundenPortalTop(data.statusLink)}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
       <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),
       b,
       disclaimer,
-      mailKundenStandardOptions(anredeKey)
+      mailKundenStandardOptions(anredeKey, data.statusLink)
     ),
   }
 }
@@ -773,7 +788,6 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
     betreff: `Projekt-Update — ${data.updateTitel} · ${data.projektTitel.trim() || 'Ihr Projekt'} · ${b.firmenname}`,
     html: mailHtmlBase(
       `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
-      ${mailKundenPortalTop(data.statusLink)}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       ${detailHtml}
@@ -784,7 +798,7 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
       data.updateTitel,
       b,
       disclaimer,
-      mailKundenStandardOptions(anredeKey)
+      mailKundenStandardOptions(anredeKey, data.statusLink)
     ),
   }
 }

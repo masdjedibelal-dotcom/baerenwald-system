@@ -102,6 +102,8 @@ const KUNDE_DETAIL_SELECT = `
       id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
       notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
       gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
+      portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
       leads(
         id, status, situation, bereiche, created_at, budget_ca
       ),

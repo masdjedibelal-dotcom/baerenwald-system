@@ -1,3 +1,4 @@
+import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
 import type { KundenObjekt } from '@/lib/types'
 
 export type KundenObjektInput = {
@@ -6,6 +7,10 @@ export type KundenObjektInput = {
   hausnummer?: string | null
   plz?: string | null
   ort?: string | null
+  melde_slug?: string | null
+  melde_aktiv?: boolean
+  einheiten_hinweis?: string | null
+  notizen_intern?: string | null
 }
 
 /** Nur Objekte des angegebenen Kunden (Client-State kann sonst Objekte anderer Kunden mischen). */
@@ -22,6 +27,10 @@ export function validateKundenObjektInput(input: KundenObjektInput): string | nu
   if (!input.titel?.trim()) return 'Bitte einen Titel angeben (z. B. WEG).'
   if (!input.strasse?.trim()) return 'Straße ist Pflicht.'
   if (!input.plz?.trim() || !input.ort?.trim()) return 'Postleitzahl und Ort sind Pflicht.'
+  const slug = input.melde_slug?.trim()
+  if (slug && !isValidMeldeSlug(normalizeOrgSlug(slug))) {
+    return 'Melde-Slug: 2–48 Zeichen, nur Kleinbuchstaben, Zahlen und Bindestriche.'
+  }
   return null
 }
 

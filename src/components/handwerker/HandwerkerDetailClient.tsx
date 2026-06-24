@@ -55,6 +55,12 @@ import {
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
+  handwerkerDisplayName,
+  handwerkerGfName,
+  normalizeHandwerkerNamen,
+  validateHandwerkerStammPflicht,
+} from '@/lib/handwerker-stammdaten'
+import {
   getPartnerPortalMailDraft,
   previewPartnerPortalMail,
   sendPartnerPortalLinkMail,
@@ -143,8 +149,10 @@ export function HandwerkerDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [hasPortalAccount, setHasPortalAccount] = useState(false)
 
-  const [formName, setFormName] = useState(hw.name)
-  const [formFirma, setFormFirma] = useState(hw.firma ?? '')
+  const legacyKontakt = normalizeHandwerkerNamen(hw)
+  const [formFirma, setFormFirma] = useState(legacyKontakt.firma)
+  const [formVorname, setFormVorname] = useState(legacyKontakt.vorname)
+  const [formNachname, setFormNachname] = useState(legacyKontakt.nachname)
   const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
   const [formEmail, setFormEmail] = useState(hw.email ?? '')
   const [formAdresse, setFormAdresse] = useState(hw.adresse ?? '')
@@ -155,8 +163,10 @@ export function HandwerkerDetailClient({
 
   useEffect(() => {
     if (modalOpen) {
-      setFormName(hw.name)
-      setFormFirma(hw.firma ?? '')
+      const k = normalizeHandwerkerNamen(hw)
+      setFormFirma(k.firma)
+      setFormVorname(k.vorname)
+      setFormNachname(k.nachname)
       setFormTelefon(hw.telefon ?? '')
       setFormEmail(hw.email ?? '')
       setFormAdresse(hw.adresse ?? '')
@@ -217,15 +227,21 @@ export function HandwerkerDetailClient({
   }, [hw.id, rahmenVertrag?.id])
 
   const saveKontaktModal = useCallback(() => {
-    if (!formName.trim() || !formTelefon.trim()) {
-      setErr('Name und Telefon sind Pflichtfelder.')
+    const pflicht = validateHandwerkerStammPflicht({
+      firma: formFirma,
+      vorname: formVorname,
+      nachname: formNachname,
+    })
+    if (pflicht) {
+      setErr(pflicht)
       return
     }
     const input: HandwerkerFormInput = {
-      name: formName.trim(),
       firma: formFirma.trim() || null,
+      vorname: formVorname.trim() || null,
+      nachname: formNachname.trim() || null,
       email: formEmail.trim() || null,
-      telefon: formTelefon.trim(),
+      telefon: formTelefon.trim() || null,
       whatsapp: hw.whatsapp?.trim() || null,
       webseite: hw.webseite?.trim() || null,
       adresse: formAdresse.trim() || null,
@@ -250,8 +266,9 @@ export function HandwerkerDetailClient({
       router.refresh()
     })
   }, [
-    formName,
     formFirma,
+    formVorname,
+    formNachname,
     formEmail,
     formTelefon,
     formAdresse,
@@ -334,8 +351,12 @@ export function HandwerkerDetailClient({
         }
       >
         <div className="space-y-1">
-          <PropertyRow label="Name" value={hw.name} editable={false} />
-          <PropertyRow label="Firma" value={hw.firma || '—'} editable={false} />
+          <PropertyRow label="Firmenname" value={handwerkerDisplayName(hw)} editable={false} />
+          <PropertyRow
+            label="Geschäftsführer"
+            value={handwerkerGfName(hw) || '—'}
+            editable={false}
+          />
           <PropertyRow
             label="Telefon"
             value={
@@ -599,10 +620,10 @@ export function HandwerkerDetailClient({
       <DetailHead
         backHref="/handwerker"
         backLabel="Zurück zu Handwerker"
-        title={hw.name}
+        title={handwerkerDisplayName(hw)}
         sub={
           <span>
-            {hw.firma ? `${hw.firma} · ` : null}
+            {handwerkerGfName(hw) ? `${handwerkerGfName(hw)} · ` : null}
             {hw.subkategorie ?? 'Handwerker'}
             {gewerkNamen.length ? ` · ${gewerkNamen.slice(0, 3).join(', ')}` : null}
             {hw.adresse ? ` · ${hw.adresse}` : null}
@@ -657,9 +678,20 @@ export function HandwerkerDetailClient({
         const editForm = (
           <div className="space-y-4">
             {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
-            <Input label="Name *" value={formName} onChange={(e) => setFormName(e.target.value)} required />
-            <Input label="Firma" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
-            <Input label="Telefon *" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} required />
+            <Input label="Firmenname *" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
+            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+              <Input
+                label="Vorname (Geschäftsführer)"
+                value={formVorname}
+                onChange={(e) => setFormVorname(e.target.value)}
+              />
+              <Input
+                label="Nachname (Geschäftsführer)"
+                value={formNachname}
+                onChange={(e) => setFormNachname(e.target.value)}
+              />
+            </div>
+            <Input label="Telefon" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} />
             <Input label="E-Mail" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
             <Input label="Adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} />
           </div>

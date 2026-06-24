@@ -1,10 +1,30 @@
 import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 
-export function defaultPortalInviteBetreff(anrede: 'du' | 'sie'): string {
+export function defaultPortalInviteBetreff(
+  anrede: 'du' | 'sie',
+  opts?: { organisation?: boolean }
+): string {
+  if (opts?.organisation) {
+    return anrede === 'du' ? 'Dein Auftraggeber-Portal' : 'Ihr Auftraggeber-Portal'
+  }
   return anrede === 'du' ? 'Dein Zugang zu MeinBärenwald' : 'Ihr Zugang zu MeinBärenwald'
 }
 
-export function defaultPortalInviteText(anrede: 'du' | 'sie'): string {
+export function defaultPortalInviteText(
+  anrede: 'du' | 'sie',
+  opts?: { organisation?: boolean; orgName?: string | null }
+): string {
+  const org = opts?.orgName?.trim()
+  if (opts?.organisation) {
+    if (anrede === 'du') {
+      return org
+        ? `hier ist dein Zugang zum Auftraggeber-Portal für ${org}.\n\nRegistriere dich mit dieser E-Mail-Adresse — Meldungen, Freigaben und Objekte im Blick.`
+        : 'hier ist dein Zugang zum Auftraggeber-Portal.\n\nRegistriere dich mit dieser E-Mail-Adresse — Meldungen, Freigaben und Objekte im Blick.'
+    }
+    return org
+      ? `hier ist Ihr Zugang zum Auftraggeber-Portal für ${org}.\n\nRegistrieren Sie sich mit dieser E-Mail-Adresse — Meldungen, Freigaben und Objekte im Blick.`
+      : 'hier ist Ihr Zugang zum Auftraggeber-Portal.\n\nRegistrieren Sie sich mit dieser E-Mail-Adresse — Meldungen, Freigaben und Objekte im Blick.'
+  }
   if (anrede === 'du') {
     return (
       'hier ist dein Zugang zu MeinBärenwald, deinem Kundenportal von Bärenwald.\n\n' +
@@ -28,7 +48,7 @@ export function defaultPartnerPortalInviteText(): string {
   )
 }
 
-function publicWebsiteBaseUrl(): string {
+export function publicWebsiteBaseUrl(): string {
   return (
     process.env.FRONTEND_URL ??
     process.env.NEXT_PUBLIC_WEBSEITE_URL ??

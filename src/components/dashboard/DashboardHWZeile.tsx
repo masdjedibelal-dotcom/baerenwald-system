@@ -6,6 +6,7 @@ import { AlertTriangle, Check, X } from 'lucide-react'
 import { SidePanel } from '@/components/ui/SidePanel'
 import { IconText } from '@/components/ui/IconText'
 import type { HandwerkerZeile } from '@/components/handwerker/HandwerkerListeClient'
+import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 
 function gewerkKurz(h: HandwerkerZeile): string {
   const g = h.gewerke
@@ -50,7 +51,7 @@ export function DashboardHWZeile({ row: h }: { row: HandwerkerZeile }) {
       <button type="button" onClick={() => setOpen(true)} className="list-row w-full text-left">
         <div className="md:hidden w-full">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-bw-text">{h.firma?.trim() || h.name}</span>
+            <span className="text-sm font-medium text-bw-text">{handwerkerDisplayName(h)}</span>
             <span className="text-xs text-bw-text-muted">aktiv</span>
           </div>
           <p className="text-xs text-bw-text-muted">{gewerkKurz(h)}</p>
@@ -59,7 +60,7 @@ export function DashboardHWZeile({ row: h }: { row: HandwerkerZeile }) {
           </div>
         </div>
         <div className="hidden w-full items-center gap-4 md:flex">
-          <span className="flex-1 truncate text-sm font-medium text-bw-text">{h.firma?.trim() || h.name}</span>
+          <span className="flex-1 truncate text-sm font-medium text-bw-text">{handwerkerDisplayName(h)}</span>
           <span className="w-32 truncate text-xs text-bw-text-muted">{gewerkKurz(h)}</span>
           <div className="w-40">
             <ComplianceHint h={h} />
@@ -71,8 +72,8 @@ export function DashboardHWZeile({ row: h }: { row: HandwerkerZeile }) {
       <SidePanel
         open={open}
         onClose={() => setOpen(false)}
-        title={h.firma?.trim() || h.name}
-        subtitle={h.name}
+        title={handwerkerDisplayName(h)}
+        subtitle={handwerkerGfName(h) || undefined}
       >
         <div className="space-y-4 p-5 text-sm">
           <p className="text-bw-text-muted">{h.email ?? '—'}</p>

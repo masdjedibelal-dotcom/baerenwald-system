@@ -9,7 +9,6 @@ import {
   mailHtmlBase,
   mailKundenContactLine,
   mailKundenGruss,
-  mailKundenPortalTop,
   mailKundenStandardOptions,
   mailSummaryBlock,
 } from '@/lib/mail-templates'
@@ -93,7 +92,6 @@ export function buildAuftragsbestaetigungMail(
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:#374151;margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
   })
 
-  const portalTopHtml = mailKundenPortalTop(data.statusLink)
   const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
@@ -105,7 +103,6 @@ export function buildAuftragsbestaetigungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      ${portalTopHtml}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       <p style="font-size:14px;font-weight:600;color:#111111;margin:0 0 8px;">${stepsTitle}</p>
@@ -115,7 +112,7 @@ export function buildAuftragsbestaetigungMail(
     preheader,
     b,
     undefined,
-    mailKundenStandardOptions(anrede)
+    mailKundenStandardOptions(anrede, data.statusLink)
   )
 
   return { betreff, html }

@@ -3,7 +3,6 @@ import {
   mailHtmlBase,
   mailKundenContactLine,
   mailKundenGruss,
-  mailKundenPortalTop,
   mailKundenStandardOptions,
   mailSummaryBlock,
 } from '@/lib/mail-templates'
@@ -84,7 +83,6 @@ export function buildRechnungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      ${mailKundenPortalTop()}
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>

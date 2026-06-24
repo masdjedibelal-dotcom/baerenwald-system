@@ -2,12 +2,29 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import { kundeHatOrgKennung } from '@/app/actions/kunden-organisation'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import {
   validateKundenObjektInput,
   type KundenObjektInput,
 } from '@/lib/kunden-objekte'
+import { normalizeOrgSlug } from '@/lib/org/slug'
 import type { KundenObjekt } from '@/lib/types'
+
+function objektDbPayload(input: KundenObjektInput): Record<string, unknown> {
+  const slug = input.melde_slug?.trim() ? normalizeOrgSlug(input.melde_slug) : null
+  return {
+    titel: input.titel.trim(),
+    strasse: input.strasse?.trim() || null,
+    hausnummer: input.hausnummer?.trim() || null,
+    plz: input.plz?.trim() || null,
+    ort: input.ort?.trim() || null,
+    melde_slug: slug,
+    melde_aktiv: input.melde_aktiv !== false,
+    einheiten_hinweis: input.einheiten_hinweis?.trim() || null,
+    notizen_intern: input.notizen_intern?.trim() || null,
+  }
+}
 
 export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[]> {
   const id = kundeId?.trim()
@@ -33,16 +50,21 @@ export async function createKundenObjekt(
   const err = validateKundenObjektInput(input)
   if (err) return { ok: false, message: err }
 
+  const hatKennung = await kundeHatOrgKennung(kundeId.trim())
+  if (!hatKennung) {
+    return {
+      ok: false,
+      message: 'Bitte zuerst eine Org-Kennung im Tab „Organisation“ hinterlegen.',
+    }
+  }
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('kunden_objekte')
     .insert({
       kunde_id: kundeId.trim(),
-      titel: input.titel.trim(),
-      strasse: input.strasse?.trim() || null,
-      hausnummer: input.hausnummer?.trim() || null,
-      plz: input.plz?.trim() || null,
-      ort: input.ort?.trim() || null,
+      created_by: 'crm',
+      ...objektDbPayload(input),
     })
     .select('*')
     .single()
@@ -66,11 +88,7 @@ export async function updateKundenObjekt(
   const { error } = await supabase
     .from('kunden_objekte')
     .update({
-      titel: input.titel.trim(),
-      strasse: input.strasse?.trim() || null,
-      hausnummer: input.hausnummer?.trim() || null,
-      plz: input.plz?.trim() || null,
-      ort: input.ort?.trim() || null,
+      ...objektDbPayload(input),
       updated_at: new Date().toISOString(),
     })
     .eq('id', objektId)

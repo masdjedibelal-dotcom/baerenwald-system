@@ -53,6 +53,7 @@ import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
+import { LeadOrgKontextBlock } from '@/components/anfragen/LeadOrgKontextBlock'
 import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
@@ -82,7 +83,7 @@ const KundeModal = dynamic(
   { ssr: false }
 )
 import { toast } from '@/components/ui/app-toast'
-import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
+import { deleteAnfrage, weiterfuehrenAlsProjekt } from '@/app/(dashboard)/anfragen/actions'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
 import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { findeNeuestenEntwurf, hatNurEntwuerfe } from '@/lib/angebote/angebot-lebenszyklus'
@@ -554,6 +555,25 @@ export function AnfrageDetailClient({
         hint: leadEmail?.trim() ? undefined : 'E-Mail im Modal eintragen',
         onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
       },
+      ...(lead.anlass === 'meldung'
+        ? ([
+            {
+              label: 'Als Projekt weiterführen',
+              icon: <Briefcase className="h-[15px] w-[15px]" aria-hidden />,
+              onClick: () => {
+                startTransition(async () => {
+                  const r = await weiterfuehrenAlsProjekt(lead.id)
+                  if (!r.ok) {
+                    toast.error(r.message)
+                    return
+                  }
+                  toast.success('Projekt-Anfrage angelegt')
+                  router.push(`/anfragen/${r.id}`)
+                })
+              },
+            },
+          ] satisfies ActionsMenuItem[])
+        : []),
       'sep',
       {
         label: 'Termin vereinbart',
@@ -579,7 +599,7 @@ export function AnfrageDetailClient({
         onClick: () => setDeleteConfirmOpen(true),
       },
     ]
-  }, [lead.id, leadEmail, mailCompose])
+  }, [lead.id, lead.anlass, leadEmail, mailCompose, router, startTransition])
 
   function fuehreAnfrageLoeschen() {
     startTransition(async () => {
@@ -635,6 +655,7 @@ export function AnfrageDetailClient({
   const projektuebersichtCards = (
     <>
       {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
+      <LeadOrgKontextBlock lead={lead} />
       <LeadFunnelProjektAnzeige
         lead={lead}
         gewerke={wizardGewerke}

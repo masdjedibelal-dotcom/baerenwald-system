@@ -78,7 +78,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (body.typ === 'kunde') {
     if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
       return NextResponse.json(
-        { error: handwerkerSendenBlockierHinweis(detail.angebot_handwerker) },
+        { error: handwerkerSendenBlockierHinweis(
+          detail.angebot_handwerker,
+          (detail.leads as { org_freigabe_status?: string } | null | undefined)
+            ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
+        ) },
         { status: 400 }
       )
     }

@@ -2,8 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   ListFilterSection,
@@ -26,12 +26,16 @@ import {
   type ZeitraumPreset,
 } from '@/lib/listZeitraum'
 import { ComplianceBadge, normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
+import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
+import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
 import { cn } from '@/lib/utils'
 
 export type HandwerkerZeile = {
   id: string
   name: string
   firma: string | null
+  vorname: string | null
+  nachname: string | null
   email: string | null
   telefon: string | null
   gewerke: unknown
@@ -46,8 +50,9 @@ export type HandwerkerZeile = {
 export type GewerkOption = { slug: string; name: string }
 
 const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
-  { key: 'name', label: 'Name' },
-  { key: 'firma', label: 'Firma' },
+  { key: 'firma', label: 'Firmenname' },
+  { key: 'vorname', label: 'Vorname GF' },
+  { key: 'nachname', label: 'Nachname GF' },
   { key: 'telefon', label: 'Telefon' },
   { key: 'email', label: 'E-Mail' },
   { key: 'gewerke', label: 'Gewerke' },
@@ -74,8 +79,9 @@ function gewerkeStrRaw(g: unknown): string {
 
 function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
   return {
-    name: h.name,
     firma: h.firma ?? '',
+    vorname: h.vorname ?? '',
+    nachname: h.nachname ?? '',
     telefon: h.telefon ?? '',
     email: h.email ?? '',
     gewerke: gewerkeStr(h),
@@ -120,6 +126,27 @@ export function HandwerkerListeClient({
   const einsatzFilterAktiv = searchParams.get('filter') === 'einsatz'
   const isPane = mode === 'pane'
 
+  const [modalOpen, setModalOpen] = useState(false)
+
+  function closeNeuModal() {
+    setModalOpen(false)
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('neu')
+    const q = params.toString()
+    router.replace(q ? `/handwerker?${q}` : '/handwerker', { scroll: false })
+  }
+
+  function openNeuModal() {
+    setModalOpen(true)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('neu', '1')
+    router.replace(`/handwerker?${params.toString()}`, { scroll: false })
+  }
+
+  useEffect(() => {
+    if (searchParams.get('neu') === '1') setModalOpen(true)
+  }, [searchParams])
+
   const listRows = useMemo(() => {
     if (!einsatzFilterAktiv) return rows
     return rows.filter((h) => h.aktiver_einsatz)
@@ -151,7 +178,13 @@ export function HandwerkerListeClient({
       }
       if (dateRange && !datumInZeitraum(h.created_at, dateRange)) return false
       if (!needle) return true
-      const pool = [h.name, h.firma ?? '', h.email ?? '', h.telefon ?? '', gewerkeStr(h)]
+      const pool = [
+        handwerkerDisplayName(h),
+        handwerkerGfName(h),
+        h.email ?? '',
+        h.telefon ?? '',
+        gewerkeStr(h),
+      ]
         .join(' ')
         .toLowerCase()
       return pool.includes(needle)
@@ -162,7 +195,7 @@ export function HandwerkerListeClient({
     () =>
       filtered.map((h) => ({
         row: h,
-        name: h.name,
+        name: handwerkerDisplayName(h),
         gewerk: gewerkeStr(h),
         compliance: complianceRank(h),
       })),
@@ -215,7 +248,7 @@ export function HandwerkerListeClient({
   )
 
   const sortOptions = [
-    { field: 'name', label: 'Name' },
+    { field: 'name', label: 'Firma' },
     { field: 'gewerk', label: 'Gewerk' },
     { field: 'compliance', label: 'Compliance' },
   ]
@@ -275,7 +308,16 @@ export function HandwerkerListeClient({
                 onSort: (f) => (f ? handleSort(f) : resetSort()),
               }}
               toolbarEnd={
-                <select
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm hidden shrink-0 gap-1 md:inline-flex"
+                    onClick={openNeuModal}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Neuer Handwerker
+                  </button>
+                  <select
                   aria-label="Sortieren"
                   value={field ?? ''}
                   onChange={(e) => (e.target.value ? handleSort(e.target.value) : resetSort())}
@@ -288,6 +330,7 @@ export function HandwerkerListeClient({
                     </option>
                   ))}
                 </select>
+                </>
               }
             />
           </ListFilterSection>
@@ -305,6 +348,13 @@ export function HandwerkerListeClient({
               ? 'Lege Handwerker an, um sie hier zu verwalten.'
               : 'Passe Filter oder Suche an.'
           }
+          action={
+            rows.length === 0 ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={openNeuModal}>
+                + Ersten Handwerker anlegen
+              </button>
+            ) : null
+          }
         />
       ) : (
         <>
@@ -319,9 +369,9 @@ export function HandwerkerListeClient({
                   href={isPane ? `/handwerker/${h.id}` : undefined}
                   onClick={isPane ? undefined : () => openDetail(h.id)}
                   className={cn(selectedId === h.id && 'ring-2 ring-bw-primary/40')}
-                  avatar={<ListAvatar name={h.name} />}
-                  title={h.name}
-                  line2={h.firma?.trim() || gewerkeLabel}
+                  avatar={<ListAvatar name={handwerkerDisplayName(h)} />}
+                  title={handwerkerDisplayName(h)}
+                  line2={handwerkerGfName(h) || gewerkeLabel}
                   line3={
                     [h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'
                   }
@@ -338,8 +388,8 @@ export function HandwerkerListeClient({
           >
             <div className="list-row-grid head" style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}>
               <div />
-              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Firma</div>
+              <SortableHeader label="Firma" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
+              <div>Geschäftsführer</div>
               <SortableHeader label="Gewerke" field="gewerk" currentField={field} currentDir={dir} onSort={handleSort} />
               <SortableHeader
                 label="Compliance"
@@ -360,14 +410,16 @@ export function HandwerkerListeClient({
                 )}
                 style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}
               >
-                <ListAvatar name={h.name} />
+                <ListAvatar name={handwerkerDisplayName(h)} />
                 <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">{h.name}</p>
+                  <p className="truncate text-[13.5px] font-medium text-bw-text">
+                    {handwerkerDisplayName(h)}
+                  </p>
                   <p className="truncate text-xs text-bw-text-muted">
                     {[h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'}
                   </p>
                 </div>
-                <p className="truncate text-[13px] text-bw-text">{h.firma?.trim() || '—'}</p>
+                <p className="truncate text-[13px] text-bw-text">{handwerkerGfName(h) || '—'}</p>
                 <p className="truncate text-[12.5px] text-bw-text-muted">
                   {(h.gewerk_namen ?? []).join(' · ') || '—'}
                 </p>
@@ -377,6 +429,17 @@ export function HandwerkerListeClient({
           </ListGridShell>
         </>
       )}
+
+      <HandwerkerModal
+        open={modalOpen}
+        onClose={closeNeuModal}
+        gewerkeOptionen={gewerkeOptionen}
+        onSaved={(id) => {
+          closeNeuModal()
+          router.push(`/handwerker/${id}`)
+          router.refresh()
+        }}
+      />
 
       <CsvExportModal
         open={exportOpen}

@@ -11,7 +11,6 @@ import {
   mailHtmlBase,
   mailKundenContactLine,
   mailKundenGruss,
-  mailKundenPortalTop,
   mailKundenStandardOptions,
   mailSummaryBlock,
 } from '@/lib/mail-templates'
@@ -179,7 +178,6 @@ export function buildBautagebuchKundenMail(
   const nachrichtHtml = textToHtmlParagraphs(data.nachricht)
   const uebersicht = projektUebersichtBlock(data.positionen, data.gewerke, data.eintrag, anrede)
 
-  const portalTopHtml = mailKundenPortalTop(data.statusLink)
   const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
@@ -192,7 +190,6 @@ export function buildBautagebuchKundenMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      ${portalTopHtml}
       ${nachrichtHtml}
       ${uebersicht}
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
@@ -200,7 +197,7 @@ export function buildBautagebuchKundenMail(
     preheader,
     b,
     disclaimer,
-    mailKundenStandardOptions(anrede)
+    mailKundenStandardOptions(anrede, data.statusLink)
   )
 
   return {

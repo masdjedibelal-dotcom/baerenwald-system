@@ -3,8 +3,10 @@
 import { useEffect, useState, useTransition } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
+import { suggestMeldeSlugFromTitel } from '@/lib/org/slug'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
 
@@ -27,6 +29,10 @@ export function KundenObjektModal({
   const [hausnummer, setHausnummer] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
+  const [meldeSlug, setMeldeSlug] = useState('')
+  const [meldeAktiv, setMeldeAktiv] = useState(true)
+  const [einheitenHinweis, setEinheitenHinweis] = useState('')
+  const [notizenIntern, setNotizenIntern] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -37,19 +43,43 @@ export function KundenObjektModal({
       setHausnummer(editObjekt.hausnummer ?? '')
       setPlz(editObjekt.plz ?? '')
       setOrt(editObjekt.ort ?? '')
+      setMeldeSlug(editObjekt.melde_slug ?? '')
+      setMeldeAktiv(editObjekt.melde_aktiv !== false)
+      setEinheitenHinweis(editObjekt.einheiten_hinweis ?? '')
+      setNotizenIntern(editObjekt.notizen_intern ?? '')
     } else {
       setTitel('')
       setStrasse('')
       setHausnummer('')
       setPlz('')
       setOrt('')
+      setMeldeSlug('')
+      setMeldeAktiv(true)
+      setEinheitenHinweis('')
+      setNotizenIntern('')
     }
     setErr(null)
   }, [open, editObjekt])
 
+  function vorschlagSlug() {
+    const basis = titel.trim() || [strasse, hausnummer, plz].filter(Boolean).join(' ')
+    if (!basis) return
+    setMeldeSlug(suggestMeldeSlugFromTitel(basis))
+  }
+
   function speichern() {
     setErr(null)
-    const payload = { titel, strasse, hausnummer, plz, ort }
+    const payload = {
+      titel,
+      strasse,
+      hausnummer,
+      plz,
+      ort,
+      melde_slug: meldeSlug || null,
+      melde_aktiv: meldeAktiv,
+      einheiten_hinweis: einheitenHinweis || null,
+      notizen_intern: notizenIntern || null,
+    }
     startTransition(async () => {
       if (editObjekt) {
         const r = await updateKundenObjekt(editObjekt.id, kundeId, payload)
@@ -64,6 +94,10 @@ export function KundenObjektModal({
           hausnummer: hausnummer.trim() || null,
           plz: plz.trim() || null,
           ort: ort.trim() || null,
+          melde_slug: meldeSlug.trim() || null,
+          melde_aktiv: meldeAktiv,
+          einheiten_hinweis: einheitenHinweis.trim() || null,
+          notizen_intern: notizenIntern.trim() || null,
         })
         toast.success('Objekt gespeichert')
         onClose()
@@ -103,6 +137,48 @@ export function KundenObjektModal({
           <Input label="PLZ" value={plz} onChange={(e) => setPlz(e.target.value)} required />
           <Input label="Ort" value={ort} onChange={(e) => setOrt(e.target.value)} required />
         </div>
+
+        <div className="border-t border-bw-border pt-3">
+          <p className="mb-2 text-[12px] font-medium text-bw-text">Öffentliches Meldeformular</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <Input
+                label="Melde-Slug"
+                placeholder="z. B. weg-musterstrasse"
+                value={meldeSlug}
+                onChange={(e) => setMeldeSlug(e.target.value)}
+                hint="Teil-URL: /melden/{org}/{melde_slug}"
+              />
+            </div>
+            <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={vorschlagSlug}>
+              Vorschlag
+            </Button>
+          </div>
+          <label className="mt-2 flex items-center gap-2 text-[13px] text-bw-text">
+            <input
+              type="checkbox"
+              checked={meldeAktiv}
+              onChange={(e) => setMeldeAktiv(e.target.checked)}
+              className="rounded border-bw-border"
+            />
+            Meldeformular aktiv
+          </label>
+          <Input
+            label="Einheiten-Hinweis"
+            placeholder="z. B. Wohnung, Etage, Gewerbeeinheit"
+            value={einheitenHinweis}
+            onChange={(e) => setEinheitenHinweis(e.target.value)}
+            className="mt-2"
+          />
+          <Textarea
+            label="Interne Notizen"
+            rows={2}
+            value={notizenIntern}
+            onChange={(e) => setNotizenIntern(e.target.value)}
+            className="mt-2"
+          />
+        </div>
+
         {err ? <p className="text-sm text-danger">{err}</p> : null}
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>

@@ -112,6 +112,8 @@ export function AngebotVersandSection({
     }) ?? (kundeName.split(/\s+/)[0] || kundeName)
 
   const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
+  const orgFreigabeStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
+    ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
   const titel =
     angebotTitel?.trim() ||
     detail.notizen?.trim()?.slice(0, 80) ||
@@ -293,7 +295,7 @@ export function AngebotVersandSection({
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
               : !darfAngebotAnKundeSenden(rows, detail.status)
-                ? handwerkerSendenBlockierHinweis(rows)
+                ? handwerkerSendenBlockierHinweis(rows, orgFreigabeStatus)
                 : 'Nur bei Status „Entwurf“ oder „Handwerker akzeptiert“ versendbar.'}
           </p>
         )}

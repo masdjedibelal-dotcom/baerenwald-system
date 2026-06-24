@@ -23,6 +23,15 @@ import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
 import {
+  ANFRAGEN_ANLASS_FILTER_OPTS,
+  ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS,
+  leadMatchesAnlassFilter,
+  leadMatchesOrgSpezialFilter,
+  type AnfragenAnlassFilter,
+  type AnfragenOrgSpezialFilter,
+} from '@/lib/crm/anfragen-org-filter'
+import { ANLASS_LABELS } from '@/lib/org/org-portal-helpers'
+import {
   ANFRAGEN_STATUS_FILTER_ORDER,
   leadInAnfragenPipeline,
   leadStatusInAnfragenListe,
@@ -57,6 +66,11 @@ const KANAL_FILTERS: { value: '' | LeadKanal; label: string }[] = [
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'email', label: 'E-Mail' },
   { value: 'vor_ort', label: 'Vor Ort' },
+  { value: 'hv_melder_link', label: 'Melde-Link' },
+  { value: 'hv_einladung', label: 'HV-Einladung' },
+  { value: 'org_portal', label: 'Auftraggeber-Portal' },
+  { value: 'org_funnel', label: 'Org-Projekt' },
+  { value: 'org_service', label: 'Org-Servicepaket' },
   { value: 'sonstiges', label: 'Sonstiges' },
 ]
 
@@ -195,6 +209,8 @@ export function AnfragenListeClient({
 
   const [statusFilter, setStatusFilter] = useState<AnfragenStatusFilter>('')
   const [kanal, setKanal] = useState<'' | LeadKanal>('')
+  const [anlassFilter, setAnlassFilter] = useState<AnfragenAnlassFilter>('')
+  const [orgSpezialFilter, setOrgSpezialFilter] = useState<AnfragenOrgSpezialFilter>('')
   const [q, setQ] = useState('')
   const debouncedQ = useDebouncedValue(q, 300)
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
@@ -241,6 +257,8 @@ export function AnfragenListeClient({
         return false
       }
       if (kanal && l.kanal !== kanal) return false
+      if (!leadMatchesAnlassFilter(l, anlassFilter)) return false
+      if (!leadMatchesOrgSpezialFilter(l, orgSpezialFilter)) return false
       if (dateRange && !datumInZeitraum(l.created_at, dateRange)) return false
       if (!needle) return true
       const name = leadName(l).toLowerCase()
@@ -248,7 +266,7 @@ export function AnfragenListeClient({
       const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
       return name.includes(needle) || mail.includes(needle) || tel.includes(needle)
     })
-  }, [anfragenLeads, statusFilter, kanal, debouncedQ, dateRange])
+  }, [anfragenLeads, statusFilter, kanal, anlassFilter, orgSpezialFilter, debouncedQ, dateRange])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -264,11 +282,20 @@ export function AnfragenListeClient({
 
   const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
 
-  const hasFilters = !!(statusFilter || kanal || zeitraum !== 'alle' || q.trim())
+  const hasFilters = !!(
+    statusFilter ||
+    kanal ||
+    anlassFilter ||
+    orgSpezialFilter ||
+    zeitraum !== 'alle' ||
+    q.trim()
+  )
 
   function resetAllFilters() {
     setStatusFilter('')
     setKanal('')
+    setAnlassFilter('')
+    setOrgSpezialFilter('')
     setQ('')
     setZeitraum('alle')
     setCustomFrom('')
@@ -280,6 +307,19 @@ export function AnfragenListeClient({
     // Status steht bereits in FilterChips — kein Tag doppelt anzeigen
     if (kanal) {
       t.push({ id: 'kanal', label: KANAL_LABELS[kanal], onRemove: () => setKanal('') })
+    }
+    if (anlassFilter) {
+      t.push({
+        id: 'anlass',
+        label: ANLASS_LABELS[anlassFilter] ?? anlassFilter,
+        onRemove: () => setAnlassFilter(''),
+      })
+    }
+    if (orgSpezialFilter) {
+      const label =
+        ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS.find((o) => o.value === orgSpezialFilter)?.label ??
+        orgSpezialFilter
+      t.push({ id: 'org_spezial', label, onRemove: () => setOrgSpezialFilter('') })
     }
     if (zeitraum !== 'alle') {
       t.push({
@@ -296,7 +336,7 @@ export function AnfragenListeClient({
       t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
     }
     return t
-  }, [kanal, zeitraum, q])
+  }, [kanal, anlassFilter, orgSpezialFilter, zeitraum, q])
 
   function openDetail(leadId: string) {
     router.push(`/anfragen/${leadId}`)
@@ -322,6 +362,24 @@ export function AnfragenListeClient({
               })),
               selected: [statusFilter],
               onChange: (v) => setStatusFilter((v[0] ?? '') as AnfragenStatusFilter),
+            },
+            {
+              label: 'Anlass',
+              options: ANFRAGEN_ANLASS_FILTER_OPTS.map((o) => ({
+                label: o.label,
+                value: o.value,
+              })),
+              selected: [anlassFilter],
+              onChange: (v) => setAnlassFilter((v[0] ?? '') as AnfragenAnlassFilter),
+            },
+            {
+              label: 'Org-Status',
+              options: ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS.map((o) => ({
+                label: o.label,
+                value: o.value,
+              })),
+              selected: [orgSpezialFilter],
+              onChange: (v) => setOrgSpezialFilter((v[0] ?? '') as AnfragenOrgSpezialFilter),
             },
           ]}
         >

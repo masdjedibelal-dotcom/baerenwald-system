@@ -1,5 +1,6 @@
 import type { AuftragPosition } from '@/lib/types'
 import type { NachtragPositionDraft } from '@/lib/vertraege/types'
+import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 
 export function bauvorhabenAusAuftrag(input: {
   titel?: string | null
@@ -63,10 +64,22 @@ function formatEur(n: number) {
   return `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
-export function handwerkerAnzeigename(h: { name: string; firma?: string | null }) {
-  const firma = h.firma?.trim()
-  if (firma && firma !== h.name.trim()) return `${h.name.trim()} (${firma})`
-  return h.name.trim()
+export function handwerkerAnzeigename(h: {
+  name: string
+  firma?: string | null
+  vorname?: string | null
+  nachname?: string | null
+}) {
+  return handwerkerDisplayName(h)
+}
+
+export function handwerkerVertreterName(h: {
+  name: string
+  firma?: string | null
+  vorname?: string | null
+  nachname?: string | null
+}) {
+  return handwerkerGfName(h) || handwerkerDisplayName(h)
 }
 
 export function formatVertragDatumDe(iso: string | null | undefined): string | null {

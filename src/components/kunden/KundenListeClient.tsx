@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   ListFilterSection,
@@ -89,6 +89,7 @@ export function KundenListeClient({
   selectedId?: string | null
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -99,6 +100,30 @@ export function KundenListeClient({
   const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+
+  function closeNeuModal() {
+    setModalOpen(false)
+    setEditKunde(null)
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('neu')
+    const q = params.toString()
+    router.replace(q ? `/kunden?${q}` : '/kunden', { scroll: false })
+  }
+
+  function openNeuModal() {
+    setEditKunde(null)
+    setModalOpen(true)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('neu', '1')
+    router.replace(`/kunden?${params.toString()}`, { scroll: false })
+  }
+
+  useEffect(() => {
+    if (searchParams.get('neu') === '1') {
+      setEditKunde(null)
+      setModalOpen(true)
+    }
+  }, [searchParams])
 
   const dateRange = useMemo(
     () => getZeitraumRange(zeitraum, customFrom, customTo),
@@ -240,6 +265,16 @@ export function KundenListeClient({
           tags={filterTags}
           onExportClick={() => setExportOpen(true)}
           resultCount={filtered.length}
+          toolbarEnd={
+            <button
+              type="button"
+              className="btn btn-primary btn-sm hidden shrink-0 gap-1 md:inline-flex"
+              onClick={openNeuModal}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Neuer Kunde
+            </button>
+          }
           sort={{
             options: [
               { field: 'name', label: 'Kunde' },
@@ -267,14 +302,7 @@ export function KundenListeClient({
           }
           action={
             kunden.length === 0 ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  setEditKunde(null)
-                  setModalOpen(true)
-                }}
-              >
+              <button type="button" className="btn btn-primary btn-sm" onClick={openNeuModal}>
                 + Ersten Kunden anlegen
               </button>
             ) : null
@@ -368,14 +396,7 @@ export function KundenListeClient({
         </>
       )}
 
-      <KundeModal
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setEditKunde(null)
-        }}
-        editKunde={editKunde}
-      />
+      <KundeModal open={modalOpen} onClose={closeNeuModal} editKunde={editKunde} />
 
       <CsvExportModal
         open={exportOpen}

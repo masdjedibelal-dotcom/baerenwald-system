@@ -6,7 +6,6 @@ import {
   mailHtmlBase,
   mailKundenContactLine,
   mailKundenGruss,
-  mailKundenPortalTop,
   mailKundenStandardOptions,
   mailSummaryBlock,
 } from '@/lib/mail-templates'
@@ -355,12 +354,11 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
         ${anrede === 'du' ? ctaDu : ctaSie}
       </p>
-      ${mailKundenPortalTop(data.portalLink)}
       ${grussHtml}
       <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
-  return mailHtmlBase(content, preheader, branding, disclaimer, mailKundenStandardOptions(anredeKey))
+  return mailHtmlBase(content, preheader, branding, disclaimer, mailKundenStandardOptions(anredeKey, data.portalLink))
 }
 
 export type NachfassMailInput = AngebotMailInput

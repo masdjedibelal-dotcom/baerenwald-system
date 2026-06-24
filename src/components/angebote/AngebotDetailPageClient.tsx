@@ -58,6 +58,7 @@ import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbei
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
@@ -268,6 +269,8 @@ export function AngebotDetailPageClient({
   const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
 
+  const orgFreigabeStatus = lead?.org_freigabe_status ?? null
+
   const statusEinfach = resolveStatusEinfach(detail)
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
@@ -403,7 +406,7 @@ export function AngebotDetailPageClient({
       return
     }
     toast.error(
-      handwerkerSendenBlockierHinweis(detail.angebot_handwerker ?? []) ||
+      handwerkerSendenBlockierHinweis(detail.angebot_handwerker ?? [], orgFreigabeStatus) ||
         'Angebot kann derzeit nicht an den Kunden gesendet werden.'
     )
   }
@@ -930,6 +933,10 @@ export function AngebotDetailPageClient({
   const fixedOverview = (
     <div className="space-y-3">
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <AngebotOrgFreigabeBanner
+        orgFreigabeStatus={orgFreigabeStatus}
+        orgFreigabeLog={lead?.org_freigabe_log}
+      />
       {stammdatenInhalt}
     </div>
   )

@@ -62,6 +62,10 @@ export async function saveKunde(
   }
   const payload = sanitizeKundePayload(data)
 
+  if (!kundeId && (data.typ === 'gewerbe' || data.typ === 'hausverwaltung')) {
+    payload.portal_modus = 'organisation'
+  }
+
   if (kundeId) {
     const { error } = await withCrmReadFallback(async (db) =>
       db.from('kunden').update(payload).eq('id', kundeId)

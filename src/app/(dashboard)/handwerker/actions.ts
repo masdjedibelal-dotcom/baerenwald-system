@@ -2,14 +2,19 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import {
+  buildHandwerkerStammDbPayload,
+  validateHandwerkerStammPflicht,
+} from '@/lib/handwerker-stammdaten'
 import { PARTNER_DOCS_BUCKET, partnerDokumentStoragePath } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
 
 export type HandwerkerFormInput = {
-  name: string
   firma: string | null
+  vorname: string | null
+  nachname: string | null
   email: string | null
-  telefon: string
+  telefon: string | null
   whatsapp: string | null
   webseite: string | null
   adresse: string | null
@@ -24,17 +29,30 @@ export type HandwerkerFormInput = {
   notizen: string | null
 }
 
+function handwerkerStammFromInput(input: HandwerkerFormInput) {
+  const err = validateHandwerkerStammPflicht(input)
+  if (err) return { ok: false as const, message: err }
+  const stamm = buildHandwerkerStammDbPayload(input)
+  if (!stamm.name) return { ok: false as const, message: 'Name konnte nicht ermittelt werden.' }
+  return { ok: true as const, stamm }
+}
+
 export async function createHandwerker(
   input: HandwerkerFormInput
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const parsed = handwerkerStammFromInput(input)
+  if (!parsed.ok) return parsed
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('handwerker')
     .insert({
-      name: input.name.trim(),
-      firma: input.firma?.trim() || null,
+      name: parsed.stamm.name,
+      firma: parsed.stamm.firma,
+      vorname: parsed.stamm.vorname,
+      nachname: parsed.stamm.nachname,
       email: input.email?.trim() || null,
-      telefon: input.telefon.trim(),
+      telefon: input.telefon?.trim() || null,
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
@@ -60,14 +78,19 @@ export async function updateHandwerker(
   id: string,
   input: HandwerkerFormInput
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const parsed = handwerkerStammFromInput(input)
+  if (!parsed.ok) return parsed
+
   const supabase = createClient()
   const { error } = await supabase
     .from('handwerker')
     .update({
-      name: input.name.trim(),
-      firma: input.firma?.trim() || null,
+      name: parsed.stamm.name,
+      firma: parsed.stamm.firma,
+      vorname: parsed.stamm.vorname,
+      nachname: parsed.stamm.nachname,
       email: input.email?.trim() || null,
-      telefon: input.telefon.trim(),
+      telefon: input.telefon?.trim() || null,
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
@@ -110,7 +133,7 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
     .from('handwerker')
     .select(
       `
-      id, name, firma, email, telefon, whatsapp, webseite, gewerke, subkategorie,
+      id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
       ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
       adresse, partner_kategorie_id,
       partner_kategorien ( id, name, slug, sort_order )
@@ -144,7 +167,7 @@ export type HandwerkerDetailPayload = {
 }
 
 const HANDWERKER_DETAIL_SELECT_BASE = `
-  id, name, firma, email, telefon, whatsapp, webseite, gewerke, subkategorie,
+  id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
   ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
   adresse, partner_kategorie_id,
   partner_kategorien ( id, name, slug, sort_order ),

@@ -1159,3 +1159,75 @@ export async function ensureLeadVertriebsAnalyse(
 ) {
   return ensureLeadVertriebsAnalyseAction(leadId, options)
 }
+
+/** Meldung-Lead als Projektanfrage weiterführen (gleiches Objekt / Auftraggeber). */
+export async function weiterfuehrenAlsProjekt(
+  quellLeadId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: src, error } = await supabase
+    .from('leads')
+    .select(
+      `
+      id, kunde_id, auftraggeber_kunde_id, kunde_objekt_id, plz, strasse, hausnummer,
+      situation, bereiche, zeitraum, funnel_daten, notizen, kundentyp
+    `
+    )
+    .eq('id', quellLeadId.trim())
+    .maybeSingle()
+
+  if (error || !src) return { ok: false, message: error?.message ?? 'Anfrage nicht gefunden.' }
+
+  const row = src as Record<string, unknown>
+  const kundeId =
+    (row.auftraggeber_kunde_id as string | null)?.trim() ||
+    (row.kunde_id as string | null)?.trim() ||
+    null
+
+  const { data: neu, error: insErr } = await supabase
+    .from('leads')
+    .insert({
+      kunde_id: kundeId,
+      auftraggeber_kunde_id: (row.auftraggeber_kunde_id as string | null) ?? null,
+      kunde_objekt_id: (row.kunde_objekt_id as string | null) ?? null,
+      kanal: 'sonstiges' as LeadKanal,
+      anlass: 'projekt',
+      erfassung_von: 'crm',
+      status: 'neu' as LeadStatus,
+      situation: (row.situation as string | null) ?? 'erneuern',
+      bereiche: (row.bereiche as string[] | null) ?? null,
+      plz: (row.plz as string | null) ?? null,
+      zeitraum: (row.zeitraum as string | null) ?? null,
+      kundentyp: (row.kundentyp as string | null) ?? null,
+      funnel_daten: row.funnel_daten ?? null,
+      notizen: [
+        (row.notizen as string | null)?.trim(),
+        `Weitergeführt aus Meldung ${quellLeadId.slice(0, 8).toUpperCase()}`,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      org_freigabe_status: 'nicht_noetig',
+      erstellt_von: user?.id ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (insErr || !neu) return { ok: false, message: insErr?.message ?? 'Projekt-Anfrage konnte nicht angelegt werden.' }
+
+  const newId = (neu as { id: string }).id
+  await supabase.from('leads_status_history').insert({
+    lead_id: newId,
+    status_neu: 'neu',
+    user_id: user?.id ?? null,
+    notiz: `Aus Meldung ${quellLeadId} weitergeführt`,
+  })
+
+  revalidatePath('/anfragen')
+  revalidatePath(`/anfragen/${quellLeadId}`)
+  revalidatePath(`/anfragen/${newId}`)
+  return { ok: true, id: newId }
+}

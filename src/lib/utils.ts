@@ -125,6 +125,11 @@ export const KANAL_LABELS: Record<LeadKanal, string> = {
   email: 'E-Mail',
   vor_ort: 'Vor Ort',
   sonstiges: 'Sonstiges',
+  hv_melder_link: 'Melde-Link',
+  hv_einladung: 'HV-Einladung',
+  org_portal: 'Auftraggeber-Portal',
+  org_funnel: 'Org-Projekt',
+  org_service: 'Org-Servicepaket',
 }
 
 export const SITUATION_LABELS: Record<string, string> = {

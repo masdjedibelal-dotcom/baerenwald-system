@@ -28,6 +28,11 @@ export const ANFRAGEN_LISTE_SELECT = `
       erstellt_von,
       created_at,
       updated_at,
+      anlass,
+      org_freigabe_status,
+      einladung_status,
+      auftraggeber_kunde_id,
+      erfassung_von,
       kunden(id, name, email, telefon, vorname, nachname, typ),
       angebote(id, status, gesamt_fix, gesamt_min, gesamt_max, created_at)
     `

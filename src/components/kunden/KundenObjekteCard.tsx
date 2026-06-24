@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Building2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Building2, Copy, ExternalLink, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
@@ -13,11 +13,14 @@ import {
   kundenObjektStrasseZeile,
 } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
+import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import type { KundenObjekt } from '@/lib/types'
 
 type Props = {
   kundeId: string
   objekte: KundenObjekt[]
+  /** Org-Kennung für Melde-Links */
+  orgKennung?: string | null
   /** Anfrage/Wizard: aktuell gewähltes Objekt */
   selectedId?: string | null
   onSelect?: (objektId: string | null) => void
@@ -30,6 +33,7 @@ type Props = {
 export function KundenObjekteCard({
   kundeId,
   objekte,
+  orgKennung,
   selectedId,
   onSelect,
   onChanged,
@@ -55,6 +59,15 @@ export function KundenObjekteCard({
     }
     return merged.sort((a, b) => a.titel.localeCompare(b.titel, 'de'))
   }, [localObjekte, objekte, kundeId])
+
+  function kopierenLink(url: string) {
+    void navigator.clipboard.writeText(url).then(
+      () => toast.success('Melde-Link kopiert'),
+      () => toast.error('Kopieren fehlgeschlagen')
+    )
+  }
+
+  const orgSlug = orgKennung?.trim().toLowerCase() || null
 
   const selectOptions = useMemo(
     () => [
@@ -177,6 +190,36 @@ export function KundenObjekteCard({
                     .filter(Boolean)
                     .join(', ') || '—'}
                 </p>
+                {orgSlug && o.melde_slug?.trim() ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        o.melde_aktiv !== false
+                          ? 'bg-emerald-100 text-emerald-900'
+                          : 'bg-bw-muted text-bw-text-muted'
+                      }`}
+                    >
+                      {o.melde_aktiv !== false ? 'Melde-Link aktiv' : 'Melde-Link inaktiv'}
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] text-bw-primary hover:underline"
+                      onClick={() => kopierenLink(buildMeldeLink(orgSlug, o.melde_slug))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden />
+                      Link kopieren
+                    </button>
+                    <a
+                      href={buildMeldeLink(orgSlug, o.melde_slug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-bw-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                      Öffnen
+                    </a>
+                  </div>
+                ) : null}
               </div>
               <div className="flex shrink-0 gap-1">
                 <button

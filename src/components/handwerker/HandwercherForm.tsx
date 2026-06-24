@@ -12,6 +12,7 @@ import {
   updateHandwerker,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
+import { normalizeHandwerkerNamen, validateHandwerkerStammPflicht } from '@/lib/handwerker-stammdaten'
 import type { Gewerk, Handwerker } from '@/lib/types'
 
 export function HandwerkerForm({
@@ -24,8 +25,10 @@ export function HandwerkerForm({
   isNew: boolean
 }) {
   const router = useRouter()
-  const [name, setName] = useState(initial?.name ?? '')
-  const [firma, setFirma] = useState(initial?.firma ?? '')
+  const legacy = normalizeHandwerkerNamen(initial ?? {})
+  const [firma, setFirma] = useState(legacy.firma)
+  const [vorname, setVorname] = useState(legacy.vorname)
+  const [nachname, setNachname] = useState(legacy.nachname)
   const [email, setEmail] = useState(initial?.email ?? '')
   const [telefon, setTelefon] = useState(initial?.telefon ?? '')
   const [adresse, setAdresse] = useState(initial?.adresse ?? '')
@@ -46,19 +49,17 @@ export function HandwerkerForm({
 
   const submit = async () => {
     setErr(null)
-    if (!name.trim()) {
-      setErr('Name ist Pflichtfeld.')
-      return
-    }
-    if (!telefon.trim()) {
-      setErr('Telefon ist Pflichtfeld.')
+    const pflicht = validateHandwerkerStammPflicht({ firma, vorname, nachname })
+    if (pflicht) {
+      setErr(pflicht)
       return
     }
     const payload: HandwerkerFormInput = {
-      name: name.trim(),
       firma: firma.trim() || null,
+      vorname: vorname.trim() || null,
+      nachname: nachname.trim() || null,
       email: email.trim() || null,
-      telefon: telefon.trim(),
+      telefon: telefon.trim() || null,
       whatsapp: null,
       webseite: null,
       adresse: adresse.trim() || null,
@@ -117,15 +118,26 @@ export function HandwerkerForm({
       ) : null}
 
       <div className="space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label="Firma" value={firma} onChange={(e) => setFirma(e.target.value)} />
+        <Input label="Firmenname *" value={firma} onChange={(e) => setFirma(e.target.value)} />
+        <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+          <Input
+            label="Vorname (Geschäftsführer)"
+            value={vorname}
+            onChange={(e) => setVorname(e.target.value)}
+          />
+          <Input
+            label="Nachname (Geschäftsführer)"
+            value={nachname}
+            onChange={(e) => setNachname(e.target.value)}
+          />
+        </div>
         <Input
           label="E-Mail"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Input label="Telefon *" type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+        <Input label="Telefon" type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
         <Input label="Adresse" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
 
         <fieldset className="space-y-2">

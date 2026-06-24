@@ -1,5 +1,6 @@
-import type { AngebotHandwerkerRow } from '@/lib/types'
+import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
+import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
 
 export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undefined): boolean {
   return (rows ?? []).length > 0
@@ -51,7 +52,30 @@ export function darfAngebotAnKundeSenden(
   return handwerkerFreigabeErledigt(list)
 }
 
-export function handwerkerSendenBlockierHinweis(rows: AngebotHandwerkerRow[] | null | undefined): string {
+export function orgFreigabeBlockiertHandwerker(
+  orgStatus: OrgFreigabeStatus | null | undefined
+): boolean {
+  return orgFreigabeBlockiertPartner(orgStatus)
+}
+
+export function orgFreigabeBlockierHinweis(
+  orgStatus: OrgFreigabeStatus | null | undefined
+): string | null {
+  if (orgStatus === 'ausstehend') {
+    return 'Wartet auf Org-Freigabe — Handwerker können erst danach angefragt werden.'
+  }
+  if (orgStatus === 'abgelehnt') {
+    return 'Organisation hat die Freigabe abgelehnt — Handwerker-Anfrage blockiert.'
+  }
+  return null
+}
+
+export function handwerkerSendenBlockierHinweis(
+  rows: AngebotHandwerkerRow[] | null | undefined,
+  orgStatus?: OrgFreigabeStatus | null
+): string {
+  const orgHinweis = orgFreigabeBlockierHinweis(orgStatus)
+  if (orgHinweis) return orgHinweis
   const list = rows ?? []
   if (!list.length) {
     return 'Bitte zuerst Handwerker zuweisen und Partner-Angebot einholen.'

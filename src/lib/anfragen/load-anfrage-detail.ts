@@ -2,7 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { enrichLeadDetailUserNames } from '@/lib/anfragen/enrich-lead-user-names'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
-import type { LeadDetail, LeadDokumentRow, LeadTimelineRow } from '@/lib/types'
+import type {
+  KundenObjekt,
+  LeadAuftraggeberEmbed,
+  LeadDetail,
+  LeadDokumentRow,
+  LeadTimelineRow,
+  OrgFreigabeLogRow,
+} from '@/lib/types'
 
 const SELECT_FULL = `
   *,
@@ -76,6 +83,42 @@ async function loadLeadDokumenteOptional(
   return (data ?? []) as LeadDokumentRow[]
 }
 
+async function loadLeadOrgKontextOptional(
+  supabase: SupabaseClient,
+  lead: LeadDetail
+): Promise<Pick<LeadDetail, 'auftraggeber' | 'kunden_objekte' | 'org_freigabe_log'>> {
+  const out: Pick<LeadDetail, 'auftraggeber' | 'kunden_objekte' | 'org_freigabe_log'> = {}
+
+  if (lead.auftraggeber_kunde_id) {
+    const { data } = await supabase
+      .from('kunden')
+      .select('id, name, email, org_anzeigename, org_kennung')
+      .eq('id', lead.auftraggeber_kunde_id)
+      .maybeSingle()
+    if (data) out.auftraggeber = data as LeadAuftraggeberEmbed
+  }
+
+  if (lead.kunde_objekt_id) {
+    const { data } = await supabase
+      .from('kunden_objekte')
+      .select('*')
+      .eq('id', lead.kunde_objekt_id)
+      .maybeSingle()
+    if (data) out.kunden_objekte = data as KundenObjekt
+  }
+
+  const { data: logRows } = await supabase
+    .from('org_freigabe_log')
+    .select('*')
+    .eq('lead_id', lead.id)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  if (logRows?.length) out.org_freigabe_log = logRows as OrgFreigabeLogRow[]
+
+  return out
+}
+
 /** Lädt eine Anfrage für die Detailseite; fehlende Relationen (z. B. lead_timeline) brechen nicht ab. */
 export async function loadAnfrageDetail(
   supabase: SupabaseClient,
@@ -101,11 +144,12 @@ export async function loadAnfrageDetail(
     let lead = data as unknown as LeadDetail
     const kunde = resolveLeadKunde(lead.kunden as LeadDetail['kunden'])
     if (kunde) lead = { ...lead, kunden: kunde }
-    const [timeline, dokumente] = await Promise.all([
+    const [timeline, dokumente, orgKontext] = await Promise.all([
       loadLeadTimelineOptional(supabase, leadId),
       loadLeadDokumenteOptional(supabase, leadId),
+      loadLeadOrgKontextOptional(supabase, lead),
     ])
-    lead = { ...lead, lead_timeline: timeline, lead_dokumente: dokumente }
+    lead = { ...lead, lead_timeline: timeline, lead_dokumente: dokumente, ...orgKontext }
     return enrichLeadDetailUserNames(supabase, lead)
   }
 

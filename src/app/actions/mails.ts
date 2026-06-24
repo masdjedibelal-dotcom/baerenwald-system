@@ -21,7 +21,6 @@ import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
-  buildPortalButton,
   buildPortalLoginLink,
   buildPartnerDashboardLink,
   buildPartnerPortalButton,
@@ -39,7 +38,7 @@ export async function sendAnfrageBestaetigung(
   const { data: lead, error } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kanal, kontakt_email, kontakt_name, bereiche, situation, plz, preis_min, preis_max, kunde_id, kundentyp, kunden(name, typ)'
+      'id, kanal, anlass, kontakt_email, kontakt_name, bereiche, situation, plz, preis_min, preis_max, kunde_id, kundentyp, kunden(name, typ), kunden_objekte(titel)'
     )
     .eq('id', leadId)
     .maybeSingle()
@@ -77,6 +76,13 @@ export async function sendAnfrageBestaetigung(
       preis_max: (lead as { preis_max?: number | null }).preis_max,
       quelle: force || kanal !== 'website' ? 'crm' : 'website',
       kundeTyp,
+      anlass: (lead as { anlass?: string | null }).anlass as import('@/lib/types').LeadAnlass | null,
+      objektTitel: (() => {
+        const ko = (lead as { kunden_objekte?: { titel?: string } | { titel?: string }[] | null })
+          .kunden_objekte
+        const one = Array.isArray(ko) ? ko[0] : ko
+        return one?.titel?.trim() || null
+      })(),
     },
     branding
   )
@@ -459,7 +465,6 @@ function kundenPortalMailHtml(input: {
     .map((p) => p.replace(/\n/g, '<br/>'))
     .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
     .join('')
-  const portal = buildPortalButton(input.portalLink, input.anrede)
   const disclaimer =
     input.anrede === 'du'
       ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
@@ -467,7 +472,6 @@ function kundenPortalMailHtml(input: {
   const content = `
     <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}
-    ${portal}
     <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
       ${
         input.anrede === 'du'
@@ -481,7 +485,7 @@ function kundenPortalMailHtml(input: {
     defaultPortalInviteBetreff(input.anrede),
     input.branding,
     disclaimer,
-    { skipMeinBaerenwaldPs: true, anrede: input.anrede }
+    { anrede: input.anrede, portalLink: input.portalLink }
   )
 }
 
@@ -502,19 +506,22 @@ export async function getKundenPortalMailDraft(
 > {
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, email, typ')
+    .select('id, name, email, typ, portal_modus, org_anzeigename')
     .eq('id', kundeId)
     .maybeSingle()
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
   const to = String((kunde as { email?: string | null }).email ?? '').trim()
   if (!to) return { ok: false, message: 'Kunde hat keine E-Mail-Adresse.' }
 
+  const istOrganisation = (kunde as { portal_modus?: string }).portal_modus === 'organisation'
+  const orgName = (kunde as { org_anzeigename?: string | null }).org_anzeigename
+
   const portalLink = buildPortalLoginLink()
   const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
-  const betreff = defaultPortalInviteBetreff(anrede)
-  const text = defaultPortalInviteText(anrede)
+  const betreff = defaultPortalInviteBetreff(anrede, { organisation: istOrganisation })
+  const text = defaultPortalInviteText(anrede, { organisation: istOrganisation, orgName })
   const html = kundenPortalMailHtml({ name, portalLink, anrede, text, branding })
   return {
     ok: true,
