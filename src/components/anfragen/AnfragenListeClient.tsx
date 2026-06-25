@@ -187,6 +187,7 @@ export function AnfragenListeClient({
   const [exportOpen, setExportOpen] = useState(false)
   const [neuOpen, setNeuOpen] = useState(false)
   const defaultKundeId = searchParams.get('kunde_id')
+  const zielNachAnlage = searchParams.get('ziel')
 
   function closeNeuSheet() {
     setNeuOpen(false)
@@ -560,7 +561,11 @@ export function AnfragenListeClient({
         defaultKundeId={defaultKundeId}
         onSuccess={(id) => {
           closeNeuSheet()
-          router.push(`/anfragen/${id}`)
+          if (zielNachAnlage === 'angebot') {
+            router.push(`/anfragen/${id}?angebot_wizard=1`)
+          } else {
+            router.push(`/anfragen/${id}`)
+          }
           router.refresh()
         }}
       />

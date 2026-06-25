@@ -158,8 +158,11 @@ export async function searchKunden(q: string) {
   const { data } = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
-      .select('id, name, vorname, nachname, typ, email, telefon, plz, ort, notizen, created_at')
-      .ilike('name', pattern)
+      .select('id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at')
+      .or(
+        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern},ort.ilike.${pattern}`
+      )
+      .order('name')
       .limit(12)
   )
 

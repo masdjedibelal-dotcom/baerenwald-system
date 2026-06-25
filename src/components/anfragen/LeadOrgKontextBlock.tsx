@@ -1,11 +1,17 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Building2, Copy, ImageIcon, User } from 'lucide-react'
+import { Building2, Copy, Download, ImageIcon, Shield, User } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import {
+  exportMelderAuskunft,
+  loescheMelderDaten,
+} from '@/app/(dashboard)/einstellungen/datenschutz/actions'
+import { fotosAusMelderFunnel, istMelderKanal } from '@/lib/datenschutz/melder-leads'
 import {
   ANLASS_LABELS,
   buildEinladungErgaenzenLink,
@@ -19,13 +25,6 @@ import { formatDatumZeit } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail, OrgFreigabeLogRow } from '@/lib/types'
 
-function fotosAusFunnel(funnelDaten: unknown): string[] {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return []
-  const fotos = (funnelDaten as { fotos?: unknown }).fotos
-  if (!Array.isArray(fotos)) return []
-  return fotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
-}
-
 function orgFreigabeBadgeStatus(
   status: LeadDetail['org_freigabe_status']
 ): 'done' | 'offer' | 'cancel' | 'order' {
@@ -36,10 +35,13 @@ function orgFreigabeBadgeStatus(
 }
 
 export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
+  const router = useRouter()
   const [fotoIdx, setFotoIdx] = useState(0)
+  const [busy, setBusy] = useState<string | null>(null)
   const auftraggeber = lead.auftraggeber
   const objekt = lead.kunden_objekte
-  const fotos = fotosAusFunnel(lead.funnel_daten)
+  const fotos = fotosAusMelderFunnel(lead.funnel_daten)
+  const istMelderLead = istMelderKanal(lead.kanal)
   const anlass = lead.anlass
   const zeigtMelder = anlass === 'meldung' || Boolean(lead.melder_name || lead.melder_email)
   const zeigtServicepaket = anlass === 'servicepaket'
@@ -55,6 +57,45 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
       toast.error('Kopieren fehlgeschlagen')
     }
   }
+
+  async function melderAuskunftExport() {
+    setBusy('auskunft')
+    const r = await exportMelderAuskunft(lead.id)
+    setBusy(null)
+    if (!r.ok) {
+      toast.error(r.message)
+      return
+    }
+    const blob = new Blob([r.text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `melder-auskunft-${lead.id.slice(0, 8)}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Auskunft exportiert')
+  }
+
+  async function melderDatenLoeschen(kategorie: 'melder_leads_offen' | 'melder_leads_abgeschlossen' | 'melder_fotos') {
+    const labels = {
+      melder_fotos: 'Melder-Fotos',
+      melder_leads_offen: 'Melderdaten (vollständig)',
+      melder_leads_abgeschlossen: 'Melderdaten (vollständig)',
+    }
+    if (!window.confirm(`${labels[kategorie]} wirklich löschen/anonymisieren?`)) return
+    setBusy(kategorie)
+    const r = await loescheMelderDaten(lead.id, kategorie, 'betroffenenanfrage')
+    setBusy(null)
+    if (!r.ok) {
+      toast.error(r.message)
+      return
+    }
+    toast.success('Verarbeitet')
+    router.refresh()
+  }
+
+  const melderLoeschKategorie =
+    lead.status === 'abgeschlossen' ? 'melder_leads_abgeschlossen' : 'melder_leads_offen'
 
   const hatOrgKontext =
     auftraggeber ||
@@ -186,6 +227,49 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
                 <Copy className="h-3.5 w-3.5" aria-hidden />
                 Einladungslink kopieren
               </Button>
+            </div>
+          ) : null}
+          {istMelderLead ? (
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-bw-border pt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                loading={busy === 'auskunft'}
+                onClick={() => void melderAuskunftExport()}
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                Melder-Auskunft
+              </Button>
+              {fotos.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  loading={busy === 'melder_fotos'}
+                  onClick={() => void melderDatenLoeschen('melder_fotos')}
+                >
+                  Fotos löschen
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                className="gap-1.5"
+                loading={busy === melderLoeschKategorie}
+                onClick={() => void melderDatenLoeschen(melderLoeschKategorie)}
+              >
+                <Shield className="h-3.5 w-3.5" aria-hidden />
+                Melderdaten löschen
+              </Button>
+              <Link
+                href="/einstellungen/integration?section=datenschutz"
+                className="inline-flex items-center text-[12px] text-bw-primary hover:underline"
+              >
+                Datenschutz-Modul →
+              </Link>
             </div>
           ) : null}
         </Card>

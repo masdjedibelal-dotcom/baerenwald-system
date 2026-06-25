@@ -1,5 +1,19 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { DatenschutzAnfrageRow, DatenschutzFaelligRow, DatenschutzFristRow, DatenschutzLoeschlogRow } from '@/lib/datenschutz/types'
+import {
+  fotosAusMelderFunnel,
+  istMelderKanal,
+  leadHatMelderPersonenbezogeneDaten,
+  melderLeadAnzeigeTitel,
+  MELDER_KANALE,
+} from '@/lib/datenschutz/melder-leads'
+import type {
+  DatenschutzAnfrageRow,
+  DatenschutzFaelligRow,
+  DatenschutzFristRow,
+  DatenschutzLoeschlogRow,
+  DatenschutzVvtRow,
+  MelderLeadKurz,
+} from '@/lib/datenschutz/types'
 
 function monthsAgoDateOnly(months: number): string {
   const d = new Date()
@@ -58,6 +72,66 @@ export async function loadDatenschutzAnfragen(): Promise<DatenschutzAnfrageRow[]
   const { data, error } = await supabaseAdmin.from('datenschutz_anfragen').select('*').order('created_at', { ascending: false })
   if (error || !data) return []
   return data as DatenschutzAnfrageRow[]
+}
+
+export async function loadDatenschutzVvt(): Promise<DatenschutzVvtRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('datenschutz_vvt')
+    .select('*')
+    .eq('aktiv', true)
+    .order('sort_order')
+  if (error || !data) return []
+  return data as DatenschutzVvtRow[]
+}
+
+async function loadLeadIdsMitAuftrag(): Promise<Set<string>> {
+  const { data } = await supabaseAdmin
+    .from('angebote')
+    .select('lead_id')
+    .not('auftrag_id', 'is', null)
+    .not('lead_id', 'is', null)
+  const ids = new Set<string>()
+  for (const row of data ?? []) {
+    const lid = (row as { lead_id: string | null }).lead_id
+    if (lid) ids.add(lid)
+  }
+  const { data: leadsAuftrag } = await supabaseAdmin.from('leads').select('id').eq('status', 'auftrag')
+  for (const row of leadsAuftrag ?? []) {
+    ids.add(String((row as { id: string }).id))
+  }
+  return ids
+}
+
+export async function searchMelderLeadsByEmail(email: string): Promise<MelderLeadKurz[]> {
+  const q = email.trim().toLowerCase()
+  if (!q) return []
+  const { data, error } = await supabaseAdmin
+    .from('leads')
+    .select('id, melder_name, melder_email, melder_einheit, kanal, status, created_at, auftraggeber_kunde_id')
+    .in('kanal', MELDER_KANALE)
+    .ilike('melder_email', q)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error || !data) return []
+  return data as MelderLeadKurz[]
+}
+
+export async function loadMelderLeadForAuskunft(leadId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('leads')
+    .select(
+      `
+      id, created_at, updated_at, kanal, status, anlass,
+      melder_name, melder_einheit, melder_telefon, melder_email,
+      notizen, kontakt_nachricht, plz, strasse, hausnummer, ort, funnel_daten,
+      auftraggeber:auftraggeber_kunde_id(name, org_anzeigename),
+      kunden_objekte:kunde_objekt_id(titel, plz, ort)
+    `
+    )
+    .eq('id', leadId)
+    .maybeSingle()
+  if (error || !data) return null
+  return data
 }
 
 export async function loadDatenschutzFaellige(): Promise<DatenschutzFaelligRow[]> {
@@ -194,6 +268,93 @@ export async function loadDatenschutzFaellige(): Promise<DatenschutzFaelligRow[]
         basis_datum: basis,
         monate_faellig: monthsBetween(basis),
         beschreibung: 'Kundenstamm anonymisieren',
+      })
+    }
+  }
+
+  const leadIdsMitAuftrag = await loadLeadIdsMitAuftrag()
+
+  const mMelderFotos = fm('melder_fotos')
+  if (mMelderFotos != null) {
+    const cutoffEnd = `${monthsAgoDateOnly(mMelderFotos)}T23:59:59.999Z`
+    const { data: melderLeadsFotos } = await supabaseAdmin
+      .from('leads')
+      .select('id, kanal, created_at, melder_name, melder_einheit, kontakt_name, funnel_daten')
+      .in('kanal', MELDER_KANALE)
+      .lte('created_at', cutoffEnd)
+
+    for (const l of melderLeadsFotos ?? []) {
+      const id = String((l as { id: string }).id)
+      if (isStillAufgeschoben(aufschub, 'melder_fotos', id)) continue
+      const n = fotoCount(fotosAusMelderFunnel((l as { funnel_daten: unknown }).funnel_daten))
+      if (n === 0) continue
+      const basis = String((l as { created_at: string }).created_at).slice(0, 10)
+      out.push({
+        kategorie: 'melder_fotos',
+        referenz_id: id,
+        titel: melderLeadAnzeigeTitel(l as { id: string; melder_name?: string | null; melder_einheit?: string | null; kontakt_name?: string | null }),
+        basis_datum: basis,
+        monate_faellig: monthsBetween(basis),
+        beschreibung: `${n} Melder-Foto(s) löschen`,
+      })
+    }
+  }
+
+  const mMelderOffen = fm('melder_leads_offen')
+  if (mMelderOffen != null) {
+    const cutoffEnd = `${monthsAgoDateOnly(mMelderOffen)}T23:59:59.999Z`
+    const { data: melderOffen } = await supabaseAdmin
+      .from('leads')
+      .select(
+        'id, kanal, status, created_at, updated_at, melder_name, melder_email, melder_telefon, melder_einheit, kontakt_name, kontakt_email, funnel_daten'
+      )
+      .in('kanal', MELDER_KANALE)
+      .lte('updated_at', cutoffEnd)
+
+    for (const l of melderOffen ?? []) {
+      const status = String((l as { status: string }).status)
+      if (status === 'auftrag' || status === 'abgeschlossen') continue
+      const id = String((l as { id: string }).id)
+      if (leadIdsMitAuftrag.has(id)) continue
+      if (isStillAufgeschoben(aufschub, 'melder_leads_offen', id)) continue
+      if (!leadHatMelderPersonenbezogeneDaten(l as Parameters<typeof leadHatMelderPersonenbezogeneDaten>[0])) continue
+      const u = String((l as { updated_at: string }).updated_at)
+      out.push({
+        kategorie: 'melder_leads_offen',
+        referenz_id: id,
+        titel: melderLeadAnzeigeTitel(l as { id: string; melder_name?: string | null; melder_einheit?: string | null; kontakt_name?: string | null }),
+        basis_datum: u.slice(0, 10),
+        monate_faellig: monthsBetween(u.slice(0, 10)),
+        beschreibung: 'Melder-Lead anonymisieren (offen/abgebrochen)',
+      })
+    }
+  }
+
+  const mMelderAb = fm('melder_leads_abgeschlossen')
+  if (mMelderAb != null) {
+    const cutoffEnd = `${monthsAgoDateOnly(mMelderAb)}T23:59:59.999Z`
+    const { data: melderAb } = await supabaseAdmin
+      .from('leads')
+      .select(
+        'id, kanal, status, updated_at, melder_name, melder_email, melder_telefon, melder_einheit, kontakt_name, kontakt_email, funnel_daten'
+      )
+      .in('kanal', MELDER_KANALE)
+      .eq('status', 'abgeschlossen')
+      .lte('updated_at', cutoffEnd)
+
+    for (const l of melderAb ?? []) {
+      const id = String((l as { id: string }).id)
+      if (leadIdsMitAuftrag.has(id)) continue
+      if (isStillAufgeschoben(aufschub, 'melder_leads_abgeschlossen', id)) continue
+      if (!leadHatMelderPersonenbezogeneDaten(l as Parameters<typeof leadHatMelderPersonenbezogeneDaten>[0])) continue
+      const u = String((l as { updated_at: string }).updated_at)
+      out.push({
+        kategorie: 'melder_leads_abgeschlossen',
+        referenz_id: id,
+        titel: melderLeadAnzeigeTitel(l as { id: string; melder_name?: string | null; melder_einheit?: string | null; kontakt_name?: string | null }),
+        basis_datum: u.slice(0, 10),
+        monate_faellig: monthsBetween(u.slice(0, 10)),
+        beschreibung: 'Melder-Lead anonymisieren (abgeschlossen ohne Auftrag)',
       })
     }
   }

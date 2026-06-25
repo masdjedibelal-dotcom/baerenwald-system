@@ -1,4 +1,9 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import {
+  fotosAusMelderFunnel,
+  istMelderKanal,
+  leadHatMelderPersonenbezogeneDaten,
+} from '@/lib/datenschutz/melder-leads'
 import { deleteStorageObjectsFromUrls } from '@/lib/datenschutz/storage'
 
 const BLOCKED = new Set([
@@ -105,6 +110,98 @@ export async function anonymisiereKunde(kundeId: string, userId: string | null, 
   return { ok: true as const }
 }
 
+async function leadHatVerknuepftenAuftrag(leadId: string): Promise<boolean> {
+  const { count } = await supabaseAdmin
+    .from('angebote')
+    .select('id', { count: 'exact', head: true })
+    .eq('lead_id', leadId)
+    .not('auftrag_id', 'is', null)
+  return (count ?? 0) > 0
+}
+
+async function loadMelderLead(leadId: string) {
+  const { data } = await supabaseAdmin
+    .from('leads')
+    .select(
+      'id, kanal, melder_name, melder_email, melder_telefon, melder_einheit, funnel_daten, kontakt_name, kontakt_email'
+    )
+    .eq('id', leadId)
+    .maybeSingle()
+  return data as {
+    id: string
+    kanal: string
+    melder_name?: string | null
+    melder_email?: string | null
+    melder_telefon?: string | null
+    melder_einheit?: string | null
+    funnel_daten?: unknown
+    kontakt_name?: string | null
+    kontakt_email?: string | null
+  } | null
+}
+
+function funnelOhneFotos(funnelDaten: unknown): Record<string, unknown> | null {
+  if (!funnelDaten || typeof funnelDaten !== 'object' || Array.isArray(funnelDaten)) return null
+  const next = { ...(funnelDaten as Record<string, unknown>) }
+  delete next.fotos
+  return Object.keys(next).length ? next : null
+}
+
+async function anonymisiereMelderLeadFelder(
+  leadId: string,
+  opts: { fotosOnly?: boolean }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const lead = await loadMelderLead(leadId)
+  if (!lead) return { ok: false, message: 'Lead nicht gefunden' }
+  if (!istMelderKanal(lead.kanal)) {
+    return { ok: false, message: 'Kein Melder-Lead (Kanal nicht hv_melder_link / hv_einladung).' }
+  }
+
+  if (opts.fotosOnly) {
+    const urls = fotosAusMelderFunnel(lead.funnel_daten)
+    if (!urls.length) return { ok: false, message: 'Keine Melder-Fotos vorhanden.' }
+    await deleteStorageObjectsFromUrls(urls)
+    const { error } = await supabaseAdmin
+      .from('leads')
+      .update({ funnel_daten: funnelOhneFotos(lead.funnel_daten) })
+      .eq('id', leadId)
+    if (error) return { ok: false, message: error.message }
+    return { ok: true }
+  }
+
+  if (await leadHatVerknuepftenAuftrag(leadId)) {
+    return {
+      ok: false,
+      message: 'Lead hat einen verknüpften Auftrag — Melderdaten werden nicht gelöscht.',
+    }
+  }
+
+  const urls = fotosAusMelderFunnel(lead.funnel_daten)
+  if (urls.length) await deleteStorageObjectsFromUrls(urls)
+
+  const { error } = await supabaseAdmin
+    .from('leads')
+    .update({
+      melder_name: null,
+      melder_email: null,
+      melder_telefon: null,
+      melder_einheit: null,
+      kontakt_name: 'Anonymisiert',
+      kontakt_email: null,
+      kontakt_telefon: null,
+      kontakt_nachricht: null,
+      notizen: null,
+      funnel_daten: null,
+      plz: null,
+      strasse: null,
+      hausnummer: null,
+      ort: null,
+    })
+    .eq('id', leadId)
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
 async function clearFotosForAuftrag(auftragId: string): Promise<{ urls: string[]; cleared: number }> {
   const urls: string[] = []
 
@@ -188,6 +285,37 @@ export async function executeDatenschutzLoeschung(input: {
       typ: 'foto',
       referenz_id,
       referenz_typ: 'formular_eintrag',
+      grund,
+      geloescht_von: userId,
+    })
+    return { ok: true }
+  }
+
+  if (kategorie === 'melder_fotos') {
+    const r = await anonymisiereMelderLeadFelder(referenz_id, { fotosOnly: true })
+    if (!r.ok) return r
+    await insertLoeschlog({
+      typ: 'melder_foto',
+      referenz_id,
+      referenz_typ: 'leads',
+      grund,
+      geloescht_von: userId,
+    })
+    return { ok: true }
+  }
+
+  if (kategorie === 'melder_leads_offen' || kategorie === 'melder_leads_abgeschlossen') {
+    const lead = await loadMelderLead(referenz_id)
+    if (!lead) return { ok: false, message: 'Lead nicht gefunden' }
+    if (!leadHatMelderPersonenbezogeneDaten(lead)) {
+      return { ok: false, message: 'Melderdaten bereits anonymisiert.' }
+    }
+    const r = await anonymisiereMelderLeadFelder(referenz_id, { fotosOnly: false })
+    if (!r.ok) return r
+    await insertLoeschlog({
+      typ: 'melder_lead',
+      referenz_id,
+      referenz_typ: 'leads',
       grund,
       geloescht_von: userId,
     })

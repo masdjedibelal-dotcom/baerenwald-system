@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { anonymisiereKunde as anonymisiereKundeLib } from '@/lib/datenschutz/execute-loeschung'
+import {
+  anonymisiereKunde as anonymisiereKundeLib,
+  executeDatenschutzLoeschung,
+} from '@/lib/datenschutz/execute-loeschung'
+import { buildMelderAuskunftText } from '@/lib/datenschutz/melder-leads'
+import { loadMelderLeadForAuskunft, searchMelderLeadsByEmail } from '@/lib/datenschutz/queries'
+import type { DatenschutzAnfrageKontext, MelderLeadKurz } from '@/lib/datenschutz/types'
 
 async function requireUserId(): Promise<string | null> {
   const supabase = createClient()
@@ -31,7 +37,7 @@ export async function updateDatenschutzFrist(
     .update({ frist_monate: input.frist_monate, aktiv: input.aktiv })
     .eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/datenschutz')
+  revalidatePath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -52,7 +58,7 @@ export async function addDatenschutzAufschub(input: {
     erstellt_von: uid,
   })
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/datenschutz')
+  revalidatePath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -61,6 +67,7 @@ export async function createDatenschutzAnfrage(input: {
   name: string
   email: string
   beschreibung: string | null
+  kontext?: DatenschutzAnfrageKontext | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const uid = await requireUserId()
   if (!uid) return { ok: false, message: 'Nicht angemeldet' }
@@ -70,10 +77,57 @@ export async function createDatenschutzAnfrage(input: {
     name: input.name.trim(),
     email: input.email.trim(),
     beschreibung: input.beschreibung?.trim() || null,
+    kontext: input.kontext ?? null,
     status: 'offen',
   })
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/datenschutz')
+  revalidatePath('/einstellungen/integration')
+  return { ok: true }
+}
+
+export async function sucheMelderLeads(email: string): Promise<MelderLeadKurz[]> {
+  const uid = await requireUserId()
+  if (!uid) return []
+  return searchMelderLeadsByEmail(email)
+}
+
+export async function exportMelderAuskunft(
+  leadId: string
+): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
+  const uid = await requireUserId()
+  if (!uid) return { ok: false, message: 'Nicht angemeldet' }
+
+  const lead = await loadMelderLeadForAuskunft(leadId)
+  if (!lead) return { ok: false, message: 'Lead nicht gefunden' }
+
+  const auftraggeber = lead.auftraggeber as { name?: string | null; org_anzeigename?: string | null } | null
+  const kundenObjekte = lead.kunden_objekte as { titel?: string | null; plz?: string | null; ort?: string | null } | null
+
+  const text = buildMelderAuskunftText({
+    ...(lead as Parameters<typeof buildMelderAuskunftText>[0]),
+    auftraggeber,
+    kunden_objekte: kundenObjekte,
+  })
+  return { ok: true, text }
+}
+
+export async function loescheMelderDaten(
+  leadId: string,
+  kategorie: 'melder_leads_offen' | 'melder_leads_abgeschlossen' | 'melder_fotos',
+  grund = 'betroffenenanfrage'
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const uid = await requireUserId()
+  if (!uid) return { ok: false, message: 'Nicht angemeldet' }
+
+  const r = await executeDatenschutzLoeschung({
+    kategorie,
+    referenz_id: leadId,
+    grund,
+    userId: uid,
+  })
+  if (!r.ok) return r
+  revalidatePath('/einstellungen/integration')
+  revalidatePath(`/anfragen/${leadId}`)
   return { ok: true }
 }
 
@@ -86,7 +140,7 @@ export async function anonymisiereKunde(
   if (!uid) return { ok: false, message: 'Nicht angemeldet' }
   const r = await anonymisiereKundeLib(kundeId, uid, grund)
   if (!r.ok) return r
-  revalidatePath('/einstellungen/datenschutz')
+  revalidatePath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -107,6 +161,6 @@ export async function updateDatenschutzAnfrage(
 
   const { error } = await supabaseAdmin.from('datenschutz_anfragen').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/datenschutz')
+  revalidatePath('/einstellungen/integration')
   return { ok: true }
 }

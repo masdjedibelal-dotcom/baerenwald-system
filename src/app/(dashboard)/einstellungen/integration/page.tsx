@@ -9,6 +9,7 @@ import {
   loadDatenschutzFaellige,
   loadDatenschutzFristen,
   loadDatenschutzLog,
+  loadDatenschutzVvt,
 } from '@/lib/datenschutz/queries'
 
 export const metadata: Metadata = {
@@ -16,13 +17,14 @@ export const metadata: Metadata = {
 }
 
 export default async function EinstellungenIntegrationPage() {
-  const [compliance, felder, fristen, faellig, log, anfragen] = await Promise.all([
+  const [compliance, felder, fristen, faellig, log, anfragen, vvt] = await Promise.all([
     loadComplianceTypen(),
     loadAllCustomFieldDefinitions(),
     loadDatenschutzFristen(),
     loadDatenschutzFaellige(),
     loadDatenschutzLog(200),
     loadDatenschutzAnfragen(),
+    loadDatenschutzVvt(),
   ])
 
   return (
@@ -32,7 +34,7 @@ export default async function EinstellungenIntegrationPage() {
         <EinstellungenIntegrationClient
           compliance={compliance}
           felder={felder}
-          datenschutz={{ fristen, faellig, log, anfragen }}
+          datenschutz={{ fristen, faellig, log, anfragen, vvt }}
         />
       </Suspense>
     </div>

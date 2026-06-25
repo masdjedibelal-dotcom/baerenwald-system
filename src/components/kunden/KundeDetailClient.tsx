@@ -5,8 +5,6 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
-import { DetailAccordion } from '@/components/ui/DetailAccordion'
-import { Timeline } from '@/components/ui/timeline'
 import { ListGridShell } from '@/components/layout/ListPageParts'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { Textarea } from '@/components/ui/Textarea'
@@ -34,8 +32,12 @@ import {
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
-import { KundenVorgaengeBaum } from '@/components/kunden/KundenVorgaengeBaum'
 import type { KundenObjekt } from '@/lib/types'
+import {
+  kundeNeueAnfrageHref,
+  kundeNeuerAuftragHref,
+  kundeNeuesAngebotHref,
+} from '@/lib/kunden/kunde-pipeline-nav'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
@@ -49,13 +51,13 @@ import {
   Building2,
   FileText,
   LayoutGrid,
+  ListChecks,
   Mail,
   MoreHorizontal,
   Pencil,
 } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
-import { buildZeitstrahl } from '@/components/kunden/KundenZeitstrahl'
 import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
@@ -76,7 +78,6 @@ import { BEREICH_LABELS, formatAnfragePreisAnzeige, formatDatum, formatRelativeD
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { StammdatenVerknuepfungen } from '@/components/stammdaten/StammdatenVerknuepfungen'
 import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -180,10 +181,10 @@ function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) 
   return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
 }
 
-type KundeDetailTab = 'stammdaten' | 'organisation' | 'vorgaenge' | 'aktivitaet' | 'dokumente'
+type KundeDetailTab = 'stammdaten' | 'organisation' | 'anfragen' | 'angebote' | 'auftraege' | 'dokumente'
 
-const DESKTOP_KUNDE_TABS_BASE: KundeDetailTab[] = ['vorgaenge', 'aktivitaet', 'dokumente']
-const MOBILE_KUNDE_TABS_BASE: KundeDetailTab[] = ['stammdaten', 'vorgaenge', 'aktivitaet', 'dokumente']
+const DESKTOP_KUNDE_TABS_BASE: KundeDetailTab[] = ['anfragen', 'angebote', 'auftraege', 'dokumente']
+const MOBILE_KUNDE_TABS_BASE: KundeDetailTab[] = ['stammdaten', 'anfragen', 'angebote', 'auftraege', 'dokumente']
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -202,7 +203,7 @@ export function KundeDetailClient({
   const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
-  const [tab, setTab] = useState<KundeDetailTab>('vorgaenge')
+  const [tab, setTab] = useState<KundeDetailTab>('anfragen')
   const [interneNotiz, setInterneNotiz] = useState(initialKunde.notizen ?? '')
   const [pending, startTransition] = useTransition()
   const [customValues, setCustomValues] = useState(initialValues)
@@ -378,15 +379,6 @@ export function KundeDetailClient({
       ? (kunde.gesamt_umsatz ?? 0) / auftraegeCount
       : null
 
-  const timelineItems = useMemo(() => {
-    return buildZeitstrahl(kunde).map((e) => ({
-      id: e.id,
-      text: e.beschreibung ? `${e.titel} — ${e.beschreibung}` : e.titel,
-      time: formatRelativeDate(e.datum),
-      state: 'done' as const,
-    }))
-  }, [kunde])
-
   const dokumenteCount = useMemo(() => {
     let n = (kunde.kunden_dokumente ?? []).filter((d) => d.typ !== 'protokoll').length
     for (const l of kunde.leads ?? []) {
@@ -402,7 +394,7 @@ export function KundeDetailClient({
     return n
   }, [kunde, rechnungen])
 
-  const vorgaengeCount = anfragenCount + angeboteCount + auftraegeCount + rechnungen.length
+  const zeigtOrganisationTab = istKundeNurGewerbeTyp(kunde.typ)
 
   const angeboteAnAuftrag = useMemo(() => {
     const byAuftrag = new Map<string, CrmDokumentZeile[]>()
@@ -425,8 +417,6 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const zeigtOrganisationTab = istKundeNurGewerbeTyp(kunde.typ)
-
   const desktopKundeTabIds = useMemo((): KundeDetailTab[] => {
     if (!zeigtOrganisationTab) return DESKTOP_KUNDE_TABS_BASE
     return ['organisation', ...DESKTOP_KUNDE_TABS_BASE]
@@ -445,22 +435,33 @@ export function KundeDetailClient({
           ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
           : []),
         {
-          id: 'vorgaenge' as const,
-          label: 'Vorgänge',
-          icon: Briefcase,
-          count: vorgaengeCount || undefined,
+          id: 'anfragen' as const,
+          label: 'Anfragen',
+          icon: Mail,
+          count: anfragenCount || undefined,
         },
-        { id: 'aktivitaet' as const, label: 'Aktivität', icon: Mail },
+        {
+          id: 'angebote' as const,
+          label: 'Angebote',
+          icon: FileText,
+          count: angeboteCount || undefined,
+        },
+        {
+          id: 'auftraege' as const,
+          label: 'Aufträge',
+          icon: Briefcase,
+          count: auftraegeCount || undefined,
+        },
         {
           id: 'dokumente' as const,
           label: 'Dokumente',
-          icon: FileText,
+          icon: ListChecks,
           count: dokumenteCount || undefined,
         },
       ]
       return tabs
     },
-    [dokumenteCount, vorgaengeCount, zeigtOrganisationTab]
+    [anfragenCount, angeboteCount, auftraegeCount, dokumenteCount, zeigtOrganisationTab]
   )
 
   const mobileDetailTabs = useMemo(
@@ -471,22 +472,33 @@ export function KundeDetailClient({
           ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
           : []),
         {
-          id: 'vorgaenge' as const,
-          label: 'Vorgänge',
-          icon: Briefcase,
-          count: vorgaengeCount || undefined,
+          id: 'anfragen' as const,
+          label: 'Anfragen',
+          icon: Mail,
+          count: anfragenCount || undefined,
         },
-        { id: 'aktivitaet' as const, label: 'Aktivität', icon: Mail },
+        {
+          id: 'angebote' as const,
+          label: 'Angebote',
+          icon: FileText,
+          count: angeboteCount || undefined,
+        },
+        {
+          id: 'auftraege' as const,
+          label: 'Aufträge',
+          icon: Briefcase,
+          count: auftraegeCount || undefined,
+        },
         {
           id: 'dokumente' as const,
           label: 'Dokumente',
-          icon: FileText,
+          icon: ListChecks,
           count: dokumenteCount || undefined,
         },
       ]
       return tabs
     },
-    [dokumenteCount, vorgaengeCount, zeigtOrganisationTab]
+    [anfragenCount, angeboteCount, auftraegeCount, dokumenteCount, zeigtOrganisationTab]
   )
 
   const ueberfaellig = useMemo(() => {
@@ -761,19 +773,18 @@ export function KundeDetailClient({
           onChanged={() => refresh()}
         />
       ) : null}
+      <Card title="Interne Notiz" collapsible>
+        <p className="mb-2 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
+        <Textarea
+          placeholder="Interne Kundennotiz…"
+          value={interneNotiz}
+          onChange={(e) => setInterneNotiz(e.target.value)}
+          rows={5}
+        />
+      </Card>
       {kpiRow}
       <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
     </div>
-  )
-
-  const tabTimeline = (
-    <>
-      {timelineItems.length === 0 ? (
-        <p className="text-sm text-bw-text-muted">Noch keine Aktivitäten.</p>
-      ) : (
-        <Timeline items={timelineItems} />
-      )}
-    </>
   )
 
   const tabDokumenteInhalt = (
@@ -893,37 +904,6 @@ export function KundeDetailClient({
     </div>
   )
 
-  const tabNotizen = (
-    <>
-      <p className="mb-2 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
-      <Textarea
-        placeholder="Interne Kundennotiz…"
-        value={interneNotiz}
-        onChange={(e) => setInterneNotiz(e.target.value)}
-        rows={10}
-      />
-    </>
-  )
-
-  const tabAktivitaet = (
-    <DetailAccordion
-      mobileOnly
-      sections={[
-        {
-          id: 'verlauf',
-          title: ACTIVITY_SECTIONS.verlauf,
-          defaultOpen: true,
-          content: tabTimeline,
-        },
-        {
-          id: 'notizen',
-          title: ACTIVITY_SECTIONS.notizen,
-          content: tabNotizen,
-        },
-      ]}
-    />
-  )
-
   const AUFTRAEGE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px'
   const ANFRAGEN_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
   const ANGEBOTE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
@@ -943,7 +923,7 @@ export function KundeDetailClient({
       {(kunde.leads ?? []).length === 0 ? (
         <p className="py-4 text-center text-sm text-bw-text-muted">
           Noch keine Anfragen.{' '}
-          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+          <Link href={kundeNeueAnfrageHref(kunde.id)} className="text-bw-link hover:underline">
             Anfrage anlegen
           </Link>
         </p>
@@ -1005,8 +985,8 @@ export function KundeDetailClient({
       {alleAngebote.length === 0 ? (
         <p className="py-4 text-center text-sm text-bw-text-muted">
           Noch keine Angebote.{' '}
-          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
-            Anfrage anlegen
+          <Link href={kundeNeuesAngebotHref(kunde)} className="text-bw-link hover:underline">
+            Angebot anlegen
           </Link>
         </p>
       ) : (
@@ -1058,8 +1038,8 @@ export function KundeDetailClient({
       {(kunde.auftraege ?? []).length === 0 ? (
         <p className="py-4 text-center text-sm text-bw-text-muted">
           Noch keine Aufträge.{' '}
-          <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
-            Anfrage anlegen
+          <Link href={kundeNeuerAuftragHref(kunde)} className="text-bw-link hover:underline">
+            Auftrag anlegen
           </Link>
         </p>
       ) : (
@@ -1070,7 +1050,10 @@ export function KundeDetailClient({
             <div className="text-right">Wert</div>
             <div>Status</div>
           </div>
-          {(kunde.auftraege ?? []).map((a) => {
+          {(kunde.auftraege ?? [])
+            .slice()
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .map((a) => {
             const agg = angebotAgg(a)
             const wert = betragAnzeige(agg?.gesamt_fix ?? null, agg?.gesamt_min ?? null, agg?.gesamt_max ?? null)
             return (
@@ -1179,35 +1162,6 @@ export function KundeDetailClient({
     </div>
   )
 
-  const tabVorgaenge = (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <VorgaengeSectionHeading title="Projekte" count={(kunde.leads ?? []).length || undefined} />
-        <KundenVorgaengeBaum kunde={kunde} />
-      </section>
-      {ueberfaellig.length > 0 ? (
-        <section className="space-y-2">
-          <VorgaengeSectionHeading title="Offene Posten" count={ueberfaellig.length} />
-          <ul className="space-y-2">
-            {ueberfaellig.map((r) => (
-              <li key={r.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                <div className="flex items-center gap-1.5 font-medium">
-                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-                  <Link href={`/rechnungen/${r.id}`} className="hover:underline">
-                    Rechnung {r.rechnungsnummer}
-                  </Link>
-                </div>
-                <p>
-                  {auftragTitelFromRechnung(r)} · Überfällig · {formatEur(r.brutto)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </div>
-  )
-
   const ansprechperson = [kunde.vorname, kunde.nachname].filter(Boolean).join(' ').trim()
   const headSubParts = [
     QUELLE_LABELS[kunde.quelle ?? ''] ?? null,
@@ -1218,13 +1172,29 @@ export function KundeDetailClient({
   const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
     return [
       {
+        label: 'Neue Anfrage',
+        icon: <Mail className="h-4 w-4" aria-hidden />,
+        onClick: () => router.push(kundeNeueAnfrageHref(kunde.id)),
+      },
+      {
+        label: 'Neues Angebot',
+        icon: <FileText className="h-4 w-4" aria-hidden />,
+        onClick: () => router.push(kundeNeuesAngebotHref(kunde)),
+      },
+      {
+        label: 'Neuer Auftrag',
+        icon: <Briefcase className="h-4 w-4" aria-hidden />,
+        onClick: () => router.push(kundeNeuerAuftragHref(kunde)),
+      },
+      'sep',
+      {
         label: 'MeinBärenwald-Einladung',
         icon: <FileText className="h-4 w-4" aria-hidden />,
         hint: !kunde.email ? 'Keine E-Mail' : undefined,
         onClick: () => void openPortalModal(),
       },
     ]
-  }, [kunde.email])
+  }, [kunde, router])
 
   const tabOrganisation = zeigtOrganisationTab ? (
     <KundenOrganisationTab
@@ -1240,22 +1210,26 @@ export function KundeDetailClient({
   const desktopTabContent =
     tab === 'organisation'
       ? tabOrganisation
-      : tab === 'vorgaenge'
-        ? tabVorgaenge
-        : tab === 'aktivitaet'
-          ? tabAktivitaet
-          : tabDokumenteInhalt
+      : tab === 'anfragen'
+        ? tabAnfragen
+        : tab === 'angebote'
+          ? tabAngebote
+          : tab === 'auftraege'
+            ? tabAuftraege
+            : tabDokumenteInhalt
 
   const mobileTabContent =
     tab === 'stammdaten'
       ? stammdatenInhalt
       : tab === 'organisation'
         ? tabOrganisation
-        : tab === 'vorgaenge'
-          ? tabVorgaenge
-          : tab === 'aktivitaet'
-            ? tabAktivitaet
-            : tabDokumenteInhalt
+        : tab === 'anfragen'
+          ? tabAnfragen
+          : tab === 'angebote'
+            ? tabAngebote
+            : tab === 'auftraege'
+              ? tabAuftraege
+              : tabDokumenteInhalt
 
   return (
     <div className="space-y-4 pb-6">
@@ -1315,7 +1289,7 @@ export function KundeDetailClient({
         desktopTabContent={desktopTabContent}
         mobileTabContent={mobileTabContent}
         mobileDefaultTab="stammdaten"
-        desktopDefaultTab="vorgaenge"
+        desktopDefaultTab="anfragen"
         mobileTabIds={mobileKundeTabIds}
         desktopTabIds={desktopKundeTabIds}
       />

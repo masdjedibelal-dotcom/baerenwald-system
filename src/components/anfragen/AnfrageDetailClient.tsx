@@ -145,6 +145,7 @@ export function AnfrageDetailClient({
   angebotKopieVonQuelleId,
   angebotFlowSnapshot = null,
   angeboteAuswahlInitial = false,
+  angebotWizardInitial = false,
   projektKontext,
   dbAuftragId = null,
 }: {
@@ -160,6 +161,8 @@ export function AnfrageDetailClient({
   angebotFlowSnapshot?: AnfrageAngebotFlowSnapshot | null
   /** z. B. Redirect von /anfragen/[id]/angebote — Modal sofort öffnen */
   angeboteAuswahlInitial?: boolean
+  /** z. B. nach Kunden-Aktion oder ?ziel=angebot — Wizard sofort öffnen */
+  angebotWizardInitial?: boolean
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
 }) {
@@ -375,6 +378,18 @@ export function AnfrageDetailClient({
       cancelled = true
     }
   }, [angebotKopieVonQuelleId, lead.id, openAngebotWizard, router])
+
+  const angebotWizardQueryHandledRef = useRef(false)
+  useEffect(() => {
+    if (!angebotWizardInitial) {
+      angebotWizardQueryHandledRef.current = false
+      return
+    }
+    if (angebotWizardQueryHandledRef.current) return
+    angebotWizardQueryHandledRef.current = true
+    openAngebotWizard(null)
+    router.replace(`/anfragen/${lead.id}`, { scroll: false })
+  }, [angebotWizardInitial, lead.id, openAngebotWizard, router])
 
   const hasAngebote = angeboteListe.length > 0
 

@@ -21,6 +21,8 @@ import {
 import { BEREICH_LABELS, KANAL_LABELS, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
+import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
+import type { Kunde } from '@/lib/types'
 import {
   GROESSEN_EINHEITEN,
   defaultGroesseEinheit,
@@ -69,6 +71,60 @@ function ersteFachdetailZeile(v: unknown): string {
   return ''
 }
 
+function applyKundeStammToForm(
+  data: Pick<
+    Kunde,
+    'name' | 'vorname' | 'nachname' | 'email' | 'telefon' | 'strasse' | 'hausnummer' | 'plz' | 'ort' | 'adresse' | 'typ'
+  >,
+  setters: {
+    setFirmaName: (v: string) => void
+    setVorname: (v: string) => void
+    setNachname: (v: string) => void
+    setEmail: (v: string) => void
+    setTelefon: (v: string) => void
+    setStrasse: (v: string) => void
+    setHausnummer: (v: string) => void
+    setPlz: (v: string) => void
+    setOrt: (v: string) => void
+    setSituation: (v: SituationValue | '') => void
+    setBereiche: (v: string[]) => void
+    setKundentyp: (v: string) => void
+  }
+) {
+  if (data.typ === 'gewerbe') {
+    setters.setFirmaName(String(data.name ?? ''))
+    setters.setVorname('')
+    setters.setNachname('')
+  } else if (data.typ === 'hausverwaltung') {
+    setters.setFirmaName(String(data.name ?? ''))
+    setters.setVorname(String(data.vorname ?? ''))
+    setters.setNachname(String(data.nachname ?? ''))
+  } else {
+    setters.setFirmaName('')
+    setters.setVorname(String(data.vorname ?? ''))
+    setters.setNachname(String(data.nachname ?? ''))
+    if (!data.vorname && !data.nachname && data.name) {
+      const split = splitDeutscherVollname(String(data.name))
+      setters.setVorname(split.vorname ?? '')
+      setters.setNachname(split.nachname ?? '')
+    }
+  }
+  if (data.email) setters.setEmail(String(data.email))
+  if (data.telefon) setters.setTelefon(String(data.telefon))
+  if (data.strasse) setters.setStrasse(String(data.strasse))
+  else if (data.adresse) setters.setStrasse(String(data.adresse))
+  if (data.hausnummer) setters.setHausnummer(String(data.hausnummer))
+  if (data.plz) setters.setPlz(String(data.plz))
+  if (data.ort) setters.setOrt(String(data.ort))
+  if (data.typ === 'gewerbe') {
+    setters.setSituation('gewerbe')
+    setters.setBereiche(['gewerbe'])
+    setters.setKundentyp('gewerbe')
+  } else if (data.typ === 'hausverwaltung') {
+    setters.setKundentyp('hausverwaltung')
+  }
+}
+
 export function AnfrageNeuForm({
   defaultKundeId,
   bearbeitenLead,
@@ -93,6 +149,7 @@ export function AnfrageNeuForm({
   const [verknuepfterKundeId, setVerknuepfterKundeId] = useState<string | null>(
     defaultKundeId?.trim() || null
   )
+  const [verknuepfterKunde, setVerknuepfterKunde] = useState<Kunde | null>(null)
 
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
@@ -135,52 +192,43 @@ export function AnfrageNeuForm({
     return [vorname.trim(), nachname.trim()].filter(Boolean).join(' ')
   }
 
+  function kundeFormSetters() {
+    return {
+      setFirmaName,
+      setVorname,
+      setNachname,
+      setEmail,
+      setTelefon,
+      setStrasse,
+      setHausnummer,
+      setPlz,
+      setOrt,
+      setSituation,
+      setBereiche,
+      setKundentyp,
+    }
+  }
+
   useEffect(() => {
     if (bearbeitenLead?.id) return
     const kid = defaultKundeId?.trim()
     if (!kid) {
       setVerknuepfterKundeId(null)
+      setVerknuepfterKunde(null)
       return
     }
     setVerknuepfterKundeId(kid)
     const supabase = createClient()
     void supabase
       .from('kunden')
-      .select('name, vorname, nachname, email, telefon, strasse, hausnummer, plz, ort, adresse, typ')
+      .select('id, name, vorname, nachname, email, telefon, strasse, hausnummer, plz, ort, adresse, typ')
       .eq('id', kid)
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return
-        if (data.typ === 'gewerbe') {
-          setFirmaName(String(data.name ?? ''))
-          setVorname('')
-          setNachname('')
-        } else if (data.typ === 'hausverwaltung') {
-          setFirmaName(String(data.name ?? ''))
-          setVorname(String(data.vorname ?? ''))
-          setNachname(String(data.nachname ?? ''))
-        } else {
-          setFirmaName('')
-          setVorname(String(data.vorname ?? ''))
-          setNachname(String(data.nachname ?? ''))
-          if (!data.vorname && !data.nachname && data.name) {
-            const split = splitDeutscherVollname(String(data.name))
-            setVorname(split.vorname ?? '')
-            setNachname(split.nachname ?? '')
-          }
-        }
-        if (data.email) setEmail(String(data.email))
-        if (data.telefon) setTelefon(String(data.telefon))
-        if (data.strasse) setStrasse(String(data.strasse))
-        else if (data.adresse) setStrasse(String(data.adresse))
-        if (data.hausnummer) setHausnummer(String(data.hausnummer))
-        if (data.plz) setPlz(String(data.plz))
-        if (data.ort) setOrt(String(data.ort))
-        if (data.typ === 'gewerbe') {
-          setSituation('gewerbe')
-          setBereiche(['gewerbe'])
-          setKundentyp('gewerbe')
-        }
+        const k = data as Kunde
+        setVerknuepfterKunde(k)
+        applyKundeStammToForm(k, kundeFormSetters())
       })
   }, [bearbeitenLead?.id, defaultKundeId])
 
@@ -515,6 +563,20 @@ export function AnfrageNeuForm({
     <div className="space-y-4">
       <Card title="Kunde & Kontakt">
         <div className="space-y-4">
+          {!isBearbeiten ? (
+            <KundeAuswahlFeld
+              kundeId={verknuepfterKundeId}
+              bekannterKunde={verknuepfterKunde}
+              onKundeIdChange={(id) => {
+                setVerknuepfterKundeId(id)
+                if (!id) setVerknuepfterKunde(null)
+              }}
+              onKundeGewaehlt={(k) => {
+                setVerknuepfterKunde(k)
+                applyKundeStammToForm(k, kundeFormSetters())
+              }}
+            />
+          ) : null}
           {firmaPflicht ? (
             <Field label={istHausverwaltung ? 'Firma *' : 'Firma / Name *'}>
               <input

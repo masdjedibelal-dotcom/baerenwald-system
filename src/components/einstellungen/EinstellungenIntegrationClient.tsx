@@ -14,6 +14,7 @@ import type {
   DatenschutzFaelligRow,
   DatenschutzFristRow,
   DatenschutzLoeschlogRow,
+  DatenschutzVvtRow,
 } from '@/lib/datenschutz/types'
 
 type Section = 'compliance' | 'datenschutz' | 'felder'
@@ -32,6 +33,7 @@ type Props = {
     faellig: DatenschutzFaelligRow[]
     log: DatenschutzLoeschlogRow[]
     anfragen: DatenschutzAnfrageRow[]
+    vvt: DatenschutzVvtRow[]
   }
 }
 
@@ -64,6 +66,7 @@ function IntegrationInner({ compliance, felder, datenschutz }: Props) {
           faellig={datenschutz.faellig}
           log={datenschutz.log}
           anfragen={datenschutz.anfragen}
+          vvt={datenschutz.vvt}
         />
       ) : null}
 

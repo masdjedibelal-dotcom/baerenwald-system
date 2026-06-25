@@ -6,6 +6,7 @@ import { IconText } from '@/components/ui/IconText'
 import { LinkChevron } from '@/components/ui/LinkChevron'
 import { SidePanel } from '@/components/ui/SidePanel'
 import { formatRelativeDate, cn } from '@/lib/utils'
+import { kundeNeueAnfrageHref } from '@/lib/kunden/kunde-pipeline-nav'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 
 function typBadgeClass(typ: string) {
@@ -85,8 +86,14 @@ export function KundeSidePanel({
         <p className="text-xs text-bw-text-muted">Letzte Aktivität: {formatRelativeDate(aktiv)}</p>
 
         <div className="space-y-2 border-t border-bw-border pt-2">
-          <Link href={`/anfragen?neu=1&kunde_id=${summary.id}`} className="btn btn-primary btn-sm inline-flex w-full justify-center">
+          <Link href={kundeNeueAnfrageHref(summary.id)} className="btn btn-primary btn-sm inline-flex w-full justify-center">
             + Neue Anfrage
+          </Link>
+          <Link
+            href={`/anfragen?neu=1&kunde_id=${summary.id}&ziel=angebot`}
+            className="btn btn-secondary btn-sm inline-flex w-full justify-center"
+          >
+            + Neues Angebot
           </Link>
           <Link href={`/kunden/${kundeId}`} className="btn btn-secondary btn-sm inline-flex w-full justify-center">
             <LinkChevron>Zur Kundenakte</LinkChevron>

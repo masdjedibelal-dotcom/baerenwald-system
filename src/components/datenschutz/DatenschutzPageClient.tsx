@@ -9,14 +9,19 @@ import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import type {
+  DatenschutzAnfrageKontext,
   DatenschutzAnfrageRow,
   DatenschutzFaelligRow,
   DatenschutzFristRow,
   DatenschutzLoeschlogRow,
+  DatenschutzVvtRow,
+  MelderLeadKurz,
 } from '@/lib/datenschutz/types'
+import { DATENSCHUTZ_AVV_REGISTER } from '@/lib/datenschutz/avv-register'
 import {
   addDatenschutzAufschub,
   createDatenschutzAnfrage,
+  sucheMelderLeads,
   updateDatenschutzAnfrage,
   updateDatenschutzFrist,
 } from '@/app/(dashboard)/einstellungen/datenschutz/actions'
@@ -36,8 +41,21 @@ function kategorieLabel(k: string): string {
     leads_abgebrochen: 'Lead abgebrochen',
     leads_abgeschlossen: 'Lead abgelehnt',
     kunden_daten: 'Kundenstamm',
+    melder_fotos: 'Melder-Fotos',
+    melder_leads_offen: 'Melder-Lead (offen)',
+    melder_leads_abgeschlossen: 'Melder-Lead (abgeschlossen)',
   }
   return map[k] ?? k
+}
+
+function kontextLabel(k: string | null | undefined): string {
+  const map: Record<string, string> = {
+    mieter_meldung: 'Mieter-Meldung',
+    privatkunde: 'Privatkunde',
+    partner: 'Partner',
+    sonstiges: 'Sonstiges',
+  }
+  return k ? (map[k] ?? k) : '—'
 }
 
 function tageSeit(iso: string): number {
@@ -49,9 +67,10 @@ type Props = {
   faellig: DatenschutzFaelligRow[]
   log: DatenschutzLoeschlogRow[]
   anfragen: DatenschutzAnfrageRow[]
+  vvt: DatenschutzVvtRow[]
 }
 
-export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props) {
+export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -69,12 +88,17 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
   const [anfrageName, setAnfrageName] = useState('')
   const [anfrageEmail, setAnfrageEmail] = useState('')
   const [anfrageDesc, setAnfrageDesc] = useState('')
+  const [anfrageKontext, setAnfrageKontext] = useState<DatenschutzAnfrageKontext>('sonstiges')
+
+  const [melderSucheEmail, setMelderSucheEmail] = useState('')
+  const [melderTreffer, setMelderTreffer] = useState<MelderLeadKurz[]>([])
+  const [melderSucheLief, setMelderSucheLief] = useState(false)
 
   const [editAnfrage, setEditAnfrage] = useState<DatenschutzAnfrageRow | null>(null)
   const [editNotizen, setEditNotizen] = useState('')
   const [editStatus, setEditStatus] = useState<'offen' | 'in_bearbeitung' | 'erledigt'>('offen')
 
-  const [mainTab, setMainTab] = useState<'fristen' | 'faellig' | 'anfragen'>('fristen')
+  const [mainTab, setMainTab] = useState<'fristen' | 'faellig' | 'anfragen' | 'vvt' | 'avv'>('fristen')
 
   const offeneAnfragen = useMemo(() => anfragen.filter((a) => a.status !== 'erledigt'), [anfragen])
 
@@ -170,6 +194,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
       name: anfrageName,
       email: anfrageEmail,
       beschreibung: anfrageDesc || null,
+      kontext: anfrageKontext,
     })
     setBusy(null)
     if (!r.ok) {
@@ -181,7 +206,20 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
     setAnfrageName('')
     setAnfrageEmail('')
     setAnfrageDesc('')
+    setAnfrageKontext('sonstiges')
     router.refresh()
+  }
+
+  async function runMelderSuche() {
+    if (!melderSucheEmail.trim()) {
+      toast.error('E-Mail eingeben')
+      return
+    }
+    setBusy('melder-suche')
+    const rows = await sucheMelderLeads(melderSucheEmail)
+    setMelderTreffer(rows)
+    setMelderSucheLief(true)
+    setBusy(null)
   }
 
   async function runSaveAnfrage() {
@@ -208,7 +246,9 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
           [
             ['fristen', 'Fristen'],
             ['faellig', 'Fällige Löschungen'],
-            ['anfragen', 'Kunden-Anfragen'],
+            ['anfragen', 'Betroffenenanfragen'],
+            ['vvt', 'VVT'],
+            ['avv', 'AVV-Register'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -231,6 +271,16 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
         Steuerlich relevante Daten (Rechnungen, Belege) werden erst nach Ablauf der gesetzlichen Aufbewahrungspflicht
         (typisch 10 Jahre) zur Löschung vorgeschlagen bzw. hier technisch blockiert.
       </div>
+
+      <details className="rounded-lg border border-border bg-canvas/40 px-4 py-3 text-sm text-ink">
+        <summary className="cursor-pointer font-medium">Schulung CRM-Nutzer (Melde-Flow)</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
+          <li>Nur notwendige Melderdaten erfassen (HV-Einladung).</li>
+          <li>Keine Screenshots/Fotos außerhalb des Systems speichern.</li>
+          <li>Bei Auskunftsanfragen: Frist 1 Monat, Hausverwaltung einbinden.</li>
+          <li>Löschungen nur über dieses Datenschutz-Modul — nicht manuell in der Datenbank.</li>
+        </ul>
+      </details>
 
       {mainTab === 'fristen' ? (
       <section>
@@ -362,13 +412,57 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
       ) : null}
 
       {mainTab === 'anfragen' ? (
-      <section>
+      <section className="space-y-6">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-ink">Kunden-Anfragen (DSGVO)</h2>
+          <h2 className="text-lg font-semibold text-ink">Betroffenenanfragen (DSGVO)</h2>
           <Button type="button" variant="primary" size="sm" onClick={() => setAnfrageOpen(true)}>
             + Anfrage erfassen
           </Button>
         </div>
+
+        <Card className="p-4">
+          <h3 className="mb-2 text-sm font-semibold text-ink">Mieter-Meldungen suchen (melder_email)</h3>
+          <p className="mb-3 text-xs text-muted">
+            Kanäle hv_melder_link und hv_einladung. Bei Auskunft/Löschung primär Hausverwaltung einbinden.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              label="Melder-E-Mail"
+              name="melder_suche"
+              type="email"
+              value={melderSucheEmail}
+              onChange={(e) => setMelderSucheEmail(e.target.value)}
+              className="min-w-[220px] flex-1"
+            />
+            <div className="flex items-end">
+              <Button type="button" variant="secondary" size="sm" loading={busy === 'melder-suche'} onClick={() => void runMelderSuche()}>
+                Suchen
+              </Button>
+            </div>
+          </div>
+          {melderSucheLief ? (
+            melderTreffer.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">Keine Melder-Leads gefunden.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {melderTreffer.map((l) => (
+                  <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-border px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">{l.melder_name ?? '—'}</span>
+                      <span className="text-muted">
+                        {' '}
+                        · {l.melder_einheit ?? '—'} · {l.status} · {l.created_at.slice(0, 10)}
+                      </span>
+                    </div>
+                    <a href={`/anfragen/${l.id}`} className="text-bw-primary hover:underline">
+                      Lead öffnen →
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+        </Card>
 
         {offeneAnfragen.map((a) => {
           const t = tageSeit(a.created_at)
@@ -387,7 +481,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
                 <div>
                   <span className="font-medium text-ink">{a.name}</span>{' '}
                   <span className="text-muted">
-                    · {a.typ} · {a.created_at.slice(0, 10)} · {a.status}
+                    · {a.typ} · {kontextLabel(a.kontext)} · {a.created_at.slice(0, 10)} · {a.status}
                   </span>
                 </div>
                 <Button
@@ -421,6 +515,89 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
             </ul>
           </details>
         ) : null}
+      </section>
+      ) : null}
+
+      {mainTab === 'vvt' ? (
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-ink">Verzeichnis von Verarbeitungstätigkeiten (Art. 30)</h2>
+        {vvt.length === 0 ? (
+          <p className="text-sm text-muted">
+            Noch keine Einträge — Migration <code className="text-xs">20260725120000_datenschutz_melder.sql</code>{' '}
+            anwenden.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {vvt.map((e) => (
+              <Card key={e.id} className="p-4">
+                <h3 className="font-semibold text-ink">{e.titel}</h3>
+                <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted">Zweck</dt>
+                    <dd>{e.zweck}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Rechtsgrundlage</dt>
+                    <dd>{e.rechtsgrundlage ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Betroffene</dt>
+                    <dd>{e.betroffene_kategorien ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Datenarten</dt>
+                    <dd>{e.datenarten ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Empfänger</dt>
+                    <dd>{e.empfaenger ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Drittland</dt>
+                    <dd>{e.drittland ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Löschfrist</dt>
+                    <dd>{e.loeschfrist_hinweis ?? '—'}</dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted">TOMs</dt>
+                    <dd>{e.toms ?? '—'}</dd>
+                  </div>
+                </dl>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+      ) : null}
+
+      {mainTab === 'avv' ? (
+      <section>
+        <h2 className="mb-1 text-lg font-semibold text-ink">AVV-Register — Unterauftragsverarbeiter</h2>
+        <p className="mb-3 text-sm text-muted">Manuell pflegen; mit Anwalt und AVV-Anlage abstimmen.</p>
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border bg-canvas text-muted">
+                <th className="px-3 py-2 font-medium">Anbieter</th>
+                <th className="px-3 py-2 font-medium">Zweck</th>
+                <th className="px-3 py-2 font-medium">Standort</th>
+                <th className="px-3 py-2 font-medium">Vertrag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DATENSCHUTZ_AVV_REGISTER.map((row) => (
+                <tr key={row.name} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2 font-medium">{row.name}</td>
+                  <td className="px-3 py-2">{row.zweck}</td>
+                  <td className="px-3 py-2 text-muted">{row.standort}</td>
+                  <td className="px-3 py-2 text-muted">{row.vertrag}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       </section>
       ) : null}
 
@@ -526,6 +703,19 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen }: Props
             value={anfrageEmail}
             onChange={(e) => setAnfrageEmail(e.target.value)}
           />
+          <label className="block text-sm font-medium text-ink">
+            Kontext
+            <select
+              className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3 text-ink"
+              value={anfrageKontext}
+              onChange={(e) => setAnfrageKontext(e.target.value as DatenschutzAnfrageKontext)}
+            >
+              <option value="mieter_meldung">Mieter-Meldung (HV-Portal)</option>
+              <option value="privatkunde">Privatkunde</option>
+              <option value="partner">Partner / Handwerker</option>
+              <option value="sonstiges">Sonstiges</option>
+            </select>
+          </label>
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-ink">Beschreibung</span>
             <Textarea value={anfrageDesc} onChange={(e) => setAnfrageDesc(e.target.value)} rows={3} />
