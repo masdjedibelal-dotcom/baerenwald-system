@@ -24,12 +24,14 @@ import { LeadStatusBadge } from '@/components/ui/Badge'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
+  initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
   istKundeHausverwaltungTyp,
   istKundeGewerbeTyp,
   istKundeNurGewerbeTyp,
   kundeDisplayName,
 } from '@/lib/kunde-stammdaten'
+import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenVorgaengeBaum } from '@/components/kunden/KundenVorgaengeBaum'
@@ -90,6 +92,25 @@ const TYP_OPTIONS = [
   { value: 'hausverwaltung', label: 'Hausverwaltung' },
   { value: 'sonstiges', label: 'Sonstiges' },
 ]
+
+function buildEditFormFromKunde(k: KundeDetailPayload) {
+  const addr = initKundeStammEditFelder(k)
+  return {
+    firmaName: k.typ === 'gewerbe' || k.typ === 'hausverwaltung' ? (k.name ?? '') : '',
+    vorname: k.vorname ?? '',
+    nachname: k.nachname ?? k.name,
+    typ: k.typ,
+    telefon: k.telefon ?? '',
+    email: k.email ?? '',
+    plz: k.plz ?? '',
+    ort: k.ort ?? '',
+    strasse: addr.strasse,
+    hausnummer: addr.hausnummer,
+    webseite: k.webseite ?? '',
+    ansprechpartner: k.ansprechpartner ?? '',
+    quelle: k.quelle ?? '',
+  }
+}
 
 function formatEur(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return '—'
@@ -190,6 +211,7 @@ export function KundeDetailClient({
   const kundeRef = useRef(kunde)
   kundeRef.current = kunde
   const [editOpen, setEditOpen] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
   const [portalModalOpen, setPortalModalOpen] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalSending, setPortalSending] = useState(false)
@@ -201,21 +223,7 @@ export function KundeDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
   const [hasPortalAccount, setHasPortalAccount] = useState(false)
-  const [editForm, setEditForm] = useState({
-    firmaName: initialKunde.typ === 'gewerbe' || initialKunde.typ === 'hausverwaltung' ? initialKunde.name : '',
-    vorname: initialKunde.vorname ?? '',
-    nachname: initialKunde.nachname ?? initialKunde.name,
-    typ: initialKunde.typ,
-    telefon: initialKunde.telefon ?? '',
-    email: initialKunde.email ?? '',
-    plz: initialKunde.plz ?? '',
-    ort: initialKunde.ort ?? '',
-    strasse: (initialKunde.strasse?.trim() || initialKunde.adresse) ?? '',
-    hausnummer: initialKunde.hausnummer ?? '',
-    webseite: initialKunde.webseite ?? '',
-    ansprechpartner: initialKunde.ansprechpartner ?? '',
-    quelle: initialKunde.quelle ?? '',
-  })
+  const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
 
   useEffect(() => {
     void (async () => {
@@ -232,22 +240,7 @@ export function KundeDetailClient({
   useEffect(() => {
     setKunde(initialKunde)
     setInterneNotiz(initialKunde.notizen ?? '')
-    setEditForm({
-      firmaName:
-        initialKunde.typ === 'gewerbe' || initialKunde.typ === 'hausverwaltung' ? initialKunde.name : '',
-      vorname: initialKunde.vorname ?? '',
-      nachname: initialKunde.nachname ?? initialKunde.name,
-      typ: initialKunde.typ,
-      telefon: initialKunde.telefon ?? '',
-      email: initialKunde.email ?? '',
-      plz: initialKunde.plz ?? '',
-      ort: initialKunde.ort ?? '',
-      strasse: (initialKunde.strasse?.trim() || initialKunde.adresse) ?? '',
-      hausnummer: initialKunde.hausnummer ?? '',
-      webseite: initialKunde.webseite ?? '',
-      ansprechpartner: initialKunde.ansprechpartner ?? '',
-      quelle: initialKunde.quelle ?? '',
-    })
+    setEditForm(buildEditFormFromKunde(initialKunde))
   }, [initialKunde])
 
   useEffect(() => {
@@ -432,7 +425,7 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const zeigtOrganisationTab = istKundeGewerbeTyp(kunde.typ) || kunde.portal_modus === 'organisation'
+  const zeigtOrganisationTab = istKundeNurGewerbeTyp(kunde.typ)
 
   const desktopKundeTabIds = useMemo((): KundeDetailTab[] => {
     if (!zeigtOrganisationTab) return DESKTOP_KUNDE_TABS_BASE
@@ -506,7 +499,14 @@ export function KundeDetailClient({
     })
   }, [rechnungen])
 
+  function openEditModal() {
+    setEditErr(null)
+    setEditForm(buildEditFormFromKunde(kunde))
+    setEditOpen(true)
+  }
+
   function saveKundeModal() {
+    setEditErr(null)
     startTransition(async () => {
       const firmaPflicht = istKundeFirmaPflichtTyp(editForm.typ)
       const r = await saveKunde(
@@ -528,10 +528,32 @@ export function KundeDetailClient({
         },
         kunde.id
       )
-      if (r.ok) {
-        setEditOpen(false)
-        refresh()
+      if (!r.ok) {
+        setEditErr(r.message)
+        toast.error(r.message)
+        return
       }
+      const name = firmaPflicht ? editForm.firmaName.trim() : kunde.name
+      setKunde((prev) => ({
+        ...prev,
+        typ: editForm.typ,
+        name,
+        vorname: editForm.vorname || null,
+        nachname: editForm.nachname || null,
+        strasse: editForm.strasse || null,
+        hausnummer: editForm.hausnummer || null,
+        telefon: editForm.telefon || null,
+        email: editForm.email || null,
+        plz: editForm.plz || null,
+        ort: editForm.ort || null,
+        webseite: editForm.webseite || null,
+        ansprechpartner: editForm.ansprechpartner || null,
+        quelle: editForm.quelle || null,
+        adresse: [editForm.strasse, editForm.hausnummer].filter(Boolean).join(' ') || null,
+      }))
+      toast.success('Stammdaten gespeichert')
+      setEditOpen(false)
+      refresh()
     })
   }
 
@@ -634,7 +656,7 @@ export function KundeDetailClient({
       collapsible
       title="Stammdaten"
       action={
-        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
+        <button type="button" onClick={openEditModal} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
           <Pencil className="h-3.5 w-3.5" />
         </button>
       }
@@ -1388,6 +1410,7 @@ export function KundeDetailClient({
           </div>
         }
       >
+        {editErr ? <p className="mb-3 text-sm text-status-cancel-text">{editErr}</p> : null}
         <div className="form-grid-2 grid gap-3 md:grid-cols-2">
           <Select
             label="Typ *"

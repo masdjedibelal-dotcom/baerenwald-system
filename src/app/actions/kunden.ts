@@ -51,6 +51,14 @@ function sanitizeKundePayload(input: SaveKundeInput): Record<string, unknown> {
   return payload
 }
 
+function applyHausverwaltungDefaults(payload: Record<string, unknown>, typ: string) {
+  if (typ !== 'hausverwaltung') return
+  payload.portal_modus = 'organisation'
+  payload.freigabe_modus = 'freigabe'
+  payload.freigabe_schwelle_eur = null
+  payload.notfall_direkt = false
+}
+
 export async function saveKunde(
   data: SaveKundeInput,
   kundeId?: string,
@@ -61,6 +69,7 @@ export async function saveKunde(
     if (err) return { ok: false, message: err }
   }
   const payload = sanitizeKundePayload(data)
+  applyHausverwaltungDefaults(payload, data.typ)
 
   if (!kundeId && (data.typ === 'gewerbe' || data.typ === 'hausverwaltung')) {
     payload.portal_modus = 'organisation'

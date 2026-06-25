@@ -94,20 +94,57 @@ export type SaveKundeStammInput = {
   ort?: string | null
 }
 
+/** Trennt „Musterstraße 12a“ in Straße und Hausnummer (Legacy-Adressen). */
+export function splitStrasseHausnummer(raw: string): { strasse: string; hausnummer: string | null } {
+  const input = raw.trim()
+  if (!input) return { strasse: '', hausnummer: null }
+  const m = input.match(/^(.+?)\s+(\d+[a-zA-Z]?(?:-\d+[a-zA-Z]?)?)$/)
+  if (!m) return { strasse: input, hausnummer: null }
+  const strasse = m[1].trim()
+  const hausnummer = m[2].trim()
+  if (!strasse || !hausnummer) return { strasse: input, hausnummer: null }
+  return { strasse, hausnummer }
+}
+
+export function initKundeStammEditFelder(k: Pick<Kunde, 'strasse' | 'hausnummer' | 'adresse'>): {
+  strasse: string
+  hausnummer: string
+} {
+  const nr = k.hausnummer?.trim() || ''
+  if (nr) {
+    return {
+      strasse: (k.strasse?.trim() || k.adresse?.trim() || '').trim(),
+      hausnummer: nr,
+    }
+  }
+  const split = splitStrasseHausnummer(k.strasse?.trim() || k.adresse?.trim() || '')
+  return { strasse: split.strasse, hausnummer: split.hausnummer ?? '' }
+}
+
+export function normalizeSaveKundeStammInput(input: SaveKundeStammInput): SaveKundeStammInput {
+  if (input.hausnummer?.trim()) return input
+  const strasse = input.strasse?.trim() || ''
+  if (!strasse) return input
+  const split = splitStrasseHausnummer(strasse)
+  if (!split.hausnummer) return input
+  return { ...input, strasse: split.strasse, hausnummer: split.hausnummer }
+}
+
 export function validateKundeStammPflicht(input: SaveKundeStammInput): string | null {
-  const typ = input.typ
+  const data = normalizeSaveKundeStammInput(input)
+  const typ = data.typ
   if (istKundeFirmaPflichtTyp(typ)) {
-    if (!input.name?.trim()) {
+    if (!data.name?.trim()) {
       return istKundeHausverwaltungTyp(typ) ? 'Firma ist Pflicht.' : 'Firmenname ist Pflicht.'
     }
   } else {
-    if (!input.vorname?.trim() && !input.nachname?.trim()) {
+    if (!data.vorname?.trim() && !data.nachname?.trim()) {
       return 'Vorname oder Nachname ist Pflicht.'
     }
   }
-  if (!input.strasse?.trim()) return 'Straße ist Pflicht.'
-  if (!input.hausnummer?.trim()) return 'Hausnummer ist Pflicht.'
-  if (!input.plz?.trim() || !input.ort?.trim()) return 'Postleitzahl und Ort sind Pflicht.'
+  if (!data.strasse?.trim()) return 'Straße ist Pflicht.'
+  if (!data.hausnummer?.trim()) return 'Hausnummer ist Pflicht.'
+  if (!data.plz?.trim() || !data.ort?.trim()) return 'Postleitzahl und Ort sind Pflicht.'
   return null
 }
 
@@ -121,8 +158,9 @@ export function buildKundeStammDbPayload(input: SaveKundeStammInput): {
   ort: string | null
   adresse: string | null
 } {
-  const strasse = input.strasse?.trim() || null
-  const hausnummer = input.hausnummer?.trim() || null
+  const normalized = normalizeSaveKundeStammInput(input)
+  const strasse = normalized.strasse?.trim() || null
+  const hausnummer = normalized.hausnummer?.trim() || null
   const plz = input.plz?.trim() || null
   const ort = input.ort?.trim() || null
   const vorname = input.vorname?.trim() || null

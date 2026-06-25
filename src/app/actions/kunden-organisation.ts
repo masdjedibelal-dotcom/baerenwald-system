@@ -49,6 +49,38 @@ export async function saveKundeOrganisation(
   const id = kundeId?.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
 
+  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('typ').eq('id', id).maybeSingle()
+  )
+  if (kundeErr) return { ok: false, message: kundeErr.message }
+  const istHausverwaltung = (kundeRow as { typ?: string } | null)?.typ === 'hausverwaltung'
+
+  if (istHausverwaltung) {
+    const hvPayload: Record<string, unknown> = {
+      portal_modus: 'organisation',
+      freigabe_modus: 'freigabe',
+      freigabe_schwelle_eur: null,
+      notfall_direkt: false,
+      org_anzeigename: input.org_anzeigename?.trim() || null,
+      org_logo_url: input.org_logo_url?.trim() || null,
+    }
+    const slug = normalizeOrgSlug(input.org_kennung ?? '')
+    if (!isValidMeldeSlug(slug)) {
+      return {
+        ok: false,
+        message: 'Für Hausverwaltung ist eine gültige Org-Kennung Pflicht (2–48 Zeichen, a-z, 0-9, -).',
+      }
+    }
+    const unique = await checkOrgKennungUnique(slug, id)
+    if (!unique.ok) return unique
+    hvPayload.org_kennung = slug
+    const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(hvPayload).eq('id', id))
+    if (error) return { ok: false, message: error.message }
+    revalidatePath('/kunden')
+    revalidatePath(`/kunden/${id}`)
+    return { ok: true }
+  }
+
   const portalModus = input.portal_modus
   const payload: Record<string, unknown> = {
     portal_modus: portalModus,

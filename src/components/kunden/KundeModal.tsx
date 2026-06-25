@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Accordion } from '@/components/ui/Accordion'
 import { findKundenDuplikate, saveKunde } from '@/app/actions/kunden'
 import {
+  initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
   istKundeHausverwaltungTyp,
   istKundeNurGewerbeTyp,
@@ -97,8 +98,9 @@ export function KundeModal({
       setNachname(namen.nachname ?? '')
       setTelefon(editKunde.telefon ?? '')
       setEmail(editKunde.email ?? '')
-      setStrasse(editKunde.strasse?.trim() || editKunde.adresse?.trim() || '')
-      setHausnummer(editKunde.hausnummer ?? '')
+      const addr = initKundeStammEditFelder(editKunde)
+      setStrasse(addr.strasse)
+      setHausnummer(addr.hausnummer)
       setPlz(editKunde.plz ?? '')
       setOrt(editKunde.ort ?? '')
       setWebseite(editKunde.webseite ?? '')
