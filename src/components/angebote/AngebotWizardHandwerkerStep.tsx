@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { gewerkById } from '@/lib/gewerke-ausfuehrung'
+import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { DokumentZeile } from '@/lib/dokument-zeilen'
 import type { Gewerk, Handwerker } from '@/lib/types'
 
@@ -34,10 +35,11 @@ function gewerkeAusZeilen(zeilen: DokumentZeile[]): { gewerk_id: string; gewerk_
 
 function handwerkerFuerGewerk(handwerker: Handwerker[], gewerke: Gewerk[], gewerkId: string): Handwerker[] {
   const g = gewerkById(gewerke, gewerkId)
-  const slug = g?.slug?.toLowerCase()
-  if (!slug) return handwerker
-  return handwerker.filter((h) =>
-    (h.gewerke ?? []).some((x) => String(x).toLowerCase() === slug)
+  const slug = g?.slug
+  if (!slug) return handwerker.filter((h) => h.aktiv !== false)
+  return filterHandwerkerFuerGewerkSlug(
+    handwerker.filter((h) => h.aktiv !== false),
+    slug
   )
 }
 

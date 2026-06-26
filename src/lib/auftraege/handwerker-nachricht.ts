@@ -37,7 +37,9 @@ export function buildHandwerkerAuftragNachricht(input: HandwerkerNachrichtInput)
   const gruss = vn ? `Hallo ${vn},` : 'Hallo,'
   const leistungen =
     input.leistungen.length > 0
-      ? input.leistungen.map((l) => `• ${l}`).join('\n')
+      ? input.leistungen.map((l, i) =>
+          input.leistungen.length > 1 ? `${i + 1}. ${l}` : `• ${l}`
+        ).join('\n')
       : '• gemäß Auftrag'
 
   const lines = [
@@ -66,7 +68,11 @@ export function buildHandwerkerAuftragNachricht(input: HandwerkerNachrichtInput)
 }
 
 /** Betreff für Zuweisungs-Mail / WhatsApp nach Leistungs-Zuweisung */
-export function handwerkerZuweisungMailSubject(leistungName: string): string {
+export function handwerkerZuweisungMailSubject(
+  leistungName: string,
+  count = 1
+): string {
+  if (count > 1) return `Leistungsanfrage: ${count} Positionen — Bärenwald Partner`
   const l = leistungName.trim()
   return l ? `Leistungsanfrage: ${l} — Bärenwald Partner` : 'Leistungsanfrage — Bärenwald Partner'
 }

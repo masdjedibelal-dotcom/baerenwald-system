@@ -26,6 +26,7 @@ import {
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
+import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import {
   gewerkOptionsFromList,
   OfferPositionCard,
@@ -185,9 +186,9 @@ export function AngebotNeuForm({
   const handwerkerOptions = useCallback(
     (gewerkId: string) => {
       const slug = gewerkSlug(gewerkId)
-      return handwerker.filter(
-        (h) => h.aktiv && slug && (h.gewerke ?? []).includes(slug)
-      )
+      const aktiv = handwerker.filter((h) => h.aktiv)
+      if (!slug) return aktiv
+      return filterHandwerkerFuerGewerkSlug(aktiv, slug)
     },
     [gewerkSlug, handwerker]
   )

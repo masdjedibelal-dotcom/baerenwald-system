@@ -85,7 +85,10 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
       plz,
       zeitraum: zeitraum || undefined,
       positionen: (posFiltered.length ? posFiltered : posAll).map((p) => ({
+        leistung: p.leistung,
         beschreibung: p.beschreibung || p.leistung,
+        menge: p.menge || 1,
+        einheit: p.einheit,
       })),
       link,
       notiz: row.aufgabe_notiz?.trim() || undefined,

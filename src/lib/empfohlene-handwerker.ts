@@ -1,4 +1,5 @@
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import { handwerkerHatGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type EmpfohlenerHandwerker = {
@@ -82,7 +83,7 @@ export async function loadEmpfohleneHandwerker(
     if (!gw) continue
 
     const kandidaten = handwerker
-      .filter((h) => ((h.gewerke as string[] | null) ?? []).includes(slug))
+      .filter((h) => handwerkerHatGewerkSlug((h.gewerke as string[] | null) ?? [], slug))
       .map((h) => ({
         id: h.id as string,
         name: h.name as string,

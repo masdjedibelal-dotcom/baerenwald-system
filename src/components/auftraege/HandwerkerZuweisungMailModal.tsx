@@ -170,6 +170,12 @@ export function HandwerkerZuweisungMailModal({
           </p>
           <p className="text-sm text-bw-text-muted">
             Gewerk: <span className="font-medium text-bw-text">{target.gewerkName}</span>
+            {target.positionIds && target.positionIds.length > 1 ? (
+              <span className="text-bw-text-muted">
+                {' '}
+                · {target.positionIds.length} Leistungen in einer Anfrage
+              </span>
+            ) : null}
           </p>
           <Input
             label="Betreff"

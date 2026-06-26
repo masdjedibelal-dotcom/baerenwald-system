@@ -27,6 +27,7 @@ import {
   updateAuftragPositionSteuerung,
 } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks'
+import { leistungenLabelsFromPositionen } from '@/lib/auftraege/handwerker-zuweisen-scope'
 import {
   LEISTUNG_STATUS_OPTIONS,
   leistungStatusBadgeClass,
@@ -34,6 +35,8 @@ import {
   normalizeLeistungStatus,
   type AuftragLeistungStatus,
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
+import { AuftragPositionHandwerkerBadge, AuftragPositionHandwerkerPanel } from '@/components/auftraege/AuftragPositionHandwerkerPanel'
+import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 import {
   istEigenleistungPosition,
   preisEigenleistung,
@@ -43,9 +46,8 @@ import type { HandwerkerNachrichtInput } from '@/lib/auftraege/handwerker-nachri
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { buildPartnerLoginLink } from '@/lib/portal-utils'
-import type { AuftragPosition } from '@/lib/types'
+import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
-import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 
 function EuroInput({
   label,
@@ -85,6 +87,7 @@ function HandwerkerPositionSelect({
   value,
   disabled,
   onChanged,
+  onAssigned,
 }: {
   auftragId: string
   positionId: string
@@ -93,6 +96,7 @@ function HandwerkerPositionSelect({
   value: string | null
   disabled?: boolean
   onChanged: () => void
+  onAssigned?: (handwerkerId: string, handwerkerName: string) => void
 }) {
   const [pending, startTransition] = useTransition()
   const [loading, setLoading] = useState(true)
@@ -139,7 +143,12 @@ function HandwerkerPositionSelect({
         handwerkerId: nextId,
       })
       if (!r.ok) toast.error(r.message)
-      else onChanged()
+      else {
+        onChanged()
+        const label = options.find((o) => o.value === nextId)?.label ?? 'Partner'
+        const name = label.includes(' · ') ? label.split(' · ')[0]! : label
+        onAssigned?.(nextId, name)
+      }
     })
   }
 
@@ -169,6 +178,9 @@ export function AuftragPositionenLeistungEditPanel({
   onOpenHwMail,
   onBewerteHandwerker,
   onChanged,
+  partnerRow = null,
+  angebotId = null,
+  angebotTitel = 'Projekt',
   eigenregie = false,
   showReorder = true,
   showDelete = true,
@@ -186,6 +198,9 @@ export function AuftragPositionenLeistungEditPanel({
   onOpenHwMail: (mail: HandwerkerZuweisungMailTarget) => void
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
   onChanged: () => void
+  partnerRow?: AngebotHandwerkerRow | null
+  angebotId?: string | null
+  angebotTitel?: string
   eigenregie?: boolean
   showReorder?: boolean
   showDelete?: boolean
@@ -201,7 +216,6 @@ export function AuftragPositionenLeistungEditPanel({
   const hw = pos.handwerker
 
   const nachrichtInput: HandwerkerNachrichtInput = useMemo(() => {
-    const qty = pos.einheit && pos.einheit !== 'pauschal' ? `${pos.menge ?? 1} ${pos.einheit}` : 'Pauschal'
     return {
       handwerkerName: hw?.name ?? '',
       kundeName: handwerkerKontext.kundeName,
@@ -209,7 +223,7 @@ export function AuftragPositionenLeistungEditPanel({
       plz: handwerkerKontext.plz,
       ort: handwerkerKontext.ort,
       gewerkName: block.gewerkName,
-      leistungen: [`${pos.leistung_name} (${qty})`],
+      leistungen: leistungenLabelsFromPositionen([pos]),
       startDatum: pos.start_datum ?? handwerkerKontext.startDatum,
       endDatum: pos.end_datum ?? handwerkerKontext.endDatum,
       portalLink: buildPartnerLoginLink(),
@@ -303,7 +317,27 @@ export function AuftragPositionenLeistungEditPanel({
             value={pos.handwerker_id ?? null}
             disabled={pending || pendingLocal}
             onChanged={onChanged}
+            onAssigned={(handwerkerId, handwerkerName) => {
+              onOpenHwMail({
+                handwerkerId,
+                handwerkerName,
+                gewerkName: block.gewerkName,
+                positionId: pos.id,
+              })
+            }}
           />
+          {pos.handwerker_id ? (
+            <div className="mt-3">
+              <AuftragPositionHandwerkerPanel
+                pos={pos}
+                partnerRow={partnerRow}
+                angebotId={angebotId}
+                angebotTitel={angebotTitel}
+                auftragId={auftragId}
+                onChanged={onChanged}
+              />
+            </div>
+          ) : null}
           {hw ? (
             <div className="leistung-acc-hw-actions">
               <button
@@ -404,10 +438,14 @@ export function AuftragPositionenLeistungSummaryRow({
   pos,
   onPress,
   showChevron = false,
+  partnerRow = null,
+  showHwBadge = false,
 }: {
   pos: AuftragPosition
   onPress?: () => void
   showChevron?: boolean
+  partnerRow?: AngebotHandwerkerRow | null
+  showHwBadge?: boolean
 }) {
   const leistungStatus = normalizeLeistungStatus(pos.leistung_status)
   const Tag = onPress ? 'button' : 'div'
@@ -418,12 +456,22 @@ export function AuftragPositionenLeistungSummaryRow({
       className={cn('pos-mobile-leistung-row', onPress && 'pos-mobile-leistung-row--tappable')}
       onClick={onPress}
     >
-      <span className="pos-mobile-leistung-row__name">{pos.leistung_name}</span>
-      <span className={cn('leistung-status-badge', leistungStatusBadgeClass(leistungStatus))}>
-        {leistungStatusLabel(leistungStatus)}
-      </span>
-      <span className="pos-mobile-leistung-row__price">{formatPreis(pos.preis_fix ?? null, null, null)}</span>
-      {showChevron ? <ChevronDown className="pos-mobile-leistung-row__chevron h-4 w-4 -rotate-90" aria-hidden /> : null}
+      <div className="min-w-0 flex-1 text-left">
+        <span className="pos-mobile-leistung-row__name block truncate">{pos.leistung_name}</span>
+        {!showHwBadge && pos.handwerker?.name ? (
+          <span className="block truncate text-[10px] text-bw-text-muted">HW: {pos.handwerker.name}</span>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+        {showHwBadge && pos.handwerker_id ? (
+          <AuftragPositionHandwerkerBadge pos={pos} partnerRow={partnerRow} />
+        ) : null}
+        <span className={cn('leistung-status-badge', leistungStatusBadgeClass(leistungStatus))}>
+          {leistungStatusLabel(leistungStatus)}
+        </span>
+        <span className="pos-mobile-leistung-row__price">{formatPreis(pos.preis_fix ?? null, null, null)}</span>
+        {showChevron ? <ChevronDown className="pos-mobile-leistung-row__chevron h-4 w-4 -rotate-90" aria-hidden /> : null}
+      </div>
     </Tag>
   )
 }

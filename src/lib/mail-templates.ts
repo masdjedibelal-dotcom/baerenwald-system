@@ -1056,9 +1056,14 @@ export function mailHandwerkerLeistungZuweisung(
   const name = esc(data.name)
   const plz = esc(data.plz.trim() || '—')
   const cards = data.leistungen
-    .map((l) => {
+    .map((l, i) => {
       const beschreibung = l.beschreibung?.trim() ? esc(l.beschreibung.trim()) : '—'
+      const posLabel =
+        data.leistungen.length > 1
+          ? `<p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#2E7D52;text-transform:uppercase;">Position ${i + 1} von ${data.leistungen.length}</p>`
+          : ''
       return whiteBorderBox(`
+        ${posLabel}
         <table width="100%" cellpadding="0" cellspacing="0">
         ${detailRow('Gewerk', esc(l.gewerk_name))}
         ${detailRow('Leistung', esc(l.leistung_name))}
@@ -1078,6 +1083,7 @@ export function mailHandwerkerLeistungZuweisung(
       `
       <h2 style="color:#2E7D52;margin:0 0 16px;">Neue Leistungsanfrage</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
+      ${data.leistungen.length > 1 ? `<p style="margin:0 0 16px;line-height:1.6;">Folgende <strong>${data.leistungen.length} Positionen</strong> warten auf Ihre Rückmeldung:</p>` : ''}
       ${cards}
       ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
     `,
@@ -1202,7 +1208,7 @@ export function mailHandwerkerAnfrage(
     gewerk: string
     plz: string
     zeitraum?: string | null
-    positionen: { beschreibung?: string | null }[]
+    positionen: { leistung?: string | null; beschreibung?: string | null; menge?: number; einheit?: string }[]
     link: string
     notiz?: string | null
   },
@@ -1212,17 +1218,40 @@ export function mailHandwerkerAnfrage(
   const gw = esc(data.gewerk)
   const plz = esc(data.plz)
   const zt = data.zeitraum?.trim() || 'Nach Absprache'
-  const lis = data.positionen.map((p) => `<li>${esc(String(p.beschreibung ?? '').trim())}</li>`).join('')
+  const posCount = data.positionen.length
+  const posCards = data.positionen
+    .map((p, i) => {
+      const titel = esc(String(p.leistung ?? p.beschreibung ?? 'Position').trim())
+      const beschr = String(p.beschreibung ?? '').trim()
+      const leistung = String(p.leistung ?? '').trim()
+      const beschrBlock =
+        beschr && beschr !== leistung
+          ? `<p style="margin:8px 0 0;font-size:13px;color:#4B5563;line-height:1.5;">${esc(beschr).replace(/\n/g, '<br/>')}</p>`
+          : ''
+      const menge = p.menge && p.einheit ? `${p.menge} ${p.einheit}` : ''
+      const mengeRow = menge
+        ? `<tr><td style="color:#6B7280;padding:4px 0;vertical-align:top;">Menge:</td><td style="font-weight:600;color:#1A3D2B;">${esc(menge)}</td></tr>`
+        : ''
+      return whiteBorderBox(`
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#2E7D52;text-transform:uppercase;">Position ${i + 1}${posCount > 1 ? ` von ${posCount}` : ''}</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#1A3D2B;">${titel}</p>
+        ${beschrBlock}
+        ${mengeRow ? `<table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;margin-top:8px;">${mengeRow}</table>` : ''}
+      `)
+    })
+    .join('')
   const notizBlock = data.notiz?.trim()
     ? `<p style="font-size:14px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
     : ''
+  const betreffSuffix =
+    posCount > 1 ? `${data.gewerk} (${posCount} Positionen)` : data.gewerk
   return {
-    betreff: `Neue Anfrage: ${data.gewerk} — Bärenwald München`,
+    betreff: `Neue Anfrage: ${betreffSuffix} — Bärenwald München`,
     html: mailHtmlBase(
       `
       <h2 style="color:#2E7D52;margin:0 0 16px;">Neue Anfrage für Sie</h2>
       <p>Guten Tag ${name},</p>
-      <p>wir haben eine neue Anfrage im Bereich <strong>${gw}</strong>.</p>
+      <p>wir haben eine neue Anfrage im Bereich <strong>${gw}</strong>${posCount > 1 ? ` mit <strong>${posCount} Positionen</strong>` : ''}.</p>
       ${greenBox(`
         <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
         <tr><td style="color:#2E7D52;padding:4px 0;width:40%;">Gewerk:</td><td style="font-weight:600;color:#1A3D2B;">${gw}</td></tr>
@@ -1230,7 +1259,7 @@ export function mailHandwerkerAnfrage(
         <tr><td style="color:#2E7D52;padding:4px 0;">Zeitraum:</td><td style="font-weight:600;color:#1A3D2B;">${esc(zt)}</td></tr>
         </table>
       `)}
-      <ul style="font-size:14px;line-height:1.8;padding-left:20px;margin:16px 0;">${lis}</ul>
+      ${posCount > 0 ? `<div style="margin:16px 0;">${posCards}</div>` : ''}
       ${notizBlock}
       ${btn('Anfrage ansehen & antworten →', data.link)}
       <p style="font-size:13px;color:#6B7280;">Link:<br/><a href="${esc(data.link)}" style="color:#2E7D52;word-break:break-all;">${esc(data.link)}</a></p>

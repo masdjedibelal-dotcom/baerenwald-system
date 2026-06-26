@@ -20,6 +20,7 @@ import {
   Pencil,
   Phone,
   Receipt,
+  Shield,
   Wallet,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
@@ -52,6 +53,10 @@ import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnah
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
+import {
+  AuftragComplianceTab,
+  zaehleAuftragComplianceOffen,
+} from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import {
@@ -120,15 +125,31 @@ type AuftragLeadSnapshot = Pick<
   'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
 >
 
-type AuftragDetailTab = 'stammdaten' | 'leistung' | 'baustelle' | 'schritte' | 'aktivitaet' | 'dokumente' | 'finanzen'
+type AuftragDetailTab =
+  | 'stammdaten'
+  | 'leistung'
+  | 'baustelle'
+  | 'schritte'
+  | 'aktivitaet'
+  | 'dokumente'
+  | 'compliance'
+  | 'finanzen'
 
-const DESKTOP_AUFTRAG_TABS_BASE: AuftragDetailTab[] = ['schritte', 'aktivitaet', 'dokumente', 'finanzen']
+const DESKTOP_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
+  'leistung',
+  'schritte',
+  'aktivitaet',
+  'dokumente',
+  'compliance',
+  'finanzen',
+]
 const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'stammdaten',
   'leistung',
   'schritte',
   'aktivitaet',
   'dokumente',
+  'compliance',
   'finanzen',
 ]
 
@@ -300,7 +321,9 @@ export function AuftragDetailClient({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (window.location.hash === '#dokumentation') setMainTab('dokumente')
+    const hash = window.location.hash
+    if (hash === '#dokumentation') setMainTab('dokumente')
+    if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('compliance')
   }, [])
 
   useEffect(() => {
@@ -557,6 +580,11 @@ export function AuftragDetailClient({
     [detail, rechnungenListe, vertraegeListe]
   )
 
+  const complianceCount = useMemo(
+    () => zaehleAuftragComplianceOffen(detail, complianceTypen, partnerDokumente, gewerke as Gewerk[]),
+    [detail, complianceTypen, partnerDokumente, gewerke]
+  )
+
   const handwerkerKontext = useMemo(
     () => ({
       kundeName: name,
@@ -589,6 +617,11 @@ export function AuftragDetailClient({
     const raw = detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null | undefined
     return raw?.angebot_handwerker ?? []
   }, [detail.angebote])
+
+  const angebotTitel = useMemo(() => {
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    return (ang as { titel?: string } | null)?.titel?.trim() || detail.titel?.trim() || 'Projekt'
+  }, [detail.angebote, detail.titel])
 
   const naechsteSchritte = useMemo(
     () =>
@@ -640,6 +673,12 @@ export function AuftragDetailClient({
         ? [{ id: 'baustelle' as const, label: 'Baustelle', icon: HardHat }]
         : []),
       {
+        id: 'leistung' as const,
+        label: 'Positionen',
+        icon: List,
+        count: posCount || undefined,
+      },
+      {
         id: 'schritte' as const,
         label: 'Nächste Schritte',
         icon: ListChecks,
@@ -658,18 +697,24 @@ export function AuftragDetailClient({
         count: dokumenteCount || undefined,
       },
       {
+        id: 'compliance' as const,
+        label: 'Compliance',
+        icon: Shield,
+        count: complianceCount || undefined,
+      },
+      {
         id: 'finanzen' as const,
         label: 'Finanzen',
         icon: Wallet,
       },
     ]
     return tabs
-  }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount])
+  }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount, complianceCount, posCount])
 
   const mobileDetailTabs = useMemo(() => {
     const tabs = [
       { id: 'stammdaten' as const, label: 'Stammdaten', icon: LayoutGrid },
-      { id: 'leistung' as const, label: 'Leistungsübersicht', icon: List },
+      { id: 'leistung' as const, label: 'Positionen', icon: List, count: posCount || undefined },
       ...(istBauprojekt
         ? [{ id: 'baustelle' as const, label: 'Baustelle', icon: HardHat }]
         : []),
@@ -692,13 +737,19 @@ export function AuftragDetailClient({
         count: dokumenteCount || undefined,
       },
       {
+        id: 'compliance' as const,
+        label: 'Compliance',
+        icon: Shield,
+        count: complianceCount || undefined,
+      },
+      {
         id: 'finanzen' as const,
         label: 'Finanzen',
         icon: Wallet,
       },
     ]
     return tabs
-  }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount])
+  }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount, complianceCount, posCount])
 
   const desktopTabIds = useMemo(
     () =>
@@ -767,6 +818,7 @@ export function AuftragDetailClient({
   const leistungInhalt = (
     <div className="space-y-3">
       <Card
+        id="auftrag-positionen"
         title="Positionen"
         bodyClassName="p-4"
         action={
@@ -777,10 +829,16 @@ export function AuftragDetailClient({
           ) : null
         }
       >
+        <p className="mb-4 text-sm text-bw-text-muted">
+          Leistung anklicken zum Bearbeiten — Name, Beschreibung, Preise, Handwerker und Termine ändern.
+        </p>
         <AuftragPositionenSteuerungTab
           auftragId={detail.id}
           positionen={detail.auftrag_positionen ?? []}
           gewerke={gewerke}
+          angebotId={detail.angebot_id}
+          angebotTitel={angebotTitel}
+          angebotHandwerker={angebotHandwerker}
           auftragStatus={detail.status}
           handwerkerKontext={handwerkerKontext}
           eigenregie={istBauprojekt}
@@ -831,7 +889,6 @@ export function AuftragDetailClient({
     <div className="space-y-3">
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       {stammdatenInhalt}
-      {leistungInhalt}
     </div>
   )
 
@@ -888,6 +945,8 @@ export function AuftragDetailClient({
   const desktopTabContent =
     mainTab === 'baustelle' ? (
       baustelleInhalt
+    ) : mainTab === 'leistung' ? (
+      leistungInhalt
     ) : mainTab === 'schritte' ? (
       schritteInhalt
     ) : mainTab === 'aktivitaet' ? (
@@ -897,6 +956,11 @@ export function AuftragDetailClient({
         detail={detail}
         rechnungen={rechnungenListe}
         vertraege={vertraegeListe}
+        onChanged={() => refresh()}
+      />
+    ) : mainTab === 'compliance' ? (
+      <AuftragComplianceTab
+        detail={detail}
         complianceTypen={complianceTypen}
         partnerDokumente={partnerDokumente}
         gewerke={gewerke as Gewerk[]}
@@ -922,6 +986,11 @@ export function AuftragDetailClient({
         detail={detail}
         rechnungen={rechnungenListe}
         vertraege={vertraegeListe}
+        onChanged={() => refresh()}
+      />
+    ) : mainTab === 'compliance' ? (
+      <AuftragComplianceTab
+        detail={detail}
         complianceTypen={complianceTypen}
         partnerDokumente={partnerDokumente}
         gewerke={gewerke as Gewerk[]}

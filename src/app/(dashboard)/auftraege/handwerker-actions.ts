@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import {
   listHandwerkerFuerGewerk,
@@ -106,7 +107,7 @@ export async function listHandwerkerAuswahlFuerGewerk(input: {
   const ids = rows.map((h) => h.id)
   const { lastByHw, busyIds } = await loadEinsatzMeta(supabase, ids)
 
-  const empfohlenRaw = slug ? rows.filter((h) => (h.gewerke ?? []).includes(slug!)) : []
+  const empfohlenRaw = slug ? filterHandwerkerFuerGewerkSlug(rows, slug) : []
   const empfohlenIds = new Set(empfohlenRaw.map((h) => h.id))
   const alleRaw = rows.filter((h) => !empfohlenIds.has(h.id))
 
@@ -294,7 +295,12 @@ export async function assignAuftragHandwerkerPosition(input: {
         .eq('auftrag_id', input.auftragId)
         .eq('gewerk_id', gw.id)
         .maybeSingle()
-      if (!existing?.id) {
+      if (existing?.id) {
+        await supabase
+          .from('auftrag_handwerker')
+          .update({ handwerker_id: input.handwerkerId, status })
+          .eq('id', existing.id)
+      } else {
         await supabase.from('auftrag_handwerker').insert({
           auftrag_id: input.auftragId,
           gewerk_id: gw.id,
@@ -328,7 +334,7 @@ export async function updateAuftragHandwerkerStatus(input: {
 
   const { data: row, error: findErr } = await supabase
     .from('auftrag_handwerker')
-    .select('id, handwerker_id, gewerke(name), handwerker(name)')
+    .select('id, handwerker_id, gewerk_id, gewerke(name), handwerker(name)')
     .eq('id', input.zuweisungId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
@@ -339,6 +345,33 @@ export async function updateAuftragHandwerkerStatus(input: {
     .update({ status: input.status })
     .eq('id', input.zuweisungId)
   if (error) return { ok: false, message: error.message }
+
+  const gewerkId = (row as { gewerk_id?: string }).gewerk_id
+  const handwerkerId = row.handwerker_id as string
+  if (gewerkId && handwerkerId) {
+    const { data: gw } = await supabase.from('gewerke').select('slug, name').eq('id', gewerkId).maybeSingle()
+    let posQuery = supabase
+      .from('auftrag_positionen')
+      .select('id')
+      .eq('auftrag_id', input.auftragId)
+      .eq('handwerker_id', handwerkerId)
+    if (gw?.slug) {
+      posQuery = posQuery.eq('gewerk_slug', gw.slug as string)
+    } else if (gw?.name) {
+      posQuery = posQuery.eq('gewerk_name', gw.name as string)
+    }
+    const { data: posRows } = await posQuery
+    const now = new Date().toISOString()
+    for (const p of posRows ?? []) {
+      await supabase
+        .from('auftrag_positionen')
+        .update({
+          handwerker_status: input.status,
+          handwerker_angefragt_at: input.status === 'angefragt' ? now : null,
+        })
+        .eq('id', p.id as string)
+    }
+  }
 
   const gwRaw = row.gewerke as unknown
   const gwName = (Array.isArray(gwRaw) ? gwRaw[0] : gwRaw) as { name?: string } | null

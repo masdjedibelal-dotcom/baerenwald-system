@@ -20,7 +20,14 @@ import {
 import { gewerkZeitraum } from '@/lib/auftraege/auftrag-leistung-phasen'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import type { AuftragPosition } from '@/lib/types'
+import {
+  AuftragPositionHandwerkerPanel,
+} from '@/components/auftraege/AuftragPositionHandwerkerPanel'
+import { angebotHandwerkerFuerPosition } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
+import {
+  handwerkerGruppenAusBlock,
+} from '@/lib/auftraege/handwerker-zuweisen-scope'
+import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import type { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 
@@ -67,6 +74,10 @@ export function AuftragPositionenMobile({
   pending,
   handwerkerKontext,
   auftragAbgeschlossen,
+  angebotId = null,
+  angebotTitel = 'Projekt',
+  angebotHandwerker = [],
+  gewerke = [],
   onAddGewerk,
   onAddLeistung,
   onDeleteBlock,
@@ -91,6 +102,10 @@ export function AuftragPositionenMobile({
   pending: boolean
   handwerkerKontext: HandwerkerZuweisenKontext
   auftragAbgeschlossen: boolean
+  angebotId?: string | null
+  angebotTitel?: string
+  angebotHandwerker?: AngebotHandwerkerRow[]
+  gewerke?: { id: string; name: string; slug: string }[]
   eigenregie?: boolean
   onAddGewerk: () => void
   onAddLeistung: (block: AuftragGewerkBlock) => void
@@ -127,6 +142,16 @@ export function AuftragPositionenMobile({
     if (!activeBlock || !activeLeistungId) return null
     return activeBlock.positionen.find((p) => p.id === activeLeistungId) ?? null
   }, [activeBlock, activeLeistungId])
+
+  const activeLeistungPartnerRow = useMemo(() => {
+    if (!activeLeistung) return null
+    return angebotHandwerkerFuerPosition(activeLeistung, angebotHandwerker, gewerke)
+  }, [activeLeistung, angebotHandwerker, gewerke])
+
+  const activeHwGruppen = useMemo(
+    () => (activeBlock ? handwerkerGruppenAusBlock(activeBlock) : []),
+    [activeBlock]
+  )
 
   useEffect(() => {
     setOpenBlocks((prev) => {
@@ -261,9 +286,17 @@ export function AuftragPositionenMobile({
 
               {open ? (
                 <div className="pos-mobile-gewerk__body">
-                  {block.positionen.map((pos) => (
-                    <AuftragPositionenLeistungSummaryRow key={pos.id} pos={pos} />
-                  ))}
+                  {block.positionen.map((pos) => {
+                    const partnerRow = angebotHandwerkerFuerPosition(pos, angebotHandwerker, gewerke)
+                    return (
+                      <AuftragPositionenLeistungSummaryRow
+                        key={pos.id}
+                        pos={pos}
+                        partnerRow={partnerRow}
+                        showHwBadge={!eigenregie}
+                      />
+                    )
+                  })}
                 </div>
               ) : null}
             </div>
@@ -390,13 +423,36 @@ export function AuftragPositionenMobile({
                   {activeSelectionCount} Leistung{activeSelectionCount === 1 ? '' : 'en'} zuweisen
                 </Button>
               ) : null}
+              {activeHwGruppen.length > 0 ? (
+                <div className="mb-3 space-y-2">
+                  {activeHwGruppen.map((g) => {
+                    const samplePos = activeBlock.positionen.find((p) => p.handwerker_id === g.handwerkerId)
+                    if (!samplePos) return null
+                    const partnerRow = angebotHandwerkerFuerPosition(samplePos, angebotHandwerker, gewerke)
+                    return (
+                      <AuftragPositionHandwerkerPanel
+                        key={g.handwerkerId}
+                        pos={samplePos}
+                        partnerRow={partnerRow}
+                        angebotId={angebotId}
+                        angebotTitel={angebotTitel}
+                        auftragId={auftragId}
+                        compact
+                        onChanged={onChanged}
+                      />
+                    )
+                  })}
+                </div>
+              ) : null}
               </>
               ) : null}
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
                 Leistungen
               </p>
               <div className="pos-mobile-sheet-leistungen divide-y divide-bw-border rounded-md border border-bw-border">
-                {activeBlock.positionen.map((pos) => (
+                {activeBlock.positionen.map((pos) => {
+                  const partnerRow = angebotHandwerkerFuerPosition(pos, angebotHandwerker, gewerke)
+                  return (
                   <div key={pos.id} className="flex items-center gap-2 px-2 py-1">
                     {!eigenregie ? (
                     <input
@@ -410,12 +466,15 @@ export function AuftragPositionenMobile({
                     <div className="min-w-0 flex-1">
                       <AuftragPositionenLeistungSummaryRow
                         pos={pos}
+                        partnerRow={partnerRow}
+                        showHwBadge={!eigenregie}
                         showChevron
                         onPress={() => openLeistungSheet(pos.id)}
                       />
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <button
                 type="button"
@@ -448,6 +507,9 @@ export function AuftragPositionenMobile({
             onOpenHwMail={onOpenHwMail}
             onBewerteHandwerker={onBewerteHandwerker}
             eigenregie={eigenregie}
+            partnerRow={activeLeistungPartnerRow}
+            angebotId={angebotId}
+            angebotTitel={angebotTitel}
             onChanged={onChanged}
             showReorder={false}
           />

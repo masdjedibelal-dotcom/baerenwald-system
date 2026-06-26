@@ -11,7 +11,7 @@ import {
 } from '@/lib/handwerker/compliance-partner-profile'
 import { complianceDokumentStatus, dokumentFuerTyp, dokumenteFuerProjekt } from '@/lib/handwerker/compliance-katalog'
 import { normalizeComplianceEbene } from '@/lib/handwerker/compliance-partner-profile'
-import { partnerDokumentStatusLabel } from '@/lib/handwerker/partner-dokument-status'
+import { partnerDokumentStatusLabel, partnerDokumentIstFreigegeben } from '@/lib/handwerker/partner-dokument-status'
 import { RAHMENVERTRAG_TYP_SLUG, rahmenvertragErfuellt } from '@/lib/handwerker/compliance-vertrag-status'
 import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
@@ -65,6 +65,7 @@ function zeileFuerTyp(
 
   let statusLabel = 'Fehlt'
   if (rvOk) statusLabel = 'Rahmenvertrag im CRM'
+  else if (workflow && partnerDokumentIstFreigegeben(workflow)) statusLabel = 'Bestätigt'
   else if (workflow && workflow !== 'freigegeben' && workflow !== 'genehmigt') {
     statusLabel = partnerDokumentStatusLabel(workflow)
   } else if (status === 'ok') statusLabel = 'Vorhanden'

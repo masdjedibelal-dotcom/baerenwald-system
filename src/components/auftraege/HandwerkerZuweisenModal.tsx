@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { HardHat } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
+import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
@@ -11,7 +12,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   assignAuftragHandwerkerGewerk,
   assignAuftragHandwerkerPosition,
-  listHandwerkerFuerGewerk,
+  listHandwerkerAuswahlFuerGewerk,
 } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
 import {
@@ -46,7 +47,54 @@ export type HandwerkerZuweisenScope =
       position: AuftragPosition
       gewerkId: string
       gewerkName: string
+      gewerkSlug?: string | null
     }
+
+function HandwerkerPickRow({
+  h,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  h: HandwerkerGewerkListeEintrag
+  selected: boolean
+  disabled?: boolean
+  onSelect: () => void
+}) {
+  return (
+    <label className="flex cursor-pointer gap-3 rounded-lg border border-bw-border p-3 hover:bg-bw-hover">
+      <input
+        type="radio"
+        name="hw-pick"
+        className="mt-1"
+        checked={selected}
+        disabled={disabled}
+        onChange={onSelect}
+      />
+      <div className="min-w-0 flex-1 text-sm">
+        <p className="font-medium text-bw-text">
+          {h.name}
+          {h.firma ? <span className="text-bw-text-muted"> · {h.firma}</span> : null}
+        </p>
+        {h.telefon ? (
+          <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="text-bw-link underline">
+            {h.telefon}
+          </a>
+        ) : (
+          <span className="text-bw-text-muted">Kein Telefon</span>
+        )}
+        <span
+          className={cn(
+            'mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium',
+            h.verfuegbar ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'
+          )}
+        >
+          {h.verfuegbar ? 'Verfügbar' : 'Im Einsatz'}
+        </span>
+      </div>
+    </label>
+  )
+}
 
 export function HandwerkerZuweisenModal({
   open,
@@ -69,35 +117,43 @@ export function HandwerkerZuweisenModal({
   const isMobile = useIsMobile()
   const [pending, startTransition] = useTransition()
   const [loadingList, setLoadingList] = useState(false)
-  const [hwList, setHwList] = useState<HandwerkerGewerkListeEintrag[]>([])
+  const [empfohlen, setEmpfohlen] = useState<HandwerkerGewerkListeEintrag[]>([])
+  const [alle, setAlle] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [listErr, setListErr] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState('')
   const [status, setStatus] = useState<AuftragHandwerkerZuweisungStatus>('angefragt')
 
-  const gewerkId = scope?.type === 'gewerk' ? scope.gewerkId : scope?.gewerkId ?? ''
+  const gewerkId = scope?.gewerkId ?? ''
+  const gewerkSlug = scope?.gewerkSlug ?? null
   const gewerkName = scope?.type === 'gewerk' ? scope.gewerkName : scope?.gewerkName ?? ''
   const scopePosCount = scope?.type === 'gewerk' ? scope.positionIds?.length ?? 0 : 0
   const scopeLeistungenCount = scope?.type === 'gewerk' ? scope.leistungen?.length ?? scopePosCount : 0
 
-  const selectedHw = hwList.find((h) => h.id === selectedId)
+  const selectedHw =
+    empfohlen.find((h) => h.id === selectedId) ?? alle.find((h) => h.id === selectedId)
 
   useEffect(() => {
-    if (!open || !scope || !gewerkId) return
+    if (!open || !scope) return
     setSelectedId('')
     setStatus('angefragt')
     setListErr(null)
+    setEmpfohlen([])
+    setAlle([])
     setLoadingList(true)
     void (async () => {
-      const r = await listHandwerkerFuerGewerk(gewerkId)
+      const r = await listHandwerkerAuswahlFuerGewerk({
+        gewerkId: gewerkId || null,
+        gewerkSlug,
+      })
       if (!r.ok) {
         setListErr(r.message)
-        setHwList([])
       } else {
-        setHwList(r.handwerker)
+        setEmpfohlen(r.empfohlen)
+        setAlle(r.alle)
       }
       setLoadingList(false)
     })()
-  }, [open, scope, gewerkId])
+  }, [open, scope, gewerkId, gewerkSlug])
 
   function zuweisen() {
     if (!scope || !selectedId) {
@@ -162,6 +218,23 @@ export function HandwerkerZuweisenModal({
     </div>
   )
 
+  const leistungenPreview =
+    scope?.type === 'gewerk' && scope.leistungen.length > 0 ? (
+      <div className="mb-4 rounded-lg border border-bw-border bg-bw-bg-soft/50 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+          {scope.leistungen.length === 1 ? 'Leistung in der Anfrage' : `${scope.leistungen.length} Leistungen in einer Anfrage`}
+        </p>
+        <ul className="space-y-1.5 text-sm text-bw-text">
+          {scope.leistungen.map((l, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="font-semibold text-bw-primary">{i + 1}.</span>
+              <span>{l}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
+
   const body = (
     <>
       <p className="mb-3 text-sm text-bw-text-muted">
@@ -171,6 +244,7 @@ export function HandwerkerZuweisenModal({
             ? `${scopeLeistungenCount} Leistungen in „${gewerkName}“ — ein Handwerker, eine Partner-Mail.`
             : `Handwerker für das Gewerk „${gewerkName}“ auswählen. Danach öffnet sich die Partner-Mail-Vorschau.`}
       </p>
+      {leistungenPreview}
       {(kontext.startDatum || kontext.endDatum) && (
         <p className="mb-3 text-xs text-bw-text-muted">
           Zeitraum: {kontext.startDatum ? formatDatum(kontext.startDatum) : '—'}
@@ -191,45 +265,57 @@ export function HandwerkerZuweisenModal({
       {listErr ? <p className="mb-2 text-sm text-danger">{listErr}</p> : null}
       {loadingList ? (
         <p className="text-sm text-bw-text-muted">Handwerker werden geladen…</p>
-      ) : hwList.length === 0 ? (
-        <p className="text-sm text-bw-text-muted">Keine Handwerker für dieses Gewerk.</p>
+      ) : empfohlen.length === 0 && alle.length === 0 ? (
+        <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
       ) : (
-        <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
-          {hwList.map((h) => (
-            <li key={h.id}>
-              <label className="flex cursor-pointer gap-3 rounded-lg border border-bw-border p-3 hover:bg-bw-hover">
-                <input
-                  type="radio"
-                  name="hw-pick"
-                  className="mt-1"
-                  checked={selectedId === h.id}
-                  onChange={() => setSelectedId(h.id)}
-                />
-                <div className="min-w-0 flex-1 text-sm">
-                  <p className="font-medium text-bw-text">
-                    {h.name}
-                    {h.firma ? <span className="text-bw-text-muted"> · {h.firma}</span> : null}
-                  </p>
-                  {h.telefon ? (
-                    <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="text-bw-link underline">
-                      {h.telefon}
-                    </a>
-                  ) : (
-                    <span className="text-bw-text-muted">Kein Telefon</span>
-                  )}
-                  <span
-                    className={cn(
-                      'mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium',
-                      h.verfuegbar ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'
-                    )}
-                  >
-                    {h.verfuegbar ? 'Verfügbar' : 'Im Einsatz'}
-                  </span>
-                </div>
-              </label>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+          <Accordion
+            title={`Empfohlen${empfohlen.length ? ` · ${empfohlen.length}` : ''}`}
+            defaultOpen
+            className="hw-pick-accordion"
+          >
+            {empfohlen.length === 0 ? (
+              <p className="text-sm text-bw-text-muted">
+                Keine Handwerker mit diesem Gewerk in den Stammdaten — alle Partner unten.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {empfohlen.map((h) => (
+                  <li key={h.id}>
+                    <HandwerkerPickRow
+                      h={h}
+                      selected={selectedId === h.id}
+                      disabled={pending}
+                      onSelect={() => setSelectedId(h.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Accordion>
+          <Accordion
+            title={`Alle Handwerker${alle.length ? ` · ${alle.length}` : ''}`}
+            defaultOpen={empfohlen.length === 0}
+            className="hw-pick-accordion"
+          >
+            {alle.length === 0 ? (
+              <p className="text-sm text-bw-text-muted">Keine weiteren Handwerker.</p>
+            ) : (
+              <ul className="space-y-2">
+                {alle.map((h) => (
+                  <li key={h.id}>
+                    <HandwerkerPickRow
+                      h={h}
+                      selected={selectedId === h.id}
+                      disabled={pending}
+                      onSelect={() => setSelectedId(h.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Accordion>
+        </div>
       )}
       {selectedHw ? (
         <p className="mt-3 flex items-center gap-2 text-xs text-bw-text-muted">

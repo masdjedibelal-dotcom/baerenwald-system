@@ -15,7 +15,7 @@ export function partnerDokumentIstFreigegeben(status: string | null | undefined)
 
 export function partnerDokumentStatusLabel(status: string | null | undefined): string {
   const s = (status ?? 'freigegeben').toLowerCase()
-  if (s === 'freigegeben' || s === 'genehmigt') return 'Erledigt'
+  if (s === 'freigegeben' || s === 'genehmigt') return 'Bestätigt'
   if (s === 'abgelehnt') return 'Abgelehnt'
   if (s === 'in_pruefung' || s === 'eingereicht' || s === 'hochgeladen') return 'In Prüfung'
   return 'In Prüfung'

@@ -90,6 +90,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     geplanter_start: null,
     antwort_frist_iso,
     positionen: pos.map((p: AngebotPosition) => ({
+      leistung: (p.leistung || '').trim(),
       beschreibung: (p.beschreibung || p.leistung).trim(),
       menge: p.menge || 1,
       einheit: p.einheit,

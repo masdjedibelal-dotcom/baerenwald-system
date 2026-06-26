@@ -239,19 +239,38 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       </Card>
 
       <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-ink">Ihre Aufgaben</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink">
+          {data.positionen.length > 1
+            ? `Ihre Aufgaben (${data.positionen.length} Positionen)`
+            : 'Ihre Aufgabe'}
+        </h2>
         <ul className="space-y-3">
           {data.positionen.length === 0 ? (
             <li className="text-sm text-muted">Keine Positionen für dieses Gewerk.</li>
           ) : (
-            data.positionen.map((p, i) => (
-              <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <p className="font-medium text-ink">{p.beschreibung}</p>
-                <p className="mt-1 text-muted">
-                  {p.menge} {p.einheit}
-                </p>
-              </li>
-            ))
+            data.positionen.map((p, i) => {
+              const titel = (p.leistung?.trim() || p.beschreibung).trim()
+              const beschr =
+                p.leistung?.trim() && p.beschreibung.trim() && p.beschreibung.trim() !== p.leistung.trim()
+                  ? p.beschreibung.trim()
+                  : ''
+              return (
+                <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                  {data.positionen.length > 1 ? (
+                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                      Position {i + 1}
+                    </p>
+                  ) : null}
+                  <p className="font-medium text-ink">{titel}</p>
+                  {beschr ? (
+                    <p className="mt-1 whitespace-pre-wrap text-muted">{beschr}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-muted">
+                    {p.menge} {p.einheit}
+                  </p>
+                </li>
+              )
+            })
           )}
         </ul>
       </section>

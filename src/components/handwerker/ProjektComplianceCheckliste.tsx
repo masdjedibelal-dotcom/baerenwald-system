@@ -158,7 +158,7 @@ export function ProjektComplianceCheckliste({
       const r = await freigebenPartnerDokument(docId, handwerkerId)
       if (!r.ok) toast.error(r.message)
       else {
-        toast.success('Freigegeben')
+        toast.success('Dokument bestätigt')
         router.refresh()
       }
     })
@@ -280,7 +280,7 @@ export function ProjektComplianceCheckliste({
           ) : null}
         </div>
         {showAuftragLink ? (
-          <Link href={`/auftraege/${auftragId}#dokumente`} className="text-xs text-bw-link hover:underline">
+          <Link href={`/auftraege/${auftragId}#compliance`} className="text-xs text-bw-link hover:underline">
             Im Auftrag öffnen
           </Link>
         ) : null}
@@ -348,7 +348,7 @@ export function ProjektComplianceCheckliste({
                               disabled={busy}
                               onClick={() => freigeben(doc.id)}
                             >
-                              Freigeben
+                              Bestätigen
                             </button>
                             <button
                               type="button"

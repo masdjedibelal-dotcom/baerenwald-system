@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
+import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
 import { sendMail } from '@/lib/mail-service'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -1496,10 +1497,10 @@ export async function listHandwerkerFuerGewerk(
   if (hErr) return { ok: false, message: hErr.message }
 
   const slug = gw.slug as string
-  const filtered = (allHw ?? []).filter((h) => {
-    const g = (h.gewerke as string[] | null) ?? []
-    return g.includes(slug)
-  })
+  const filtered = filterHandwerkerFuerGewerkSlug(
+    (allHw ?? []) as { id: string; gewerke?: string[] | null; name: string; firma: string | null; telefon: string | null }[],
+    slug
+  )
 
   const ids = filtered.map((h) => h.id)
   const lastByHw = new Map<string, string>()

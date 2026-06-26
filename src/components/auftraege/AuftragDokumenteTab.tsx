@@ -1,10 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
-import { FileText, Pencil, Shield, Trash2, Upload } from 'lucide-react'
-import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
-import { gewerkSlugsAusPositionen } from '@/lib/handwerker/compliance-partner-profile'
-import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
+import { FileText, Pencil, Trash2, Upload } from 'lucide-react'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
@@ -36,17 +33,11 @@ export function AuftragDokumenteTab({
   detail,
   rechnungen = [],
   vertraege = [],
-  complianceTypen = [],
-  partnerDokumente = [],
-  gewerke = [],
   onChanged,
 }: {
   detail: AuftragDetail
   rechnungen?: RechnungAuswahlZeile[]
   vertraege?: HandwerkerVertragRow[]
-  complianceTypen?: ComplianceDokumentTyp[]
-  partnerDokumente?: PartnerDokument[]
-  gewerke?: Gewerk[]
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -181,60 +172,13 @@ export function AuftragDokumenteTab({
     return m
   }, [detail.auftrag_timeline])
 
-  const handwerkerZeilen = useMemo(() => {
-    const rows = detail.auftrag_handwerker ?? []
-    const seen = new Set<string>()
-    return rows.filter((z) => {
-      if (!z.handwerker_id || seen.has(z.handwerker_id)) return false
-      seen.add(z.handwerker_id)
-      return true
-    })
-  }, [detail.auftrag_handwerker])
-
-  const projektGewerkSlugs = useMemo(
-    () => gewerkSlugsAusPositionen(detail.auftrag_positionen ?? []),
-    [detail.auftrag_positionen]
-  )
-
   return (
-    <div className="auftrag-dok-panel space-y-8 pb-4">
-      {handwerkerZeilen.length > 0 && complianceTypen.length > 0 ? (
-        <section id="compliance-checkliste" className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-bw-primary" aria-hidden />
-            <div>
-              <h2 className="text-base font-semibold text-bw-text">Compliance-Nachweise</h2>
-              <p className="text-sm text-bw-text-muted">
-                Projektbezogene Unterlagen je Handwerker — Uploads sind mit dem Handwerker-Profil
-                verknüpft.
-              </p>
-            </div>
-          </div>
-          <div className="space-y-6">
-            {handwerkerZeilen.map((z) => (
-              <div
-                key={z.handwerker_id}
-                className="rounded-xl border border-bw-border bg-bw-card p-4"
-              >
-                <ProjektComplianceCheckliste
-                  handwerkerId={z.handwerker_id}
-                  handwerkerName={z.handwerker?.name ?? z.handwerker?.firma ?? 'Handwerker'}
-                  auftragId={detail.id}
-                  auftragTitel={detail.titel}
-                  dokumente={partnerDokumente}
-                  complianceTypen={complianceTypen}
-                  projektGewerkSlugs={projektGewerkSlugs}
-                  gewerke={gewerke}
-                  istBauprojekt={detail.ist_bauprojekt ?? null}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+    <div className="auftrag-dok-panel space-y-3 pb-4">
+      <p className="text-sm text-bw-text-muted">
+        Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise finden
+        Sie im Tab <span className="font-medium text-bw-text">Compliance</span>.
+      </p>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-bw-text">Projekt-Dokumente</h2>
       <input
         ref={fileRef}
         type="file"
@@ -407,7 +351,6 @@ export function AuftragDokumenteTab({
           </Button>
         </div>
       </Modal>
-      </section>
     </div>
   )
 }

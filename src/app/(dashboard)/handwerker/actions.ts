@@ -6,7 +6,12 @@ import {
   buildHandwerkerStammDbPayload,
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
-import { PARTNER_DOCS_BUCKET, partnerDokumentStoragePath } from '@/lib/partnerDocUtils'
+import {
+  PARTNER_DOCS_BUCKET,
+  parseStoredDocumentRef,
+  partnerDokumentStoragePath,
+  VERTRAEGE_PDFS_BUCKET,
+} from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
 
 export type HandwerkerFormInput = {
@@ -431,25 +436,51 @@ export async function updatePartnerDokument(
   return { ok: true }
 }
 
-/** Kurzzeit-Link zum Öffnen (privater Bucket). */
+/** Kurzzeit-Link zum Öffnen (privater Bucket + Vertrags-PDFs). */
 export async function signPartnerDokumentUrl(
   stored: string | null | undefined
 ): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   const s = stored?.trim() ?? ''
   if (!s) return { ok: false, message: 'Keine Datei hinterlegt.' }
-  if (s.startsWith('http')) {
+
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const ref = parseStoredDocumentRef(s)
+  if (ref?.path) {
+    const { supabaseAdmin } = await import('@/lib/supabase-admin')
+    const { data, error } = await supabaseAdmin.storage
+      .from(ref.bucket)
+      .createSignedUrl(ref.path, 3600)
+
+    if (!error && data?.signedUrl) {
+      return { ok: true, url: data.signedUrl }
+    }
+
+    if (ref.bucket === VERTRAEGE_PDFS_BUCKET) {
+      const { data: pub } = supabaseAdmin.storage.from(ref.bucket).getPublicUrl(ref.path)
+      if (pub.publicUrl) return { ok: true, url: pub.publicUrl }
+    }
+
+    const msg = error?.message ?? ''
+    if (/not found|object not found/i.test(msg)) {
+      return {
+        ok: false,
+        message:
+          'Datei im Storage nicht gefunden — das Dokument wurde ggf. gelöscht oder verschoben. Bitte erneut hochladen.',
+      }
+    }
+    return { ok: false, message: msg || 'Signierte URL fehlgeschlagen' }
+  }
+
+  if (/^https?:\/\//i.test(s)) {
     return { ok: true, url: s }
   }
-  const path = partnerDokumentStoragePath(s)
-  if (!path) return { ok: false, message: 'Keine Datei hinterlegt.' }
-  const supabase = createClient()
-  const { data, error } = await supabase.storage
-    .from(PARTNER_DOCS_BUCKET)
-    .createSignedUrl(path, 3600)
-  if (error || !data?.signedUrl) {
-    return { ok: false, message: error?.message ?? 'Signierte URL fehlgeschlagen' }
-  }
-  return { ok: true, url: data.signedUrl }
+
+  return { ok: false, message: 'Keine gültige Datei-Referenz.' }
 }
 
 export async function deletePartnerDokument(
