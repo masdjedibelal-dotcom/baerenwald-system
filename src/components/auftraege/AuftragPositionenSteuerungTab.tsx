@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   ChevronDown,
   HardHat,
-  Mail,
-  MessageCircle,
   Pencil,
   Plus,
   Trash2,
@@ -14,10 +12,6 @@ import {
 import { EmptyState } from '@/components/layout/EmptyState'
 import { AuftragPositionenMobile } from '@/components/auftraege/AuftragPositionenMobile'
 import { AuftragPositionenLeistungEditPanel } from '@/components/auftraege/AuftragPositionenLeistungEdit'
-import {
-  HandwerkerKontaktModal,
-  type HandwerkerKontaktModalMode,
-} from '@/components/auftraege/HandwerkerKontaktModal'
 import {
   HandwerkerZuweisenModal,
   type HandwerkerZuweisenKontext,
@@ -47,15 +41,11 @@ import { gewerkZeitraum, summenPositionen } from '@/lib/auftraege/auftrag-leistu
 import {
   handwerkerScopeGewerkBlock,
   handwerkerScopePositionen,
-  handwerkerGruppenAusBlock,
-  leistungenLabelsFromPositionen,
   positionIdsOhneHandwerker,
-  type HandwerkerGruppeInBlock,
 } from '@/lib/auftraege/handwerker-zuweisen-scope'
 import {
   angebotHandwerkerFuerPosition,
 } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
-import type { HandwerkerNachrichtInput } from '@/lib/auftraege/handwerker-nachricht'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { AngebotHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib/types'
@@ -166,11 +156,6 @@ export function AuftragPositionenSteuerungTab({
   const [selectedPosIds, setSelectedPosIds] = useState<Set<string>>(() => new Set())
   const [modalScope, setModalScope] = useState<HandwerkerZuweisenScope | null>(null)
   const [hwMailModal, setHwMailModal] = useState<HandwerkerZuweisungMailTarget | null>(null)
-  const [hwKontaktModal, setHwKontaktModal] = useState<{
-    mode: HandwerkerKontaktModalMode
-    gruppe: HandwerkerGruppeInBlock
-    gewerkName: string
-  } | null>(null)
   const sorted = useMemo(
     () => [...positionen].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [positionen]
@@ -182,25 +167,6 @@ export function AuftragPositionenSteuerungTab({
   )
 
   const totals = useMemo(() => summenPositionen(sorted), [sorted])
-
-  function nachrichtInputFuerGruppe(
-    gruppe: HandwerkerGruppeInBlock,
-    gewerkName: string
-  ): HandwerkerNachrichtInput {
-    return {
-      handwerkerName: gruppe.handwerkerName,
-      kundeName: handwerkerKontext.kundeName,
-      adresse: handwerkerKontext.adresse,
-      plz: handwerkerKontext.plz,
-      ort: handwerkerKontext.ort,
-      gewerkName,
-      leistungen: gruppe.leistungen,
-      startDatum: handwerkerKontext.startDatum,
-      endDatum: handwerkerKontext.endDatum,
-      notizen: handwerkerKontext.notizen,
-      portalLink: undefined,
-    }
-  }
 
   const allIds = useMemo(() => sorted.map((p) => p.id), [sorted])
 
@@ -455,9 +421,6 @@ export function AuftragPositionenSteuerungTab({
               pending={pending}
               onToggleLeistung={toggleLeistung}
               onOpenHwMail={(mail) => setHwMailModal(mail)}
-              onOpenHwKontakt={(mode, gruppe) =>
-                setHwKontaktModal({ mode, gruppe, gewerkName: block.gewerkName })
-              }
               onSavePosition={savePosition}
               onMovePosition={movePosition}
               onDeletePosition={(id) => {
@@ -518,25 +481,6 @@ export function AuftragPositionenSteuerungTab({
         target={hwMailModal}
         onSent={onChanged}
       />
-
-      <HandwerkerKontaktModal
-        open={!!hwKontaktModal}
-        onClose={() => setHwKontaktModal(null)}
-        mode={hwKontaktModal?.mode ?? 'whatsapp'}
-        handwerkerName={hwKontaktModal?.gruppe.handwerkerName ?? ''}
-        telefon={hwKontaktModal?.gruppe.telefon}
-        email={hwKontaktModal?.gruppe.email}
-        nachrichtInput={
-          hwKontaktModal
-            ? nachrichtInputFuerGruppe(hwKontaktModal.gruppe, hwKontaktModal.gewerkName)
-            : {
-                handwerkerName: '',
-                kundeName: '',
-                gewerkName: '',
-                leistungen: [],
-              }
-        }
-      />
       </>
       ) : null}
     </div>
@@ -552,7 +496,6 @@ function GewerkBlock({
   auftragId,
   onToggleLeistung,
   onOpenHwMail,
-  onOpenHwKontakt,
   onOpenGewerkHandwerker,
   onOpenSelectionHandwerker,
   selectedPosIds,
@@ -589,7 +532,6 @@ function GewerkBlock({
   eigenregie?: boolean
   onToggleLeistung: (id: string) => void
   onOpenHwMail: (mail: HandwerkerZuweisungMailTarget) => void
-  onOpenHwKontakt: (mode: HandwerkerKontaktModalMode, gruppe: HandwerkerGruppeInBlock) => void
   onOpenGewerkHandwerker: () => void
   onOpenSelectionHandwerker: () => void
   selectedPosIds: Set<string>
@@ -610,7 +552,6 @@ function GewerkBlock({
   const gewerkId = block.gewerkId
   const selectionCount = selectedInBlock.length
   const canAssignGewerk = Boolean(gewerkId)
-  const hwGruppen = useMemo(() => handwerkerGruppenAusBlock(block), [block])
 
   function patchBlock(meta: Omit<Parameters<typeof updateAuftragGewerkBlockMeta>[0], 'auftragId' | 'positionIds'>) {
     startTransition(async () => {
@@ -699,60 +640,6 @@ function GewerkBlock({
           </Button>
         ) : null}
       </div>
-      ) : null}
-
-      {!eigenregie && hwGruppen.length > 0 ? (
-        <div className="border-b border-bw-border bg-bw-bg/40 px-3 py-2.5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-            Partner kontaktieren
-          </p>
-          <ul className="space-y-2">
-            {hwGruppen.map((g) => (
-              <li
-                key={g.handwerkerId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bw-border bg-surface px-3 py-2"
-              >
-                <div className="min-w-0 text-sm">
-                  <p className="font-medium text-bw-text">{g.handwerkerName}</p>
-                  <p className="text-xs text-bw-text-muted">
-                    {g.positionIds.length === 1
-                      ? '1 Leistung'
-                      : `${g.positionIds.length} Leistungen in einer Anfrage`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() =>
-                      onOpenHwMail({
-                        handwerkerId: g.handwerkerId,
-                        handwerkerName: g.handwerkerName,
-                        gewerkName: block.gewerkName,
-                        positionIds: g.positionIds,
-                      })
-                    }
-                  >
-                    <Mail className="h-3.5 w-3.5" aria-hidden />
-                    Mail
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() => onOpenHwKontakt('whatsapp', g)}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" aria-hidden />
-                    Nachricht
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
       ) : null}
 
       <div className="divide-y divide-bw-border">
