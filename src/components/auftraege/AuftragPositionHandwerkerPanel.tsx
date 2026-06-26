@@ -107,26 +107,13 @@ export function AuftragPositionHandwerkerPanel({
 
   return (
     <div className={cn('rounded-lg border border-bw-border bg-bw-bg-soft/50', compact ? 'p-2.5' : 'p-3')}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Partner-Status</p>
-          {pos.handwerker?.name ? (
-            <p className="text-sm font-medium text-bw-text">{pos.handwerker.name}</p>
-          ) : null}
-        </div>
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
-            auftragHwStatusBadgeClass(hwStatus)
-          )}
-        >
-          {auftragHwStatusLabel(hwStatus)}
-        </span>
-      </div>
+      {pos.handwerker?.name ? (
+        <p className="text-sm font-medium text-bw-text">{pos.handwerker.name}</p>
+      ) : null}
 
-      <div className="mt-2">
+      <div className={pos.handwerker?.name ? 'mt-2' : undefined}>
         <Select
-          label="Status"
+          label="Partner-Status"
           name={`hw-status-${pos.id}`}
           value={hwStatus}
           disabled={pending}

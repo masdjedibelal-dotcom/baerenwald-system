@@ -43,11 +43,6 @@ import {
   groupAuftragPositionenByGewerkForAnzeige,
   type AuftragGewerkBlock,
 } from '@/lib/auftraege/auftrag-position-blocks'
-import {
-  leistungStatusBadgeClass,
-  leistungStatusLabel,
-  normalizeLeistungStatus,
-} from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { gewerkZeitraum, summenPositionen } from '@/lib/auftraege/auftrag-leistung-phasen'
 import {
   handwerkerScopeGewerkBlock,
@@ -60,10 +55,6 @@ import {
 import {
   angebotHandwerkerFuerPosition,
 } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
-import {
-  AuftragPositionHandwerkerBadge,
-  AuftragPositionHandwerkerPanel,
-} from '@/components/auftraege/AuftragPositionHandwerkerPanel'
 import type { HandwerkerNachrichtInput } from '@/lib/auftraege/handwerker-nachricht'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -761,24 +752,6 @@ function GewerkBlock({
               </li>
             ))}
           </ul>
-          {hwGruppen.map((g) => {
-            const samplePos = block.positionen.find((p) => p.handwerker_id === g.handwerkerId)
-            if (!samplePos) return null
-            const partnerRow = angebotHandwerkerFuerPosition(samplePos, angebotHandwerker, gewerke)
-            return (
-              <div key={`panel-${g.handwerkerId}`} className="mt-3">
-                <AuftragPositionHandwerkerPanel
-                  pos={samplePos}
-                  partnerRow={partnerRow}
-                  angebotId={angebotId}
-                  angebotTitel={angebotTitel}
-                  auftragId={auftragId}
-                  compact
-                  onChanged={onChanged}
-                />
-              </div>
-            )
-          })}
         </div>
       ) : null}
 
@@ -869,7 +842,6 @@ function LeistungRow({
   onChanged: () => void
   partnerRow?: AngebotHandwerkerRow | null
 }) {
-  const leistungStatus = normalizeLeistungStatus(pos.leistung_status)
   const resolvedPartnerRow = partnerRow ?? angebotHandwerkerFuerPosition(pos, angebotHandwerker, gewerke)
 
   return (
@@ -896,17 +868,8 @@ function LeistungRow({
         />
         <div className="leistung-row-head-main">
           <p className="leistung-row-title">{pos.leistung_name}</p>
-          {!eigenregie && pos.handwerker?.name ? (
-            <p className="text-[11px] text-bw-text-muted">HW: {pos.handwerker.name}</p>
-          ) : null}
         </div>
         <div className="leistung-row-head-end" onClick={(e) => e.stopPropagation()}>
-          {!eigenregie ? (
-            <AuftragPositionHandwerkerBadge pos={pos} partnerRow={resolvedPartnerRow} className="mr-1" />
-          ) : null}
-          <span className={cn('leistung-status-badge', leistungStatusBadgeClass(leistungStatus))}>
-            {leistungStatusLabel(leistungStatus)}
-          </span>
           <span className="leistung-row-price">{formatPreis(pos.preis_fix ?? null, null, null)}</span>
           <button type="button" className="icon-btn text-status-cancel-text" title="Löschen" onClick={onDelete}>
             <Trash2 className="h-3.5 w-3.5" aria-hidden />

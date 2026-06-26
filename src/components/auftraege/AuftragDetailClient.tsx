@@ -872,9 +872,8 @@ export function AuftragDetailClient({
         }
       >
         <p className="mb-4 text-sm text-bw-text-muted">
-          Leistung in der Liste anklicken zum Aufklappen. Name und Beschreibung bearbeiten, dann
-          Feld verlassen (Tab oder Klick außerhalb) — Änderungen werden gespeichert. Für neue
-          Gewerke/Leistungen im Angebot: Menü → „Angebot bearbeiten (Korrektur)“.
+          Leistung anklicken zum Aufklappen: zuerst Leistungsdaten, dann Handwerker, dann Fortschritt.
+          Änderungen speichern beim Verlassen des Feldes. Neue Gewerke über Menü → „Angebot bearbeiten (Korrektur)“.
         </p>
         <AuftragPositionenSteuerungTab
           auftragId={detail.id}

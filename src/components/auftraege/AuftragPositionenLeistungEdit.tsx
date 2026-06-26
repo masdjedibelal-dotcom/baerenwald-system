@@ -30,13 +30,11 @@ import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks
 import { leistungenLabelsFromPositionen } from '@/lib/auftraege/handwerker-zuweisen-scope'
 import {
   LEISTUNG_STATUS_OPTIONS,
-  leistungStatusBadgeClass,
-  leistungStatusLabel,
   normalizeLeistungStatus,
   type AuftragLeistungStatus,
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
-import { AuftragPositionHandwerkerBadge, AuftragPositionHandwerkerPanel } from '@/components/auftraege/AuftragPositionHandwerkerPanel'
 import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
+import { AuftragPositionHandwerkerPanel } from '@/components/auftraege/AuftragPositionHandwerkerPanel'
 import {
   istEigenleistungPosition,
   preisEigenleistung,
@@ -326,164 +324,176 @@ export function AuftragPositionenLeistungEditPanel({
 
   return (
     <>
-      <div className="leistung-acc-fields">
-        <div className="field-full">
+      <div className="space-y-4">
+        <section>
+          <h4 className="leistung-acc-section-label">Leistung</h4>
+          <div className="leistung-acc-fields">
+            <Input
+              label="Bezeichnung"
+              value={draft.leistung_name}
+              onChange={(e) => setDraft((d) => ({ ...d, leistung_name: e.target.value }))}
+              onBlur={(e) => commitDraft({ leistung_name: e.target.value })}
+              className="field-full"
+              placeholder="Leistungsbezeichnung"
+              required
+            />
+            <div className="field-full">
+              <Input
+                label="Beschreibung"
+                value={draft.beschreibung}
+                onChange={(e) => setDraft((d) => ({ ...d, beschreibung: e.target.value }))}
+                onBlur={(e) => commitDraft({ beschreibung: e.target.value })}
+                placeholder="z. B. Bestand komplett entfernen"
+              />
+            </div>
+            <EuroInput
+              label="Verkaufspreis"
+              value={draft.preis_fix}
+              onChange={(v) => setDraft((d) => ({ ...d, preis_fix: v }))}
+              onBlur={() => commitDraft({ preis_fix: draft.preis_fix })}
+            />
+            {eigenleistung ? (
+              <div className="w-full">
+                <label className="input-label">EK Eigen (intern)</label>
+                <div className="rounded-md border border-bw-border bg-bw-bg px-3 py-2 text-[13px] tabular-nums text-bw-text">
+                  {eigen > 0 ? formatEurBetrag(eigen) : '—'}
+                </div>
+                <p className="leistung-acc-hint">
+                  Eigenleistung — von uns abgedeckt, keine Fremdleistung / kein Partner-EK.
+                  {marge !== 0 ? ` Marge: ${formatEurBetrag(marge)}` : ''}
+                </p>
+              </div>
+            ) : (
+              <EuroInput
+                label="Preis Partner (Fremdleistung)"
+                value={draft.preis_partner}
+                onChange={(v) => setDraft((d) => ({ ...d, preis_partner: v }))}
+                onBlur={() => commitDraft({ preis_partner: draft.preis_partner })}
+                hint={marge !== 0 ? `Marge: ${formatEurBetrag(marge)}` : undefined}
+              />
+            )}
+            <Input
+              label="Von"
+              type="date"
+              value={draft.start_datum}
+              onChange={(e) => setDraft((d) => ({ ...d, start_datum: e.target.value }))}
+              onBlur={(e) => commitDraft({ start_datum: e.target.value })}
+            />
+            <Input
+              label="Bis"
+              type="date"
+              value={draft.end_datum}
+              onChange={(e) => setDraft((d) => ({ ...d, end_datum: e.target.value }))}
+              onBlur={(e) => commitDraft({ end_datum: e.target.value })}
+            />
+          </div>
+        </section>
+
+        {!eigenregie ? (
+          <section className="border-t border-bw-border pt-4">
+            <h4 className="leistung-acc-section-label">Handwerker</h4>
+            <div className="space-y-3">
+              <HandwerkerPositionSelect
+                auftragId={auftragId}
+                positionId={pos.id}
+                gewerkId={gewerkId}
+                gewerkSlug={block.gewerkSlug}
+                value={pos.handwerker_id ?? null}
+                disabled={pending || pendingLocal}
+                onChanged={onChanged}
+                onAssigned={(handwerkerId, handwerkerName) => {
+                  onOpenHwMail({
+                    handwerkerId,
+                    handwerkerName,
+                    gewerkName: block.gewerkName,
+                    positionId: pos.id,
+                  })
+                }}
+              />
+              {pos.handwerker_id && hw ? (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="WhatsApp"
+                    aria-label="WhatsApp"
+                    onClick={() => setKontaktModal('whatsapp')}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Partner-Mail"
+                    aria-label="Partner-Mail"
+                    onClick={() => {
+                      const handwerkerId = pos.handwerker_id ?? hw.id
+                      if (!handwerkerId) {
+                        toast.error('Handwerker-ID fehlt — bitte Seite neu laden.')
+                        return
+                      }
+                      onOpenHwMail({
+                        handwerkerId,
+                        handwerkerName: hw.name,
+                        gewerkName: block.gewerkName,
+                        positionId: pos.id,
+                      })
+                    }}
+                  >
+                    <Mail className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                  {auftragAbgeschlossen && onBewerteHandwerker ? (
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title="Handwerker bewerten"
+                      aria-label="Handwerker bewerten"
+                      onClick={() => {
+                        const handwerkerId = pos.handwerker_id ?? hw.id
+                        if (!handwerkerId) return
+                        onBewerteHandwerker({
+                          handwerkerId,
+                          name: hw.name,
+                          firma: (hw as { firma?: string | null }).firma ?? null,
+                          gewerkName: block.gewerkName,
+                          gewerkId: gewerkId || null,
+                        })
+                      }}
+                    >
+                      <Star className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {pos.handwerker_id ? (
+                <AuftragPositionHandwerkerPanel
+                  pos={pos}
+                  partnerRow={partnerRow}
+                  angebotId={angebotId}
+                  angebotTitel={angebotTitel}
+                  auftragId={auftragId}
+                  onChanged={onChanged}
+                />
+              ) : (
+                <p className="text-xs text-bw-text-muted">
+                  Noch kein Handwerker zugewiesen — oben auswählen oder im Gewerk „Handwerker fürs Gewerk“
+                  nutzen.
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="border-t border-bw-border pt-4">
+          <h4 className="leistung-acc-section-label">Fortschritt</h4>
           <Select
-            label="Status"
+            label="Leistungs-Status"
             value={leistungStatus}
             options={LEISTUNG_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             onChange={(e) => changeLeistungStatus(e.target.value as AuftragLeistungStatus)}
             disabled={pending || pendingLocal}
           />
-        </div>
-        <Input
-          label="Leistung"
-          value={draft.leistung_name}
-          onChange={(e) => setDraft((d) => ({ ...d, leistung_name: e.target.value }))}
-          onBlur={() => commitDraft({ leistung_name: draft.leistung_name })}
-          className="field-full"
-          placeholder="Leistungsbezeichnung"
-          required
-        />
-        <div className="field-full">
-          <Input
-            label="Beschreibung"
-            value={draft.beschreibung}
-            onChange={(e) => setDraft((d) => ({ ...d, beschreibung: e.target.value }))}
-            onBlur={() => commitDraft({ beschreibung: draft.beschreibung })}
-            placeholder="z. B. Bestand komplett entfernen"
-          />
-        </div>
-        <EuroInput
-          label="Verkaufspreis"
-          value={draft.preis_fix}
-          onChange={(v) => setDraft((d) => ({ ...d, preis_fix: v }))}
-          onBlur={() => commitDraft({ preis_fix: draft.preis_fix })}
-        />
-        {eigenleistung ? (
-          <div className="w-full">
-            <label className="input-label">EK Eigen (intern)</label>
-            <div className="rounded-md border border-bw-border bg-bw-bg px-3 py-2 text-[13px] tabular-nums text-bw-text">
-              {eigen > 0 ? formatEurBetrag(eigen) : '—'}
-            </div>
-            <p className="leistung-acc-hint">
-              Eigenleistung — von uns abgedeckt, keine Fremdleistung / kein Partner-EK.
-              {marge !== 0 ? ` Marge: ${formatEurBetrag(marge)}` : ''}
-            </p>
-          </div>
-        ) : (
-          <EuroInput
-            label="Preis Partner (Fremdleistung)"
-            value={draft.preis_partner}
-            onChange={(v) => setDraft((d) => ({ ...d, preis_partner: v }))}
-            onBlur={() => commitDraft({ preis_partner: draft.preis_partner })}
-            hint={marge !== 0 ? `Marge: ${formatEurBetrag(marge)}` : undefined}
-          />
-        )}
-        <Input
-          label="Von"
-          type="date"
-          value={draft.start_datum}
-          onChange={(e) => setDraft((d) => ({ ...d, start_datum: e.target.value }))}
-          onBlur={() => commitDraft({ start_datum: draft.start_datum })}
-        />
-        <Input
-          label="Bis"
-          type="date"
-          value={draft.end_datum}
-          onChange={(e) => setDraft((d) => ({ ...d, end_datum: e.target.value }))}
-          onBlur={() => commitDraft({ end_datum: draft.end_datum })}
-        />
-        <div className="field-full leistung-acc-hw-field">
-          {!eigenregie ? (
-          <>
-          <HandwerkerPositionSelect
-            auftragId={auftragId}
-            positionId={pos.id}
-            gewerkId={gewerkId}
-            gewerkSlug={block.gewerkSlug}
-            value={pos.handwerker_id ?? null}
-            disabled={pending || pendingLocal}
-            onChanged={onChanged}
-            onAssigned={(handwerkerId, handwerkerName) => {
-              onOpenHwMail({
-                handwerkerId,
-                handwerkerName,
-                gewerkName: block.gewerkName,
-                positionId: pos.id,
-              })
-            }}
-          />
-          {pos.handwerker_id ? (
-            <div className="mt-3">
-              <AuftragPositionHandwerkerPanel
-                pos={pos}
-                partnerRow={partnerRow}
-                angebotId={angebotId}
-                angebotTitel={angebotTitel}
-                auftragId={auftragId}
-                onChanged={onChanged}
-              />
-            </div>
-          ) : null}
-          {hw ? (
-            <div className="leistung-acc-hw-actions">
-              <button
-                type="button"
-                className="icon-btn"
-                title="WhatsApp"
-                aria-label="WhatsApp"
-                onClick={() => setKontaktModal('whatsapp')}
-              >
-                <MessageCircle className="h-3.5 w-3.5" aria-hidden />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                title="Partner-Mail"
-                aria-label="Partner-Mail"
-                onClick={() => {
-                  const handwerkerId = pos.handwerker_id ?? hw.id
-                  if (!handwerkerId) {
-                    toast.error('Handwerker-ID fehlt — bitte Seite neu laden.')
-                    return
-                  }
-                  onOpenHwMail({
-                    handwerkerId,
-                    handwerkerName: hw.name,
-                    gewerkName: block.gewerkName,
-                    positionId: pos.id,
-                  })
-                }}
-              >
-                <Mail className="h-3.5 w-3.5" aria-hidden />
-              </button>
-              {auftragAbgeschlossen && onBewerteHandwerker ? (
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Handwerker bewerten"
-                  aria-label="Handwerker bewerten"
-                  onClick={() => {
-                    const handwerkerId = pos.handwerker_id ?? hw.id
-                    if (!handwerkerId) return
-                    onBewerteHandwerker({
-                      handwerkerId,
-                      name: hw.name,
-                      firma: (hw as { firma?: string | null }).firma ?? null,
-                      gewerkName: block.gewerkName,
-                      gewerkId: gewerkId || null,
-                    })
-                  }}
-                >
-                  <Star className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          </>
-          ) : null}
-        </div>
+        </section>
       </div>
 
       {showReorder || showDelete ? (
@@ -526,16 +536,14 @@ export function AuftragPositionenLeistungSummaryRow({
   pos,
   onPress,
   showChevron = false,
-  partnerRow = null,
-  showHwBadge = false,
 }: {
   pos: AuftragPosition
   onPress?: () => void
   showChevron?: boolean
-  partnerRow?: AngebotHandwerkerRow | null
+  /** @deprecated Nur noch Name + Preis in der Zeile — Status im aufgeklappten Panel */
+  partnerRow?: unknown
   showHwBadge?: boolean
 }) {
-  const leistungStatus = normalizeLeistungStatus(pos.leistung_status)
   const Tag = onPress ? 'button' : 'div'
 
   return (
@@ -546,17 +554,8 @@ export function AuftragPositionenLeistungSummaryRow({
     >
       <div className="min-w-0 flex-1 text-left">
         <span className="pos-mobile-leistung-row__name block truncate">{pos.leistung_name}</span>
-        {!showHwBadge && pos.handwerker?.name ? (
-          <span className="block truncate text-[10px] text-bw-text-muted">HW: {pos.handwerker.name}</span>
-        ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-        {showHwBadge && pos.handwerker_id ? (
-          <AuftragPositionHandwerkerBadge pos={pos} partnerRow={partnerRow} />
-        ) : null}
-        <span className={cn('leistung-status-badge', leistungStatusBadgeClass(leistungStatus))}>
-          {leistungStatusLabel(leistungStatus)}
-        </span>
+      <div className="flex shrink-0 items-center gap-1">
         <span className="pos-mobile-leistung-row__price">{formatPreis(pos.preis_fix ?? null, null, null)}</span>
         {showChevron ? <ChevronDown className="pos-mobile-leistung-row__chevron h-4 w-4 -rotate-90" aria-hidden /> : null}
       </div>

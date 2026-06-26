@@ -20,13 +20,7 @@ import {
 import { gewerkZeitraum } from '@/lib/auftraege/auftrag-leistung-phasen'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import {
-  AuftragPositionHandwerkerPanel,
-} from '@/components/auftraege/AuftragPositionHandwerkerPanel'
 import { angebotHandwerkerFuerPosition } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
-import {
-  handwerkerGruppenAusBlock,
-} from '@/lib/auftraege/handwerker-zuweisen-scope'
 import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import type { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
@@ -147,11 +141,6 @@ export function AuftragPositionenMobile({
     if (!activeLeistung) return null
     return angebotHandwerkerFuerPosition(activeLeistung, angebotHandwerker, gewerke)
   }, [activeLeistung, angebotHandwerker, gewerke])
-
-  const activeHwGruppen = useMemo(
-    () => (activeBlock ? handwerkerGruppenAusBlock(activeBlock) : []),
-    [activeBlock]
-  )
 
   useEffect(() => {
     setOpenBlocks((prev) => {
@@ -422,27 +411,6 @@ export function AuftragPositionenMobile({
                   <UserPlus className="h-3.5 w-3.5" aria-hidden />
                   {activeSelectionCount} Leistung{activeSelectionCount === 1 ? '' : 'en'} zuweisen
                 </Button>
-              ) : null}
-              {activeHwGruppen.length > 0 ? (
-                <div className="mb-3 space-y-2">
-                  {activeHwGruppen.map((g) => {
-                    const samplePos = activeBlock.positionen.find((p) => p.handwerker_id === g.handwerkerId)
-                    if (!samplePos) return null
-                    const partnerRow = angebotHandwerkerFuerPosition(samplePos, angebotHandwerker, gewerke)
-                    return (
-                      <AuftragPositionHandwerkerPanel
-                        key={g.handwerkerId}
-                        pos={samplePos}
-                        partnerRow={partnerRow}
-                        angebotId={angebotId}
-                        angebotTitel={angebotTitel}
-                        auftragId={auftragId}
-                        compact
-                        onChanged={onChanged}
-                      />
-                    )
-                  })}
-                </div>
               ) : null}
               </>
               ) : null}
