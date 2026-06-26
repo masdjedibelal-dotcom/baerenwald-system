@@ -98,10 +98,8 @@ export function HandwerkerEinreichungPruefung({
       }
       const preisTeil =
         res.aktualisiert > 0
-          ? ` Partnerpreis in ${res.aktualisiert} Position(en) übernommen.`
-          : auftragId
-            ? ''
-            : ' Partnerpreis wird bei Auftragsanlage übernommen.'
+          ? ` Vereinbarter Einkaufspreis in ${res.aktualisiert} Position(en) gesetzt.`
+          : ''
       const mailTeil = res.mailGesendet
         ? ' Bestätigung an den Handwerker gesendet.'
         : res.mailHinweis

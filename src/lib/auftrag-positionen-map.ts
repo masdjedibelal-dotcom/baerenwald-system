@@ -52,22 +52,26 @@ export function angebotPositionenToAuftragRows(
     const hatHandwerker = !!p.handwerker_id?.trim()
     const konditionPreis =
       p.id && posPreisMap?.has(p.id) ? posPreisMap.get(p.id)! : null
+    const ekZeile =
+      p.einkaufspreis != null && p.einkaufspreis > 0
+        ? Math.round(p.einkaufspreis * m * 100) / 100
+        : null
     const gewerkEk =
       p.gewerk_id && ekMap?.has(p.gewerk_id) ? ekMap.get(p.gewerk_id)! : null
     const partnerPreis =
       konditionPreis != null && konditionPreis > 0
         ? konditionPreis
-        : hatHandwerker
-          ? gewerkEk != null && gewerkEk > 0
-            ? gewerkEk
-            : p.einkaufspreis != null && p.einkaufspreis > 0
-              ? Math.round(p.einkaufspreis * m * 100) / 100
+        : ekZeile != null && ekZeile > 0
+          ? ekZeile
+          : hatHandwerker
+            ? gewerkEk != null && gewerkEk > 0
+              ? gewerkEk
               : lohnZeile + matZeile > 0
                 ? lohnZeile + matZeile
                 : null
-          : gewerkEk != null && gewerkEk > 0
-            ? gewerkEk
-            : null
+            : gewerkEk != null && gewerkEk > 0
+              ? gewerkEk
+              : null
     return {
       auftrag_id: auftragId,
       gewerk_slug: p.gewerk_slug?.trim() || null,

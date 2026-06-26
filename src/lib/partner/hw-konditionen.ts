@@ -181,3 +181,65 @@ export function partnerPreisMapFromZuweisung(
 export function angebotPositionenFromRaw(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
 }
+
+/** Zeilen-Netto aus Einkaufspreis/Einheit × Menge. */
+export function zeileNettoAusEinkaufspreis(p: Pick<AngebotPosition, 'einkaufspreis' | 'menge'>): number | null {
+  if (p.einkaufspreis == null || p.einkaufspreis <= 0) return null
+  return round2(p.einkaufspreis * (p.menge || 1))
+}
+
+/** Einkaufspreis pro Einheit aus Zeilen-Netto. */
+export function einkaufspreisAusZeileNetto(zeileNetto: number, menge: number): number {
+  const m = menge > 0 ? menge : 1
+  return round2(zeileNetto / m)
+}
+
+export function vereinbarteZeileNettoByPositionId(
+  konditionen: HwKonditionenJson | null
+): Map<string, number> {
+  const map = new Map<string, number>()
+  if (!konditionen) return map
+  for (const p of konditionen.positionen) {
+    if (p.position_id && p.hw_netto > 0) map.set(p.position_id, p.hw_netto)
+  }
+  return map
+}
+
+/**
+ * Nach CRM-Übernahme: vereinbarter HW-Preis = Einkaufspreis (je Einheit).
+ * vereinbart_netto_zeile → einkaufspreis = zeile / menge
+ */
+export function applyVereinbarteKonditionenToAngebotPositionen(
+  positionen: AngebotPosition[],
+  konditionen: HwKonditionenJson
+): { positionen: AngebotPosition[]; aktualisiert: number } {
+  const byId = vereinbarteZeileNettoByPositionId(konditionen)
+  let aktualisiert = 0
+  const next = positionen.map((pos) => {
+    if (!pos.id || !byId.has(pos.id)) return pos
+    const zeileNetto = byId.get(pos.id)!
+    const ekUnit = einkaufspreisAusZeileNetto(zeileNetto, pos.menge || 1)
+    aktualisiert++
+    return { ...pos, einkaufspreis: ekUnit }
+  })
+  return { positionen: next, aktualisiert }
+}
+
+/** Legacy ohne hw_konditionen: Gesamt-Netto auf alle Positionen des Gewerks. */
+export function applyLegacyGewerkZeileToAngebotPositionen(
+  positionen: AngebotPosition[],
+  gewerkId: string,
+  zeileNetto: number
+): { positionen: AngebotPosition[]; aktualisiert: number } {
+  if (zeileNetto <= 0) return { positionen, aktualisiert: 0 }
+  let aktualisiert = 0
+  const next = positionen.map((pos) => {
+    if (pos.gewerk_id !== gewerkId) return pos
+    aktualisiert++
+    return {
+      ...pos,
+      einkaufspreis: einkaufspreisAusZeileNetto(zeileNetto, pos.menge || 1),
+    }
+  })
+  return { positionen: next, aktualisiert }
+}

@@ -45,10 +45,11 @@ import {
 } from '@/lib/partner/handwerker-einreichung'
 import {
   angebotPositionenFromRaw,
-  buildPartnerPreisByAngebotPositionId,
+  applyLegacyGewerkZeileToAngebotPositionen,
+  applyVereinbarteKonditionenToAngebotPositionen,
   parseHwKonditionen,
-  partnerPreisMapFromZuweisung,
   resolveAuftragPositionId,
+  zeileNettoAusEinkaufspreis,
 } from '@/lib/partner/hw-konditionen'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import {
@@ -754,7 +755,7 @@ export async function getHandwerkerEinreichungPdfUrl(
   return { ok: true, url }
 }
 
-/** Partner-EK in Auftragspositionen übernehmen (nach Auftragsanlage). */
+/** Vereinbarten HW-Preis übernehmen: Einkaufspreis im Angebot + ggf. preis_partner im Auftrag. */
 export async function uebernehmeHandwerkerEinreichungEk(input: {
   angebotId: string
   zuweisungId: string
@@ -764,6 +765,9 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const angebotId = input.angebotId.trim()
+  const zuweisungId = input.zuweisungId.trim()
 
   const { data: zu, error: zErr } = await supabase
     .from('angebot_handwerker')
@@ -779,8 +783,8 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
       gewerke(slug, name)
     `
     )
-    .eq('id', input.zuweisungId.trim())
-    .eq('angebot_id', input.angebotId.trim())
+    .eq('id', zuweisungId)
+    .eq('angebot_id', angebotId)
     .maybeSingle()
 
   if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
@@ -789,86 +793,123 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
   }
 
   const konditionen = parseHwKonditionen(zu.hw_konditionen)
-  const ek = ekNettoFromHwEinreichung(zu as { hw_preis_netto?: number | null; hw_preis_brutto?: number | null })
-  if (!konditionen?.positionen.length && (ek == null || ek <= 0)) {
+  const legacyZeile = ekNettoFromHwEinreichung(zu as {
+    hw_preis_netto?: number | null
+    hw_preis_brutto?: number | null
+  })
+  if (!konditionen?.positionen.length && (legacyZeile == null || legacyZeile <= 0)) {
     return { ok: false, message: 'Kein gültiger Preis in der Einreichung' }
   }
 
-  const { data: auftrag } = await supabase
-    .from('auftraege')
-    .select('id')
-    .eq('angebot_id', input.angebotId.trim())
+  const { data: angebotRow, error: aErr } = await supabase
+    .from('angebote')
+    .select('positionen')
+    .eq('id', angebotId)
     .maybeSingle()
 
-  if (!auftrag?.id) {
-    return { ok: false, message: 'Noch kein Auftrag — Partnerpreis wird bei Auftragsanlage automatisch übernommen.' }
+  if (aErr || !angebotRow) return { ok: false, message: 'Angebot nicht gefunden' }
+
+  let angebotPos = angebotPositionenFromRaw(angebotRow.positionen)
+  let angebotAktualisiert = 0
+
+  if (konditionen?.positionen.length) {
+    const applied = applyVereinbarteKonditionenToAngebotPositionen(angebotPos, konditionen)
+    angebotPos = applied.positionen
+    angebotAktualisiert = applied.aktualisiert
+    if (angebotAktualisiert === 0) {
+      return { ok: false, message: 'Keine passenden Angebotspositionen für die Konditionen gefunden' }
+    }
+  } else {
+    const applied = applyLegacyGewerkZeileToAngebotPositionen(
+      angebotPos,
+      String(zu.gewerk_id),
+      legacyZeile!
+    )
+    angebotPos = applied.positionen
+    angebotAktualisiert = applied.aktualisiert
+    if (angebotAktualisiert === 0) {
+      return { ok: false, message: 'Keine passenden Angebotspositionen für dieses Gewerk' }
+    }
   }
+
+  const { error: posSaveErr } = await supabaseAdmin
+    .from('angebote')
+    .update({ positionen: angebotPos })
+    .eq('id', angebotId)
+
+  if (posSaveErr) return { ok: false, message: posSaveErr.message }
 
   const gwRaw = zu.gewerke as { slug?: string; name?: string } | { slug?: string; name?: string }[] | null
   const gw = Array.isArray(gwRaw) ? gwRaw[0] : gwRaw
   const slug = gw?.slug?.trim()
   const name = gw?.name?.trim()
+  const now = new Date().toISOString()
+  let auftragAktualisiert = 0
 
-  const { data: angebot } = await supabase
-    .from('angebote')
-    .select('positionen')
-    .eq('id', input.angebotId.trim())
+  const { data: auftrag } = await supabase
+    .from('auftraege')
+    .select('id')
+    .eq('angebot_id', angebotId)
     .maybeSingle()
 
-  const angebotPos = angebotPositionenFromRaw(angebot?.positionen)
-  const now = new Date().toISOString()
-  let aktualisiert = 0
-
-  if (konditionen?.positionen.length) {
+  if (auftrag?.id) {
     const { data: auftragPos, error: apErr } = await supabase
       .from('auftrag_positionen')
       .select('id, leistung_name, gewerk_slug, gewerk_name')
       .eq('auftrag_id', auftrag.id)
 
     if (apErr) return { ok: false, message: apErr.message }
-    if (!auftragPos?.length) return { ok: false, message: 'Keine Auftragspositionen' }
 
-    for (const kp of konditionen.positionen) {
-      if (kp.hw_netto <= 0) continue
-      const auftragPosId = resolveAuftragPositionId(
-        angebotPos,
-        auftragPos,
-        kp,
-        slug,
-        name
-      )
-      if (!auftragPosId) continue
-      const { error: upErr } = await supabase
+    if (konditionen?.positionen.length && auftragPos?.length) {
+      for (const kp of konditionen.positionen) {
+        if (kp.hw_netto <= 0) continue
+        const auftragPosId = resolveAuftragPositionId(
+          angebotPos,
+          auftragPos,
+          kp,
+          slug,
+          name
+        )
+        if (!auftragPosId) continue
+        const { error: upErr } = await supabase
+          .from('auftrag_positionen')
+          .update({ preis_partner: kp.hw_netto })
+          .eq('id', auftragPosId)
+        if (!upErr) auftragAktualisiert++
+      }
+    } else if (auftragPos?.length) {
+      let posQuery = supabase
         .from('auftrag_positionen')
-        .update({ preis_partner: kp.hw_netto })
-        .eq('id', auftragPosId)
-      if (!upErr) aktualisiert++
+        .select('id, leistung_name, gewerk_slug, gewerk_name, menge, preis_partner')
+        .eq('auftrag_id', auftrag.id)
+
+      if (slug) posQuery = posQuery.eq('gewerk_slug', slug)
+      else if (name) posQuery = posQuery.eq('gewerk_name', name)
+
+      const { data: posRows, error: pErr } = await posQuery
+      if (pErr) return { ok: false, message: pErr.message }
+
+      for (const p of posRows ?? []) {
+        const angMatch = angebotPos.find(
+          (ap) =>
+            ap.gewerk_id === String(zu.gewerk_id) &&
+            ap.leistung_name?.trim().toLowerCase() ===
+              String(p.leistung_name ?? '')
+                .trim()
+                .toLowerCase()
+        )
+        const zeile =
+          (angMatch && zeileNettoAusEinkaufspreis(angMatch)) ?? legacyZeile!
+        const { error: upErr } = await supabase
+          .from('auftrag_positionen')
+          .update({ preis_partner: zeile })
+          .eq('id', p.id as string)
+        if (!upErr) auftragAktualisiert++
+      }
     }
 
-    if (aktualisiert === 0) {
-      return { ok: false, message: 'Keine passenden Auftragspositionen für die Konditionen gefunden' }
-    }
-  } else {
-    let posQuery = supabase
-      .from('auftrag_positionen')
-      .select('id')
-      .eq('auftrag_id', auftrag.id)
-
-    if (slug) posQuery = posQuery.eq('gewerk_slug', slug)
-    else if (name) posQuery = posQuery.eq('gewerk_name', name)
-    else return { ok: false, message: 'Gewerk nicht ermittelbar' }
-
-    const { data: posRows, error: pErr } = await posQuery
-    if (pErr) return { ok: false, message: pErr.message }
-    if (!posRows?.length) return { ok: false, message: 'Keine passenden Auftragspositionen' }
-
-    for (const p of posRows) {
-      const { error: upErr } = await supabase
-        .from('auftrag_positionen')
-        .update({ preis_partner: ek! })
-        .eq('id', p.id as string)
-      if (!upErr) aktualisiert++
-    }
+    revalidatePath(`/auftraege/${auftrag.id}`)
+    revalidatePath('/auftraege')
   }
 
   await supabaseAdmin
@@ -876,10 +917,8 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     .update({ hw_status: 'uebernommen', hw_crm_antwort_at: now })
     .eq('id', zu.id as string)
 
-  revalidatePath(`/angebote/${input.angebotId}`)
-  revalidatePath(`/auftraege/${auftrag.id}`)
-  revalidatePath('/auftraege')
-  return { ok: true, aktualisiert }
+  revalidatePath(`/angebote/${angebotId}`)
+  return { ok: true, aktualisiert: Math.max(angebotAktualisiert, auftragAktualisiert) }
 }
 
 /** CRM: Handwerker-Angebot manuell erfassen (z. B. per E-Mail/WhatsApp). */
@@ -956,7 +995,7 @@ export async function crmManuelleHandwerkerEinreichung(
 }
 
 /**
- * CRM-Bestätigung: EK übernehmen (falls Auftrag da), Status „übernommen“, Mail an Handwerker.
+ * CRM-Bestätigung: vereinbarten Preis übernehmen (Einkaufspreis + ggf. Auftrag), Mail an Handwerker.
  * Bei vorhandenem Auftrag: Rückgabe für Nachunternehmervertrag-Wizard (Unterlagen + PDF).
  */
 export async function bestaetigeHandwerkerEinreichung(input: {
@@ -1008,19 +1047,9 @@ export async function bestaetigeHandwerkerEinreichung(input: {
     .maybeSingle()
 
   let aktualisiert = 0
-  if (auftrag?.id) {
-    const ekRes = await uebernehmeHandwerkerEinreichungEk({ angebotId, zuweisungId })
-    if (!ekRes.ok) return ekRes
-    aktualisiert = ekRes.aktualisiert
-  } else {
-    const now = new Date().toISOString()
-    const { error: stErr } = await supabaseAdmin
-      .from('angebot_handwerker')
-      .update({ hw_status: 'uebernommen', hw_crm_antwort_at: now })
-      .eq('id', zuweisungId)
-    if (stErr) return { ok: false, message: stErr.message }
-    revalidatePath(`/angebote/${angebotId}`)
-  }
+  const uebernahmeRes = await uebernehmeHandwerkerEinreichungEk({ angebotId, zuweisungId })
+  if (!uebernahmeRes.ok) return uebernahmeRes
+  aktualisiert = uebernahmeRes.aktualisiert
 
   const mail = await notifyPartnerHandwerkerAngebotBestaetigt(zuweisungId)
   const mailGesendet = mail.ok
@@ -1713,7 +1742,7 @@ export async function createAuftragFromAngebot(
   const sendKunde = opts?.send_kunden_email ?? true
   const sendHw = opts?.send_handwerker_email ?? true
 
-  const pos = normalizeAngebotPositionen(angebot.positionen)
+  let pos = normalizeAngebotPositionen(angebot.positionen)
   const gewerkNamen = Array.from(new Set(pos.map((p) => p.gewerk_name).filter(Boolean)))
   const titel = `${gewerkNamen.join(', ')} — ${angebot.kunden.name}`.slice(0, 240)
 
@@ -1771,6 +1800,36 @@ export async function createAuftragFromAngebot(
 
   const postInsertTasks: Array<PromiseLike<unknown>> = []
 
+  let angebotPosDirty = false
+  for (const h of angebot.angebot_handwerker ?? []) {
+    if (!hasHwEinreichung(h)) continue
+    if ((h.hw_status ?? '').toLowerCase() === 'uebernommen') continue
+    const k = parseHwKonditionen(h.hw_konditionen)
+    if (k) {
+      const applied = applyVereinbarteKonditionenToAngebotPositionen(pos, k)
+      pos = applied.positionen
+      if (applied.aktualisiert > 0) angebotPosDirty = true
+    } else {
+      const ek = ekNettoFromHwEinreichung(h)
+      if (ek != null && ek > 0) {
+        const applied = applyLegacyGewerkZeileToAngebotPositionen(pos, h.gewerk_id, ek)
+        pos = applied.positionen
+        if (applied.aktualisiert > 0) angebotPosDirty = true
+      }
+    }
+  }
+  if (angebotPosDirty) {
+    postInsertTasks.push(
+      supabaseAdmin
+        .from('angebote')
+        .update({ positionen: pos })
+        .eq('id', angebotId)
+        .then(({ error }) => {
+          if (error) throw new Error(error.message)
+        })
+    )
+  }
+
   if (hwRows.length) {
     postInsertTasks.push(
       supabaseAdmin
@@ -1790,10 +1849,8 @@ export async function createAuftragFromAngebot(
   }
 
   const gewerkEk = buildGewerkEkMap(angebot.angebot_handwerker ?? [])
-  const partnerPreisByPositionId = buildPartnerPreisByAngebotPositionId(angebot.angebot_handwerker ?? [])
   const posRows = angebotPositionenToAuftragRows(auftragId, pos, {
     gewerkEkByGewerkId: gewerkEk,
-    partnerPreisByPositionId,
   })
   if (posRows.length) {
     postInsertTasks.push(
@@ -1806,8 +1863,11 @@ export async function createAuftragFromAngebot(
   const eingereichtIds = (angebot.angebot_handwerker ?? [])
     .filter((h) => {
       if (!hasHwEinreichung(h)) return false
-      if (gewerkEk.has(h.gewerk_id)) return true
-      return partnerPreisMapFromZuweisung(h).size > 0
+      if ((h.hw_status ?? '').toLowerCase() === 'uebernommen') return false
+      const k = parseHwKonditionen(h.hw_konditionen)
+      if (k?.positionen.some((p) => p.hw_netto > 0)) return true
+      const ek = ekNettoFromHwEinreichung(h)
+      return ek != null && ek > 0
     })
     .map((h) => h.id)
   if (eingereichtIds.length) {

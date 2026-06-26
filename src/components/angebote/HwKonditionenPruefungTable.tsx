@@ -57,8 +57,8 @@ export function HwKonditionenPruefungTable({
           <thead>
             <tr className="border-b border-bw-border bg-bw-bg-soft/60 text-left text-bw-text-muted">
               <th className="px-2 py-1.5 font-medium">Leistung</th>
-              <th className="px-2 py-1.5 font-medium text-right">EK netto</th>
-              <th className="px-2 py-1.5 font-medium text-right">HW netto</th>
+              <th className="px-2 py-1.5 font-medium text-right">Vorschlag netto</th>
+              <th className="px-2 py-1.5 font-medium text-right">Vergütung netto</th>
               <th className="px-2 py-1.5 font-medium text-right">Δ</th>
               <th className="px-2 py-1.5 font-medium text-center">Geändert</th>
             </tr>
@@ -121,6 +121,7 @@ export function HwKonditionenPruefungTable({
       </div>
 
       <p className="text-xs text-bw-text-muted">
+        Nach Übernahme gilt je Leistung ein vereinbarter Netto-Preis (Einkaufspreis = Vergütung).
         Summe brutto: {betragAnzeige(summeBrutto, null, null)}
       </p>
     </div>
