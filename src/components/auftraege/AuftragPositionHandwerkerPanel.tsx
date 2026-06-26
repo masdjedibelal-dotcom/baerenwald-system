@@ -187,6 +187,8 @@ export function AuftragPositionHandwerkerPanel({
   const partnerPortalStatus = (partnerRow?.status ?? '').toLowerCase()
   const partnerAkzeptiert = partnerPortalStatus === 'akzeptiert' || zuweisungStatus === 'akzeptiert'
   const eingereicht = partnerRow ? hasHwEinreichung(partnerRow) : false
+  const hwStatusKonditionen = (partnerRow?.hw_status ?? '').toLowerCase()
+  const konditionenWartenAufHw = hwStatusKonditionen === 'bestaetigt'
   const konditionen = partnerRow ? parseHwKonditionen(partnerRow.hw_konditionen) : null
   const konditionZeile = konditionen
     ? hwKonditionForAuftragPosition(
@@ -325,6 +327,13 @@ export function AuftragPositionHandwerkerPanel({
               <p className="mt-2 text-xs text-bw-text-muted whitespace-pre-wrap">
                 <span className="font-medium text-bw-text">Partner-Notiz:</span>{' '}
                 {partnerRow.hw_notiz.trim()}
+              </p>
+            ) : null}
+
+            {konditionenWartenAufHw ? (
+              <p className="mt-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-950">
+                <span className="font-semibold">CRM hat übernommen.</span> Der Partner muss die vereinbarten
+                Konditionen im Portal noch bestätigen — danach Status „übernommen“ und optional Angebots-PDF.
               </p>
             ) : null}
 

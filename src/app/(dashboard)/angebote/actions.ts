@@ -914,7 +914,10 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
 
   await supabaseAdmin
     .from('angebot_handwerker')
-    .update({ hw_status: 'uebernommen', hw_crm_antwort_at: now })
+    .update({
+      hw_status: konditionen?.positionen.length ? 'bestaetigt' : 'uebernommen',
+      hw_crm_antwort_at: now,
+    })
     .eq('id', zu.id as string)
 
   revalidatePath(`/angebote/${angebotId}`)
@@ -1039,6 +1042,21 @@ export async function bestaetigeHandwerkerEinreichung(input: {
   if ((zu.hw_status ?? '').toLowerCase() === 'uebernommen') {
     return { ok: true, aktualisiert: 0, mailGesendet: false, mailHinweis: 'Bereits übernommen.' }
   }
+  if ((zu.hw_status ?? '').toLowerCase() === 'bestaetigt') {
+    return {
+      ok: true,
+      aktualisiert: 0,
+      mailGesendet: false,
+      mailHinweis: 'Konditionen bereits übernommen — Partner muss im Portal noch bestätigen.',
+    }
+  }
+
+  const { data: zuDetail } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .select('hw_konditionen')
+    .eq('id', zuweisungId)
+    .maybeSingle()
+  const hatKonditionen = Boolean(parseHwKonditionen(zuDetail?.hw_konditionen)?.positionen.length)
 
   const { data: auftrag } = await supabase
     .from('auftraege')
@@ -1051,7 +1069,9 @@ export async function bestaetigeHandwerkerEinreichung(input: {
   if (!uebernahmeRes.ok) return uebernahmeRes
   aktualisiert = uebernahmeRes.aktualisiert
 
-  const mail = await notifyPartnerHandwerkerAngebotBestaetigt(zuweisungId)
+  const mail = await notifyPartnerHandwerkerAngebotBestaetigt(zuweisungId, {
+    bitteBestaetigen: hatKonditionen,
+  })
   const mailGesendet = mail.ok
   const mailHinweis = mail.ok ? undefined : mail.error
 

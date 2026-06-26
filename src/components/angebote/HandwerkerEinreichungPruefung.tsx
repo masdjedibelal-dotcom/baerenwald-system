@@ -93,6 +93,7 @@ export function HandwerkerEinreichungPruefung({
   const hwSt = (z.hw_status ?? '').toLowerCase()
   const kannPruefen = kannHwEinreichungPruefen(z)
   const uebernommen = hwSt === 'uebernommen'
+  const bestaetigt = hwSt === 'bestaetigt'
   const ek = eingereicht ? ekNettoFromHwEinreichung(z) : null
   const handwerkerName = z.handwerker?.name?.trim() || 'Handwerker'
   const gewerkName = z.gewerke?.name?.trim() || 'Gewerk'
@@ -128,12 +129,18 @@ export function HandwerkerEinreichungPruefung({
           ? ` Hinweis: ${res.mailHinweis}`
           : ''
       if (res.openWizard && onAcceptWizard) {
-        toast.success(`Konditionen übernommen.${preisTeil}${mailTeil} Nachunternehmervertrag wird geöffnet…`)
+        toast.success(
+          `Konditionen übernommen.${preisTeil}${mailTeil} Partner muss vereinbarte Preise noch im Portal bestätigen. Nachunternehmervertrag wird geöffnet…`
+        )
         onAcceptWizard(res.openWizard)
         onRefresh()
         return
       }
-      toast.success(`Konditionen übernommen.${preisTeil}${mailTeil}`)
+      toast.success(
+        konditionen
+          ? `Konditionen übernommen.${preisTeil}${mailTeil} Der Partner muss die vereinbarten Preise im Portal noch bestätigen.`
+          : `Konditionen übernommen.${preisTeil}${mailTeil}`
+      )
       onRefresh()
     })
   }
@@ -299,8 +306,15 @@ export function HandwerkerEinreichungPruefung({
 
           {uebernommen ? (
             <span className="text-xs font-medium text-bw-primary self-center">
-              Übernommen — Partner informiert
+              Übernommen — Partner hat bestätigt
             </span>
+          ) : null}
+
+          {bestaetigt ? (
+            <p className="w-full rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs text-violet-950">
+              Konditionen im CRM übernommen — <span className="font-medium">Partner muss im Portal noch bestätigen</span>{' '}
+              (Tab Anfragen). Danach wechselt der Vorgang zu Angebote.
+            </p>
           ) : null}
         </div>
       </div>

@@ -13,7 +13,8 @@ function partnerSiteBaseUrl(): string {
 }
 
 export async function notifyPartnerHandwerkerAngebotBestaetigt(
-  anfrageId: string
+  anfrageId: string,
+  options?: { bitteBestaetigen?: boolean }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const id = anfrageId.trim()
   if (!id) return { ok: false, error: 'anfrageId fehlt' }
@@ -28,6 +29,9 @@ export async function notifyPartnerHandwerkerAngebotBestaetigt(
   }
 
   const url = `${partnerSiteBaseUrl()}/api/internal/partner-notify-angebot-bestaetigt`
+  const payload: { anfrageId: string; bitteBestaetigen?: boolean } = { anfrageId: id }
+  if (options?.bitteBestaetigen) payload.bitteBestaetigen = true
+
   let res: Response
   try {
     res = await fetch(url, {
@@ -36,7 +40,7 @@ export async function notifyPartnerHandwerkerAngebotBestaetigt(
         Authorization: `Bearer ${secret}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ anfrageId: id }),
+      body: JSON.stringify(payload),
       cache: 'no-store',
     })
   } catch (e) {
