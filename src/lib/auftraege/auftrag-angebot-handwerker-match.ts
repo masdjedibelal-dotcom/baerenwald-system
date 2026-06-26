@@ -21,11 +21,21 @@ export function angebotHandwerkerFuerPosition(
   gewerke: GewerkOpt[]
 ): AngebotHandwerkerRow | null {
   if (!pos.handwerker_id?.trim()) return null
+  const hwId = pos.handwerker_id.trim()
   const gewerkId = gewerkIdFuerPosition(pos, gewerke)
-  if (!gewerkId) return null
-  return (
-    rows.find((r) => r.handwerker_id === pos.handwerker_id && r.gewerk_id === gewerkId) ?? null
-  )
+  const forHw = rows.filter((r) => r.handwerker_id === hwId)
+
+  if (gewerkId) {
+    const exact = forHw.find((r) => r.gewerk_id === gewerkId)
+    if (exact) return exact
+  }
+
+  // Portal-Zuweisung ohne gewerk_id (Legacy): eindeutige Zeile pro Handwerker
+  const ohneGewerk = forHw.filter((r) => !r.gewerk_id?.trim())
+  if (ohneGewerk.length === 1) return ohneGewerk[0]!
+  if (forHw.length === 1) return forHw[0]!
+
+  return null
 }
 
 export function effektiverHandwerkerStatus(

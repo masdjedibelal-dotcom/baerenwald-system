@@ -660,6 +660,11 @@ export function AuftragDetailClient({
     return raw?.angebot_handwerker ?? []
   }, [detail.angebote])
 
+  const angebotPositionen = useMemo(() => {
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    return normalizeAngebotPositionen((ang as { positionen?: unknown } | null)?.positionen)
+  }, [detail.angebote])
+
   const angebotTitel = useMemo(() => {
     const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
     return (ang as { titel?: string } | null)?.titel?.trim() || detail.titel?.trim() || 'Projekt'
@@ -872,8 +877,8 @@ export function AuftragDetailClient({
         }
       >
         <p className="mb-4 text-sm text-bw-text-muted">
-          Leistung anklicken zum Aufklappen: zuerst Leistungsdaten, dann Handwerker, dann Fortschritt.
-          Änderungen speichern beim Verlassen des Feldes. Neue Gewerke über Menü → „Angebot bearbeiten (Korrektur)“.
+          Leistung anklicken: Leistungsdaten → Handwerker (Zuweisung, Gegenangebot, Übernehmen) →
+          Fortschritt. „Akzeptiert“ = Partner hat zugewiesen, nicht automatisch Preis vereinbart.
         </p>
         <AuftragPositionenSteuerungTab
           auftragId={detail.id}
@@ -882,6 +887,7 @@ export function AuftragDetailClient({
           angebotId={detail.angebot_id}
           angebotTitel={angebotTitel}
           angebotHandwerker={angebotHandwerker}
+          angebotPositionen={angebotPositionen}
           auftragStatus={detail.status}
           handwerkerKontext={handwerkerKontext}
           eigenregie={istBauprojekt}

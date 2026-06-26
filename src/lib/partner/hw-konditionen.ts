@@ -150,6 +150,35 @@ export function resolveAuftragPositionId(
   return null
 }
 
+/** Konditionszeile zu einer Auftragsposition (Angebot-ID oder Leistungstext). */
+export function hwKonditionForAuftragPosition(
+  konditionen: HwKonditionenJson | null,
+  auftragPos: AuftragPosMatch,
+  angebotPositionen: AngebotPosition[],
+  gewerkSlug?: string | null,
+  gewerkName?: string | null
+): HwKonditionenPosition | null {
+  if (!konditionen?.positionen.length) return null
+
+  for (const k of konditionen.positionen) {
+    const resolved = resolveAuftragPositionId(
+      angebotPositionen,
+      [auftragPos],
+      k,
+      gewerkSlug,
+      gewerkName
+    )
+    if (resolved === auftragPos.id) return k
+  }
+
+  const byName = normLeistung(auftragPos.leistung_name)
+  const exact = konditionen.positionen.find((k) => normLeistung(k.leistung) === byName)
+  if (exact) return exact
+
+  if (konditionen.positionen.length === 1) return konditionen.positionen[0]!
+  return null
+}
+
 /** Partnerpreis pro Angebotsposition (aus übernommenen / eingereichten Konditionen). */
 export function buildPartnerPreisByAngebotPositionId(
   rows: AngebotHandwerkerRow[]

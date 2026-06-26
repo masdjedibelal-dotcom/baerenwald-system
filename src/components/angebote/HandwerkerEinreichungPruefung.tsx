@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn, formatDatumZeit } from '@/lib/utils'
-import type { AngebotHandwerkerRow } from '@/lib/types'
+import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import {
   ablehneHandwerkerEinreichung,
@@ -24,7 +24,7 @@ import {
   hwStatusLabel,
   kannHwEinreichungPruefen,
 } from '@/lib/partner/handwerker-einreichung'
-import { parseHwKonditionen } from '@/lib/partner/hw-konditionen'
+import { parseHwKonditionen, hwKonditionForAuftragPosition } from '@/lib/partner/hw-konditionen'
 import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import {
   handwerkerEinreichungAntwortBetreff,
@@ -46,6 +46,8 @@ export function HandwerkerEinreichungPruefung({
   angebotId,
   angebotTitel,
   auftragId,
+  auftragPosition = null,
+  angebotPositionen = [],
   onRefresh,
   onAcceptWizard,
 }: {
@@ -53,6 +55,11 @@ export function HandwerkerEinreichungPruefung({
   angebotId: string
   angebotTitel: string
   auftragId: string | null
+  auftragPosition?: Pick<
+    AuftragPosition,
+    'id' | 'leistung_name' | 'gewerk_slug' | 'gewerk_name'
+  > | null
+  angebotPositionen?: AngebotPosition[]
   onRefresh: () => void
   onAcceptWizard?: (ctx: {
     auftragId: string
@@ -67,7 +74,22 @@ export function HandwerkerEinreichungPruefung({
   const [mailModal, setMailModal] = useState<AntwortModal | null>(null)
 
   const eingereicht = hasHwEinreichung(z)
-  const konditionen = parseHwKonditionen(z.hw_konditionen)
+  const konditionenRaw = parseHwKonditionen(z.hw_konditionen)
+  const konditionen =
+    konditionenRaw && auftragPosition
+      ? (() => {
+          const zeile = hwKonditionForAuftragPosition(
+            konditionenRaw,
+            auftragPosition,
+            angebotPositionen,
+            auftragPosition.gewerk_slug,
+            auftragPosition.gewerk_name
+          )
+          return zeile
+            ? { ...konditionenRaw, positionen: [zeile] }
+            : konditionenRaw
+        })()
+      : konditionenRaw
   const hwSt = (z.hw_status ?? '').toLowerCase()
   const kannPruefen = kannHwEinreichungPruefen(z)
   const uebernommen = hwSt === 'uebernommen'
@@ -213,7 +235,14 @@ export function HandwerkerEinreichungPruefung({
           ) : null}
         </p>
 
-        {konditionen ? <HwKonditionenPruefungTable z={z} /> : null}
+        {konditionen ? (
+          <HwKonditionenPruefungTable
+            z={{
+              ...z,
+              hw_konditionen: konditionen,
+            }}
+          />
+        ) : null}
 
         {z.hw_eingereicht_at ? (
           <p className="text-xs text-bw-text-muted">

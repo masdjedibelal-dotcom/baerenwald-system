@@ -71,6 +71,7 @@ export function AuftragPositionenMobile({
   angebotId = null,
   angebotTitel = 'Projekt',
   angebotHandwerker = [],
+  angebotPositionen = [],
   gewerke = [],
   onAddGewerk,
   onAddLeistung,
@@ -99,6 +100,7 @@ export function AuftragPositionenMobile({
   angebotId?: string | null
   angebotTitel?: string
   angebotHandwerker?: AngebotHandwerkerRow[]
+  angebotPositionen?: import('@/lib/types').AngebotPosition[]
   gewerke?: { id: string; name: string; slug: string }[]
   eigenregie?: boolean
   onAddGewerk: () => void
@@ -478,6 +480,7 @@ export function AuftragPositionenMobile({
             partnerRow={activeLeistungPartnerRow}
             angebotId={angebotId}
             angebotTitel={angebotTitel}
+            angebotPositionen={angebotPositionen}
             onChanged={onChanged}
             showReorder={false}
           />

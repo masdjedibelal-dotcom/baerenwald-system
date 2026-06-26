@@ -48,7 +48,7 @@ import {
 } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import type { AngebotHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib/types'
+import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition, AuftragStatus } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -132,6 +132,7 @@ export function AuftragPositionenSteuerungTab({
   angebotId = null,
   angebotTitel = 'Projekt',
   angebotHandwerker = [],
+  angebotPositionen = [],
   auftragStatus = 'offen',
   auftragAbgeschlossen = false,
   onBewerteHandwerker,
@@ -145,6 +146,7 @@ export function AuftragPositionenSteuerungTab({
   angebotId?: string | null
   angebotTitel?: string
   angebotHandwerker?: AngebotHandwerkerRow[]
+  angebotPositionen?: AngebotPosition[]
   auftragStatus?: AuftragStatus
   auftragAbgeschlossen?: boolean
   eigenregie?: boolean
@@ -376,6 +378,7 @@ export function AuftragPositionenSteuerungTab({
           angebotId={angebotId}
           angebotTitel={angebotTitel}
           angebotHandwerker={angebotHandwerker}
+          angebotPositionen={angebotPositionen}
           gewerke={gewerke}
           eigenregie={eigenregie}
         />
@@ -445,6 +448,7 @@ export function AuftragPositionenSteuerungTab({
               angebotId={angebotId}
               angebotTitel={angebotTitel}
               angebotHandwerker={angebotHandwerker}
+              angebotPositionen={angebotPositionen}
               gewerke={gewerke}
               onBewerteHandwerker={onBewerteHandwerker}
               eigenregie={eigenregie}
@@ -515,6 +519,7 @@ function GewerkBlock({
   angebotId = null,
   angebotTitel = 'Projekt',
   angebotHandwerker = [],
+  angebotPositionen = [],
   gewerke = [],
 }: {
   index: number
@@ -527,6 +532,7 @@ function GewerkBlock({
   angebotId?: string | null
   angebotTitel?: string
   angebotHandwerker?: AngebotHandwerkerRow[]
+  angebotPositionen?: AngebotPosition[]
   gewerke?: GewerkOpt[]
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
   eigenregie?: boolean
@@ -666,6 +672,7 @@ function GewerkBlock({
             angebotId={angebotId}
             angebotTitel={angebotTitel}
             angebotHandwerker={angebotHandwerker}
+            angebotPositionen={angebotPositionen}
             gewerke={gewerke}
             onChanged={onChanged}
           />
@@ -703,6 +710,7 @@ function LeistungRow({
   angebotId = null,
   angebotTitel = 'Projekt',
   angebotHandwerker = [],
+  angebotPositionen = [],
   gewerke = [],
 }: {
   pos: AuftragPosition
@@ -717,6 +725,7 @@ function LeistungRow({
   angebotId?: string | null
   angebotTitel?: string
   angebotHandwerker?: AngebotHandwerkerRow[]
+  angebotPositionen?: AngebotPosition[]
   gewerke?: GewerkOpt[]
   eigenregie?: boolean
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
@@ -784,6 +793,7 @@ function LeistungRow({
             partnerRow={resolvedPartnerRow}
             angebotId={angebotId}
             angebotTitel={angebotTitel}
+            angebotPositionen={angebotPositionen}
             onChanged={onChanged}
           />
         </div>

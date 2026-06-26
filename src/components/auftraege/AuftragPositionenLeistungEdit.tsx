@@ -44,8 +44,17 @@ import type { HandwerkerNachrichtInput } from '@/lib/auftraege/handwerker-nachri
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { buildPartnerLoginLink } from '@/lib/portal-utils'
-import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
+import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
+import {
+  hasHwEinreichung,
+  kannHwEinreichungPruefen,
+} from '@/lib/partner/handwerker-einreichung'
+import {
+  hwKonditionForAuftragPosition,
+  parseHwKonditionen,
+} from '@/lib/partner/hw-konditionen'
+import { betragAnzeige } from '@/lib/angebot-einfach'
 
 function EuroInput({
   label,
@@ -207,6 +216,7 @@ export function AuftragPositionenLeistungEditPanel({
   partnerRow = null,
   angebotId = null,
   angebotTitel = 'Projekt',
+  angebotPositionen = [],
   eigenregie = false,
   showReorder = true,
   showDelete = true,
@@ -227,6 +237,7 @@ export function AuftragPositionenLeistungEditPanel({
   partnerRow?: AngebotHandwerkerRow | null
   angebotId?: string | null
   angebotTitel?: string
+  angebotPositionen?: AngebotPosition[]
   eigenregie?: boolean
   showReorder?: boolean
   showDelete?: boolean
@@ -240,6 +251,26 @@ export function AuftragPositionenLeistungEditPanel({
   const eigen = preisEigenleistung(pos)
   const marge = (pos.preis_fix ?? 0) - partner - eigen
   const hw = pos.handwerker
+  const konditionen = partnerRow ? parseHwKonditionen(partnerRow.hw_konditionen) : null
+  const konditionZeile = konditionen
+    ? hwKonditionForAuftragPosition(
+        konditionen,
+        {
+          id: pos.id,
+          leistung_name: pos.leistung_name,
+          gewerk_slug: pos.gewerk_slug,
+          gewerk_name: pos.gewerk_name,
+        },
+        angebotPositionen,
+        pos.gewerk_slug,
+        pos.gewerk_name
+      )
+    : null
+  const konditionenAusstehend =
+    Boolean(partnerRow) &&
+    hasHwEinreichung(partnerRow!) &&
+    kannHwEinreichungPruefen(partnerRow!) &&
+    konditionZeile != null
 
   const [draft, setDraft] = useState(() => draftFromPosition(pos, partner))
 
@@ -363,9 +394,20 @@ export function AuftragPositionenLeistungEditPanel({
                   {marge !== 0 ? ` Marge: ${formatEurBetrag(marge)}` : ''}
                 </p>
               </div>
+            ) : konditionenAusstehend ? (
+              <div className="w-full">
+                <label className="input-label">Preis Partner (aus Gegenangebot)</label>
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] tabular-nums font-medium text-amber-950">
+                  {betragAnzeige(konditionZeile!.hw_netto, null, null)} netto
+                </div>
+                <p className="leistung-acc-hint">
+                  Vom Partner eingereicht — bitte unten unter „Konditionen & Verhandlung“ übernehmen,
+                  nachfragen oder ablehnen. Erst danach wird der Auftragspreis gesetzt.
+                </p>
+              </div>
             ) : (
               <EuroInput
-                label="Preis Partner (Fremdleistung)"
+                label="Preis Partner (vereinbart / intern)"
                 value={draft.preis_partner}
                 onChange={(v) => setDraft((d) => ({ ...d, preis_partner: v }))}
                 onBlur={() => commitDraft({ preis_partner: draft.preis_partner })}
@@ -471,6 +513,7 @@ export function AuftragPositionenLeistungEditPanel({
                   partnerRow={partnerRow}
                   angebotId={angebotId}
                   angebotTitel={angebotTitel}
+                  angebotPositionen={angebotPositionen}
                   auftragId={auftragId}
                   onChanged={onChanged}
                 />
