@@ -1,5 +1,7 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
+import { buildAngebotIdsMitAuftrag } from '@/lib/crm/pipeline-liste-filter'
+import { buildAngebotIdsMitRechnung } from '@/lib/crm/projekt-pipeline'
 import type { AngebotListeEintrag } from '@/lib/types'
 
 export const ANGEBOTE_LISTE_SELECT = `
@@ -31,33 +33,43 @@ export const ANGEBOTE_LISTE_SELECT = `
 export async function loadAngeboteListe(): Promise<{
   angebote: AngebotListeEintrag[]
   angebotIdsMitAuftrag: string[]
+  angebotIdsMitRechnung: string[]
   error: string | null
 }> {
-  const [angeboteRes, auftragRes] = await Promise.all([
+  const [angeboteRes, auftragRes, rechnungRes] = await Promise.all([
     withCrmReadFallback(async (db) =>
       db.from('angebote').select(ANGEBOTE_LISTE_SELECT).order('created_at', { ascending: false }).limit(100)
     ),
     withCrmReadFallback(async (db) =>
       db.from('auftraege').select('angebot_id').not('angebot_id', 'is', null)
     ),
+    withCrmReadFallback(async (db) =>
+      db.from('rechnungen').select('angebot_id').not('angebot_id', 'is', null)
+    ),
   ])
 
   if (angeboteRes.error) {
-    return { angebote: [], angebotIdsMitAuftrag: [], error: angeboteRes.error.message }
+    return {
+      angebote: [],
+      angebotIdsMitAuftrag: [],
+      angebotIdsMitRechnung: [],
+      error: angeboteRes.error.message,
+    }
   }
 
   const angebotIdsMitAuftrag = Array.from(
-    new Set(
-      ((auftragRes.data ?? []) as { angebot_id: string | null }[])
-        .map((r) => r.angebot_id?.trim())
-        .filter(Boolean) as string[]
-    )
+    buildAngebotIdsMitAuftrag((auftragRes.data ?? []) as { angebot_id: string | null }[])
+  )
+
+  const angebotIdsMitRechnung = Array.from(
+    buildAngebotIdsMitRechnung((rechnungRes.data ?? []) as { angebot_id: string | null }[])
   )
 
   return {
     angebote: (angeboteRes.data ?? []) as unknown as AngebotListeEintrag[],
     angebotIdsMitAuftrag,
-    error: auftragRes.error?.message ?? null,
+    angebotIdsMitRechnung,
+    error: auftragRes.error?.message ?? rechnungRes.error?.message ?? null,
   }
 }
 

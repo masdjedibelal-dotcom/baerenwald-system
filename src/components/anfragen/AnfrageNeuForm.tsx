@@ -179,6 +179,7 @@ export function AnfrageNeuForm({
   const [budgetMax, setBudgetMax] = useState('')
   const [istBauprojekt, setIstBauprojekt] = useState(false)
   const [bauprojektManuell, setBauprojektManuell] = useState(false)
+  const [bestaetigungsmailSenden, setBestaetigungsmailSenden] = useState(false)
 
   const resolvedFormId = formId ?? ANFRAGE_NEU_FORM_ID
   const isBearbeiten = Boolean(bearbeitenLead?.id)
@@ -1017,6 +1018,31 @@ export function AnfrageNeuForm({
           </Field>
         </div>
       </Card>
+
+      {!isBearbeiten ? (
+        <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
+          {email.trim() ? (
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={bestaetigungsmailSenden}
+                onChange={(e) => setBestaetigungsmailSenden(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium text-bw-text">Bestätigungs-Mail an Kunden senden</span>
+                <span className="mt-0.5 block text-xs text-bw-text-muted">
+                  An {email.trim()} — standardmäßig aus bei manuell erfassten Anfragen.
+                </span>
+              </span>
+            </label>
+          ) : (
+            <p className="text-xs text-bw-text-muted">
+              Keine E-Mail beim Kontakt — Bestätigungs-Mail kann nicht gesendet werden.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">

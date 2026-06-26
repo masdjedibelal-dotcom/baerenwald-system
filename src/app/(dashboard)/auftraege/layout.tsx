@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AuftraegeLayout({ children }: { children: React.ReactNode }) {
-  const { auftraege, error } = await loadAuftraegeListe()
+  const { auftraege, pipelineKontextByAuftragId, error } = await loadAuftraegeListe()
 
   if (error) {
     return (
@@ -18,5 +18,12 @@ export default async function AuftraegeLayout({ children }: { children: React.Re
     )
   }
 
-  return <AuftraegeMasterDetailShell auftraege={auftraege}>{children}</AuftraegeMasterDetailShell>
+  return (
+    <AuftraegeMasterDetailShell
+      auftraege={auftraege}
+      pipelineKontextByAuftragId={pipelineKontextByAuftragId}
+    >
+      {children}
+    </AuftraegeMasterDetailShell>
+  )
 }

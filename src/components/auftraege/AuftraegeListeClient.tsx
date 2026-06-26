@@ -27,12 +27,17 @@ import {
   auftragTitel,
   auftragWertAnzeige,
   auftragWertNum,
-  countAuftragPhase,
   formatAuftragsNr,
   lieferdatumAnzeige,
-  matchesAuftragPhase,
   type AuftragListenPhase,
 } from '@/lib/auftraege/auftrag-liste-helpers'
+import {
+  abrechnungPipelineLabel,
+  countAuftragPipelinePhase,
+  leereAuftragPipelineKontext,
+  matchesAuftragPipelinePhase,
+  type AuftragPipelineKontext,
+} from '@/lib/crm/projekt-pipeline'
 import {
   getZeitraumRange,
   datumInZeitraum,
@@ -94,10 +99,12 @@ function auftragExportRow(a: AuftragListeEintrag): Record<string, unknown> {
 
 export function AuftraegeListeClient({
   auftraege,
+  pipelineKontextByAuftragId = {},
   mode = 'page',
   selectedId = null,
 }: {
   auftraege: AuftragListeEintrag[]
+  pipelineKontextByAuftragId?: Record<string, AuftragPipelineKontext>
   mode?: 'page' | 'pane'
   selectedId?: string | null
 }) {
@@ -139,14 +146,20 @@ export function AuftraegeListeClient({
     return auftraege.filter((a) => {
       if (statusList?.length) {
         if (!statusList.includes(a.status)) return false
-      } else if (!matchesAuftragPhase(a, phase)) {
+      } else if (
+        !matchesAuftragPipelinePhase(
+          a,
+          pipelineKontextByAuftragId[a.id] ?? leereAuftragPipelineKontext(),
+          phase
+        )
+      ) {
         return false
       }
       if (dateRange && !datumInZeitraum(a.created_at, dateRange)) return false
       if (!needle) return true
       return auftragSuchtext(a).includes(needle)
     })
-  }, [auftraege, phase, statusList, debouncedQ, dateRange])
+  }, [auftraege, phase, statusList, debouncedQ, dateRange, pipelineKontextByAuftragId])
 
   const sortRows: SortRow[] = useMemo(
     () =>
@@ -183,10 +196,16 @@ export function AuftraegeListeClient({
       PHASE_FILTERS.map((o) => ({
         label: o.label,
         value: o.value,
-        count: countAuftragPhase(auftraege, o.value),
+        count: countAuftragPipelinePhase(auftraege, pipelineKontextByAuftragId, o.value),
       })),
-    [auftraege]
+    [auftraege, pipelineKontextByAuftragId]
   )
+
+  function pipelineHinweis(a: AuftragListeEintrag): string | null {
+    return abrechnungPipelineLabel(
+      pipelineKontextByAuftragId[a.id] ?? leereAuftragPipelineKontext()
+    )
+  }
 
   const filterTags = useMemo((): FilterTag[] => {
     const t: FilterTag[] = []
@@ -301,15 +320,17 @@ export function AuftraegeListeClient({
           title={
             auftraege.length === 0
               ? 'Keine Aufträge'
-              : phase === 'aktiv' && countAuftragPhase(auftraege, 'aktiv') === 0
+              : phase === 'aktiv' &&
+                  countAuftragPipelinePhase(auftraege, pipelineKontextByAuftragId, 'aktiv') === 0
                 ? 'Keine aktiven Aufträge'
                 : 'Keine Treffer'
           }
           description={
             auftraege.length === 0
               ? 'Aufträge aus angenommenen Angeboten erscheinen hier.'
-              : phase === 'aktiv' && countAuftragPhase(auftraege, 'aktiv') === 0
-                ? 'Abgeschlossene Aufträge findest du unter Phase „Fertig“ oder „Alle“.'
+              : phase === 'aktiv' &&
+                  countAuftragPipelinePhase(auftraege, pipelineKontextByAuftragId, 'aktiv') === 0
+                ? 'Abgeschlossene und vollständig abgerechnete Aufträge findest du unter „Fertig“ oder „Alle“.'
                 : 'Filter anpassen.'
           }
         />
@@ -323,7 +344,9 @@ export function AuftraegeListeClient({
                     {gruppe.label} ({gruppe.items.length})
                   </p>
                 ) : null}
-                {gruppe.items.map((a) => (
+                {gruppe.items.map((a) => {
+                  const abrechnungHinweis = pipelineHinweis(a)
+                  return (
                 <AppEntityListRow
                   key={a.id}
                   href={isPane ? `/auftraege/${a.id}` : undefined}
@@ -333,10 +356,20 @@ export function AuftraegeListeClient({
                   title={auftragKundenName(a)}
                   line2={a.titel?.trim() || '—'}
                   line3={lieferdatumAnzeige(a)}
-                  line4={auftragWertAnzeige(a)}
+                  line4={
+                    abrechnungHinweis ? (
+                      <span>
+                        <span className="text-amber-800">{abrechnungHinweis}</span>
+                        <span className="text-bw-text-muted"> · {auftragWertAnzeige(a)}</span>
+                      </span>
+                    ) : (
+                      auftragWertAnzeige(a)
+                    )
+                  }
                   badge={<AuftragStatusBadge status={a.status} />}
                 />
-            ))}
+                  )
+                })}
               </div>
             ))}
           </ListMobileStack>
@@ -376,7 +409,9 @@ export function AuftraegeListeClient({
                     {gruppe.label} ({gruppe.items.length})
                   </p>
                 ) : null}
-                {gruppe.items.map((a) => (
+                {gruppe.items.map((a) => {
+                  const abrechnungHinweis = pipelineHinweis(a)
+                  return (
                 <div
                   key={a.id}
                   role="button"
@@ -393,7 +428,13 @@ export function AuftraegeListeClient({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[13.5px] font-semibold text-bw-text">{auftragTitel(a)}</p>
-                    <p className="truncate text-xs text-bw-text-muted">{auftragOrt(a)}</p>
+                    <p className="truncate text-xs text-bw-text-muted">
+                      {abrechnungHinweis ? (
+                        <span className="text-amber-800">{abrechnungHinweis}</span>
+                      ) : (
+                        auftragOrt(a)
+                      )}
+                    </p>
                   </div>
                   <p className="truncate text-[13px] text-bw-text">{auftragKundenName(a)}</p>
                   <p className="text-right text-[13px] font-semibold tabular-nums text-bw-text">
@@ -402,7 +443,8 @@ export function AuftraegeListeClient({
                   <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{lieferdatumAnzeige(a)}</p>
                   <AuftragStatusBadge status={a.status} />
                 </div>
-            ))}
+                  )
+                })}
               </div>
             ))}
           </ListGridShell>

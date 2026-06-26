@@ -1,12 +1,14 @@
-import { resolveStatusEinfach, type AngebotStatusEinfach } from '@/lib/angebot-einfach'
 import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
-import { matchesAuftragPhase } from '@/lib/auftraege/auftrag-liste-helpers'
-import type {
-  AngebotListeEintrag,
-  AuftragListeEintrag,
-  LeadStatus,
-  LeadWithAngebote,
-} from '@/lib/types'
+import type { LeadStatus, LeadWithAngebote } from '@/lib/types'
+
+export {
+  angebotInAngebotePipeline,
+  angebotVerkaufErledigt,
+  auftragInAuftraegePipeline,
+  buildAngebotIdsMitRechnung,
+  buildRechnungenByAuftragId,
+  type AuftragPipelineKontext,
+} from '@/lib/crm/projekt-pipeline'
 
 /** Aktive Anfragen-Pipeline: Neu → Kontaktiert → Termin. */
 export const ANFRAGEN_PIPELINE_STATUS: LeadStatus[] = [...LEAD_STATUS_VOR_ANGEBOT]
@@ -32,28 +34,6 @@ export function leadInAnfragenPipeline(lead: LeadWithAngebote): boolean {
   const angebote = lead.angebote ?? []
   if (angebote.length > 0) return false
   return true
-}
-
-const ANGEBOT_PIPELINE_AUSGESCHLOSSEN: AngebotStatusEinfach[] = [
-  'abgelehnt',
-  'abgelaufen',
-  'ersetzt',
-]
-
-/** Angebote-Pipeline: offen, noch kein Auftrag. */
-export function angebotInAngebotePipeline(
-  angebot: AngebotListeEintrag,
-  angebotIdsMitAuftrag: ReadonlySet<string>
-): boolean {
-  if (angebotIdsMitAuftrag.has(angebot.id)) return false
-  const st = resolveStatusEinfach(angebot)
-  if (ANGEBOT_PIPELINE_AUSGESCHLOSSEN.includes(st)) return false
-  return true
-}
-
-/** Aufträge-Pipeline: nur laufende Aufträge. */
-export function auftragInAuftraegePipeline(auftrag: AuftragListeEintrag): boolean {
-  return matchesAuftragPhase(auftrag, 'aktiv')
 }
 
 export function buildAngebotIdsMitAuftrag(rows: { angebot_id: string | null }[]): Set<string> {

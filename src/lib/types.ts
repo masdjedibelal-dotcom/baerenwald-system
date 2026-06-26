@@ -453,6 +453,7 @@ export type AngebotHandwerkerRow = {
   hw_notiz?: string | null
   hw_crm_notiz?: string | null
   hw_crm_antwort_at?: string | null
+  hw_konditionen?: unknown
   handwerker?: {
     id: string
     name: string

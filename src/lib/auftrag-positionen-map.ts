@@ -33,9 +33,13 @@ function preisZeileNetto(p: AngebotPosition): number {
 export function angebotPositionenToAuftragRows(
   auftragId: string,
   positionen: AngebotPosition[],
-  opts?: { gewerkEkByGewerkId?: Map<string, number> }
+  opts?: {
+    gewerkEkByGewerkId?: Map<string, number>
+    partnerPreisByPositionId?: Map<string, number>
+  }
 ): AuftragPositionInsert[] {
   const ekMap = opts?.gewerkEkByGewerkId
+  const posPreisMap = opts?.partnerPreisByPositionId
   return positionen
     .filter((p) => !istGewerkBeschreibungPosition(p))
     .map((p, i) => {
@@ -46,19 +50,24 @@ export function angebotPositionenToAuftragRows(
     const lohnZeile = Math.round(p.lohn_netto * m * 100) / 100
     const matZeile = Math.round(p.material_netto * m * 100) / 100
     const hatHandwerker = !!p.handwerker_id?.trim()
+    const konditionPreis =
+      p.id && posPreisMap?.has(p.id) ? posPreisMap.get(p.id)! : null
     const gewerkEk =
       p.gewerk_id && ekMap?.has(p.gewerk_id) ? ekMap.get(p.gewerk_id)! : null
-    const partnerPreis = hatHandwerker
-      ? gewerkEk != null && gewerkEk > 0
-        ? gewerkEk
-        : p.einkaufspreis != null && p.einkaufspreis > 0
-          ? Math.round(p.einkaufspreis * m * 100) / 100
-          : lohnZeile + matZeile > 0
-            ? lohnZeile + matZeile
+    const partnerPreis =
+      konditionPreis != null && konditionPreis > 0
+        ? konditionPreis
+        : hatHandwerker
+          ? gewerkEk != null && gewerkEk > 0
+            ? gewerkEk
+            : p.einkaufspreis != null && p.einkaufspreis > 0
+              ? Math.round(p.einkaufspreis * m * 100) / 100
+              : lohnZeile + matZeile > 0
+                ? lohnZeile + matZeile
+                : null
+          : gewerkEk != null && gewerkEk > 0
+            ? gewerkEk
             : null
-      : gewerkEk != null && gewerkEk > 0
-        ? gewerkEk
-        : null
     return {
       auftrag_id: auftragId,
       gewerk_slug: p.gewerk_slug?.trim() || null,

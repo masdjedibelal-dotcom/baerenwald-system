@@ -195,13 +195,12 @@ export async function loadProjektKontext(
       .eq('auftrag_id', auftragId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
-  } else if (kundeId && leadId) {
+  } else if (angebotId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
       .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id')
-      .eq('kunde_id', kundeId)
+      .eq('angebot_id', angebotId)
       .order('rechnungsdatum', { ascending: false })
-      .limit(12)
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   }
 

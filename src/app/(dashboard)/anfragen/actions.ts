@@ -253,6 +253,8 @@ export type NeueAnfragePayload = {
   ort?: string | null
   /** Bauprojekt — Bautagesbericht & Leistungs-Compliance */
   ist_bauprojekt?: boolean
+  /** Manuell im CRM: Bestätigungsmail an Kund:in (Standard: aus) */
+  bestaetigungsmail_senden?: boolean
 }
 
 export async function createAnfrage(
@@ -425,7 +427,7 @@ export async function createAnfrage(
   })
   if (tlErr) console.warn('lead_timeline created:', tlErr.message)
 
-  if (email) {
+  if (email && payload.bestaetigungsmail_senden === true) {
     const { sendAnfrageBestaetigung } = await import('@/app/actions/mails')
     const mailRes = await sendAnfrageBestaetigung(leadId, true)
     if (!mailRes.ok) {

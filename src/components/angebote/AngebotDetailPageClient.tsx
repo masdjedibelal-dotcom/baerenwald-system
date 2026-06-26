@@ -932,6 +932,28 @@ export function AngebotDetailPageClient({
 
   const fixedOverview = (
     <div className="space-y-3">
+      {auftragId ? (
+        <div className="rounded-lg border border-bw-primary/25 bg-bw-primary/5 px-3 py-2.5 text-sm">
+          <p className="font-medium text-bw-text">Verkauf abgeschlossen</p>
+          <p className="mt-0.5 text-bw-text-muted">
+            Dieses Angebot wurde angenommen. Weiter im{' '}
+            <Link href={`/auftraege/${auftragId}`} className="font-medium text-bw-link hover:underline">
+              Auftrag
+            </Link>
+            {projektKontext?.rechnungen?.length
+              ? ` (${projektKontext.rechnungen.length} Rechnung${projektKontext.rechnungen.length === 1 ? '' : 'en'})`
+              : ''}
+            .
+          </p>
+        </div>
+      ) : statusEinfach === 'angenommen' ? (
+        <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-sm">
+          <p className="font-medium text-bw-text">Angenommen — Auftrag fehlt noch</p>
+          <p className="mt-0.5 text-bw-text-muted">
+            Legen Sie den Auftrag an, um mit der Ausführung und Abrechnung zu starten.
+          </p>
+        </div>
+      ) : null}
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       <AngebotOrgFreigabeBanner
         orgFreigabeStatus={orgFreigabeStatus}

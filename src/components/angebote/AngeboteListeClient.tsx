@@ -98,11 +98,13 @@ function angebotRegion(a: AngebotListeEintrag): string {
 export function AngeboteListeClient({
   angebote,
   angebotIdsMitAuftrag = [],
+  angebotIdsMitRechnung = [],
   mode = 'page',
   selectedId = null,
 }: {
   angebote: AngebotListeEintrag[]
   angebotIdsMitAuftrag?: string[]
+  angebotIdsMitRechnung?: string[]
   mode?: 'page' | 'pane'
   selectedId?: string | null
 }) {
@@ -121,10 +123,17 @@ export function AngeboteListeClient({
     () => new Set(angebotIdsMitAuftrag),
     [angebotIdsMitAuftrag]
   )
+  const angebotIdsMitRechnungSet = useMemo(
+    () => new Set(angebotIdsMitRechnung),
+    [angebotIdsMitRechnung]
+  )
 
   const pipelineAngebote = useMemo(
-    () => angebote.filter((a) => angebotInAngebotePipeline(a, angebotIdsMitAuftragSet)),
-    [angebote, angebotIdsMitAuftragSet]
+    () =>
+      angebote.filter((a) =>
+        angebotInAngebotePipeline(a, angebotIdsMitAuftragSet, angebotIdsMitRechnungSet)
+      ),
+    [angebote, angebotIdsMitAuftragSet, angebotIdsMitRechnungSet]
   )
   const pipelineGrouped = useMemo(
     () => filterAktiveAngeboteListe(pipelineAngebote),

@@ -9,12 +9,15 @@ import {
 } from '@/components/layout/app/AppMasterDetailLayout'
 import { auftragIdFromPath, auftraegeFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { AuftragListeEintrag } from '@/lib/types'
+import type { AuftragPipelineKontext } from '@/lib/crm/projekt-pipeline'
 
 export function AuftraegeMasterDetailShell({
   auftraege,
+  pipelineKontextByAuftragId = {},
   children,
 }: {
   auftraege: AuftragListeEintrag[]
+  pipelineKontextByAuftragId?: Record<string, AuftragPipelineKontext>
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -35,7 +38,12 @@ export function AuftraegeMasterDetailShell({
             </div>
           }
         >
-          <AuftraegeListeClient auftraege={auftraege} mode="pane" selectedId={selectedId} />
+          <AuftraegeListeClient
+            auftraege={auftraege}
+            pipelineKontextByAuftragId={pipelineKontextByAuftragId}
+            mode="pane"
+            selectedId={selectedId}
+          />
         </Suspense>
       }
     >

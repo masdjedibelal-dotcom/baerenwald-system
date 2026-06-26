@@ -49,6 +49,7 @@ const AUFTRAG_DETAIL_SELECT = `
         hw_notiz,
         hw_crm_notiz,
         hw_crm_antwort_at,
+        hw_konditionen,
         handwerker(id, name, email, telefon),
         gewerke(id, name, slug)
       )),

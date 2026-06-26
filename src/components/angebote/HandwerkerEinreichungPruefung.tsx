@@ -24,6 +24,8 @@ import {
   hwStatusLabel,
   kannHwEinreichungPruefen,
 } from '@/lib/partner/handwerker-einreichung'
+import { parseHwKonditionen } from '@/lib/partner/hw-konditionen'
+import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import {
   handwerkerEinreichungAntwortBetreff,
   handwerkerEinreichungAntwortPreviewHtml,
@@ -65,6 +67,7 @@ export function HandwerkerEinreichungPruefung({
   const [mailModal, setMailModal] = useState<AntwortModal | null>(null)
 
   const eingereicht = hasHwEinreichung(z)
+  const konditionen = parseHwKonditionen(z.hw_konditionen)
   const hwSt = (z.hw_status ?? '').toLowerCase()
   const kannPruefen = kannHwEinreichungPruefen(z)
   const uebernommen = hwSt === 'uebernommen'
@@ -93,24 +96,24 @@ export function HandwerkerEinreichungPruefung({
         toast.error(res.message)
         return
       }
-      const ekTeil =
+      const preisTeil =
         res.aktualisiert > 0
-          ? ` EK in ${res.aktualisiert} Position(en) übernommen.`
+          ? ` Partnerpreis in ${res.aktualisiert} Position(en) übernommen.`
           : auftragId
             ? ''
-            : ' EK wird bei Auftragsanlage übernommen.'
+            : ' Partnerpreis wird bei Auftragsanlage übernommen.'
       const mailTeil = res.mailGesendet
         ? ' Bestätigung an den Handwerker gesendet.'
         : res.mailHinweis
           ? ` Hinweis: ${res.mailHinweis}`
           : ''
       if (res.openWizard && onAcceptWizard) {
-        toast.success(`Angebot angenommen.${ekTeil}${mailTeil} Nachunternehmervertrag wird geöffnet…`)
+        toast.success(`Konditionen übernommen.${preisTeil}${mailTeil} Nachunternehmervertrag wird geöffnet…`)
         onAcceptWizard(res.openWizard)
         onRefresh()
         return
       }
-      toast.success(`Angebot angenommen.${ekTeil}${mailTeil}`)
+      toast.success(`Konditionen übernommen.${preisTeil}${mailTeil}`)
       onRefresh()
     })
   }
@@ -207,10 +210,12 @@ export function HandwerkerEinreichungPruefung({
           {' · '}
           <span className="text-bw-text-muted">Brutto:</span>{' '}
           {z.hw_preis_brutto != null ? betragAnzeige(z.hw_preis_brutto, null, null) : '—'}
-          {ek != null ? (
+          {!konditionen && ek != null ? (
             <span className="text-bw-text-muted"> · EK: {betragAnzeige(ek, null, null)}</span>
           ) : null}
         </p>
+
+        {konditionen ? <HwKonditionenPruefungTable z={z} /> : null}
 
         {z.hw_eingereicht_at ? (
           <p className="text-xs text-bw-text-muted">
@@ -242,7 +247,7 @@ export function HandwerkerEinreichungPruefung({
           {kannPruefen ? (
             <>
               <Button type="button" variant="primary" size="sm" loading={pending} onClick={bestaetigen}>
-                Annehmen
+                Übernehmen
               </Button>
               <Button
                 type="button"
@@ -267,7 +272,7 @@ export function HandwerkerEinreichungPruefung({
 
           {uebernommen ? (
             <span className="text-xs font-medium text-bw-primary self-center">
-              Angenommen — Partner informiert
+              Übernommen — Partner informiert
             </span>
           ) : null}
         </div>
