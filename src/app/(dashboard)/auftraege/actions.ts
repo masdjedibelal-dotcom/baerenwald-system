@@ -192,7 +192,7 @@ export async function addAuftragPosition(
     end_datum?: string | null
     handwerker_id?: string | null
   }
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
   const { data: last } = await supabase
     .from('auftrag_positionen')
@@ -202,30 +202,34 @@ export async function addAuftragPosition(
     .limit(1)
     .maybeSingle()
   const nextOrder = (last?.sort_order ?? 0) + 10
-  const { error } = await supabase.from('auftrag_positionen').insert({
-    auftrag_id: auftragId,
-    gewerk_slug: data.gewerk_slug?.trim() || null,
-    gewerk_name: data.gewerk_name.trim(),
-    gewerk_block_key: data.gewerk_block_key?.trim() || null,
-    projekt_phase: data.projekt_phase?.trim() || null,
-    oberkategorie: data.oberkategorie?.trim() || null,
-    unterkategorie: data.unterkategorie?.trim() || null,
-    leistung_name: data.leistung_name.trim(),
-    beschreibung: data.beschreibung?.trim() || null,
-    einheit: data.einheit?.trim() || 'pauschal',
-    menge: data.menge ?? 1,
-    preis_fix: data.preis_fix ?? null,
-    preis_partner: data.preis_partner ?? null,
-    lohn_fix: data.lohn_fix ?? null,
-    material_fix: data.material_fix ?? null,
-    start_datum: data.start_datum?.slice(0, 10) || null,
-    end_datum: data.end_datum?.slice(0, 10) || null,
-    handwerker_id: data.handwerker_id?.trim() || null,
-    sort_order: nextOrder,
-  })
+  const { data: inserted, error } = await supabase
+    .from('auftrag_positionen')
+    .insert({
+      auftrag_id: auftragId,
+      gewerk_slug: data.gewerk_slug?.trim() || null,
+      gewerk_name: data.gewerk_name.trim(),
+      gewerk_block_key: data.gewerk_block_key?.trim() || null,
+      projekt_phase: data.projekt_phase?.trim() || null,
+      oberkategorie: data.oberkategorie?.trim() || null,
+      unterkategorie: data.unterkategorie?.trim() || null,
+      leistung_name: data.leistung_name.trim(),
+      beschreibung: data.beschreibung?.trim() || null,
+      einheit: data.einheit?.trim() || 'pauschal',
+      menge: data.menge ?? 1,
+      preis_fix: data.preis_fix ?? null,
+      preis_partner: data.preis_partner ?? null,
+      lohn_fix: data.lohn_fix ?? null,
+      material_fix: data.material_fix ?? null,
+      start_datum: data.start_datum?.slice(0, 10) || null,
+      end_datum: data.end_datum?.slice(0, 10) || null,
+      handwerker_id: data.handwerker_id?.trim() || null,
+      sort_order: nextOrder,
+    })
+    .select('id')
+    .single()
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/auftraege/${auftragId}`)
-  return { ok: true }
+  return { ok: true, id: inserted.id as string }
 }
 
 export async function updateAuftragPosition(

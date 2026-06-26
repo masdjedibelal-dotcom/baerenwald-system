@@ -328,8 +328,12 @@ export function AuftragPositionenSteuerungTab({
         leistung_name: 'Neue Leistung',
         gewerk_block_key: `${g.slug}-${Date.now()}`,
       })
-      if (!r.ok) toast.error(r.message)
-      else onChanged()
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setOpenLeistungen((prev) => new Set(prev).add(r.id))
+      onChanged()
     })
   }
 
@@ -342,8 +346,12 @@ export function AuftragPositionenSteuerungTab({
         leistung_name: 'Neue Leistung',
         gewerk_block_key: sample?.gewerk_block_key ?? block.key,
       })
-      if (!r.ok) toast.error(r.message)
-      else onChanged()
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setOpenLeistungen((prev) => new Set(prev).add(r.id))
+      onChanged()
     })
   }
 

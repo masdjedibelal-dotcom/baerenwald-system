@@ -283,6 +283,9 @@ export function AngebotWizard({
   )
   const [projektUploading, setProjektUploading] = useState(false)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
+  const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
+  const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
+  const wizardTitel = istAuftragKorrektur ? 'Angebot korrigieren' : 'Angebot erstellen'
   const [completedAngebotId, setCompletedAngebotId] = useState<string | null>(null)
   const [versendetErfolg, setVersendetErfolg] = useState(false)
   const [angebotsnr, setAngebotsnr] = useState(bootstrap?.angebotsnr?.trim() || 'Entwurf')
@@ -470,6 +473,7 @@ export function AngebotWizard({
           meta.zahlungsbedingungen === 'anzahlung_50'
             ? zahlungsplan
             : null,
+        auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
       })
       setSaving(false)
       if (!res.ok) {
@@ -505,6 +509,8 @@ export function AngebotWizard({
       variantenPersist,
       wichtigeHinweisePersist,
       onSaved,
+      istAuftragKorrektur,
+      auftragKorrekturId,
     ]
   )
 
@@ -611,7 +617,11 @@ export function AngebotWizard({
     const id = await persistDraft({ notify: false })
     setSaving(false)
     if (!id) return
-    toast.success('Angebot erstellt')
+    toast.success(
+      istAuftragKorrektur
+        ? 'Angebot gespeichert — Auftrag wurde aktualisiert'
+        : 'Angebot erstellt'
+    )
     setVersendetErfolg(false)
     setCompletedAngebotId(id)
     router.refresh()
@@ -633,13 +643,18 @@ export function AngebotWizard({
       lead_id: lead.id,
       mailTo,
       mailCc,
+      auftragKorrektur: istAuftragKorrektur,
     })
     setSaving(false)
     if (!res.ok) {
       toast.error(res.message)
       return
     }
-    toast.success('Angebot erstellt und versendet')
+    toast.success(
+      istAuftragKorrektur
+        ? 'Korrektur gespeichert und an den Kunden gesendet'
+        : 'Angebot erstellt und versendet'
+    )
     setVersendetErfolg(true)
     setCompletedAngebotId(id)
     onDone?.(id)
@@ -673,7 +688,7 @@ export function AngebotWizard({
             leistungsumfangMail
           ),
           schluss: resolveAngebotMailSchluss(meta.schluss, previewAnrede),
-          istKorrektur: bootstrap?.bereitsGesendet ?? false,
+          istKorrektur: bootstrap?.bereitsGesendet ?? istAuftragKorrektur ?? false,
         },
         mailBranding
       ),
@@ -689,6 +704,7 @@ export function AngebotWizard({
       previewAnrede,
       kundeTyp,
       bootstrap?.bereitsGesendet,
+      istAuftragKorrektur,
       mailBranding,
     ]
   )
@@ -785,7 +801,7 @@ export function AngebotWizard({
           className="wizard-mobile-toolbar__save shrink-0 px-2.5"
           loading={saving}
           onClick={() => void handleWizardErstellen()}
-          aria-label="Angebot erstellen"
+          aria-label={istAuftragKorrektur ? 'Speichern und Auftrag aktualisieren' : 'Angebot erstellen'}
         >
           <Check className="h-4 w-4" aria-hidden />
         </Button>
@@ -798,7 +814,7 @@ export function AngebotWizard({
           onClick={() => void handleWizardErstellenUndVersenden()}
         >
           <Send className="h-4 w-4" />
-          Senden
+          {istAuftragKorrektur ? 'Korrektur senden' : 'Senden'}
         </Button>
       </>
     )
@@ -818,9 +834,20 @@ export function AngebotWizard({
       </button>
       <div className="h-6 w-px bg-bw-border" aria-hidden />
       <div className="title-block min-w-0 flex-1">
-        <div className="ttl">Angebot erstellen</div>
+        <div className="ttl">{wizardTitel}</div>
         <div className="sub">
-          Für Anfrage {lead.id.slice(0, 8).toUpperCase()} · {name}
+          {istAuftragKorrektur ? (
+            <>
+              Korrektur für laufenden Auftrag · {name}
+              <span className="block text-[12px] text-bw-text-muted">
+                Keine erneute Annahme — Änderungen gelten für Rechnung und Ausführung.
+              </span>
+            </>
+          ) : (
+            <>
+              Für Anfrage {lead.id.slice(0, 8).toUpperCase()} · {name}
+            </>
+          )}
           {entwurfStatusHint ? (
             <span
               className={cn(
@@ -886,7 +913,7 @@ export function AngebotWizard({
             onClick={() => void handleWizardErstellen()}
           >
             <Check className="h-4 w-4" aria-hidden />
-            Angebot erstellen
+            {istAuftragKorrektur ? 'Speichern & Auftrag aktualisieren' : 'Angebot erstellen'}
           </Button>
           <Button
             type="button"
@@ -897,7 +924,7 @@ export function AngebotWizard({
             onClick={() => void handleWizardErstellenUndVersenden()}
           >
             <Send className="h-4 w-4" aria-hidden />
-            Erstellen und versenden
+            {istAuftragKorrektur ? 'Korrektur an Kunden senden' : 'Erstellen und versenden'}
           </Button>
         </>
       )}
@@ -1215,9 +1242,20 @@ export function AngebotWizard({
 
               <Card className="mt-4 border-dashed">
                 <p className="text-sm text-bw-text-muted">
-                  Mit <strong>Angebot erstellen</strong> speichern Sie nur den Entwurf. Mit{' '}
-                  <strong>Erstellen und versenden</strong> wird das Angebot direkt an den Kunden
-                  geschickt. Handwerker-Zuweisung ist optional und kann danach im Angebot erfolgen.
+                  {istAuftragKorrektur ? (
+                    <>
+                      Mit <strong>Speichern & Auftrag aktualisieren</strong> werden Angebot und
+                      Auftragspositionen angepasst — ohne erneute Kundenannahme. Mit{' '}
+                      <strong>Korrektur an Kunden senden</strong> geht zusätzlich die aktualisierte
+                      Angebots-PDF per E-Mail raus.
+                    </>
+                  ) : (
+                    <>
+                      Mit <strong>Angebot erstellen</strong> speichern Sie nur den Entwurf. Mit{' '}
+                      <strong>Erstellen und versenden</strong> wird das Angebot direkt an den Kunden
+                      geschickt. Handwerker-Zuweisung ist optional und kann danach im Angebot erfolgen.
+                    </>
+                  )}
                 </p>
               </Card>
             </div>

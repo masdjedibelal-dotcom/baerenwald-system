@@ -1283,6 +1283,10 @@ export async function sendAngebotToKunde(
     betreff?: string
     skipTimeline?: boolean
     asSystem?: boolean
+    /** Status kunde_akzeptiert / angenommen beibehalten (Korrektur aus Auftrag) */
+    statusBeibehalten?: boolean
+    /** Handwerker-Pipeline nicht erneut prüfen (Korrektur) */
+    skipHandwerkerGate?: boolean
   }
 ) {
   const supabase = options?.asSystem ? supabaseAdmin : createClient()
@@ -1290,7 +1294,10 @@ export async function sendAngebotToKunde(
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
   }
-  if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
+  if (
+    !options?.skipHandwerkerGate &&
+    !darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)
+  ) {
     const orgStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
       ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
     return {
@@ -1298,7 +1305,7 @@ export async function sendAngebotToKunde(
       message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker, orgStatus),
     }
   }
-  const istKorrektur = Boolean(detail.gesendet_kunde_at)
+  const istKorrektur = Boolean(options?.statusBeibehalten || detail.gesendet_kunde_at)
   const kundenMail = detail.kunden?.email?.trim() ?? ''
   const toList =
     options?.to?.map((e) => e.trim()).filter(Boolean) ??
@@ -1307,23 +1314,37 @@ export async function sendAngebotToKunde(
     return { ok: false as const, message: 'Keine Empfänger-Adresse (An)' }
   }
 
-  const [pdf, st] = await Promise.all([
-    persistPdfForAngebot(angebotId, { detail, skipRevalidate: true }),
-    setAngebotStatus(angebotId, 'gesendet_kunde', { asSystem: options?.asSystem }),
-  ])
+  const pdf = await persistPdfForAngebot(angebotId, { detail, skipRevalidate: true })
   if (!pdf.ok) return pdf
-  if (!st.ok) return st
+
+  if (!options?.statusBeibehalten) {
+    const st = await setAngebotStatus(angebotId, 'gesendet_kunde', { asSystem: options?.asSystem })
+    if (!st.ok) return st
+  }
 
   const now = new Date().toISOString()
-  await supabase
-    .from('angebote')
-    .update({
-      gesendet_kunde_at: now,
-      gesendet_am: now,
-      status_einfach: 'gesendet',
-      updated_at: now,
-    })
-    .eq('id', angebotId)
+  if (options?.statusBeibehalten) {
+    await supabase
+      .from('angebote')
+      .update({
+        gesendet_kunde_at: now,
+        gesendet_am: now,
+        status: 'kunde_akzeptiert',
+        status_einfach: 'angenommen',
+        updated_at: now,
+      })
+      .eq('id', angebotId)
+  } else {
+    await supabase
+      .from('angebote')
+      .update({
+        gesendet_kunde_at: now,
+        gesendet_am: now,
+        status_einfach: 'gesendet',
+        updated_at: now,
+      })
+      .eq('id', angebotId)
+  }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
   const summenMail = summenAusPositionen(posMail, 19)

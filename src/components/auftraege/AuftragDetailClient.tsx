@@ -111,7 +111,14 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
-import type { AngebotHandwerkerRow } from '@/lib/types'
+import type { AngebotHandwerkerRow, LeadDetail } from '@/lib/types'
+import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+
+const AngebotWizard = dynamic(
+  () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
+  { ssr: false }
+)
 
 const KundeModal = dynamic(
   () => import('@/components/kunden/KundeModal').then((mod) => ({ default: mod.KundeModal })),
@@ -219,6 +226,33 @@ export function AuftragDetailClient({
   const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
   const [hwBewertungZiele, setHwBewertungZiele] = useState<HandwerkerBewertungZiel[] | null>(null)
+  const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
+  const [angebotKorrekturBootstrap, setAngebotKorrekturBootstrap] =
+    useState<AngebotWizardBootstrap | null>(null)
+  const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
+  const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
+
+  const openAngebotKorrektur = useCallback(() => {
+    if (!detail.angebot_id) {
+      toast.error('Kein verknüpftes Angebot.')
+      return
+    }
+    if (!detail.lead_id) {
+      toast.error('Keine Anfrage verknüpft — Korrektur nur über das Angebot möglich.')
+      return
+    }
+    startTransition(async () => {
+      const res = await loadAngebotKorrekturWizardBootstrap(detail.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      setAngebotKorrekturBootstrap(res.bootstrap)
+      setAngebotKorrekturLead(res.lead)
+      setAngebotKorrekturKey((k) => k + 1)
+      setAngebotKorrekturOpen(true)
+    })
+  }, [detail.angebot_id, detail.id, detail.lead_id])
 
   const hauptvertraegeFuerNachtrag = useMemo(
     () =>
@@ -496,7 +530,13 @@ export function AuftragDetailClient({
     )
 
     if (detail.angebot_id) {
-      items.push('sep', {
+      items.push({
+        label: 'Angebot bearbeiten (Korrektur)',
+        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
+        hint: 'Leistungen ergänzen, Korrektur an Kunden senden',
+        onClick: openAngebotKorrektur,
+      })
+      items.push({
         label: 'Zum Angebot',
         icon: <Receipt className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => router.push(`/angebote/${detail.angebot_id}`),
@@ -535,6 +575,8 @@ export function AuftragDetailClient({
   }, [
     detail.angebot_id,
     detail.id,
+    detail.lead_id,
+    openAngebotKorrektur,
     detail.kunden?.email,
     kundeTelefon,
     mailCompose,
@@ -830,7 +872,9 @@ export function AuftragDetailClient({
         }
       >
         <p className="mb-4 text-sm text-bw-text-muted">
-          Leistung anklicken zum Bearbeiten — Name, Beschreibung, Preise, Handwerker und Termine ändern.
+          Leistung in der Liste anklicken zum Aufklappen. Name und Beschreibung bearbeiten, dann
+          Feld verlassen (Tab oder Klick außerhalb) — Änderungen werden gespeichert. Für neue
+          Gewerke/Leistungen im Angebot: Menü → „Angebot bearbeiten (Korrektur)“.
         </p>
         <AuftragPositionenSteuerungTab
           auftragId={detail.id}
@@ -1304,6 +1348,29 @@ export function AuftragDetailClient({
       ) : null}
 
       {mailCompose.modal}
+
+      {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
+        <AngebotWizard
+          key={angebotKorrekturKey}
+          lead={angebotKorrekturLead}
+          gewerke={gewerke as Gewerk[]}
+          preislisten={preislisten}
+          firm={firm}
+          bootstrap={angebotKorrekturBootstrap}
+          onClose={() => {
+            setAngebotKorrekturOpen(false)
+            setAngebotKorrekturBootstrap(null)
+            setAngebotKorrekturLead(null)
+          }}
+          onDone={() => {
+            setAngebotKorrekturOpen(false)
+            setAngebotKorrekturBootstrap(null)
+            setAngebotKorrekturLead(null)
+            refresh()
+          }}
+          onSaved={() => refresh()}
+        />
+      ) : null}
     </div>
   )
 }

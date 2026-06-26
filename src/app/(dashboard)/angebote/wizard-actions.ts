@@ -36,6 +36,7 @@ import {
 import { rebindLooseAnfahrtPositionen } from '@/lib/anfahrt-angebot'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
+import { syncAuftragAusAngebotKorrektur } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import {
   syncInputsFromAngebotPositionen,
   syncInputsFromDokumentArtikel,
@@ -65,6 +66,8 @@ export type SaveAngebotWizardDraftPayload = {
   handwerker_zuweisungen?: { gewerk_id: string; handwerker_id: string }[]
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
+  /** Nach Speichern: Auftragspositionen aus Angebot übernehmen */
+  auftragKorrekturId?: string | null
 }
 
 async function persistAngebotPdfNachEntwurfSpeichern(
@@ -190,6 +193,13 @@ export async function saveAngebotWizardDraft(
       .eq('id', input.angebotId)
       .maybeSingle()
     await persistAngebotPdfNachEntwurfSpeichern(input.angebotId, input.lead_id, opts)
+    if (input.auftragKorrekturId?.trim()) {
+      const sync = await syncAuftragAusAngebotKorrektur({
+        auftragId: input.auftragKorrekturId.trim(),
+        angebotId: input.angebotId,
+      })
+      if (!sync.ok) return sync
+    }
     return { ok: true, angebotId: input.angebotId, angebotsnr: nrRow?.angebotsnr ?? null }
   }
 
@@ -235,12 +245,19 @@ export async function sendAngebotWizard(input: {
   lead_id: string
   mailTo: string[]
   mailCc?: string[]
+  /** Angenommenes Angebot: Korrektur senden ohne Status-Rücksetzung */
+  auftragKorrektur?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const sent = await sendAngebotToKunde(input.angebotId, {
     to: input.mailTo,
     cc: input.mailCc,
+    statusBeibehalten: input.auftragKorrektur,
+    skipHandwerkerGate: input.auftragKorrektur,
   })
   if (!sent.ok) return sent
+  if (input.auftragKorrektur) {
+    revalidatePath(`/auftraege`)
+  }
   revalidatePath(`/anfragen/${input.lead_id}`)
   revalidatePath('/anfragen')
   revalidatePath('/angebote')

@@ -53,11 +53,13 @@ function EuroInput({
   label,
   value,
   onChange,
+  onBlur,
   hint,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
+  onBlur?: () => void
   hint?: string
 }) {
   return (
@@ -72,11 +74,37 @@ function EuroInput({
           className="input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
         />
       </div>
       {hint ? <p className="leistung-acc-hint">{hint}</p> : null}
     </div>
   )
+}
+
+type LeistungDraft = {
+  leistung_name: string
+  beschreibung: string
+  preis_fix: string
+  preis_partner: string
+  start_datum: string
+  end_datum: string
+}
+
+function draftFromPosition(pos: AuftragPosition, partnerFallback: number): LeistungDraft {
+  return {
+    leistung_name: pos.leistung_name,
+    beschreibung: pos.beschreibung ?? '',
+    preis_fix: pos.preis_fix != null ? String(pos.preis_fix) : '',
+    preis_partner:
+      pos.preis_partner != null
+        ? String(pos.preis_partner)
+        : partnerFallback > 0
+          ? String(partnerFallback)
+          : '',
+    start_datum: pos.start_datum?.slice(0, 10) ?? '',
+    end_datum: pos.end_datum?.slice(0, 10) ?? '',
+  }
 }
 
 function HandwerkerPositionSelect({
@@ -215,6 +243,60 @@ export function AuftragPositionenLeistungEditPanel({
   const marge = (pos.preis_fix ?? 0) - partner - eigen
   const hw = pos.handwerker
 
+  const [draft, setDraft] = useState(() => draftFromPosition(pos, partner))
+
+  useEffect(() => {
+    setDraft(draftFromPosition(pos, partner))
+  }, [
+    pos.id,
+    pos.leistung_name,
+    pos.beschreibung,
+    pos.preis_fix,
+    pos.preis_partner,
+    pos.start_datum,
+    pos.end_datum,
+    partner,
+  ])
+
+  function commitDraft(patch: Partial<LeistungDraft>) {
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    const serverPatch: Parameters<typeof updateAuftragPositionSteuerung>[2] = {}
+    if (patch.leistung_name !== undefined) {
+      const name = next.leistung_name.trim()
+      if (!name) {
+        toast.error('Leistungsname darf nicht leer sein.')
+        return
+      }
+      if (name !== pos.leistung_name) serverPatch.leistung_name = name
+    }
+    if (patch.beschreibung !== undefined) {
+      const text = next.beschreibung.trim() || null
+      if (text !== (pos.beschreibung?.trim() || null)) serverPatch.beschreibung = text
+    }
+    if (patch.preis_fix !== undefined) {
+      const n = next.preis_fix.trim() ? Number(next.preis_fix) : null
+      if (n !== pos.preis_fix) serverPatch.preis_fix = n != null && Number.isFinite(n) ? n : null
+    }
+    if (patch.preis_partner !== undefined) {
+      const n = next.preis_partner.trim() ? Number(next.preis_partner) : null
+      const current = pos.preis_partner ?? (partner > 0 ? partner : null)
+      const parsed = n != null && Number.isFinite(n) ? n : null
+      if (parsed !== current) serverPatch.preis_partner = parsed
+    }
+    if (patch.start_datum !== undefined) {
+      const d = next.start_datum || null
+      const current = pos.start_datum?.slice(0, 10) || null
+      if (d !== current) serverPatch.start_datum = d
+    }
+    if (patch.end_datum !== undefined) {
+      const d = next.end_datum || null
+      const current = pos.end_datum?.slice(0, 10) || null
+      if (d !== current) serverPatch.end_datum = d
+    }
+    if (Object.keys(serverPatch).length) onSave(serverPatch)
+  }
+
   const nachrichtInput: HandwerkerNachrichtInput = useMemo(() => {
     return {
       handwerkerName: hw?.name ?? '',
@@ -256,8 +338,9 @@ export function AuftragPositionenLeistungEditPanel({
         </div>
         <Input
           label="Leistung"
-          value={pos.leistung_name}
-          onChange={(e) => onSave({ leistung_name: e.target.value })}
+          value={draft.leistung_name}
+          onChange={(e) => setDraft((d) => ({ ...d, leistung_name: e.target.value }))}
+          onBlur={() => commitDraft({ leistung_name: draft.leistung_name })}
           className="field-full"
           placeholder="Leistungsbezeichnung"
           required
@@ -265,15 +348,17 @@ export function AuftragPositionenLeistungEditPanel({
         <div className="field-full">
           <Input
             label="Beschreibung"
-            value={pos.beschreibung ?? ''}
-            onChange={(e) => onSave({ beschreibung: e.target.value || null })}
+            value={draft.beschreibung}
+            onChange={(e) => setDraft((d) => ({ ...d, beschreibung: e.target.value }))}
+            onBlur={() => commitDraft({ beschreibung: draft.beschreibung })}
             placeholder="z. B. Bestand komplett entfernen"
           />
         </div>
         <EuroInput
           label="Verkaufspreis"
-          value={String(pos.preis_fix ?? '')}
-          onChange={(v) => onSave({ preis_fix: v ? Number(v) : null })}
+          value={draft.preis_fix}
+          onChange={(v) => setDraft((d) => ({ ...d, preis_fix: v }))}
+          onBlur={() => commitDraft({ preis_fix: draft.preis_fix })}
         />
         {eigenleistung ? (
           <div className="w-full">
@@ -289,22 +374,25 @@ export function AuftragPositionenLeistungEditPanel({
         ) : (
           <EuroInput
             label="Preis Partner (Fremdleistung)"
-            value={String(pos.preis_partner ?? (partner || ''))}
-            onChange={(v) => onSave({ preis_partner: v ? Number(v) : null })}
+            value={draft.preis_partner}
+            onChange={(v) => setDraft((d) => ({ ...d, preis_partner: v }))}
+            onBlur={() => commitDraft({ preis_partner: draft.preis_partner })}
             hint={marge !== 0 ? `Marge: ${formatEurBetrag(marge)}` : undefined}
           />
         )}
         <Input
           label="Von"
           type="date"
-          value={pos.start_datum?.slice(0, 10) ?? ''}
-          onChange={(e) => onSave({ start_datum: e.target.value || null })}
+          value={draft.start_datum}
+          onChange={(e) => setDraft((d) => ({ ...d, start_datum: e.target.value }))}
+          onBlur={() => commitDraft({ start_datum: draft.start_datum })}
         />
         <Input
           label="Bis"
           type="date"
-          value={pos.end_datum?.slice(0, 10) ?? ''}
-          onChange={(e) => onSave({ end_datum: e.target.value || null })}
+          value={draft.end_datum}
+          onChange={(e) => setDraft((d) => ({ ...d, end_datum: e.target.value }))}
+          onBlur={() => commitDraft({ end_datum: draft.end_datum })}
         />
         <div className="field-full leistung-acc-hw-field">
           {!eigenregie ? (
