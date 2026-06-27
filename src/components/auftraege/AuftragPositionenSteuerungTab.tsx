@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
-  ChevronDown,
   HardHat,
   Pencil,
   Plus,
@@ -11,7 +10,8 @@ import {
 } from 'lucide-react'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { AuftragPositionenMobile } from '@/components/auftraege/AuftragPositionenMobile'
-import { AuftragPositionenLeistungEditPanel } from '@/components/auftraege/AuftragPositionenLeistungEdit'
+import { AuftragPositionDetailPanel } from '@/components/auftraege/AuftragPositionDetailPanel'
+import { AuftragPositionRowSummary } from '@/components/auftraege/AuftragPositionRowSummary'
 import {
   HandwerkerZuweisenModal,
   type HandwerkerZuweisenKontext,
@@ -49,7 +49,7 @@ import {
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition, AuftragStatus } from '@/lib/types'
-import { cn, formatPreis } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -250,6 +250,20 @@ export function AuftragPositionenSteuerungTab({
     return block.positionen.map((p) => p.id).filter((id) => selectedPosIds.has(id))
   }
 
+  function openOhneHandwerkerInBlock(block: AuftragGewerkBlock) {
+    const ids = positionIdsOhneHandwerker(block)
+    if (!ids.length) {
+      toast.message('Alle Leistungen haben bereits einen Handwerker.')
+      return
+    }
+    const scope = handwerkerScopePositionen(block, ids)
+    if (!scope) {
+      toast.error('Gewerk nicht in Stammdaten.')
+      return
+    }
+    setModalScope(scope)
+  }
+
   function savePosition(pos: AuftragPosition, patch: Parameters<typeof updateAuftragPositionSteuerung>[2]) {
     startTransition(async () => {
       const r = await updateAuftragPositionSteuerung(pos.id, auftragId, patch)
@@ -438,12 +452,7 @@ export function AuftragPositionenSteuerungTab({
               onChanged={onChanged}
               auftragId={auftragId}
               onOpenGewerkHandwerker={() => openGewerkHandwerker(block)}
-              onOpenSelectionHandwerker={() => openSelectionHandwerker(block)}
-              selectedPosIds={selectedPosIds}
-              onTogglePosSelection={togglePosSelection}
-              onSelectAllInBlock={() => selectAllInBlock(block)}
-              onSelectOhneHandwerkerInBlock={() => selectOhneHandwerkerInBlock(block)}
-              selectedInBlock={selectedInBlock(block)}
+              onOpenOhneHandwerker={() => openOhneHandwerkerInBlock(block)}
               auftragAbgeschlossen={auftragAbgeschlossen}
               angebotId={angebotId}
               angebotTitel={angebotTitel}
@@ -501,12 +510,7 @@ function GewerkBlock({
   onToggleLeistung,
   onOpenHwMail,
   onOpenGewerkHandwerker,
-  onOpenSelectionHandwerker,
-  selectedPosIds,
-  onTogglePosSelection,
-  onSelectAllInBlock,
-  onSelectOhneHandwerkerInBlock,
-  selectedInBlock,
+  onOpenOhneHandwerker,
   onSavePosition,
   onMovePosition,
   onDeletePosition,
@@ -539,12 +543,7 @@ function GewerkBlock({
   onToggleLeistung: (id: string) => void
   onOpenHwMail: (mail: HandwerkerZuweisungMailTarget) => void
   onOpenGewerkHandwerker: () => void
-  onOpenSelectionHandwerker: () => void
-  selectedPosIds: Set<string>
-  onTogglePosSelection: (id: string) => void
-  onSelectAllInBlock: () => void
-  onSelectOhneHandwerkerInBlock: () => void
-  selectedInBlock: string[]
+  onOpenOhneHandwerker: () => void
   onSavePosition: (pos: AuftragPosition, patch: Parameters<typeof updateAuftragPositionSteuerung>[2]) => void
   onMovePosition: (id: string, dir: -1 | 1) => void
   onDeletePosition: (id: string) => void
@@ -556,8 +555,8 @@ function GewerkBlock({
   const zt = gewerkZeitraum(block)
   const posIds = block.positionen.map((p) => p.id)
   const gewerkId = block.gewerkId
-  const selectionCount = selectedInBlock.length
   const canAssignGewerk = Boolean(gewerkId)
+  const ohneHwCount = positionIdsOhneHandwerker(block).length
 
   function patchBlock(meta: Omit<Parameters<typeof updateAuftragGewerkBlockMeta>[0], 'auftragId' | 'positionIds'>) {
     startTransition(async () => {
@@ -612,37 +611,17 @@ function GewerkBlock({
           <HardHat className="h-3.5 w-3.5" aria-hidden />
           Handwerker fürs Gewerk
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={pending || pendingLocal}
-          onClick={onSelectAllInBlock}
-        >
-          Alle wählen
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={pending || pendingLocal}
-          onClick={onSelectOhneHandwerkerInBlock}
-        >
-          Ohne Handwerker
-        </Button>
-        {selectionCount > 0 ? (
+        {ohneHwCount > 0 ? (
           <Button
             type="button"
-            variant="primary"
+            variant="ghost"
             size="sm"
-            className="ml-auto h-7 gap-1 text-xs"
+            className="h-7 gap-1 text-xs"
             disabled={!canAssignGewerk || pending || pendingLocal}
-            onClick={onOpenSelectionHandwerker}
+            onClick={onOpenOhneHandwerker}
           >
             <UserPlus className="h-3.5 w-3.5" aria-hidden />
-            {selectionCount} Leistung{selectionCount === 1 ? '' : 'en'} zuweisen
+            {ohneHwCount} ohne Handwerker
           </Button>
         ) : null}
       </div>
@@ -656,12 +635,10 @@ function GewerkBlock({
             block={block}
             gewerkId={gewerkId}
             open={openLeistungen.has(pos.id)}
-            selected={selectedPosIds.has(pos.id)}
             pending={pending || pendingLocal}
             handwerkerKontext={handwerkerKontext}
             auftragId={auftragId}
             onToggle={() => onToggleLeistung(pos.id)}
-            onToggleSelect={() => onTogglePosSelection(pos.id)}
             onSave={(patch) => onSavePosition(pos, patch)}
             onMove={onMovePosition}
             onDelete={() => onDeletePosition(pos.id)}
@@ -692,12 +669,10 @@ function LeistungRow({
   block,
   gewerkId,
   open,
-  selected,
   pending,
   handwerkerKontext,
   auftragId,
   onToggle,
-  onToggleSelect,
   onSave,
   onMove,
   onDelete,
@@ -706,7 +681,6 @@ function LeistungRow({
   onBewerteHandwerker,
   onChanged,
   eigenregie = false,
-  partnerRow = null,
   angebotId = null,
   angebotTitel = 'Projekt',
   angebotHandwerker = [],
@@ -717,7 +691,6 @@ function LeistungRow({
   block: AuftragGewerkBlock
   gewerkId: string
   open: boolean
-  selected: boolean
   pending: boolean
   handwerkerKontext: HandwerkerZuweisenKontext
   auftragId: string
@@ -730,53 +703,29 @@ function LeistungRow({
   eigenregie?: boolean
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
   onToggle: () => void
-  onToggleSelect: () => void
   onSave: (patch: Parameters<typeof updateAuftragPositionSteuerung>[2]) => void
   onMove: (id: string, dir: -1 | 1) => void
   onDelete: () => void
   onOpenHwMail: (mail: HandwerkerZuweisungMailTarget) => void
   onChanged: () => void
-  partnerRow?: AngebotHandwerkerRow | null
 }) {
-  const resolvedPartnerRow = partnerRow ?? angebotHandwerkerFuerPosition(pos, angebotHandwerker, gewerke)
+  const resolvedPartnerRow = angebotHandwerkerFuerPosition(pos, angebotHandwerker, gewerke)
 
   return (
-    <div className={cn('leistung-row', open && 'open', selected && 'ring-1 ring-inset ring-bw-primary/30')}>
-      <div className="flex items-stretch">
-        {!eigenregie ? (
-        <label
-          className="flex shrink-0 cursor-pointer items-center px-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-bw-border"
-            checked={selected}
-            onChange={onToggleSelect}
-            aria-label={`${pos.leistung_name} für Handwerker-Zuweisung auswählen`}
-          />
-        </label>
-        ) : null}
-        <button type="button" className="leistung-row-head min-w-0 flex-1" onClick={onToggle}>
-        <ChevronDown
-          className={cn('h-3.5 w-3.5 shrink-0 text-bw-text-muted transition-transform', open && 'rotate-180')}
-          aria-hidden
-        />
-        <div className="leistung-row-head-main">
-          <p className="leistung-row-title">{pos.leistung_name}</p>
-        </div>
-        <div className="leistung-row-head-end" onClick={(e) => e.stopPropagation()}>
-          <span className="leistung-row-price">{formatPreis(pos.preis_fix ?? null, null, null)}</span>
-          <button type="button" className="icon-btn text-status-cancel-text" title="Löschen" onClick={onDelete}>
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        </div>
-        </button>
-      </div>
+    <div className={cn('pos-v2-row', open && 'pos-v2-row--open')}>
+      <AuftragPositionRowSummary
+        pos={pos}
+        open={open}
+        partnerRow={resolvedPartnerRow}
+        angebotPositionen={angebotPositionen}
+        eigenregie={eigenregie}
+        onToggle={onToggle}
+        onDelete={onDelete}
+      />
 
       {open ? (
-        <div className="leistung-row-body">
-          <AuftragPositionenLeistungEditPanel
+        <div className="pos-v2-row-body">
+          <AuftragPositionDetailPanel
             pos={pos}
             block={block}
             gewerkId={gewerkId}

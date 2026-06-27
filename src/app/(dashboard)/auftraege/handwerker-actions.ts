@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import {
@@ -229,6 +230,13 @@ export async function assignAuftragHandwerkerGewerk(input: {
     input.handwerkerId
   )
 
+  await ensureAngebotHandwerkerGewerkId(supabase, {
+    auftragId: input.auftragId,
+    handwerkerId: input.handwerkerId,
+    gewerkSlug: gw.slug as string | null,
+    gewerkName: gw.name as string,
+  })
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   revalidatePath('/auftraege')
   return { ok: true }
@@ -317,6 +325,13 @@ export async function assignAuftragHandwerkerPosition(input: {
     `${pos.leistung_name} (${pos.gewerk_name}) → ${hw.name} (${status})`,
     input.handwerkerId
   )
+
+  await ensureAngebotHandwerkerGewerkId(supabase, {
+    auftragId: input.auftragId,
+    handwerkerId: input.handwerkerId,
+    gewerkSlug: pos.gewerk_slug as string | null,
+    gewerkName: String(pos.gewerk_name ?? ''),
+  })
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }

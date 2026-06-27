@@ -162,6 +162,9 @@ export function AuftragPositionHandwerkerPanel({
   auftragId,
   onChanged,
   onAcceptWizard,
+  layout = 'default',
+  advancedOpen = false,
+  onAdvancedToggle,
 }: {
   pos: AuftragPosition
   partnerRow: AngebotHandwerkerRow | null
@@ -176,10 +179,19 @@ export function AuftragPositionHandwerkerPanel({
     gewerkId: string
     zuweisungId: string
   }) => void
+  layout?: 'default' | 'embedded'
+  advancedOpen?: boolean
+  onAdvancedToggle?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [manuellOpen, setManuellOpen] = useState(false)
-  const [crmStatusOpen, setCrmStatusOpen] = useState(false)
+  const [crmStatusOpenLocal, setCrmStatusOpenLocal] = useState(false)
+  const crmStatusOpen = layout === 'embedded' ? advancedOpen : crmStatusOpenLocal
+  const toggleCrmStatus =
+    layout === 'embedded' && onAdvancedToggle
+      ? onAdvancedToggle
+      : () => setCrmStatusOpenLocal((v) => !v)
+  const embedded = layout === 'embedded'
 
   if (!pos.handwerker_id) return null
 
@@ -221,49 +233,23 @@ export function AuftragPositionHandwerkerPanel({
     })
   }
 
-  return (
-    <div className="space-y-3">
-      {/* 1 — Zuweisung (≠ Konditionen) */}
-      <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
-          Zuweisung
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          {pos.handwerker?.name ? (
-            <span className="text-sm font-medium text-bw-text">{pos.handwerker.name}</span>
-          ) : null}
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 text-xs font-medium',
-              auftragHwStatusBadgeClass(zuweisungStatus)
-            )}
-          >
-            {auftragHwStatusLabel(zuweisungStatus)}
-          </span>
-          {partnerRow?.antwort_at ? (
-            <span className="text-xs text-bw-text-muted">
-              {formatDatumZeit(partnerRow.antwort_at)}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-2 text-xs text-bw-text-muted">
-          „Akzeptiert“ bedeutet: Partner hat die Anfrage angenommen — nicht automatisch, dass Preise
-          vereinbart sind.
-        </p>
+  const ablehnungBlock =
+    partnerRow &&
+    (partnerRow.status ?? '').toLowerCase() === 'abgelehnt' &&
+    partnerRow.ablehnung_grund ? (
+      <p className="rounded-md border border-danger/30 bg-danger/5 px-2 py-1.5 text-xs text-danger">
+        Ablehnung: {labelHandwerkerAblehnung(partnerRow.ablehnung_grund)}
+        {partnerRow.antwort_notiz?.trim() ? ` — ${partnerRow.antwort_notiz.trim()}` : ''}
+      </p>
+    ) : null
 
-        {partnerRow &&
-        (partnerRow.status ?? '').toLowerCase() === 'abgelehnt' &&
-        partnerRow.ablehnung_grund ? (
-          <p className="mt-2 rounded-md border border-danger/30 bg-danger/5 px-2 py-1.5 text-xs text-danger">
-            Ablehnung: {labelHandwerkerAblehnung(partnerRow.ablehnung_grund)}
-            {partnerRow.antwort_notiz?.trim() ? ` — ${partnerRow.antwort_notiz.trim()}` : ''}
-          </p>
-        ) : null}
-
+  const crmAdvancedBlock = (
+    <div className={embedded ? 'pos-v2-advanced' : undefined}>
+      {!embedded ? (
         <button
           type="button"
           className="mt-2 flex items-center gap-1 text-[11px] text-bw-text-muted hover:text-bw-text"
-          onClick={() => setCrmStatusOpen((v) => !v)}
+          onClick={toggleCrmStatus}
         >
           <ChevronDown
             className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')}
@@ -271,27 +257,83 @@ export function AuftragPositionHandwerkerPanel({
           />
           CRM-Status manuell setzen
         </button>
-        {crmStatusOpen ? (
-          <div className="mt-2">
-            <Select
-              label="Zuweisungs-Status (intern)"
-              name={`hw-status-${pos.id}`}
-              value={zuweisungStatus as AuftragHandwerkerZuweisungStatus}
-              disabled={pending}
-              onChange={(e) => changeStatus(e.target.value as AuftragHandwerkerZuweisungStatus)}
-              options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              className="text-sm"
-            />
-          </div>
-        ) : null}
-      </div>
+      ) : (
+        <button
+          type="button"
+          className="pos-v2-advanced-trigger"
+          onClick={toggleCrmStatus}
+          aria-expanded={crmStatusOpen}
+        >
+          <ChevronDown
+            className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')}
+            aria-hidden
+          />
+          Erweitert — CRM-Status manuell
+        </button>
+      )}
+      {crmStatusOpen ? (
+        <div className={embedded ? 'pos-v2-advanced-body' : 'mt-2'}>
+          <Select
+            label="Zuweisungs-Status (intern)"
+            name={`hw-status-${pos.id}`}
+            value={zuweisungStatus as AuftragHandwerkerZuweisungStatus}
+            disabled={pending}
+            onChange={(e) => changeStatus(e.target.value as AuftragHandwerkerZuweisungStatus)}
+            options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            className="text-sm"
+          />
+        </div>
+      ) : null}
+    </div>
+  )
 
-      {/* 2 — Konditionen & Verhandlung */}
-      <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
-            Konditionen & Verhandlung
+  return (
+    <div className="space-y-3">
+      {!embedded ? (
+        <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
+            Zuweisung
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {pos.handwerker?.name ? (
+              <span className="text-sm font-medium text-bw-text">{pos.handwerker.name}</span>
+            ) : null}
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-xs font-medium',
+                auftragHwStatusBadgeClass(zuweisungStatus)
+              )}
+            >
+              {auftragHwStatusLabel(zuweisungStatus)}
+            </span>
+            {partnerRow?.antwort_at ? (
+              <span className="text-xs text-bw-text-muted">
+                {formatDatumZeit(partnerRow.antwort_at)}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-2 text-xs text-bw-text-muted">
+            „Akzeptiert“ bedeutet: Partner hat die Anfrage angenommen — nicht automatisch, dass Preise
+            vereinbart sind.
+          </p>
+          {ablehnungBlock}
+          {crmAdvancedBlock}
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          embedded ? 'pos-v2-konditionen-card' : 'rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3'
+        )}
+      >
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {!embedded ? (
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
+              Konditionen & Verhandlung
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-bw-text">Gegenvorschlag & Aktionen</p>
+          )}
           {eingereicht ? (
             <span
               className={cn(
@@ -317,8 +359,10 @@ export function AuftragPositionHandwerkerPanel({
               eingereicht={eingereicht}
             />
 
-            {konditionZeile && konditionen && !eingereicht ? (
-              <div className="mt-3">
+            {embedded && ablehnungBlock ? <div className="mb-2">{ablehnungBlock}</div> : null}
+
+            {konditionZeile && konditionen && (!eingereicht || embedded) ? (
+              <div className={cn('mt-3', embedded && eingereicht && 'opacity-90')}>
                 <PositionKonditionVorschau kondition={konditionZeile} art={konditionen.art} />
               </div>
             ) : null}
@@ -362,6 +406,8 @@ export function AuftragPositionHandwerkerPanel({
                 onAcceptWizard={onAcceptWizard}
               />
             ) : null}
+
+            {embedded ? crmAdvancedBlock : null}
           </>
         )}
       </div>

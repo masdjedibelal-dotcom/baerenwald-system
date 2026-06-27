@@ -67,7 +67,13 @@ export function HwKonditionenPruefungTable({
             {konditionen.positionen.map((p, i) => {
               const delta = hwKonditionDelta(p.ek_netto, p.hw_netto)
               return (
-                <tr key={p.position_id || `${p.leistung}-${i}`} className="border-b border-bw-border/60">
+                <tr
+                  key={p.position_id || `${p.leistung}-${i}`}
+                  className={cn(
+                    'border-b border-bw-border/60',
+                    p.geaendert && 'bg-amber-50/90'
+                  )}
+                >
                   <td className="px-2 py-1.5 text-bw-text">
                     <span className="font-medium">{p.leistung}</span>
                     {p.beschreibung ? (

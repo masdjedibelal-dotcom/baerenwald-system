@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
+import { handwerkerAusGeschwisterPositionen } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { buildGewerkEkMap } from '@/lib/partner/handwerker-einreichung'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
 
@@ -69,35 +70,57 @@ export async function syncAngebotPositionenZuAuftrag(input: {
     const row = rows[0]
     if (!row) continue
 
+    let erbt: ReturnType<typeof handwerkerAusGeschwisterPositionen> = null
+    if (!row.handwerker_id?.trim()) {
+      erbt = handwerkerAusGeschwisterPositionen(pool, {
+        gewerk_block_key: row.gewerk_block_key,
+        gewerk_slug: row.gewerk_slug,
+        gewerk_name: row.gewerk_name,
+      })
+      if (erbt) row.handwerker_id = erbt.handwerker_id
+    }
+
     const match = findAuftragPosMatch(pool, angPos)
     if (match?.id) {
-      const { error } = await supabaseAdmin
-        .from('auftrag_positionen')
-        .update({
-          gewerk_slug: row.gewerk_slug,
-          gewerk_name: row.gewerk_name,
-          gewerk_block_key: row.gewerk_block_key,
-          leistung_name: row.leistung_name,
-          beschreibung: row.beschreibung,
-          einheit: row.einheit,
-          menge: row.menge,
-          preis_fix: row.preis_fix,
-          lohn_fix: row.lohn_fix,
-          material_fix: row.material_fix,
-          preis_partner: row.preis_partner,
-          handwerker_id: row.handwerker_id,
-        })
-        .eq('id', match.id)
+      const patch: Record<string, unknown> = {
+        gewerk_slug: row.gewerk_slug,
+        gewerk_name: row.gewerk_name,
+        gewerk_block_key: row.gewerk_block_key,
+        leistung_name: row.leistung_name,
+        beschreibung: row.beschreibung,
+        einheit: row.einheit,
+        menge: row.menge,
+        preis_fix: row.preis_fix,
+        lohn_fix: row.lohn_fix,
+        material_fix: row.material_fix,
+        preis_partner: row.preis_partner,
+        handwerker_id: row.handwerker_id,
+      }
+      if (erbt?.handwerker_status) patch.handwerker_status = erbt.handwerker_status
+      const { error } = await supabaseAdmin.from('auftrag_positionen').update(patch).eq('id', match.id)
       if (!error) aktualisiert++
       continue
     }
 
     const { error } = await supabaseAdmin.from('auftrag_positionen').insert({
       ...row,
+      handwerker_status: erbt?.handwerker_status ?? null,
       sort_order: sortCursor,
     })
     sortCursor += 10
-    if (!error) neu++
+    if (!error) {
+      neu++
+      pool.push({
+        id: '',
+        auftrag_id: auftragId,
+        gewerk_slug: row.gewerk_slug,
+        gewerk_name: row.gewerk_name,
+        gewerk_block_key: row.gewerk_block_key,
+        leistung_name: row.leistung_name,
+        handwerker_id: row.handwerker_id,
+        handwerker_status: erbt?.handwerker_status ?? null,
+      } as AuftragPosition)
+    }
   }
 
   const gewerkNamen = Array.from(new Set(positionen.map((p) => p.gewerk_name).filter(Boolean)))

@@ -3,6 +3,7 @@
 import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import { handwerkerAusGeschwisterPositionen, ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { buildInternFormularSubmittedHtml, sendEmailHtml } from '@/lib/auftraege/emails'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
@@ -191,9 +192,34 @@ export async function addAuftragPosition(
     start_datum?: string | null
     end_datum?: string | null
     handwerker_id?: string | null
+    handwerker_status?: string | null
   }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
+
+  let handwerkerId = data.handwerker_id !== undefined ? data.handwerker_id?.trim() || null : undefined
+  let handwerkerStatus =
+    data.handwerker_status !== undefined ? data.handwerker_status?.trim() || null : undefined
+
+  if (handwerkerId === undefined) {
+    const { data: siblings } = await supabase
+      .from('auftrag_positionen')
+      .select('handwerker_id, handwerker_status, gewerk_block_key, gewerk_slug, gewerk_name')
+      .eq('auftrag_id', auftragId)
+
+    const erbt = handwerkerAusGeschwisterPositionen(siblings ?? [], {
+      gewerk_block_key: data.gewerk_block_key,
+      gewerk_slug: data.gewerk_slug,
+      gewerk_name: data.gewerk_name,
+    })
+    if (erbt) {
+      handwerkerId = erbt.handwerker_id
+      if (handwerkerStatus === undefined) handwerkerStatus = erbt.handwerker_status
+    } else {
+      handwerkerId = null
+    }
+  }
+
   const { data: last } = await supabase
     .from('auftrag_positionen')
     .select('sort_order')
@@ -222,12 +248,23 @@ export async function addAuftragPosition(
       material_fix: data.material_fix ?? null,
       start_datum: data.start_datum?.slice(0, 10) || null,
       end_datum: data.end_datum?.slice(0, 10) || null,
-      handwerker_id: data.handwerker_id?.trim() || null,
+      handwerker_id: handwerkerId ?? null,
+      handwerker_status: handwerkerStatus ?? null,
       sort_order: nextOrder,
     })
     .select('id')
     .single()
   if (error) return { ok: false, message: error.message }
+
+  if (handwerkerId) {
+    await ensureAngebotHandwerkerGewerkId(supabase, {
+      auftragId,
+      handwerkerId,
+      gewerkSlug: data.gewerk_slug,
+      gewerkName: data.gewerk_name,
+    })
+  }
+
   revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true, id: inserted.id as string }
 }
