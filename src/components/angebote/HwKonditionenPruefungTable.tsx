@@ -1,5 +1,8 @@
 'use client'
 
+/**
+ * @deprecated Konditionen-Tabelle — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
+ */
 import { cn } from '@/lib/utils'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import type { AngebotHandwerkerRow } from '@/lib/types'

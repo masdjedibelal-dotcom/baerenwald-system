@@ -876,10 +876,6 @@ export function AuftragDetailClient({
           ) : null
         }
       >
-        <p className="mb-4 text-sm text-bw-text-muted">
-          Leistung anklicken: Leistungsdaten → Handwerker (Zuweisung, Gegenangebot, Übernehmen) →
-          Fortschritt. „Akzeptiert“ = Partner hat zugewiesen, nicht automatisch Preis vereinbart.
-        </p>
         <AuftragPositionenSteuerungTab
           auftragId={detail.id}
           positionen={detail.auftrag_positionen ?? []}

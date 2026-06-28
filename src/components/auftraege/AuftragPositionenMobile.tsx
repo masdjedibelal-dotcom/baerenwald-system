@@ -1,5 +1,8 @@
 'use client'
 
+/**
+ * @deprecated Ersetzt durch responsive `AuftragLeistungenV3Tab`. Wird von Legacy-Tab genutzt.
+ */
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { ChevronDown, HardHat, Pencil, Plus, Trash2, UserPlus } from 'lucide-react'
 import {

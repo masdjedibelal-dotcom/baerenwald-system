@@ -2909,6 +2909,167 @@
     @apply mt-2 rounded-lg border border-bw-border bg-bw-bg/60 p-3;
   }
 
+  /* ── Leistungen v3: flache Liste ── */
+  .pos-v3 {
+    @apply space-y-4 pb-24;
+  }
+
+  .pos-v3-totals {
+    @apply grid gap-3 rounded-xl border border-bw-border bg-bw-card px-4 py-3 sm:grid-cols-3;
+  }
+
+  .pos-v3-totals-label {
+    @apply block text-[11px] font-medium uppercase tracking-wide text-bw-text-muted;
+  }
+
+  .pos-v3-totals-value {
+    @apply block text-base font-semibold tabular-nums text-bw-text;
+  }
+
+  .pos-v3-gewerk {
+    @apply overflow-hidden rounded-xl border border-bw-border bg-bw-card;
+  }
+
+  .pos-v3-gewerk-head {
+    @apply flex flex-wrap items-center gap-2 border-b border-bw-border bg-bw-bg/50 px-3 py-2.5;
+  }
+
+  .pos-v3-gewerk-name {
+    @apply flex-1 text-sm font-semibold text-bw-text;
+  }
+
+  .pos-v3-gewerk-vk {
+    @apply text-xs font-medium tabular-nums text-bw-text-muted;
+  }
+
+  .pos-v3-rows {
+    @apply divide-y divide-bw-border;
+  }
+
+  .pos-v3-row {
+    @apply flex flex-wrap items-center gap-2 px-3 py-2.5 transition-colors hover:bg-bw-hover/50 sm:flex-nowrap sm:gap-3;
+  }
+
+  .pos-v3-row--selected {
+    @apply bg-bw-primary/5;
+  }
+
+  .pos-v3-check {
+    @apply flex shrink-0 items-center;
+  }
+
+  .pos-v3-check input {
+    @apply h-4 w-4 rounded border-bw-border text-bw-primary;
+  }
+
+  .pos-v3-row-main {
+    @apply min-w-0 flex-1 basis-full sm:basis-auto;
+  }
+
+  .pos-v3-row-name {
+    @apply block text-sm font-medium text-bw-text;
+  }
+
+  .pos-v3-hw-chip {
+    @apply mt-0.5 inline-flex items-center gap-1 rounded-full bg-bw-bg px-2 py-0.5 text-[11px] font-medium text-bw-text-muted;
+  }
+
+  .pos-v3-hw-chip--action {
+    @apply cursor-pointer border border-dashed border-bw-border text-bw-primary transition-colors hover:border-bw-primary hover:bg-bw-primary/5;
+  }
+
+  .pos-v3-row-zeitraum {
+    @apply mt-0.5 block text-[10px] text-bw-text-muted;
+  }
+
+  .pos-v3-row-pricing {
+    @apply shrink-0 text-right;
+  }
+
+  .pos-v3-row-vk {
+    @apply block text-sm font-semibold tabular-nums text-bw-text;
+  }
+
+  .pos-v3-row-ek {
+    @apply block text-[10px] tabular-nums text-bw-text-muted;
+  }
+
+  .pos-v3-row-delete {
+    @apply shrink-0 rounded p-1.5 text-bw-text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40;
+  }
+
+  .pos-v3-add-btn {
+    @apply flex w-full items-center justify-center gap-1.5 border-t border-dashed border-bw-border px-3 py-2.5 text-sm font-medium text-bw-primary transition-colors hover:bg-bw-hover/50 disabled:opacity-40;
+  }
+
+  .pos-v3-bulk-bar {
+    @apply fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-bw-border bg-bw-card px-4 py-2.5 shadow-lg sm:bottom-6;
+  }
+
+  .pos-v3-bulk-close {
+    @apply ml-1 rounded p-1 text-bw-text-muted hover:bg-bw-hover hover:text-bw-text;
+  }
+
+  .pos-v3-send-bar {
+    @apply sticky bottom-0 z-30 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bw-border bg-bw-card/95 px-4 py-3 backdrop-blur;
+  }
+
+  .pos-v3-status-pill {
+    @apply rounded-full px-2.5 py-1 text-[11px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50;
+  }
+
+  .pos-v3-status-menu {
+    @apply absolute right-0 top-full z-50 mt-1 min-w-[8.5rem] overflow-hidden rounded-lg border border-bw-border bg-bw-card py-1 shadow-lg;
+  }
+
+  .pos-v3-status-menu-item {
+    @apply block w-full px-3 py-1.5 text-left text-sm text-bw-text hover:bg-bw-hover;
+  }
+
+  .pos-v3-status-menu-item.active {
+    @apply bg-bw-primary/10 font-medium text-bw-primary;
+  }
+
+  .pos-v3-hw-list {
+    @apply max-h-64 space-y-1 overflow-y-auto rounded-lg border border-bw-border p-1;
+  }
+
+  .pos-v3-hw-row {
+    @apply flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bw-hover;
+  }
+
+  .pos-v3-hw-row--active {
+    @apply bg-bw-primary/10 ring-1 ring-bw-primary/30;
+  }
+
+  .pos-v3-hw-avatar {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bw-primary/15 text-xs font-bold text-bw-primary;
+  }
+
+  .pos-v3-detail-grid {
+    @apply grid gap-4 sm:grid-cols-2;
+  }
+
+  .pos-v3-detail-grid dt {
+    @apply text-[11px] font-medium uppercase tracking-wide text-bw-text-muted;
+  }
+
+  .pos-v3-detail-grid dd {
+    @apply mt-0.5 text-sm text-bw-text;
+  }
+
+  .pos-v3-segmented {
+    @apply inline-flex rounded-lg border border-bw-border p-0.5;
+  }
+
+  .pos-v3-segmented button {
+    @apply rounded-md px-3 py-1.5 text-sm font-medium text-bw-text-muted transition-colors hover:text-bw-text;
+  }
+
+  .pos-v3-segmented button.active {
+    @apply bg-bw-primary text-white shadow-sm;
+  }
+
   .pos-pipeline {
     @apply flex flex-wrap items-start gap-0 overflow-x-auto pb-1;
   }

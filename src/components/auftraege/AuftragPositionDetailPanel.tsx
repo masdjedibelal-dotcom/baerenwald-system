@@ -1,5 +1,8 @@
 'use client'
 
+/**
+ * @deprecated Ersetzt durch flache Liste in `leistungen-v3/` (v3). Wird von Legacy-Tab genutzt.
+ */
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   ChevronDown,

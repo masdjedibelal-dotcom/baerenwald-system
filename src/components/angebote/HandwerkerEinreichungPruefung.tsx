@@ -1,5 +1,8 @@
 'use client'
 
+/**
+ * @deprecated Gegenvorschlag-Prüfung — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
+ */
 import { useState, useTransition } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
