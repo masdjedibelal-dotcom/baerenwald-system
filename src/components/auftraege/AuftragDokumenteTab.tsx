@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { FileText, Pencil, Trash2, Upload } from 'lucide-react'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
+  signHandwerkerDokumentStoragePaths,
   updateAuftragDokumentMeta,
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
@@ -16,6 +17,8 @@ import { toast } from '@/components/ui/app-toast'
 import {
   abschlussdokumentZeile,
   angebotAusAuftragDetail,
+  angebotHandwerkerAusAuftragDetail,
+  handwerkerDokumentZeilen,
   rechnungDokumentZeilen,
   timelineDokumentZeilen,
   vertragDokumentZeilen,
@@ -46,13 +49,36 @@ export function AuftragDokumenteTab({
   const [editRow, setEditRow] = useState<AuftragDokumentZeile | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [hwSignedUrls, setHwSignedUrls] = useState<Record<string, string>>({})
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const handwerkerZeilen = useMemo(
+    () => handwerkerDokumentZeilen(angebotHandwerkerAusAuftragDetail(detail)),
+    [detail]
+  )
+
+  useEffect(() => {
+    const paths = handwerkerZeilen.map((z) => z.storagePath).filter(Boolean) as string[]
+    if (!paths.length) {
+      setHwSignedUrls({})
+      return
+    }
+    let cancelled = false
+    void signHandwerkerDokumentStoragePaths(paths).then((res) => {
+      if (cancelled) return
+      if (res.ok) setHwSignedUrls(res.urls)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [handwerkerZeilen])
 
   const zeilen = useMemo(() => {
     const rows = [
       ...timelineDokumentZeilen(detail),
       ...rechnungDokumentZeilen(rechnungen),
       ...vertragDokumentZeilen(vertraege),
+      ...handwerkerZeilen,
     ]
     const ang = angebotAusAuftragDetail(detail)
     if (ang?.pdf_url) {
@@ -80,7 +106,7 @@ export function AuftragDokumenteTab({
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
     return rows.sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
-  }, [detail, rechnungen, vertraege])
+  }, [detail, rechnungen, vertraege, handwerkerZeilen])
 
   async function uploadFiles(files: FileList | File[]) {
     const list = Array.from(files).slice(0, 5)
@@ -245,6 +271,11 @@ export function AuftragDokumenteTab({
               {zeilen.map((row) => {
                 const ev = row.timelineId ? timelineById.get(row.timelineId) : null
                 const readOnly = row.quelle !== 'timeline' || !row.timelineId
+                const href =
+                  row.storagePath && hwSignedUrls[row.storagePath]
+                    ? hwSignedUrls[row.storagePath]!
+                    : row.href
+                const pdfReady = !row.storagePath || Boolean(hwSignedUrls[row.storagePath])
                 return (
                   <tr key={row.id}>
                     <td className="tabular-nums whitespace-nowrap text-bw-text-muted">
@@ -291,15 +322,24 @@ export function AuftragDokumenteTab({
                       )}
                     </td>
                     <td className="text-right">
-                      <a
-                        href={row.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50"
-                        aria-label={`${row.name} öffnen`}
-                      >
-                        <FileText className="h-4 w-4" aria-hidden />
-                      </a>
+                      {pdfReady ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50"
+                          aria-label={`${row.name} öffnen`}
+                        >
+                          <FileText className="h-4 w-4" aria-hidden />
+                        </a>
+                      ) : (
+                        <span
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-bw-text-muted opacity-50"
+                          aria-hidden
+                        >
+                          <FileText className="h-4 w-4" />
+                        </span>
+                      )}
                     </td>
                     <td className="text-right">
                       <div className="inline-flex justify-end gap-1">

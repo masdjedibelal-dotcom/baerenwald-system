@@ -20,11 +20,13 @@ import type { AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { AuftragLeistungDetailModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungDetailModal'
 import { AuftragLeistungEditModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungEditModal'
+import { AuftragGewerkAddRow } from '@/components/auftraege/leistungen-v3/AuftragGewerkAddRow'
 import { AuftragLeistungNewModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungNewModal'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { LeistungStatusPill } from '@/components/auftraege/leistungen-v3/LeistungStatusPill'
 import {
   blockVkSumme,
+  createLeeresGewerkBlock,
   formatZeitraumKurz,
   groupPositionenByGewerkSlug,
   rowMarge,
@@ -56,7 +58,7 @@ export function AuftragLeistungenV3Tab({
   const [newBlock, setNewBlock] = useState<AuftragGewerkBlock | null>(null)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
-  const [newOpen, setNewOpen] = useState(false)
+  const [extraBlocks, setExtraBlocks] = useState<AuftragGewerkBlock[]>([])
   const [unsentCount, setUnsentCount] = useState(0)
 
   const disabled = auftragAbgeschlossen || pending
@@ -65,6 +67,11 @@ export function AuftragLeistungenV3Tab({
     [positionen]
   )
   const blocks = useMemo(() => groupPositionenByGewerkSlug(sorted, gewerke), [sorted, gewerke])
+  const allBlocks = useMemo(() => {
+    const keys = new Set(blocks.map((b) => b.key))
+    const pending = extraBlocks.filter((b) => !keys.has(b.key))
+    return [...blocks, ...pending]
+  }, [blocks, extraBlocks])
   const totals = useMemo(() => summenPositionen(sorted), [sorted])
   const margePct =
     totals.verkauf > 0 ? Math.round((totals.marge / totals.verkauf) * 1000) / 10 : null
@@ -104,6 +111,25 @@ export function AuftragLeistungenV3Tab({
 
   function clearSelection() {
     setSelectedIds(new Set())
+  }
+
+  function addGewerk(g: GewerkOpt) {
+    const block = createLeeresGewerkBlock(g)
+    setExtraBlocks((prev) => [...prev, block])
+    setNewBlock(block)
+  }
+
+  function removeEmptyBlock(block: AuftragGewerkBlock) {
+    if (block.positionen.length > 0) return
+    setExtraBlocks((prev) => prev.filter((b) => b.key !== block.key))
+    if (newBlock?.key === block.key) setNewBlock(null)
+  }
+
+  function onLeistungSaved() {
+    if (newBlock) {
+      setExtraBlocks((prev) => prev.filter((b) => b.key !== newBlock.key))
+    }
+    refresh()
   }
 
   function bulkDelete() {
@@ -184,33 +210,31 @@ export function AuftragLeistungenV3Tab({
 
   const selectedCount = selectedIds.size
 
-  if (!sorted.length) {
+  if (!sorted.length && extraBlocks.length === 0) {
     return (
       <div className="pos-v3">
         <EmptyState
           icon={ClipboardList}
-          title="Noch keine Leistungen"
-          description="Fügen Sie die erste Leistung für diesen Auftrag hinzu."
+          title="Noch keine Gewerke"
+          description="Legen Sie zuerst ein Gewerk an und fügen Sie danach Leistungen hinzu."
           action={
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
+            <AuftragGewerkAddRow
+              gewerke={gewerke}
               disabled={disabled}
-              onClick={() => setNewOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Leistung hinzufügen
-            </Button>
+              className="pos-gewerk-add-row justify-center"
+              onAdd={addGewerk}
+            />
           }
         />
         <AuftragLeistungNewModal
-          open={newOpen}
-          onClose={() => setNewOpen(false)}
+          open={newBlock !== null}
+          onClose={() => setNewBlock(null)}
           auftragId={auftragId}
-          block={null}
+          angebotId={angebotId}
+          projektName={angebotTitel}
+          block={newBlock}
           gewerke={gewerke}
-          onSaved={refresh}
+          onSaved={onLeistungSaved}
         />
       </div>
     )
@@ -238,28 +262,46 @@ export function AuftragLeistungenV3Tab({
         </div>
       </div>
 
-      {blocks.map((block) => {
+      {allBlocks.map((block) => {
         const blockIds = block.positionen.map((p) => p.id)
         const blockAllSelected =
           blockIds.length > 0 && blockIds.every((id) => selectedIds.has(id))
         const blockSomeSelected = blockIds.some((id) => selectedIds.has(id))
+        const isEmpty = block.positionen.length === 0
 
         return (
           <section key={block.key} className="pos-v3-gewerk">
             <header className="pos-v3-gewerk-head">
-              <label className="pos-v3-check">
-                <input
-                  type="checkbox"
-                  checked={blockAllSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = blockSomeSelected && !blockAllSelected
-                  }}
-                  disabled={disabled}
-                  onChange={() => toggleBlock(block)}
-                />
-              </label>
+              {blockIds.length > 0 ? (
+                <label className="pos-v3-check">
+                  <input
+                    type="checkbox"
+                    checked={blockAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = blockSomeSelected && !blockAllSelected
+                    }}
+                    disabled={disabled}
+                    onChange={() => toggleBlock(block)}
+                  />
+                </label>
+              ) : (
+                <span className="pos-v3-check w-4 shrink-0" aria-hidden />
+              )}
               <span className="pos-v3-gewerk-name">Gewerk: {block.gewerkName}</span>
-              <span className="pos-v3-gewerk-vk">VK gesamt: {formatEurBetrag(blockVkSumme(block))}</span>
+              <span className="pos-v3-gewerk-vk">
+                {isEmpty ? 'Noch keine Leistungen' : `VK gesamt: ${formatEurBetrag(blockVkSumme(block))}`}
+              </span>
+              {isEmpty ? (
+                <button
+                  type="button"
+                  className="pos-v3-row-delete"
+                  disabled={disabled}
+                  aria-label="Leeren Gewerk-Abschnitt entfernen"
+                  onClick={() => removeEmptyBlock(block)}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
             </header>
 
             <ul className="pos-v3-rows">
@@ -360,6 +402,8 @@ export function AuftragLeistungenV3Tab({
         )
       })}
 
+      <AuftragGewerkAddRow gewerke={gewerke} disabled={disabled} onAdd={addGewerk} />
+
       {selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
           <span className="text-sm font-medium text-bw-text">
@@ -443,9 +487,11 @@ export function AuftragLeistungenV3Tab({
         open={newBlock !== null}
         onClose={() => setNewBlock(null)}
         auftragId={auftragId}
+        angebotId={angebotId}
+        projektName={angebotTitel}
         block={newBlock}
         gewerke={gewerke}
-        onSaved={refresh}
+        onSaved={onLeistungSaved}
       />
 
       <AuftragLeistungZuweisungModal

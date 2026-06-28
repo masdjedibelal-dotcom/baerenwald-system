@@ -14,6 +14,10 @@ import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { gewichteterFortschrittProzent } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import type { AuftragLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import type { AuftragPosition, AuftragPositionNotiz } from '@/lib/types'
+import {
+  positionPatchBenoetigtVertragSync,
+  syncProjektvertragStilleFireAndForget,
+} from '@/lib/vertraege/sync-projektvertrag-stille'
 
 /** Fortschritt auf Auftragsebene aus Leistungsstatus + Verkaufspreisen berechnen. */
 export async function syncAuftragFortschrittFromPositionen(
@@ -139,8 +143,33 @@ export async function updateAuftragPositionSteuerung(
     }
   }
 
+  let vorherHandwerkerId: string | null = null
+  if (positionPatchBenoetigtVertragSync(patch)) {
+    const { data: current } = await supabase
+      .from('auftrag_positionen')
+      .select('handwerker_id')
+      .eq('id', posId)
+      .maybeSingle()
+    vorherHandwerkerId = current?.handwerker_id ? String(current.handwerker_id) : null
+  }
+
   const { error } = await supabase.from('auftrag_positionen').update(patch).eq('id', posId)
   if (error) return { ok: false, message: error.message }
+
+  if (positionPatchBenoetigtVertragSync(patch)) {
+    const nachherHandwerkerId =
+      patch.handwerker_id !== undefined
+        ? patch.handwerker_id
+          ? String(patch.handwerker_id)
+          : null
+        : vorherHandwerkerId
+    if (vorherHandwerkerId && vorherHandwerkerId !== nachherHandwerkerId) {
+      syncProjektvertragStilleFireAndForget(auftragId, vorherHandwerkerId)
+    }
+    if (nachherHandwerkerId) {
+      syncProjektvertragStilleFireAndForget(auftragId, nachherHandwerkerId)
+    }
+  }
   if ('leistung_status' in patch || 'preis_fix' in patch) {
     await syncAuftragFortschrittFromPositionen(auftragId)
   } else {

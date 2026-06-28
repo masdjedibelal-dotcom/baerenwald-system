@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 
 async function assertAuftrag(auftragId: string) {
   const supabase = createClient()
@@ -88,4 +89,27 @@ export async function deleteAuftragDokumentEintrag(input: {
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
+}
+
+/** Signierte URLs für Handwerker-Uploads (Bucket handwerker-uploads). */
+export async function signHandwerkerDokumentStoragePaths(
+  paths: string[]
+): Promise<{ ok: true; urls: Record<string, string> } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const unique = Array.from(new Set(paths.map((p) => p.trim()).filter(Boolean)))
+  if (!unique.length) return { ok: true, urls: {} }
+
+  const urls: Record<string, string> = {}
+  await Promise.all(
+    unique.map(async (path) => {
+      const signed = await signedHandwerkerUploadUrl(path)
+      if (signed) urls[path] = signed
+    })
+  )
+  return { ok: true, urls }
 }

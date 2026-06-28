@@ -3010,6 +3010,10 @@
     @apply ml-1 rounded p-1 text-bw-text-muted hover:bg-bw-hover hover:text-bw-text;
   }
 
+  .pos-v3-row--freitext {
+    @apply cursor-default hover:bg-transparent;
+  }
+
   .pos-v3-send-bar {
     @apply sticky bottom-0 z-30 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bw-border bg-bw-card/95 px-4 py-3 backdrop-blur;
   }

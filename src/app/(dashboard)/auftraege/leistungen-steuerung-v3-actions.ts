@@ -4,8 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
+import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
+import { syncProjektvertragStilleFuerAuftrag } from '@/lib/vertraege/sync-projektvertrag-stille'
 import { gewerkIdFuerPosition } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
 import { notifyPartnerUnified, partnerOffenLink } from '@/lib/partner/notify-partner-unified'
+import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import type { AuftragPosition } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
@@ -38,6 +41,9 @@ export async function bulkDeleteAuftragPositionenV3(
     if (error) return { ok: false, message: error.message }
     deleted++
   }
+
+  await syncAuftragIstBauprojekt(auftragId)
+  void syncProjektvertragStilleFuerAuftrag(auftragId)
 
   revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true, deleted }
@@ -131,6 +137,8 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
   angebotId?: string | null
   projektName: string
   gewerke?: GewerkOpt[]
+  /** Nur diese Positionen senden (z. B. nach „Speichern & senden“). */
+  positionIds?: string[] | null
 }): Promise<
   | { ok: true; gesendet: number; handwerker: number }
   | { ok: false; message: string }
@@ -148,7 +156,12 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
 
   if (pErr) return { ok: false, message: pErr.message }
 
+  const onlyIds = input.positionIds?.length
+    ? new Set(input.positionIds.map((id) => id.trim()).filter(Boolean))
+    : null
+
   const zuSenden = (posRows ?? []).filter((p) => {
+    if (onlyIds && !onlyIds.has(String(p.id))) return false
     const st = (p.handwerker_status ?? '').toLowerCase()
     return st === 'zugewiesen' || st === '' || st === 'ausstehend'
   })
@@ -218,6 +231,8 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
     if (!notify.ok) {
       return { ok: false, message: notify.error }
     }
+
+    syncProjektvertragStilleFireAndForget(input.auftragId, hwId)
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
@@ -272,6 +287,8 @@ export async function notifyPartnerPositionGeaendertV3(input: {
   })
 
   if (!notify.ok) return { ok: false, message: notify.error }
+
+  syncProjektvertragStilleFireAndForget(input.auftragId, hwId)
   return { ok: true }
 }
 

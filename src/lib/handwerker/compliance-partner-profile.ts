@@ -37,8 +37,8 @@ export function partnerLeistetBauleistung(
   alleGewerke: Gewerk[]
 ): boolean {
   const slugs = new Set(partnerGewerkSlugs(handwerkerGewerke))
-  if (!slugs.size) return true
-  return alleGewerke.some((g) => slugs.has(g.slug) && g.ist_bauleistung !== false)
+  if (!slugs.size) return false
+  return alleGewerke.some((g) => slugs.has(g.slug) && g.ist_bauleistung === true)
 }
 
 /** Meister-/Fachbetrieb-Gewerke (aus Einstellungen Gewerke → Ausführung). */
@@ -92,8 +92,7 @@ export function typGiltFuerProjekt(
   if (normalizeComplianceEbene(typ) !== 'leistung') return false
   if (istBauprojekt === false && typ.nur_bei_bauleistung) return false
 
-  const hwSlugs = partnerGewerkSlugs(handwerkerGewerke)
-  const relevantSlugs = projektGewerkSlugs.length ? projektGewerkSlugs : hwSlugs
+  const relevantSlugs = projektGewerkSlugs
 
   let hatBau: boolean
   if (istBauprojekt === true) {
@@ -101,11 +100,10 @@ export function typGiltFuerProjekt(
   } else if (istBauprojekt === false) {
     hatBau = false
   } else {
-    hatBau =
-      relevantSlugs.some((s) => {
-        const g = alleGewerke.find((x) => x.slug === s)
-        return g?.ist_bauleistung !== false
-      }) || partnerLeistetBauleistung(hwSlugs, alleGewerke)
+    hatBau = relevantSlugs.some((s) => {
+      const g = alleGewerke.find((x) => x.slug === s)
+      return g?.ist_bauleistung === true
+    })
   }
 
   if (typ.nur_bei_bauleistung && !hatBau) return false

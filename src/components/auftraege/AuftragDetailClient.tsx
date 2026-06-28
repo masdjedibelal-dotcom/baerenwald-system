@@ -147,7 +147,6 @@ const DESKTOP_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'schritte',
   'aktivitaet',
   'dokumente',
-  'compliance',
   'finanzen',
 ]
 const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
@@ -156,7 +155,6 @@ const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'schritte',
   'aktivitaet',
   'dokumente',
-  'compliance',
   'finanzen',
 ]
 
@@ -214,6 +212,7 @@ export function AuftragDetailClient({
   const [projektTitel, setProjektTitel] = useState('')
   const [projektStart, setProjektStart] = useState('')
   const [projektEnde, setProjektEnde] = useState('')
+  const [projektIstBauprojekt, setProjektIstBauprojekt] = useState(false)
   const [abschlussModal, setAbschlussModal] = useState(false)
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
@@ -351,6 +350,7 @@ export function AuftragDetailClient({
     setProjektTitel(initial.titel ?? '')
     setProjektStart(initial.start_datum?.slice(0, 10) ?? '')
     setProjektEnde(initial.end_datum?.slice(0, 10) ?? '')
+    setProjektIstBauprojekt(initial.ist_bauprojekt === true)
   }, [initial])
 
   useEffect(() => {
@@ -743,12 +743,16 @@ export function AuftragDetailClient({
         icon: FolderOpen,
         count: dokumenteCount || undefined,
       },
-      {
-        id: 'compliance' as const,
-        label: 'Compliance',
-        icon: Shield,
-        count: complianceCount || undefined,
-      },
+      ...(istBauprojekt
+        ? [
+            {
+              id: 'compliance' as const,
+              label: 'Compliance',
+              icon: Shield,
+              count: complianceCount || undefined,
+            },
+          ]
+        : []),
       {
         id: 'finanzen' as const,
         label: 'Finanzen',
@@ -783,12 +787,16 @@ export function AuftragDetailClient({
         icon: FolderOpen,
         count: dokumenteCount || undefined,
       },
-      {
-        id: 'compliance' as const,
-        label: 'Compliance',
-        icon: Shield,
-        count: complianceCount || undefined,
-      },
+      ...(istBauprojekt
+        ? [
+            {
+              id: 'compliance' as const,
+              label: 'Compliance',
+              icon: Shield,
+              count: complianceCount || undefined,
+            },
+          ]
+        : []),
       {
         id: 'finanzen' as const,
         label: 'Finanzen',
@@ -798,21 +806,24 @@ export function AuftragDetailClient({
     return tabs
   }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount, complianceCount, posCount])
 
-  const desktopTabIds = useMemo(
-    () =>
-      istBauprojekt
-        ? (['baustelle', ...DESKTOP_AUFTRAG_TABS_BASE] as AuftragDetailTab[])
-        : DESKTOP_AUFTRAG_TABS_BASE,
-    [istBauprojekt]
-  )
+  const desktopTabIds = useMemo(() => {
+    const ids: AuftragDetailTab[] = istBauprojekt ? ['baustelle', ...DESKTOP_AUFTRAG_TABS_BASE] : [...DESKTOP_AUFTRAG_TABS_BASE]
+    if (istBauprojekt && !ids.includes('compliance')) {
+      const fin = ids.indexOf('finanzen')
+      ids.splice(fin >= 0 ? fin : ids.length, 0, 'compliance')
+    }
+    return ids
+  }, [istBauprojekt])
 
-  const mobileTabIds = useMemo(
-    () =>
-      istBauprojekt
-        ? (['stammdaten', 'leistung', 'baustelle', ...MOBILE_AUFTRAG_TABS_BASE.slice(2)] as AuftragDetailTab[])
-        : MOBILE_AUFTRAG_TABS_BASE,
-    [istBauprojekt]
-  )
+  const mobileTabIds = useMemo(() => {
+    if (!istBauprojekt) return MOBILE_AUFTRAG_TABS_BASE
+    const ids: AuftragDetailTab[] = ['stammdaten', 'leistung', 'baustelle', ...MOBILE_AUFTRAG_TABS_BASE.slice(2)]
+    if (!ids.includes('compliance')) {
+      const fin = ids.indexOf('finanzen')
+      ids.splice(fin >= 0 ? fin : ids.length, 0, 'compliance')
+    }
+    return ids
+  }, [istBauprojekt])
 
   const stammdatenInhalt = (
     <div className="space-y-3">
@@ -1051,7 +1062,21 @@ export function AuftragDetailClient({
         backHref="/auftraege"
         backLabel="Zurück zu Aufträge"
         title={projektName}
-        badges={<AuftragStatusBadge status={detail.status} />}
+        badges={
+          <>
+            <AuftragStatusBadge status={detail.status} />
+            <span
+              className={`badge badge-no-dot ${istBauprojekt ? 'badge-offer' : ''}`}
+              title={
+                istBauprojekt
+                  ? 'Bauprojekt: Bautagebuch, Compliance-Checkliste'
+                  : 'Standardauftrag ohne Bau-Checkliste'
+              }
+            >
+              {istBauprojekt ? 'Bauprojekt' : 'Standardauftrag'}
+            </span>
+          </>
+        }
         meta={headMeta}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">
@@ -1077,7 +1102,16 @@ export function AuftragDetailClient({
             <button
               type="button"
               className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5"
-              onClick={() => setProjektModal(true)}
+              onClick={() => {
+                setProjektIstBauprojekt(
+                  detail.ist_bauprojekt === true
+                    ? true
+                    : detail.ist_bauprojekt === false
+                      ? false
+                      : istBauprojekt
+                )
+                setProjektModal(true)
+              }}
             >
               <Pencil className="h-3.5 w-3.5" aria-hidden />
               <span className="hidden sm:inline">Bearbeiten</span>
@@ -1154,6 +1188,21 @@ export function AuftragDetailClient({
             value={projektEnde}
             onChange={(e) => setProjektEnde(e.target.value)}
           />
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-bw-text">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-bw-border"
+              checked={projektIstBauprojekt}
+              onChange={(e) => setProjektIstBauprojekt(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Bauprojekt / Bauauftrag</span>
+              <span className="mt-0.5 block text-xs text-bw-text-muted">
+                Aktiviert Bautagebuch, Baustellen-Tab und Compliance-Checkliste (wie im
+                Partner-Portal).
+              </span>
+            </span>
+          </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => setProjektModal(false)}>
@@ -1168,6 +1217,7 @@ export function AuftragDetailClient({
                   titel: projektTitel,
                   start_datum: projektStart || null,
                   end_datum: projektEnde || null,
+                  ist_bauprojekt: projektIstBauprojekt,
                 })
                 if (r.ok) setProjektModal(false)
                 return r

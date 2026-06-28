@@ -55,6 +55,12 @@ export function AuftragLeistungDetailModal({
         </>
       }
     >
+      {!pos.handwerker_id ? (
+        <p className="mb-3 rounded-lg border border-bw-border bg-bw-green-bg/40 px-3 py-2 text-xs text-bw-text-muted">
+          Tipp: Beim Anlegen einer neuen Leistung direkt einen Handwerker wählen — schneller als
+          nachträglich zuweisen.
+        </p>
+      ) : null}
       <dl className="pos-v3-detail-grid">
         <div>
           <dt>Bezeichnung</dt>

@@ -24,7 +24,7 @@ export function gewerkSlugsSuggerierenBauprojekt(
   if (!slugs?.length) return false
   return slugs.some((s) => {
     const g = alleGewerke.find((x) => x.slug === s)
-    return g?.ist_bauleistung !== false
+    return g?.ist_bauleistung === true
   })
 }
 

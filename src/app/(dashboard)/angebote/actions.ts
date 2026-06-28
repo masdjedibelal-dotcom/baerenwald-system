@@ -52,6 +52,7 @@ import {
   zeileNettoAusEinkaufspreis,
 } from '@/lib/partner/hw-konditionen'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+import { parseHwAnhangStoragePaths } from '@/lib/partner/partner-hw-dokument-typen'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
@@ -95,6 +96,7 @@ import { insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
 import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
+import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -726,7 +728,8 @@ export async function sendAngebotToHandwerker(
 /** Signierte URL für HW-PDF aus Partner-Portal (Angebot oder Rechnung). */
 export async function getHandwerkerEinreichungPdfUrl(
   zuweisungId: string,
-  art: 'angebot' | 'rechnung' = 'angebot'
+  art: 'angebot' | 'rechnung' = 'angebot',
+  anhangIndex = 0
 ): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   const supabase = createClient()
   const {
@@ -734,23 +737,33 @@ export async function getHandwerkerEinreichungPdfUrl(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet' }
 
-  const col = art === 'rechnung' ? 'hw_rechnung_pdf_url' : 'hw_angebot_pdf_url'
+  if (art === 'rechnung') {
+    const { data: row, error } = await supabase
+      .from('angebot_handwerker')
+      .select('hw_rechnung_pdf_url')
+      .eq('id', zuweisungId.trim())
+      .maybeSingle()
+    const stored = (row as { hw_rechnung_pdf_url?: string | null } | null)?.hw_rechnung_pdf_url
+    if (error || !stored) return { ok: false, message: 'Keine Rechnung hinterlegt' }
+    const url = await signedHandwerkerUploadUrl(String(stored))
+    if (!url) return { ok: false, message: 'PDF konnte nicht geladen werden' }
+    return { ok: true, url }
+  }
+
   const { data: row, error } = await supabase
     .from('angebot_handwerker')
-    .select(col)
+    .select('hw_angebot_pdf_url, hw_angebot_anhang_urls')
     .eq('id', zuweisungId.trim())
     .maybeSingle()
 
-  const stored =
-    art === 'rechnung'
-      ? (row as { hw_rechnung_pdf_url?: string | null } | null)?.hw_rechnung_pdf_url
-      : (row as { hw_angebot_pdf_url?: string | null } | null)?.hw_angebot_pdf_url
+  if (error || !row) return { ok: false, message: 'Kein PDF hinterlegt' }
 
-  if (error || !stored) {
-    return { ok: false, message: art === 'rechnung' ? 'Keine Rechnung hinterlegt' : 'Kein PDF hinterlegt' }
-  }
+  const r = row as { hw_angebot_pdf_url?: string | null; hw_angebot_anhang_urls?: unknown }
+  const paths = parseHwAnhangStoragePaths(r.hw_angebot_anhang_urls, r.hw_angebot_pdf_url)
+  const stored = paths[anhangIndex]
+  if (!stored) return { ok: false, message: 'Kein PDF hinterlegt' }
 
-  const url = await signedHandwerkerUploadUrl(String(stored))
+  const url = await signedHandwerkerUploadUrl(stored)
   if (!url) return { ok: false, message: 'PDF konnte nicht geladen werden' }
   return { ok: true, url }
 }
@@ -775,6 +788,7 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
       `
       id,
       angebot_id,
+      handwerker_id,
       gewerk_id,
       hw_preis_netto,
       hw_preis_brutto,
@@ -919,6 +933,10 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
       hw_crm_antwort_at: now,
     })
     .eq('id', zu.id as string)
+
+  if (auftrag?.id && zu.handwerker_id) {
+    syncProjektvertragStilleFireAndForget(String(auftrag.id), String(zu.handwerker_id))
+  }
 
   revalidatePath(`/angebote/${angebotId}`)
   return { ok: true, aktualisiert: Math.max(angebotAktualisiert, auftragAktualisiert) }

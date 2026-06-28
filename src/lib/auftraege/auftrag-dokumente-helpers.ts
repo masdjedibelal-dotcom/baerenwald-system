@@ -1,6 +1,10 @@
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { Angebot, AuftragDetail } from '@/lib/types'
+import type { Angebot, AngebotHandwerkerRow, AuftragDetail } from '@/lib/types'
+import {
+  parseHwAnhangStoragePaths,
+  partnerHwDokumentListenName,
+} from '@/lib/partner/partner-hw-dokument-typen'
 import { normalizeUrlList } from '@/lib/utils'
 
 export type AuftragDokumentZeile = {
@@ -10,8 +14,10 @@ export type AuftragDokumentZeile = {
   datum: string
   fuerKunde: boolean
   href: string
-  quelle: 'timeline' | 'rechnung' | 'protokoll' | 'angebot' | 'vertrag'
+  quelle: 'timeline' | 'rechnung' | 'protokoll' | 'angebot' | 'vertrag' | 'handwerker'
   timelineId?: string
+  /** Storage-Pfad im Bucket handwerker-uploads — wird serverseitig signiert. */
+  storagePath?: string
 }
 
 /** Einzelnes Angebot aus FK-Join (PostgREST liefert teils ein Objekt, teils Array). */
@@ -93,6 +99,54 @@ export function vertragDokumentZeilen(vertraege: HandwerkerVertragRow[]): Auftra
     })
 }
 
+export function angebotHandwerkerAusAuftragDetail(detail: AuftragDetail): AngebotHandwerkerRow[] {
+  const ang = angebotAusAuftragDetail(detail) as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null
+  return ang?.angebot_handwerker ?? []
+}
+
+export function handwerkerDokumentZeilen(rows: AngebotHandwerkerRow[]): AuftragDokumentZeile[] {
+  const out: AuftragDokumentZeile[] = []
+  for (const row of rows) {
+    const gewerkName = row.gewerke?.name?.trim() || 'Gewerk'
+    const hwName = row.handwerker?.name?.trim() || 'Handwerker'
+    const beschreibung = `${gewerkName} · ${hwName}`
+
+    const paths = parseHwAnhangStoragePaths(row.hw_angebot_anhang_urls, row.hw_angebot_pdf_url)
+    const total = paths.length
+    paths.forEach((path, i) => {
+      out.push({
+        id: `hw-${row.id}-unterlage-${i}`,
+        name: partnerHwDokumentListenName('unterlage', { index: i, total }),
+        beschreibung,
+        datum: row.hw_eingereicht_at ?? '',
+        fuerKunde: false,
+        href: '#',
+        storagePath: path,
+        quelle: 'handwerker',
+      })
+    })
+
+    const rechnungPath = row.hw_rechnung_pdf_url?.trim()
+    if (rechnungPath) {
+      out.push({
+        id: `hw-${row.id}-rechnung`,
+        name: partnerHwDokumentListenName('rechnung'),
+        beschreibung,
+        datum: row.hw_rechnung_eingereicht_at ?? '',
+        fuerKunde: false,
+        href: '#',
+        storagePath: rechnungPath,
+        quelle: 'handwerker',
+      })
+    }
+  }
+  return out
+}
+
+export function zaehleHandwerkerDokumente(rows: AngebotHandwerkerRow[]): number {
+  return handwerkerDokumentZeilen(rows).length
+}
+
 export function abschlussdokumentZeile(detail: AuftragDetail): AuftragDokumentZeile | null {
   const versendet = (detail.auftrag_timeline ?? []).some(
     (ev) => ev?.typ === 'abschlussdoku_versendet'
@@ -122,5 +176,6 @@ export function zaehleAuftragDokumente(
   if (ang?.pdf_url) n += 1
   if (detail.abnahme_protokoll_url) n += 1
   if (abschlussdokumentZeile(detail)) n += 1
+  n += zaehleHandwerkerDokumente(angebotHandwerkerAusAuftragDetail(detail))
   return n
 }

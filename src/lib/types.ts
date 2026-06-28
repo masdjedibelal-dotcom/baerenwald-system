@@ -446,6 +446,7 @@ export type AngebotHandwerkerRow = {
   hw_preis_netto?: number | null
   hw_preis_brutto?: number | null
   hw_angebot_pdf_url?: string | null
+  hw_angebot_anhang_urls?: string[] | null
   hw_rechnung_pdf_url?: string | null
   hw_rechnung_eingereicht_at?: string | null
   hw_eingereicht_at?: string | null

@@ -6,6 +6,8 @@
 
 **Kernbefund:** Das CRM ist funktional breit aufgestellt, aber **visuell und strukturell noch kein skalierbares Produkt**. Viele Bereiche wurden iterativ gebaut (Legacy + v2 + v3 parallel). Das Fundament (Status-Logik, Detail-Screen-Pattern, Design Tokens, Mobile/Desktop-IA) muss **vor** weiterem Feature-Ausbau vereinheitlicht werden.
 
+**Soll-Zustand (UI/UX-Zielbild):** [DESIGN_KONZEPT_CRM_UI_UX.md](./DESIGN_KONZEPT_CRM_UI_UX.md) — vollständiges Konzept für intuitive Navigation, Screens, Status und Umsetzungswellen.
+
 ---
 
 ## Inhaltsverzeichnis
@@ -647,10 +649,12 @@ Handwerker-Flows sind **dual**:
 
 | Thema | Dokument |
 |-------|----------|
+| **UI/UX Soll-Konzept (Zielbild)** | [DESIGN_KONZEPT_CRM_UI_UX.md](./DESIGN_KONZEPT_CRM_UI_UX.md) |
 | Handwerker-Prozess (fachlich) | [HANDWERKER_KOORDINATION_PROZESS.md](./handwerker-koordination/HANDWERKER_KOORDINATION_PROZESS.md) |
 | Handwerker-UI Ist/Ziel v2 | [HANDWERKER_KOORDINATION_UI_ANALYSE.md](./handwerker-koordination/HANDWERKER_KOORDINATION_UI_ANALYSE.md) |
 | CRM ↔ Portal Checkliste | [CRM_PARTNER_FLOW_CHECKLIST.md](./CRM_PARTNER_FLOW_CHECKLIST.md) |
 | HW-Angebot Einreichung | [HANDWERKER_ANGEBOT_EINREICHUNG.md](./HANDWERKER_ANGEBOT_EINREICHUNG.md) |
+| HW-Zuweisung & Bauprojekt (Handoff) | [CRM_HANDOFF_HW_BAUAUFTRAG.md](./CRM_HANDOFF_HW_BAUAUFTRAG.md) |
 | Positions v3 Code | `src/components/auftraege/leistungen-v3/` |
 | Navigation | `src/lib/nav-config.ts` |
 | UI-Roadmap (Code) | `src/lib/design-system/phases.ts` |

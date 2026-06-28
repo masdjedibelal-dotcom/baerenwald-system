@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   CalendarClock,
   Check,
@@ -31,7 +31,7 @@ import { DetailProp } from '@/components/ui/detail-prop'
 import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { Card } from '@/components/ui/Card'
 import { RichTextContent } from '@/components/ui/RichTextContent'
-import { angebotGewerkNameAnzeige, istFreitextPosition, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
+import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
@@ -80,15 +80,10 @@ import {
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
 import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
-import {
-  groupAngebotPositionenByBlockForAnzeige,
-  istInterneGewerkBeschreibungEntry,
-  type AngebotBlockPdfEntry,
-  type AngebotPositionBlockGroup,
-} from '@/lib/angebote/angebot-position-blocks'
+import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/AngebotPositionenV3Tab'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
-import type { AngebotDetail, AngebotPosition, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
+import type { AngebotDetail, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
 import type { KiVisualisierung } from '@/lib/visualize/types'
 import { cn, formatDatum, formatDatumZeit } from '@/lib/utils'
 import {
@@ -102,118 +97,6 @@ import {
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
-
-function positionNetto(p: AngebotPosition): number {
-  const menge = p.menge || 1
-  const ausSplit = (p.lohn_netto + p.material_netto) * menge
-  if (ausSplit > 0) return ausSplit
-  return ((p.gesamt_min + p.gesamt_max) / 2) * menge
-}
-
-function positionAnzeigeTitel(p: AngebotPosition): string {
-  const leistung = (p.leistung_name || p.leistung || '').trim()
-  if (istFreitextPosition(p)) {
-    if (leistung && leistung !== 'Freitext') return leistung
-    return angebotGewerkNameAnzeige(p.gewerk_name)
-  }
-  return leistung || (p.beschreibung || '').trim() || '—'
-}
-
-function PositionenMobileEntry({ entry, indexKey }: { entry: AngebotBlockPdfEntry; indexKey: string }) {
-  if (istInterneGewerkBeschreibungEntry(entry)) return null
-  if (entry.kind === 'freitext') {
-    return (
-      <div key={indexKey} className="border-b border-bw-border px-4 py-3 text-sm last:border-b-0">
-        {entry.freitext.titel ? (
-          <div className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-            {entry.freitext.titel}
-          </div>
-        ) : null}
-        {entry.freitext.text ? (
-          <RichTextContent html={entry.freitext.text} className="mt-0.5 text-sm text-bw-text-muted" />
-        ) : null}
-      </div>
-    )
-  }
-
-  const p = entry.position
-  const netto = positionNetto(p)
-  const titel = positionAnzeigeTitel(p)
-  const besch = p.beschreibung && p.beschreibung !== titel ? p.beschreibung : ''
-
-  return (
-    <div key={indexKey} className="border-b border-bw-border px-4 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 text-[13px] font-medium text-bw-text">{titel}</p>
-        <p className="shrink-0 text-[13px] font-semibold tabular-nums text-bw-primary">
-          {netto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-        </p>
-      </div>
-      {besch ? <RichTextContent html={besch} className="mt-1 text-xs text-bw-text-muted" /> : null}
-      <p className="mt-1.5 text-xs text-bw-text-muted">
-        {p.menge} {p.einheit}
-        {p.ist_fachbetrieb ? (
-          <span className="ml-2 inline-flex rounded bg-bw-hover px-1.5 py-0.5 text-[10px] font-medium">
-            Fachbetrieb
-          </span>
-        ) : null}
-      </p>
-    </div>
-  )
-}
-
-function PositionenMobileListe({
-  blocks,
-  mehrereGewerke,
-}: {
-  blocks: AngebotPositionBlockGroup[]
-  mehrereGewerke: boolean
-}) {
-  return (
-    <div className="space-y-3 p-4 md:hidden">
-      {blocks.map((block) => (
-        <div key={block.key} className="space-y-2">
-          {mehrereGewerke ? (
-            <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">{block.titel}</p>
-          ) : null}
-          {block.entries.map((entry, idx) => (
-            <PositionenMobileEntry
-              key={`${block.key}-m-${idx}`}
-              entry={entry}
-              indexKey={`${block.key}-m-${idx}`}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PositionenZeile({ p }: { p: AngebotPosition }) {
-  const netto = positionNetto(p)
-  const titel = positionAnzeigeTitel(p)
-  const besch = p.beschreibung && p.beschreibung !== titel ? p.beschreibung : ''
-  return (
-    <tr className="border-b border-bw-border align-top">
-      <td className="px-4 py-3">
-        <div className="font-medium text-bw-text">{titel}</div>
-        {besch ? (
-          <RichTextContent html={besch} className="mt-0.5 text-xs text-bw-text-muted" />
-        ) : null}
-        {p.ist_fachbetrieb ? (
-          <span className="mt-1 inline-flex rounded bg-bw-hover px-1.5 py-0.5 text-[10px] font-medium text-bw-text-muted">
-            Fachbetrieb
-          </span>
-        ) : null}
-      </td>
-      <td className="px-4 py-3 text-right tabular-nums">{p.menge}</td>
-      <td className="px-4 py-3 text-bw-text-muted">{p.einheit}</td>
-      <td className="px-4 py-3 text-right tabular-nums font-medium">
-        {netto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-      </td>
-    </tr>
-  )
-}
 
 type Tab = 'stammdaten' | 'leistung' | 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente' | 'visualisierungen'
 
@@ -274,15 +157,10 @@ export function AngebotDetailPageClient({
   const statusEinfach = resolveStatusEinfach(detail)
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
-  const positionBlocks = useMemo(
-    () => groupAngebotPositionenByBlockForAnzeige(detail.positionen ?? [], gewerke),
-    [detail.positionen, gewerke]
-  )
   const positionenAnzeigeCount = useMemo(
     () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)).length,
     [detail.positionen]
   )
-  const mehrereGewerke = positionBlocks.length > 1
 
   const kannBearbeiten =
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
@@ -804,69 +682,7 @@ export function AngebotDetailPageClient({
   )
 
   const positionenTab = (
-    <div className="overflow-hidden rounded-lg border border-bw-border">
-      <PositionenMobileListe blocks={positionBlocks} mehrereGewerke={mehrereGewerke} />
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-bw-border text-xs text-bw-text-muted">
-              <th className="px-4 py-2 text-left font-medium">Leistung</th>
-              <th className="px-4 py-2 text-right font-medium">Menge</th>
-              <th className="px-4 py-2 text-left font-medium">Einheit</th>
-              <th className="px-4 py-2 text-right font-medium">€</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positionBlocks.map((block) => (
-              <Fragment key={block.key}>
-                {mehrereGewerke ? (
-                  <tr className="bg-bw-hover/40">
-                    <td
-                      colSpan={4}
-                      className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted"
-                    >
-                      {block.titel}
-                    </td>
-                  </tr>
-                ) : null}
-                {block.entries
-                  .filter((entry) => !istInterneGewerkBeschreibungEntry(entry))
-                  .map((entry, idx) =>
-                  entry.kind === 'freitext' ? (
-                    <tr key={`${block.key}-ft-${idx}`} className="border-b border-bw-border align-top">
-                      <td colSpan={4} className="px-4 py-3">
-                        {entry.freitext.titel ? (
-                          <div className="text-xs font-semibold text-bw-text-muted">{entry.freitext.titel}</div>
-                        ) : null}
-                        {entry.freitext.text ? (
-                          <RichTextContent html={entry.freitext.text} className="mt-0.5 text-sm text-bw-text-muted" />
-                        ) : null}
-                      </td>
-                    </tr>
-                  ) : (
-                    <PositionenZeile key={entry.position.id || `${block.key}-${idx}`} p={entry.position} />
-                  )
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="border-t border-bw-border px-4 py-3 text-sm">
-        <div className="flex justify-between py-1">
-          <span className="text-bw-text-muted">Netto</span>
-          <span className="tabular-nums">{formatEur(summen.netto)}</span>
-        </div>
-        <div className="flex justify-between py-1">
-          <span className="text-bw-text-muted">MwSt {summen.mwstSatz}%</span>
-          <span className="tabular-nums">{formatEur(summen.mwst)}</span>
-        </div>
-        <div className="flex justify-between border-t border-bw-border pt-2 font-semibold text-bw-primary">
-          <span>Brutto</span>
-          <span className="tabular-nums">{formatEur(summen.brutto)}</span>
-        </div>
-      </div>
-    </div>
+    <AngebotPositionenV3Tab positionen={detail.positionen ?? []} gewerke={gewerke} />
   )
 
   const stammdatenInhalt = (

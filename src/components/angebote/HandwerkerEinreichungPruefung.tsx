@@ -27,6 +27,10 @@ import {
   hwStatusLabel,
   kannHwEinreichungPruefen,
 } from '@/lib/partner/handwerker-einreichung'
+import {
+  parseHwAnhangStoragePaths,
+  partnerHwDokumentListenName,
+} from '@/lib/partner/partner-hw-dokument-typen'
 import { parseHwKonditionen, hwKonditionForAuftragPosition } from '@/lib/partner/hw-konditionen'
 import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import {
@@ -101,12 +105,25 @@ export function HandwerkerEinreichungPruefung({
   const handwerkerName = z.handwerker?.name?.trim() || 'Handwerker'
   const gewerkName = z.gewerke?.name?.trim() || 'Gewerk'
   const hwEmail = z.handwerker?.email?.trim() || ''
+  const unterlagePaths = parseHwAnhangStoragePaths(z.hw_angebot_anhang_urls, z.hw_angebot_pdf_url)
+  const hatRechnung = Boolean(z.hw_rechnung_pdf_url?.trim())
 
   if (!eingereicht) return null
 
-  function openPdf() {
+  function openUnterlagePdf(index: number) {
     startTransition(async () => {
-      const res = await getHandwerkerEinreichungPdfUrl(z.id, 'angebot')
+      const res = await getHandwerkerEinreichungPdfUrl(z.id, 'angebot', index)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      window.open(res.url, '_blank', 'noopener,noreferrer')
+    })
+  }
+
+  function openRechnungPdf() {
+    startTransition(async () => {
+      const res = await getHandwerkerEinreichungPdfUrl(z.id, 'rechnung')
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -274,10 +291,24 @@ export function HandwerkerEinreichungPruefung({
         ) : null}
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {z.hw_angebot_pdf_url ? (
-            <Button type="button" variant="secondary" size="sm" loading={pending} onClick={openPdf}>
+          {unterlagePaths.map((_, i) => (
+            <Button
+              key={`unterlage-${i}`}
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={pending}
+              onClick={() => openUnterlagePdf(i)}
+            >
               <Download className="mr-1 h-3.5 w-3.5" aria-hidden />
-              Angebot-PDF
+              {partnerHwDokumentListenName('unterlage', { index: i, total: unterlagePaths.length })}
+            </Button>
+          ))}
+
+          {hatRechnung ? (
+            <Button type="button" variant="secondary" size="sm" loading={pending} onClick={openRechnungPdf}>
+              <Download className="mr-1 h-3.5 w-3.5" aria-hidden />
+              {partnerHwDokumentListenName('rechnung')}
             </Button>
           ) : null}
 

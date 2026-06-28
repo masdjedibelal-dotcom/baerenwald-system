@@ -37,6 +37,8 @@ export type HandwerkerVertragRow = {
   aufmass_rhythmus_tage: number
   pdf_url: string | null
   signiert_am: string | null
+  portal_akzeptiert_am?: string | null
+  portal_akzeptiert_auth_user_id?: string | null
   notizen: string | null
   parent_vertrag_id?: string | null
   dokument_art?: HandwerkerVertragDokumentArt

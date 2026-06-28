@@ -8,7 +8,7 @@ import {
 } from '@/lib/auftraege/auftrag-leistung-phasen'
 import type { AuftragPosition } from '@/lib/types'
 
-/** Gruppiert strikt nach gewerk_slug (Fallback: gewerk_name). */
+/** Gruppiert nach gewerk_block_key (wie Angebot/Legacy), Fallback gewerk_slug / gewerk_name. */
 export function groupPositionenByGewerkSlug(
   positionen: AuftragPosition[],
   gewerke: GewerkOpt[]
@@ -17,30 +17,45 @@ export function groupPositionenByGewerkSlug(
     .filter((p) => !istInterneAuftragGewerkBeschreibung(p))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
-  const map = new Map<string, AuftragGewerkBlock>()
+  const blocks: AuftragGewerkBlock[] = []
+  const indexByKey = new Map<string, number>()
 
   for (const p of sorted) {
     const slug = p.gewerk_slug?.trim()
-    const key = slug || `name:${p.gewerk_name.trim().toLowerCase()}`
     const g =
       (slug ? gewerke.find((x) => x.slug === slug) : undefined) ??
       gewerke.find((x) => x.name === p.gewerk_name)
+    const key =
+      p.gewerk_block_key?.trim() ||
+      slug ||
+      `name:${p.gewerk_name.trim().toLowerCase()}`
 
-    let block = map.get(key)
-    if (!block) {
-      block = {
+    let idx = indexByKey.get(key)
+    if (idx === undefined) {
+      idx = blocks.length
+      indexByKey.set(key, idx)
+      blocks.push({
         key,
         gewerkId: g?.id ?? '',
         gewerkName: g?.name ?? p.gewerk_name,
         gewerkSlug: slug ?? g?.slug ?? null,
         positionen: [],
-      }
-      map.set(key, block)
+      })
     }
-    block.positionen.push(p)
+    blocks[idx]!.positionen.push(p)
   }
 
-  return Array.from(map.values())
+  return blocks
+}
+
+export function createLeeresGewerkBlock(gewerk: GewerkOpt): AuftragGewerkBlock {
+  return {
+    key: `${gewerk.slug}-${Date.now()}`,
+    gewerkId: gewerk.id,
+    gewerkName: gewerk.name,
+    gewerkSlug: gewerk.slug,
+    positionen: [],
+  }
 }
 
 export function blockVkSumme(block: AuftragGewerkBlock): number {
