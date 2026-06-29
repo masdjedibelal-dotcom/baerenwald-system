@@ -75,6 +75,19 @@ export function buildPartnerRegisterUrl(): string {
   return `${publicWebsiteBaseUrl()}/partner/registrieren`
 }
 
+/** Deep-Link zum Vorgang im Partner-Portal (Tab „Vorgänge“). */
+export function buildPartnerVorgangPortalUrl(auftragId: string): string {
+  const id = auftragId.trim()
+  return `${publicWebsiteBaseUrl()}/partner?section=vorgaenge&id=${encodeURIComponent(id)}`
+}
+
+/** Relativer Link für partner-notify API (Website baut absolute URL). */
+export function partnerVorgangRelativeLink(auftragId: string): string {
+  const id = auftragId.trim()
+  return `/partner?section=vorgaenge&id=${encodeURIComponent(id)}`
+}
+
+/** @deprecated Nutze buildPartnerVorgangPortalUrl — alter Aufträge-Tab */
 export function buildPartnerAuftragPortalUrl(auftragId: string): string {
   const id = auftragId.trim()
   return `${publicWebsiteBaseUrl()}/partner?section=auftraege&auftrag=${encodeURIComponent(id)}`

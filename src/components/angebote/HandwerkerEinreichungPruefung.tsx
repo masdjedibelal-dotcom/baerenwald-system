@@ -3,6 +3,7 @@
 /**
  * @deprecated Gegenvorschlag-Prüfung — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
  */
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
@@ -75,6 +76,25 @@ export function HandwerkerEinreichungPruefung({
     zuweisungId: string
   }) => void
 }) {
+  if (auftragId) {
+    return (
+      <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-xs text-bw-text-muted">
+        <p className="font-medium text-bw-text">Vorgänge-Flow (Auftrag aktiv)</p>
+        <p className="mt-1">
+          Preise und Leistungen pflegt ihr im Auftrag unter Tab{' '}
+          <strong>Positionen</strong> (Zuweisen → Senden). Der Partner bestätigt im Portal unter{' '}
+          <strong>Vorgänge</strong> — ohne Gegenvorschlag oder „Übernehmen“ hier.
+        </p>
+        <Link
+          href={`/auftraege/${auftragId}?tab=leistung`}
+          className="mt-2 inline-block text-sm font-medium text-bw-primary hover:underline"
+        >
+          Zum Auftrag → Positionen
+        </Link>
+      </div>
+    )
+  }
+
   const [pending, startTransition] = useTransition()
   const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
   const [crmNotiz, setCrmNotiz] = useState('')

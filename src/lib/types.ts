@@ -613,6 +613,10 @@ export type AuftragPosition = {
   handwerker_id: string | null
   handwerker_status?: string | null
   handwerker_angefragt_at?: string | null
+  /** neu | geaendert | entfernt — CRM setzt, Portal cleart nach Annahme */
+  aenderung_typ?: 'neu' | 'geaendert' | 'entfernt' | string | null
+  /** Alter preis_partner vor Preisänderung (Netto-Zeile) */
+  preis_alt?: number | null
   /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt */
   leistung_status?: string | null
   absprachen?: string | null

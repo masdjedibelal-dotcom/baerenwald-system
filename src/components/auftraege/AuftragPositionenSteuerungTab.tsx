@@ -7,10 +7,7 @@ import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition, AuftragSta
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
-/**
- * Leistungen & Steuerung — flache Liste (v3).
- * Legacy-Implementierung: {@link AuftragPositionenSteuerungTabLegacy}
- */
+/** Leistungen & Steuerung — flache Liste (v3). */
 export function AuftragPositionenSteuerungTab({
   auftragId,
   positionen,

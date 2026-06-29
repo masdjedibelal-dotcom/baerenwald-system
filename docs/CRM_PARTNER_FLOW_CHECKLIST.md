@@ -1,5 +1,7 @@
 # CRM Partner-Flow — Checkliste (Stand Juni 2026)
 
+> **Partner-Journey (End-to-End):** HW-Angebot einreichen → CRM bestätigt (`uebernommen`) → Projektvertrag automatisch erzeugt → HW bestätigt im Portal → Auftrag freigeschaltet → Compliance-Dokumente → Bautagebuch. Siehe [HANDWERKER_KOORDINATION_PROZESS.md](./handwerker-koordination/HANDWERKER_KOORDINATION_PROZESS.md).
+
 Abgleich mit Portal-Migration `handwerks-plattform/supabase/migrations/20260611120000_portal_partner_vertrag_compliance.sql`.
 
 ## Prio 1 — Datenbank
@@ -29,7 +31,7 @@ Ohne aktive Einträge bleibt die Portal-Checkliste leer.
 |---------|------------|-----|
 | HW reicht Angebot ein | — (Portal) | `hw_status = eingereicht`, `hw_eingereicht_at` |
 | CRM + Kunde bestätigen | „Einreichung bestätigen“ | `hw_status = uebernommen` |
-| Nach Übernahme | **automatisch** (seit 20260618) | `handwerker_vertraege` `typ=projekt`, `status=pdf_erzeugt` |
+| Nach Übernahme | **automatisch** (seit 20260618) — silent sync ✅ | `handwerker_vertraege` `typ=projekt`, `status=pdf_erzeugt` |
 | HW bestätigt im Portal | API POST oder Portal-DB | `projektvertrag_bestaetigt_am` |
 | Auftrag sichtbar | — | Portal Tab „Aufträge“ |
 
@@ -68,6 +70,45 @@ Auth: Partner-JWT, `handwerker.auth_user_id = auth.uid()`.
 6. HW bestätigt verbindlich → `projektvertrag_bestaetigt_am`
 7. Portal Tab Aufträge: Auftrag + Dokumente
 8. Bautagebuch weiterhin OK
+
+---
+
+## Vorgänge-Flow (Leistungen am laufenden Auftrag)
+
+Siehe **[PORTAL_VORGAENGE_HANDOFF.md](./PORTAL_VORGAENGE_HANDOFF.md)** für Portal-Details.
+
+### Migration
+
+- [ ] `20260729120000_auftrag_positionen_vorgaenge_meta.sql` (CRM + Portal-Migration auf gleicher DB)
+
+### CRM-Prozess
+
+| Schritt | Portal-Mail? | DB-Felder |
+|---------|--------------|-----------|
+| Zuweisen (Popup) | Nein | `handwerker_status=zugewiesen`, `aenderung_typ=neu` |
+| Senden (Leiste) | Ja (`typ: neu/geaendert/entfernt`) | `handwerker_status=angefragt` |
+| Löschen mit HW | Ja (`typ: entfernt`) | Zeile bleibt, `aenderung_typ=entfernt` |
+| Partner bestätigt | — | **nur Portal** setzt `handwerker_bestaetigt_at`; bei `entfernt` löscht Portal die Zeile |
+
+### Env
+
+- [ ] `PARTNER_INTERNAL_API_SECRET` CRM = Portal
+- [ ] `NEXT_PUBLIC_SITE_URL` im CRM (Website/Portal-Host)
+
+### CRM-Code (Referenz)
+
+- Notify: `src/lib/partner/notify-partner-unified.ts`
+- v3 Actions: `src/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions.ts`
+- Meta: `src/lib/auftraege/partner-vorgang-meta.ts`
+- UI-Badges: `src/lib/auftraege/partner-vorgang-display.ts`
+
+### Test Vorgänge
+
+1. Zuweisen ohne Mail → Portal still
+2. Senden → Glocke + Tab Vorgänge
+3. Portal Annehmen → CRM ohne offenen Badge
+4. CRM ändert Preis → erneut senden → Portal „Geändert“
+5. CRM entfernt Leistung → Portal „Entfernt“ → Annahme → Zeile weg in CRM
 
 ## Bekannte Abweichungen / Klärung mit Frontend
 

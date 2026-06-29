@@ -4,34 +4,21 @@ import { useEffect, useState, useTransition } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
-import {
-  LEISTUNG_STATUS_OPTIONS,
-  type AuftragLeistungStatus,
-} from '@/lib/auftraege/auftrag-fortschritt-preis'
-import { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
-import { notifyPartnerPositionGeaendertV3 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
-import type { AuftragPosition } from '@/lib/types'
-import { normalizeLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
+import { updateAngebotPositionSteuerung } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
+import { positionNettoZeile } from '@/lib/angebot-positionen'
+import type { AngebotPosition } from '@/lib/types'
 
-type GewerkOpt = { id: string; name: string; slug: string }
-
-export function AuftragLeistungEditModal({
+export function AngebotLeistungEditModal({
   open,
   onClose,
   pos,
-  auftragId,
   angebotId,
-  projektName,
-  gewerke,
   onSaved,
 }: {
   open: boolean
   onClose: () => void
-  pos: AuftragPosition | null
-  auftragId: string
-  angebotId?: string | null
-  projektName: string
-  gewerke: GewerkOpt[]
+  pos: AngebotPosition | null
+  angebotId: string
   onSaved: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -39,58 +26,45 @@ export function AuftragLeistungEditModal({
   const [beschreibung, setBeschreibung] = useState('')
   const [vk, setVk] = useState('')
   const [ek, setEk] = useState('')
-  const [von, setVon] = useState('')
-  const [bis, setBis] = useState('')
-  const [status, setStatus] = useState<AuftragLeistungStatus>('offen')
+  const [menge, setMenge] = useState('1')
+  const [einheit, setEinheit] = useState('Stk.')
 
   useEffect(() => {
     if (!open || !pos) return
-    setName(pos.leistung_name ?? '')
+    setName(pos.leistung_name || pos.leistung || '')
     setBeschreibung(pos.beschreibung ?? '')
-    setVk(pos.preis_fix != null ? String(pos.preis_fix) : '')
-    setEk(pos.preis_partner != null ? String(pos.preis_partner) : '')
-    setVon(pos.start_datum?.slice(0, 10) ?? '')
-    setBis(pos.end_datum?.slice(0, 10) ?? '')
-    setStatus(normalizeLeistungStatus(pos.leistung_status))
+    setVk(String(positionNettoZeile(pos)))
+    const ekLine = (pos.einkaufspreis ?? 0) * (pos.menge || 1)
+    setEk(ekLine > 0 ? String(ekLine) : '')
+    setMenge(String(pos.menge || 1))
+    setEinheit(pos.einheit || 'Stk.')
   }, [open, pos])
 
   function save() {
     if (!pos) return
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error('Name ist erforderlich.')
+      toast.error('Bezeichnung ist erforderlich.')
       return
     }
     const vkNum = vk.trim() ? Number(vk.replace(',', '.')) : null
     const ekNum = ek.trim() ? Number(ek.replace(',', '.')) : null
+    const mengeNum = menge.trim() ? Number(menge.replace(',', '.')) : 1
 
     startTransition(async () => {
-      const r = await updateAuftragPositionSteuerung(pos.id, auftragId, {
+      const r = await updateAngebotPositionSteuerung(angebotId, pos.id, {
         leistung_name: trimmed,
         beschreibung: beschreibung.trim() || null,
-        preis_fix: vkNum != null && Number.isFinite(vkNum) ? vkNum : null,
-        preis_partner: ekNum != null && Number.isFinite(ekNum) ? ekNum : null,
-        start_datum: von || null,
-        end_datum: bis || null,
-        leistung_status: status,
+        vk_netto: vkNum != null && Number.isFinite(vkNum) ? vkNum : null,
+        ek_netto: ekNum != null && Number.isFinite(ekNum) ? ekNum : null,
+        menge: mengeNum > 0 ? mengeNum : 1,
+        einheit: einheit.trim() || 'Stk.',
       })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-
-      if (r.partnerAenderung && pos.handwerker_id) {
-        const notify = await notifyPartnerPositionGeaendertV3({
-          auftragId,
-          angebotId,
-          positionId: pos.id,
-          projektName,
-          gewerke,
-        })
-        if (!notify.ok) toast.error(notify.message)
-      }
-
-      toast.success('Leistung gespeichert.')
+      toast.success('Position gespeichert.')
       onSaved()
       onClose()
     })
@@ -102,7 +76,7 @@ export function AuftragLeistungEditModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Leistung bearbeiten"
+      title="Position bearbeiten"
       size="lg"
       footer={
         <>
@@ -117,7 +91,7 @@ export function AuftragLeistungEditModal({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className="input-label">Name</label>
+          <label className="input-label">Bezeichnung</label>
           <input className="input w-full" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="sm:col-span-2">
@@ -157,27 +131,19 @@ export function AuftragLeistungEditModal({
           </div>
         </div>
         <div>
-          <label className="input-label">Von</label>
-          <input type="date" className="input w-full" value={von} onChange={(e) => setVon(e.target.value)} />
+          <label className="input-label">Menge</label>
+          <input
+            type="number"
+            className="input w-full"
+            step="0.01"
+            min="0.01"
+            value={menge}
+            onChange={(e) => setMenge(e.target.value)}
+          />
         </div>
         <div>
-          <label className="input-label">Bis</label>
-          <input type="date" className="input w-full" value={bis} onChange={(e) => setBis(e.target.value)} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="input-label">Baufortschritt</label>
-          <div className="pos-v3-segmented">
-            {LEISTUNG_STATUS_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={status === o.value ? 'active' : undefined}
-                onClick={() => setStatus(o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          <label className="input-label">Einheit</label>
+          <input className="input w-full" value={einheit} onChange={(e) => setEinheit(e.target.value)} />
         </div>
       </div>
     </Modal>

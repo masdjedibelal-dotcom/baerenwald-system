@@ -24,6 +24,8 @@ import { AuftragGewerkAddRow } from '@/components/auftraege/leistungen-v3/Auftra
 import { AuftragLeistungNewModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungNewModal'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { LeistungStatusPill } from '@/components/auftraege/leistungen-v3/LeistungStatusPill'
+import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/PartnerVorgangChip'
+import { istPartnerEntfernungAusstehend } from '@/lib/auftraege/partner-vorgang-display'
 import {
   blockVkSumme,
   createLeeresGewerkBlock,
@@ -145,12 +147,20 @@ export function AuftragLeistungenV3Tab({
       return
     }
     startTransition(async () => {
-      const r = await bulkDeleteAuftragPositionenV3(auftragId, ids)
+      const r = await bulkDeleteAuftragPositionenV3(auftragId, ids, { projektName: angebotTitel })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success(r.deleted === 1 ? 'Leistung entfernt.' : `${r.deleted} Leistungen entfernt.`)
+      const msg =
+        r.markiert > 0
+          ? r.markiert === 1
+            ? 'Leistung als entfernt markiert — Partner wird informiert.'
+            : `${r.markiert} Leistungen als entfernt markiert — Partner wird informiert.`
+          : r.deleted === 1
+            ? 'Leistung entfernt.'
+            : `${r.deleted} Leistungen entfernt.`
+      toast.success(msg)
       clearSelection()
       setDetailPos(null)
       refresh()
@@ -160,12 +170,16 @@ export function AuftragLeistungenV3Tab({
   function deleteOne(pos: AuftragPosition) {
     if (!window.confirm(`„${pos.leistung_name}" wirklich entfernen?`)) return
     startTransition(async () => {
-      const r = await bulkDeleteAuftragPositionenV3(auftragId, [pos.id])
+      const r = await bulkDeleteAuftragPositionenV3(auftragId, [pos.id], { projektName: angebotTitel })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Leistung entfernt.')
+      toast.success(
+        r.markiert > 0
+          ? 'Leistung als entfernt markiert — Partner wird informiert.'
+          : 'Leistung entfernt.'
+      )
       setDetailPos(null)
       setSelectedIds((prev) => {
         const next = new Set(prev)
@@ -310,11 +324,17 @@ export function AuftragLeistungenV3Tab({
                 const vk = Math.max(0, pos.preis_fix ?? 0)
                 const zeitraum = formatZeitraumKurz(pos)
                 const hwName = pos.handwerker?.name
+                const entferntPending = istPartnerEntfernungAusstehend(pos)
+                const rowLocked = entferntPending
 
                 return (
                   <li key={pos.id}>
                     <div
-                      className={cn('pos-v3-row', selectedIds.has(pos.id) && 'pos-v3-row--selected')}
+                      className={cn(
+                        'pos-v3-row',
+                        selectedIds.has(pos.id) && 'pos-v3-row--selected',
+                        entferntPending && 'pos-v3-row--entfernt'
+                      )}
                       role="button"
                       tabIndex={0}
                       onClick={() => setDetailPos(pos)}
@@ -329,16 +349,17 @@ export function AuftragLeistungenV3Tab({
                         <input
                           type="checkbox"
                           checked={selectedIds.has(pos.id)}
-                          disabled={disabled}
+                          disabled={disabled || rowLocked}
                           onChange={() => toggleOne(pos.id)}
                         />
                       </label>
 
                       <div className="pos-v3-row-main">
                         <span className="pos-v3-row-name">{pos.leistung_name}</span>
+                        <PartnerVorgangChip pos={pos} />
                         {hwName ? (
                           <span className="pos-v3-hw-chip">{hwName}</span>
-                        ) : (
+                        ) : !rowLocked ? (
                           <button
                             type="button"
                             className="pos-v3-hw-chip pos-v3-hw-chip--action"
@@ -351,7 +372,7 @@ export function AuftragLeistungenV3Tab({
                             <UserPlus className="h-3 w-3" />
                             Zuweisen
                           </button>
-                        )}
+                        ) : null}
                         {zeitraum ? <span className="pos-v3-row-zeitraum">{zeitraum}</span> : null}
                       </div>
 
@@ -366,7 +387,7 @@ export function AuftragLeistungenV3Tab({
                       <div onClick={(e) => e.stopPropagation()}>
                         <LeistungStatusPill
                           status={pos.leistung_status}
-                          disabled={disabled}
+                          disabled={disabled || rowLocked}
                           onChange={(s) => updateStatus(pos, s)}
                         />
                       </div>
@@ -374,8 +395,8 @@ export function AuftragLeistungenV3Tab({
                       <button
                         type="button"
                         className="pos-v3-row-delete"
-                        disabled={disabled}
-                        aria-label="Leistung entfernen"
+                        disabled={disabled || rowLocked}
+                        aria-label={rowLocked ? 'Entfernung wartet auf Partner' : 'Leistung entfernen'}
                         onClick={(e) => {
                           e.stopPropagation()
                           deleteOne(pos)

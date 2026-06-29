@@ -46,4 +46,38 @@ export const UI_PHASES: UiPhase[] = [
       'Branding: weichere Borders, ruhigere Cards',
     ],
   },
+  {
+    id: 'D',
+    title: 'Fundament — Status & Tokens',
+    status: 'done',
+    todos: [
+      'StatusBadge + status-display.ts (semantische Varianten)',
+      'Design Tokens in globals.css (Spacing-Referenz)',
+      'Detail-Pattern: ein Badge im Header (Anfrage, Angebot, Auftrag)',
+      'Breakpoint 900px dokumentieren',
+    ],
+  },
+  {
+    id: 'E',
+    title: 'Kernflows',
+    status: 'in_progress',
+    todos: [
+      'Angebot-Positionen v3 editierbar (wie Auftrag)',
+      'Positionen v3 — Vorgänge-Flow + Badges',
+      'Handwerker-Journey CRM + Portal (Checkliste + Handoff-Doku)',
+      'Angebot-Wizard + Detail entflechten',
+      'Finanzen — ein Einstieg (Tab vs. Route)',
+    ],
+  },
+  {
+    id: 'F',
+    title: 'Konsolidierung',
+    status: 'planned',
+    todos: [
+      'Legacy Positionen-Tab entfernt (v3 aktiv)',
+      'Einstellungen IA (Preise & Listen)',
+      'Empty/Error/Loading überall vereinheitlichen',
+      'Accessibility-Pass (Fokus, Kontrast, Touch)',
+    ],
+  },
 ]

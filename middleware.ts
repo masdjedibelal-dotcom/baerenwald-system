@@ -30,7 +30,13 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  let supabaseResponse = NextResponse.next({ request })
+  const path = request.nextUrl.pathname
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', path)
+
+  let supabaseResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +50,9 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({
+            request: { headers: requestHeaders },
+          })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -58,8 +66,6 @@ export async function middleware(request: NextRequest) {
   try {
     const { data, error } = await supabase.auth.getUser()
     if (error) {
-      // AuthSessionMissingError ist normal (= kein eingeloggter User), also kein Fehler.
-      // Netzwerk-/DNS-Fehler (AuthRetryableFetchError, status 0) sollen den Loop verhindern.
       const err = error as unknown as { status?: number; name?: string }
       if (err.status === 0 || err.name === 'AuthRetryableFetchError') {
         authReachable = false
@@ -67,11 +73,9 @@ export async function middleware(request: NextRequest) {
     }
     user = data.user
   } catch {
-    // fetch failed → DNS / Netzwerk weg
     authReachable = false
   }
 
-  const path = request.nextUrl.pathname
   const isPublic =
     path.startsWith('/login') ||
     path.startsWith('/auth/') ||
@@ -88,7 +92,6 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/cron/') ||
     path.startsWith('/api/dev/auto-login')
 
-  // Lokal: automatisch mit DEV_CRM_* einloggen (siehe .env.example)
   if (devAuthSkipEnabled() && !user && !isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = '/api/dev/auto-login'
@@ -96,10 +99,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Wenn Supabase nicht erreichbar ist: KEIN Redirect-Loop produzieren.
-  // Request einfach durchlassen — Layout/Login zeigen ihren eigenen Fallback.
   if (!authReachable) {
-    return supabaseResponse
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   if (!user && !isPublic) {
@@ -108,7 +109,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  if (user && path === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

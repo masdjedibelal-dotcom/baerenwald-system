@@ -3,6 +3,7 @@
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { positionNettoZeile } from '@/lib/angebot-positionen'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import type { AngebotPosition } from '@/lib/types'
 import { angebotPositionAnzeigeTitel, angebotRowMarge } from '@/components/angebote/positionen-v3/utils'
@@ -12,16 +13,24 @@ export function AngebotPositionDetailModal({
   onClose,
   pos,
   gewerkName,
+  editable = false,
+  disabled = false,
+  onRemove,
+  onEdit,
 }: {
   open: boolean
   onClose: () => void
   pos: AngebotPosition | null
   gewerkName: string
+  editable?: boolean
+  disabled?: boolean
+  onRemove?: () => void
+  onEdit?: () => void
 }) {
   if (!pos) return null
 
   const titel = angebotPositionAnzeigeTitel(pos)
-  const vk = Math.max(0, (pos.lohn_netto + pos.material_netto) * (pos.menge || 1))
+  const vk = positionNettoZeile(pos)
   const { ek, marge, pct } = angebotRowMarge(pos)
   const besch = pos.beschreibung?.trim()
   const hwName = pos.handwerker_name?.trim()
@@ -33,9 +42,22 @@ export function AngebotPositionDetailModal({
       title={titel}
       size="lg"
       footer={
-        <Button type="button" variant="primary" onClick={onClose}>
-          Schließen
-        </Button>
+        editable && onEdit && onRemove ? (
+          <>
+            <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
+              Entfernen
+            </Button>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
+                Bearbeiten
+              </Button>
+            </div>
+          </>
+        ) : (
+          <Button type="button" variant="primary" onClick={onClose}>
+            Schließen
+          </Button>
+        )
       }
     >
       <dl className="pos-v3-detail-grid">

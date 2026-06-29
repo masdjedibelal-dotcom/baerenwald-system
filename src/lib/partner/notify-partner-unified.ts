@@ -3,6 +3,8 @@
  * @see handwerks-plattform/src/app/api/internal/partner-notify/route.ts
  */
 
+import { partnerVorgangRelativeLink } from '@/lib/portal-utils'
+
 export type PartnerNotifyTyp = 'neu' | 'geaendert' | 'entfernt' | 'erinnerung'
 
 function partnerSiteBaseUrl(): string {
@@ -23,6 +25,8 @@ export async function notifyPartnerUnified(input: {
   anfrageId?: string | null
   auftragId?: string | null
   positionIds?: string[]
+  aenderungTyp?: 'neu' | 'geaendert' | 'entfernt' | null
+  preisAlt?: number | null
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
   if (!secret) {
@@ -40,6 +44,8 @@ export async function notifyPartnerUnified(input: {
   if (input.anfrageId) body.anfrageId = input.anfrageId
   if (input.auftragId) body.auftragId = input.auftragId
   if (input.positionIds?.length) body.positionIds = input.positionIds
+  if (input.aenderungTyp) body.aenderungTyp = input.aenderungTyp
+  if (input.preisAlt != null && Number.isFinite(input.preisAlt)) body.preisAlt = input.preisAlt
 
   let res: Response
   try {
@@ -70,6 +76,12 @@ export async function notifyPartnerUnified(input: {
   return { ok: true }
 }
 
+/** Primärer Deep-Link für Zuweisung/Änderung (Tab Vorgänge). */
+export function partnerVorgangLink(auftragId: string): string {
+  return partnerVorgangRelativeLink(auftragId)
+}
+
+/** @deprecated Legacy — Tab „Offen“. Nutze partnerVorgangLink(auftragId). */
 export function partnerOffenLink(anfrageId: string): string {
   return `/partner?section=offen&id=${encodeURIComponent(anfrageId)}`
 }

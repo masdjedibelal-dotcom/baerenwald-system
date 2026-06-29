@@ -45,7 +45,9 @@ import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
+import { KanalBadge } from '@/components/ui/Badge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -793,7 +795,10 @@ export function AnfrageDetailClient({
         backHref="/anfragen"
         backLabel="Zurück zu Anfragen"
         title={kundenName(lead)}
-        badges={<LeadStatusBadge status={lead.status} />}
+        badges={(() => {
+          const s = anfrageStatusDisplay(lead.status)
+          return <StatusBadge label={s.label} variant={s.variant} />
+        })()}
         meta={headMeta}
         actions={
           <>

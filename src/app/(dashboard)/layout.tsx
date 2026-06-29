@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureUnifiedTeamAccount } from '@/lib/auth/unified-team-account'
 import { ensureStandardTemplates } from '@/lib/standard-templates'
+import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -33,6 +35,10 @@ export default async function DashboardLayout({
     } = await supabase.auth.getUser()
 
     if (!user) {
+      if (isDevAuthSkipEnabled()) {
+        const path = headers().get('x-pathname') || '/'
+        redirect(`/api/dev/auto-login?next=${encodeURIComponent(path)}`)
+      }
       redirect('/login')
     }
 

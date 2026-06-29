@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import {
   ClipboardList,
@@ -39,7 +39,7 @@ import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCo
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
-import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -72,6 +72,7 @@ import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
+import { auftragStatusDisplay, auftragTypDisplay } from '@/lib/status/status-display'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -158,6 +159,25 @@ const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'finanzen',
 ]
 
+const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
+  'stammdaten',
+  'leistung',
+  'baustelle',
+  'schritte',
+  'aktivitaet',
+  'dokumente',
+  'compliance',
+  'finanzen',
+])
+
+function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab | null {
+  const tab = (raw ?? '').trim().toLowerCase()
+  if (!tab) return null
+  if (tab === 'positionen') return 'leistung'
+  if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
+  return null
+}
+
 export function AuftragDetailClient({
   detail: initial,
   lead = null,
@@ -192,6 +212,7 @@ export function AuftragDetailClient({
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { refresh, generation } = useCrmRefresh()
   const isMobile = useIsMobile()
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
@@ -208,6 +229,11 @@ export function AuftragDetailClient({
     phase: 'vorab' | 'update' | 'abnahme'
   } | null>(null)
   const [mainTab, setMainTab] = useState<AuftragDetailTab>('schritte')
+
+  useEffect(() => {
+    const tab = resolveAuftragDetailTabFromQuery(searchParams.get('tab'))
+    if (tab) setMainTab(tab)
+  }, [searchParams])
   const [projektModal, setProjektModal] = useState(false)
   const [projektTitel, setProjektTitel] = useState('')
   const [projektStart, setProjektStart] = useState('')
@@ -402,6 +428,9 @@ export function AuftragDetailClient({
       }),
     [detail.ist_bauprojekt, detail.auftrag_positionen, gewerke]
   )
+
+  const auftragStatus = useMemo(() => auftragStatusDisplay(detail.status), [detail.status])
+  const auftragTyp = useMemo(() => auftragTypDisplay(istBauprojekt), [istBauprojekt])
 
   const projektName = auftragTitel(detail)
   const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
@@ -1064,17 +1093,16 @@ export function AuftragDetailClient({
         title={projektName}
         badges={
           <>
-            <AuftragStatusBadge status={detail.status} />
-            <span
-              className={`badge badge-no-dot ${istBauprojekt ? 'badge-offer' : ''}`}
+            <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />
+            <StatusBadge
+              variant={auftragTyp.variant}
+              label={auftragTyp.label}
               title={
                 istBauprojekt
                   ? 'Bauprojekt: Bautagebuch, Compliance-Checkliste'
                   : 'Standardauftrag ohne Bau-Checkliste'
               }
-            >
-              {istBauprojekt ? 'Bauprojekt' : 'Standardauftrag'}
-            </span>
+            />
           </>
         }
         meta={headMeta}

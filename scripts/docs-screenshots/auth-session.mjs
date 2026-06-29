@@ -25,15 +25,23 @@ async function createDocsSession() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data: usersData, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 20 })
+  const { data: usersData, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 50 })
   if (listErr) throw new Error(`Supabase listUsers: ${listErr.message}`)
 
+  const { data: crmProfiles } = await admin.from('user_profiles').select('id')
+  const crmIds = new Set((crmProfiles ?? []).map((p) => p.id))
+
+  const candidates = usersData.users.filter((u) => u.email && !u.email.endsWith('@anon.local'))
   const user =
-    usersData.users.find((u) => u.email && !u.email.endsWith('@anon.local')) ??
-    usersData.users.find((u) => u.email)
+    candidates.find((u) => crmIds.has(u.id)) ??
+    candidates.find((u) => {
+      const meta = (u.user_metadata ?? {}) as { portal_role?: string }
+      return meta.portal_role !== 'handwerker'
+    }) ??
+    candidates[0]
 
   if (!user?.email) {
-    throw new Error('Kein Supabase-Auth-User gefunden.')
+    throw new Error('Kein CRM-Auth-User gefunden.')
   }
 
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({

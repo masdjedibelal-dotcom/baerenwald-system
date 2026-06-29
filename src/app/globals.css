@@ -2954,6 +2954,34 @@
     @apply bg-bw-primary/5;
   }
 
+  .pos-v3-row--entfernt {
+    @apply bg-bw-bg/80 opacity-75;
+  }
+
+  .pos-v3-row--entfernt .pos-v3-row-name {
+    @apply line-through text-bw-text-muted;
+  }
+
+  .pos-v3-vorgang-chip {
+    @apply mt-0.5 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight;
+  }
+
+  .pos-v3-vorgang-chip--entfernt {
+    @apply bg-red-50 text-red-800 ring-1 ring-red-200/80;
+  }
+
+  .pos-v3-vorgang-chip--geaendert {
+    @apply bg-amber-50 text-amber-900 ring-1 ring-amber-200/80;
+  }
+
+  .pos-v3-vorgang-chip--neu {
+    @apply bg-slate-100 text-slate-700 ring-1 ring-slate-200/80;
+  }
+
+  .pos-v3-vorgang-chip--gesendet {
+    @apply bg-sky-50 text-sky-900 ring-1 ring-sky-200/80;
+  }
+
   .pos-v3-check {
     @apply flex shrink-0 items-center;
   }
@@ -3827,7 +3855,16 @@
     z-index: 200;
   }
 
-  /* ── App-ready: Design-Tokens & Primitives (W5) ── */
+  /* ── App-ready: Design-Tokens & Primitives (W5) ──
+   *
+   * Spacing-Skala (Tailwind → px):
+   *   0=0 · 0.5=2 · 1=4 · 1.5=6 · 2=8 · 2.5=10 · 3=12 · 4=16 · 5=20
+   *   6=24 · 8=32 · 10=40 · 11=44 · 12=48 · 18=72 · 22=88
+   *
+   * Radius: sm=4 · md=6 · lg=8 · xl=12 · 2xl=16
+   * Shadow: sm / md / lg / card (siehe tailwind.config.ts)
+   * Farben: bw-primary (#2E7D52) · status-*-bg/text · sidebar-*
+   */
   :root {
     --app-grouped: #f2f2f7;
     --app-card: #ffffff;

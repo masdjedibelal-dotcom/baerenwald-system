@@ -63,7 +63,7 @@ import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSecti
 import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { KundeModal } from '@/components/kunden/KundeModal'
-import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import {
   angebotSummenBrutto,
@@ -79,6 +79,7 @@ import {
   kundeNameAusAngebot,
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
+import { angebotStatusDisplay } from '@/lib/status/status-display'
 import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/AngebotPositionenV3Tab'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -155,6 +156,7 @@ export function AngebotDetailPageClient({
   const orgFreigabeStatus = lead?.org_freigabe_status ?? null
 
   const statusEinfach = resolveStatusEinfach(detail)
+  const angebotStatus = useMemo(() => angebotStatusDisplay(detail), [detail])
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
   const positionenAnzeigeCount = useMemo(
@@ -165,6 +167,9 @@ export function AngebotDetailPageClient({
   const kannBearbeiten =
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
+
+  /** Positionen v3: wie Auftrag — solange Wizard-Status es erlaubt (auch nach Kundenannahme). */
+  const positionenBearbeitbar = angebotDarfImWizardBearbeitetWerden(detail.status)
 
   function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap) {
     setWizardBootstrap(bootstrap)
@@ -682,7 +687,13 @@ export function AngebotDetailPageClient({
   )
 
   const positionenTab = (
-    <AngebotPositionenV3Tab positionen={detail.positionen ?? []} gewerke={gewerke} />
+    <AngebotPositionenV3Tab
+      angebotId={detail.id}
+      positionen={detail.positionen ?? []}
+      gewerke={gewerke}
+      editable={positionenBearbeitbar}
+      onChanged={() => refresh()}
+    />
   )
 
   const stammdatenInhalt = (
@@ -828,7 +839,9 @@ export function AngebotDetailPageClient({
         backHref="/angebote"
         backLabel="Zurück zu Angebote"
         title={kundeName}
-        badges={<AngebotEinfachStatusBadge status={statusEinfach} />}
+        badges={
+          <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />
+        }
         meta={headMeta}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">

@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { handwerkerAusGeschwisterPositionen, ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
+import { metaNeueLeistungMitPartner } from '@/lib/auftraege/partner-vorgang-meta'
 import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
 import { buildInternFormularSubmittedHtml, sendEmailHtml } from '@/lib/auftraege/emails'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -257,6 +258,14 @@ export async function addAuftragPosition(
     .limit(1)
     .maybeSingle()
   const nextOrder = (last?.sort_order ?? 0) + 10
+  const partnerMeta =
+    handwerkerId != null
+      ? metaNeueLeistungMitPartner(
+          data.preis_partner ?? null,
+          handwerkerStatus ?? 'zugewiesen'
+        )
+      : {}
+
   const { data: inserted, error } = await supabase
     .from('auftrag_positionen')
     .insert({
@@ -280,6 +289,7 @@ export async function addAuftragPosition(
       handwerker_id: handwerkerId ?? null,
       handwerker_status: handwerkerStatus ?? null,
       sort_order: nextOrder,
+      ...partnerMeta,
     })
     .select('id')
     .single()

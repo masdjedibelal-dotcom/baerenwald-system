@@ -12,6 +12,11 @@ import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { gewichteterFortschrittProzent } from '@/lib/auftraege/auftrag-fortschritt-preis'
+import {
+  metaHandwerkerEntfernt,
+  metaNeueLeistungMitPartner,
+  metaPartnerAenderung,
+} from '@/lib/auftraege/partner-vorgang-meta'
 import type { AuftragLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import type { AuftragPosition, AuftragPositionNotiz } from '@/lib/types'
 import {
@@ -120,7 +125,7 @@ export async function updateAuftragPositionSteuerung(
       | 'leistung_status'
     >
   >
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; partnerAenderung?: boolean } | { ok: false; message: string }> {
   const supabase = createClient()
   const patch: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(data)) {
@@ -128,28 +133,44 @@ export async function updateAuftragPositionSteuerung(
   }
   if (!Object.keys(patch).length) return { ok: true }
 
+  const { data: currentRow } = await supabase
+    .from('auftrag_positionen')
+    .select('handwerker_id, preis_partner, handwerker_status, aenderung_typ, leistung_name, beschreibung')
+    .eq('id', posId)
+    .maybeSingle()
+
+  const current = currentRow as {
+    handwerker_id: string | null
+    preis_partner: number | null
+    handwerker_status?: string | null
+    aenderung_typ?: string | null
+    leistung_name?: string | null
+    beschreibung?: string | null
+  } | null
+
   if (patch.handwerker_id === null) {
-    patch.preis_partner = null
+    Object.assign(patch, metaHandwerkerEntfernt())
+  } else if (current) {
+    const inhaltGeaendert =
+      ('leistung_name' in patch &&
+        String(patch.leistung_name ?? '') !== String(current.leistung_name ?? '')) ||
+      ('beschreibung' in patch &&
+        String(patch.beschreibung ?? '') !== String(current.beschreibung ?? ''))
+
+    const partnerMeta = metaPartnerAenderung(current, {
+      handwerkerId: 'handwerker_id' in patch ? (patch.handwerker_id as string | null) : undefined,
+      preisPartner: 'preis_partner' in patch ? (patch.preis_partner as number | null) : undefined,
+      inhaltGeaendert,
+    })
+    if (partnerMeta) Object.assign(patch, partnerMeta)
   }
 
-  if (patch.preis_partner != null && !('handwerker_id' in patch)) {
-    const { data: current } = await supabase
-      .from('auftrag_positionen')
-      .select('handwerker_id')
-      .eq('id', posId)
-      .maybeSingle()
-    if (!current?.handwerker_id) {
-      patch.preis_partner = null
-    }
+  if (patch.preis_partner != null && !('handwerker_id' in patch) && !current?.handwerker_id) {
+    patch.preis_partner = null
   }
 
   let vorherHandwerkerId: string | null = null
   if (positionPatchBenoetigtVertragSync(patch)) {
-    const { data: current } = await supabase
-      .from('auftrag_positionen')
-      .select('handwerker_id')
-      .eq('id', posId)
-      .maybeSingle()
     vorherHandwerkerId = current?.handwerker_id ? String(current.handwerker_id) : null
   }
 
@@ -175,7 +196,12 @@ export async function updateAuftragPositionSteuerung(
   } else {
     revalidatePath(`/auftraege/${auftragId}`)
   }
-  return { ok: true }
+  const partnerAenderung = Boolean(
+    current?.handwerker_id &&
+      patch.aenderung_typ &&
+      patch.aenderung_typ !== 'neu'
+  )
+  return { ok: true, partnerAenderung }
 }
 
 export async function updateAuftragPositionLeistungStatus(input: {

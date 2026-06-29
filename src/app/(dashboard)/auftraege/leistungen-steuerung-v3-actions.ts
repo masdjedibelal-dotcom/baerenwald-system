@@ -7,7 +7,13 @@ import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-positio
 import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
 import { syncProjektvertragStilleFuerAuftrag } from '@/lib/vertraege/sync-projektvertrag-stille'
 import { gewerkIdFuerPosition } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
-import { notifyPartnerUnified, partnerOffenLink } from '@/lib/partner/notify-partner-unified'
+import {
+  metaBeimSendenAnHandwerker,
+  metaErstzuweisung,
+  metaLeistungEntfernt,
+  metaPartnerAenderung,
+} from '@/lib/auftraege/partner-vorgang-meta'
+import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -24,29 +30,68 @@ async function assertAuftrag(auftragId: string) {
 
 export async function bulkDeleteAuftragPositionenV3(
   auftragId: string,
-  positionIds: string[]
-): Promise<{ ok: true; deleted: number } | { ok: false; message: string }> {
+  positionIds: string[],
+  opts?: { projektName?: string }
+): Promise<{ ok: true; deleted: number; markiert: number } | { ok: false; message: string }> {
   const gate = await assertAuftrag(auftragId)
   if (!gate.ok) return gate
   const ids = Array.from(new Set(positionIds.map((id) => id.trim()).filter(Boolean)))
   if (!ids.length) return { ok: false, message: 'Keine Positionen ausgewählt.' }
 
+  const { data: rows, error: loadErr } = await gate.supabase!
+    .from('auftrag_positionen')
+    .select('id, leistung_name, handwerker_id, handwerker_status, aenderung_typ, preis_partner')
+    .eq('auftrag_id', auftragId)
+    .in('id', ids)
+
+  if (loadErr) return { ok: false, message: loadErr.message }
+
   let deleted = 0
-  for (const id of ids) {
-    const { error } = await gate.supabase!
-      .from('auftrag_positionen')
-      .delete()
-      .eq('id', id)
-      .eq('auftrag_id', auftragId)
-    if (error) return { ok: false, message: error.message }
-    deleted++
+  let markiert = 0
+  const projektName = opts?.projektName?.trim() || 'Projekt'
+
+  for (const row of rows ?? []) {
+    const id = String(row.id)
+    const hwId = row.handwerker_id ? String(row.handwerker_id) : null
+
+    if (hwId) {
+      const { error } = await gate.supabase!
+        .from('auftrag_positionen')
+        .update(metaLeistungEntfernt())
+        .eq('id', id)
+        .eq('auftrag_id', auftragId)
+      if (error) return { ok: false, message: error.message }
+      markiert++
+
+      const notify = await notifyPartnerUnified({
+        handwerkerId: hwId,
+        typ: 'entfernt',
+        projektName,
+        leistungName: String(row.leistung_name ?? ''),
+        link: partnerVorgangLink(auftragId),
+        auftragId,
+        positionIds: [id],
+        aenderungTyp: 'entfernt',
+      })
+      if (!notify.ok) return { ok: false, message: notify.error }
+
+      syncProjektvertragStilleFireAndForget(auftragId, hwId)
+    } else {
+      const { error } = await gate.supabase!
+        .from('auftrag_positionen')
+        .delete()
+        .eq('id', id)
+        .eq('auftrag_id', auftragId)
+      if (error) return { ok: false, message: error.message }
+      deleted++
+    }
   }
 
   await syncAuftragIstBauprojekt(auftragId)
   void syncProjektvertragStilleFuerAuftrag(auftragId)
 
   revalidatePath(`/auftraege/${auftragId}`)
-  return { ok: true, deleted }
+  return { ok: true, deleted, markiert }
 }
 
 export async function zuweiseHandwerkerAnPositionenV3(input: {
@@ -78,7 +123,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
 
   const { data: rows, error: loadErr } = await gate.supabase!
     .from('auftrag_positionen')
-    .select('id, gewerk_slug, gewerk_name')
+    .select('id, gewerk_slug, gewerk_name, handwerker_id, preis_partner, handwerker_status, aenderung_typ')
     .eq('auftrag_id', input.auftragId)
     .in('id', ids)
 
@@ -87,11 +132,21 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
 
   let updated = 0
   for (const row of rows) {
+    const current = row as PositionPartnerSnapshotRow
+    const partnerPatch =
+      metaPartnerAenderung(current, {
+        handwerkerId: hwId,
+        preisPartner: ek ?? current.preis_partner,
+      }) ?? metaErstzuweisung(ek ?? current.preis_partner)
+
     const patch: Record<string, unknown> = {
       handwerker_id: hwId,
-      handwerker_status: 'zugewiesen',
+      ...partnerPatch,
     }
-    if (ek != null) patch.preis_partner = ek
+    if (ek == null && current.preis_partner != null) {
+      // EK unverändert — nicht überschreiben
+      delete patch.preis_partner
+    }
 
     const { error } = await gate.supabase!
       .from('auftrag_positionen')
@@ -111,6 +166,13 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true, updated }
+}
+
+type PositionPartnerSnapshotRow = {
+  handwerker_id: string | null
+  preis_partner: number | null
+  handwerker_status?: string | null
+  aenderung_typ?: string | null
 }
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -150,7 +212,9 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
 
   const { data: posRows, error: pErr } = await gate.supabase!
     .from('auftrag_positionen')
-    .select('id, leistung_name, handwerker_id, handwerker_status, gewerk_slug, gewerk_name')
+    .select(
+      'id, leistung_name, handwerker_id, handwerker_status, gewerk_slug, gewerk_name, preis_partner, aenderung_typ, preis_alt'
+    )
     .eq('auftrag_id', input.auftragId)
     .not('handwerker_id', 'is', null)
 
@@ -162,12 +226,22 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
 
   const zuSenden = (posRows ?? []).filter((p) => {
     if (onlyIds && !onlyIds.has(String(p.id))) return false
+    if ((p.aenderung_typ ?? '') === 'entfernt') return false
     const st = (p.handwerker_status ?? '').toLowerCase()
     return st === 'zugewiesen' || st === '' || st === 'ausstehend'
   })
 
   if (!zuSenden.length) {
     return { ok: false, message: 'Keine zugewiesenen, noch nicht gesendeten Leistungen.' }
+  }
+
+  for (const p of zuSenden) {
+    if (p.preis_partner == null || Number(p.preis_partner) <= 0) {
+      return {
+        ok: false,
+        message: `„${String(p.leistung_name ?? 'Leistung')}“: preis_partner (Netto-Zeile) fehlt — Handwerker kann nicht annehmen.`,
+      }
+    }
   }
 
   const byHw = new Map<string, typeof zuSenden>()
@@ -181,25 +255,29 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
   const now = new Date().toISOString()
   const angebotId = input.angebotId?.trim() || null
   let gesendet = 0
+  const link = partnerVorgangLink(input.auftragId)
 
   for (const [hwId, positions] of Array.from(byHw.entries())) {
     const posIds = positions.map((p) => String(p.id))
 
-    for (const id of posIds) {
+    for (const p of positions) {
+      const sendPatch = metaBeimSendenAnHandwerker({
+        aenderung_typ: p.aenderung_typ as string | null,
+      })
+      if (!sendPatch.handwerker_angefragt_at) sendPatch.handwerker_angefragt_at = now
+
       const { error } = await gate.supabase!
         .from('auftrag_positionen')
-        .update({ handwerker_status: 'angefragt', handwerker_angefragt_at: now })
-        .eq('id', id)
+        .update(sendPatch)
+        .eq('id', p.id)
         .eq('auftrag_id', input.auftragId)
       if (error) return { ok: false, message: error.message }
       gesendet++
     }
 
-    let anfrageId: string | null = null
     if (angebotId && positions[0]) {
       const ahRow = await findAngebotHandwerkerRow(angebotId, hwId, positions[0] as AuftragPosition, gewerke)
       if (ahRow?.id) {
-        anfrageId = ahRow.id
         const prev = (ahRow.status ?? '').toLowerCase()
         if (!prev || prev === 'zugewiesen' || prev === 'ausstehend') {
           await supabaseAdmin
@@ -210,22 +288,28 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
       }
     }
 
-    const link = anfrageId
-      ? partnerOffenLink(anfrageId)
-      : `/partner?section=anfragen&id=auftrag:${input.auftragId}`
+    const aenderungTyp = positions.some((p) => p.aenderung_typ === 'geaendert')
+      ? 'geaendert'
+      : positions.some((p) => p.aenderung_typ === 'entfernt')
+        ? 'entfernt'
+        : 'neu'
 
     const notify = await notifyPartnerUnified({
       handwerkerId: hwId,
-      typ: 'neu',
+      typ: aenderungTyp === 'geaendert' ? 'geaendert' : 'neu',
       projektName: input.projektName,
       link,
       leistungName:
         positions.length === 1
           ? String(positions[0]!.leistung_name ?? '')
           : `${positions.length} Leistungen`,
-      anfrageId,
       auftragId: input.auftragId,
       positionIds: posIds,
+      aenderungTyp,
+      preisAlt:
+        positions.length === 1 && positions[0]!.preis_alt != null
+          ? Number(positions[0]!.preis_alt)
+          : null,
     })
 
     if (!notify.ok) {
@@ -245,45 +329,38 @@ export async function notifyPartnerPositionGeaendertV3(input: {
   positionId: string
   projektName: string
   gewerke?: GewerkOpt[]
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+}): Promise<{ ok: true; skipped?: boolean } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
   const { data: pos } = await gate.supabase!
     .from('auftrag_positionen')
-    .select('id, leistung_name, handwerker_id, gewerk_slug, gewerk_name')
+    .select(
+      'id, leistung_name, handwerker_id, gewerk_slug, gewerk_name, aenderung_typ, preis_alt, preis_partner, handwerker_status'
+    )
     .eq('id', input.positionId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
 
-  if (!pos?.handwerker_id) return { ok: true }
+  if (!pos?.handwerker_id) return { ok: true, skipped: true }
 
-  const hwId = String(pos.handwerker_id)
-  let anfrageId: string | null = null
-  const angebotId = input.angebotId?.trim()
-  if (angebotId) {
-    const row = await findAngebotHandwerkerRow(
-      angebotId,
-      hwId,
-      pos as AuftragPosition,
-      input.gewerke ?? []
-    )
-    anfrageId = row?.id ?? null
+  const aenderungTyp = (pos.aenderung_typ ?? '') as 'neu' | 'geaendert' | 'entfernt' | ''
+  if (!aenderungTyp || aenderungTyp === 'neu') {
+    return { ok: true, skipped: true }
   }
 
-  const link = anfrageId
-    ? partnerOffenLink(anfrageId)
-    : `/partner?section=anfragen&id=auftrag:${input.auftragId}`
+  const hwId = String(pos.handwerker_id)
 
   const notify = await notifyPartnerUnified({
     handwerkerId: hwId,
-    typ: 'geaendert',
+    typ: aenderungTyp === 'entfernt' ? 'entfernt' : 'geaendert',
     projektName: input.projektName,
     leistungName: String(pos.leistung_name ?? ''),
-    link,
-    anfrageId,
+    link: partnerVorgangLink(input.auftragId),
     auftragId: input.auftragId,
     positionIds: [input.positionId],
+    aenderungTyp,
+    preisAlt: pos.preis_alt != null ? Number(pos.preis_alt) : null,
   })
 
   if (!notify.ok) return { ok: false, message: notify.error }
@@ -300,13 +377,14 @@ export async function countUnsentZugewieseneLeistungenV3(
 
   const { data, error } = await gate.supabase!
     .from('auftrag_positionen')
-    .select('id, handwerker_id, handwerker_status')
+    .select('id, handwerker_id, handwerker_status, aenderung_typ')
     .eq('auftrag_id', auftragId)
     .not('handwerker_id', 'is', null)
 
   if (error) return { ok: false, message: error.message }
 
   const count = (data ?? []).filter((p) => {
+    if ((p.aenderung_typ ?? '') === 'entfernt') return false
     const st = (p.handwerker_status ?? '').toLowerCase()
     return st === 'zugewiesen' || st === '' || st === 'ausstehend'
   }).length
