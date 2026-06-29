@@ -102,6 +102,7 @@ import {
   type ProjektVertragWizardBootstrap,
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
+import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import {
@@ -280,14 +281,7 @@ export function AuftragDetailClient({
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
   const hauptvertraegeFuerNachtrag = useMemo(
-    () =>
-      vertraegeListe.filter(
-        (v) =>
-          v.typ === 'projekt' &&
-          v.dokument_art !== 'ergaenzung' &&
-          !v.parent_vertrag_id &&
-          (v.status === 'pdf_erzeugt' || v.status === 'unterschrieben')
-      ),
+    () => vertraegeListe.filter(istHauptvertragFuerNachtrag),
     [vertraegeListe]
   )
 
