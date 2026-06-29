@@ -1,3 +1,4 @@
+import { gesendetAmWert } from '@/lib/angebot-einfach'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { Angebot, AngebotHandwerkerRow, AuftragDetail } from '@/lib/types'
@@ -6,6 +7,41 @@ import {
   partnerHwDokumentListenName,
 } from '@/lib/partner/partner-hw-dokument-typen'
 import { normalizeUrlList } from '@/lib/utils'
+
+function dokumentDatumMs(datum: string | null | undefined): number {
+  if (!datum?.trim()) return 0
+  const ms = new Date(datum).getTime()
+  return Number.isNaN(ms) ? 0 : ms
+}
+
+/** Neueste zuerst; ohne Datum unten; bei Gleichstand alphabetisch (wie Kunden-/Partnerportal). */
+export function sortDokumentZeilenNachDatum<T extends { datum: string; name: string }>(
+  rows: T[]
+): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = dokumentDatumMs(a.datum)
+    const tb = dokumentDatumMs(b.datum)
+    if (ta !== tb) {
+      if (ta === 0) return 1
+      if (tb === 0) return -1
+      return tb - ta
+    }
+    return a.name.localeCompare(b.name, 'de')
+  })
+}
+
+/** Sichtbarkeit Angebot im Kundenportal (portal-dokumente.ts). */
+export function isAngebotKundenportalSichtbar(
+  ang: Pick<Angebot, 'gesendet_am' | 'gesendet_kunde_at' | 'status_einfach' | 'status'>
+): boolean {
+  const st = (ang.status_einfach ?? ang.status ?? '').toLowerCase()
+  return (
+    Boolean(gesendetAmWert(ang)) ||
+    st === 'gesendet' ||
+    st === 'angenommen' ||
+    st === 'kunde_akzeptiert'
+  )
+}
 
 export type AuftragDokumentZeile = {
   id: string
@@ -58,7 +94,7 @@ export function timelineDokumentZeilen(detail: AuftragDetail): AuftragDokumentZe
 
 export function rechnungDokumentZeilen(rechnungen: RechnungAuswahlZeile[]): AuftragDokumentZeile[] {
   return rechnungen
-    .filter((r) => r.pdf_url || r.status === 'gesendet')
+    .filter((r) => (r.status ?? '').toLowerCase() === 'gesendet' && Boolean(r.pdf_url?.trim()))
     .map((r) => ({
       id: `rechnung-${r.id}`,
       name: r.rechnungsnummer?.trim() || 'Rechnung',
@@ -148,19 +184,66 @@ export function zaehleHandwerkerDokumente(rows: AngebotHandwerkerRow[]): number 
 }
 
 export function abschlussdokumentZeile(detail: AuftragDetail): AuftragDokumentZeile | null {
-  const versendet = (detail.auftrag_timeline ?? []).some(
-    (ev) => ev?.typ === 'abschlussdoku_versendet'
-  )
-  if (!versendet) return null
-  const ev = (detail.auftrag_timeline ?? []).find((e) => e?.typ === 'abschlussdoku_versendet')
+  const url =
+    (detail as { abschlussdokumentation_url?: string | null }).abschlussdokumentation_url?.trim() ??
+    null
+  const gesendetAt = (detail as { abschlussdokumentation_gesendet_at?: string | null })
+    .abschlussdokumentation_gesendet_at
+
+  if (!url) {
+    const versendet = (detail.auftrag_timeline ?? []).some(
+      (ev) => ev?.typ === 'abschlussdoku_versendet'
+    )
+    if (!versendet) return null
+    const ev = (detail.auftrag_timeline ?? []).find((e) => e?.typ === 'abschlussdoku_versendet')
+    const timelinePdf = normalizeUrlList(ev?.foto_urls)[0]?.trim()
+    if (!timelinePdf) {
+      return {
+        id: 'abschlussdoku-pdf',
+        name: 'Abschlussdokumentation',
+        beschreibung: 'Abschluss',
+        datum: ev?.created_at ?? detail.updated_at ?? detail.created_at,
+        fuerKunde: Boolean(ev?.fuer_kunde_freigegeben),
+        href: `/api/auftraege/${detail.id}/abschlussdokumentation/pdf`,
+        quelle: 'protokoll',
+      }
+    }
+    return {
+      id: 'abschlussdoku-pdf',
+      name: 'Abschlussdokumentation',
+      beschreibung: 'Abschluss',
+      datum: gesendetAt ?? ev?.created_at ?? detail.updated_at ?? detail.created_at,
+      fuerKunde: true,
+      href: timelinePdf,
+      quelle: 'protokoll',
+    }
+  }
+
   return {
     id: 'abschlussdoku-pdf',
     name: 'Abschlussdokumentation',
     beschreibung: 'Abschluss',
-    datum: ev?.created_at ?? detail.updated_at ?? detail.created_at,
+    datum: gesendetAt ?? detail.updated_at ?? detail.created_at,
     fuerKunde: true,
-    href: `/api/auftraege/${detail.id}/abschlussdokumentation/pdf`,
+    href: url,
     quelle: 'protokoll',
+  }
+}
+
+export function angebotDokumentZeile(
+  detail: AuftragDetail,
+  ang: Angebot
+): AuftragDokumentZeile | null {
+  const href = ang.pdf_url?.trim()
+  if (!href) return null
+  return {
+    id: 'angebot-pdf',
+    name: 'Angebot PDF',
+    beschreibung: ang.angebotsnr?.trim() || 'Angebot',
+    datum: gesendetAmWert(ang) ?? ang.updated_at ?? detail.created_at,
+    fuerKunde: isAngebotKundenportalSichtbar(ang),
+    href,
+    quelle: 'angebot',
   }
 }
 
@@ -173,7 +256,7 @@ export function zaehleAuftragDokumente(
   n += rechnungDokumentZeilen(rechnungen).length
   n += vertragDokumentZeilen(vertraege).length
   const ang = angebotAusAuftragDetail(detail)
-  if (ang?.pdf_url) n += 1
+  if (ang?.pdf_url?.trim()) n += 1
   if (detail.abnahme_protokoll_url) n += 1
   if (abschlussdokumentZeile(detail)) n += 1
   n += zaehleHandwerkerDokumente(angebotHandwerkerAusAuftragDetail(detail))

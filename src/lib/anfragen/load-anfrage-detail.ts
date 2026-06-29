@@ -25,7 +25,9 @@ const SELECT_FULL = `
     positionen,
     created_at,
     angebotsnr,
-    pdf_url
+    pdf_url,
+    gesendet_am,
+    gesendet_kunde_at
   ),
   leads_status_history(*),
   kalender_termine(*),

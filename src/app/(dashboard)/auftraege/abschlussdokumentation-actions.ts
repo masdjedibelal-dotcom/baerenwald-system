@@ -25,6 +25,7 @@ import {
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { loadLeistungszeitraumAusRechnung } from '@/lib/auftraege/abschlussdokumentation-leistungszeitraum'
 import { renderAbschlussdokumentationPdfBuffer } from '@/lib/auftraege/render-abschlussdokumentation-pdf'
+import { persistAbschlussdokumentationPdf } from '@/lib/auftraege/persist-abschlussdokumentation-pdf'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { sendMail } from '@/lib/mail-service'
 import { normalizeUrlList } from '@/lib/utils'
@@ -185,15 +186,27 @@ async function buildAbschlussMailAnhaenge(
   return { ok: true, extraPdfAttachments }
 }
 
-async function markAuftragAbgeschlossen(auftragId: string, beschreibung: string, perMail: boolean) {
+async function markAuftragAbgeschlossen(
+  auftragId: string,
+  beschreibung: string,
+  perMail: boolean,
+  abschlussPdfUrl?: string | null
+) {
   const detail = await loadAuftragDetail(auftragId)
+  const now = new Date().toISOString()
   await supabaseAdmin
     .from('auftraege')
     .update({
       status: 'abgeschlossen',
       fortschritt: 100,
-      abnahme_datum: detail?.abnahme_datum ?? new Date().toISOString().slice(0, 10),
-      updated_at: new Date().toISOString(),
+      abnahme_datum: detail?.abnahme_datum ?? now.slice(0, 10),
+      ...(perMail && abschlussPdfUrl?.trim()
+        ? {
+            abschlussdokumentation_url: abschlussPdfUrl.trim(),
+            abschlussdokumentation_gesendet_at: now,
+          }
+        : {}),
+      updated_at: now,
     })
     .eq('id', auftragId)
 
@@ -203,10 +216,11 @@ async function markAuftragAbgeschlossen(auftragId: string, beschreibung: string,
     typ: 'abschlussdoku_versendet',
     titel: perMail ? 'Abschlussdokumentation versendet' : 'Auftrag abgeschlossen',
     beschreibung,
+    foto_urls: perMail && abschlussPdfUrl?.trim() ? [abschlussPdfUrl.trim()] : [],
     erstellt_von: uid,
     sichtbar_fuer_kunde: perMail,
     fuer_kunde_freigegeben: perMail,
-    freigegeben_at: perMail ? new Date().toISOString() : null,
+    freigegeben_at: perMail ? now : null,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)
@@ -409,6 +423,9 @@ export async function sendAbschlussdokumentationAnKunde(
   const built = await buildAbschlussPdf(auftragId, optionen)
   if (!built.ok) return built
 
+  const stored = await persistAbschlussdokumentationPdf(auftragId, built.buffer)
+  if (!stored.ok) return stored
+
   const anhaenge = await buildAbschlussMailAnhaenge(auftragId, built.detail)
   if (!anhaenge.ok) return anhaenge
 
@@ -439,7 +456,8 @@ export async function sendAbschlussdokumentationAnKunde(
         : voraus.hasRechnung
           ? 'Abschlussdokumentation mit Rechnung per E-Mail an den Kunden gesendet.'
           : 'Abschlussdokumentation per E-Mail an den Kunden gesendet.',
-    true
+    true,
+    stored.publicUrl
   )
   return { ok: true }
 }

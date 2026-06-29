@@ -96,7 +96,7 @@ import { insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
 import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
-import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
+import { provisionProjektVertraegeFuerAuftrag, provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -935,7 +935,7 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     .eq('id', zu.id as string)
 
   if (auftrag?.id && zu.handwerker_id) {
-    syncProjektvertragStilleFireAndForget(String(auftrag.id), String(zu.handwerker_id))
+    provisionProjektvertragFireAndForget(String(auftrag.id), String(zu.handwerker_id))
   }
 
   revalidatePath(`/angebote/${angebotId}`)
@@ -1119,6 +1119,11 @@ export async function bestaetigeHandwerkerEinreichung(input: {
           console.warn('[bestaetigeHandwerkerEinreichung] auftrag_handwerker:', ahErr.message)
         }
       }
+
+      provisionProjektvertragFireAndForget(
+        auftrag.id as string,
+        zuHw.handwerker_id as string
+      )
 
       return {
         ok: true,
@@ -1982,6 +1987,13 @@ export async function createAuftragFromAngebot(
     await Promise.all(postInsertTasks)
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Auftrag-Anlage fehlgeschlagen' }
+  }
+
+  const vertragRes = await provisionProjektVertraegeFuerAuftrag(auftragId)
+  if (!vertragRes.ok) {
+    console.warn('[createAuftragFromAngebot] projektvertrag:', vertragRes.message)
+  } else if (vertragRes.provisioned > 0) {
+    console.info('[createAuftragFromAngebot] projektvertraege:', vertragRes.provisioned)
   }
 
   const branding = await brandingPromise

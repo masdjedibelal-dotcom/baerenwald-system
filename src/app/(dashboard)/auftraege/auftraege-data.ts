@@ -3,6 +3,7 @@ import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT } from '@/lib/partner/partner-hw-dokument-typen'
 import { listAuftragBautagebuch } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import { listAuftragBautagesberichte } from '@/app/(dashboard)/auftraege/bautagesbericht-actions'
 import {
@@ -109,7 +110,7 @@ function normalizeAngebotJoin(
 const AUFTRAG_DETAIL_SELECT_FALLBACK = `
       *,
       kunden(*),
-      angebote(*),
+      angebote(*, angebot_handwerker(${ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT})),
       auftrag_timeline(*),
       auftrag_positionen(
         *,

@@ -6,7 +6,7 @@ import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { handwerkerAusGeschwisterPositionen } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { buildGewerkEkMap } from '@/lib/partner/handwerker-einreichung'
-import { syncProjektvertragStilleFuerAuftrag } from '@/lib/vertraege/sync-projektvertrag-stille'
+import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
 
 function norm(s: string): string {
@@ -159,7 +159,7 @@ export async function syncAngebotPositionenZuAuftrag(input: {
     })
   }
 
-  void syncProjektvertragStilleFuerAuftrag(auftragId)
+  provisionProjektvertragFireAndForget(auftragId)
 
   return { ok: true, neu, aktualisiert }
 }

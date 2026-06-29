@@ -14,6 +14,7 @@ import {
   metaPartnerAenderung,
 } from '@/lib/auftraege/partner-vorgang-meta'
 import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -163,6 +164,8 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       gewerkName: String(row.gewerk_name ?? ''),
     })
   }
+
+  provisionProjektvertragFireAndForget(input.auftragId, hwId)
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true, updated }

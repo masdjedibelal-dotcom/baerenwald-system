@@ -501,6 +501,8 @@ export type Auftrag = {
   end_datum: string | null
   abnahme_datum: string | null
   abnahme_protokoll_url: string | null
+  abschlussdokumentation_url?: string | null
+  abschlussdokumentation_gesendet_at?: string | null
   notizen: string | null
   erstellt_von: string | null
   created_at: string

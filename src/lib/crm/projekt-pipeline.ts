@@ -1,5 +1,8 @@
 import { resolveStatusEinfach, type AngebotStatusEinfach } from '@/lib/angebot-einfach'
-import type { AuftragListenPhase } from '@/lib/auftraege/auftrag-liste-helpers'
+import {
+  matchesAuftragPhase,
+  type AuftragListenPhase,
+} from '@/lib/auftraege/auftrag-liste-helpers'
 import {
   abschlagBereitsAbgerechnet,
   berechneZahlungsplan,
@@ -111,16 +114,13 @@ export function auftragInAuftraegePipeline(
   return false
 }
 
+/** Listen-Phasen nach Auftragsstatus (nicht Abrechnungs-Pipeline). */
 export function matchesAuftragPipelinePhase(
   auftrag: AuftragListeEintrag,
-  kontext: AuftragPipelineKontext,
+  _kontext: AuftragPipelineKontext,
   phase: AuftragListenPhase
 ): boolean {
-  if (!phase) return true
-  const inPipeline = auftragInAuftraegePipeline(auftrag, kontext)
-  if (phase === 'aktiv') return inPipeline
-  if (phase === 'fertig') return auftrag.status !== 'storniert' && !inPipeline
-  return true
+  return matchesAuftragPhase(auftrag, phase)
 }
 
 export function countAuftragPipelinePhase(

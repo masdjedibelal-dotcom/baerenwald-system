@@ -394,7 +394,8 @@ export function KundeDetailClient({
     return n
   }, [kunde, rechnungen])
 
-  const zeigtOrganisationTab = istKundeNurGewerbeTyp(kunde.typ)
+  const zeigtOrganisationTab =
+    istKundeGewerbeTyp(kunde.typ) || kunde.portal_modus === 'organisation'
 
   const angeboteAnAuftrag = useMemo(() => {
     const byAuftrag = new Map<string, CrmDokumentZeile[]>()

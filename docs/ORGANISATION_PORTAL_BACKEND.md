@@ -1,23 +1,32 @@
 # Auftraggeber-Portal — Backend/CRM Handoff
 
-> **Kopie für CRM-Projekt.** Original: `handwerks-plattform/docs/ORGANISATION_PORTAL_BACKEND.md`
+Stand: Juni 2026. Frontend: `handwerks-plattform`. CRM: `baerenwald-crm-dashboard`.
 
-Siehe die vollständige Checkliste im Frontend-Repo:
+## Bereits im CRM umgesetzt
 
-**Pfad:** `~/Desktop/Bärenwald/handwerks-plattform/docs/ORGANISATION_PORTAL_BACKEND.md`
+| Bereich | Status |
+|---------|--------|
+| Migration Org-Felder | `20260708120000_organisation_portal_stamm.sql` |
+| Tab **Organisation** | `KundenOrganisationTab` (Gewerbe + Hausverwaltung) |
+| Objekte + `melde_slug` | `KundenObjekteCard`, `KundenObjektModal`, Melde-Link |
+| Lead-Detail Org-Blöcke | `LeadOrgKontextBlock` (Auftraggeber, Melder, Objekt, Freigabe-Log) |
+| Anfragen-Filter | Anlass, Org-Kanal, Wartet Freigabe / Wartet Melder |
+| Partner-Gate | `send-handwerker-anfrage.ts` blockiert bis Org-Freigabe |
+| HV-Defaults bei Anlage | `saveKunde` → `portal_modus=organisation` für HV/Gewerbe |
 
-## Kurzüberblick
+## Noch offen / Lücken
 
-- SQL-Migrationen sind auf Supabase angewendet
-- Frontend (`handwerks-plattform`) ist fertig
-- CRM (`baerenwald-crm-dashboard`) braucht noch: Org-Tab, Objekt-Melde-Links, Lead-Detail-Blöcke, Filter, Freigabe-Workflow, E-Mails
+- **Kleinreparatur** (`kleinreparatur_aktiv`, Schwellwert) — noch keine CRM-Spalten/UI (nur Portal-Seite?)
+- **hv_meldung_status** — Lead-Workflow-Anzeige im CRM prüfen/ergänzen
+- **org_kennung Pflicht** beim Speichern Organisation (Validierung vorhanden, UX-Hinweis)
+- **Phase 5** Org-E-Mails teilweise (`org-mail-notify.ts`), Templates vervollständigen
+- **Phase 6** Reporting/KPIs (Dashboard hat „Wartet auf Org-Freigabe“)
 
-## Nächster Schritt im CRM
+## Bärenwald München — Stammdaten (manuell)
 
-1. `src/lib/types.ts` — Org-Felder ergänzen
-2. Kunden-Detail Tab **Organisation**
-3. `KundenObjekteCard` — `melde_slug`, Link, QR
-4. `AnfrageDetailClient` — Blöcke Auftraggeber | Melder | Objekt | Fotos
-5. Filter in Anfragen-Liste (`anlass`, Wartet Freigabe, Wartet Melder)
+1. Kunde öffnen → Tab **Organisation** → `org_kennung` z. B. `baerenwald-muenchen`, Anzeigename setzen
+2. Tab **Objekte** (Stammdaten) → Objekt mit `melde_slug` z. B. `haus-muenchen`
+3. Doppel-Stamm `info@baerenwald-muenchen.de` bereinigen
+4. Test: `https://baerenwaldmuenchen.de/melden/baerenwald-muenchen/haus-muenchen`
 
-Vollständige Phasen, SQL-Felder, Test-Checkliste → siehe Original-Dokument.
+Vollständige Portal-Spec: `handwerks-plattform/docs/ORGANISATION_PORTAL_BACKEND.md`

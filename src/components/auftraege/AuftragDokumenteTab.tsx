@@ -17,9 +17,11 @@ import { toast } from '@/components/ui/app-toast'
 import {
   abschlussdokumentZeile,
   angebotAusAuftragDetail,
+  angebotDokumentZeile,
   angebotHandwerkerAusAuftragDetail,
   handwerkerDokumentZeilen,
   rechnungDokumentZeilen,
+  sortDokumentZeilenNachDatum,
   timelineDokumentZeilen,
   vertragDokumentZeilen,
   type AuftragDokumentZeile,
@@ -81,17 +83,8 @@ export function AuftragDokumenteTab({
       ...handwerkerZeilen,
     ]
     const ang = angebotAusAuftragDetail(detail)
-    if (ang?.pdf_url) {
-      rows.unshift({
-        id: 'angebot-pdf',
-        name: 'Angebot PDF',
-        beschreibung: ang.angebotsnr?.trim() || 'Angebot',
-        datum: ang.updated_at ?? detail.created_at,
-        fuerKunde: true,
-        href: ang.pdf_url,
-        quelle: 'angebot',
-      })
-    }
+    const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null
+    if (angebotZeile) rows.unshift(angebotZeile)
     if (detail.abnahme_protokoll_url) {
       rows.push({
         id: 'abnahme-pdf',
@@ -105,7 +98,7 @@ export function AuftragDokumenteTab({
     }
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
-    return rows.sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
+    return sortDokumentZeilenNachDatum(rows)
   }, [detail, rechnungen, vertraege, handwerkerZeilen])
 
   async function uploadFiles(files: FileList | File[]) {
@@ -291,9 +284,13 @@ export function AuftragDokumenteTab({
                     </td>
                     <td>
                       {readOnly ? (
-                        <span className="dok-freigabe-pill dok-freigabe-kunde">
-                          {row.fuerKunde ? 'Kunde' : 'Intern'}
-                        </span>
+        <span className="dok-freigabe-pill dok-freigabe-kunde">
+          {row.fuerKunde
+            ? 'Kunde'
+            : row.quelle === 'vertrag' || row.quelle === 'handwerker'
+              ? 'Partner'
+              : 'Intern'}
+        </span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           <button
