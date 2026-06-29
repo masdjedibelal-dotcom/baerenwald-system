@@ -1,5 +1,8 @@
 import type { Gewerk } from '@/lib/types'
 
+/** Mindestfelder für Bauprojekt-Erkennung (reicht für schlanke DB-Selects). */
+export type GewerkBauprojektHinweis = Pick<Gewerk, 'slug' | 'ist_bauleistung'>
+
 /** Bereiche, bei denen typischerweise ein Bauprojekt vorliegt. */
 const BAU_BEREICHE = new Set([
   'fassade',
@@ -19,7 +22,7 @@ export function bereicheSuggerierenBauprojekt(bereiche: string[] | null | undefi
 
 export function gewerkSlugsSuggerierenBauprojekt(
   slugs: string[] | null | undefined,
-  alleGewerke: Gewerk[]
+  alleGewerke: GewerkBauprojektHinweis[]
 ): boolean {
   if (!slugs?.length) return false
   return slugs.some((s) => {
@@ -32,7 +35,7 @@ export function gewerkSlugsSuggerierenBauprojekt(
 export function auftragIstBauprojekt(opts: {
   ist_bauprojekt?: boolean | null
   gewerkSlugs?: string[] | null
-  alleGewerke?: Gewerk[]
+  alleGewerke?: GewerkBauprojektHinweis[]
 }): boolean {
   if (opts.ist_bauprojekt === true) return true
   if (opts.ist_bauprojekt === false) return false

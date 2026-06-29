@@ -104,7 +104,7 @@ export async function loadProjektVertragBootstrap(
   const bauprojekt = auftragIstBauprojekt({
     ist_bauprojekt: (auf as { ist_bauprojekt?: boolean | null }).ist_bauprojekt,
     gewerkSlugs: positionSlugs,
-    alleGewerke: (alleGewerke ?? []) as { slug: string; ist_bauleistung?: boolean | null }[],
+    alleGewerke: alleGewerke ?? [],
   })
   if (!bauprojekt) {
     return {
