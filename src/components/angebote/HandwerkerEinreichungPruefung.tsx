@@ -170,7 +170,7 @@ export function HandwerkerEinreichungPruefung({
           : ''
       if (res.openWizard && onAcceptWizard) {
         toast.success(
-          `Konditionen übernommen.${preisTeil}${mailTeil} Partner muss vereinbarte Preise noch im Portal bestätigen. Nachunternehmervertrag wird geöffnet…`
+          `Konditionen übernommen.${preisTeil}${mailTeil} Partner bestätigt im Portal. Nachunternehmervertrag wird geöffnet…`
         )
         onAcceptWizard(res.openWizard)
         onRefresh()

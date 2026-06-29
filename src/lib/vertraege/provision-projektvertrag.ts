@@ -7,7 +7,7 @@ import {
   verguetungAusPositionen,
 } from '@/lib/vertraege/build-vertrag-texte'
 import type { AuftragPosition } from '@/lib/types'
-import { sendProjektvertragBereitMail } from '@/lib/vertraege/send-projektvertrag-bereit-mail'
+import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 
 function unwrapJoin<T>(raw: T | T[] | null | undefined): T | null {
   if (!raw) return null
@@ -122,6 +122,10 @@ export async function provisionProjektVertraegeFuerAuftrag(
 ): Promise<{ ok: true; provisioned: number; skipped: number } | { ok: false; message: string }> {
   const aid = auftragId.trim()
   if (!aid) return { ok: false, message: 'Auftrag fehlt.' }
+
+  if (!(await auftragErfordertProjektvertrag(aid))) {
+    return { ok: true, provisioned: 0, skipped: 0 }
+  }
 
   const hwIds = opts?.handwerkerIds?.length
     ? Array.from(new Set(opts.handwerkerIds.map((id) => id.trim()).filter(Boolean)))
@@ -286,17 +290,6 @@ export async function provisionProjektVertragFuerHandwerker(
 
   const pdf = await persistPdfForVertrag(vertragId)
   if (!pdf.ok) return pdf
-
-  const mail = await sendProjektvertragBereitMail({
-    auftragId,
-    handwerkerId,
-    vertragId,
-  })
-  if (!mail.ok) {
-    console.warn('[provisionProjektVertrag] vertrag-bereit-mail:', mail.message)
-  } else if (!mail.gesendet && mail.hinweis) {
-    console.warn('[provisionProjektVertrag] vertrag-bereit-mail:', mail.hinweis)
-  }
 
   return { ok: true, vertrag_id: vertragId, created: true }
 }

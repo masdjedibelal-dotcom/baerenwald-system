@@ -29,8 +29,10 @@ export function projektvertragErfuellt(
   vertraege: HandwerkerVertragRow[],
   auftragId: string,
   handwerkerId: string,
-  auftragHandwerkerBestaetigtAm?: string | null
+  auftragHandwerkerBestaetigtAm?: string | null,
+  opts?: { istBauprojekt?: boolean | null }
 ): boolean {
+  if (opts?.istBauprojekt === false) return true
   if (hatOffeneErgaenzungFuerPortal(vertraege, auftragId, handwerkerId)) return false
   if (auftragHandwerkerBestaetigtAm) return true
   const v = vertraege.find(
@@ -100,6 +102,7 @@ export type AuftragHandwerkerComplianceZeile = {
 
 export function auftragHandwerkerComplianceZeilen(opts: {
   auftragId: string
+  ist_bauprojekt?: boolean | null
   handwerker: { handwerker_id: string; name: string; projektvertrag_bestaetigt_am?: string | null }[]
   complianceTypen: ComplianceDokumentTyp[]
   partnerDokumente: PartnerDokument[]
@@ -138,7 +141,8 @@ export function auftragHandwerkerComplianceZeilen(opts: {
         vertraege,
         auftragId,
         hw.handwerker_id,
-        hw.projektvertrag_bestaetigt_am
+        hw.projektvertrag_bestaetigt_am,
+        { istBauprojekt: opts.ist_bauprojekt }
       ),
       fehlende_unterlagen: fehlendeLabels.length,
       fehlende_unterlagen_labels: fehlendeLabels,

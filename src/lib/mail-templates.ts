@@ -2,7 +2,12 @@ import type { MailBranding } from '@/lib/mail-branding'
 import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
 import { resolveBrandLogoUrl, type BrandLogoVariant } from '@/lib/brand'
 import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
-import { buildPortalButton, buildPortalLoginLink } from '@/lib/portal-utils'
+import {
+  buildPortalLoginLink,
+  portalMailButtonLabel,
+  portalMailPsIntro,
+  type PortalMailAudience,
+} from '@/lib/portal-utils'
 import { buildAuftragsbestaetigungMail } from '@/lib/mail/auftragsbestaetigung-mail'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import { buildRechnungMail, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
@@ -91,30 +96,32 @@ export function mailSummaryBlock(opts: {
 }
 
 export type MailHtmlBaseOptions = {
-  /** Kunden-Mails: P.S. MeinBärenwald (Standard: an) */
+  /** Kein Portal-P.S. (interne / Partner-Mails). */
   skipMeinBaerenwaldPs?: boolean
   anrede?: 'du' | 'sie'
-  /** Link für P.S.-Block / MeinBärenwald-Button (Standard: /portal/login). */
+  /** Link für P.S.-Button (Standard: /portal/login). */
   portalLink?: string | null
+  /** privat = MeinBärenwald · organisation = Auftraggeber-Portal */
+  portalAudience?: PortalMailAudience
   /** @deprecated Alias für portalLink. */
   statusLink?: string | null
 }
 
-/** P.S.-Hinweis auf MeinBärenwald — Standard-Fuß in Kunden-Mails. */
+/** P.S. mit genau einem Portal-Button — nie zusätzlich im Mail-Body duplizieren. */
 export function mailMeinBaerenwaldPsFooter(opts: {
   anrede: 'du' | 'sie'
   portalLink?: string
+  audience?: PortalMailAudience
 }): string {
+  const audience = opts.audience ?? 'privat'
   const portal = opts.portalLink?.trim() || buildPortalLoginLink()
   const anrede = opts.anrede
-  const text =
-    anrede === 'du'
-      ? 'In <strong>MeinBärenwald</strong> siehst du dein Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
-      : 'In <strong>MeinBärenwald</strong> sehen Sie Ihr Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
+  const text = portalMailPsIntro(audience, anrede)
+  const buttonLabel = portalMailButtonLabel(audience)
   return `<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid #E5E7EB;">
     <p style="font-size:13px;font-weight:700;color:#6B7280;margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
     <p style="font-size:14px;color:#374151;line-height:1.55;margin:0 0 12px;">${text}</p>
-    ${buildPortalButton(portal, anrede)}
+    ${mailSecondaryButtonHtml(buttonLabel, portal, { margin: '0' })}
   </div>`
 }
 
@@ -144,6 +151,7 @@ export function mailHtmlBase(
       : mailMeinBaerenwaldPsFooter({
           anrede: options?.anrede ?? 'du',
           portalLink,
+          audience: options?.portalAudience ?? 'privat',
         })
 
   return `<!DOCTYPE html>
@@ -182,12 +190,17 @@ ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` :
 </body></html>`
 }
 
-/** Standard-Fuß: P.S. mit MeinBärenwald-Button unten (nach Gruß & Inhalt). */
+/** Standard-Fuß: P.S. mit einem Portal-Button (nach Gruß & Inhalt). */
 export function mailKundenStandardOptions(
   anrede: 'du' | 'sie',
-  portalLink?: string | null
+  portalLink?: string | null,
+  portalAudience?: PortalMailAudience
 ): MailHtmlBaseOptions {
-  return { anrede, portalLink: portalLink?.trim() || undefined }
+  return {
+    anrede,
+    portalLink: portalLink?.trim() || undefined,
+    portalAudience: portalAudience ?? 'privat',
+  }
 }
 
 /** @deprecated Portal-Button gehört in den P.S.-Footer — nutze mailKundenStandardOptions(). */

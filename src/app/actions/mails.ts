@@ -28,6 +28,7 @@ import {
   defaultPortalInviteText,
   defaultPartnerPortalInviteBetreff,
   defaultPartnerPortalInviteText,
+  type PortalMailAudience,
 } from '@/lib/portal-utils'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
@@ -456,6 +457,7 @@ function kundenPortalMailHtml(input: {
   anrede: 'du' | 'sie'
   text: string
   branding: MailBranding
+  portalAudience: PortalMailAudience
 }): string {
   const greeting = input.anrede === 'sie'
     ? `Guten Tag ${escapeHtml(input.name)},`
@@ -466,9 +468,13 @@ function kundenPortalMailHtml(input: {
     .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
     .join('')
   const disclaimer =
-    input.anrede === 'du'
-      ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
-      : 'Sie erhalten diese E-Mail mit Einladung zu MeinBärenwald.'
+    input.portalAudience === 'organisation'
+      ? input.anrede === 'du'
+        ? 'Du erhältst diese E-Mail mit Einladung zum Auftraggeber-Portal.'
+        : 'Sie erhalten diese E-Mail mit Einladung zum Auftraggeber-Portal.'
+      : input.anrede === 'du'
+        ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
+        : 'Sie erhalten diese E-Mail mit Einladung zu MeinBärenwald.'
   const content = `
     <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}
@@ -482,10 +488,16 @@ function kundenPortalMailHtml(input: {
   `
   return mailHtmlBase(
     content,
-    defaultPortalInviteBetreff(input.anrede),
+    defaultPortalInviteBetreff(input.anrede, {
+      organisation: input.portalAudience === 'organisation',
+    }),
     input.branding,
     disclaimer,
-    { anrede: input.anrede, portalLink: input.portalLink }
+    {
+      anrede: input.anrede,
+      portalLink: input.portalLink,
+      portalAudience: input.portalAudience,
+    }
   )
 }
 
@@ -522,7 +534,15 @@ export async function getKundenPortalMailDraft(
   const anrede = mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
   const betreff = defaultPortalInviteBetreff(anrede, { organisation: istOrganisation })
   const text = defaultPortalInviteText(anrede, { organisation: istOrganisation, orgName })
-  const html = kundenPortalMailHtml({ name, portalLink, anrede, text, branding })
+  const portalAudience: PortalMailAudience = istOrganisation ? 'organisation' : 'privat'
+  const html = kundenPortalMailHtml({
+    name,
+    portalLink,
+    anrede,
+    text,
+    branding,
+    portalAudience,
+  })
   return {
     ok: true,
     to,
@@ -546,7 +566,7 @@ export async function sendKundenPortalLinkMail(input: {
   if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ')
+    .select('id, name, typ, portal_modus')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
@@ -557,12 +577,17 @@ export async function sendKundenPortalLinkMail(input: {
     input.anrede === 'du' || input.anrede === 'sie'
       ? input.anrede
       : mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
+  const portalAudience: PortalMailAudience =
+    (kunde as { portal_modus?: string }).portal_modus === 'organisation'
+      ? 'organisation'
+      : 'privat'
   const html = kundenPortalMailHtml({
     name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
     portalLink,
     anrede,
     text: input.text,
     branding,
+    portalAudience,
   })
 
   const r = await sendMail({
@@ -585,7 +610,7 @@ export async function previewKundenPortalMail(input: {
 }): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ')
+    .select('id, name, typ, portal_modus')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
@@ -596,12 +621,17 @@ export async function previewKundenPortalMail(input: {
     input.anrede === 'du' || input.anrede === 'sie'
       ? input.anrede
       : mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
+  const portalAudience: PortalMailAudience =
+    (kunde as { portal_modus?: string }).portal_modus === 'organisation'
+      ? 'organisation'
+      : 'privat'
   const html = kundenPortalMailHtml({
     name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
     portalLink,
     anrede,
     text: input.text,
     branding,
+    portalAudience,
   })
   return { ok: true, html }
 }

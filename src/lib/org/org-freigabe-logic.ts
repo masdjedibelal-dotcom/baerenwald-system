@@ -4,7 +4,7 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailOrgFreigabeAngefordert } from '@/lib/email/meldung-mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
-import type { Kunde, Lead, OrgFreigabeStatus } from '@/lib/types'
+import type { Kunde, Lead, LeadAnlass, LeadErfassungVon, OrgFreigabeStatus } from '@/lib/types'
 
 type OrgKundePick = Pick<
   Kunde,
@@ -13,7 +13,15 @@ type OrgKundePick = Pick<
 
 type LeadPick = Pick<
   Lead,
-  'id' | 'auftraggeber_kunde_id' | 'kunde_id' | 'situation' | 'funnel_daten' | 'org_freigabe_status' | 'kunde_objekt_id'
+  | 'id'
+  | 'auftraggeber_kunde_id'
+  | 'kunde_id'
+  | 'situation'
+  | 'funnel_daten'
+  | 'org_freigabe_status'
+  | 'kunde_objekt_id'
+  | 'erfassung_von'
+  | 'anlass'
 >
 
 function funnelKategorie(funnelDaten: unknown): string | null {
@@ -27,11 +35,22 @@ export function leadIstNotfall(lead: Pick<Lead, 'situation' | 'funnel_daten'>): 
   return funnelKategorie(lead.funnel_daten) === 'notfall'
 }
 
+/** Org-Freigabe nur bei Mieter-Schadenmeldung (Meldeformular), nicht HV/CRM. */
+export function leadIstMieterSchadenmeldung(lead: {
+  erfassung_von?: LeadErfassungVon | string | null
+  anlass?: LeadAnlass | string | null
+}): boolean {
+  if ((lead.erfassung_von ?? '').trim() !== 'melder') return false
+  const anlass = (lead.anlass ?? '').trim()
+  return !anlass || anlass === 'meldung'
+}
+
 export function orgFreigabeErforderlich(
   org: OrgKundePick | null | undefined,
   lead: LeadPick,
   betragEur: number
 ): boolean {
+  if (!leadIstMieterSchadenmeldung(lead)) return false
   if (!org || org.portal_modus !== 'organisation') return false
   if (org.freigabe_modus !== 'freigabe') return false
   if (org.notfall_direkt !== false && leadIstNotfall(lead)) return false
@@ -78,7 +97,7 @@ function angebotBetragEur(gesamtFix: number | null | undefined, gesamtMax: numbe
   return 0
 }
 
-/** Setzt Org-Freigabe nach Angebotserstellung/-Update; sendet M3 bei neuem Freigabe-Bedarf. */
+/** Setzt Org-Freigabe nach Angebotserstellung/-Update; sendet Freigabe-Mail nur bei Mieter-Meldung. */
 export async function syncOrgFreigabeNachAngebot(input: {
   leadId: string
   angebotId: string
@@ -93,7 +112,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
   const { data: leadRaw, error: leadErr } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, auftraggeber_kunde_id, kunde_id, situation, funnel_daten, org_freigabe_status, kunde_objekt_id'
+      'id, auftraggeber_kunde_id, kunde_id, situation, funnel_daten, org_freigabe_status, kunde_objekt_id, erfassung_von, anlass'
     )
     .eq('id', leadId)
     .maybeSingle()
@@ -123,6 +142,14 @@ export async function syncOrgFreigabeNachAngebot(input: {
   const aktuell = (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus
 
   if (!erforderlich) {
+    if (aktuell === 'ausstehend') {
+      const now = new Date().toISOString()
+      await supabaseAdmin
+        .from('leads')
+        .update({ org_freigabe_status: 'nicht_noetig', updated_at: now })
+        .eq('id', leadId)
+      return { ok: true, status: 'nicht_noetig' }
+    }
     return { ok: true, status: aktuell }
   }
 

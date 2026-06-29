@@ -10,6 +10,7 @@ import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
 import { letzterHauptvertrag } from '@/lib/vertraege/portal-vertrag-helpers'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { AuftragPosition } from '@/lib/types'
+import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 
 function unwrapJoin<T>(raw: T | T[] | null | undefined): T | null {
   if (!raw) return null
@@ -107,6 +108,10 @@ export async function syncProjektvertragStille(
   const aid = auftragId.trim()
   const hid = handwerkerId.trim()
   if (!aid || !hid) return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
+
+  if (!(await auftragErfordertProjektvertrag(aid))) {
+    return { ok: true, updated: false, skipped: true, reason: 'kein_bauprojekt' }
+  }
 
   const loaded = await loadVertragMeta(aid, hid)
   if (!loaded.ok) return loaded

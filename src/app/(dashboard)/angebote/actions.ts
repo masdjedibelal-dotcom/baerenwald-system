@@ -33,11 +33,12 @@ import { getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
-import { buildPartnerLoginLink, buildPortalLoginLink } from '@/lib/portal-utils'
+import { buildPartnerLoginLink, buildPortalLoginLink, portalAudienceFromKunde } from '@/lib/portal-utils'
 import {
   buildGewerkEkMap,
   ekNettoFromHwEinreichung,
@@ -1125,17 +1126,23 @@ export async function bestaetigeHandwerkerEinreichung(input: {
         zuHw.handwerker_id as string
       )
 
+      const erfordertVertrag = await auftragErfordertProjektvertrag(auftrag.id as string)
+
       return {
         ok: true,
         aktualisiert,
         mailGesendet,
         mailHinweis,
-        openWizard: {
-          auftragId: auftrag.id as string,
-          handwerkerId: zuHw.handwerker_id as string,
-          gewerkId: zuHw.gewerk_id as string,
-          zuweisungId,
-        },
+        ...(erfordertVertrag
+          ? {
+              openWizard: {
+                auftragId: auftrag.id as string,
+                handwerkerId: zuHw.handwerker_id as string,
+                gewerkId: zuHw.gewerk_id as string,
+                zuweisungId,
+              },
+            }
+          : {}),
       }
     }
   }
@@ -1416,6 +1423,7 @@ export async function sendAngebotToKunde(
     kontakt_name: detail.leads?.kontakt_name ?? null,
   })
   const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
+  const portalAudience = portalAudienceFromKunde(detail.kunden)
   const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
   const angebotNr = detail.angebotsnr?.trim()
   const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
@@ -1445,6 +1453,7 @@ export async function sendAngebotToKunde(
             schluss: wizardMeta?.schluss,
             istKorrektur,
             portalLink: portalLink ?? undefined,
+            portalAudience,
             visualisierung_vorschau_url: vizPreviewUrl,
           },
           branding

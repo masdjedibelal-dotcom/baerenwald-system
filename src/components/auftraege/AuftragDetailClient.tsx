@@ -579,18 +579,22 @@ export function AuftragDetailClient({
         icon: <ClipboardList className="h-[15px] w-[15px]" aria-hidden />,
         onClick: openAbnahme,
       },
-      {
-        label: 'Nachunternehmervertrag',
-        icon: <FileSignature className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => openNachunternehmervertrag(),
-      },
-      ...(hauptvertraegeFuerNachtrag.length
+      ...(istBauprojekt
         ? [
             {
-              label: 'Nachtrag erstellen',
+              label: 'Nachunternehmervertrag',
               icon: <FileSignature className="h-[15px] w-[15px]" aria-hidden />,
-              onClick: () => openNachtragErstellen(),
+              onClick: () => openNachunternehmervertrag(),
             } as ActionsMenuItem,
+            ...(hauptvertraegeFuerNachtrag.length
+              ? [
+                  {
+                    label: 'Nachtrag erstellen',
+                    icon: <FileSignature className="h-[15px] w-[15px]" aria-hidden />,
+                    onClick: () => openNachtragErstellen(),
+                  } as ActionsMenuItem,
+                ]
+              : []),
           ]
         : []),
       {
@@ -615,6 +619,7 @@ export function AuftragDetailClient({
     openNachunternehmervertrag,
     openRechnungErstellen,
     router,
+    istBauprojekt,
   ])
 
   const submitFormular = () => {

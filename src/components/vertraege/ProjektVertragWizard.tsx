@@ -246,17 +246,11 @@ export function ProjektVertragWizard({
       setVertragsNr(res.vertrags_nr)
       setPdfUrl(res.pdf_url)
       if (acceptMode) {
-        const mailTeil =
-          'mailGesendet' in res && res.mailGesendet
-            ? ' Partner per E-Mail informiert.'
-            : 'mailHinweis' in res && res.mailHinweis
-              ? ` (${res.mailHinweis})`
-              : ''
-        toast.success(`Vertrag erzeugt.${mailTeil}`)
+        toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
       } else if (nachtragMode) {
         const mailTeil =
           'mailGesendet' in res && res.mailGesendet
-            ? ' Partner per E-Mail informiert.'
+            ? ' Partner per E-Mail informiert (Neue Änderungsanfrage).'
             : 'mailHinweis' in res && res.mailHinweis
               ? ` (${res.mailHinweis})`
               : ''
@@ -636,9 +630,9 @@ export function ProjektVertragWizard({
             <div className="space-y-4 text-sm">
               <p className="text-bw-text-muted">
                 {acceptMode
-                  ? 'Der Vertrag wird erzeugt und der Partner per E-Mail informiert. Im Portal sieht er den Vertrag zum Download bzw. zur verbindlichen Zustimmung sowie die gewählten Unterlagen.'
+                  ? 'Der Vertrag wird erzeugt. Im Partner-Portal erscheint er unter Vorgänge zum Download bzw. zur verbindlichen Zustimmung sowie die gewählten Unterlagen. Eine separate Vertrags-Mail wird nicht versendet.'
                   : nachtragMode
-                    ? 'Die Ergänzungsvereinbarung wird erzeugt und der Partner per E-Mail informiert. Im Portal erscheint sie wie ein Projektvertrag zum Bestätigen.'
+                    ? 'Die Ergänzungsvereinbarung wird erzeugt. Der Nachunternehmervertrag wird still aktualisiert. Der Partner erhält dieselbe Auftrags-Mail wie bei einer neuen Zuweisung — Betreff: „Neue Änderungsanfrage“.'
                     : 'Der Vertrag wird im Bärenwald-Design erzeugt und automatisch in den Auftragsdokumenten gespeichert.'}
               </p>
               {nachtragMode ? (

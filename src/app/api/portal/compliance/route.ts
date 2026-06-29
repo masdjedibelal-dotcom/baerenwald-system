@@ -115,7 +115,8 @@ export async function GET() {
           vertraege,
           auftrag.id,
           hw.id,
-          row.projektvertrag_bestaetigt_am as string | null
+          row.projektvertrag_bestaetigt_am as string | null,
+          { istBauprojekt: auftrag.ist_bauprojekt ?? null }
         ),
         compliancePflichtSlugs: (row.compliance_pflicht_slugs as string[] | null) ?? null,
         istBauprojekt: auftrag.ist_bauprojekt ?? null,

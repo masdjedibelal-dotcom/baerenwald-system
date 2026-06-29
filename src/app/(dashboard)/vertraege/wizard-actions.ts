@@ -11,7 +11,8 @@ import {
   gewerkSlugsAusPositionen,
   istPflichtFuerProjekt,
 } from '@/lib/handwerker/compliance-partner-profile'
-import { sendErgaenzungBereitMail, sendProjektvertragBereitMail } from '@/lib/vertraege/send-projektvertrag-bereit-mail'
+import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import {
   bauvorhabenAusAuftrag,
   formatVertragDatumDe,
@@ -23,7 +24,7 @@ import {
 } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
-import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
+import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
   CompliancePoolItem,
@@ -85,7 +86,7 @@ export async function loadProjektVertragBootstrap(
     .from('auftraege')
     .select(
       `
-      id, titel, start_datum, end_datum,
+      id, titel, start_datum, end_datum, ist_bauprojekt,
       kunden(name, adresse, strasse, hausnummer, plz, ort),
       auftrag_handwerker(handwerker_id, gewerk_id, gewerke(id, name), handwerker(${HW_SELECT})),
       auftrag_positionen(*)
@@ -95,6 +96,23 @@ export async function loadProjektVertragBootstrap(
     .maybeSingle()
 
   if (error || !auf) return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden' }
+
+  const { data: alleGewerke } = await supabase.from('gewerke').select('slug, ist_bauleistung')
+  const positionSlugs = ((auf.auftrag_positionen ?? []) as AuftragPosition[])
+    .map((p) => p.gewerk_slug?.trim())
+    .filter(Boolean) as string[]
+  const bauprojekt = auftragIstBauprojekt({
+    ist_bauprojekt: (auf as { ist_bauprojekt?: boolean | null }).ist_bauprojekt,
+    gewerkSlugs: positionSlugs,
+    alleGewerke: (alleGewerke ?? []) as { slug: string; ist_bauleistung?: boolean | null }[],
+  })
+  if (!bauprojekt) {
+    return {
+      ok: false,
+      message:
+        'Nachunternehmervertrag nur bei Bauprojekten. Standardaufträge bestätigt der Partner Leistung und Preis im Portal.',
+    }
+  }
 
   const positionen = (auf.auftrag_positionen ?? []) as AuftragPosition[]
   const hwRows = (auf.auftrag_handwerker ?? []).map((row) => {
@@ -532,12 +550,6 @@ export async function finalizeHandwerkerAcceptWizard(payload: {
   })
   if (!finalized.ok) return finalized
 
-  const mail = await sendProjektvertragBereitMail({
-    auftragId,
-    handwerkerId,
-    vertragId: finalized.vertrag_id,
-  })
-
   const { data: auftrag } = await supabaseAdmin
     .from('auftraege')
     .select('angebot_id')
@@ -551,8 +563,7 @@ export async function finalizeHandwerkerAcceptWizard(payload: {
     vertrag_id: finalized.vertrag_id,
     vertrags_nr: finalized.vertrags_nr,
     pdf_url: finalized.pdf_url,
-    mailGesendet: mail.ok && mail.gesendet,
-    mailHinweis: mail.ok && !mail.gesendet ? mail.hinweis : mail.ok ? undefined : mail.message,
+    mailGesendet: false,
   }
 }
 
@@ -872,10 +883,41 @@ export async function finalizeNachtragVertrag(payload: {
   const pdf = await persistPdfForVertrag(draft.vertrag_id)
   if (!pdf.ok) return pdf
 
-  const mail = await sendErgaenzungBereitMail({
+  const handwerkerId = payload.meta.handwerker_id
+  syncProjektvertragStilleFireAndForget(payload.auftrag_id, handwerkerId)
+
+  const { data: auftragRow } = await supabaseAdmin
+    .from('auftraege')
+    .select('titel, kunden(name)')
+    .eq('id', payload.auftrag_id)
+    .maybeSingle()
+  const kunde = Array.isArray(auftragRow?.kunden)
+    ? auftragRow.kunden[0]
+    : auftragRow?.kunden
+  const projektName =
+    (auftragRow?.titel as string | null)?.trim() ||
+    (kunde as { name?: string | null } | null)?.name?.trim() ||
+    'Auftrag'
+
+  const nachtragPos = payload.meta.nachtrag_positionen ?? []
+  const positionIds = nachtragPos
+    .map((p) => p.id?.trim())
+    .filter((id): id is string => Boolean(id && !id.startsWith('neu-')))
+
+  const notify = await notifyPartnerUnified({
+    handwerkerId,
+    typ: 'geaendert',
+    projektName,
+    link: partnerVorgangLink(payload.auftrag_id),
+    leistungName:
+      nachtragPos.length === 1
+        ? String(nachtragPos[0]!.leistung_name ?? '')
+        : nachtragPos.length > 1
+          ? `${nachtragPos.length} Leistungen`
+          : 'Änderungsanfrage',
     auftragId: payload.auftrag_id,
-    handwerkerId: payload.meta.handwerker_id,
-    vertragId: draft.vertrag_id,
+    positionIds: positionIds.length ? positionIds : undefined,
+    aenderungTyp: 'geaendert',
   })
 
   revalidatePath(`/auftraege/${payload.auftrag_id}`)
@@ -884,7 +926,7 @@ export async function finalizeNachtragVertrag(payload: {
     vertrag_id: draft.vertrag_id,
     vertrags_nr: draft.vertrags_nr,
     pdf_url: pdf.publicUrl,
-    mailGesendet: mail.ok && mail.gesendet,
-    mailHinweis: mail.ok && !mail.gesendet ? mail.hinweis : mail.ok ? undefined : mail.message,
+    mailGesendet: notify.ok,
+    mailHinweis: notify.ok ? undefined : notify.error,
   }
 }

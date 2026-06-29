@@ -83,6 +83,11 @@ export async function syncAngebotPositionenZuAuftrag(input: {
 
     const match = findAuftragPosMatch(pool, angPos)
     if (match?.id) {
+      const angebotHwId = angPos.handwerker_id?.trim() || null
+      const bestehendHwId = match.handwerker_id?.trim() || null
+      const resolvedHandwerkerId =
+        angebotHwId || bestehendHwId || erbt?.handwerker_id || row.handwerker_id?.trim() || null
+
       const patch: Record<string, unknown> = {
         gewerk_slug: row.gewerk_slug,
         gewerk_name: row.gewerk_name,
@@ -94,10 +99,26 @@ export async function syncAngebotPositionenZuAuftrag(input: {
         preis_fix: row.preis_fix,
         lohn_fix: row.lohn_fix,
         material_fix: row.material_fix,
-        preis_partner: row.preis_partner,
-        handwerker_id: row.handwerker_id,
       }
-      if (erbt?.handwerker_status) patch.handwerker_status = erbt.handwerker_status
+
+      if (resolvedHandwerkerId) {
+        patch.handwerker_id = resolvedHandwerkerId
+        if (
+          erbt?.handwerker_status &&
+          resolvedHandwerkerId !== bestehendHwId
+        ) {
+          patch.handwerker_status = erbt.handwerker_status
+        }
+      }
+
+      const hatVerhandeltenPartnerPreis =
+        match.preis_partner != null &&
+        Number(match.preis_partner) > 0 &&
+        Boolean(bestehendHwId)
+      if (!hatVerhandeltenPartnerPreis && row.preis_partner != null) {
+        patch.preis_partner = row.preis_partner
+      }
+
       const { error } = await supabaseAdmin.from('auftrag_positionen').update(patch).eq('id', match.id)
       if (!error) aktualisiert++
       continue

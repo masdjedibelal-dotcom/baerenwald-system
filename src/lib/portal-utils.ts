@@ -1,5 +1,31 @@
 import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 
+/** Kundenportal vs. Auftraggeber-Portal — steuert Button- und P.S.-Text in Mails. */
+export type PortalMailAudience = 'privat' | 'organisation'
+
+export function portalAudienceFromKunde(
+  kunde?: { portal_modus?: string | null } | null
+): PortalMailAudience {
+  return kunde?.portal_modus === 'organisation' ? 'organisation' : 'privat'
+}
+
+export function portalMailButtonLabel(audience: PortalMailAudience): string {
+  return audience === 'organisation'
+    ? 'Zum Auftraggeber-Portal →'
+    : 'Zu MeinBärenwald →'
+}
+
+export function portalMailPsIntro(audience: PortalMailAudience, anrede: 'du' | 'sie'): string {
+  if (audience === 'organisation') {
+    return anrede === 'du'
+      ? 'Im <strong>Auftraggeber-Portal</strong> siehst du Meldungen, Freigaben, Angebote und Dokumente.'
+      : 'Im <strong>Auftraggeber-Portal</strong> sehen Sie Meldungen, Freigaben, Angebote und Dokumente.'
+  }
+  return anrede === 'du'
+    ? 'In <strong>MeinBärenwald</strong> siehst du dein Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
+    : 'In <strong>MeinBärenwald</strong> sehen Sie Ihr Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
+}
+
 export function defaultPortalInviteBetreff(
   anrede: 'du' | 'sie',
   opts?: { organisation?: boolean }
@@ -129,28 +155,17 @@ export function buildPartnerPortalButton(portalLink: string): string {
 </p>`
 }
 
+/** Einzelner Portal-Button (ohne Zusatzabsatz — Text steht im P.S.-Block der Mail-Hülle). */
 export function buildPortalButton(
   portalLink: string,
-  anrede: 'du' | 'sie' = 'du'
+  anrede: 'du' | 'sie' = 'du',
+  audience: PortalMailAudience = 'privat'
 ): string {
-  const text = anrede === 'du'
-    ? 'Zu MeinBärenwald →'
-    : 'Zu MeinBärenwald →'
-  const sub = anrede === 'du'
-    ? 'Melde dich mit deiner E-Mail an oder registriere dich — Anfragen, Angebote und Dokumente im Blick.'
-    : 'Melden Sie sich mit Ihrer E-Mail an oder registrieren Sie sich — Anfragen, Angebote und Dokumente im Blick.'
-
+  void anrede
   return `
 <div style="margin:20px 0 8px;">
-  ${mailSecondaryButtonHtml(text, portalLink, { margin: '0' })}
-</div>
-<p style="font-size:13px;
-  color:#6B7280;
-  margin:0 0 16px;
-  line-height:1.6;
-  font-family:Arial,Helvetica,sans-serif;">
-  ${sub}
-</p>`
+  ${mailSecondaryButtonHtml(portalMailButtonLabel(audience), portalLink, { margin: '0' })}
+</div>`
 }
 
 /** @deprecated Token-Links entfallen — nutze buildPortalLoginLink() */

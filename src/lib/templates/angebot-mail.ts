@@ -11,6 +11,7 @@ import {
 } from '@/lib/mail-templates'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
+import type { PortalMailAudience } from '@/lib/portal-utils'
 
 export type AngebotMailAnrede = 'du' | 'sie'
 
@@ -76,8 +77,10 @@ export type AngebotMailInput = KundeAnredeKontext & {
   schluss?: string
   /** Angebot wurde bereits einmal versendet — korrigierte Fassung */
   istKorrektur?: boolean
-  /** Link zu /portal/login (MeinBärenwald) */
+  /** Link zu /portal/login */
   portalLink?: string
+  /** Steuert P.S.-Text und Button-Label (MeinBärenwald vs. Auftraggeber-Portal). */
+  portalAudience?: PortalMailAudience
   /** Vorschau-Bild KI-Visualisierung (wenn ins Angebot) */
   visualisierung_vorschau_url?: string | null
 }
@@ -358,7 +361,13 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
-  return mailHtmlBase(content, preheader, branding, disclaimer, mailKundenStandardOptions(anredeKey, data.portalLink))
+  return mailHtmlBase(
+    content,
+    preheader,
+    branding,
+    disclaimer,
+    mailKundenStandardOptions(anredeKey, data.portalLink, data.portalAudience)
+  )
 }
 
 export type NachfassMailInput = AngebotMailInput
