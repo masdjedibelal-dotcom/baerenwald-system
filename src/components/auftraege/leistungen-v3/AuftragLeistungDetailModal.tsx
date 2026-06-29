@@ -7,6 +7,8 @@ import { leistungStatusLabel, normalizeLeistungStatus } from '@/lib/auftraege/au
 import { istPartnerEntfernungAusstehend } from '@/lib/auftraege/partner-vorgang-display'
 import type { AuftragPosition } from '@/lib/types'
 import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/PartnerVorgangChip'
+import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
+import { handwerkerAntwortAnzeige } from '@/lib/auftraege/partner-vorgang-display'
 import { formatZeitraumKurz, rowMarge } from '@/components/auftraege/leistungen-v3/utils'
 
 export function AuftragLeistungDetailModal({
@@ -76,6 +78,7 @@ export function AuftragLeistungDetailModal({
         </p>
       ) : null}
       <PartnerVorgangChip pos={pos} className="mb-3" />
+      <HandwerkerAntwortChip pos={pos} className="mb-3" />
       {!pos.handwerker_id ? (
         <p className="mb-3 rounded-lg border border-bw-border bg-bw-green-bg/40 px-3 py-2 text-xs text-bw-text-muted">
           Tipp: Beim Anlegen einer neuen Leistung direkt einen Handwerker wählen — schneller als
@@ -126,6 +129,12 @@ export function AuftragLeistungDetailModal({
           <dt>Handwerker</dt>
           <dd>{hwName ?? '— noch nicht zugewiesen —'}</dd>
         </div>
+        {pos.handwerker_id ? (
+          <div>
+            <dt>Anfrage-Status</dt>
+            <dd>{handwerkerAntwortAnzeige(pos)?.label ?? '—'}</dd>
+          </div>
+        ) : null}
         {zeitraum ? (
           <div>
             <dt>Zeitraum</dt>

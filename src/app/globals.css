@@ -2982,6 +2982,26 @@
     @apply bg-sky-50 text-sky-900 ring-1 ring-sky-200/80;
   }
 
+  .pos-v3-hw-antwort-chip {
+    @apply mt-0.5 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight;
+  }
+
+  .pos-v3-hw-antwort-chip--angenommen {
+    @apply bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/80;
+  }
+
+  .pos-v3-hw-antwort-chip--abgelehnt {
+    @apply bg-red-50 text-red-800 ring-1 ring-red-200/80;
+  }
+
+  .pos-v3-hw-antwort-chip--offen {
+    @apply bg-amber-50 text-amber-900 ring-1 ring-amber-200/80;
+  }
+
+  .pos-v3-hw-antwort-chip--nicht-gesendet {
+    @apply bg-slate-100 text-slate-600 ring-1 ring-slate-200/80;
+  }
+
   .pos-v3-check {
     @apply flex shrink-0 items-center;
   }

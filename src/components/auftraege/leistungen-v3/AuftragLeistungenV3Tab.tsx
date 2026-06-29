@@ -25,6 +25,7 @@ import { AuftragLeistungNewModal } from '@/components/auftraege/leistungen-v3/Au
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { LeistungStatusPill } from '@/components/auftraege/leistungen-v3/LeistungStatusPill'
 import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/PartnerVorgangChip'
+import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
 import { istPartnerEntfernungAusstehend } from '@/lib/auftraege/partner-vorgang-display'
 import {
   blockVkSumme,
@@ -357,6 +358,7 @@ export function AuftragLeistungenV3Tab({
                       <div className="pos-v3-row-main">
                         <span className="pos-v3-row-name">{pos.leistung_name}</span>
                         <PartnerVorgangChip pos={pos} />
+                        <HandwerkerAntwortChip pos={pos} />
                         {hwName ? (
                           <span className="pos-v3-hw-chip">{hwName}</span>
                         ) : !rowLocked ? (

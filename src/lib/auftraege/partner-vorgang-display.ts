@@ -2,6 +2,13 @@ import type { AuftragPosition } from '@/lib/types'
 
 export type PartnerVorgangChipVariant = 'entfernt' | 'geaendert' | 'neu' | 'gesendet'
 
+export type HandwerkerAntwortVariant = 'angenommen' | 'abgelehnt' | 'offen' | 'nicht_gesendet'
+
+export type HandwerkerAntwortAnzeige = {
+  label: string
+  variant: HandwerkerAntwortVariant
+}
+
 export type PartnerVorgangAnzeige = {
   label: string
   variant: PartnerVorgangChipVariant
@@ -32,6 +39,30 @@ export function partnerVorgangAnzeige(
     return { label: 'Neu — wartet auf Partner', variant: 'gesendet' }
   }
   return null
+}
+
+/** Partner-Antwort auf die Anfrage (akzeptiert / abgelehnt / noch offen). */
+export function handwerkerAntwortAnzeige(
+  pos: Pick<AuftragPosition, 'handwerker_id' | 'handwerker_status'>
+): HandwerkerAntwortAnzeige | null {
+  if (!pos.handwerker_id) return null
+
+  const st = (pos.handwerker_status ?? '').toLowerCase()
+
+  if (st === 'akzeptiert') {
+    return { label: 'Angenommen', variant: 'angenommen' }
+  }
+  if (st === 'abgelehnt') {
+    return { label: 'Abgelehnt', variant: 'abgelehnt' }
+  }
+  if (st === 'zugewiesen' || st === '') {
+    return { label: 'Nicht gesendet', variant: 'nicht_gesendet' }
+  }
+  if (PENDING.has(st)) {
+    return { label: 'Offen', variant: 'offen' }
+  }
+
+  return { label: 'Offen', variant: 'offen' }
 }
 
 export function istPartnerEntfernungAusstehend(
