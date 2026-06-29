@@ -24,7 +24,7 @@ import {
 } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
-import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
+import { auftragIstBauprojekt, type GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
   CompliancePoolItem,
@@ -104,7 +104,7 @@ export async function loadProjektVertragBootstrap(
   const bauprojekt = auftragIstBauprojekt({
     ist_bauprojekt: (auf as { ist_bauprojekt?: boolean | null }).ist_bauprojekt,
     gewerkSlugs: positionSlugs,
-    alleGewerke: alleGewerke ?? [],
+    alleGewerke: (alleGewerke ?? []) as GewerkBauprojektHinweis[],
   })
   if (!bauprojekt) {
     return {

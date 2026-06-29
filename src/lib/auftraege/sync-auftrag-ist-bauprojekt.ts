@@ -2,7 +2,7 @@ import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { gewerkSlugsSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import type { Gewerk } from '@/lib/types'
+import type { GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 
 /**
  * Leitet `auftraege.ist_bauprojekt` aus Positionen ab — nur wenn nicht manuell gesetzt.
@@ -41,11 +41,14 @@ export async function syncAuftragIstBauprojekt(
 
   const { data: gewerkeRows, error: gErr } = await supabaseAdmin
     .from('gewerke')
-    .select('id, name, slug, ist_bauleistung')
+    .select('slug, ist_bauleistung')
 
   if (gErr) return { ok: false, message: gErr.message }
 
-  const hatBau = gewerkSlugsSuggerierenBauprojekt(slugs, (gewerkeRows ?? []) as Gewerk[])
+  const hatBau = gewerkSlugsSuggerierenBauprojekt(
+    slugs,
+    (gewerkeRows ?? []) as GewerkBauprojektHinweis[]
+  )
 
   const { error: upErr } = await supabaseAdmin
     .from('auftraege')

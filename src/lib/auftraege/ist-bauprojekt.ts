@@ -1,7 +1,8 @@
-import type { Gewerk } from '@/lib/types'
-
 /** Mindestfelder für Bauprojekt-Erkennung (reicht für schlanke DB-Selects). */
-export type GewerkBauprojektHinweis = Pick<Gewerk, 'slug' | 'ist_bauleistung'>
+export type GewerkBauprojektHinweis = {
+  slug: string
+  ist_bauleistung?: boolean | null
+}
 
 /** Bereiche, bei denen typischerweise ein Bauprojekt vorliegt. */
 const BAU_BEREICHE = new Set([

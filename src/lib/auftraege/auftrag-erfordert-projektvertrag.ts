@@ -2,7 +2,7 @@ import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { auftragIstBauprojekt, gewerkSlugsSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import type { Gewerk } from '@/lib/types'
+import type { GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 
 /** Nachunternehmervertrag nur bei Bauprojekt — Standardauftrag: Portal-Annahme reicht. */
 export async function auftragErfordertProjektvertrag(auftragId: string): Promise<boolean> {
@@ -33,6 +33,6 @@ export async function auftragErfordertProjektvertrag(auftragId: string): Promise
   return auftragIstBauprojekt({
     ist_bauprojekt: null,
     gewerkSlugs: slugs,
-    alleGewerke: (gewerkeRaw ?? []) as Gewerk[],
+    alleGewerke: (gewerkeRaw ?? []) as GewerkBauprojektHinweis[],
   })
 }
