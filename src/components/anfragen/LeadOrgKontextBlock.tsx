@@ -14,9 +14,9 @@ import {
 import { fotosAusMelderFunnel, istMelderKanal } from '@/lib/datenschutz/melder-leads'
 import {
   disponiereHavarieNotmassnahme,
-  leadIstHavarie,
   schlageKostentraegerVor,
 } from '@/lib/org/hv-lead-actions'
+import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import {
   ANLASS_LABELS,
   buildEinladungErgaenzenLink,

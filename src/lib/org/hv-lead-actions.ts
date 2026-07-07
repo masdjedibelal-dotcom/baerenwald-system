@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { syncOrgFreigabeNachAngebot } from '@/lib/org/org-freigabe-logic'
+import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 
 async function crmActorId(): Promise<string | null> {
   const supabase = createClient()
@@ -13,15 +14,6 @@ async function crmActorId(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser()
   return user?.id ?? null
-}
-function leadIstHavarie(lead: {
-  situation?: string | null
-  funnel_daten?: unknown
-}): boolean {
-  if (lead.situation === 'notfall') return true
-  const fd = lead.funnel_daten as { melde_kategorie?: string; havarie?: boolean } | null
-  if (fd?.havarie === true) return true
-  return fd?.melde_kategorie === 'notfall'
 }
 
 async function resolveNotmassnahmeHandwerkerId(explicit?: string): Promise<string | null> {

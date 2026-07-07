@@ -206,6 +206,14 @@ export type Lead = {
   einladung_status?: EinladungStatus | null
   org_freigabe_status?: OrgFreigabeStatus | null
   service_modus?: ServiceModus | null
+  /** HV-Plattform: Meldungs-Workflow-Status */
+  hv_meldung_status?: string | null
+  kostentraeger?: string | null
+  kostentraeger_vorgeschlagen?: boolean | null
+  versicherungs_nr?: string | null
+  vorgang_phase?: string | null
+  melde_tracking_token?: string | null
+  duplikat_hinweis?: boolean | null
   /** Bauprojekt — erweiterte Unterlagen & Bautagesberichte */
   ist_bauprojekt?: boolean
   ki_session_id?: string | null
@@ -520,6 +528,10 @@ export type Auftrag = {
   kunden_seite_letzter_aufruf?: string | null
   /** Bauprojekt — Bautagesbericht statt kurzem Bautagebuch */
   ist_bauprojekt?: boolean
+  /** HV-Plattform: Kostenträger (Rechnung/Versicherungsakte) */
+  kostentraeger?: string | null
+  versicherungs_nr?: string | null
+  versicherungsakte_pdf_url?: string | null
   kunden?: Kunde
 }
 
