@@ -1,0 +1,16 @@
+Betreff: Meldung — GH12 Musterstraße
+
+--- Pflicht ---
+
+Objekt: GH12 Musterstraße
+Auftrag: Angebot
+Beschreibung: Seit gestern tropft der Hahn im Bad Whg. 12, Wasser läuft in die Schublade.
+Einheit & Ort: Whg. 12, 2. OG links, Bad
+Kontakt vor Ort: Max Mustermann, 0170 1234567
+
+Bitte 1–2 Fotos vom Schaden als Anhang mitschicken.
+
+--- Optional ---
+
+Erreichbar: ab 14:00, Mo–Fr
+Zugang: Schlüssel beim Hausmeister Müller, EG links
