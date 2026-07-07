@@ -7,7 +7,7 @@ import {
 } from '@/lib/org/hv-lead-actions'
 import { replaceAuftragHandwerkerUndSenden } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
-import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe'
+import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe-actions'
 
 export const runtime = 'nodejs'
 

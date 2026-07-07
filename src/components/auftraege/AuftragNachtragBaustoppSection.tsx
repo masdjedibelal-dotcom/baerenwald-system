@@ -13,7 +13,7 @@ import {
   sendNachtragErinnerungAnKunde,
   updateNachtragHandwercherBestaetigt,
 } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
-import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe'
+import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe-actions'
 import {
   AlertTriangle,
   Check,
