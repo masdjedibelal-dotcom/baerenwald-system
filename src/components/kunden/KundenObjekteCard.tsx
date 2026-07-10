@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Building2, Copy, ExternalLink, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Building2, Copy, ExternalLink, FolderOpen, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
@@ -184,7 +185,14 @@ export function KundenObjekteCard({
             <li key={o.id} className="flex gap-3 px-3 py-2.5">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-bw-text">{o.titel}</p>
+                <p className="text-[13px] font-medium text-bw-text">
+                  <Link
+                    href={`/kunden/${kundeId}/objekte/${o.id}`}
+                    className="text-bw-text hover:text-bw-link hover:underline"
+                  >
+                    {o.titel}
+                  </Link>
+                </p>
                 <p className="text-[12px] text-bw-text-muted">
                   {[kundenObjektStrasseZeile(o), [o.plz, o.ort].filter(Boolean).join(' ')]
                     .filter(Boolean)
@@ -222,6 +230,14 @@ export function KundenObjekteCard({
                 ) : null}
               </div>
               <div className="flex shrink-0 gap-1">
+                <Link
+                  href={`/kunden/${kundeId}/objekte/${o.id}`}
+                  className="btn btn-ghost btn-sm"
+                  aria-label="Objektakte öffnen"
+                  title="Objektakte"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                </Link>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"

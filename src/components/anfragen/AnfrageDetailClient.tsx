@@ -68,6 +68,7 @@ import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { fetchKundenObjekte, setLeadKundeObjekt } from '@/app/actions/kunden-objekte'
 import type { KundenObjekt } from '@/lib/types'
+import type { ObjektAkteReadOnlyPayload } from '@/lib/objektakte/types'
 
 const AngebotWizard = dynamic(
   () =>
@@ -144,6 +145,7 @@ export function AnfrageDetailClient({
   wizardFirm,
   wizardHandwerker = [],
   kundenObjekte = [],
+  objektAkteReadOnly = null,
   angebotKopieVonQuelleId,
   angebotFlowSnapshot = null,
   angeboteAuswahlInitial = false,
@@ -158,6 +160,7 @@ export function AnfrageDetailClient({
   wizardFirm?: FirmenEinstellungen
   wizardHandwerker?: Handwerker[]
   kundenObjekte?: KundenObjekt[]
+  objektAkteReadOnly?: ObjektAkteReadOnlyPayload | null
   /** Server: beim Aufruf mit ?angebot_kopie_von= wird der Wizard als 1:1-Kopie geöffnet. */
   angebotKopieVonQuelleId?: string
   angebotFlowSnapshot?: AnfrageAngebotFlowSnapshot | null
@@ -672,7 +675,7 @@ export function AnfrageDetailClient({
   const projektuebersichtCards = (
     <>
       {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
-      <LeadOrgKontextBlock lead={lead} />
+      <LeadOrgKontextBlock lead={lead} objektAkteReadOnly={objektAkteReadOnly} />
       <LeadFunnelProjektAnzeige
         lead={lead}
         gewerke={wizardGewerke}

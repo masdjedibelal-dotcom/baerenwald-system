@@ -28,6 +28,8 @@ import {
   ORG_FREIGABE_LABELS,
 } from '@/lib/org/org-portal-helpers'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
+import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
+import type { ObjektAkteReadOnlyPayload } from '@/lib/objektakte/types'
 import { formatDatumZeit } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail, OrgFreigabeLogRow } from '@/lib/types'
@@ -41,7 +43,13 @@ function orgFreigabeBadgeStatus(
   return 'order'
 }
 
-export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
+export function LeadOrgKontextBlock({
+  lead,
+  objektAkteReadOnly = null,
+}: {
+  lead: LeadDetail
+  objektAkteReadOnly?: ObjektAkteReadOnlyPayload | null
+}) {
   const router = useRouter()
   const [fotoIdx, setFotoIdx] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
@@ -311,7 +319,25 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
           {objekt.einheiten_hinweis ? (
             <p className="mt-1 text-[12px] text-bw-text-muted">{objekt.einheiten_hinweis}</p>
           ) : null}
+          {(() => {
+            const orgKundeId =
+              auftraggeber?.id ?? (lead as { auftraggeber_kunde_id?: string | null }).auftraggeber_kunde_id
+            return orgKundeId ? (
+              <p className="mt-2">
+                <Link
+                  href={`/kunden/${orgKundeId}/objekte/${objekt.id}`}
+                  className="text-[12px] text-bw-primary hover:underline"
+                >
+                  Kontakte & Bewohner (Objektakte) →
+                </Link>
+              </p>
+            ) : null
+          })()}
         </Card>
+      ) : null}
+
+      {objektAkteReadOnly ? (
+        <ObjektAkteReadOnlySection data={objektAkteReadOnly} variant="compact" />
       ) : null}
 
       {zeigtServicepaket ? (

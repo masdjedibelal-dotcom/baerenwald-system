@@ -9,6 +9,7 @@ import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
+import { loadObjektAkteReadOnly } from '@/lib/objektakte/load-objekt-akte'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
 /** Schwere Client-Bundle (Wizard, PDF) aus Page-Chunk auslagern — verhindert ChunkLoadError bei HMR. */
@@ -127,6 +128,17 @@ export default async function AnfrageDetailPage({
     kundenObjekte = await fetchKundenObjekte(kundeId)
   }
 
+  const orgKundeId = lead.auftraggeber_kunde_id?.trim() || kundeId?.trim() || null
+  const objektId = lead.kunde_objekt_id?.trim() || null
+  const objektAkteReadOnly =
+    orgKundeId && objektId
+      ? await loadObjektAkteReadOnly({
+          kundeId: orgKundeId,
+          objektId,
+          leadId: params.id,
+        })
+      : null
+
   if (angeboteFromLead && angeboteFromLead.length) {
     const sorted = [...angeboteFromLead].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -143,6 +155,7 @@ export default async function AnfrageDetailPage({
         wizardPreislisten={preislisten}
         wizardFirm={firm}
         kundenObjekte={kundenObjekte}
+        objektAkteReadOnly={objektAkteReadOnly}
         angebotKopieVonQuelleId={angebotKopieVon}
         wizardHandwerker={wizardHandwerker}
         angebotFlowSnapshot={angebotFlowSnapshot}
@@ -173,6 +186,7 @@ export default async function AnfrageDetailPage({
       wizardPreislisten={preislisten}
       wizardFirm={firm}
       kundenObjekte={kundenObjekte}
+      objektAkteReadOnly={objektAkteReadOnly}
       angebotKopieVonQuelleId={angebotKopieVon}
       wizardHandwerker={wizardHandwerker}
       angebotFlowSnapshot={angebotFlowSnapshot}

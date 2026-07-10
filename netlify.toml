@@ -18,31 +18,9 @@
     "scripts/ki-analyse/**",
   ]
 
-# Cron-Jobs (ersetzt ehem. vercel.json) — CRON_SECRET in Netlify setzen
-[[scheduled]]
-  path = "/api/cron/einbehalte"
-  schedule = "30 7 * * *"
-
-[[scheduled]]
-  path = "/api/cron/rechnungen"
-  schedule = "0 8 * * *"
-
-[[scheduled]]
-  path = "/api/cron/datenschutz"
-  schedule = "0 8 1 * *"
-
-[[scheduled]]
-  path = "/api/cron/angebot-nachfass"
-  schedule = "0 9 * * *"
-
-[[scheduled]]
-  path = "/api/cron/copilot-briefing"
-  schedule = "30 7 * * 1-6"
-
-[[scheduled]]
-  path = "/api/cron/ki-hub-analyze"
-  schedule = "0 7 * * 1-6"
-
-[[scheduled]]
-  path = "/api/cron/ki-hub-metrics"
-  schedule = "30 6 * * *"
+# Hinweis: Netlify kennt KEIN [[scheduled]] in netlify.toml (das war Vercel-Syntax
+# und verursachte "Error loading the config file").
+# Cron-Jobs für die Next.js-API-Routen bitte extern auslösen (z. B. GitHub Action
+# oder cron-job.org) mit Bearer CRON_SECRET auf die /api/cron/*-Endpunkte, oder
+# als native Netlify Scheduled Functions in netlify/functions/ mit
+# `export const config = { schedule: "..." }`.
