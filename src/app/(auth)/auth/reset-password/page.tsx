@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Card } from '@/components/ui/Card'
 import { BrandLogo } from '@/components/brand/BrandLogo'
@@ -10,6 +10,7 @@ import { verifyCrmStaffSession } from '@/app/(auth)/auth-actions'
 function ResetPasswordContent() {
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,10 +21,27 @@ function ResetPasswordContent() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      const code = searchParams.get('code')
+      if (code) {
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code)
+        if (exchangeErr && !cancelled) {
+          setError(
+            'Link abgelaufen oder ungültig. Bitte erneut „Passwort vergessen“ im CRM anfordern.'
+          )
+          setChecking(false)
+          return
+        }
+        if (!cancelled) {
+          router.replace('/auth/reset-password')
+        }
+      }
+
       const { data } = await supabase.auth.getUser()
       if (cancelled) return
       if (!data.user) {
-        setError('Link abgelaufen oder ungültig. Bitte erneut „Passwort vergessen“ im CRM anfordern.')
+        setError(
+          'Keine gültige Sitzung — bitte den Link aus der E-Mail erneut öffnen oder „Passwort vergessen“ im CRM nutzen.'
+        )
         setChecking(false)
         return
       }
@@ -40,7 +58,7 @@ function ResetPasswordContent() {
     return () => {
       cancelled = true
     }
-  }, [supabase])
+  }, [router, searchParams, supabase])
 
   async function handleSave() {
     if (password.length < 8) {
