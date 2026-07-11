@@ -60,6 +60,7 @@ export async function wipeCrmTransactionalData(
 type LeadRow = {
   id: string
   kunde_id: string | null
+  auftraggeber_kunde_id?: string | null
   kontakt_email: string | null
   kontakt_name: string | null
   kontakt_telefon: string | null
@@ -68,8 +69,19 @@ type LeadRow = {
   kunden?: { email?: string | null; name?: string | null } | null
 }
 
+async function deleteByIds(
+  admin: SupabaseClient,
+  table: string,
+  column: string,
+  ids: string[]
+): Promise<string | null> {
+  if (!ids.length) return null
+  const { error } = await admin.from(table).delete().in(column, ids)
+  return error ? `${table}: ${error.message}` : null
+}
+
 /**
- * Löscht nur erkannte Alt-Demo-Leads (example.com, Muster-Namen, …) und verwaiste Demo-Kunden.
+ * Löscht Demo-/E2E-Leads inkl. verknüpfter Angebote, Aufträge und Rechnungen.
  */
 export async function purgeLegacyDemoRecords(
   admin: SupabaseClient
@@ -77,7 +89,7 @@ export async function purgeLegacyDemoRecords(
   const { data: rows, error: loadErr } = await admin
     .from('leads')
     .select(
-      'id, kunde_id, kontakt_email, kontakt_name, kontakt_telefon, notizen, funnel_daten, kunden!kunde_id(email, name)'
+      'id, kunde_id, auftraggeber_kunde_id, kontakt_email, kontakt_name, kontakt_telefon, notizen, funnel_daten, kunden!kunde_id(email, name)'
     )
 
   if (loadErr) {
@@ -87,62 +99,70 @@ export async function purgeLegacyDemoRecords(
   const demoLeads = (rows ?? []).filter((r) => isLegacyDemoLead(r as LeadRow))
   const leadIds = demoLeads.map((r) => r.id)
   const kundeIdsFromLeads = Array.from(
-    new Set(demoLeads.map((r) => r.kunde_id).filter((id): id is string => !!id))
+    new Set([
+      ...demoLeads.map((r) => r.kunde_id).filter((id): id is string => !!id),
+      ...demoLeads
+        .map((r) => (r as LeadRow).auftraggeber_kunde_id)
+        .filter((id): id is string => !!id),
+    ])
   )
 
-  if (!leadIds.length && !kundeIdsFromLeads.length) {
-    const { data: kundenRows } = await admin.from('kunden').select('id, name, email')
-    const demoKundenOnly = (kundenRows ?? []).filter((k) =>
-      isLegacyDemoLead({
-        kontakt_email: k.email,
-        kontakt_name: k.name,
-        kontakt_telefon: null,
-        notizen: null,
-        funnel_daten: null,
-      })
-    )
-    if (!demoKundenOnly.length) {
-      return { ok: true, deletedLeads: 0, deletedKunden: 0 }
-    }
-    const { error: kErr } = await admin
-      .from('kunden')
-      .delete()
-      .in(
-        'id',
-        demoKundenOnly.map((k) => k.id)
-      )
-    if (kErr) return { ok: false, message: `kunden: ${kErr.message}` }
-    return { ok: true, deletedLeads: 0, deletedKunden: demoKundenOnly.length }
+  const { data: kundenRows } = await admin.from('kunden').select('id, name, email')
+  const demoKundenOnly = (kundenRows ?? []).filter((k) =>
+    isLegacyDemoLead({
+      kontakt_email: k.email,
+      kontakt_name: k.name,
+      kontakt_telefon: null,
+      notizen: null,
+      funnel_daten: null,
+    })
+  )
+  const demoKundeIds = Array.from(
+    new Set([...kundeIdsFromLeads, ...demoKundenOnly.map((k) => k.id)])
+  )
+
+  if (!leadIds.length && !demoKundeIds.length) {
+    return { ok: true, deletedLeads: 0, deletedKunden: 0 }
   }
 
   const errors: string[] = []
 
-  if (leadIds.length) {
-    const { error: angErr } = await admin.from('angebote').delete().in('lead_id', leadIds)
-    if (angErr) errors.push(`angebote: ${angErr.message}`)
+  let auftragIds: string[] = []
+  if (leadIds.length || demoKundeIds.length) {
+    let q = admin.from('auftraege').select('id')
+    if (leadIds.length && demoKundeIds.length) {
+      q = q.or(`lead_id.in.(${leadIds.join(',')}),kunde_id.in.(${demoKundeIds.join(',')})`)
+    } else if (leadIds.length) {
+      q = q.in('lead_id', leadIds)
+    } else {
+      q = q.in('kunde_id', demoKundeIds)
+    }
+    const { data: aufRows, error: aufLoadErr } = await q
+    if (aufLoadErr) errors.push(`auftraege/load: ${aufLoadErr.message}`)
+    else auftragIds = (aufRows ?? []).map((r) => r.id)
+  }
 
-    const { error: leadErr } = await admin.from('leads').delete().in('id', leadIds)
-    if (leadErr) errors.push(`leads: ${leadErr.message}`)
+  for (const err of [
+    await deleteByIds(admin, 'rechnungen', 'auftrag_id', auftragIds),
+    await deleteByIds(admin, 'rechnungen', 'kunde_id', demoKundeIds),
+    await deleteByIds(admin, 'kalender_termine', 'auftrag_id', auftragIds),
+    await deleteByIds(admin, 'kalender_termine', 'lead_id', leadIds),
+    await deleteByIds(admin, 'ki_anfragen_log', 'lead_id', leadIds),
+    await deleteByIds(admin, 'angebote', 'lead_id', leadIds),
+    await deleteByIds(admin, 'angebote', 'kunde_id', demoKundeIds),
+    await deleteByIds(admin, 'auftraege', 'id', auftragIds),
+    await deleteByIds(admin, 'leads', 'id', leadIds),
+  ]) {
+    if (err) errors.push(err)
   }
 
   let deletedKunden = 0
-  for (const kid of kundeIdsFromLeads) {
+  for (const kid of demoKundeIds) {
     const { count } = await admin
       .from('leads')
       .select('id', { count: 'exact', head: true })
-      .eq('kunde_id', kid)
+      .or(`kunde_id.eq.${kid},auftraggeber_kunde_id.eq.${kid}`)
     if ((count ?? 0) > 0) continue
-
-    const { data: kunde } = await admin.from('kunden').select('id, name, email').eq('id', kid).maybeSingle()
-    if (!kunde || !isLegacyDemoLead({
-      kontakt_email: kunde.email,
-      kontakt_name: kunde.name,
-      kontakt_telefon: null,
-      notizen: null,
-      funnel_daten: null,
-    })) {
-      continue
-    }
 
     const { error: kDel } = await admin.from('kunden').delete().eq('id', kid)
     if (kDel) errors.push(`kunden ${kid}: ${kDel.message}`)

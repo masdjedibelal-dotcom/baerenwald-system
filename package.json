@@ -38,6 +38,7 @@
     "db:bautagebuch-gewerk": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260601140000_bautagebuch_gewerk_id.sql",
     "db:ki-analysen": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260612120000_ki_cluster_analysen.sql",
     "db:ki-historik": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260613120000_ki_historische_daten.sql",
+    "bootstrap:crm-admin": "node --env-file=.env.local scripts/bootstrap-crm-admin.mjs",
     "db:handwerker-vertraege": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260614120000_handwerker_vertraege.sql",
     "db:compliance-scope": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260615120000_compliance_dokument_scope.sql",
     "db:compliance-auftrag": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260616120000_partner_dokumente_auftrag.sql",

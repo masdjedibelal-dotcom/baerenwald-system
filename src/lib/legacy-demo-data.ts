@@ -12,7 +12,19 @@ const LEGACY_DEMO_NAME_FRAGMENTS = [
 ] as const
 
 const LEGACY_DEMO_EMAIL_RE =
-  /@(example\.(com|de|org)|test\.local|demo\.|muster\.|sample\.)/i
+  /@(example\.(com|de|org)|baerenwald-test\.local|beispiel\.de|demo\.de|test\.local|demo\.|muster\.|sample\.)/i
+
+const LEGACY_DEMO_NAME_RE =
+  /^(e2e |rls test|dup [ab]|ohne foto|musterverwaltung gmbh$)/i
+
+/** E2E-/Test-E-Mail (Playwright, Musterverwaltung, …). */
+export function isE2eOrTestEmail(email: string | null | undefined): boolean {
+  if (!email?.trim()) return false
+  const e = email.trim().toLowerCase()
+  if (e.startsWith('e2e-')) return true
+  if (e.includes('example.com') || e.includes('example.de')) return true
+  return LEGACY_DEMO_EMAIL_RE.test(e)
+}
 
 type LeadLike = Pick<
   LeadWithAngebote,
@@ -54,11 +66,11 @@ export function isLegacyDemoLead(lead: LeadLike): boolean {
   if (funnelMarksDemo(lead.funnel_daten)) return true
 
   for (const mail of emailsOf(lead)) {
-    if (LEGACY_DEMO_EMAIL_RE.test(mail)) return true
-    if (mail.includes('example.com') || mail.includes('example.de')) return true
+    if (isE2eOrTestEmail(mail)) return true
   }
 
   for (const name of namesOf(lead)) {
+    if (LEGACY_DEMO_NAME_RE.test(name)) return true
     if (LEGACY_DEMO_NAME_FRAGMENTS.some((frag) => name.includes(frag))) return true
   }
 

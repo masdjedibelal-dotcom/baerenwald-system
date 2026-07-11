@@ -2,11 +2,13 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Building2,
   Circle,
+  ClipboardList,
   Globe,
   Link2,
   Mail,
   MapPin,
   MessageCircle,
+  PencilLine,
   Phone,
 } from 'lucide-react'
 import { cn, KANAL_LABELS, STATUS_LABELS } from '@/lib/utils'
@@ -37,21 +39,32 @@ const kanalIcon: Record<LeadKanal, LucideIcon> = {
   email: Mail,
   vor_ort: MapPin,
   hv_melder_link: Link2,
+  hv_direkt: Building2,
   hv_einladung: Mail,
+  hv_katalog: ClipboardList,
+  hv_manuell: PencilLine,
   org_portal: Building2,
   org_funnel: Building2,
   org_service: Building2,
   sonstiges: Circle,
 }
 
+function kanalBadgeLabel(kanal: LeadKanal | string): string {
+  return (KANAL_LABELS as Record<string, string>)[kanal] ?? String(kanal)
+}
+
+function kanalBadgeIcon(kanal: LeadKanal | string): LucideIcon {
+  return (kanalIcon as Record<string, LucideIcon>)[kanal] ?? Circle
+}
+
 export function KanalBadge({
   kanal,
   className,
 }: {
-  kanal: LeadKanal
+  kanal: LeadKanal | string
   className?: string
 }) {
-  const Icon = kanalIcon[kanal]
+  const Icon = kanalBadgeIcon(kanal)
   return (
     <span
       className={cn(
@@ -60,7 +73,7 @@ export function KanalBadge({
       )}
     >
       <Icon className="h-3.5 w-3.5 shrink-0 text-bw-light" aria-hidden />
-      <span>{KANAL_LABELS[kanal]}</span>
+      <span>{kanalBadgeLabel(kanal)}</span>
     </span>
   )
 }
