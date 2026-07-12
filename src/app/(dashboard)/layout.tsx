@@ -50,7 +50,21 @@ export default async function DashboardLayout({
 
     if (!crmProfile) {
       const meta = (user.user_metadata ?? {}) as { name?: string; role?: string }
-      const rolle = meta.role === 'admin' ? 'admin' : meta.role === 'manager' ? 'manager' : null
+      const app = (user.app_metadata ?? {}) as {
+        name?: string
+        role?: string
+        crm_role?: string
+        is_admin?: boolean
+      }
+      const rolle =
+        meta.role === 'admin' ||
+        app.role === 'admin' ||
+        app.crm_role === 'admin' ||
+        app.is_admin
+          ? 'admin'
+          : meta.role === 'manager' || app.role === 'manager'
+            ? 'manager'
+            : null
       if (rolle && user.email) {
         await ensureUnifiedTeamAccount(supabaseAdmin, {
           authUserId: user.id,

@@ -56,6 +56,8 @@ import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCo
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
 import { LeadOrgKontextBlock } from '@/components/anfragen/LeadOrgKontextBlock'
+import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
+import { PipelineKontextBadge, PortalSyncWarning } from '@/components/anfragen/PipelineKontextBadge'
 import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
@@ -675,6 +677,24 @@ export function AnfrageDetailClient({
   const projektuebersichtCards = (
     <>
       {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <PipelineKontextBadge lead={lead} />
+        {lead.duplikat_hinweis ? (
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">
+            Mögliches Duplikat — ähnliche Meldung kürzlich am gleichen Objekt
+          </span>
+        ) : null}
+      </div>
+      <PortalSyncWarning
+        lead={lead}
+        auftragStatus={lead.status === 'abgeschlossen' ? 'abgeschlossen' : null}
+      />
+      <CrmPortalOpenButtons
+        kundeId={lead.auftraggeber_kunde_id ?? undefined}
+        leadId={lead.id}
+        showKunde={Boolean(lead.auftraggeber_kunde_id)}
+        showMieter
+      />
       <LeadOrgKontextBlock lead={lead} objektAkteReadOnly={objektAkteReadOnly} />
       <LeadFunnelProjektAnzeige
         lead={lead}

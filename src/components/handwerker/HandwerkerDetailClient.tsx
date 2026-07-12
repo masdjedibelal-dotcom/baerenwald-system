@@ -20,6 +20,7 @@ import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerCompl
 import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
 import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import { AppDetailScreen } from '@/components/layout/app'
 import {
   Briefcase,
@@ -623,6 +624,7 @@ export function HandwerkerDetailClient({
 
   return (
     <>
+      <CrmPortalOpenButtons handwerkerId={hw.id} showHandwerker />
       <DetailHead
         backHref="/handwerker"
         backLabel="Zurück zu Handwerker"

@@ -39,6 +39,7 @@ import {
   kundeNeuesAngebotHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -1234,6 +1235,10 @@ export function KundeDetailClient({
 
   return (
     <div className="space-y-4 pb-6">
+      <CrmPortalOpenButtons
+        kundeId={kunde.id}
+        showKunde={kunde.portal_modus === 'organisation' || Boolean(kunde.auth_user_id)}
+      />
       <DetailHead
         backHref="/kunden"
         backLabel="Zurück zu Kunden"

@@ -98,6 +98,7 @@ import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfas
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
 import { provisionProjektVertraegeFuerAuftrag, provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
+import { syncPortalLeadStatus } from '@/lib/portal/sync-portal-lead-status'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -1507,6 +1508,13 @@ export async function sendAngebotToKunde(
     })
     if (!tl.ok) console.warn('[sendAngebotToKunde] timeline:', tl.message)
     revalidatePath(`/anfragen/${detail.lead_id}`)
+
+    if (!options?.statusBeibehalten) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      void syncPortalLeadStatus(detail.lead_id, 'angebot_gesendet', { actor: user ?? null })
+    }
   }
 
   return { ok: true as const }
@@ -2167,6 +2175,12 @@ export async function createAuftragFromAngebot(
   }
 
   await Promise.all(timelineTasks)
+
+  if (angebot.lead_id) {
+    const leadUpd = await updateLeadStatus(angebot.lead_id, 'auftrag', 'Auftrag aus Angebot erstellt')
+    if (!leadUpd.ok) console.warn('[createAuftragFromAngebot] lead status:', leadUpd.message)
+    void syncPortalLeadStatus(angebot.lead_id, 'auftrag_beauftragt', { actor: authUser ?? null })
+  }
 
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath(`/angebote/${angebotId}`)

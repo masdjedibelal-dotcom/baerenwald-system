@@ -13,10 +13,26 @@ import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/act
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
+import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten'
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, anlass, kunde_objekt_id, auftraggeber_kunde_id, melder_einheit'
+
+type AuftragLeadRow = Pick<
+  Lead,
+  | 'id'
+  | 'plz'
+  | 'kontakt_name'
+  | 'kontakt_email'
+  | 'kontakt_telefon'
+  | 'funnel_daten'
+  | 'kanal'
+  | 'anlass'
+  | 'kunde_objekt_id'
+  | 'auftraggeber_kunde_id'
+  | 'melder_einheit'
+>
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
@@ -58,10 +74,9 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
     )
     const rahmenVertraegeByHandwerker = await loadRahmenVertraegeForHandwerker(handwerkerIds)
 
-    let lead: Pick<
-      Lead,
-      'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
-    > | null = null
+    let lead: AuftragLeadRow | null = null
+    let hvMeldungLeadId: string | null = null
+    let hvMeldungLabel: string | null = null
 
     const [leadTimeline, projektKontext] = await Promise.all([
       detail.lead_id
@@ -74,7 +89,30 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
                 .order('created_at', { ascending: true }),
               supabase.from('leads').select(LEAD_STAMMDATEN_SELECT).eq('id', detail.lead_id!).maybeSingle(),
             ])
-            lead = (leadRow as typeof lead) ?? null
+            lead = (leadRow as AuftragLeadRow | null) ?? null
+
+            if (
+              lead &&
+              resolvePipelineKontext(lead) !== 'hv_meldung' &&
+              lead.kunde_objekt_id
+            ) {
+              const { data: hvLead } = await supabase
+                .from('leads')
+                .select('id, melder_einheit, melder_name, created_at')
+                .eq('kunde_objekt_id', lead.kunde_objekt_id)
+                .eq('anlass', 'meldung')
+                .neq('id', lead.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+              if (hvLead?.id) {
+                hvMeldungLeadId = String(hvLead.id)
+                const einheit = (hvLead.melder_einheit as string | null)?.trim()
+                const name = (hvLead.melder_name as string | null)?.trim()
+                hvMeldungLabel = [einheit, name].filter(Boolean).join(' · ') || 'HV-Meldung'
+              }
+            }
+
             return (tlByLead ?? []) as LeadTimelineRow[]
           })()
         : Promise.resolve([] as LeadTimelineRow[]),
@@ -105,6 +143,8 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         partnerDokumente={partnerDokumente}
         rahmenVertraegeByHandwerker={Object.fromEntries(rahmenVertraegeByHandwerker)}
         projektKontext={projektKontext}
+        hvMeldungLeadId={hvMeldungLeadId}
+        hvMeldungLabel={hvMeldungLabel}
       />
     )
   } catch (e) {

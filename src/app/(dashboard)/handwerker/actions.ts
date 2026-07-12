@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   buildHandwerkerStammDbPayload,
   validateHandwerkerStammPflicht,
@@ -85,6 +86,42 @@ export async function updateHandwerker(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const parsed = handwerkerStammFromInput(input)
   if (!parsed.ok) return parsed
+
+  const newEmail = input.email?.trim().toLowerCase() || null
+  const { data: existing } = await supabaseAdmin
+    .from('handwerker')
+    .select('email, auth_user_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (
+    newEmail &&
+    existing?.auth_user_id &&
+    newEmail !== String(existing.email ?? '').trim().toLowerCase()
+  ) {
+    const { data: kundeConflict } = await supabaseAdmin
+      .from('kunden')
+      .select('id')
+      .ilike('email', newEmail)
+      .limit(1)
+    if (kundeConflict?.length) {
+      return {
+        ok: false,
+        message:
+          'Diese E-Mail gehört bereits einem Kunden-/Mieter-Portal-Konto. Partner-Login nicht möglich.',
+      }
+    }
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(
+      String(existing.auth_user_id),
+      { email: newEmail }
+    )
+    if (authErr) {
+      return {
+        ok: false,
+        message: `E-Mail im Portal (Auth) konnte nicht aktualisiert werden: ${authErr.message}`,
+      }
+    }
+  }
 
   const supabase = createClient()
   const { error } = await supabase

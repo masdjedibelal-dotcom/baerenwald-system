@@ -22,6 +22,10 @@ import {
   syncProjektvertragStilleFireAndForget,
   syncProjektvertragStilleFuerAuftrag,
 } from '@/lib/vertraege/sync-projektvertrag-stille'
+import {
+  portalSyncEventFromAuftragStatus,
+  syncPortalLeadStatus,
+} from '@/lib/portal/sync-portal-lead-status'
 
 type ServerRuntime = typeof import('@/lib/server-runtime')
 
@@ -113,6 +117,21 @@ async function setAuftragStatus(
     titel: `Status: ${AUFTRAG_STATUS_LABELS[status] ?? status}`,
     erstellt_von: uid,
   })
+
+  const syncEvent = portalSyncEventFromAuftragStatus(status)
+  if (syncEvent) {
+    const { data: aufLead } = await supabase
+      .from('auftraege')
+      .select('lead_id')
+      .eq('id', auftragId)
+      .maybeSingle()
+    if (aufLead?.lead_id) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      void syncPortalLeadStatus(String(aufLead.lead_id), syncEvent, { actor: user ?? null })
+    }
+  }
 
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
@@ -589,11 +608,6 @@ export async function completeAuftragAbnahme(auftragId: string) {
   const uid = await getAuthUserId()
 
   if (detail.lead_id) {
-    await supabaseAdmin
-      .from('leads')
-      .update({ vorgang_phase: 'abgeschlossen', hv_meldung_status: 'abgeschlossen' })
-      .eq('id', detail.lead_id)
-
     const { writeAuditEvent } = await import('@/lib/audit/write-audit-event')
     await writeAuditEvent({
       entityType: 'lead',

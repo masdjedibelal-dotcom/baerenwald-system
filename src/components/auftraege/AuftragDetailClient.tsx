@@ -196,6 +196,8 @@ export function AuftragDetailClient({
   partnerDokumente = [],
   rahmenVertraegeByHandwerker = {},
   projektKontext,
+  hvMeldungLeadId = null,
+  hvMeldungLabel = null,
 }: {
   detail: AuftragDetail
   lead?: AuftragLeadSnapshot | null
@@ -212,6 +214,8 @@ export function AuftragDetailClient({
   partnerDokumente?: import('@/lib/types').PartnerDokument[]
   rahmenVertraegeByHandwerker?: Record<string, HandwerkerVertragRow>
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
+  hvMeldungLeadId?: string | null
+  hvMeldungLabel?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1185,6 +1189,15 @@ export function AuftragDetailClient({
       />
 
       {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
+
+      {hvMeldungLeadId ? (
+        <p className="mb-3 text-sm text-bw-text-muted">
+          Zugehörige HV-Meldung:{' '}
+          <Link href={`/anfragen/${hvMeldungLeadId}`} className="text-bw-link hover:underline">
+            {hvMeldungLabel ?? 'Zur Meldung'}
+          </Link>
+        </p>
+      ) : null}
 
       {err ? (
         <p className="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
