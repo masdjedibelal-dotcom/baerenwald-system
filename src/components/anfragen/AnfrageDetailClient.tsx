@@ -154,6 +154,7 @@ export function AnfrageDetailClient({
   angebotWizardInitial = false,
   projektKontext,
   dbAuftragId = null,
+  dbAuftragStatus = null,
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
@@ -172,6 +173,7 @@ export function AnfrageDetailClient({
   angebotWizardInitial?: boolean
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
+  dbAuftragStatus?: string | null
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -685,10 +687,7 @@ export function AnfrageDetailClient({
           </span>
         ) : null}
       </div>
-      <PortalSyncWarning
-        lead={lead}
-        auftragStatus={lead.status === 'abgeschlossen' ? 'abgeschlossen' : null}
-      />
+      <PortalSyncWarning lead={lead} auftragStatus={dbAuftragStatus} />
       <CrmPortalOpenButtons
         kundeId={lead.auftraggeber_kunde_id ?? undefined}
         leadId={lead.id}

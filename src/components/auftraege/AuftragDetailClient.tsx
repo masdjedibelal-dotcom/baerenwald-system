@@ -68,6 +68,7 @@ import {
 } from '@/app/(dashboard)/auftraege/actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
+import { PortalSyncWarning } from '@/components/anfragen/PipelineKontextBadge'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import {
   ensureKundenTokenAction,
@@ -132,7 +133,14 @@ type GewerkOpt = { id: string; name: string; slug: string }
 
 type AuftragLeadSnapshot = Pick<
   Lead,
-  'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
+  | 'id'
+  | 'plz'
+  | 'kontakt_name'
+  | 'kontakt_email'
+  | 'kontakt_telefon'
+  | 'funnel_daten'
+  | 'vorgang_phase'
+  | 'hv_meldung_status'
 >
 
 type AuftragDetailTab =
@@ -1197,6 +1205,12 @@ export function AuftragDetailClient({
             {hvMeldungLabel ?? 'Zur Meldung'}
           </Link>
         </p>
+      ) : null}
+
+      {lead ? (
+        <div className="mb-3">
+          <PortalSyncWarning lead={lead} auftragStatus={detail.status} />
+        </div>
       ) : null}
 
       {err ? (

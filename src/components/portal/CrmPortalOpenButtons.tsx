@@ -60,8 +60,8 @@ export function CrmPortalOpenButtons({
         Portal aus CRM öffnen
       </p>
       <p className="text-xs text-bw-muted">
-        Öffnet das Portal in der gewählten Rolle (neuer Tab). Der letzte Portal-Login wird dabei
-        ersetzt — das ist normal.
+        Öffnet die Portal-Ansicht dieser Person in einem neuen Tab. Die vorherige
+        Portal-Session wird dabei automatisch ersetzt.
       </p>
       <div className="flex flex-wrap gap-2">
         {showKunde && kundeId ? (

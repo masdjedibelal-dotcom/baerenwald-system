@@ -683,9 +683,25 @@ export function HandwerkerDetailClient({
       </AppDetailScreen>
 
       {(() => {
+        const emailChanged =
+          hasPortalAccount &&
+          formEmail.trim().toLowerCase() !== (hw.email ?? '').trim().toLowerCase()
         const editForm = (
           <div className="space-y-4">
             {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
+            {emailChanged ? (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Dieser Partner hat ein aktives Portal-Konto. Beim Speichern wird die Login-E-Mail in
+                Supabase Auth mitgeändert — der Partner muss sich danach mit der neuen Adresse
+                anmelden.
+              </p>
+            ) : null}
+            {!hw.email?.trim() && hasPortalAccount ? (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Portal-Konto ist verknüpft, aber keine E-Mail im Stammblatt. Bitte E-Mail pflegen,
+                damit Zugang und Kommunikation konsistent bleiben.
+              </p>
+            ) : null}
             <Input label="Firmenname *" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
             <div className="form-grid-2 grid gap-3 md:grid-cols-2">
               <Input

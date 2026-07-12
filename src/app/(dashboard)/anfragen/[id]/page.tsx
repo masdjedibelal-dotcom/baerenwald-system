@@ -109,7 +109,7 @@ export default async function AnfrageDetailPage({
   const [{ data: auftragRow }, projektKontext] = await Promise.all([
     supabase
       .from('auftraege')
-      .select('id')
+      .select('id, status')
       .eq('lead_id', params.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -123,6 +123,7 @@ export default async function AnfrageDetailPage({
   ])
 
   const dbAuftragId = (auftragRow as { id: string } | null)?.id ?? null
+  const dbAuftragStatus = (auftragRow as { status?: string } | null)?.status ?? null
   let kundenObjekte: KundenObjekt[] = []
   if (kundeId && istKundeGewerbeTyp(kundeTyp)) {
     kundenObjekte = await fetchKundenObjekte(kundeId)
@@ -163,6 +164,7 @@ export default async function AnfrageDetailPage({
         angebotWizardInitial={angebotWizardInitial}
         projektKontext={projektKontext}
         dbAuftragId={dbAuftragId}
+        dbAuftragStatus={dbAuftragStatus}
       />
     )
   }
@@ -194,6 +196,7 @@ export default async function AnfrageDetailPage({
       angebotWizardInitial={angebotWizardInitial}
       projektKontext={projektKontext}
       dbAuftragId={dbAuftragId}
+      dbAuftragStatus={dbAuftragStatus}
     />
   )
 }

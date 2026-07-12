@@ -22,7 +22,7 @@ export function PortalSyncWarning({
   lead,
   auftragStatus,
 }: {
-  lead: LeadDetail
+  lead: Pick<LeadDetail, 'vorgang_phase' | 'hv_meldung_status'>
   auftragStatus?: string | null
 }) {
   if (!portalSyncDivergiert(lead, auftragStatus)) return null

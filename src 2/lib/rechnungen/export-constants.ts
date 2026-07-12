@@ -1,1 +1,0 @@
-export const RECHNUNGEN_PDF_ZIP_MAX = 500

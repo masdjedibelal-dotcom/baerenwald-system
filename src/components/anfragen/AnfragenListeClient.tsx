@@ -12,7 +12,8 @@ import {
 import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { SortableHeader } from '@/components/ui/SortableHeader'
-import { LeadStatusBadge } from '@/components/ui/Badge'
+import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useSort } from '@/hooks/useSort'
@@ -477,13 +478,15 @@ export function AnfragenListeClient({
                   lead.funnel_daten
                 )}
                 badge={
-                  <span className="flex flex-wrap items-center gap-1">
+                  <span className="flex flex-wrap items-center justify-end gap-1">
                     {isGptProjektStudio(lead.funnel_daten) ? (
                       <span className="inline-flex items-center gap-0.5 rounded-md border border-[#2E7D52]/30 bg-[#EAF3DE] px-1.5 py-0.5 text-[10px] font-semibold text-[#1A3D2B]">
                         <Sparkles className="h-3 w-3" aria-hidden />
                         KI
                       </span>
                     ) : null}
+                    <PipelineKontextBadge lead={lead} />
+                    {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[24px] !text-[10px]" /> : null}
                     <LeadStatusBadge status={lead.status} />
                   </span>
                 }
@@ -551,7 +554,11 @@ export function AnfragenListeClient({
                     lead.funnel_daten
                   )}
                 </p>
-                <LeadStatusBadge status={lead.status} />
+                <span className="flex flex-wrap items-center justify-end gap-1">
+                  <PipelineKontextBadge lead={lead} />
+                  {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[24px] !text-[10px]" /> : null}
+                  <LeadStatusBadge status={lead.status} />
+                </span>
               </div>
             ))}
           </ListGridShell>
