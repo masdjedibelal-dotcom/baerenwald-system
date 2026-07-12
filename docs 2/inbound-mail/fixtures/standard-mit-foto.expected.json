@@ -1,0 +1,41 @@
+{
+  "pipeline": { "stufe": "A", "pflichtfeld_count": 5, "threadMerge": null, "skipAutoReply": false },
+  "parse": {
+    "auftrag": { "bestellabsicht": "angebot", "direktBetragEur": null },
+    "fields": {
+      "objekt": "GH12 Musterstraße",
+      "beschreibung": "Seit gestern tropft der Hahn im Bad Whg. 12, Wasser läuft in die Schublade.",
+      "einheit_ort": "Whg. 12, 2. OG links, Bad",
+      "kontakt_vor_ort": "Max Mustermann, 0170 1234567",
+      "erreichbar_ab": "ab 14:00, Mo–Fr",
+      "zugang_hinweis": "Schlüssel beim Hausmeister Müller, EG links"
+    },
+    "kontakt": {
+      "name": "Max Mustermann",
+      "telefon": "0170 1234567",
+      "email": null
+    },
+    "derived": {
+      "melde_kategorie": "reparatur",
+      "melde_bereich": "wasser"
+    },
+    "anhaenge": ["https://storage.example/foto1.jpg"],
+    "inbound_flags": []
+  },
+  "persist": {
+    "kanal": "hv_mail",
+    "kostentraeger": "unklar",
+    "melder_einheit": "Whg. 12, 2. OG links, Bad",
+    "melder_name": "Max Mustermann",
+    "melder_telefon": "0170 1234567",
+    "notizen_prefix": "[Ort: Whg. 12, 2. OG links, Bad]",
+    "funnel_daten": {
+      "bestellabsicht": "angebot",
+      "havarie": false,
+      "melde_kategorie": "reparatur",
+      "melde_bereich": "wasser",
+      "inbound_flags": []
+    },
+    "auto_reply": null
+  }
+}
