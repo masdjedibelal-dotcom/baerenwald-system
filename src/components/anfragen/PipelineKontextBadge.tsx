@@ -1,7 +1,12 @@
-import { portalSyncDivergiert, PIPELINE_KONTEXT_LABELS, resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
-import type { LeadDetail } from '@/lib/types'
+import {
+  portalSyncDivergiert,
+  PIPELINE_KONTEXT_LABELS,
+  resolvePipelineKontext,
+  type PipelineKontextLead,
+  type PortalSyncLead,
+} from '@/lib/leads/pipeline-kontext'
 
-export function PipelineKontextBadge({ lead }: { lead: LeadDetail }) {
+export function PipelineKontextBadge({ lead }: { lead: PipelineKontextLead }) {
   const ctx = resolvePipelineKontext(lead)
   const label = PIPELINE_KONTEXT_LABELS[ctx]
   const cls =
@@ -22,7 +27,7 @@ export function PortalSyncWarning({
   lead,
   auftragStatus,
 }: {
-  lead: Pick<LeadDetail, 'vorgang_phase' | 'hv_meldung_status'>
+  lead: PortalSyncLead
   auftragStatus?: string | null
 }) {
   if (!portalSyncDivergiert(lead, auftragStatus)) return null

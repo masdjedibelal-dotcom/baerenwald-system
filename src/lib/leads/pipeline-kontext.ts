@@ -10,11 +10,18 @@ const HV_KANALE = new Set<LeadKanal>([
 
 export type PipelineKontext = 'hv_meldung' | 'direktkunde' | 'website' | 'sonstiges'
 
-export function resolvePipelineKontext(lead: {
+export type PipelineKontextLead = {
   kanal?: string | null
   auftraggeber_kunde_id?: string | null
   anlass?: string | null
-}): PipelineKontext {
+}
+
+export type PortalSyncLead = {
+  vorgang_phase?: string | null
+  hv_meldung_status?: string | null
+}
+
+export function resolvePipelineKontext(lead: PipelineKontextLead): PipelineKontext {
   const kanal = (lead.kanal ?? '') as LeadKanal
   if (lead.auftraggeber_kunde_id || (lead.anlass === 'meldung' && HV_KANALE.has(kanal))) {
     return 'hv_meldung'
@@ -34,10 +41,7 @@ export const PIPELINE_KONTEXT_LABELS: Record<PipelineKontext, string> = {
 }
 
 /** Grobe Prüfung: Portal-Phase passt nicht zum Auftragsstatus. */
-export function portalSyncDivergiert(lead: {
-  vorgang_phase?: string | null
-  hv_meldung_status?: string | null
-}, auftragStatus?: string | null): boolean {
+export function portalSyncDivergiert(lead: PortalSyncLead, auftragStatus?: string | null): boolean {
   if (!auftragStatus) return false
   const phase = (lead.vorgang_phase ?? '').trim()
   const hv = (lead.hv_meldung_status ?? '').trim()
