@@ -175,6 +175,21 @@ function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
   }
 }
 
+function leadPipelineMeta(lead: LeadWithAngebote) {
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {isGptProjektStudio(lead.funnel_daten) ? (
+        <span className="inline-flex items-center gap-0.5 rounded-md border border-[#2E7D52]/30 bg-[#EAF3DE] px-1.5 py-0.5 text-[10px] font-semibold text-[#1A3D2B]">
+          <Sparkles className="h-3 w-3" aria-hidden />
+          KI
+        </span>
+      ) : null}
+      <PipelineKontextBadge lead={lead} />
+      {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[22px] !text-[10px]" /> : null}
+    </span>
+  )
+}
+
 export function AnfragenListeClient({
   leads,
   mode = 'page',
@@ -467,6 +482,7 @@ export function AnfragenListeClient({
                 onClick={isPane ? undefined : () => openDetail(lead.id)}
                 className={cn(selectedId === lead.id && 'ring-2 ring-bw-primary/40')}
                 avatar={<ListAvatar name={leadName(lead)} />}
+                eyebrow={leadPipelineMeta(lead)}
                 title={leadName(lead)}
                 line2={`${leadSituationText(lead)} · ${leadBereicheText(lead)}`}
                 line3={leadEingegangen(lead)}
@@ -477,19 +493,7 @@ export function AnfragenListeClient({
                   lead.preis_max,
                   lead.funnel_daten
                 )}
-                badge={
-                  <span className="flex flex-wrap items-center justify-end gap-1">
-                    {isGptProjektStudio(lead.funnel_daten) ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-md border border-[#2E7D52]/30 bg-[#EAF3DE] px-1.5 py-0.5 text-[10px] font-semibold text-[#1A3D2B]">
-                        <Sparkles className="h-3 w-3" aria-hidden />
-                        KI
-                      </span>
-                    ) : null}
-                    <PipelineKontextBadge lead={lead} />
-                    {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[24px] !text-[10px]" /> : null}
-                    <LeadStatusBadge status={lead.status} />
-                  </span>
-                }
+                badge={<LeadStatusBadge status={lead.status} />}
               />
             ))}
           </ListMobileStack>
@@ -535,12 +539,15 @@ export function AnfragenListeClient({
                 style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}
               >
                 <ListAvatar name={leadName(lead)} />
-                <p className="truncate text-[13.5px] font-medium text-bw-text">
-                  {isGptProjektStudio(lead.funnel_daten) ? (
-                    <Sparkles className="mr-1 inline h-3 w-3 text-[#2E7D52]" aria-hidden />
-                  ) : null}
-                  {leadName(lead)}
-                </p>
+                <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-1">{leadPipelineMeta(lead)}</div>
+                  <p className="truncate text-[13.5px] font-medium text-bw-text">
+                    {isGptProjektStudio(lead.funnel_daten) ? (
+                      <Sparkles className="mr-1 inline h-3 w-3 text-[#2E7D52]" aria-hidden />
+                    ) : null}
+                    {leadName(lead)}
+                  </p>
+                </div>
                 <p className="truncate text-[13px] text-bw-text">{leadSituationText(lead)}</p>
                 <p className="truncate text-[13px] text-bw-text-muted">{leadBereicheText(lead)}</p>
                 <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{leadEingegangen(lead)}</p>
@@ -554,9 +561,7 @@ export function AnfragenListeClient({
                     lead.funnel_daten
                   )}
                 </p>
-                <span className="flex flex-wrap items-center justify-end gap-1">
-                  <PipelineKontextBadge lead={lead} />
-                  {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[24px] !text-[10px]" /> : null}
+                <span className="flex justify-end">
                   <LeadStatusBadge status={lead.status} />
                 </span>
               </div>

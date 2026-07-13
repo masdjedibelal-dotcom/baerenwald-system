@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { handleOrgFreigabeErgebnis } from '@/lib/org/org-freigabe-logic'
 import { notifyInterneNeueMeldung, notifyOrgFreigabeErgebnis } from '@/lib/org/org-mail-notify'
 
 function authorize(req: Request): boolean {
@@ -28,6 +29,17 @@ export async function POST(req: Request) {
 
   if (body.typ === 'freigabe_ergebnis') {
     const aktion = body.aktion === 'abgelehnt' ? 'abgelehnt' : 'freigegeben'
+    if (aktion === 'freigegeben') {
+      const acceptRes = await handleOrgFreigabeErgebnis({
+        leadId,
+        aktion,
+        notiz: body.notiz,
+      })
+      if (!acceptRes.ok) {
+        console.error('[org-portal-notify] freigabe accept:', acceptRes.message)
+        return NextResponse.json({ ok: false, error: acceptRes.message }, { status: 422 })
+      }
+    }
     const res = await notifyOrgFreigabeErgebnis({ leadId, aktion, notiz: body.notiz })
     if (!res.ok) return NextResponse.json({ ok: false, error: res.message }, { status: 500 })
     return NextResponse.json({ ok: true })

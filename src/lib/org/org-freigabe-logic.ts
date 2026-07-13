@@ -263,3 +263,115 @@ export async function syncOrgFreigabeNachNachtrag(input: {
 
   return { ok: true, status: 'ausstehend' }
 }
+
+async function resolveAngebotIdFuerOrgFreigabe(leadId: string): Promise<string | null> {
+  const { data: logRow } = await supabaseAdmin
+    .from('org_freigabe_log')
+    .select('angebot_id')
+    .eq('lead_id', leadId)
+    .in('aktion', ['angefordert', 'nachtrag_angefordert'])
+    .not('angebot_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const fromLog = (logRow as { angebot_id?: string | null } | null)?.angebot_id
+  if (fromLog) return String(fromLog)
+
+  const { data: ang } = await supabaseAdmin
+    .from('angebote')
+    .select('id')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return ang?.id ? String(ang.id) : null
+}
+
+/**
+ * Nach HV-Freigabe im Portal: Angebot als angenommen markieren und Auftrag anlegen.
+ * Idempotent — bestehender Auftrag zum Angebot wird wiederverwendet.
+ */
+export async function handleOrgFreigabeErgebnis(input: {
+  leadId: string
+  aktion: 'freigegeben' | 'abgelehnt'
+  notiz?: string | null
+}): Promise<
+  | { ok: true; angebotId?: string; auftragId?: string; skipped?: boolean }
+  | { ok: false; message: string }
+> {
+  const leadId = input.leadId?.trim()
+  if (!leadId) return { ok: false, message: 'Lead-ID fehlt.' }
+  if (input.aktion === 'abgelehnt') return { ok: true, skipped: true }
+
+  const angebotId = await resolveAngebotIdFuerOrgFreigabe(leadId)
+  if (!angebotId) {
+    return { ok: false, message: 'Kein Angebot für diese Freigabe gefunden.' }
+  }
+
+  const { data: existingAuftrag } = await supabaseAdmin
+    .from('auftraege')
+    .select('id')
+    .eq('angebot_id', angebotId)
+    .maybeSingle()
+  if (existingAuftrag?.id) {
+    return {
+      ok: true,
+      angebotId,
+      auftragId: String(existingAuftrag.id),
+      skipped: true,
+    }
+  }
+
+  const { acceptAngebotAndCreateAuftrag } = await import(
+    '@/app/(dashboard)/angebote/angebot-flow-actions'
+  )
+  const { createAuftragFromAngebot } = await import('@/app/(dashboard)/angebote/actions')
+
+  const { data: ang } = await supabaseAdmin
+    .from('angebote')
+    .select('id, status, lead_id')
+    .eq('id', angebotId)
+    .maybeSingle()
+  if (!ang) return { ok: false, message: 'Angebot nicht gefunden.' }
+
+  const status = String(ang.status ?? '')
+  if (status === 'abgelehnt' || status === 'storniert') {
+    return { ok: false, message: 'Angebot ist abgelehnt — kein Auftrag möglich.' }
+  }
+
+  if (status === 'kunde_akzeptiert' || status === 'angenommen') {
+    const res = await createAuftragFromAngebot(angebotId, {
+      send_kunden_email: false,
+      send_handwerker_email: false,
+    })
+    if (!res.ok) return res
+    await supabaseAdmin.from('lead_timeline').insert({
+      lead_id: leadId,
+      angebot_id: angebotId,
+      typ: 'angebot',
+      titel: 'HV-Freigabe — Auftrag erstellt',
+      beschreibung: input.notiz?.trim() || null,
+      erstellt_von: null,
+    })
+    return { ok: true, angebotId, auftragId: res.auftragId }
+  }
+
+  const res = await acceptAngebotAndCreateAuftrag(angebotId, {
+    asSystem: true,
+    send_kunden_email: false,
+  })
+  if (!res.ok) return res
+
+  await supabaseAdmin.from('lead_timeline').insert({
+    lead_id: leadId,
+    angebot_id: angebotId,
+    typ: 'angebot',
+    titel: 'HV-Freigabe — Angebot angenommen, Auftrag erstellt',
+    beschreibung: input.notiz?.trim() || null,
+    erstellt_von: null,
+  })
+
+  return { ok: true, angebotId, auftragId: res.auftragId }
+}
