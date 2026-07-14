@@ -17,6 +17,7 @@ import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import { mailOrgPortalEinladung } from '@/lib/email/meldung-mail-templates'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
@@ -532,17 +533,36 @@ export async function getKundenPortalMailDraft(
   const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
-  const betreff = defaultPortalInviteBetreff(anrede, { organisation: istOrganisation })
-  const text = defaultPortalInviteText(anrede, { organisation: istOrganisation, orgName })
-  const portalAudience: PortalMailAudience = istOrganisation ? 'organisation' : 'privat'
-  const html = kundenPortalMailHtml({
-    name,
-    portalLink,
-    anrede,
-    text,
-    branding,
-    portalAudience,
-  })
+  let betreff: string
+  let text: string
+  let html: string
+  if (istOrganisation) {
+    text = defaultPortalInviteText(anrede, { organisation: true, orgName })
+    const tpl = mailOrgPortalEinladung(
+      {
+        name,
+        orgAnzeigename: orgName,
+        portalLink,
+        anrede,
+        text,
+      },
+      branding
+    )
+    betreff = tpl.betreff
+    html = tpl.html
+  } else {
+    betreff = defaultPortalInviteBetreff(anrede, { organisation: false })
+    text = defaultPortalInviteText(anrede, { organisation: false, orgName })
+    const portalAudience: PortalMailAudience = 'privat'
+    html = kundenPortalMailHtml({
+      name,
+      portalLink,
+      anrede,
+      text,
+      branding,
+      portalAudience,
+    })
+  }
   return {
     ok: true,
     to,
@@ -566,7 +586,7 @@ export async function sendKundenPortalLinkMail(input: {
   if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ, portal_modus')
+    .select('id, name, typ, portal_modus, org_anzeigename')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
@@ -581,14 +601,27 @@ export async function sendKundenPortalLinkMail(input: {
     (kunde as { portal_modus?: string }).portal_modus === 'organisation'
       ? 'organisation'
       : 'privat'
-  const html = kundenPortalMailHtml({
-    name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
-    portalLink,
-    anrede,
-    text: input.text,
-    branding,
-    portalAudience,
-  })
+  const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
+  const html =
+    portalAudience === 'organisation'
+      ? mailOrgPortalEinladung(
+          {
+            name,
+            orgAnzeigename: (kunde as { org_anzeigename?: string | null }).org_anzeigename,
+            portalLink,
+            anrede,
+            text: input.text,
+          },
+          branding
+        ).html
+      : kundenPortalMailHtml({
+          name,
+          portalLink,
+          anrede,
+          text: input.text,
+          branding,
+          portalAudience,
+        })
 
   const r = await sendMail({
     typ: 'update_hinweis',
@@ -610,7 +643,7 @@ export async function previewKundenPortalMail(input: {
 }): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ, portal_modus')
+    .select('id, name, typ, portal_modus, org_anzeigename')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
@@ -625,14 +658,27 @@ export async function previewKundenPortalMail(input: {
     (kunde as { portal_modus?: string }).portal_modus === 'organisation'
       ? 'organisation'
       : 'privat'
-  const html = kundenPortalMailHtml({
-    name: String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim(),
-    portalLink,
-    anrede,
-    text: input.text,
-    branding,
-    portalAudience,
-  })
+  const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
+  const html =
+    portalAudience === 'organisation'
+      ? mailOrgPortalEinladung(
+          {
+            name,
+            orgAnzeigename: (kunde as { org_anzeigename?: string | null }).org_anzeigename,
+            portalLink,
+            anrede,
+            text: input.text,
+          },
+          branding
+        ).html
+      : kundenPortalMailHtml({
+          name,
+          portalLink,
+          anrede,
+          text: input.text,
+          branding,
+          portalAudience,
+        })
   return { ok: true, html }
 }
 

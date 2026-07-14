@@ -22,6 +22,9 @@ import {
   User,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import { DetailResponsiveTabs } from '@/components/layout/app'
@@ -81,6 +84,8 @@ import {
   mahnstufeListenLabel,
   rechnungHatMahnverlauf,
 } from '@/lib/rechnungen/mahnverlauf'
+import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
+import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 function DetailProp({
@@ -168,6 +173,27 @@ export function RechnungDetailClient({
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
   const titel = detail.kunden?.name?.trim() || 'Rechnung'
+  const { backHref, backLabel } = vorgangBackNav('rechnung')
+  const resolvedVorgang = useMemo(() => {
+    if (!projektKontext?.lead) return null
+    return resolveVorgangFromCrmEntities({
+      lead: {
+        id: projektKontext.lead.id,
+        status: projektKontext.lead.status,
+        created_at: detail.created_at,
+        updated_at: detail.updated_at,
+      },
+      rechnungen: [
+        {
+          id: detail.id,
+          status: detail.status,
+          faellig: detail.faellig_am,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+        },
+      ],
+    })
+  }, [projektKontext, detail])
 
   const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
   const ueberfaellig =
@@ -536,6 +562,7 @@ export function RechnungDetailClient({
     <div className="space-y-3">
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       {rechnungsdetailsCard}
+      <PosBoard title="Leistungen" positionen={pos} readOnly />
       {zeigtMahnverlauf ? (
         <RechnungMahnverlaufCard
           rechnung={detail}
@@ -616,7 +643,7 @@ export function RechnungDetailClient({
   const desktopDetailTabs = [
     { id: 'uebersicht', label: 'Übersicht', icon: LayoutGrid },
     { id: 'positionen', label: 'Positionen', icon: FileText, count: pos.length || undefined },
-    { id: 'aktivitaet', label: 'Aktivität', icon: History },
+    { id: 'aktivitaet', label: entityDetailTabLabel('timeline'), icon: History },
     { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
   ]
 
@@ -624,7 +651,7 @@ export function RechnungDetailClient({
     { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
     { id: 'leistung', label: 'Leistungsübersicht', icon: List, count: pos.length || undefined },
     { id: 'schritte', label: 'Nächste Schritte', icon: ListChecks },
-    { id: 'aktivitaet', label: 'Aktivität', icon: History },
+    { id: 'aktivitaet', label: entityDetailTabLabel('timeline'), icon: History },
     { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
   ]
 
@@ -648,11 +675,14 @@ export function RechnungDetailClient({
   )
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        backHref="/rechnungen"
-        backLabel="Zurück zu Rechnungen"
-        title={
+    <EntityDetailLayout
+      resolvedVorgang={resolvedVorgang}
+      phase="rechnung"
+      breadcrumbTitle={titel}
+      head={{
+        backHref,
+        backLabel,
+        title: (
           <div className="detail-head-title-row">
             <span>{titel}</span>
             {rechnungStatusBadge(detail.status, ueberfaellig)}
@@ -662,8 +692,8 @@ export function RechnungDetailClient({
               </span>
             ) : null}
           </div>
-        }
-        sub={
+        ),
+        sub: (
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {headSub}
             {detail.brutto != null ? (
@@ -672,8 +702,8 @@ export function RechnungDetailClient({
               </span>
             ) : null}
           </span>
-        }
-        actions={
+        ),
+        actions: (
           <>
             {primaryAction}
             <ActionsMenu
@@ -691,8 +721,9 @@ export function RechnungDetailClient({
               sheetTitle="Rechnung"
             />
           </>
-        }
-      />
+        ),
+      }}
+    >
 
       {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
@@ -769,6 +800,6 @@ export function RechnungDetailClient({
       />
 
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }

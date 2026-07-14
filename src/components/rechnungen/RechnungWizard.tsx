@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,9 +11,8 @@ import {
   Plus,
   Save,
   Send,
-  X,
 } from 'lucide-react'
-import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
+import { WizardShell } from '@/components/layout/WizardShell'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -84,27 +82,6 @@ function gesamtNettoFromBootstrap(bootstrap: RechnungWizardBootstrap): number {
     netto += (p.lohn_netto + p.material_netto) * (p.menge || 1)
   }
   return netto
-}
-
-function Step({
-  n,
-  label,
-  active,
-  done,
-}: {
-  n: number
-  label: string
-  active: boolean
-  done: boolean
-}) {
-  return (
-    <div className={cn('step', active && 'active', done && 'done')}>
-      <span className="step-n">
-        {done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : n}
-      </span>
-      <span>{label}</span>
-    </div>
-  )
 }
 
 function PropRow({
@@ -584,6 +561,11 @@ export function RechnungWizard({
     (standalone ? 'Direktrechnung' : bootstrap.auftragsReferenz)
   const wizardTitel = istAbschlag ? 'Abschlagsrechnungen erstellen' : 'Rechnung erstellen'
   const step1Label = standalone ? 'Kunde & Leistungen' : 'Leistungen'
+  const wizardSteps = [
+    { id: 1, label: step1Label },
+    { id: 2, label: 'Zahlplan' },
+    { id: 3, label: 'Paket & Versand' },
+  ] as const
 
   useEffect(() => {
     if (step !== 3) return
@@ -654,90 +636,73 @@ export function RechnungWizard({
       </>
     )
 
-  const wizardHeader = (
+  const wizardDesktopActions = (
     <>
-      <WizardMobileToolbar
-        onClose={onClose}
-        totalSteps={3}
-        currentStep={step}
-        stepLabel={`Schritt ${step}`}
-        actions={wizardMobileActions}
-      />
-      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
-      <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Schließen">
-        <X className="h-4 w-4" />
-      </button>
-      <div className="h-6 w-px bg-bw-border" aria-hidden />
-      <div className="title-block min-w-0">
-        <div className="ttl">{wizardTitel}</div>
-        <div className="sub">
-          {projektTitel}
-          {bootstrap.auftragsReferenz ? ` · ${bootstrap.auftragsReferenz}` : ''}
-        </div>
-      </div>
-      <div className="flex-1" />
-      <div className="stepper" role="navigation" aria-label="Fortschritt">
-        <Step n={1} label={step1Label} active={step === 1} done={step > 1} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={2} label="Finalisieren" active={step === 2} done={step > 2} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={3} label="Versenden" active={step === 3} done={false} />
-      </div>
-      <div className="flex-1" />
-      <div className="flex items-center gap-2">
-        {step > 1 ? (
-          <Button variant="secondary" onClick={() => setStep((s) => s - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-            Zurück
+      {step > 1 ? (
+        <Button variant="secondary" onClick={() => setStep((s) => s - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+          Zurück
+        </Button>
+      ) : null}
+      {step < 3 ? (
+        <>
+          <Button
+            variant="secondary"
+            disabled={saving}
+            onClick={() => void persistDraft({ notify: true })}
+            className="gap-1.5"
+          >
+            <Save className="h-4 w-4" aria-hidden />
+            Speichern
           </Button>
-        ) : null}
-        {step < 3 ? (
-          <>
-            <Button
-              variant="secondary"
-              disabled={saving}
-              onClick={() => void persistDraft({ notify: true })}
-              className="gap-1.5"
-            >
-              <Save className="h-4 w-4" aria-hidden />
-              Speichern
-            </Button>
-            <Button disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
-              Weiter
-              <ChevronRight className="h-4 w-4" aria-hidden />
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="secondary"
-              disabled={saving}
-              onClick={() => void handleSaveWithoutMail()}
-              className="gap-1.5"
-            >
-              <Save className="h-4 w-4" aria-hidden />
-              Ohne E-Mail speichern
-            </Button>
-            <Button disabled={saving} onClick={() => void handleSend()} className="gap-1.5">
-              <Send className="h-4 w-4" aria-hidden />
-              An Kunden senden
-            </Button>
-          </>
-        )}
-        {lastSavedAt ? (
-          <span className={cn('text-xs text-bw-text-muted', draftDirty && 'wizard-save-status--dirty')}>
-            Gespeichert {lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        ) : saving ? (
-          <span className="text-xs wizard-save-status--saving">Speichere…</span>
-        ) : null}
-      </div>
-      </div>
+          <Button disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
+            Weiter
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button
+            variant="secondary"
+            disabled={saving}
+            onClick={() => void handleSaveWithoutMail()}
+            className="gap-1.5"
+          >
+            <Save className="h-4 w-4" aria-hidden />
+            Ohne E-Mail speichern
+          </Button>
+          <Button disabled={saving} onClick={() => void handleSend()} className="gap-1.5">
+            <Send className="h-4 w-4" aria-hidden />
+            An Kunden senden
+          </Button>
+        </>
+      )}
+      {lastSavedAt ? (
+        <span className={cn('text-xs text-bw-text-muted', draftDirty && 'wizard-save-status--dirty')}>
+          Gespeichert {lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      ) : saving ? (
+        <span className="text-xs wizard-save-status--saving">Speichere…</span>
+      ) : null}
     </>
   )
 
   const wizard = (
-    <AppFlowScreen className="wizard-flow" header={wizardHeader}>
+    <WizardShell
+      className="wizard-flow"
+      title={wizardTitel}
+      subtitle={
+        <>
+          {projektTitel}
+          {bootstrap.auftragsReferenz ? ` · ${bootstrap.auftragsReferenz}` : ''}
+        </>
+      }
+      steps={[...wizardSteps]}
+      currentStep={step}
+      onClose={onClose}
+      mobileActions={wizardMobileActions}
+      desktopActions={wizardDesktopActions}
+    >
       <div className="wizard-inner">
           {step === 1 ? (
             <div className="space-y-4">
@@ -1032,7 +997,7 @@ export function RechnungWizard({
           }}
         />
       ) : null}
-    </AppFlowScreen>
+    </WizardShell>
   )
 
   return createPortal(wizard, document.body)

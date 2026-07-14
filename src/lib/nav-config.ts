@@ -1,9 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
-  Inbox,
-  FileText,
-  Wrench,
+  Folders,
   Receipt,
   HardHat,
   Users,
@@ -33,9 +31,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
     label: 'Arbeit',
     items: [
       { href: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-      { href: '/anfragen', icon: Inbox, label: 'Anfragen' },
-      { href: '/angebote', icon: FileText, label: 'Angebote' },
-      { href: '/auftraege', icon: Wrench, label: 'Aufträge' },
+      { href: '/vorgaenge', icon: Folders, label: 'Vorgänge' },
     ],
   },
   {
@@ -71,9 +67,8 @@ export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).f
 /** Mobile BottomNav (5 Slots + Mehr). */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { href: '/anfragen', icon: Inbox, label: 'Anfragen' },
-  { href: '/angebote', icon: FileText, label: 'Angebote' },
-  { href: '/auftraege', icon: Wrench, label: 'Aufträge' },
+  { href: '/vorgaenge', icon: Folders, label: 'Vorgänge' },
+  { href: '/kalender', icon: Calendar, label: 'Kalender' },
 ]
 
 /** Mobile Mehr-Sheet. */
@@ -97,6 +92,7 @@ export type RouteMetaDef = {
 /** TopBar-Titel und CTAs pro Listen-Route. */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
+  '/vorgaenge': { title: 'Vorgänge', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
   '/anfragen': { title: 'Anfragen', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
   '/auftraege': { title: 'Aufträge' },
   '/rechnungen': { title: 'Rechnungen', cta: { label: 'Neue Rechnung', href: '/rechnungen/neu' } },
@@ -110,6 +106,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
 }
 
 export const SECTION_LABELS: Record<string, string> = {
+  vorgaenge: 'Vorgänge',
   anfragen: 'Anfragen',
   auftraege: 'Aufträge',
   rechnungen: 'Rechnungen',

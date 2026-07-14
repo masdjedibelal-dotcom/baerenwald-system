@@ -16,6 +16,8 @@
     "setup:chrome": "npx @puppeteer/browsers install chrome-headless-shell@stable --path chrome-headless-shell && node scripts/write-pdf-chrome-env.mjs",
     "test:pdf": "node scripts/verify-pdf.mjs",
     "test:angebot-positionen": "node scripts/test-angebot-positionen-flow.mjs",
+    "test:resolve-vorgang": "npx tsx scripts/test-resolve-vorgang.ts && npx tsx scripts/test-vorgaenge-kpis.ts",
+    "test:checkout-audit": "node scripts/checkout-audit.mjs",
     "db:einstellungen": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/einstellungen-setup.sql",
     "db:rechnungen-compliance": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260521120000_rechnungen_compliance.sql",
     "db:rechnung-nummer": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260601130000_rechnung_nummer_re2026.sql",

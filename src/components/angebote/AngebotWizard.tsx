@@ -20,11 +20,11 @@ import {
   Pencil,
   Save,
   Send,
-  X,
 } from 'lucide-react'
 import { AngebotWizardComplete } from '@/components/angebote/AngebotWizardComplete'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
-import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
+import { WizardShell } from '@/components/layout/WizardShell'
+import { AppFlowScreen } from '@/components/layout/app'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
@@ -819,58 +819,8 @@ export function AngebotWizard({
       </>
     )
 
-  const wizardHeader = (
+  const wizardDesktopActions = (
     <>
-      <WizardMobileToolbar
-        onClose={handleRequestClose}
-        totalSteps={WIZARD_TOTAL_STEPS}
-        currentStep={step}
-        stepLabel={`Schritt ${step}: ${WIZARD_STEP_LABELS[step - 1]}`}
-        actions={wizardMobileActions}
-      />
-      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
-      <button type="button" className="btn btn-ghost btn-sm" onClick={handleRequestClose} aria-label="Schließen">
-        <X className="h-4 w-4" />
-      </button>
-      <div className="h-6 w-px bg-bw-border" aria-hidden />
-      <div className="title-block min-w-0 flex-1">
-        <div className="ttl">{wizardTitel}</div>
-        <div className="sub">
-          {istAuftragKorrektur ? (
-            <>
-              Korrektur für laufenden Auftrag · {name}
-              <span className="block text-[12px] text-bw-text-muted">
-                Keine erneute Annahme — Änderungen gelten für Rechnung und Ausführung.
-              </span>
-            </>
-          ) : (
-            <>
-              Für Anfrage {lead.id.slice(0, 8).toUpperCase()} · {name}
-            </>
-          )}
-          {entwurfStatusHint ? (
-            <span
-              className={cn(
-                'wizard-save-status',
-                draftDirty && !saving && 'wizard-save-status--dirty',
-                saving && 'wizard-save-status--saving'
-              )}
-            >
-              {' '}
-              · {entwurfStatusHint}
-            </span>
-          ) : null}
-        </div>
-      </div>
-      <div className="flex-1" />
-      <nav className="stepper" aria-label="Fortschritt">
-        <Step n={1} label="Leistungen" active={step === 1} done={step > 1} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={2} label="Finalisieren" active={step === 2} done={step > 2} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={3} label="Versand" active={step === 3} done={false} />
-      </nav>
-      <div className="flex-1" />
       {step > 1 ? (
         <Button type="button" variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)}>
           <ChevronLeft className="h-4 w-4" />
@@ -928,27 +878,59 @@ export function AngebotWizard({
           </Button>
         </>
       )}
-      </div>
     </>
   )
 
-  const wizard = (
-    <AppFlowScreen
-      className="wizard-flow"
-      header={completedAngebotId ? undefined : wizardHeader}
-    >
-      {completedAngebotId ? (
-        <AngebotWizardComplete
-          angebotId={completedAngebotId}
-          kundeName={name}
-          versendet={versendetErfolg}
-          onClose={() => {
-            setCompletedAngebotId(null)
-            onClose()
-          }}
-        />
+  const wizardSubtitle = (
+    <>
+      {istAuftragKorrektur ? (
+        <>
+          Korrektur für laufenden Auftrag · {name}
+          <span className="block text-[12px] text-bw-text-muted">
+            Keine erneute Annahme — Änderungen gelten für Rechnung und Ausführung.
+          </span>
+        </>
       ) : (
-      <>
+        <>Für Anfrage {lead.id.slice(0, 8).toUpperCase()} · {name}</>
+      )}
+      {entwurfStatusHint ? (
+        <span
+          className={cn(
+            'wizard-save-status',
+            draftDirty && !saving && 'wizard-save-status--dirty',
+            saving && 'wizard-save-status--saving'
+          )}
+        >
+          {' '}
+          · {entwurfStatusHint}
+        </span>
+      ) : null}
+    </>
+  )
+
+  const wizard = completedAngebotId ? (
+    <AppFlowScreen className="wizard-flow" header={null}>
+      <AngebotWizardComplete
+        angebotId={completedAngebotId}
+        kundeName={name}
+        versendet={versendetErfolg}
+        onClose={() => {
+          setCompletedAngebotId(null)
+          onClose()
+        }}
+      />
+    </AppFlowScreen>
+  ) : (
+    <WizardShell
+      className="wizard-flow"
+      title={wizardTitel}
+      subtitle={wizardSubtitle}
+      steps={WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))}
+      currentStep={step}
+      onClose={handleRequestClose}
+      mobileActions={wizardMobileActions}
+      desktopActions={wizardDesktopActions}
+    >
       <div className="wizard-inner">
           {step === 1 ? (
             <>
@@ -1277,33 +1259,10 @@ export function AngebotWizard({
           }}
         />
       ) : null}
-      </>
-      )}
-    </AppFlowScreen>
+    </WizardShell>
   )
 
   return createPortal(wizard, document.body)
-}
-
-function Step({
-  n,
-  label,
-  active,
-  done,
-}: {
-  n: number
-  label: string
-  active: boolean
-  done: boolean
-}) {
-  return (
-    <div className={cn('step', active && 'active', done && 'done')}>
-      <span className="step-n">
-        {done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : n}
-      </span>
-      <span>{label}</span>
-    </div>
-  )
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

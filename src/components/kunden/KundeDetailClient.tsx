@@ -38,7 +38,8 @@ import {
   kundeNeuerAuftragHref,
   kundeNeuesAngebotHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
@@ -469,7 +470,7 @@ export function KundeDetailClient({
   const mobileDetailTabs = useMemo(
     () => {
       const tabs = [
-        { id: 'stammdaten' as const, label: 'Stammdaten', icon: LayoutGrid },
+        { id: 'stammdaten' as const, label: entityDetailTabLabel('stammdaten'), icon: LayoutGrid },
         ...(zeigtOrganisationTab
           ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
           : []),
@@ -1234,22 +1235,18 @@ export function KundeDetailClient({
               : tabDokumenteInhalt
 
   return (
-    <div className="space-y-4 pb-6">
-      <CrmPortalOpenButtons
-        kundeId={kunde.id}
-        showKunde={kunde.portal_modus === 'organisation' || Boolean(kunde.auth_user_id)}
-      />
-      <DetailHead
-        backHref="/kunden"
-        backLabel="Zurück zu Kunden"
-        title={
+    <EntityDetailLayout
+      head={{
+        backHref: '/kunden',
+        backLabel: 'Zurück zu Kunden',
+        title: (
           <div className="detail-head-title-row">
             <span>{kundeDisplayName(kunde)}</span>
             <TypBadge typ={kunde.typ} />
           </div>
-        }
-        sub={headSubParts.join(' · ') || 'Kunde'}
-        actions={
+        ),
+        sub: headSubParts.join(' · ') || 'Kunde',
+        actions: (
           <>
             <button
               type="button"
@@ -1279,9 +1276,13 @@ export function KundeDetailClient({
               sheetTitle="Kunde"
             />
           </>
-        }
+        ),
+      }}
+    >
+      <CrmPortalOpenButtons
+        kundeId={kunde.id}
+        showKunde={kunde.portal_modus === 'organisation' || Boolean(kunde.auth_user_id)}
       />
-
       <DetailResponsiveTabs
         tab={tab}
         onTabChange={setTab}
@@ -1488,6 +1489,6 @@ export function KundeDetailClient({
       </Modal>
 
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }

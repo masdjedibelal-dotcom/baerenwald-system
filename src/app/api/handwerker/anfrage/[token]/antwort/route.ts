@@ -1,19 +1,20 @@
-import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { buildInternHandwerkerAntwortMail } from '@/lib/angebote/angebot-mail-templates'
 import {
   HANDWERKER_ABLEHNUNG_GRUND_LABELS,
   isHandwerkerAblehnungGrund,
 } from '@/lib/angebote/ablehnung-labels'
-import { sendInternNotifyEmail } from '@/lib/angebote/emails'
-import { getPublicAppUrl } from '@/lib/utils'
+import { buildInternHandwerkerAntwortMail } from '@/lib/angebote/angebot-mail-templates'
+import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
+import { sendMail } from '@/lib/mail-service'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
-type Body = {
-  antwort: 'akzeptiert' | 'abgelehnt'
-  /** Pflicht bei antwort abgelehnt — Schlüssel aus HANDWERKER_ABLEHNUNG_GRUND_* */
-  grund?: string
-  notiz?: string
+type AntwortBody =
+  | { antwort: 'akzeptiert'; notiz?: string }
+  | { antwort: 'abgelehnt'; grund: string; notiz?: string }
+
+function one<T>(x: T | T[] | null | undefined): T | null {
+  if (x == null) return null
+  return Array.isArray(x) ? (x[0] as T) ?? null : x
 }
 
 export async function PATCH(req: Request, { params }: { params: { token: string } }) {
@@ -22,24 +23,19 @@ export async function PATCH(req: Request, { params }: { params: { token: string 
     return NextResponse.json({ error: 'Token fehlt' }, { status: 400 })
   }
 
-  let body: Body
+  let body: AntwortBody
   try {
-    body = (await req.json()) as Body
+    body = (await req.json()) as AntwortBody
   } catch {
-    return NextResponse.json({ error: 'Ungültiger JSON-Body' }, { status: 400 })
+    return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
   }
 
   if (body.antwort !== 'akzeptiert' && body.antwort !== 'abgelehnt') {
-    return NextResponse.json({ error: 'antwort muss akzeptiert oder abgelehnt sein' }, { status: 400 })
+    return NextResponse.json({ error: 'Ungültige Antwort' }, { status: 400 })
   }
-
-  const grundRaw = body.grund?.trim() ?? ''
   if (body.antwort === 'abgelehnt') {
-    if (!grundRaw || !isHandwerkerAblehnungGrund(grundRaw)) {
-      return NextResponse.json(
-        { error: 'Bitte einen gültigen Ablehnungsgrund auswählen.' },
-        { status: 400 }
-      )
+    if (!body.grund || !isHandwerkerAblehnungGrund(body.grund)) {
+      return NextResponse.json({ error: 'Ablehnungsgrund fehlt oder ungültig' }, { status: 400 })
     }
   }
 
@@ -49,85 +45,130 @@ export async function PATCH(req: Request, { params }: { params: { token: string 
       `
       id,
       angebot_id,
-      antwort_at,
+      gewerk_id,
+      handwerker_id,
       status,
+      antwort_at,
       handwerker(name),
-      gewerke(name)
+      gewerke(name),
+      angebote(id, lead_id)
     `
     )
     .eq('token', token)
     .maybeSingle()
 
   if (error || !row) {
-    return NextResponse.json({ error: 'Dieser Link ist nicht mehr gültig.' }, { status: 404 })
+    return NextResponse.json({ error: 'Link ungültig' }, { status: 404 })
   }
 
   const raw = row as Record<string, unknown>
-  const one = <T,>(x: T | T[] | null | undefined): T | null => {
-    if (x == null) return null
-    return Array.isArray(x) ? (x[0] as T) ?? null : x
+  if (raw.antwort_at) {
+    return NextResponse.json({ error: 'Bereits beantwortet' }, { status: 409 })
   }
 
-  const r = {
-    id: String(raw.id),
-    angebot_id: String(raw.angebot_id),
-    antwort_at: (raw.antwort_at as string | null) ?? null,
-    handwerker: one(raw.handwerker) as { name: string } | null,
-    gewerke: one(raw.gewerke) as { name: string } | null,
+  const st = String(raw.status ?? '').toLowerCase()
+  if (st === 'akzeptiert' || st === 'abgelehnt' || st === 'ersetzt') {
+    return NextResponse.json({ error: 'Bereits beantwortet' }, { status: 409 })
   }
 
-  if (r.antwort_at) {
-    return NextResponse.json({ error: 'Sie haben bereits geantwortet.' }, { status: 400 })
-  }
-
-  const notiz = body.notiz?.trim() || null
-  const ablehnungGrundDb = body.antwort === 'abgelehnt' && isHandwerkerAblehnungGrund(grundRaw) ? grundRaw : null
-  const newStatus = body.antwort === 'akzeptiert' ? 'akzeptiert' : 'abgelehnt'
   const now = new Date().toISOString()
+  const notiz = body.notiz?.trim() || null
+  const angenommen = body.antwort === 'akzeptiert'
+  const status = angenommen ? 'akzeptiert' : 'abgelehnt'
+  const ablehnungGrund = !angenommen && body.antwort === 'abgelehnt' ? body.grund : null
 
-  const { error: upErr } = await supabaseAdmin
+  const { error: updErr } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
-      status: newStatus,
+      status,
       antwort_at: now,
       antwort_notiz: notiz,
-      ablehnung_grund: ablehnungGrundDb,
+      ablehnung_grund: ablehnungGrund,
     })
-    .eq('id', r.id)
-    .is('antwort_at', null)
+    .eq('id', raw.id)
 
-  if (upErr) {
-    return NextResponse.json({ error: upErr.message }, { status: 500 })
+  if (updErr) {
+    return NextResponse.json({ error: updErr.message }, { status: 500 })
   }
 
-  const hwName = r.handwerker?.name?.trim() || 'Handwerkerin'
-  const gwName = r.gewerke?.name?.trim() || 'Gewerk'
-  const angebotId = r.angebot_id
-  const dashboardUrl = `${getPublicAppUrl()}/angebote/${angebotId}`
-
-  const subject =
-    body.antwort === 'akzeptiert'
-      ? `${hwName} hat angenommen`
-      : `${hwName} hat abgelehnt — ${gwName}`
-
+  const angebot = one(raw.angebote) as { id: string; lead_id: string | null } | null
+  const hw = one(raw.handwerker) as { name: string } | null
+  const gw = one(raw.gewerke) as { name: string } | null
+  const handwerkerName = hw?.name?.trim() || 'Handwerker'
+  const gewerkName = gw?.name?.trim() || 'Gewerk'
   const grundLabel =
-    ablehnungGrundDb && isHandwerkerAblehnungGrund(ablehnungGrundDb)
-      ? HANDWERKER_ABLEHNUNG_GRUND_LABELS[ablehnungGrundDb]
+    ablehnungGrund && isHandwerkerAblehnungGrund(ablehnungGrund)
+      ? HANDWERKER_ABLEHNUNG_GRUND_LABELS[ablehnungGrund]
       : null
 
-  const html = buildInternHandwerkerAntwortMail({
-    handwerkerName: hwName,
-    gewerkName: gwName,
-    angenommen: body.antwort === 'akzeptiert',
-    ablehnungGrund: grundLabel,
-    notiz,
-    dashboardUrl,
+  if (angenommen && raw.angebot_id && raw.gewerk_id) {
+    const { data: parallel } = await supabaseAdmin
+      .from('angebot_handwerker')
+      .select('id, handwerker_id, status, handwerker(name)')
+      .eq('angebot_id', raw.angebot_id)
+      .eq('gewerk_id', raw.gewerk_id)
+      .neq('id', raw.id)
+
+    for (const other of parallel ?? []) {
+      const otherSt = String(other.status ?? '').toLowerCase()
+      if (otherSt === 'akzeptiert' || otherSt === 'abgelehnt' || otherSt === 'ersetzt') continue
+      await supabaseAdmin
+        .from('angebot_handwerker')
+        .update({ status: 'ersetzt', antwort_at: now })
+        .eq('id', other.id)
+
+      if (angebot?.lead_id) {
+        const otherHw = one(
+          (other as { handwerker?: { name: string } | { name: string }[] | null }).handwerker
+        ) as { name: string } | null
+        await insertLeadTimelineEvent(supabaseAdmin, {
+          lead_id: angebot.lead_id,
+          angebot_id: angebot.id,
+          typ: 'handwerker',
+          titel: 'Handwerker nicht gewählt',
+          beschreibung: `${otherHw?.name?.trim() || 'Handwerker'} · ${gewerkName}`,
+        })
+      }
+    }
+  }
+
+  if (angebot?.lead_id) {
+    await insertLeadTimelineEvent(supabaseAdmin, {
+      lead_id: angebot.lead_id,
+      angebot_id: angebot.id,
+      typ: 'handwerker',
+      titel: angenommen ? 'Handwerker hat zugesagt' : 'Handwerker hat abgelehnt',
+      beschreibung: [
+        `${handwerkerName} · ${gewerkName}`,
+        grundLabel,
+        notiz,
+      ]
+        .filter(Boolean)
+        .join(' — '),
+    })
+  }
+
+  const { data: einRows } = await supabaseAdmin.from('einstellungen').select('key, value')
+  const einMap = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
+  const internTo = einMap.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://crm.baerenwaldmuenchen.de'
+  const dashboardUrl = angebot?.id ? `${baseUrl}/angebote/${angebot.id}` : `${baseUrl}/angebote`
+
+  void sendMail({
+    an: internTo,
+    betreff: angenommen
+      ? `Handwerker zugesagt: ${gewerkName}`
+      : `Handwerker abgelehnt: ${gewerkName}`,
+    html: buildInternHandwerkerAntwortMail({
+      handwerkerName,
+      gewerkName,
+      angenommen,
+      ablehnungGrund: grundLabel,
+      notiz,
+      dashboardUrl,
+    }),
+    typ: 'system',
   })
-
-  await sendInternNotifyEmail({ subject, html })
-
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
 
   return NextResponse.json({ ok: true })
 }

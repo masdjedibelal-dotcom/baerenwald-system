@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
+import { FreigabeRegelnEditor } from '@/components/org/FreigabeRegelnEditor'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { suggestOrgKennungFromName } from '@/lib/org/slug'
@@ -35,11 +36,6 @@ type Props = {
 const PORTAL_MODUS_OPTS = [
   { value: 'privat', label: 'Privat (MeinBärenwald)' },
   { value: 'organisation', label: 'Organisation (Auftraggeber-Portal)' },
-]
-
-const FREIGABE_MODUS_OPTS = [
-  { value: 'direkt', label: 'Direkt — ohne Org-Freigabe' },
-  { value: 'freigabe', label: 'Freigabe — Organisation muss freigeben' },
 ]
 
 export function KundenOrganisationTab({
@@ -200,34 +196,20 @@ export function KundenOrganisationTab({
             ) : null}
 
             <div className="border-t border-bw-border pt-3">
-              <p className="mb-2 text-[12px] font-medium text-bw-text">Freigabe-Workflow</p>
-              <Select
-                label="Freigabe-Modus"
-                name="freigabe_modus"
-                value={freigabeModus}
-                onChange={(e) => setFreigabeModus(e.target.value as FreigabeModus)}
-                options={FREIGABE_MODUS_OPTS}
+              <FreigabeRegelnEditor
+                compact
+                disabled={pending}
+                value={{
+                  freigabe_modus: freigabeModus,
+                  freigabe_schwelle_eur: schwelle,
+                  notfall_direkt: notfallDirekt,
+                }}
+                onChange={(next) => {
+                  setFreigabeModus(next.freigabe_modus)
+                  setSchwelle(next.freigabe_schwelle_eur)
+                  setNotfallDirekt(next.notfall_direkt)
+                }}
               />
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="Schwelle (€)"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="Leer = nur nach Modus"
-                  value={schwelle}
-                  onChange={(e) => setSchwelle(e.target.value)}
-                />
-                <label className="flex items-center gap-2 self-end pb-2 text-[13px] text-bw-text">
-                  <input
-                    type="checkbox"
-                    checked={notfallDirekt}
-                    onChange={(e) => setNotfallDirekt(e.target.checked)}
-                    className="rounded border-bw-border"
-                  />
-                  Notfall umgeht Freigabe
-                </label>
-              </div>
             </div>
           </>
         ) : null}

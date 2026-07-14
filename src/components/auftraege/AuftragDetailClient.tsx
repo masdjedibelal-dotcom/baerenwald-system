@@ -21,9 +21,12 @@ import {
   Phone,
   Receipt,
   Shield,
+  UserPlus,
   Wallet,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import { DetailResponsiveTabs } from '@/components/layout/app'
@@ -52,6 +55,7 @@ import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
+import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
@@ -76,6 +80,10 @@ import {
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { auftragStatusDisplay, auftragTypDisplay } from '@/lib/status/status-display'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
+import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
+import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
+import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
+import { auftragPositionenToPosBoard } from '@/lib/posboard/position-adapters'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
@@ -146,6 +154,8 @@ type AuftragLeadSnapshot = Pick<
 type AuftragDetailTab =
   | 'stammdaten'
   | 'leistung'
+  | 'zahlplan'
+  | 'bautagebuch'
   | 'baustelle'
   | 'schritte'
   | 'aktivitaet'
@@ -155,6 +165,8 @@ type AuftragDetailTab =
 
 const DESKTOP_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'leistung',
+  'zahlplan',
+  'bautagebuch',
   'schritte',
   'aktivitaet',
   'dokumente',
@@ -163,6 +175,8 @@ const DESKTOP_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
 const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
   'stammdaten',
   'leistung',
+  'zahlplan',
+  'bautagebuch',
   'schritte',
   'aktivitaet',
   'dokumente',
@@ -172,6 +186,8 @@ const MOBILE_AUFTRAG_TABS_BASE: AuftragDetailTab[] = [
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'stammdaten',
   'leistung',
+  'zahlplan',
+  'bautagebuch',
   'baustelle',
   'schritte',
   'aktivitaet',
@@ -242,6 +258,10 @@ export function AuftragDetailClient({
     templateId: string
     phase: 'vorab' | 'update' | 'abnahme'
   } | null>(null)
+  const [zuweisungModal, setZuweisungModal] = useState<{ open: boolean; ids: string[] }>({
+    open: false,
+    ids: [],
+  })
   const [mainTab, setMainTab] = useState<AuftragDetailTab>('schritte')
 
   useEffect(() => {
@@ -440,6 +460,61 @@ export function AuftragDetailClient({
   const auftragTyp = useMemo(() => auftragTypDisplay(istBauprojekt), [istBauprojekt])
 
   const projektName = auftragTitel(detail)
+  const { backHref, backLabel } = vorgangBackNav('auftrag')
+  const resolvedVorgang = useMemo(() => {
+    const leadId = lead?.id ?? detail.lead_id
+    if (!leadId) return null
+    const angebot = detail.angebote
+    return resolveVorgangFromCrmEntities({
+      lead: {
+        id: leadId,
+        status: lead?.vorgang_phase ?? 'auftrag',
+        funnel_daten: lead?.funnel_daten,
+        hv_meldung_status: lead?.hv_meldung_status,
+        kontakt_name: lead?.kontakt_name,
+        plz: lead?.plz,
+        created_at: detail.created_at,
+        updated_at: detail.updated_at,
+      },
+      angebote: angebot
+        ? [
+            {
+              id: angebot.id,
+              status: angebot.status,
+              status_einfach: angebot.status_einfach,
+              created_at: angebot.created_at,
+              updated_at: angebot.updated_at,
+            },
+          ]
+        : [],
+      auftraege: [
+        {
+          id: detail.id,
+          status: detail.status,
+          titel: detail.titel,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+          handwerkerAktionOffen: auftragBrauchtHandwerkerAktion(detail.auftrag_positionen ?? []),
+        },
+      ],
+      rechnungen: rechnungenListe.map((r) => ({
+        id: r.id,
+        status: r.status,
+        faellig: r.faellig_am,
+        created_at: r.rechnungsdatum ?? detail.created_at,
+      })),
+    })
+  }, [lead, detail, rechnungenListe])
+  const posBoardPositionen = useMemo(
+    () => auftragPositionenToPosBoard(detail.auftrag_positionen ?? []),
+    [detail.auftrag_positionen]
+  )
+  const canAssignHandwerker =
+    (detail.auftrag_positionen ?? []).length > 0 && detail.status !== 'abgeschlossen'
+  const openHandwerkerZuweisung = useCallback((positionIds: string[]) => {
+    if (!positionIds.length) return
+    setZuweisungModal({ open: true, ids: positionIds })
+  }, [])
   const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
   const headMeta = useMemo(() => {
     const ort = detail.kunden?.ort?.trim() || ''
@@ -745,7 +820,7 @@ export function AuftragDetailClient({
         angebotHandwerker,
         bautagebuchCount: detail.auftrag_bautagebuch?.length ?? 0,
         onHandwerkerZuweisen: () => setMainTab('leistung'),
-        onBautagebuch: () => setMainTab('leistung'),
+        onBautagebuch: () => setMainTab('bautagebuch'),
         onHwAngebot: detail.angebot_id
           ? () => router.push(`/angebote/${detail.angebot_id}`)
           : undefined,
@@ -788,6 +863,17 @@ export function AuftragDetailClient({
         count: posCount || undefined,
       },
       {
+        id: 'zahlplan' as const,
+        label: 'Zahlplan',
+        icon: Wallet,
+      },
+      {
+        id: 'bautagebuch' as const,
+        label: 'Bautagebuch',
+        icon: ClipboardList,
+        count: detail.auftrag_bautagebuch?.length || undefined,
+      },
+      {
         id: 'schritte' as const,
         label: 'Nächste Schritte',
         icon: ListChecks,
@@ -828,6 +914,13 @@ export function AuftragDetailClient({
     const tabs = [
       { id: 'stammdaten' as const, label: 'Stammdaten', icon: LayoutGrid },
       { id: 'leistung' as const, label: 'Positionen', icon: List, count: posCount || undefined },
+      { id: 'zahlplan' as const, label: 'Zahlplan', icon: Wallet },
+      {
+        id: 'bautagebuch' as const,
+        label: 'Bautagebuch',
+        icon: ClipboardList,
+        count: detail.auftrag_bautagebuch?.length || undefined,
+      },
       ...(istBauprojekt
         ? [{ id: 'baustelle' as const, label: 'Baustelle', icon: HardHat }]
         : []),
@@ -866,7 +959,15 @@ export function AuftragDetailClient({
       },
     ]
     return tabs
-  }, [istBauprojekt, offeneSchritteCount, timelineCount, dokumenteCount, complianceCount, posCount])
+  }, [
+    istBauprojekt,
+    offeneSchritteCount,
+    timelineCount,
+    dokumenteCount,
+    complianceCount,
+    posCount,
+    detail.auftrag_bautagebuch,
+  ])
 
   const desktopTabIds = useMemo(() => {
     const ids: AuftragDetailTab[] = istBauprojekt ? ['baustelle', ...DESKTOP_AUFTRAG_TABS_BASE] : [...DESKTOP_AUFTRAG_TABS_BASE]
@@ -935,6 +1036,34 @@ export function AuftragDetailClient({
     </div>
   )
 
+  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
+
+  const auftragNettoSumme = useMemo(() => {
+    const ap = detail.auftrag_positionen ?? []
+    if (ap.length) {
+      return auftragSummenAusPositionen(
+        ap.map((p) => ({
+          id: p.id,
+          gewerk_id: '',
+          gewerk_slug: p.gewerk_slug ?? '',
+          gewerk_name: p.gewerk_name ?? '',
+          leistung: p.leistung_name ?? '',
+          beschreibung: p.beschreibung ?? '',
+          menge: p.menge ?? 1,
+          einheit: p.einheit ?? '',
+          lohn_netto: p.lohn_fix ?? 0,
+          material_netto: p.material_fix ?? 0,
+          gesamt_min: p.preis_fix ?? 0,
+          gesamt_max: p.preis_fix ?? 0,
+          preis_typ: 'fix' as const,
+        }))
+      ).netto
+    }
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    const raw = (ang as { positionen?: unknown } | null)?.positionen
+    return auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
+  }, [detail.auftrag_positionen, detail.angebote])
+
   const leistungInhalt = (
     <div className="space-y-3">
       <Card
@@ -964,25 +1093,38 @@ export function AuftragDetailClient({
           onChanged={() => refresh()}
         />
       </Card>
-      {!istBauprojekt ? (
-        <Card
-          id="auftrag-bautagebuch"
-          title="Bautagebuch"
-          className="scroll-mt-24"
-          bodyClassName="p-4"
-        >
-          <AuftragBautagebuchCard
-            auftragId={detail.id}
-            eintraege={detail.auftrag_bautagebuch ?? []}
-            kundeName={name}
-            positionen={detail.auftrag_positionen ?? []}
-            gewerke={gewerke}
-            onChanged={() => refresh()}
-          />
-        </Card>
-      ) : null}
       <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
     </div>
+  )
+
+  const zahlplanInhalt = (
+    <AuftragZahlungsplanSection
+      auftragId={detail.id}
+      zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
+      gesamtNetto={auftragNettoSumme}
+      rechnungen={rechnungenListe}
+    />
+  )
+
+  const bautagebuchInhalt = !istBauprojekt ? (
+    <Card id="auftrag-bautagebuch" title="Bautagebuch" className="scroll-mt-24" bodyClassName="p-4">
+      <AuftragBautagebuchCard
+        auftragId={detail.id}
+        eintraege={detail.auftrag_bautagebuch ?? []}
+        kundeName={name}
+        positionen={detail.auftrag_positionen ?? []}
+        gewerke={gewerke}
+        onChanged={() => refresh()}
+      />
+    </Card>
+  ) : (
+    <p className="text-sm text-bw-text-muted">
+      Bautagebuch und Baustellenberichte finden Sie im Tab{' '}
+      <button type="button" className="text-bw-link hover:underline" onClick={() => setMainTab('baustelle')}>
+        Baustelle
+      </button>
+      .
+    </p>
   )
 
   const baustelleInhalt = istBauprojekt ? (
@@ -1007,46 +1149,33 @@ export function AuftragDetailClient({
   const fixedOverview = (
     <div className="space-y-3">
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <PosBoard
+        title="Leistungen"
+        positionen={posBoardPositionen}
+        auftragPositionen={detail.auftrag_positionen ?? []}
+        onAssignHandwerker={canAssignHandwerker ? openHandwerkerZuweisung : undefined}
+        readOnly={!canAssignHandwerker}
+        headerAction={
+          canAssignHandwerker ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-bw-border px-2.5 py-1 text-[11px] font-medium text-bw-primary hover:bg-bw-hover"
+              onClick={() =>
+                openHandwerkerZuweisung((detail.auftrag_positionen ?? []).map((p) => p.id))
+              }
+            >
+              <UserPlus className="h-3.5 w-3.5" aria-hidden />
+              Handwerker zuweisen
+            </button>
+          ) : null
+        }
+      />
       {stammdatenInhalt}
     </div>
   )
 
-  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
-
-  const auftragNettoSumme = useMemo(() => {
-    const ap = detail.auftrag_positionen ?? []
-    if (ap.length) {
-      return auftragSummenAusPositionen(
-        ap.map((p) => ({
-          id: p.id,
-          gewerk_id: '',
-          gewerk_slug: p.gewerk_slug ?? '',
-          gewerk_name: p.gewerk_name ?? '',
-          leistung: p.leistung_name ?? '',
-          beschreibung: p.beschreibung ?? '',
-          menge: p.menge ?? 1,
-          einheit: p.einheit ?? '',
-          lohn_netto: p.lohn_fix ?? 0,
-          material_netto: p.material_fix ?? 0,
-          gesamt_min: p.preis_fix ?? 0,
-          gesamt_max: p.preis_fix ?? 0,
-          preis_typ: 'fix' as const,
-        }))
-      ).netto
-    }
-    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
-    const raw = (ang as { positionen?: unknown } | null)?.positionen
-    return auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
-  }, [detail.auftrag_positionen, detail.angebote])
-
   const finanzenInhalt = (
     <div className="space-y-4">
-      <AuftragZahlungsplanSection
-        auftragId={detail.id}
-        zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
-        gesamtNetto={auftragNettoSumme}
-        rechnungen={rechnungenListe}
-      />
       {finanzenPayload ? (
         <AuftragFinanzenClient
           embedded
@@ -1066,6 +1195,10 @@ export function AuftragDetailClient({
       baustelleInhalt
     ) : mainTab === 'leistung' ? (
       leistungInhalt
+    ) : mainTab === 'zahlplan' ? (
+      zahlplanInhalt
+    ) : mainTab === 'bautagebuch' ? (
+      bautagebuchInhalt
     ) : mainTab === 'schritte' ? (
       schritteInhalt
     ) : mainTab === 'aktivitaet' ? (
@@ -1094,6 +1227,10 @@ export function AuftragDetailClient({
       stammdatenInhalt
     ) : mainTab === 'leistung' ? (
       leistungInhalt
+    ) : mainTab === 'zahlplan' ? (
+      zahlplanInhalt
+    ) : mainTab === 'bautagebuch' ? (
+      bautagebuchInhalt
     ) : mainTab === 'baustelle' ? (
       baustelleInhalt
     ) : mainTab === 'schritte' ? (
@@ -1120,12 +1257,16 @@ export function AuftragDetailClient({
     ) : null
 
   return (
-    <div className="space-y-4 pb-0">
-      <DetailHead
-        backHref="/auftraege"
-        backLabel="Zurück zu Aufträge"
-        title={projektName}
-        badges={
+    <EntityDetailLayout
+      resolvedVorgang={resolvedVorgang}
+      phase="auftrag"
+      breadcrumbTitle={projektName}
+      className="space-y-4 pb-0"
+      head={{
+        backHref,
+        backLabel,
+        title: projektName,
+        badges: (
           <>
             <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />
             <StatusBadge
@@ -1138,9 +1279,9 @@ export function AuftragDetailClient({
               }
             />
           </>
-        }
-        meta={headMeta}
-        actions={
+        ),
+        meta: headMeta,
+        actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
             {istAbgeschlossen ? (
               <button
@@ -1193,8 +1334,9 @@ export function AuftragDetailClient({
               sheetTitle="Auftrag"
             />
           </div>
-        }
-      />
+        ),
+      }}
+    >
 
       {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
@@ -1459,6 +1601,18 @@ export function AuftragDetailClient({
         onSaved={() => refresh()}
       />
 
+      <AuftragLeistungZuweisungModal
+        open={zuweisungModal.open}
+        onClose={() => setZuweisungModal({ open: false, ids: [] })}
+        auftragId={detail.id}
+        positionIds={zuweisungModal.ids}
+        positionen={detail.auftrag_positionen ?? []}
+        onDone={() => {
+          setZuweisungModal({ open: false, ids: [] })
+          refresh()
+        }}
+      />
+
       {kunde ? (
         <KundeModal
           open={stammdatenModalOpen}
@@ -1499,6 +1653,6 @@ export function AuftragDetailClient({
           onSaved={() => refresh()}
         />
       ) : null}
-    </div>
+    </EntityDetailLayout>
   )
 }

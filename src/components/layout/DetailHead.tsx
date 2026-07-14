@@ -7,6 +7,8 @@ export type DetailHeadProps = {
   /** @deprecated Zurück nur über TopBar (mobil) / Master-Detail — wird nicht mehr gerendert */
   backHref?: string
   backLabel?: string
+  /** Spec §3: „Zurück zu den Vorgängen · Phase › Titel“ */
+  breadcrumb?: ReactNode
   title: ReactNode
   sub?: ReactNode
   /** Chips unter Titel (PLZ, Betrag, Kanal …) */
@@ -25,11 +27,13 @@ export function DetailHead({
   meta,
   badges,
   actions,
+  breadcrumb,
   variant = 'project',
   className,
 }: DetailHeadProps) {
   return (
     <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
+      {breadcrumb ? <div className="mb-1">{breadcrumb}</div> : null}
       <div className="detail-head-top">
         <div className="detail-head-main min-w-0 flex-1">
           <div className="detail-head-title">{title}</div>

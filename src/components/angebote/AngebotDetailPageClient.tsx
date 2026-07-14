@@ -22,6 +22,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import { DetailResponsiveTabs } from '@/components/layout/app'
@@ -80,6 +82,8 @@ import {
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
 import { angebotStatusDisplay } from '@/lib/status/status-display'
+import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
+import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
 import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/AngebotPositionenV3Tab'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -156,6 +160,40 @@ export function AngebotDetailPageClient({
   const orgFreigabeStatus = lead?.org_freigabe_status ?? null
 
   const statusEinfach = resolveStatusEinfach(detail)
+  const { backHref, backLabel } = vorgangBackNav('angebot')
+  const resolvedVorgang = useMemo(() => {
+    if (!lead) return null
+    return resolveVorgangFromCrmEntities({
+      lead: {
+        id: lead.id,
+        status: lead.status,
+        situation: lead.situation,
+        funnel_daten: lead.funnel_daten,
+        kanal: lead.kanal,
+        org_freigabe_status: lead.org_freigabe_status,
+        hv_meldung_status: lead.hv_meldung_status,
+        kontakt_name: lead.kontakt_name,
+        plz: lead.plz,
+        bereiche: lead.bereiche,
+        created_at: lead.created_at,
+        updated_at: lead.updated_at,
+      },
+      angebote: [
+        {
+          id: detail.id,
+          status: detail.status,
+          status_einfach: statusEinfach,
+          gesendet_am: detail.gesendet_am,
+          gesendet_kunde_at: detail.gesendet_kunde_at,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+        },
+      ],
+      auftraege: auftragId
+        ? [{ id: auftragId, status: 'offen', created_at: detail.created_at }]
+        : [],
+    })
+  }, [lead, detail, statusEinfach, auftragId])
   const angebotStatus = useMemo(() => angebotStatusDisplay(detail), [detail])
   const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
@@ -782,6 +820,7 @@ export function AngebotDetailPageClient({
         </div>
       ) : null}
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <PosBoard title="Leistungen" positionen={detail.positionen ?? []} readOnly />
       <AngebotOrgFreigabeBanner
         orgFreigabeStatus={orgFreigabeStatus}
         orgFreigabeLog={lead?.org_freigabe_log}
@@ -834,16 +873,17 @@ export function AngebotDetailPageClient({
     ) : null
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        backHref="/angebote"
-        backLabel="Zurück zu Angebote"
-        title={kundeName}
-        badges={
-          <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />
-        }
-        meta={headMeta}
-        actions={
+    <EntityDetailLayout
+      resolvedVorgang={resolvedVorgang}
+      phase="angebot"
+      breadcrumbTitle={kundeName}
+      head={{
+        backHref,
+        backLabel,
+        title: kundeName,
+        badges: <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />,
+        meta: headMeta,
+        actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}
             <ActionsMenu
@@ -861,8 +901,9 @@ export function AngebotDetailPageClient({
               sheetTitle="Angebot"
             />
           </div>
-        }
-      />
+        ),
+      }}
+    >
 
       {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
@@ -1157,6 +1198,6 @@ export function AngebotDetailPageClient({
       ) : null}
 
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }

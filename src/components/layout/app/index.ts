@@ -7,6 +7,8 @@ export type { AppEntityListRowProps } from '@/components/layout/app/AppEntityLis
 export { AppDetailScreen } from '@/components/layout/app/AppDetailScreen'
 export { AppFlowScreen, AppFlowStepDots } from '@/components/layout/app/AppFlowScreen'
 export { WizardMobileToolbar } from '@/components/layout/app/WizardMobileToolbar'
+export { WizardShell } from '@/components/layout/WizardShell'
+export type { WizardShellStep } from '@/components/layout/WizardShell'
 export {
   AppMasterDetailLayout,
   AppMasterDetailPlaceholder,

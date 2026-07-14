@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
+import { ensureAutoAngebotEntwurfForLead } from '@/lib/angebote/auto-angebot-from-lead'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
@@ -10,6 +11,7 @@ import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
 import { loadObjektAkteReadOnly } from '@/lib/objektakte/load-objekt-akte'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
 /** Schwere Client-Bundle (Wizard, PDF) aus Page-Chunk auslagern — verhindert ChunkLoadError bei HMR. */
@@ -37,9 +39,16 @@ export default async function AnfrageDetailPage({
   const angeboteAuswahlInitial = searchParams?.angebote === '1'
   const angebotWizardInitial = searchParams?.angebot_wizard === '1'
   const supabase = createClient()
-  const lead = await loadAnfrageDetail(supabase, params.id)
+  let lead = await loadAnfrageDetail(supabase, params.id)
 
   if (!lead) notFound()
+
+  if (!(lead.angebote as unknown[] | null)?.length) {
+    const auto = await ensureAutoAngebotEntwurfForLead(params.id)
+    if (auto.ok && 'created' in auto && auto.created) {
+      lead = (await loadAnfrageDetail(supabase, params.id)) ?? lead
+    }
+  }
 
   const history = [...(lead.leads_status_history ?? [])].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -140,6 +149,18 @@ export default async function AnfrageDetailPage({
         })
       : null
 
+  const { data: latestAngebotPos } = await supabase
+    .from('angebote')
+    .select('positionen')
+    .eq('lead_id', params.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const posBoardPositionen = normalizeAngebotPositionen(
+    (latestAngebotPos as { positionen?: unknown } | null)?.positionen
+  )
+
   if (angeboteFromLead && angeboteFromLead.length) {
     const sorted = [...angeboteFromLead].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -165,6 +186,7 @@ export default async function AnfrageDetailPage({
         projektKontext={projektKontext}
         dbAuftragId={dbAuftragId}
         dbAuftragStatus={dbAuftragStatus}
+        posBoardPositionen={posBoardPositionen}
       />
     )
   }
@@ -197,6 +219,7 @@ export default async function AnfrageDetailPage({
       projektKontext={projektKontext}
       dbAuftragId={dbAuftragId}
       dbAuftragStatus={dbAuftragStatus}
+      posBoardPositionen={posBoardPositionen}
     />
   )
 }

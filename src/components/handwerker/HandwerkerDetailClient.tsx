@@ -19,7 +19,8 @@ import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
 import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
 import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import { AppDetailScreen } from '@/components/layout/app'
 import {
@@ -477,7 +478,7 @@ export function HandwerkerDetailClient({
 
   const detailTabs = useMemo(
     () => [
-      { id: 'stammdaten', label: 'Übersicht', icon: LayoutGrid },
+      { id: 'stammdaten', label: entityDetailTabLabel('uebersicht'), icon: LayoutGrid },
       {
         id: 'auftraege',
         label: 'Aufträge',
@@ -486,7 +487,7 @@ export function HandwerkerDetailClient({
       },
       {
         id: 'notizen',
-        label: 'Notizen',
+        label: entityDetailTabLabel('notizen'),
         icon: MessageSquare,
         count: hw.notizen?.trim() ? 1 : undefined,
       },
@@ -624,63 +625,65 @@ export function HandwerkerDetailClient({
 
   return (
     <>
-      <CrmPortalOpenButtons handwerkerId={hw.id} showHandwerker />
-      <DetailHead
-        backHref="/handwerker"
-        backLabel="Zurück zu Handwerker"
-        title={handwerkerDisplayName(hw)}
-        sub={
-          <span>
-            {handwerkerGfName(hw) ? `${handwerkerGfName(hw)} · ` : null}
-            {hw.subkategorie ?? 'Handwerker'}
-            {gewerkNamen.length ? ` · ${gewerkNamen.slice(0, 3).join(', ')}` : null}
-            {hw.adresse ? ` · ${hw.adresse}` : null}
-          </span>
-        }
-        badges={<ComplianceBadge status={hw.compliance_status} />}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {hasPortalAccount ? (
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900">
-                Portal-Konto aktiv
-              </span>
-            ) : null}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={openRahmenvertrag}>
-              <FileSignature className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Rahmenvertrag
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
-              <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Bearbeiten
-            </button>
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={handwerkerMenuItems}
-              sheetTitle="Handwerker"
-            />
-          </div>
-        }
-      />
-
-      <AppDetailScreen
-        tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
+      <EntityDetailLayout
+        head={{
+          backHref: '/handwerker',
+          backLabel: 'Zurück zu Handwerker',
+          title: handwerkerDisplayName(hw),
+          sub: (
+            <span>
+              {handwerkerGfName(hw) ? `${handwerkerGfName(hw)} · ` : null}
+              {hw.subkategorie ?? 'Handwerker'}
+              {gewerkNamen.length ? ` · ${gewerkNamen.slice(0, 3).join(', ')}` : null}
+              {hw.adresse ? ` · ${hw.adresse}` : null}
+            </span>
+          ),
+          badges: <ComplianceBadge status={hw.compliance_status} />,
+          actions: (
+            <div className="flex flex-wrap items-center gap-2">
+              {hasPortalAccount ? (
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900">
+                  Portal-Konto aktiv
+                </span>
+              ) : null}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={openRahmenvertrag}>
+                <FileSignature className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Rahmenvertrag
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
+                <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Bearbeiten
+              </button>
+              <ActionsMenu
+                trigger={
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                    aria-label="Weitere Aktionen"
+                  >
+                    <MoreHorizontal className="h-4 w-4" aria-hidden />
+                    <span className="sr-only">Mehr</span>
+                  </button>
+                }
+                items={handwerkerMenuItems}
+                sheetTitle="Handwerker"
+              />
+            </div>
+          ),
+        }}
       >
-        <div className="min-w-0 space-y-3">
-          {tab === 'stammdaten' ? sidebar : null}
-          {tab === 'auftraege' ? tabAuftraege : null}
-          {tab === 'notizen' ? tabNotizen : null}
-          {tab === 'compliance' ? tabCompliance : null}
-        </div>
-      </AppDetailScreen>
+        <CrmPortalOpenButtons handwerkerId={hw.id} showHandwerker />
+        <AppDetailScreen
+          tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
+        >
+          <div className="min-w-0 space-y-3">
+            {tab === 'stammdaten' ? sidebar : null}
+            {tab === 'auftraege' ? tabAuftraege : null}
+            {tab === 'notizen' ? tabNotizen : null}
+            {tab === 'compliance' ? tabCompliance : null}
+          </div>
+        </AppDetailScreen>
+      </EntityDetailLayout>
 
       {(() => {
         const emailChanged =

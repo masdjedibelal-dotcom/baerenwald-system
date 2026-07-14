@@ -58,6 +58,10 @@ import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjek
 import { LeadOrgKontextBlock } from '@/components/anfragen/LeadOrgKontextBlock'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import { PipelineKontextBadge, PortalSyncWarning } from '@/components/anfragen/PipelineKontextBadge'
+import { VorgangResolverBanner } from '@/components/vorgang/VorgangResolverBanner'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { EntityDetailsTab } from '@/components/entity-detail/EntityDetailsTab'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
 import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
@@ -71,6 +75,10 @@ import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { fetchKundenObjekte, setLeadKundeObjekt } from '@/app/actions/kunden-objekte'
 import type { KundenObjekt } from '@/lib/types'
 import type { ObjektAkteReadOnlyPayload } from '@/lib/objektakte/types'
+import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
+import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import type { AngebotPosition } from '@/lib/types'
 
 const AngebotWizard = dynamic(
   () =>
@@ -155,6 +163,7 @@ export function AnfrageDetailClient({
   projektKontext,
   dbAuftragId = null,
   dbAuftragStatus = null,
+  posBoardPositionen = [],
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
@@ -174,6 +183,7 @@ export function AnfrageDetailClient({
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
   dbAuftragStatus?: string | null
+  posBoardPositionen?: AngebotPosition[]
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -194,6 +204,41 @@ export function AnfrageDetailClient({
   const [objekteListe, setObjekteListe] = useState<KundenObjekt[]>(kundenObjekte)
 
   const kunde = useMemo(() => resolveLeadKunde(lead.kunden), [lead.kunden])
+  const { backHref, backLabel } = vorgangBackNav('anfrage')
+  const resolvedVorgang = useMemo(
+    () =>
+      resolveVorgangFromCrmEntities({
+        lead: {
+          id: lead.id,
+          status: lead.status,
+          situation: lead.situation,
+          funnel_daten: lead.funnel_daten,
+          kanal: lead.kanal,
+          org_freigabe_status: lead.org_freigabe_status,
+          hv_meldung_status: lead.hv_meldung_status,
+          kontakt_name: lead.kontakt_name,
+          plz: lead.plz,
+          bereiche: lead.bereiche,
+          created_at: lead.created_at,
+          updated_at: lead.updated_at,
+        },
+        angebote: angeboteListe.map((a) => ({
+          id: a.id,
+          status: a.status,
+          created_at: a.created_at,
+        })),
+        auftraege: dbAuftragId
+          ? [
+              {
+                id: dbAuftragId,
+                status: dbAuftragStatus ?? 'offen',
+                created_at: lead.created_at,
+              },
+            ]
+          : [],
+      }),
+    [lead, angeboteListe, dbAuftragId, dbAuftragStatus]
+  )
   const kundeTypFuerObjekte = resolveAngebotKundeTyp(kunde?.typ, lead.kundentyp)
   const kundeIdFuerObjekte = kunde?.id ?? lead.kunde_id ?? ''
   const zeigeObjekteCard =
@@ -514,7 +559,7 @@ export function AnfrageDetailClient({
       },
       {
         id: 'timeline',
-        label: ACTIVITY_SECTIONS.verlauf,
+        label: entityDetailTabLabel('timeline'),
         icon: History,
         count: timelineItems.length || undefined,
       },
@@ -537,7 +582,7 @@ export function AnfrageDetailClient({
   const mobileDetailTabs = useMemo(
     () => [
       { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
-      { id: 'projekt', label: 'Projekt', icon: Layers },
+      { id: 'projekt', label: entityDetailTabLabel('projekt'), icon: Layers },
       {
         id: 'schritte',
         label: 'Nächste Schritte',
@@ -546,7 +591,7 @@ export function AnfrageDetailClient({
       },
       {
         id: 'timeline',
-        label: ACTIVITY_SECTIONS.verlauf,
+        label: entityDetailTabLabel('timeline'),
         icon: History,
         count: timelineItems.length || undefined,
       },
@@ -728,6 +773,7 @@ export function AnfrageDetailClient({
       {stammdatenCard}
       {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       {projektuebersichtCards}
+      <PosBoard title="Leistungen" positionen={posBoardPositionen} readOnly />
       <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
       <LeadTermineCard
         leadId={lead.id}
@@ -762,7 +808,11 @@ export function AnfrageDetailClient({
     tab === 'stammdaten' ? (
       stammdatenInhalt
     ) : tab === 'projekt' ? (
-      <div className="space-y-3">{projektuebersichtCards}</div>
+      <EntityDetailsTab
+        projektKontext={projektKontext}
+        positionen={posBoardPositionen}
+        overview={projektuebersichtCards}
+      />
     ) : tab === 'schritte' ? (
       schritteInhalt
     ) : tab === 'timeline' ? (
@@ -812,17 +862,20 @@ export function AnfrageDetailClient({
   )
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        backHref="/anfragen"
-        backLabel="Zurück zu Anfragen"
-        title={kundenName(lead)}
-        badges={(() => {
+    <EntityDetailLayout
+      resolvedVorgang={resolvedVorgang}
+      phase="anfrage"
+      breadcrumbTitle={kundenName(lead)}
+      head={{
+        backHref,
+        backLabel,
+        title: kundenName(lead),
+        badges: (() => {
           const s = anfrageStatusDisplay(lead.status)
           return <StatusBadge label={s.label} variant={s.variant} />
-        })()}
-        meta={headMeta}
-        actions={
+        })(),
+        meta: headMeta,
+        actions: (
           <>
             <button
               type="button"
@@ -856,8 +909,9 @@ export function AnfrageDetailClient({
               sheetTitle="Anfrage"
             />
           </>
-        }
-      />
+        ),
+      }}
+    >
 
       {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
@@ -957,6 +1011,6 @@ export function AnfrageDetailClient({
       ) : null}
 
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }

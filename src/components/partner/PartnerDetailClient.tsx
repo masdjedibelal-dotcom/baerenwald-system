@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { Mail, MoreHorizontal, Pencil } from 'lucide-react'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
@@ -184,18 +184,18 @@ export function PartnerDetailClient({
   )
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        backHref="/partner"
-        backLabel="Zurück zu Partner"
-        title={
+    <EntityDetailLayout
+      head={{
+        backHref: '/partner',
+        backLabel: 'Zurück zu Partner',
+        title: (
           <div className="detail-head-title-row">
             <span>{partner.name}</span>
             <PartnerTypBadge partner={partner} />
           </div>
-        }
-        sub={headSub || undefined}
-        actions={
+        ),
+        sub: headSub || undefined,
+        actions: (
           <>
             {partner.email?.trim() ? (
               <a href={`mailto:${partner.email}`} className="btn btn-primary btn-sm inline-flex shrink-0 gap-1.5">
@@ -218,9 +218,9 @@ export function PartnerDetailClient({
               sheetTitle="Partner"
             />
           </>
-        }
-      />
-
+        ),
+      }}
+    >
       <div className="space-y-3">
         {partnerdetailsCard}
         {notizenCard}
@@ -341,6 +341,6 @@ export function PartnerDetailClient({
             )
           })()
         : null}
-    </div>
+    </EntityDetailLayout>
   )
 }
