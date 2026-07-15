@@ -7,17 +7,14 @@ Stand: Juni 2026. Frontend: `handwerks-plattform`. CRM: `baerenwald-crm-dashboar
 | Bereich | Status |
 |---------|--------|
 | Migration Org-Felder | `20260708120000_organisation_portal_stamm.sql` |
-| Tab **Organisation** | `KundenOrganisationTab` + `FreigabeRegelnEditor` |
+| Tab **Organisation** | `KundenOrganisationTab` (Gewerbe + Hausverwaltung) |
 | Objekte + `melde_slug` | `KundenObjekteCard`, `KundenObjektModal`, Melde-Link |
-| Lead-Detail Org-Blöcke | `LeadOrgKontextBlock` |
+| Lead-Detail Org-Blöcke | `LeadOrgKontextBlock` (Auftraggeber, Melder, Objekt, Freigabe-Log) |
 | Anfragen-Filter | Anlass, Org-Kanal, Wartet Freigabe / Wartet Melder |
 | Partner-Gate | `send-handwerker-anfrage.ts` blockiert bis Org-Freigabe |
-| Org-E-Mails | M3/M4 (`org-freigabe-logic`, `org-mail-notify`), M9 (`mailOrgPortalEinladung` in Portal-Einladung) |
-| Resolver + Fixtures | `resolveVorgang()` + `shared/crm-vorgang/resolve-vorgang.fixtures.json` |
-| Vorgänge-Liste | `/vorgaenge` mit KPI, Chips, Resolver |
-| Phase D Journey | PosBoard v2, WizardShell, Zahlplan/Bautagebuch-Tabs, Auto-Angebot |
+| HV-Defaults bei Anlage | `saveKunde` → `portal_modus=organisation` für HV/Gewerbe |
 
-## Noch offen / Lücken (Wave 2+)
+## Noch offen / Lücken
 
 - **Kleinreparatur** (`kleinreparatur_aktiv`, Schwellwert) — noch keine CRM-Spalten/UI (nur Portal-Seite?)
 - **hv_meldung_status** — Lead-Workflow-Anzeige im CRM prüfen/ergänzen
