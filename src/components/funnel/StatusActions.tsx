@@ -379,7 +379,7 @@ function InlineActions({
   const [moreOpen, setMoreOpen] = useState(false)
 
   return (
-    <div className="mb-4 rounded-xl border border-bw-border bg-bw-card p-4 shadow-card">
+    <div className="mb-4 rounded-xl border border-bw-border bg-[var(--card)] p-4 shadow-card">
       {model.info ? (
         <div className="mb-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text">
           <p className="inline-flex items-center gap-1.5 font-medium">
@@ -417,7 +417,7 @@ function InlineActions({
               Weitere Aktionen
             </button>
             {moreOpen ? (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[min(60vh,320px)] overflow-y-auto rounded-lg border border-bw-border bg-bw-card p-2 shadow-lg sm:right-auto sm:min-w-[260px]">
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[min(60vh,320px)] overflow-y-auto rounded-lg border border-bw-border bg-[var(--card)] p-2 shadow-lg sm:right-auto sm:min-w-[260px]">
                 {rest.map((b) => (
                   <button
                     key={`${b.tier}-${b.id}-${b.label}`}

@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockProp } from '@/components/mock-ui/MockProp'
 import { Input } from '@/components/ui/Input'
-import { PropertyRow } from '@/components/ui/PropertyRow'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import type { MeinProfilDaten } from '@/app/(dashboard)/einstellungen/profil/actions'
@@ -31,13 +31,13 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Card title="Mein Profil">
+      <MockCard title="Mein Profil" icon="user">
         <EinstellungenMeta className="mb-4">
           Name und Handynummer erscheinen im Kundenportal als Ansprechpartner, wenn du Betreuer eines
           Auftrags bist.
         </EinstellungenMeta>
-        <div className="space-y-1">
-          <PropertyRow label="E-Mail" value={initial.email || '—'} editable={false} />
+        <div className="props">
+          <MockProp label="E-Mail">{initial.email || '—'}</MockProp>
         </div>
         <div className="mt-4 space-y-3">
           <Input label="Anzeigename" required value={name} onChange={(e) => setName(e.target.value)} />
@@ -51,18 +51,18 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
           />
         </div>
         <div className="mt-6 flex justify-end">
-          <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
+          <MockBtn kind="primary" onClick={() => save()} disabled={pending}>
             Speichern
-          </Button>
+          </MockBtn>
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Rolle">
+      <MockCard title="Rolle" icon="shield">
         <p className="text-[13.5px] font-medium capitalize text-bw-text">{initial.rolle}</p>
         <EinstellungenMeta className="mt-1">
           Rollen ändern nur Admins unter Tab „Team“.
         </EinstellungenMeta>
-      </Card>
+      </MockCard>
     </div>
   )
 }

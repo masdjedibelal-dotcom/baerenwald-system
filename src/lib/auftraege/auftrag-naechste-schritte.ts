@@ -1,4 +1,4 @@
-import type { LeadSchritt } from '@/components/anfragen/LeadNaechsteSchritteCard'
+import type { LeadSchritt } from '@/lib/naechste-schritte'
 import type { AuftragDetail, AuftragStatus } from '@/lib/types'
 
 export type AuftragNaechsteSchritteOpts = {

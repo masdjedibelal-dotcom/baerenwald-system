@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Home, Mail, Pencil, Phone, Plus, Trash2 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -132,14 +132,14 @@ export function ObjektBewohnerSection({
 
   return (
     <>
-      <Card
+      <MockCard
         collapsible
         title={
           <>
             <Home className="inline h-4 w-4 text-bw-primary" aria-hidden /> Bewohner
           </>
         }
-        action={
+        actions={
           <button
             type="button"
             className="btn btn-ghost btn-sm gap-1"
@@ -209,7 +209,7 @@ export function ObjektBewohnerSection({
             ))}
           </ul>
         )}
-      </Card>
+      </MockCard>
 
       <Modal
         open={modalOpen}

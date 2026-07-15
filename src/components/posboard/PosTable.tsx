@@ -3,7 +3,8 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 
 export type PosTableBadge = {
@@ -28,22 +29,8 @@ export type PosTableGroup = {
   items: PosTableItem[]
 }
 
-function PosTableMenu({
-  items,
-}: {
-  items: ActionsMenuItem[]
-}) {
-  return (
-    <ActionsMenu
-      align="right"
-      items={items}
-      trigger={
-        <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-          <MockIcon n="dots" size={15} />
-        </button>
-      }
-    />
-  )
+function PosTableMenu({ items }: { items: EntityMenuItem[] }) {
+  return <MockEntityRowMenu items={items} title="Position" />
 }
 
 function SelectBox({ on }: { on: boolean }) {
@@ -88,8 +75,8 @@ export function PosTable({
   groups: PosTableGroup[]
   onAddItem?: (group: PosTableGroup) => void
   onAddGroup?: () => void
-  groupActions?: (group: PosTableGroup) => ActionsMenuItem[]
-  itemActions?: (group: PosTableGroup, item: PosTableItem) => ActionsMenuItem[]
+  groupActions?: (group: PosTableGroup) => EntityMenuItem[]
+  itemActions?: (group: PosTableGroup, item: PosTableItem) => EntityMenuItem[]
   selectable?: boolean
   selected?: Record<string, boolean>
   onToggleItem?: (id: string) => void
@@ -305,7 +292,7 @@ export function PosTable({
   )
 }
 
-export type PosTableActionItem = ActionsMenuItem
+export type PosTableActionItem = EntityMenuItem
 
 export function posTableMenuIcon(icon: string): ReactNode {
   return <MockIcon n={icon} size={15} />

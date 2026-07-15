@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Building2, Copy, ExternalLink, FolderOpen, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -139,7 +139,7 @@ export function KundenObjekteCard({
 
   if (variant === 'select') {
     return (
-      <Card collapsible title="Objekt" className={className}>
+      <MockCard collapsible title="Objekt" className={className}>
         <p className="mb-3 text-[12px] leading-relaxed text-bw-text-muted">
           Ausführungsort für das Angebot (erscheint im PDF unter „Durchführung in:“).
         </p>
@@ -151,12 +151,12 @@ export function KundenObjekteCard({
           editObjekt={editObjekt}
           onSaved={onObjektSaved}
         />
-      </Card>
+      </MockCard>
     )
   }
 
   return (
-    <Card
+    <MockCard
       collapsible
       title={
         <>
@@ -164,7 +164,7 @@ export function KundenObjekteCard({
         </>
       }
       className={className}
-      action={
+      actions={
         <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={openNeu}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Hinzufügen
@@ -268,6 +268,6 @@ export function KundenObjekteCard({
         editObjekt={editObjekt}
         onSaved={onObjektSaved}
       />
-    </Card>
+    </MockCard>
   )
 }

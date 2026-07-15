@@ -1,7 +1,7 @@
 'use client'
 
 import { Shield } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import type { FreigabeModus } from '@/lib/types'
@@ -32,7 +32,7 @@ export function FreigabeRegelnEditor({
   const freigabeAktiv = value.freigabe_modus === 'freigabe'
 
   return (
-    <Card
+    <MockCard
       title={
         <span className="inline-flex items-center gap-2">
           <Shield className="h-4 w-4 text-bw-primary" aria-hidden />
@@ -83,6 +83,6 @@ export function FreigabeRegelnEditor({
           </label>
         </>
       ) : null}
-    </Card>
+    </MockCard>
   )
 }

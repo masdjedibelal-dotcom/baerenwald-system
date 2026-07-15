@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { FileDown } from 'lucide-react'
 import { createNachtragEntwurfFromRegiebericht } from '@/app/(dashboard)/auftraege/actions'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import type { AuftragDetail, FormularEintrag } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -90,13 +90,13 @@ export function AuftragDokumentationPanel({
           {bau.slice(0, 3).map((e) => {
             const d = (e.daten ?? {}) as Record<string, unknown>
             return (
-              <Card key={e.id} className="p-3 text-sm">
+              <MockCard key={e.id} className="p-3 text-sm">
                 <p className="font-medium text-ink">{formatDatum(str(d.datum))}</p>
                 <p className="text-muted">{str(d.ausgefuehrte_arbeiten).slice(0, 160)}</p>
                 <p className="text-xs text-muted">
                   {e.handwerker?.name ?? '—'} · {num(d.arbeitsstunden)} h
                 </p>
-              </Card>
+              </MockCard>
             )
           })}
           {bau.length === 0 ? <p className="text-sm text-muted">Keine Einträge.</p> : null}
@@ -113,7 +113,7 @@ export function AuftragDokumentationPanel({
             const d = (e.daten ?? {}) as Record<string, unknown>
             const r = computeRegieBrutto(e)
             return (
-              <Card key={e.id} className="flex flex-col gap-2 p-3 text-sm md:flex-row md:items-center md:justify-between">
+              <MockCard key={e.id} className="flex flex-col gap-2 p-3 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-medium text-ink">{formatDatum(str(d.datum))}</p>
                   <p className="text-muted">
@@ -143,7 +143,7 @@ export function AuftragDokumentationPanel({
                     Als Nachtrag übernehmen
                   </Button>
                 </div>
-              </Card>
+              </MockCard>
             )
           })}
           {regie.length === 0 ? <p className="text-sm text-muted">Keine Regieberichte.</p> : null}

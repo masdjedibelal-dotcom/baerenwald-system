@@ -2,7 +2,7 @@
 
 import { Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import type { KiVisualisierung } from '@/lib/visualize/types'
 import { formatDatumZeit } from '@/lib/utils'
@@ -62,20 +62,12 @@ export function AngebotWizardVizBlock({
 
   if (!angebotId) {
     return (
-      <Card
-        className="wizard-projekt-viz"
-        title={
-          <>
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
-            KI-Visualisierung
-          </>
-        }
-      >
+      <MockCard className="wizard-projekt-viz" title="KI-Visualisierung" icon="star-filled">
         <p className="text-sm text-bw-text-muted">
           Entwurf einmal speichern — dann kannst du Fotos visualisieren und die Ergebnisse ins Angebot
           übernehmen.
         </p>
-      </Card>
+      </MockCard>
     )
   }
 
@@ -83,15 +75,7 @@ export function AngebotWizardVizBlock({
   const andere = sessions.filter((s) => !s.ins_angebot || s.prompt_history.length === 0)
 
   return (
-    <Card
-      className="wizard-projekt-viz"
-      title={
-        <>
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-bw-primary" aria-hidden />
-          KI-Visualisierung
-        </>
-      }
-    >
+    <MockCard className="wizard-projekt-viz" title="KI-Visualisierung" icon="star-filled">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-bw-text-muted">
           Vorher/Nachher aus Fotodokumentation — erscheint im PDF wenn „Ins Angebot übernommen“.
@@ -190,6 +174,6 @@ export function AngebotWizardVizBlock({
           ))}
         </div>
       ) : null}
-    </Card>
+    </MockCard>
   )
 }

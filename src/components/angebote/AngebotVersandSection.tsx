@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
@@ -284,7 +284,7 @@ export function AngebotVersandSection({
       ) : null}
 
       {showKundeBlock && !showKundeModalOnly ? (
-      <Card id="angebot-versand-kunde" className="mb-6 space-y-4 p-4">
+      <MockCard id="angebot-versand-kunde" className="mb-6 space-y-4 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Kunden senden</h3>
         {kannAnKunde ? (
           <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
@@ -299,11 +299,11 @@ export function AngebotVersandSection({
                 : 'Nur bei Status „Entwurf“ oder „Handwerker akzeptiert“ versendbar.'}
           </p>
         )}
-      </Card>
+      </MockCard>
       ) : null}
 
       {showHandwerkerBlock ? (
-      <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
+      <MockCard id="angebot-versand-handwerker" className="space-y-4 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Handwerker senden</h3>
         {rows.length === 0 ? (
           <p className="text-sm text-muted">Keine Handwerker zugewiesen.</p>
@@ -367,7 +367,7 @@ export function AngebotVersandSection({
             })}
           </ul>
         )}
-      </Card>
+      </MockCard>
       ) : null}
 
       <Modal

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { EmailTemplatesClient } from '@/components/einstellungen/EmailTemplatesClient'
+import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import { EinstellungenBenachrichtigungenCard } from '@/components/einstellungen/EinstellungenMockToggles'
 import { loadEmailTemplates } from '@/app/(dashboard)/einstellungen/email/actions'
 import { createClient } from '@/lib/supabase-server'
@@ -19,7 +19,7 @@ export default async function EinstellungenEmailPage() {
   ])
   return (
     <div>
-      <PageHeader description="Automatische System-E-Mails und CRM-Textbausteine." />
+      <EinstellungenMeta className="mb-4">Automatische System-E-Mails und CRM-Textbausteine.</EinstellungenMeta>
       <div className="mb-6">
         <EinstellungenBenachrichtigungenCard />
       </div>

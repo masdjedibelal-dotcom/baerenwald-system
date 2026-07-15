@@ -13,7 +13,7 @@ import {
   Send,
 } from 'lucide-react'
 import { WizardShell } from '@/components/layout/WizardShell'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/app-toast'
@@ -726,7 +726,7 @@ export function RechnungWizard({
           {step === 1 ? (
             <div className="space-y-4">
               {standalone ? (
-                <Card title="Rechnungsempfänger">
+                <MockCard title="Rechnungsempfänger">
                   {kunde ? (
                     <div className="space-y-3">
                       <KundenStammdatenCard
@@ -802,7 +802,7 @@ export function RechnungWizard({
                       </Button>
                     </div>
                   )}
-                </Card>
+                </MockCard>
               ) : (
                 <KundenStammdatenCard
                   kunde={kunde as Kunde | null}
@@ -829,7 +829,7 @@ export function RechnungWizard({
                 showUst
                 gewerke={gewerkNames}
               />
-              <Card title="Summe (Vorschau)">
+              <MockCard title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <span className="text-bw-text-muted">Netto</span>
@@ -840,7 +840,7 @@ export function RechnungWizard({
                     <p className="font-medium tabular-nums">{formatEurBetrag(berechnung.brutto)}</p>
                   </div>
                 </div>
-              </Card>
+              </MockCard>
             </div>
           ) : null}
 
@@ -891,9 +891,9 @@ export function RechnungWizard({
                 Optional: Rechnung ohne E-Mail speichern — der Versand an den Kunden erfolgt gesammelt
                 in der Abschlussdokumentation (Abnahmeprotokoll → Rechnung → Abschluss-PDF).
               </p>
-              <Card
+              <MockCard
                 title="Rechnungsempfänger"
-                action={
+                actions={
                   kunde ? (
                     <button
                       type="button"
@@ -922,7 +922,7 @@ export function RechnungWizard({
                   />
                   <PropRow label="Anhang" value={pdfName} />
                 </div>
-              </Card>
+              </MockCard>
 
               <div className="mt-4">
                 <AngebotWizardVersandEmpfaengerCard
@@ -942,12 +942,12 @@ export function RechnungWizard({
                 />
               </div>
 
-              <Card
+              <MockCard
                 title="Rechnungs-Vorschau"
                 flush
                 bodyClassName="p-0"
                 className="mt-4"
-                action={
+                actions={
                   <Button
                     type="button"
                     variant="secondary"
@@ -971,7 +971,7 @@ export function RechnungWizard({
                     Entwurf wird vorbereitet…
                   </p>
                 )}
-              </Card>
+              </MockCard>
             </div>
           ) : null}
         </div>

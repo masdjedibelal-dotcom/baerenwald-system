@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Check } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import {
   FormularFelderRenderer,
@@ -149,7 +149,7 @@ export function FormularOeffentlichClient({
         </p>
       ) : null}
 
-      <Card className="mt-6 p-4">
+      <MockCard className="mt-6 p-4">
         <FormularFelderRenderer
           felder={felder}
           daten={daten}
@@ -158,7 +158,7 @@ export function FormularOeffentlichClient({
           onFotoDatei={handleFoto}
           maxFotos={BAUTAGEBUCH_MAX_FOTOS}
         />
-      </Card>
+      </MockCard>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Button type="button" variant="secondary" fullWidth loading={pending} onClick={zwischenspeichern}>

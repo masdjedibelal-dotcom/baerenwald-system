@@ -239,7 +239,7 @@ export function AuftragPositionenGewerkView({
 
           return (
             <div key={block.key} className="pos-gewerk-section overflow-hidden rounded-lg border border-bw-border">
-              <div className="flex items-stretch bg-bw-card">
+              <div className="flex items-stretch bg-[var(--card)]">
                 <div className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-bw-text">{block.gewerkName}</p>

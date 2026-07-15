@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClipboardCheck, ClipboardList, Download, ExternalLink, Plus, Trash2, Wrench } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -53,12 +53,12 @@ export function AuftragAbnahmeprotokollCard({
   }
 
   return (
-    <Card
+    <MockCard
       id="auftrag-abnahmeprotokoll"
       title="Abnahmeprotokoll"
       className="scroll-mt-24"
       bodyClassName="p-4"
-      action={
+      actions={
         <div className="flex flex-wrap gap-2">
           {liste.length > 0 ? (
             <Button
@@ -163,6 +163,6 @@ export function AuftragAbnahmeprotokollCard({
           ))}
         </ul>
       )}
-    </Card>
+    </MockCard>
   )
 }

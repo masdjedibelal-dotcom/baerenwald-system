@@ -29,7 +29,7 @@ export function PartnerCard({
   return (
     <article
       className={cn(
-        'flex flex-col rounded-lg border border-bw-border bg-bw-card p-4 shadow-card',
+        'flex flex-col rounded-lg border border-bw-border bg-[var(--card)] p-4 shadow-card',
         'transition-colors hover:border-bw-primary/30 hover:bg-bw-hover/40'
       )}
     >

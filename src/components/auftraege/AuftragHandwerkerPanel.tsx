@@ -196,7 +196,7 @@ export function AuftragHandwerkerPanel({
 
   if (gruppen.length === 0) {
     return (
-      <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
+      <div className="mb-6 rounded-lg border border-bw-border bg-[var(--card)] p-4">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
           <HardHat className="h-4 w-4 text-bw-primary" aria-hidden />
           Handwerker
@@ -210,7 +210,7 @@ export function AuftragHandwerkerPanel({
 
   return (
     <>
-      <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
+      <div className="mb-6 rounded-lg border border-bw-border bg-[var(--card)] p-4">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
           <HardHat className="h-4 w-4 text-bw-primary" aria-hidden />
           Handwerker zuweisen

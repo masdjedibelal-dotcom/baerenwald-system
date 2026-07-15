@@ -32,7 +32,6 @@ export function entityDetailTabLabel(tabId: string): string {
     uebersicht: ENTITY_DETAIL_TAB_LABELS.uebersicht,
     zahlplan: ENTITY_DETAIL_TAB_LABELS.zahlplan,
     bautagebuch: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
-    visualisierungen: 'Visualisierungen',
   }
   return map[tabId] ?? tabId
 }

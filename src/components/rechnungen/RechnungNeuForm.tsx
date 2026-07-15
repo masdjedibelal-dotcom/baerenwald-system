@@ -10,9 +10,8 @@ import {
 } from '@/app/(dashboard)/rechnungen/actions'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { LexofficeDokumentEditor } from '@/components/dokumente/LexofficeDokumentEditor'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import {
@@ -205,7 +204,7 @@ export function RechnungNeuForm({
   }
 
   const kundenCard = kundenAdresseReadonly && !kundeHits.length ? (
-    <Card className="p-4">
+    <MockCard className="p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Kunde</p>
       <p className="mt-1 font-semibold text-bw-text">{kundenAdresseReadonly.name}</p>
       {kundenAdresseReadonly.adresse ? (
@@ -221,9 +220,9 @@ export function RechnungNeuForm({
           Adresse unvollständig — bitte im Kundenstamm ergänzen vor PDF-Versand.
         </p>
       ) : null}
-    </Card>
+    </MockCard>
   ) : (
-    <Card className="p-4">
+    <MockCard className="p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Kunde suchen</p>
       <Input
         label="Name"
@@ -262,25 +261,23 @@ export function RechnungNeuForm({
           <span className="text-bw-text-muted"> ({kundeAktiv.typ ?? 'privat'})</span>
         </p>
       ) : null}
-    </Card>
+    </MockCard>
   )
 
   return (
     <div className="pb-36 md:pb-28">
-      <PageHeader
-        description={
-          auftragsReferenz ? (
-            <p className="text-sm text-bw-text-muted">
-              Referenz Auftrag: <span className="font-semibold text-bw-text">{auftragsReferenz}</span>
-            </p>
-          ) : undefined
-        }
-        action={
-          <Link href={backHref} className="text-sm font-medium text-bw-link">
-            Zurück
-          </Link>
-        }
-      />
+      <div className="toolbar mb-4 flex flex-wrap items-center justify-between gap-2">
+        {auftragsReferenz ? (
+          <p className="text-sm text-bw-text-muted">
+            Referenz Auftrag: <span className="font-semibold text-bw-text">{auftragsReferenz}</span>
+          </p>
+        ) : (
+          <span />
+        )}
+        <Link href={backHref} className="btn btn-ghost btn-sm">
+          Zurück
+        </Link>
+      </div>
 
       {err ? (
         <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
@@ -298,7 +295,7 @@ export function RechnungNeuForm({
         {kundenCard}
 
         {kann13b ? (
-          <Card className="p-4">
+          <MockCard className="p-4">
             <label className="flex cursor-pointer items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -313,10 +310,10 @@ export function RechnungNeuForm({
                 </span>
               </span>
             </label>
-          </Card>
+          </MockCard>
         ) : null}
 
-        <Card className="p-4">
+        <MockCard className="p-4">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-bw-light">Positionen</p>
           <p className="mb-4 text-[12px] text-bw-text-muted">
             Festpreise pro Zeile — USt pro Position (0 / 7 / 19 %), sofern nicht § 13b oder
@@ -328,9 +325,9 @@ export function RechnungNeuForm({
             showGesamtrabattPanel={false}
             gewerke={gewerke}
           />
-        </Card>
+        </MockCard>
 
-        <Card className="space-y-2 p-4 text-sm">
+        <MockCard className="space-y-2 p-4 text-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Zusammenfassung</p>
           {artikelNetto !== berechnung.netto ? (
             <div className="flex justify-between text-bw-text-muted">
@@ -379,9 +376,9 @@ export function RechnungNeuForm({
               {formatHinweis35aRechnung(berechnung.lohn_netto)}
             </div>
           ) : null}
-        </Card>
+        </MockCard>
 
-        <Card className="grid gap-3 p-4 sm:grid-cols-2">
+        <MockCard className="grid gap-3 p-4 sm:grid-cols-2">
           <p className="col-span-full text-xs font-medium uppercase tracking-wide text-bw-light">
             Details (Pflichtangaben § 14 UStG)
           </p>
@@ -406,7 +403,7 @@ export function RechnungNeuForm({
           <Input type="date" label="Fällig am" value={faellig} onChange={(e) => setFaellig(e.target.value)} />
           <Input type="date" label="Leistung von *" value={von} onChange={(e) => setVon(e.target.value)} required />
           <Input type="date" label="Leistung bis *" value={bis} onChange={(e) => setBis(e.target.value)} required />
-        </Card>
+        </MockCard>
 
         <div className="flex flex-wrap gap-3">
           <Button

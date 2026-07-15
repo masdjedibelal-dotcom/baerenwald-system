@@ -6,7 +6,6 @@ import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import type { AngebotDetail, LeadDetail, LeadTimelineRow } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import { loadKiVisualisierungenForAngebot } from '@/lib/visualize/queries'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 
 export default async function AngebotDetailPage({ params }: { params: { id: string } }) {
@@ -67,11 +66,10 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     timeline = (tlByLead ?? []) as LeadTimelineRow[]
   }
 
-  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext] =
+  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, projektKontext] =
     await Promise.all([
       loadWizardContext(supabase),
       detail.lead_id ? loadAnfrageDetail(supabase, detail.lead_id) : Promise.resolve(null),
-      loadKiVisualisierungenForAngebot(params.id),
       loadProjektKontext(supabase, {
         activeKind: 'angebot',
         activeId: params.id,
@@ -90,7 +88,6 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
       gewerke={gewerke}
       wizardPreislisten={wizardPreislisten}
       wizardFirm={firm}
-      kiVisualisierungen={kiVisualisierungen}
       lead={leadDetail as LeadDetail | null}
       projektKontext={projektKontext}
     />

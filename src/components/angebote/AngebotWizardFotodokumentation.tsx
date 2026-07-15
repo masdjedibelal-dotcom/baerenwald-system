@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState, type DragEvent } from 'react'
 import { ImagePlus, Sparkles, Trash2 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Modal } from '@/components/ui/Modal'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -272,15 +272,7 @@ export function AngebotWizardFotodokumentation({
   }
 
   return (
-    <Card
-      className="wizard-projekt-fotos"
-      title={
-        <>
-          <ImagePlus className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
-          Fotodokumentation
-        </>
-      }
-    >
+    <MockCard className="wizard-projekt-fotos" title="Fotodokumentation" icon="forms">
       {unselectedNotiz.length > 0 ? (
         <div className="wizard-foto-add">
           <p className="wizard-projekt-field-hint mb-2">Aus Notizen hinzufügen:</p>
@@ -381,6 +373,6 @@ export function AngebotWizardFotodokumentation({
           </div>
         ) : null}
       </Modal>
-    </Card>
+    </MockCard>
   )
 }

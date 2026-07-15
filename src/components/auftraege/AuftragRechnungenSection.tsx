@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Plus, Receipt } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { formatDatum, formatPreis } from '@/lib/utils'
 
 export type AuftragRechnungZeile = {
@@ -59,7 +59,7 @@ export function AuftragRechnungenSection({
       ) : (
         <div className="space-y-2">
           {rechnungen.map((r) => (
-            <Card key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+            <MockCard key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
               <div className="flex min-w-0 items-center gap-2">
                 <Receipt className="h-4 w-4 shrink-0 text-bw-primary" aria-hidden />
                 <div>
@@ -76,7 +76,7 @@ export function AuftragRechnungenSection({
               <span className="font-semibold tabular-nums text-bw-text">
                 {formatPreis(r.brutto, null, null)}
               </span>
-            </Card>
+            </MockCard>
           ))}
         </div>
       )}

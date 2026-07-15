@@ -2,14 +2,11 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { FileText } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterSection } from '@/components/layout/ListPageParts'
-import { AppListScreen, AppEntityListRow } from '@/components/layout/app'
-import { ListFilterBar } from '@/components/ui/ListFilterBar'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { Input } from '@/components/ui/Input'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import type { FormularTemplate } from '@/lib/types'
 import { formatRelativeDate } from '@/lib/utils'
@@ -49,7 +46,6 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
   const formulare = templates as TemplateRow[]
   const [filter, setFilter] = useState<FilterKey>('alle')
   const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
   const [modal, setModal] = useState<FormularTemplate | null>(null)
   const [sortierung, setSortierung] = useState<SortKey>('neueste')
 
@@ -86,14 +82,14 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
   )
 
   const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
+    const needle = q.trim().toLowerCase()
     return formulare.filter((f) => {
       if (!passtZuFilter(f, filter)) return false
       if (!needle) return true
       const hay = [f.name, f.subtyp].filter(Boolean).join(' ').toLowerCase()
       return hay.includes(needle)
     })
-  }, [formulare, filter, debouncedQ])
+  }, [formulare, filter, q])
 
   const sorted = useMemo(() => {
     const list = [...filtered]
@@ -109,107 +105,98 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
   }, [filtered, sortierung])
 
   return (
-    <AppListScreen
-      filters={
-        <ListFilterSection
-          chipGroups={[
-            {
-              label: 'Typ',
-              options: filterOptionen,
-              selected: [filter],
-              onChange: (vals) => setFilter((vals[0] as FilterKey) || 'alle'),
-            },
-          ]}
-        >
-          <ListFilterBar
-            hideStatusFilter
-            hideZeitraumFilter
-            statusLabel="—"
-            statusOptions={[{ value: '', label: '—' }]}
-            statusValue=""
-            onStatusChange={() => {}}
-            zeitraumValue="alle"
-            onZeitraumChange={() => {}}
-            showCustomDates={false}
-            customFrom=""
-            customTo=""
-            onCustomFromChange={() => {}}
-            onCustomToChange={() => {}}
-            searchValue={q}
-            onSearchChange={setQ}
-            searchPlaceholder="Vorlagen suchen…"
-            onReset={() => {
-              setFilter('alle')
-              setQ('')
-            }}
-            hasActiveFilters={filter !== 'alle' || !!q.trim()}
-            resultCount={sorted.length}
-            sort={{
-              options: [
-                { field: 'neueste', label: 'Neueste zuerst' },
-                { field: 'name', label: 'Name A–Z' },
-                { field: 'felder', label: 'Meiste Felder' },
-              ],
-              currentField: sortierung,
-              currentDir: null,
-              onSort: (f) => setSortierung((f || 'neueste') as SortKey),
-            }}
-          />
-        </ListFilterSection>
-      }
-    >
-      <PageHeader
-        action={
-          <Link
-            href="/formulare/neu"
-            className="btn btn-primary btn-sm inline-flex items-center justify-center md:hidden"
-          >
+    <div className="space-y-4">
+      <MockCard
+        title="Formular-Vorlagen"
+        icon="forms"
+        actions={
+          <Link href="/formulare/neu" className="btn btn-primary btn-sm">
             + Neues Template
           </Link>
         }
-      />
-
-      <div>
-        {sorted.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title={formulare.length === 0 ? 'Noch keine Formular-Vorlagen' : 'Keine Treffer'}
-            description={
-              formulare.length === 0
-                ? 'Legen Sie ein neues Template an, um Formulare für Handwerker zu nutzen.'
-                : 'Filter anpassen.'
-            }
-            action={
-              formulare.length === 0 ? (
-                <Link href="/formulare/neu" className="btn btn-primary btn-sm">
-                  + Erstes Template anlegen
-                </Link>
-              ) : null
-            }
+      >
+        <div className="toolbar mb-4 flex flex-wrap items-center gap-2">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Vorlagen suchen…"
+            className="min-w-[200px] flex-1"
           />
+          <select
+            className="input"
+            value={sortierung}
+            onChange={(e) => setSortierung(e.target.value as SortKey)}
+            aria-label="Sortierung"
+          >
+            <option value="neueste">Neueste zuerst</option>
+            <option value="name">Name A–Z</option>
+            <option value="felder">Meiste Felder</option>
+          </select>
+        </div>
+
+        <div className="chiprow mb-4 flex flex-wrap gap-2">
+          {filterOptionen.map((opt) => (
+            <MockChip
+              key={opt.value}
+              active={filter === opt.value}
+              onClick={() => setFilter(opt.value)}
+            >
+              {opt.label}
+              {opt.count > 0 ? ` (${opt.count})` : ''}
+            </MockChip>
+          ))}
+        </div>
+
+        {sorted.length === 0 ? (
+          <div className="space-y-3">
+            <MockEmpty
+              icon="forms"
+              title={formulare.length === 0 ? 'Noch keine Formular-Vorlagen' : 'Keine Treffer'}
+              hint={
+                formulare.length === 0
+                  ? 'Legen Sie ein neues Template an, um Formulare für Handwerker zu nutzen.'
+                  : 'Filter anpassen.'
+              }
+            />
+            {formulare.length === 0 ? (
+              <Link href="/formulare/neu" className="btn btn-primary btn-sm">
+                + Erstes Template anlegen
+              </Link>
+            ) : null}
+          </div>
         ) : (
-          <ul className="m-0 list-none space-y-3 p-0">
+          <ul className="-mx-4">
             {sorted.map((formular) => (
-              <li key={formular.id}>
-                <AppEntityListRow
-                  href={`/formulare/${formular.id}/bearbeiten`}
-                  avatar={<ListAvatar name={formular.name} tone="soft" />}
-                  title={formular.name}
-                  line2={`${formular.felder?.length || 0} Felder · ${subtypLabel(formular.subtyp)}`}
-                  line3={formatRelativeDate(formular.updated_at || formular.created_at || '')}
-                  badge={
-                    !formular.aktiv ? (
-                      <span className="rounded-md bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-                        Inaktiv
-                      </span>
-                    ) : undefined
-                  }
-                />
+              <li key={formular.id} className="list-row">
+                <Link href={`/formulare/${formular.id}/bearbeiten`} className="min-w-0 flex-1">
+                  <span className="lc-title block">{formular.name}</span>
+                  <span className="lc-sub block">
+                    {formular.felder?.length || 0} Felder · {subtypLabel(formular.subtyp)}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {formatRelativeDate(formular.updated_at || formular.created_at || '')}
+                  </span>
+                </Link>
+                {!formular.aktiv ? <span className="badge badge-muted">Inaktiv</span> : null}
+                <div className="row-actions always flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="qa-btn"
+                    title="Vorschau"
+                    aria-label="Vorschau"
+                    onClick={() => setModal(formular)}
+                  >
+                    <MockIcon n="eye" size={16} />
+                  </button>
+                  <Link href={`/formulare/${formular.id}/bearbeiten`} className="qa-btn" aria-label="Bearbeiten">
+                    <MockIcon n="chevron-right" size={16} />
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </MockCard>
 
       <FormularVorschauModal
         open={!!modal}
@@ -217,6 +204,6 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
         name={modal?.name ?? ''}
         felder={modal?.felder ?? []}
       />
-    </AppListScreen>
+    </div>
   )
 }

@@ -2,13 +2,11 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
-import { toast } from '@/components/ui/app-toast'
 import {
   MockBtn,
   MockChip,
   MockEmpty,
+  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -16,7 +14,8 @@ import {
 } from '@/components/mock-ui'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { buildEntityMenu } from '@/lib/entity-menu'
+import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
   runDeleteVorgang,
@@ -107,7 +106,6 @@ export function VorgaengeListeClient({
   const [fDatumBis, setFDatumBis] = useState('')
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
-  const [exportOpen, setExportOpen] = useState(false)
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
 
@@ -268,7 +266,7 @@ export function VorgaengeListeClient({
       const isAngebot = v.phase === 'angebot'
       const isAuftrag = v.phase === 'auftrag'
       const isRechnung = v.phase === 'rechnung'
-      const items = buildEntityMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
+      return buildEntityMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
         onEdit: () => openDetail(v.detailHref),
         onCopy: () => {
           if (isAnfrage) runDuplicateAnfrage(v.leadId, router)
@@ -290,7 +288,6 @@ export function VorgaengeListeClient({
         onDelete: () => runDeleteVorgang(v.leadId, router),
         deleteLabel: v.titel,
       })
-      return entityMenuToActionItems(items, (n, size = 15) => <MockIcon n={n} size={size} />)
     },
     [router]
   )
@@ -337,7 +334,19 @@ export function VorgaengeListeClient({
               {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
             </span>
           </MockBtn>
-          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+          <MockBtn
+            icon="download"
+            kind="ghost"
+            sm
+            onClick={() =>
+              runMockListExport(
+                exportToCSV,
+                (filtered.length ? filtered : rows).map(toExportRow),
+                EXPORT_FIELDS,
+                'vorgaenge'
+              )
+            }
+          >
             <span className="listbar-btn-label">Export</span>
           </MockBtn>
         </div>
@@ -588,15 +597,7 @@ export function VorgaengeListeClient({
                   </span>
                 </div>
                 <div className="vg-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
-                  <ActionsMenu
-                    trigger={
-                      <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-                        <MockIcon n="dots" size={16} />
-                      </button>
-                    }
-                    items={rowMenuItems(v)}
-                    sheetTitle="Vorgang"
-                  />
+                  <MockEntityRowMenu items={rowMenuItems(v)} title="Vorgang" />
                 </div>
               </div>
             )
@@ -613,21 +614,6 @@ export function VorgaengeListeClient({
         onPageChange={(p) => setPageIndex(p - 1)}
       />
 
-      {!embedded ? (
-      <CsvExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title="Vorgänge exportieren"
-        fields={EXPORT_FIELDS}
-        onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : rows
-          const data = source.map(toExportRow)
-          const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
-          exportToCSV(data, fields, 'vorgaenge')
-          toast.success('Export gestartet')
-        }}
-      />
-      ) : null}
     </div>
   )
 }

@@ -12,6 +12,8 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -59,7 +61,7 @@ function SortRow({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex flex-wrap items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 py-2"
+      className="list-row flex-wrap items-start gap-3 py-3"
     >
       <button
         type="button"
@@ -144,19 +146,21 @@ function SortRow({
         />
         aktiv
       </label>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
-        <Pencil className="h-4 w-4" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={g.anzahl_leistungen > 0}
-        title={g.anzahl_leistungen > 0 ? 'Zuerst Leistungen entfernen' : 'Löschen'}
-        onClick={onDelete}
-      >
-        <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
-      </Button>
+      <div className="row-actions always flex gap-1">
+        <button type="button" className="qa-btn" onClick={() => setEditing(true)} aria-label="Bearbeiten">
+          <Pencil className="h-4 w-4" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className="qa-btn"
+          disabled={g.anzahl_leistungen > 0}
+          title={g.anzahl_leistungen > 0 ? 'Zuerst Leistungen entfernen' : 'Löschen'}
+          onClick={onDelete}
+          aria-label="Löschen"
+        >
+          <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
+        </button>
+      </div>
     </li>
   )
 }
@@ -260,26 +264,40 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   }
 
   return (
-    <div className="space-y-4">
+    <MockCard
+      title="Gewerke"
+      icon="tool"
+      actions={
+        !neuOpen ? (
+          <MockBtn kind="primary" sm onClick={() => setNeuOpen(true)}>
+            + Neues Gewerk
+          </MockBtn>
+        ) : null
+      }
+    >
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-          <ul className="space-y-2">
-            {rows.map((g) => (
-              <SortRow
-                key={g.id}
-                g={g}
-                onToggle={(aktiv) => void toggle(g.id, aktiv)}
-                onRename={(name) => void rename(g.id, name)}
-                onAusfuehrung={(patch) => void patchAusfuehrung(g.id, patch)}
-                onDelete={() => void remove(g)}
-              />
-            ))}
-          </ul>
+          {rows.length === 0 ? (
+            <p className="text-sm text-bw-text-muted">Noch keine Gewerke angelegt.</p>
+          ) : (
+            <ul className="-mx-4">
+              {rows.map((g) => (
+                <SortRow
+                  key={g.id}
+                  g={g}
+                  onToggle={(aktiv) => void toggle(g.id, aktiv)}
+                  onRename={(name) => void rename(g.id, name)}
+                  onAusfuehrung={(patch) => void patchAusfuehrung(g.id, patch)}
+                  onDelete={() => void remove(g)}
+                />
+              ))}
+            </ul>
+          )}
         </SortableContext>
       </DndContext>
 
       {neuOpen ? (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-bw-border bg-bw-card p-3">
+        <div className="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-bw-border p-3">
           <Input label="Neues Gewerk" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
           <Button type="button" variant="primary" loading={pending} onClick={() => saveNeu()}>
             Speichern
@@ -288,11 +306,7 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
             Abbrechen
           </Button>
         </div>
-      ) : (
-        <Button type="button" variant="secondary" onClick={() => setNeuOpen(true)}>
-          + Neues Gewerk
-        </Button>
-      )}
-    </div>
+      ) : null}
+    </MockCard>
   )
 }

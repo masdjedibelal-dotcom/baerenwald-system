@@ -147,7 +147,7 @@ export default async function DashboardPage() {
       href: '/angebote',
     },
     {
-      icon: 'briefcase',
+      icon: 'tool',
       label: 'Aktive Aufträge',
       value: aktiveAuftraege,
       href: '/auftraege',
@@ -199,7 +199,7 @@ export default async function DashboardPage() {
     {
       key: 'auftraege',
       title: 'Aufträge',
-      icon: 'briefcase',
+      icon: 'tool',
       href: '/auftraege',
       rows: auftraege.slice(0, 4).map((o) => ({
         id: o.id,

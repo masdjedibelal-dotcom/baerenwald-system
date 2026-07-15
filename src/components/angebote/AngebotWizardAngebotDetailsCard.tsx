@@ -1,6 +1,6 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -131,7 +131,7 @@ export function AngebotWizardAngebotDetailsCard({
   )
 
   return (
-    <Card title="Angebot-Details">
+    <MockCard title="Angebot-Details">
       <p className="wizard-inline-hint mb-3 hidden md:block">
         Änderungen aus Schritt 1 werden beim Klick auf <strong>Weiter</strong> oder{' '}
         <strong>Speichern</strong> in der Kopfzeile als Entwurf übernommen. Der Status steht oben neben
@@ -140,6 +140,6 @@ export function AngebotWizardAngebotDetailsCard({
       <MobileEditableBlock sheetTitle="Angebot-Details" overview={overview}>
         {form}
       </MobileEditableBlock>
-    </Card>
+    </MockCard>
   )
 }

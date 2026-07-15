@@ -1,6 +1,5 @@
 'use client'
 
-import { AppEntityListRow } from '@/components/layout/app'
 import { TerminMarker } from '@/components/kalender/TerminMarker'
 import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
 import type { KalenderTermin } from '@/lib/types'
@@ -46,18 +45,22 @@ export function KalenderTerminZeile({
   if (termin.adresse?.trim()) line2Parts.push(termin.adresse.trim())
   else if (!showTyp) line2Parts.push(formatUhrzeit(termin.uhrzeit_von, termin.uhrzeit_bis))
 
+  const Tag = onClick ? 'button' : 'div'
+
   return (
-    <AppEntityListRow
+    <Tag
+      type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={cn('rounded-none border-0 border-b border-bw-border shadow-none', className)}
-      avatar={
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-bw-hover">
-          <TerminMarker typ={termin.typ} className="h-3 w-3 rounded-full" />
-        </span>
-      }
-      eyebrow={faelligkeitLabel(termin, showFaelligkeit)}
-      title={kalenderTitelZeile(termin)}
-      line2={line2Parts.filter(Boolean).join(' · ')}
-    />
+      className={cn('list-row w-full text-left', className)}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bw-hover">
+        <TerminMarker typ={termin.typ} className="h-3 w-3 rounded-full" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="text-xs text-muted">{faelligkeitLabel(termin, showFaelligkeit)}</span>
+        <span className="lc-title block">{kalenderTitelZeile(termin)}</span>
+        <span className="lc-sub block">{line2Parts.filter(Boolean).join(' · ')}</span>
+      </div>
+    </Tag>
   )
 }

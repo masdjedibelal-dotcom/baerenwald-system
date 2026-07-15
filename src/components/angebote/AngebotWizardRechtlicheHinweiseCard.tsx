@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { AngebotWizardMeta } from '@/lib/angebote/angebot-wizard-types'
@@ -80,7 +80,7 @@ export function AngebotWizardRechtlicheHinweiseCard({
   )
 
   return (
-    <Card title="Rechtliche Hinweise im Angebots-PDF">
+    <MockCard title="Rechtliche Hinweise im Angebots-PDF">
       <p className="wizard-inline-hint mb-3 hidden md:block">
         Steuer- und Bankdaten kommen aus den{' '}
         <Link href="/einstellungen" className="text-bw-primary underline">
@@ -94,6 +94,6 @@ export function AngebotWizardRechtlicheHinweiseCard({
         </p>
         {form}
       </MobileEditableBlock>
-    </Card>
+    </MockCard>
   )
 }

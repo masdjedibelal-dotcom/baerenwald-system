@@ -2,7 +2,6 @@
 
 import { useCallback, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AppListScreen } from '@/components/layout/app'
 import { RechnungAuswahlPanel, type RechnungAuswahlZeile } from '@/components/rechnungen/RechnungAuswahlPanel'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { loadRechnungWizardBootstrapFromAuftrag } from '@/app/(dashboard)/rechnungen/wizard-actions'
@@ -57,7 +56,7 @@ export function RechnungAuswahlPageClient({
   }, [auftragId, openWizard])
 
   return (
-    <AppListScreen>
+    <>
       <div className="px-1 pb-6">
         <RechnungAuswahlPanel
           variant="page"
@@ -85,6 +84,6 @@ export function RechnungAuswahlPageClient({
           }}
         />
       ) : null}
-    </AppListScreen>
+    </>
   )
 }

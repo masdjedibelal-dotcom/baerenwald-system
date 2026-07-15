@@ -1,7 +1,78 @@
-import type { NaechsterSchritt } from '@/components/crm/NaechsteSchritteCard'
 import type { AngebotStatusEinfach } from '@/lib/angebot-einfach'
 import { kannHwEinreichungPruefen } from '@/lib/partner/handwerker-einreichung'
 import type { AngebotHandwerkerRow, AuftragPosition } from '@/lib/types'
+
+export type NaechsterSchritt = {
+  id: string
+  label: string
+  dateLabel?: string
+  done?: boolean
+  onClick?: () => void
+  href?: string
+}
+
+/** @deprecated Alias — use NaechsterSchritt */
+export type LeadSchritt = NaechsterSchritt & { dateLabel: string }
+
+export function buildLeadNaechsteSchritte(opts: {
+  hatTermin?: boolean
+  handwerkerErledigt?: boolean
+  angebotAnKundeGesendet?: boolean
+  angebotHref?: string
+  onTerminClick?: () => void
+  onHandwerkerEinholen?: () => void
+  onAngebotAnKunde?: () => void
+}): LeadSchritt[] {
+  const {
+    hatTermin = false,
+    handwerkerErledigt = false,
+    angebotAnKundeGesendet = false,
+    angebotHref,
+    onTerminClick,
+    onHandwerkerEinholen,
+    onAngebotAnKunde,
+  } = opts
+
+  return [
+    {
+      id: 'termin',
+      label: 'Termin vereinbaren',
+      dateLabel: hatTermin ? 'Erledigt' : 'Heute',
+      done: hatTermin,
+      onClick: hatTermin ? undefined : onTerminClick,
+    },
+    {
+      id: 'angebot_kunde',
+      label: 'Angebot an Kunden senden',
+      dateLabel: angebotAnKundeGesendet ? 'Erledigt' : hatTermin ? 'Als Nächstes' : '—',
+      done: angebotAnKundeGesendet,
+      onClick: angebotAnKundeGesendet ? undefined : onAngebotAnKunde,
+      href: angebotAnKundeGesendet
+        ? undefined
+        : angebotHref
+          ? `${angebotHref}#angebot-versand-kunde`
+          : undefined,
+    },
+    {
+      id: 'handwerker_angebot',
+      label: 'Handwerker-Angebot / Rechnung einholen',
+      dateLabel: handwerkerErledigt
+        ? 'Erledigt'
+        : angebotAnKundeGesendet
+          ? 'Als Nächstes'
+          : '—',
+      done: handwerkerErledigt,
+      onClick:
+        handwerkerErledigt || !angebotAnKundeGesendet ? undefined : onHandwerkerEinholen,
+      href:
+        handwerkerErledigt || !angebotAnKundeGesendet
+          ? undefined
+          : angebotHref
+            ? `${angebotHref}#handwerker-partner`
+            : undefined,
+    },
+  ]
+}
 
 export function buildAngebotNaechsteSchritte(opts: {
   status: AngebotStatusEinfach

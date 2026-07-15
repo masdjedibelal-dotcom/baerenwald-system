@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { MeinProfilClient } from '@/components/einstellungen/MeinProfilClient'
+import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import { loadMeinProfil } from '@/app/(dashboard)/einstellungen/profil/actions'
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export default async function EinstellungenProfilPage() {
 
   return (
     <div>
-      <PageHeader description="Dein Name und deine Kontaktdaten im CRM und Kundenportal." />
+      <EinstellungenMeta className="mb-4">Dein Name und deine Kontaktdaten im CRM und Kundenportal.</EinstellungenMeta>
       <MeinProfilClient initial={profil} />
     </div>
   )

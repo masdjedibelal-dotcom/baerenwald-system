@@ -336,7 +336,7 @@ export function HandwerkerComplianceTab({
                           </label>
                           <button
                             type="button"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828]"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-[var(--card)] text-[#c62828]"
                             title="Öffnen"
                             disabled={busy}
                             onClick={() =>

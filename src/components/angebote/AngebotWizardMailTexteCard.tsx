@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock } from '@/components/ui/MobileEditSheet'
 import {
@@ -69,7 +69,7 @@ export function AngebotWizardMailTexteCard({
   )
 
   return (
-    <Card title="Texte (E-Mail & PDF)">
+    <MockCard title="Texte (E-Mail & PDF)">
       <div className="space-y-3">
         <div className="hidden md:block">{overview}</div>
         <MobileEditableBlock
@@ -81,6 +81,6 @@ export function AngebotWizardMailTexteCard({
           {editForm}
         </MobileEditableBlock>
       </div>
-    </Card>
+    </MockCard>
   )
 }

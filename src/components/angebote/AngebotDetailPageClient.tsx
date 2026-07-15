@@ -24,17 +24,16 @@ import {
 import { DetailHead } from '@/components/layout/DetailHead'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { ProjektKette } from '@/components/crm/ProjektKette'
-import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import {
+  MockCard,
   MockDetailShell,
   MockDokumenteCard,
+  MockEntityRowMenu,
+  MockProjektUebersichtCard,
+  MockProp,
   MockVerlaufCard,
 } from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailProp } from '@/components/ui/detail-prop'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
-import { Card } from '@/components/ui/Card'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
@@ -45,9 +44,7 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { LeadTimelineList } from '@/components/anfragen/LeadTimelineList'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/actions'
 import { toast } from '@/components/ui/app-toast'
@@ -64,7 +61,6 @@ import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbei
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
-import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
 import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
@@ -94,13 +90,11 @@ import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapte
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import type { AngebotDetail, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
-import type { KiVisualisierung } from '@/lib/visualize/types'
 import { cn, formatDatum, formatDatumZeit } from '@/lib/utils'
 import {
   KUNDE_ABLEHNUNG_GRUND_LABELS,
   KUNDE_ABLEHNUNG_GRUND_OPTIONS,
 } from '@/lib/angebote/ablehnung-labels'
-import { buildAngebotNaechsteSchritte } from '@/lib/naechste-schritte'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
@@ -115,7 +109,6 @@ export function AngebotDetailPageClient({
   wizardPreislisten,
   wizardFirm,
   lead,
-  kiVisualisierungen = [],
   projektKontext,
 }: {
   detail: AngebotDetail
@@ -125,7 +118,6 @@ export function AngebotDetailPageClient({
   wizardPreislisten: Preisliste[]
   wizardFirm: FirmenEinstellungen
   lead: LeadDetail | null
-  kiVisualisierungen?: KiVisualisierung[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
   const router = useRouter()
@@ -554,52 +546,17 @@ export function AngebotDetailPageClient({
     />
   )
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildAngebotNaechsteSchritte({
-        status: statusEinfach,
-        angebotId: detail.id,
-        auftragId,
-        nachgefasst: Boolean(detail.nachgefasst_am),
-        onNachfassen:
-          (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !detail.nachgefasst_am
-            ? () => run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet')
-            : undefined,
-        onAuftragAnlegen:
-          statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
-            ? () => {
-                setAufBetreff('')
-                setAufTo([])
-                setAufCc([])
-                setAufPreviewHtml('')
-                setAcceptOpen(true)
-              }
-            : undefined,
-      }),
-    [
-      statusEinfach,
-      detail.id,
-      detail.nachgefasst_am,
-      auftragId,
-    ]
-  )
-
-  const offeneSchritteCount = useMemo(
-    () => naechsteSchritte.filter((s) => !s.done).length,
-    [naechsteSchritte]
-  )
-
   const formatEur = (n: number) =>
     n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
   const angebotsdatenCard = (
-    <Card collapsible title="Angebotsdaten">
+    <MockCard title="Angebotsdaten" icon="file-invoice">
       <div className="props">
-        <DetailProp label="Angebotsnr.">
+        <MockProp label="Angebotsnr.">
           {detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`}
-        </DetailProp>
-        <DetailProp label="Erstellt">{formatDatumZeit(detail.created_at)}</DetailProp>
-        <DetailProp label="Gültig bis">
+        </MockProp>
+        <MockProp label="Erstellt">{formatDatumZeit(detail.created_at)}</MockProp>
+        <MockProp label="Gültig bis">
           <span className={gueltigBisClass(gueltigTone)}>
             {detail.gueltig_bis ? formatDatum(detail.gueltig_bis) : '—'}
           </span>
@@ -618,41 +575,37 @@ export function AngebotDetailPageClient({
               Abgelaufen
             </span>
           ) : null}
-        </DetailProp>
-        <DetailProp label="Zahlung">{zahlungLabel}</DetailProp>
+        </MockProp>
+        <MockProp label="Zahlung">{zahlungLabel}</MockProp>
         {detail.kunden_objekte ? (
-          <DetailProp label="Objekt (Ausführungsort)">
+          <MockProp label="Objekt (Ausführungsort)">
             {kundenObjektKurzlabel(detail.kunden_objekte)}
-          </DetailProp>
+          </MockProp>
         ) : null}
-        <DetailProp label="Gesendet am">{gesendetAm ? formatDatumZeit(gesendetAm) : '—'}</DetailProp>
-        <DetailProp label="An">{kunde?.email?.trim() || '—'}</DetailProp>
-        <DetailProp label="Nachfass">{nachfassText}</DetailProp>
-        <DetailProp label="Netto">
+        <MockProp label="Gesendet am">{gesendetAm ? formatDatumZeit(gesendetAm) : '—'}</MockProp>
+        <MockProp label="An">{kunde?.email?.trim() || '—'}</MockProp>
+        <MockProp label="Nachfass">{nachfassText}</MockProp>
+        <MockProp label="Netto">
           <span className="tabular-nums">{formatEur(summen.netto)}</span>
-        </DetailProp>
-        <DetailProp label={`MwSt ${summen.mwstSatz}%`}>
+        </MockProp>
+        <MockProp label={`MwSt ${summen.mwstSatz}%`}>
           <span className="tabular-nums">{formatEur(summen.mwst)}</span>
-        </DetailProp>
-        <DetailProp label="Brutto">
+        </MockProp>
+        <MockProp label="Brutto">
           <span className="font-semibold tabular-nums text-bw-primary">{formatEur(summen.brutto)}</span>
-        </DetailProp>
+        </MockProp>
         {detail.lead_id ? (
-          <DetailProp label="Zur Anfrage">
-            <Link href={`/anfragen/${detail.lead_id}`} className="text-bw-link hover:underline">
-              Anfrage öffnen
-            </Link>
-          </DetailProp>
+          <MockProp label="Zur Anfrage" link>
+            <Link href={`/anfragen/${detail.lead_id}`}>Anfrage öffnen</Link>
+          </MockProp>
         ) : null}
         {auftragId ? (
-          <DetailProp label="Zum Auftrag">
-            <Link href={`/auftraege/${auftragId}`} className="text-bw-link hover:underline">
-              Auftrag öffnen
-            </Link>
-          </DetailProp>
+          <MockProp label="Zum Auftrag" link>
+            <Link href={`/auftraege/${auftragId}`}>Auftrag öffnen</Link>
+          </MockProp>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 
   const positionenTab = (
@@ -664,7 +617,22 @@ export function AngebotDetailPageClient({
 
   const detailsInhalt = (
     <div className="space-y-3">
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <MockProjektUebersichtCard
+        projekt={
+          detail.projektbeschreibung?.trim() ||
+          detail.leistungsumfang?.trim() ||
+          (typeof lead?.funnel_daten === 'object' &&
+          lead.funnel_daten !== null &&
+          'projekt' in lead.funnel_daten &&
+          typeof (lead.funnel_daten as Record<string, unknown>).projekt === 'string'
+            ? String((lead.funnel_daten as Record<string, unknown>).projekt)
+            : kundeName)
+        }
+        region={lead?.plz ?? kunde?.plz}
+        preisMin={lead?.preis_min}
+        preisMax={lead?.preis_max}
+        quelle={lead?.kanal}
+      />
       {positionenTab}
     </div>
   )
@@ -673,40 +641,6 @@ export function AngebotDetailPageClient({
     <div className="space-y-3">
       {kundeCard}
       {angebotsdatenCard}
-      <KommunikationCard
-        filter={{
-          angebotId: detail.id,
-          leadId: detail.lead_id ?? undefined,
-          kundeId: detail.kunde_id ?? undefined,
-        }}
-        reloadKey={mailCompose.reloadKey + generation}
-        toolbar={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id))}
-            >
-              <Mail className="h-3.5 w-3.5" aria-hidden />
-              E-Mail schreiben
-            </Button>
-            {statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert' ? (
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                className="gap-1.5"
-                onClick={openAngebotVersandModal}
-              >
-                <Send className="h-3.5 w-3.5" aria-hidden />
-                Angebot versenden
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
       <AngebotVersandSection
         mode="kunde"
         detail={detail}
@@ -731,14 +665,11 @@ export function AngebotDetailPageClient({
   )
 
   const verlaufInhalt = (
-    <div className="space-y-3">
-      {offeneSchritteCount > 0 ? <NaechsteSchritteCard steps={naechsteSchritte} /> : null}
-      <LeadTimelineList
-        events={timelineInitial}
-        fallbackCreatedAt={detail.created_at}
-        fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
-      />
-    </div>
+    <LeadTimelineList
+      events={timelineInitial}
+      fallbackCreatedAt={detail.created_at}
+      fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
+    />
   )
 
   const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
@@ -771,15 +702,6 @@ export function AngebotDetailPageClient({
       count: anhaengeCount || undefined,
       render: () => <MockDokumenteCard>{dokumenteInhalt}</MockDokumenteCard>,
     },
-    {
-      id: 'visualisierungen',
-      label: 'Visualisierungen',
-      icon: 'sparkles',
-      count: kiVisualisierungen.length || undefined,
-      render: () => (
-        <AngebotVisualisierungenTab angebotId={detail.id} sessions={kiVisualisierungen} />
-      ),
-    },
   ]
 
   return (
@@ -796,26 +718,11 @@ export function AngebotDetailPageClient({
         actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">Mehr</span>
-                </button>
-              }
-              items={detailHeadMenuItems}
-              sheetTitle="Angebot"
-            />
+            <MockEntityRowMenu items={detailHeadMenuItems} title="Angebot" />
           </div>
         ),
       }}
     >
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {statusEinfach === 'abgelehnt' ? (
         <p className="rounded-lg border border-bw-border px-3 py-2 text-sm text-bw-text-muted">

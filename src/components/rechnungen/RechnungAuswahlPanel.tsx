@@ -3,10 +3,11 @@
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
-import { AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { Loader2, Plus } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import {
   deleteRechnungEntwurf,
   loadRechnungWizardBootstrap,
@@ -19,7 +20,6 @@ import {
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { DetailAccordion } from '@/components/ui/DetailAccordion'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import { toast } from '@/components/ui/app-toast'
 
@@ -42,46 +42,33 @@ function RechnungListenZeile({
   r: RechnungAuswahlZeile
   loading: boolean
   pending: boolean
-  menuItems: (r: RechnungAuswahlZeile) => ActionsMenuItem[]
+  menuItems: (r: RechnungAuswahlZeile) => EntityMenuItem[]
 }) {
   const label = RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status
   const titel = rechnungListenTitel(r)
 
   return (
-    <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
+    <div className="list-row">
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-bw-text">{titel}</span>
-          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-            {label}
-          </span>
-        </div>
-        <p className="mt-0.5 text-[13px] text-bw-text-muted">
+        <span className="lc-title block">{titel}</span>
+        <span className="lc-sub block">
           {r.rechnungsnummer?.trim() ? `${r.rechnungsnummer} · ` : ''}
           {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
           {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
-        </p>
+        </span>
+        <span className="badge badge-muted mt-1 inline-flex">{label}</span>
       </div>
       <span className="text-[13px] font-medium tabular-nums text-bw-text">
         {formatEurBetrag(r.brutto ?? 0)}
       </span>
-      <div className="flex shrink-0 items-center">
+      <div className="row-actions always flex shrink-0 items-center">
         {loading ? (
           <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             Bitte warten…
           </span>
         ) : (
-          <ActionsMenu
-            align="right"
-            trigger={
-              <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
-                <MoreHorizontal className="h-4 w-4" aria-hidden />
-                Aktionen
-              </button>
-            }
-            items={menuItems(r)}
-          />
+          <MockEntityRowMenu items={menuItems(r)} title="Rechnung" />
         )}
       </div>
     </div>
@@ -153,12 +140,12 @@ export function RechnungAuswahlPanel({
     })
   }
 
-  function menuItems(r: RechnungAuswahlZeile): ActionsMenuItem[] {
+  function menuItems(r: RechnungAuswahlZeile): EntityMenuItem[] {
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
-    const items: ActionsMenuItem[] = [
+    const items: EntityMenuItem[] = [
       {
         label: 'Ansehen',
-        icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
+        icon: 'eye',
         onClick: () => {
           onClose?.()
           router.push(`/rechnungen/${r.id}`)
@@ -169,12 +156,12 @@ export function RechnungAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: 'Weiterbearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
+        icon: 'pencil',
         onClick: () => handleBearbeiten(r.id),
       })
       items.push('sep', {
         label: 'Löschen',
-        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+        icon: 'trash',
         danger: true,
         onClick: () => handleLoeschen(r.id),
       })
@@ -226,101 +213,43 @@ export function RechnungAuswahlPanel({
       </p>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-sm text-bw-text-muted">
-          Noch keine Rechnungen zu diesem Auftrag.
-        </p>
-      ) : variant === 'page' ? (
-        <ul className="m-0 list-none space-y-3 p-0">
-          {rows.map((r) => {
-            const loading = pending && loadingId === r.id
-            const label = RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status
-
-            return (
-              <li key={r.id} className="space-y-2">
-                <AppEntityListRow
-                  href={`/rechnungen/${r.id}`}
-                  avatar={<ListAvatar name="Rechnung" tone="muted" />}
-                  title={label}
-                  line2={
-                    r.rechnungsdatum
-                      ? `${formatDatum(r.rechnungsdatum)}${r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}`
-                      : '—'
-                  }
-                  line4={formatEurBetrag(r.brutto ?? 0)}
-                />
-                <div className="flex justify-end px-1">
-                  {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      Bitte warten…
-                    </span>
-                  ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
-                      }
-                      items={menuItems(r)}
-                    />
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <MockEmpty icon="receipt" title="Noch keine Rechnungen" hint="Zu diesem Auftrag existiert noch keine Rechnung." />
       ) : (
         <div className="space-y-3">
-          {andereRows.map((r) => {
-            const loading = pending && loadingId === r.id
-            return (
-              <div key={r.id} className="rounded-lg border border-bw-border">
-                <RechnungListenZeile r={r} loading={loading} pending={pending} menuItems={menuItems} />
-              </div>
-            )
-          })}
-
-          {gruppiert ? (
-            <DetailAccordion
-              sections={[
-                {
-                  id: 'abschlag-plan',
-                  title: `Abschlagsrechnungen${auftragsReferenz ? ` · ${auftragsReferenz}` : ''}`,
-                  defaultOpen: true,
-                  content: (
-                    <ul className="divide-y divide-bw-border">
-                      {abschlagRows.map((r) => {
-                        const loading = pending && loadingId === r.id
-                        return (
-                          <li key={r.id}>
-                            <RechnungListenZeile
-                              r={r}
-                              loading={loading}
-                              pending={pending}
-                              menuItems={menuItems}
-                            />
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  ),
-                },
-              ]}
-            />
-          ) : null}
-
-          {!gruppiert
-            ? rows.map((r) => {
+          <MockCard title="Rechnungen" icon="receipt" flush bodyClassName="p-0">
+            <ul className="m-0 list-none p-0">
+              {(variant === 'page' ? rows : gruppiert ? andereRows : rows).map((r) => {
                 const loading = pending && loadingId === r.id
                 return (
-                  <div key={r.id} className="rounded-lg border border-bw-border">
+                  <li key={r.id}>
                     <RechnungListenZeile r={r} loading={loading} pending={pending} menuItems={menuItems} />
-                  </div>
+                  </li>
                 )
-              })
-            : null}
+              })}
+            </ul>
+          </MockCard>
+
+          {gruppiert && abschlagRows.length > 0 ? (
+            <MockCard
+              collapsible
+              defaultOpen
+              title={`Abschlagsrechnungen${auftragsReferenz ? ` · ${auftragsReferenz}` : ''}`}
+              icon="receipt"
+              flush
+              bodyClassName="p-0"
+            >
+              <ul className="m-0 list-none p-0">
+                {abschlagRows.map((r) => {
+                  const loading = pending && loadingId === r.id
+                  return (
+                    <li key={r.id}>
+                      <RechnungListenZeile r={r} loading={loading} pending={pending} menuItems={menuItems} />
+                    </li>
+                  )
+                })}
+              </ul>
+            </MockCard>
+          ) : null}
         </div>
       )}
 

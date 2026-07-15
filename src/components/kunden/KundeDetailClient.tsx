@@ -3,9 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card } from '@/components/ui/Card'
 import { ListGridShell } from '@/components/layout/ListPageParts'
-import { DetailProp } from '@/components/ui/detail-prop'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -41,16 +39,17 @@ import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import {
+  MockCard,
   MockDetailShell,
   MockDokumenteCard,
+  MockEntityRowMenu,
   MockNotizComposer,
   MockNotizenCard,
+  MockProp,
   MockUebersichtCard,
 } from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import {
@@ -552,7 +551,7 @@ export function KundeDetailClient({
 
   const zusatzfelderCard =
     customFieldDefs.length > 0 ? (
-      <Card title="Zusatzfelder" collapsible>
+      <MockCard title="Zusatzfelder" icon="forms">
         <div className="space-y-3">
           {customFieldDefs.map((def) => {
             const row = customValues.find((v) => v.definition_id === def.id)
@@ -591,14 +590,14 @@ export function KundeDetailClient({
             )
           })}
         </div>
-      </Card>
+      </MockCard>
     ) : null
 
   const stammdatenCard = (
-    <Card
-      collapsible
+    <MockCard
       title="Stammdaten"
-      action={
+      icon="user"
+      actions={
         <button type="button" onClick={openEditModal} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
           <Pencil className="h-3.5 w-3.5" />
         </button>
@@ -611,52 +610,52 @@ export function KundeDetailClient({
       ) : null}
       <div className="props">
         {kundenStamm.kundennummer ? (
-          <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
+          <MockProp label="Kundennr.">{kundenStamm.kundennummer}</MockProp>
         ) : null}
         {istKundeFirmaPflichtTyp(kunde.typ) ? (
           <>
-            <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
+            <MockProp label="Firma">{kunde.name?.trim() || '—'}</MockProp>
             {kundenStamm.vorname ? (
-              <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
+              <MockProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</MockProp>
             ) : null}
             {kundenStamm.nachname ? (
-              <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
+              <MockProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</MockProp>
             ) : null}
           </>
         ) : (
           <>
-            {kundenStamm.vorname ? <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp> : null}
-            <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
+            {kundenStamm.vorname ? <MockProp label="Vorname">{kundenStamm.vorname}</MockProp> : null}
+            <MockProp label="Nachname">{kundenStamm.nachname || '—'}</MockProp>
           </>
         )}
         {kundenStamm.ansprechpartner && istKundeNurGewerbeTyp(kunde.typ) ? (
-          <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
+          <MockProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</MockProp>
         ) : null}
-        <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
-        <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
-        <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
-        <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
-        <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
-        <DetailProp label="Telefon">
+        <MockProp label="Straße">{kundenStamm.strasse || '—'}</MockProp>
+        <MockProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</MockProp>
+        <MockProp label="Postleitzahl">{kundenStamm.plz || '—'}</MockProp>
+        <MockProp label="Ort">{kundenStamm.ort || '—'}</MockProp>
+        <MockProp label="Kundentyp">{kundentypLabel(kunde.typ)}</MockProp>
+        <MockProp label="Telefon">
           {kundenStamm.telefon ? (
             <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
           ) : (
             '—'
           )}
-        </DetailProp>
-        <DetailProp label="E-Mail">
+        </MockProp>
+        <MockProp label="E-Mail">
           {kundenStamm.email ? (
             <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
           ) : (
             '—'
           )}
-        </DetailProp>
-        {kundenStamm.ust_id ? <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp> : null}
+        </MockProp>
+        {kundenStamm.ust_id ? <MockProp label="USt-IdNr.">{kundenStamm.ust_id}</MockProp> : null}
         {kunde.quelle ? (
-          <DetailProp label="Quelle">{QUELLE_LABELS[kunde.quelle] ?? kunde.quelle}</DetailProp>
+          <MockProp label="Quelle">{QUELLE_LABELS[kunde.quelle] ?? kunde.quelle}</MockProp>
         ) : null}
         {kunde.webseite ? (
-          <DetailProp label="Webseite">
+          <MockProp label="Webseite">
             <a
               href={kunde.webseite.startsWith('http') ? kunde.webseite : `https://${kunde.webseite}`}
               target="_blank"
@@ -664,13 +663,13 @@ export function KundeDetailClient({
             >
               {kunde.webseite}
             </a>
-          </DetailProp>
+          </MockProp>
         ) : null}
         {kunde.geburtstag ? (
-          <DetailProp label="Geburtstag">{formatDatum(kunde.geburtstag)}</DetailProp>
+          <MockProp label="Geburtstag">{formatDatum(kunde.geburtstag)}</MockProp>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 
   const tabStammdaten = (
@@ -686,7 +685,6 @@ export function KundeDetailClient({
           onChanged={() => refresh()}
         />
       ) : null}
-      <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
     </div>
   )
 
@@ -1231,20 +1229,7 @@ export function KundeDetailClient({
                 Portal-Konto aktiv
               </span>
             ) : null}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={kundeMenuItems}
-              sheetTitle="Kunde"
-            />
+            <MockEntityRowMenu items={kundeMenuItems} title="Kunde" />
           </>
         ),
       }}

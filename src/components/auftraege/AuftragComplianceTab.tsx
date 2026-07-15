@@ -146,7 +146,7 @@ export function AuftragComplianceTab({
               key={partner.handwerkerId}
               title={title}
               defaultOpen={index === 0}
-              className="rounded-xl border border-bw-border bg-bw-card"
+              className="rounded-xl border border-bw-border bg-[var(--card)]"
               action={
                 <span
                   className={cn(

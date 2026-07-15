@@ -2,14 +2,13 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
 import {
   MockBadge,
   MockBtn,
   MockChip,
   MockEmpty,
+  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -18,6 +17,7 @@ import {
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { runMockListExport } from '@/lib/mock-list-export'
 import { deletePartner } from '@/app/(dashboard)/partner/actions'
 import { runDuplicatePartner } from '@/lib/list-actions'
 import { cn } from '@/lib/utils'
@@ -119,7 +119,6 @@ export function PartnerNetzwerkClient({
   const router = useRouter()
   const isPane = mode === 'pane'
 
-  const [exportOpen, setExportOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [kategorie, setKategorie] = useState('alle')
   const [fName, setFName] = useState('')
@@ -269,7 +268,19 @@ export function PartnerNetzwerkClient({
               {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
             </span>
           </MockBtn>
-          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+          <MockBtn
+            icon="download"
+            kind="ghost"
+            sm
+            onClick={() =>
+              runMockListExport(
+                exportToCSV,
+                filtered.map(partnerExportRow),
+                PARTNER_EXPORT_FIELDS,
+                'partner'
+              )
+            }
+          >
             <span className="listbar-btn-label">Export</span>
           </MockBtn>
         </div>
@@ -442,12 +453,7 @@ export function PartnerNetzwerkClient({
                 onClick={(e) => e.stopPropagation()}
                 style={{ justifyContent: 'flex-end' }}
               >
-                <ActionsMenu
-                  trigger={
-                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-                      <MockIcon n="dots" size={16} />
-                    </button>
-                  }
+                <MockEntityRowMenu
                   items={listEntityMenuItems(
                     'partner',
                     { name: p.name, email: p.email, telefon: p.telefon },
@@ -466,7 +472,7 @@ export function PartnerNetzwerkClient({
                       deleteLabel: p.name,
                     }
                   )}
-                  sheetTitle="Partner"
+                  title="Partner"
                 />
               </div>
             </div>
@@ -483,18 +489,6 @@ export function PartnerNetzwerkClient({
         onPageChange={(p) => setPageIndex(p - 1)}
       />
 
-      <CsvExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title="Partner exportieren"
-        fields={PARTNER_EXPORT_FIELDS}
-        onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : partners
-          const data = source.map(partnerExportRow)
-          const fields = PARTNER_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
-          exportToCSV(data, fields, 'partner')
-        }}
-      />
     </div>
   )
 }

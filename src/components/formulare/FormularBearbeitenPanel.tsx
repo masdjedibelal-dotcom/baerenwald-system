@@ -366,7 +366,7 @@ export function FormularBearbeitenPanel({
                 + Feld hinzufügen
               </button>
               {addFeldOpen ? (
-                <div className="absolute bottom-full left-0 right-0 z-10 mb-1 rounded-lg border border-bw-border bg-bw-card p-2 shadow-lg">
+                <div className="absolute bottom-full left-0 right-0 z-10 mb-1 rounded-lg border border-bw-border bg-[var(--card)] p-2 shadow-lg">
                   {FELD_TYPEN.map((typ) => (
                     <button
                       key={typ.value}

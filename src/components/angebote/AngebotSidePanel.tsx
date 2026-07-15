@@ -169,7 +169,7 @@ export function AngebotSidePanel({
                 {pos.map((p) => (
                   <div
                     key={p.id}
-                    className="rounded-lg border border-bw-border bg-bw-card p-3 text-sm shadow-card"
+                    className="rounded-lg border border-bw-border bg-[var(--card)] p-3 text-sm shadow-card"
                   >
                     <p className="font-semibold text-bw-text">{p.gewerk_name || 'Gewerk'}</p>
                     <p className="text-bw-text-muted">{p.leistung_name ?? p.leistung}</p>

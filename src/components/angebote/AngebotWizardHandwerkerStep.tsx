@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -169,11 +169,11 @@ export function AngebotWizardHandwerkerStep({
 
   if (!blocks.length) {
     return (
-      <Card title="Handwerker">
+      <MockCard title="Handwerker">
         <p className="text-sm text-bw-text-muted">
           Bitte in Schritt 1 mindestens eine Leistung mit Gewerk erfassen.
         </p>
-      </Card>
+      </MockCard>
     )
   }
 
@@ -182,7 +182,7 @@ export function AngebotWizardHandwerkerStep({
   }
 
   return (
-    <Card title="Handwerker — Angebot / Rechnung einholen">
+    <MockCard title="Handwerker — Angebot / Rechnung einholen">
       <p className="mb-4 text-sm text-bw-text-muted">
         Pro Gewerk Partner auswählen und optional eine Notiz für die Anfrage hinterlegen. Erst nach
         Partner-Einreichung und Bestätigung senden Sie das Angebot an den Kunden.
@@ -199,6 +199,6 @@ export function AngebotWizardHandwerkerStep({
           />
         ))}
       </div>
-    </Card>
+    </MockCard>
   )
 }

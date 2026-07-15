@@ -28,7 +28,7 @@ export function MoreSheet({
       <div className="z-sidepanel fixed inset-0 bg-black/40 md:hidden" onClick={onClose} role="presentation" />
 
       <div
-        className="z-modal fixed bottom-0 left-0 right-0 animate-slide-up rounded-t-2xl bg-bw-card md:hidden"
+        className="z-modal fixed bottom-0 left-0 right-0 animate-slide-up rounded-t-2xl bg-[var(--card)] md:hidden"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
         <div className="flex justify-center pb-2 pt-3">

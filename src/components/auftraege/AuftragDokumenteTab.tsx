@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { FileText, Pencil, Trash2, Upload } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
@@ -29,7 +29,7 @@ import {
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { AuftragDetail, AuftragTimelineEvent } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 
 export type { AuftragDokumentZeile }
 export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
@@ -192,12 +192,7 @@ export function AuftragDokumenteTab({
   }, [detail.auftrag_timeline])
 
   return (
-    <div className="auftrag-dok-panel space-y-3 pb-4">
-      <p className="text-sm text-bw-text-muted">
-        Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise finden
-        Sie im Tab <span className="font-medium text-bw-text">Compliance</span>.
-      </p>
-
+    <>
       <input
         ref={fileRef}
         type="file"
@@ -211,11 +206,7 @@ export function AuftragDokumenteTab({
       />
 
       <div
-        className={cn(
-          'dok-upload-zone',
-          dragOver && 'dok-upload-zone-active',
-          (uploading || pending) && 'pointer-events-none opacity-60'
-        )}
+        onClick={() => fileRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
@@ -226,153 +217,181 @@ export function AuftragDokumenteTab({
           setDragOver(false)
           if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
         }}
-        onClick={() => fileRef.current?.click()}
+        style={{
+          padding: 16,
+          marginBottom: zeilen.length ? 12 : 0,
+          borderRadius: 8,
+          textAlign: 'center',
+          cursor: 'pointer',
+          border: `1px dashed ${dragOver ? 'var(--green)' : 'var(--border-strong)'}`,
+          background: dragOver ? 'var(--green-50)' : 'var(--bg-soft)',
+          color: dragOver ? 'var(--green)' : 'var(--text-3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          fontSize: 12.5,
+          fontWeight: 500,
+          pointerEvents: uploading || pending ? 'none' : undefined,
+          opacity: uploading || pending ? 0.6 : 1,
+        }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click()
         }}
       >
-        <Upload className="mx-auto h-6 w-6 text-bw-text-muted" aria-hidden />
-        <p className="mt-2 text-sm text-bw-text">
-          {uploading
-            ? 'Wird hochgeladen…'
-            : (
-                <>
-                  Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
-                </>
-              )}
-        </p>
-        <p className="mt-1 text-xs text-bw-text-muted">PDF, JPG, PNG · max. 10 MB</p>
+        <MockIcon n="cloud-upload" size={18} />
+        {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
       </div>
 
-      {zeilen.length === 0 ? (
-        <p className="py-6 text-center text-sm text-bw-text-muted">Noch keine Dokumente.</p>
-      ) : (
-        <div className="dok-table-wrap">
-          <table className="dok-table">
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Dateiname</th>
-                <th>Freigabe</th>
-                <th className="text-right w-14" aria-label="PDF öffnen" />
-                <th className="text-right">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zeilen.map((row) => {
-                const ev = row.timelineId ? timelineById.get(row.timelineId) : null
-                const readOnly = row.quelle !== 'timeline' || !row.timelineId
-                const href =
-                  row.storagePath && hwSignedUrls[row.storagePath]
-                    ? hwSignedUrls[row.storagePath]!
-                    : row.href
-                const pdfReady = !row.storagePath || Boolean(hwSignedUrls[row.storagePath])
-                return (
-                  <tr key={row.id}>
-                    <td className="tabular-nums whitespace-nowrap text-bw-text-muted">
-                      {row.datum ? formatDatum(row.datum) : '—'}
-                    </td>
-                    <td className="max-w-[min(100%,20rem)] font-medium text-bw-text">
-                      <span className="line-clamp-2">{row.name}</span>
-                      {row.beschreibung && row.beschreibung !== '—' ? (
-                        <span className="mt-0.5 block truncate text-xs font-normal text-bw-text-muted">
-                          {row.beschreibung}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td>
-                      {readOnly ? (
-        <span className="dok-freigabe-pill dok-freigabe-kunde">
-          {row.fuerKunde
-            ? 'Kunde'
-            : row.quelle === 'vertrag' || row.quelle === 'handwerker'
-              ? 'Partner'
-              : 'Intern'}
-        </span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          <button
-                            type="button"
-                            className={cn(
-                              'dok-freigabe-pill',
-                              row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-inaktiv'
-                            )}
-                            onClick={() => ev && toggleFreigabe(ev, true)}
-                            disabled={pending}
-                          >
-                            Kunde
-                          </button>
-                          <button
-                            type="button"
-                            className={cn(
-                              'dok-freigabe-pill',
-                              !row.fuerKunde ? 'dok-freigabe-intern' : 'dok-freigabe-inaktiv'
-                            )}
-                            onClick={() => ev && toggleFreigabe(ev, false)}
-                            disabled={pending}
-                          >
-                            intern
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      {pdfReady ? (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50"
-                          aria-label={`${row.name} öffnen`}
-                        >
-                          <FileText className="h-4 w-4" aria-hidden />
-                        </a>
-                      ) : (
-                        <span
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-bw-text-muted opacity-50"
-                          aria-hidden
-                        >
-                          <FileText className="h-4 w-4" />
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <div className="inline-flex justify-end gap-1">
-                        {!readOnly ? (
-                          <>
-                            <button
-                              type="button"
-                              className="icon-btn"
-                              title="Bearbeiten"
-                              onClick={() => {
-                                setEditRow(row)
-                                setEditName(row.name)
-                                setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              className="icon-btn text-status-cancel-text"
-                              title="Löschen"
-                              onClick={() => removeRow(row)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {zeilen.length > 0 ? (
+        <div style={{ margin: '0 -16px -14px' }}>
+          <div
+            className="list-row head"
+            style={{ gridTemplateColumns: '28px 1.6fr 1fr 120px 110px 70px' }}
+          >
+            <div />
+            <div>Name</div>
+            <div>Beschreibung</div>
+            <div>Datum</div>
+            <div>Freigabe</div>
+            <div />
+          </div>
+          {zeilen.map((row) => {
+            const ev = row.timelineId ? timelineById.get(row.timelineId) : null
+            const readOnly = row.quelle !== 'timeline' || !row.timelineId
+            const editing = editRow?.id === row.id
+            const href =
+              row.storagePath && hwSignedUrls[row.storagePath]
+                ? hwSignedUrls[row.storagePath]!
+                : row.href
+            const pdfReady = !row.storagePath || Boolean(hwSignedUrls[row.storagePath])
+            return (
+              <div
+                key={row.id}
+                className="list-row"
+                style={{
+                  gridTemplateColumns: '28px 1.6fr 1fr 120px 110px 70px',
+                  cursor: 'default',
+                  alignItems: editing ? 'start' : 'center',
+                }}
+              >
+                <MockIcon n={row.quelle === 'timeline' ? 'photo' : 'file-text'} size={18} style={{ color: 'var(--text-3)' }} />
+                {editing ? (
+                  <input
+                    className="txt"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    style={{ height: 30 }}
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {row.name}
+                  </div>
+                )}
+                {editing ? (
+                  <input
+                    className="txt"
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    placeholder="Beschreibung..."
+                    style={{ height: 30 }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: 'var(--text-3)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {row.beschreibung && row.beschreibung !== '—' ? row.beschreibung : '—'}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {row.datum ? formatDatum(row.datum) : '—'}
+                </div>
+                {readOnly ? (
+                  <span style={{ fontSize: 11.5, color: row.fuerKunde ? 'var(--green)' : 'var(--text-3)' }}>
+                    {row.fuerKunde ? 'Kunde' : 'intern'}
+                  </span>
+                ) : (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      cursor: 'pointer',
+                      fontSize: 11.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={row.fuerKunde}
+                      onChange={(e) => ev && toggleFreigabe(ev, e.target.checked)}
+                      disabled={pending}
+                      style={{ accentColor: 'var(--green)', margin: 0 }}
+                    />
+                    <span style={{ color: row.fuerKunde ? 'var(--green)' : 'var(--text-3)' }}>
+                      {row.fuerKunde ? 'Kunde' : 'intern'}
+                    </span>
+                  </label>
+                )}
+                <div style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}>
+                  {pdfReady && href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn ghost sm icon"
+                      title="Ansehen"
+                      aria-label={`${row.name} öffnen`}
+                    >
+                      <MockIcon n="eye" size={15} />
+                    </a>
+                  ) : null}
+                  {!readOnly ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn ghost sm icon"
+                        title="Bearbeiten"
+                        onClick={() => {
+                          setEditRow(row)
+                          setEditName(row.name)
+                          setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
+                        }}
+                      >
+                        <MockIcon n="pencil" size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost sm icon"
+                        title="Löschen"
+                        onClick={() => removeRow(row)}
+                      >
+                        <MockIcon n="trash" size={15} />
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+      ) : null}
 
       <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Dokument bearbeiten" size="sm">
         <div className="space-y-3">
@@ -388,6 +407,6 @@ export function AuftragDokumenteTab({
           </Button>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }

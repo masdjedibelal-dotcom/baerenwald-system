@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { FirmaBrandingForm } from '@/components/einstellungen/FirmaBrandingForm'
+import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import { loadEinstellungenForm } from '@/app/(dashboard)/einstellungen/actions'
 
 export const metadata: Metadata = {
@@ -11,7 +11,7 @@ export default async function EinstellungenFirmaPage() {
   const initial = await loadEinstellungenForm()
   return (
     <div>
-      <PageHeader description="Erscheint auf PDFs und in der Kundenkommunikation." />
+      <EinstellungenMeta className="mb-4">Erscheint auf PDFs und in der Kundenkommunikation.</EinstellungenMeta>
       <FirmaBrandingForm initial={initial} />
     </div>
   )

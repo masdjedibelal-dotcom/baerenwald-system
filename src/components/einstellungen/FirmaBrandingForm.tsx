@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
@@ -66,7 +67,7 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Card title="Firmeninfo">
+      <MockCard title="Firmeninfo">
         <div className="form-grid-2">
           <Input
             label="Firmenname"
@@ -104,9 +105,9 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             onChange={(e) => set('website', e.target.value)}
           />
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Steuer & Bank">
+      <MockCard title="Steuer & Bank">
         <div className="form-grid-2">
           <Input label="USt-ID" value={v.ust_id} onChange={(e) => set('ust_id', e.target.value)} />
           <Input
@@ -123,9 +124,9 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
           <Input label="BIC" value={v.bic} onChange={(e) => set('bic', e.target.value)} />
           <Input label="Bank" value={v.bank_name} onChange={(e) => set('bank_name', e.target.value)} />
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Angebot — Kosten & Anfahrt">
+      <MockCard title="Angebot — Kosten & Anfahrt">
         <div className="form-grid-2">
           <Input
             label="Anfahrt Pauschale (netto, €)"
@@ -150,9 +151,9 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             hint="Derzeit ohne Wirkung: Bei Kostenart „Allgemein“ gibt es keine automatische Lohn-/Material-Aufteilung mehr. Nur bei expliziter Wahl „Arbeitskosten“ oder „Materialkosten“ (je 100 %)."
           />
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="PDF-Einstellungen">
+      <MockCard title="PDF-Einstellungen">
         <div className="form-grid-2">
           <Input
             label="Zahlungsziel (Tage)"
@@ -211,9 +212,9 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             rows={4}
           />
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Logo">
+      <MockCard title="Logo">
         <div className="space-y-4">
           <input
             ref={fileRef}
@@ -252,12 +253,12 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
             </div>
           )}
         </div>
-      </Card>
+      </MockCard>
 
       <div className="flex justify-end pt-2">
-        <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
+        <MockBtn kind="primary" onClick={() => save()} disabled={pending}>
           Speichern
-        </Button>
+        </MockBtn>
       </div>
     </div>
   )

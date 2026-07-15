@@ -1,6 +1,7 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { KalenderTerminZeile } from '@/components/kalender/KalenderTerminZeile'
 import type { KalenderTermin } from '@/lib/types'
 import { isHeute } from '@/lib/kalender-auslastung'
@@ -19,14 +20,11 @@ export function KalenderHeuteCard({
   const label = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
 
   return (
-    <Card
-      title={`Heute · ${label}`}
-      bodyClassName="p-0"
-    >
+    <MockCard title={`Heute · ${label}`} icon="calendar-event">
       {heute.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-bw-text-muted">Keine Termine für heute.</p>
+        <MockEmpty icon="calendar-event" title="Keine Termine" hint="Heute steht nichts an." />
       ) : (
-        <div className="divide-y divide-bw-border">
+        <div style={{ margin: -14 }}>
           {heute.map((t) => (
             <KalenderTerminZeile
               key={t.id}
@@ -36,6 +34,6 @@ export function KalenderHeuteCard({
           ))}
         </div>
       )}
-    </Card>
+    </MockCard>
   )
 }

@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteKommunikationMailVorlage,
@@ -102,67 +103,67 @@ export function KommunikationVorlagenClient({
 
   return (
     <>
-      <Card
+      <MockCard
         title="Vorlagen"
-        action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={openNew}>
-            <Plus className="h-3.5 w-3.5" aria-hidden />
+        icon="mail"
+        actions={
+          <MockBtn kind="primary" sm icon="plus" onClick={openNew}>
             Neu
-          </Button>
+          </MockBtn>
         }
       >
         {rows.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Noch keine Vorlagen angelegt.</p>
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Noch keine Vorlagen angelegt.</p>
         ) : (
-          <ul className="divide-y divide-bw-border">
+          <div style={{ margin: -14 }}>
+            <div className="list-row head" style={{ gridTemplateColumns: '1fr auto' }}>
+              <div>Vorlage</div>
+              <div />
+            </div>
             {rows.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
-                <div className="min-w-0">
-                  <p className="font-medium text-bw-text">{r.name}</p>
-                  <p className="text-xs text-bw-text-muted">
+              <div
+                key={r.id}
+                className="list-row"
+                style={{ gridTemplateColumns: '1fr auto', alignItems: 'center' }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
                     {KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS.find((o) => o.value === r.kontext_typ)?.label ??
                       r.kontext_typ}
                     {r.betreff ? ` · ${r.betreff}` : ''}
-                  </p>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => openRow(r)}
-                    aria-label="Bearbeiten"
-                  >
-                    <Pencil className="h-4 w-4" />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" className="qa-btn" onClick={() => openRow(r)} aria-label="Bearbeiten">
+                    <MockIcon n="pencil" size={15} />
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm text-red-700"
-                    onClick={() => remove(r.id)}
-                    aria-label="Löschen"
-                  >
-                    <Trash2 className="h-4 w-4" />
+                  <button type="button" className="qa-btn" onClick={() => remove(r.id)} aria-label="Löschen">
+                    <MockIcon n="trash" size={15} />
                   </button>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </Card>
+      </MockCard>
 
-      <Modal
+      <MockModal
         open={editOpen && !!edit}
         onClose={() => setEditOpen(false)}
+        icon="mail"
         title={edit?.id ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
-        size="md"
+        sub="Kommunikation"
         footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
+          <>
+            <MockBtn sm kind="ghost" onClick={() => setEditOpen(false)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={save}>
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn sm kind="primary" icon="check" onClick={save} disabled={pending}>
               Speichern
-            </Button>
-          </div>
+            </MockBtn>
+          </>
         }
       >
         {edit ? (
@@ -196,7 +197,7 @@ export function KommunikationVorlagenClient({
             />
           </div>
         ) : null}
-      </Modal>
+      </MockModal>
     </>
   )
 }

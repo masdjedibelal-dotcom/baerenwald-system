@@ -17,7 +17,7 @@ export function MockKpiRow({ items, className }: { items: MockKpiItem[]; classNa
       {items.map((item) => (
         <div
           key={item.key}
-          className="mock-kpi-card rounded-xl border border-bw-border bg-bw-card px-3 py-2.5 text-left"
+          className="mock-kpi-card rounded-xl border border-bw-border bg-[var(--card)] px-3 py-2.5 text-left"
         >
           <div className="flex items-center gap-1.5 text-xs text-bw-text-muted">
             {item.icon ? <span className="shrink-0 opacity-80">{item.icon}</span> : null}

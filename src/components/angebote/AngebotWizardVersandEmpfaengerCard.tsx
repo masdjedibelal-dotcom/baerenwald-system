@@ -1,7 +1,7 @@
 'use client'
 
 import { Mail } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 
@@ -21,14 +21,7 @@ export function AngebotWizardVersandEmpfaengerCard({
   dokumentLabel?: string
 }) {
   return (
-    <Card
-      title={
-        <>
-          <Mail className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
-          E-Mail-Empfänger
-        </>
-      }
-    >
+    <MockCard title="E-Mail-Empfänger" icon="inbox">
       <p className="mb-3 text-[12.5px] leading-relaxed text-bw-text-muted">
         Prüfen Sie An und CC, bevor Sie das {dokumentLabel} versenden. Weitere Adressen per Eingabe
         und Enter hinzufügen — entfernen per Klick auf das × in der Pille.
@@ -52,6 +45,6 @@ export function AngebotWizardVersandEmpfaengerCard({
           disabled={disabled}
         />
       </div>
-    </Card>
+    </MockCard>
   )
 }

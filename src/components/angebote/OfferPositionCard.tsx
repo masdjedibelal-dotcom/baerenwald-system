@@ -74,7 +74,7 @@ export function OfferPositionCard({
   return (
     <article
       className={cn(
-        'overflow-hidden rounded-xl border border-bw-border bg-bw-card shadow-sm',
+        'overflow-hidden rounded-xl border border-bw-border bg-[var(--card)] shadow-sm',
         'ring-1 ring-black/[0.02]'
       )}
     >

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -28,6 +27,7 @@ import {
   MockDetailShell,
   MockDokumenteCard,
   MockEmpty,
+  MockEntityRowMenu,
   MockIcon,
   MockProp,
   MockUebersichtCard,
@@ -189,15 +189,7 @@ export function PartnerDetailClient({
           </>
         }
         actions={
-          <ActionsMenu
-            trigger={
-              <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-                <MockIcon n="dots" size={18} />
-              </button>
-            }
-            items={partnerMenuItems}
-            sheetTitle="Partner"
-          />
+          <MockEntityRowMenu items={partnerMenuItems} title="Partner" />
         }
       />
 

@@ -20,16 +20,15 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ProjektKette } from '@/components/crm/ProjektKette'
-import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockProjektUebersichtCard } from '@/components/mock-ui'
 import {
   MockDetailShell,
   MockDokumenteCard,
+  MockEntityRowMenu,
   MockVerlaufCard,
 } from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailProp } from '@/components/ui/detail-prop'
-import { LeadNaechsteSchritteCard, buildLeadNaechsteSchritte } from '@/components/anfragen/LeadNaechsteSchritteCard'
 import {
   dedupeKalenderTermineAnzeige,
   normalizeKalenderTermineList,
@@ -41,7 +40,6 @@ import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
 import { Timeline } from '@/components/ui/timeline'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
-import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { KanalBadge } from '@/components/ui/Badge'
@@ -49,22 +47,17 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
-import { LeadOrgKontextBlock } from '@/components/anfragen/LeadOrgKontextBlock'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
-import { PipelineKontextBadge, PortalSyncWarning } from '@/components/anfragen/PipelineKontextBadge'
 import { VorgangResolverBanner } from '@/components/vorgang/VorgangResolverBanner'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { EntityDetailsTab } from '@/components/entity-detail/EntityDetailsTab'
 import { PosBoard } from '@/components/posboard/PosBoard'
+import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
 import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
-import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
@@ -508,33 +501,6 @@ export function AnfrageDetailClient({
     return unique.length > 0
   }, [lead.kalender_termine])
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildLeadNaechsteSchritte({
-        hatTermin,
-        handwerkerErledigt: angebotFlowSnapshot?.handwerkerErledigt ?? false,
-        angebotAnKundeGesendet: angebotFlowSnapshot?.angebotAnKundeGesendet ?? false,
-        angebotHref:
-          angebotFlowSnapshot?.angebotHref ??
-          (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : undefined),
-        onTerminClick: () => setStatusModalKind('termin'),
-        onHandwerkerEinholen: openHandwerkerEinholen,
-        onAngebotAnKunde: openAngebotAnKunde,
-      }),
-    [
-      angeboteListe,
-      hatTermin,
-      angebotFlowSnapshot,
-      openHandwerkerEinholen,
-      openAngebotAnKunde,
-    ]
-  )
-
-  const offeneSchritteCount = useMemo(
-    () => naechsteSchritte.filter((s) => !s.done).length,
-    [naechsteSchritte]
-  )
-
   const detailHeadMenuItems = useMemo(
     () =>
       listEntityMenuItems(
@@ -642,22 +608,6 @@ export function AnfrageDetailClient({
   const projektuebersichtCards = (
     <>
       {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <PipelineKontextBadge lead={lead} />
-        {lead.duplikat_hinweis ? (
-          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">
-            Mögliches Duplikat — ähnliche Meldung kürzlich am gleichen Objekt
-          </span>
-        ) : null}
-      </div>
-      <PortalSyncWarning lead={lead} auftragStatus={dbAuftragStatus} />
-      <CrmPortalOpenButtons
-        kundeId={lead.auftraggeber_kunde_id ?? undefined}
-        leadId={lead.id}
-        showKunde={Boolean(lead.auftraggeber_kunde_id)}
-        showMieter
-      />
-      <LeadOrgKontextBlock lead={lead} objektAkteReadOnly={objektAkteReadOnly} />
       <LeadFunnelProjektAnzeige
         lead={lead}
         gewerke={wizardGewerke}
@@ -666,36 +616,16 @@ export function AnfrageDetailClient({
       />
       {objekteCard}
       {isEchterFreitext(lead.kontakt_nachricht) ? (
-        <Card title="Nachricht vom Kunden">
-          <p className="text-[13px] leading-relaxed text-bw-text-muted">{lead.kontakt_nachricht}</p>
-        </Card>
+        <MockCard title="Nachricht vom Kunden" icon="messages">
+          <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-3)' }}>{lead.kontakt_nachricht}</p>
+        </MockCard>
       ) : null}
     </>
   )
 
-  const stammdatenInhalt = (
-    <div className="space-y-3">
-      {stammdatenCard}
-      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
-      <LeadTermineCard
-        leadId={lead.id}
-        termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
-        notizen={notizenRows}
-        onReload={() => refresh()}
-      />
-    </div>
-  )
+  const stammdatenInhalt = stammdatenCard
 
-  const schritteInhalt = (
-    <LeadNaechsteSchritteCard steps={naechsteSchritte} />
-  )
-
-  const verlaufInhalt = (
-    <div className="space-y-3">
-      {offeneSchritteCount > 0 ? schritteInhalt : null}
-      <MockVerlaufCard>{timelineTab}</MockVerlaufCard>
-    </div>
-  )
+  const verlaufInhalt = <MockVerlaufCard>{timelineTab}</MockVerlaufCard>
 
   const anfrageDetailGroups = [
     {
@@ -710,18 +640,28 @@ export function AnfrageDetailClient({
       icon: 'layers',
       count: posBoardPositionen.length || undefined,
       render: () => (
-        <EntityDetailsTab
-          projektKontext={projektKontext}
-          positionen={posBoardPositionen}
-          overview={projektuebersichtCards}
-        />
+        <div className="space-y-3">
+          <MockProjektUebersichtCard
+            projekt={
+              (Array.isArray(lead.bereiche) ? lead.bereiche.join(', ') : lead.bereiche)?.trim() ||
+              lead.kontakt_name?.trim() ||
+              'Anfrage'
+            }
+            region={lead.plz}
+            preisMin={lead.preis_min}
+            preisMax={lead.preis_max}
+            quelle={lead.kanal}
+          />
+          {projektuebersichtCards}
+          <PosBoard title="Leistungen" positionen={angebotPositionenToPosBoardLines(posBoardPositionen)} />
+        </div>
       ),
     },
     {
       id: 'verlauf',
       label: ENTITY_DETAIL_TAB_LABELS.verlauf,
       icon: 'history',
-      count: (offeneSchritteCount + timelineItems.length) || undefined,
+      count: timelineItems.length || undefined,
       render: () => verlaufInhalt,
     },
     {
@@ -799,26 +739,11 @@ export function AnfrageDetailClient({
                 <span className="hidden sm:inline">Auftrag</span>
               </Link>
             ) : null}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">Mehr</span>
-                </button>
-              }
-              items={detailHeadMenuItems}
-              sheetTitle="Anfrage"
-            />
+            <MockEntityRowMenu items={detailHeadMenuItems} title="Anfrage" />
           </>
         ),
       }}
     >
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {kiAnalyseCard}
 

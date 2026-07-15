@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { Pencil } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -87,12 +88,13 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
 
   return (
     <div className="space-y-4">
-      <Card
+      <MockCard
         title="Team"
-        action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={() => setInviteOpen(true)}>
+        icon="users"
+        actions={
+          <MockBtn kind="primary" sm onClick={() => setInviteOpen(true)}>
             + Einladen
-          </Button>
+          </MockBtn>
         }
       >
         <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Benutzer.' : undefined}>
@@ -164,7 +166,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </EinstellungenListItem>
           ))}
         </EinstellungenListBody>
-      </Card>
+      </MockCard>
 
       <Modal
         open={inviteOpen}

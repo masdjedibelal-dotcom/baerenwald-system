@@ -1,6 +1,7 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { DetailVisual } from '@/components/layout/DetailHead'
 import type { TeamAuslastungEintrag } from '@/lib/kalender-auslastung'
@@ -8,14 +9,14 @@ import type { TeamAuslastungEintrag } from '@/lib/kalender-auslastung'
 export function KalenderTeamAuslastung({ members }: { members: TeamAuslastungEintrag[] }) {
   if (!members.length) {
     return (
-      <Card title="Diese Woche · Auslastung">
-        <p className="text-sm text-bw-text-muted">Keine Teamdaten verfügbar.</p>
-      </Card>
+      <MockCard title="Diese Woche · Auslastung" icon="users">
+        <MockEmpty icon="users" title="Keine Teamdaten" hint="Noch keine Auslastungsdaten verfügbar." />
+      </MockCard>
     )
   }
 
   return (
-    <Card title="Diese Woche · Auslastung">
+    <MockCard title="Diese Woche · Auslastung" icon="users">
       <ul className="space-y-3">
         {members.map((m) => {
           const initials = m.name
@@ -38,6 +39,6 @@ export function KalenderTeamAuslastung({ members }: { members: TeamAuslastungEin
           )
         })}
       </ul>
-    </Card>
+    </MockCard>
   )
 }

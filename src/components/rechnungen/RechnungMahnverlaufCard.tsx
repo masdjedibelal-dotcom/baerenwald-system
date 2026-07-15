@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, Mail } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Timeline, type TimelineItem } from '@/components/ui/timeline'
 import {
@@ -66,7 +66,7 @@ export function RechnungMahnverlaufCard({
         : `Aktuelle Mahnstufe ${aktuelle}`
 
   return (
-    <Card collapsible title="Mahnverlauf" defaultOpen>
+    <MockCard collapsible title="Mahnverlauf" defaultOpen>
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -111,6 +111,6 @@ export function RechnungMahnverlaufCard({
           </div>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 }

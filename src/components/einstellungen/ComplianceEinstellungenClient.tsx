@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Button } from '@/components/ui/Button'
 import { EinstellungenListBody, EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
 import { Input } from '@/components/ui/Input'
@@ -65,12 +66,13 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
 
   return (
     <div className="space-y-4">
-      <Card
+      <MockCard
         title="Compliance-Dokumenttypen"
-        action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={() => setModal(true)}>
+        icon="shield-check"
+        actions={
+          <MockBtn kind="primary" sm onClick={() => setModal(true)}>
             + Neuer Typ
-          </Button>
+          </MockBtn>
         }
       >
         <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Dokumenttypen.' : undefined}>
@@ -210,7 +212,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
             </li>
           ))}
         </EinstellungenListBody>
-      </Card>
+      </MockCard>
 
       <Modal
         open={modal}

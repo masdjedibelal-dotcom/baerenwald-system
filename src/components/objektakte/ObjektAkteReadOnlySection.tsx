@@ -1,7 +1,7 @@
 'use client'
 
 import { ExternalLink, FileText, StickyNote } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
   FREMD_VORGANG_KATEGORIE_LABELS,
@@ -29,7 +29,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
 
   return (
     <div className={className}>
-      <Card
+      <MockCard
         collapsible
         title={
           <>
@@ -142,7 +142,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
             ) : null}
           </div>
         )}
-      </Card>
+      </MockCard>
     </div>
   )
 }

@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { Pencil } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -124,7 +126,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
 
   return (
     <div className="space-y-4">
-      <Card title="System-E-Mails">
+      <MockCard title="System-E-Mails" icon="mail">
         <EinstellungenListBody empty={templates.length === 0 ? 'Keine Templates konfiguriert.' : undefined}>
           {templates.map((t) => (
             <EinstellungenListItem key={t.id}>
@@ -132,14 +134,14 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 <p className="text-[13.5px] font-medium text-bw-text">{t.name}</p>
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
-              <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
+              <MockBtn sm onClick={() => openModal(t)}>
                 <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
                 Bearbeiten
-              </Button>
+              </MockBtn>
             </EinstellungenListItem>
           ))}
         </EinstellungenListBody>
-      </Card>
+      </MockCard>
 
       <Modal
         open={Boolean(open)}

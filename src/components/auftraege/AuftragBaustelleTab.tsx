@@ -1,7 +1,7 @@
 'use client'
 
 import { HardHat } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { AuftragBautagesberichtCard } from '@/components/auftraege/AuftragBautagesberichtCard'
 import { BaustelleTeamCard } from '@/components/auftraege/BaustelleTeamCard'
 import { BaustelleRegiearbeitenCard } from '@/components/auftraege/BaustelleRegiearbeitenCard'
@@ -41,10 +41,10 @@ export function AuftragBaustelleTab({
 }) {
   return (
     <div className="space-y-3">
-      <Card
+      <MockCard
         title="Baustellen-Team"
         bodyClassName="p-4"
-        action={
+        actions={
           team.bauleiter_name?.trim() ? (
             <span className="inline-flex items-center gap-1 text-xs text-bw-text-muted">
               <HardHat className="h-3.5 w-3.5" aria-hidden />
@@ -54,9 +54,9 @@ export function AuftragBaustelleTab({
         }
       >
         <BaustelleTeamCard auftragId={auftragId} team={team} onChanged={onChanged} />
-      </Card>
+      </MockCard>
 
-      <Card title="Tagesberichte" bodyClassName="p-4">
+      <MockCard title="Tagesberichte" bodyClassName="p-4">
         <AuftragBautagesberichtCard
           auftragId={auftragId}
           berichte={bautagesberichte}
@@ -65,31 +65,31 @@ export function AuftragBaustelleTab({
           handwerker={handwerker}
           onChanged={onChanged}
         />
-      </Card>
+      </MockCard>
 
-      <Card title="Regiearbeiten" bodyClassName="p-4">
+      <MockCard title="Regiearbeiten" bodyClassName="p-4">
         <BaustelleRegiearbeitenCard
           auftragId={auftragId}
           regiearbeiten={regiearbeiten}
           onChanged={onChanged}
         />
-      </Card>
+      </MockCard>
 
-      <Card title="Wochenberichte" bodyClassName="p-4">
+      <MockCard title="Wochenberichte" bodyClassName="p-4">
         <BaustelleWochenberichteCard
           auftragId={auftragId}
           wochenberichte={wochenberichte}
           onChanged={onChanged}
         />
-      </Card>
+      </MockCard>
 
-      <Card title="Baustellen-Dokumente" bodyClassName="p-4">
+      <MockCard title="Baustellen-Dokumente" bodyClassName="p-4">
         <BaustelleBerichteDokumenteCard
           auftragId={auftragId}
           dokumente={baustellenDokumente}
           onChanged={onChanged}
         />
-      </Card>
+      </MockCard>
     </div>
   )
 }

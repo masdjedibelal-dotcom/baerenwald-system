@@ -25,7 +25,7 @@ import { AngebotWizardComplete } from '@/components/angebote/AngebotWizardComple
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { WizardShell } from '@/components/layout/WizardShell'
 import { AppFlowScreen } from '@/components/layout/app'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -1126,9 +1126,9 @@ export function AngebotWizard({
 
           {step === 3 ? (
             <div>
-              <Card
+              <MockCard
                 title="Rechnungsempfänger (Stammdaten)"
-                action={
+                actions={
                   leadState.kunden ? (
                     <button
                       type="button"
@@ -1158,7 +1158,7 @@ export function AngebotWizard({
                   />
                   <PropRow label="Anhang" value={pdfName} />
                 </div>
-              </Card>
+              </MockCard>
 
               <div className="mt-4">
                 <AngebotWizardVersandEmpfaengerCard
@@ -1170,12 +1170,12 @@ export function AngebotWizard({
                 />
               </div>
 
-              <Card
+              <MockCard
                 title="Angebots-Vorschau"
                 flush
                 bodyClassName="p-0"
                 className="mt-4"
-                action={
+                actions={
                   <Button
                     type="button"
                     variant="secondary"
@@ -1199,9 +1199,9 @@ export function AngebotWizard({
                     Entwurf wird vorbereitet…
                   </p>
                 )}
-              </Card>
+              </MockCard>
 
-              <Card className="mt-4 border-dashed">
+              <MockCard className="mt-4 border-dashed">
                 <p className="text-sm text-bw-text-muted">
                   {istAuftragKorrektur ? (
                     <>
@@ -1218,7 +1218,7 @@ export function AngebotWizard({
                     </>
                   )}
                 </p>
-              </Card>
+              </MockCard>
             </div>
           ) : null}
         </div>

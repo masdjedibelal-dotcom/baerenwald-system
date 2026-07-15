@@ -73,7 +73,7 @@ export function AuftragDetailKopf({
 
   return (
     <div className="mb-4 space-y-3">
-      <div className="rounded-lg border border-bw-border bg-bw-card p-4">
+      <div className="rounded-lg border border-bw-border bg-[var(--card)] p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-bw-text-muted">
             Aktuelle Phase: <span className="font-semibold text-bw-text">{phaseLabel}</span>
@@ -90,7 +90,7 @@ export function AuftragDetailKopf({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <section className="rounded-lg border border-bw-border bg-bw-card p-4">
+        <section className="rounded-lg border border-bw-border bg-[var(--card)] p-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-bw-text">
             <ArrowRight className="h-4 w-4 text-bw-primary" aria-hidden />
             Nächster Schritt
@@ -115,7 +115,7 @@ export function AuftragDetailKopf({
           </Button>
         </section>
 
-        <section className="rounded-lg border border-bw-border bg-bw-card p-4">
+        <section className="rounded-lg border border-bw-border bg-[var(--card)] p-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-bw-text">
             <Link2 className="h-4 w-4 text-bw-primary" aria-hidden />
             Kunden-Link

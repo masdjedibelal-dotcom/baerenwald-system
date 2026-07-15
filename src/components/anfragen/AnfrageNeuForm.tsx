@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Textarea } from '@/components/ui/Textarea'
 import { createAnfrage, updateAnfrageAusNeuForm } from '@/app/(dashboard)/anfragen/actions'
 import type { LeadDetail, LeadKanal } from '@/lib/types'
@@ -562,7 +562,7 @@ export function AnfrageNeuForm({
 
   const formBody = (
     <div className="space-y-4">
-      <Card title="Kunde & Kontakt">
+      <MockCard title="Kunde & Kontakt">
         <div className="space-y-4">
           {!isBearbeiten ? (
             <KundeAuswahlFeld
@@ -724,9 +724,9 @@ export function AnfrageNeuForm({
             </select>
           </Field>
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Vorhaben">
+      <MockCard title="Vorhaben">
         <div className="space-y-5">
           <div>
             <p className="form-field-label mb-2">Was planst du?</p>
@@ -789,10 +789,10 @@ export function AnfrageNeuForm({
             </span>
           </label>
         </div>
-      </Card>
+      </MockCard>
 
       {showDetails ? (
-        <Card title="Details">
+        <MockCard title="Details">
           <div className="space-y-4">
             {bereiche.flatMap((bereich) => {
               const keys = fachdetailKeysForBereich(bereich, situation)
@@ -942,10 +942,10 @@ export function AnfrageNeuForm({
                 )
               })}
           </div>
-        </Card>
+        </MockCard>
       ) : null}
 
-      <Card title="Zeitraum & Preis">
+      <MockCard title="Zeitraum & Preis">
         <div className="space-y-4">
           <Field label="Wann soll es losgehen?">
             <select
@@ -994,9 +994,9 @@ export function AnfrageNeuForm({
             </div>
           </Field>
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Notizen">
+      <MockCard title="Notizen">
         <div className="space-y-4">
           <Field label="Anmerkungen vom Kunden">
             <Textarea
@@ -1017,7 +1017,7 @@ export function AnfrageNeuForm({
             />
           </Field>
         </div>
-      </Card>
+      </MockCard>
 
       {!isBearbeiten ? (
         <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
@@ -1070,7 +1070,7 @@ export function AnfrageNeuForm({
       {showFooter ? (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-end gap-2 border-t border-bw-border bg-bw-card pt-4',
+            'flex shrink-0 items-center justify-end gap-2 border-t border-bw-border bg-[var(--card)] pt-4',
             isModal ? 'sticky bottom-0 z-10 -mx-6 mt-2 px-6 pb-4' : 'mt-2'
           )}
           style={

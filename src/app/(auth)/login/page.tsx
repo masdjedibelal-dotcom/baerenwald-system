@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import {
   requestCrmPasswordReset,
@@ -110,7 +110,7 @@ function LoginPageContent() {
           <p className="mt-1 text-sm text-bw-light">München — nur für Team-Zugänge</p>
         </div>
 
-        <Card>
+        <MockCard>
           <div className="space-y-4">
             {mode === 'login' ? (
               <>
@@ -215,7 +215,7 @@ function LoginPageContent() {
                   : 'Reset-Link senden'}
             </button>
           </div>
-        </Card>
+        </MockCard>
 
         <p className="mt-4 text-center text-xs text-bw-text-muted">
           MeinBärenwald / Partner-Portal:{' '}

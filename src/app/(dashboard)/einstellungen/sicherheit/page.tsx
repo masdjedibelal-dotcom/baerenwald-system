@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { EinstellungenSicherheitClient } from '@/components/einstellungen/EinstellungenSicherheitClient'
+import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 
 export const metadata: Metadata = {
   title: 'Sicherheit & DSGVO',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function EinstellungenSicherheitPage() {
   return (
     <div>
-      <PageHeader description="Datenschutz, Rollen und revisionssichere Aufbewahrung." />
+      <EinstellungenMeta className="mb-4">Datenschutz, Rollen und revisionssichere Aufbewahrung.</EinstellungenMeta>
       <EinstellungenSicherheitClient />
     </div>
   )

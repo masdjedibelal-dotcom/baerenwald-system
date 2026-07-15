@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight, Download, FileText, Save, X } from 'lucide-react'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -400,7 +400,7 @@ export function ProjektVertragWizard({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner max-w-3xl">
         {step === 1 ? (
-          <Card title={nachtragMode ? 'Partner & Bezug' : acceptMode ? 'Partner & Gewerk (übernommen)' : 'Partner & Gewerk'}>
+          <MockCard title={nachtragMode ? 'Partner & Bezug' : acceptMode ? 'Partner & Gewerk (übernommen)' : 'Partner & Gewerk'}>
             <div className="space-y-4">
               {nachtragMode ? (
                 <div className="rounded-lg border border-bw-border bg-bw-primary/5 p-3 text-sm">
@@ -463,21 +463,21 @@ export function ProjektVertragWizard({
                 </div>
               ) : null}
             </div>
-          </Card>
+          </MockCard>
         ) : null}
 
         {step === 2 ? (
           <div className="space-y-4">
             {nachtragMode ? (
-              <Card title="Leistungspositionen (Nachtrag)">
+              <MockCard title="Leistungspositionen (Nachtrag)">
                 <NachtragPositionenEditor
                   positionen={meta.nachtrag_positionen ?? []}
                   gewerkName={meta.gewerk_name}
                   onChange={applyNachtragPositionen}
                 />
-              </Card>
+              </MockCard>
             ) : null}
-            <Card title={nachtragMode ? 'Vertragstext' : 'Bauvorhaben & Leistung'}>
+            <MockCard title={nachtragMode ? 'Vertragstext' : 'Bauvorhaben & Leistung'}>
               <div className="space-y-4">
                 <Input
                   label="Bauvorhaben"
@@ -503,9 +503,9 @@ export function ProjektVertragWizard({
                   </div>
                 ) : null}
               </div>
-            </Card>
+            </MockCard>
             {!nachtragMode ? (
-            <Card title="Vertragskonditionen">
+            <MockCard title="Vertragskonditionen">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="Regiesatz netto (€/h)"
@@ -558,13 +558,13 @@ export function ProjektVertragWizard({
                   onChange={(e) => setMeta((m) => ({ ...m, notizen: e.target.value }))}
                 />
               </div>
-            </Card>
+            </MockCard>
             ) : null}
           </div>
         ) : null}
 
         {unterlagenStep != null && step === unterlagenStep ? (
-          <Card title="Unterlagen für den Partner">
+          <MockCard title="Unterlagen für den Partner">
             <div className="space-y-4">
               <p className="text-sm text-bw-text-muted">
                 Wähle aus dem Leistungs-Pool, welche Unterlagen der Handwerker für diesen Auftrag
@@ -622,11 +622,11 @@ export function ProjektVertragWizard({
                 Vertrag und Checkliste als To-do im Partner-Portal.
               </p>
             </div>
-          </Card>
+          </MockCard>
         ) : null}
 
         {step === pdfStep ? (
-          <Card title={acceptMode ? 'Vertrag senden' : nachtragMode ? 'Ergänzung als PDF' : 'PDF erzeugen'}>
+          <MockCard title={acceptMode ? 'Vertrag senden' : nachtragMode ? 'Ergänzung als PDF' : 'PDF erzeugen'}>
             <div className="space-y-4 text-sm">
               <p className="text-bw-text-muted">
                 {acceptMode
@@ -695,7 +695,7 @@ export function ProjektVertragWizard({
                 </div>
               ) : null}
             </div>
-          </Card>
+          </MockCard>
         ) : null}
       </div>
     </AppFlowScreen>

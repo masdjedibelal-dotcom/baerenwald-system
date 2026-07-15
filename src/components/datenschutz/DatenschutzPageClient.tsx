@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import type {
@@ -287,7 +287,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-ink">Aufbewahrungsfristen</h2>
         </div>
-        <Card className="overflow-x-auto p-0">
+        <MockCard className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-canvas text-muted">
@@ -328,7 +328,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               ))}
             </tbody>
           </table>
-        </Card>
+        </MockCard>
       </section>
       ) : null}
 
@@ -384,7 +384,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
             Löschprotokoll exportieren (CSV)
           </a>
         </div>
-        <Card className="max-h-[360px] overflow-auto p-0">
+        <MockCard className="max-h-[360px] overflow-auto p-0">
           <table className="w-full min-w-[560px] border-collapse text-left text-xs">
             <thead className="sticky top-0 bg-canvas">
               <tr className="border-b border-border text-muted">
@@ -407,7 +407,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               ))}
             </tbody>
           </table>
-        </Card>
+        </MockCard>
       </section>
       ) : null}
 
@@ -420,7 +420,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
           </Button>
         </div>
 
-        <Card className="p-4">
+        <MockCard className="p-4">
           <h3 className="mb-2 text-sm font-semibold text-ink">Mieter-Meldungen suchen (melder_email)</h3>
           <p className="mb-3 text-xs text-muted">
             Kanäle hv_melder_link und hv_einladung. Bei Auskunft/Löschung primär Hausverwaltung einbinden.
@@ -462,7 +462,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               </ul>
             )
           ) : null}
-        </Card>
+        </MockCard>
 
         {offeneAnfragen.map((a) => {
           const t = tageSeit(a.created_at)
@@ -529,7 +529,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
         ) : (
           <div className="space-y-4">
             {vvt.map((e) => (
-              <Card key={e.id} className="p-4">
+              <MockCard key={e.id} className="p-4">
                 <h3 className="font-semibold text-ink">{e.titel}</h3>
                 <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                   <div className="sm:col-span-2">
@@ -565,7 +565,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
                     <dd>{e.toms ?? '—'}</dd>
                   </div>
                 </dl>
-              </Card>
+              </MockCard>
             ))}
           </div>
         )}
@@ -576,7 +576,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
       <section>
         <h2 className="mb-1 text-lg font-semibold text-ink">AVV-Register — Unterauftragsverarbeiter</h2>
         <p className="mb-3 text-sm text-muted">Manuell pflegen; mit Anwalt und AVV-Anlage abstimmen.</p>
-        <Card className="overflow-x-auto p-0">
+        <MockCard className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-canvas text-muted">
@@ -597,7 +597,7 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               ))}
             </tbody>
           </table>
-        </Card>
+        </MockCard>
       </section>
       ) : null}
 

@@ -84,7 +84,7 @@ export function AuftragKundenUpdatePanel({
   }
 
   return (
-    <section className="mb-8 rounded-lg border border-bw-border bg-bw-card p-4">
+    <section className="mb-8 rounded-lg border border-bw-border bg-[var(--card)] p-4">
       <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
         <Send className="h-4 w-4 text-bw-primary" aria-hidden />
         Kunden-Update erstellen

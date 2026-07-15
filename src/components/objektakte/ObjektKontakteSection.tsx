@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { Mail, Pencil, Phone, Plus, Trash2, UserRound } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -135,14 +135,14 @@ export function ObjektKontakteSection({
 
   return (
     <>
-      <Card
+      <MockCard
         collapsible
         title={
           <>
             <UserRound className="inline h-4 w-4 text-bw-primary" aria-hidden /> Kontakte vor Ort
           </>
         }
-        action={
+        actions={
           <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={openNeu}>
             <Plus className="h-3.5 w-3.5" aria-hidden />
             Hinzufügen
@@ -204,7 +204,7 @@ export function ObjektKontakteSection({
             ))}
           </ul>
         )}
-      </Card>
+      </MockCard>
 
       <Modal
         open={modalOpen}

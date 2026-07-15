@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { IconText } from '@/components/ui/IconText'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Modal } from '@/components/ui/Modal'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import type { AuftragDetail, AngebotPosition } from '@/lib/types'
@@ -185,7 +185,7 @@ export function AuftragNachtragBaustoppSection({
               const summe = formatPreis(undefined, n.gesamt_min, n.gesamt_max)
 
               return (
-                <Card key={n.id} className="space-y-3 p-4 text-sm">
+                <MockCard key={n.id} className="space-y-3 p-4 text-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-ink">{n.grund}</p>
@@ -354,7 +354,7 @@ export function AuftragNachtragBaustoppSection({
                       </Button>
                     </div>
                   )}
-                </Card>
+                </MockCard>
               )
             })}
           </ul>

@@ -7,7 +7,6 @@ import { MockModal } from '@/components/mock-ui/MockModal'
 import { PositionModal } from '@/components/posboard/PositionModal'
 import {
   PosTable,
-  posTableMenuIcon,
   type PosTableBadge,
   type PosTableGroup,
 } from '@/components/posboard/PosTable'
@@ -17,7 +16,7 @@ import {
   posBoardLineNetto,
   type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -48,8 +47,8 @@ export type PosBoardProps = {
   itemExtraActions?: (
     group: PosTableGroup,
     item: { id: string }
-  ) => ActionsMenuItem[]
-  groupExtraActions?: (group: PosTableGroup) => ActionsMenuItem[]
+  ) => EntityMenuItem[]
+  groupExtraActions?: (group: PosTableGroup) => EntityMenuItem[]
   selectable?: boolean
   bulkActions?: (selected: PosBoardLine[], clearSel: () => void) => PosBoardBulkAction[]
   hideAddGewerk?: boolean
@@ -226,22 +225,22 @@ export function PosBoard({
 
   const itemActions = editable
     ? (g: PosTableGroup, it: { id: string }) => {
-        const items: ActionsMenuItem[] = [
+        const items: EntityMenuItem[] = [
           {
             label: 'Bearbeiten',
-            icon: posTableMenuIcon('pencil'),
+            icon: 'pencil',
             onClick: () => setEditId(it.id),
           },
           {
             label: 'Kopieren',
-            icon: posTableMenuIcon('copy'),
+            icon: 'copy',
             onClick: () => dup(it.id),
           },
           ...(itemExtraActions?.(g, it) ?? []),
           'sep',
           {
             label: 'Löschen',
-            icon: posTableMenuIcon('trash'),
+            icon: 'trash',
             danger: true,
             onClick: () => remove(it.id),
           },
@@ -252,15 +251,15 @@ export function PosBoard({
 
   const groupActions = editable
     ? (g: PosTableGroup) => {
-        const items: ActionsMenuItem[] = [
+        const items: EntityMenuItem[] = [
           {
             label: 'Position hinzufügen',
-            icon: posTableMenuIcon('plus'),
+            icon: 'plus',
             onClick: () => add(g.gewerk),
           },
           {
             label: 'Gewerk bearbeiten',
-            icon: posTableMenuIcon('pencil'),
+            icon: 'pencil',
             onClick: () => {
               setGEdit(g.gewerk)
               setGName(g.gewerk)
@@ -268,14 +267,14 @@ export function PosBoard({
           },
           {
             label: 'Gewerk kopieren',
-            icon: posTableMenuIcon('copy'),
+            icon: 'copy',
             onClick: () => copyGewerk(g.gewerk),
           },
           ...(groupExtraActions?.(g) ?? []),
           'sep',
           {
             label: 'Gewerk löschen',
-            icon: posTableMenuIcon('trash'),
+            icon: 'trash',
             danger: true,
             onClick: () => deleteGewerk(g.gewerk),
           },

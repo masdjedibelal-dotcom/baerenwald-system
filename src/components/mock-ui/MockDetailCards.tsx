@@ -17,9 +17,18 @@ export function MockVerlaufCard({ children, empty }: { children: ReactNode; empt
   )
 }
 
-export function MockDokumenteCard({ children, empty }: { children: ReactNode; empty?: boolean }) {
+export function MockDokumenteCard({
+  children,
+  empty,
+  count,
+}: {
+  children: ReactNode
+  empty?: boolean
+  count?: number
+}) {
+  const title = count != null ? `Dokumente · ${count}` : 'Dokumente'
   return (
-    <MockCard title="Dokumente" icon="files">
+    <MockCard title={title} icon="files">
       {empty ? (
         <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien und Fotos erscheinen hier" />
       ) : (

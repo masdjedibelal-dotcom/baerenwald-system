@@ -59,7 +59,7 @@ export function FormSheet({
         aria-modal="true"
         aria-labelledby="form-sheet-title"
         className={cn(
-          'form-sheet flex max-h-[92vh] w-full flex-col bg-bw-card shadow-[-8px_0_30px_-10px_rgba(20,24,31,0.18)]',
+          'form-sheet flex max-h-[92vh] w-full flex-col bg-[var(--card)] shadow-[-8px_0_30px_-10px_rgba(20,24,31,0.18)]',
           'animate-slide-up rounded-t-2xl md:max-h-none md:h-full md:animate-slide-right md:rounded-none',
           widthClass
         )}
@@ -97,7 +97,7 @@ export function FormSheet({
         </div>
 
         {footer ? (
-          <footer className="flex min-h-[44px] shrink-0 items-center gap-2 border-t border-bw-border bg-bw-card px-4 py-3">
+          <footer className="flex min-h-[44px] shrink-0 items-center gap-2 border-t border-bw-border bg-[var(--card)] px-4 py-3">
             {footer}
           </footer>
         ) : null}

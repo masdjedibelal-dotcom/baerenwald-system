@@ -1,4 +1,4 @@
-import type { StatDelta } from '@/components/dashboard/StatCard'
+import type { StatDelta } from '@/lib/stat-delta'
 
 /** Trend-Text für Vergleich zweier Zählwerte (z. B. heute vs. gestern). */
 export function deltaVsPrevious(

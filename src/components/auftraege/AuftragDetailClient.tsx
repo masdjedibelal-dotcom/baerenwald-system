@@ -6,43 +6,32 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   Mail,
-  MapPin,
-  MoreHorizontal,
   FileCheck,
-  Pencil,
-  UserPlus,
 } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { ProjektKette } from '@/components/crm/ProjektKette'
-import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import {
-  MockBautagebuchCard,
   MockDetailShell,
   MockDokumenteCard,
   MockNotizenCard,
   MockNotizComposer,
+  MockProjektUebersichtCard,
   MockVerlaufCard,
-  MockZahlplanCard,
 } from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
-import { listEntityMenuItems } from '@/lib/list-entity-menu'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
-import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
+import { MockEntityRowMenu } from '@/components/mock-ui'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
-import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
 import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
+import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
@@ -59,13 +48,11 @@ import {
 } from '@/app/(dashboard)/auftraege/actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
-import { PortalSyncWarning } from '@/components/anfragen/PipelineKontextBadge'
-import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
-import { auftragStatusDisplay, auftragTypDisplay } from '@/lib/status/status-display'
+import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
@@ -74,11 +61,13 @@ import { auftragPositionenToPosBoardLines } from '@/lib/posboard/position-adapte
 import { handwerkerAntwortAnzeige } from '@/lib/auftraege/partner-vorgang-display'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import type {
+  AngebotHandwerkerRow,
   AuftragDetail,
   AuftragPosition,
   FormularTemplate,
   Gewerk,
   Lead,
+  LeadDetail,
   LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
@@ -110,8 +99,8 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
-import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
-import type { AngebotHandwerkerRow, LeadDetail } from '@/lib/types'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { formatDatum } from '@/lib/utils'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 
@@ -131,6 +120,9 @@ type AuftragLeadSnapshot = Pick<
   Lead,
   | 'id'
   | 'plz'
+  | 'kanal'
+  | 'preis_min'
+  | 'preis_max'
   | 'kontakt_name'
   | 'kontakt_email'
   | 'kontakt_telefon'
@@ -411,6 +403,7 @@ export function AuftragDetailClient({
 
   const kunde = detail.kunden
   const name = kunde?.name ?? 'Auftrag'
+  const kundeTelefon = lead?.kontakt_telefon?.trim() || kunde?.telefon?.trim() || ''
   const posCount = detail.auftrag_positionen?.length ?? 0
   const kundeAdresse = useMemo(() => {
     const str = [kunde?.strasse, kunde?.hausnummer].filter(Boolean).join(' ').trim()
@@ -431,7 +424,6 @@ export function AuftragDetailClient({
   )
 
   const auftragStatus = useMemo(() => auftragStatusDisplay(detail.status), [detail.status])
-  const auftragTyp = useMemo(() => auftragTypDisplay(istBauprojekt), [istBauprojekt])
 
   const projektName = auftragTitel(detail)
   const { backHref, backLabel } = vorgangBackNav('auftrag')
@@ -529,36 +521,28 @@ export function AuftragDetailClient({
       }
       headerAction={
         canAssignHandwerker ? (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-md border border-bw-border px-2.5 py-1 text-[11px] font-medium text-bw-primary hover:bg-bw-hover"
-            onClick={() =>
-              openHandwerkerZuweisung((detail.auftrag_positionen ?? []).map((p) => p.id))
-            }
-          >
-            <UserPlus className="h-3.5 w-3.5" aria-hidden />
+          <MockBtn sm kind="ghost" icon="user-plus" onClick={() => openHandwerkerZuweisung((detail.auftrag_positionen ?? []).map((p) => p.id))}>
             Handwerker zuweisen
-          </button>
+          </MockBtn>
         ) : null
       }
     />
   )
 
-  const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
-  const headMeta = useMemo(() => {
-    const ort = detail.kunden?.ort?.trim() || ''
-    const plz = detail.kunden?.plz?.trim() || ''
-    const region = [plz, ort].filter(Boolean).join(' ')
-    return (
-      <DetailMetaRow>
-        {detail.kunden?.name ? <DetailMetaChip>{detail.kunden.name}</DetailMetaChip> : null}
-        {region ? <DetailMetaChip icon={MapPin}>{region}</DetailMetaChip> : null}
-        <DetailMetaChip className="font-mono text-[11px]">
-          AUF-{detail.id.slice(0, 8).toUpperCase()}
-        </DetailMetaChip>
-      </DetailMetaRow>
-    )
-  }, [detail])
+  const headMeta = useMemo(
+    () => (
+      <span>
+        {projektName}
+        {detail.created_at ? (
+          <>
+            {' '}
+            · erstellt {formatDatum(detail.created_at)}
+          </>
+        ) : null}
+      </span>
+    ),
+    [projektName, detail.created_at]
+  )
 
   const filteredTemplates = formModal
     ? templates.filter(
@@ -805,111 +789,41 @@ export function AuftragDetailClient({
     return raw?.angebot_handwerker ?? []
   }, [detail.angebote])
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildAuftragNaechsteSchritte({
-        status: detail.status,
-        auftragId: detail.id,
-        angebotId: detail.angebot_id,
-        hatAbnahme,
-        hatRechnung,
-        positionen: detail.auftrag_positionen ?? [],
-        auftragHandwerkerCount: detail.auftrag_handwerker?.length ?? 0,
-        angebotHandwerker,
-        bautagebuchCount: detail.auftrag_bautagebuch?.length ?? 0,
-        onHandwerkerZuweisen: () => setMainTab('details'),
-        onBautagebuch: () => setMainTab('bautagebuch'),
-        onHwAngebot: detail.angebot_id
-          ? () => router.push(`/angebote/${detail.angebot_id}`)
-          : undefined,
-        onAbschluss: openAbschluss,
-        onRechnung: openRechnungErstellen,
-        offeneMaengelCount,
-        onMaengel: () => router.push(`/auftraege/${detail.id}/abnahme/maengel`),
-      }),
-    [
-      detail.status,
-      detail.id,
-      detail.angebot_id,
-      detail.auftrag_positionen,
-      detail.auftrag_handwerker,
-      detail.auftrag_bautagebuch,
-      hatAbnahme,
-      hatRechnung,
-      angebotHandwerker,
-      offeneMaengelCount,
-      openAbschluss,
-      openRechnungErstellen,
-      router,
-    ]
-  )
+  const projektRegion = useMemo(() => {
+    const plz = lead?.plz?.trim() || detail.kunden?.plz?.trim() || ''
+    const ort =
+      (lead?.funnel_daten as { ort?: string } | null | undefined)?.ort?.trim() ||
+      detail.kunden?.ort?.trim() ||
+      ''
+    const area = detail.kunden?.ort?.trim() || ''
+    return [area || ort, plz].filter(Boolean).join(' · ') || null
+  }, [lead, detail.kunden])
 
-  const offeneSchritteCount = useMemo(
-    () => naechsteSchritte.filter((s) => !s.done).length,
-    [naechsteSchritte]
-  )
-
-  const stammdatenInhalt = (
-    <div className="space-y-3">
-      <KundenStammdatenCard
-        kunde={kunde}
-        fallback={
-          lead
-            ? {
-                plz: lead.plz,
-                kontakt_name: lead.kontakt_name,
-                kontakt_email: lead.kontakt_email,
-                kontakt_telefon: lead.kontakt_telefon,
-                funnel_daten: lead.funnel_daten,
-              }
-            : null
-        }
-        action={
-          kunde ? (
-            <button
-              type="button"
-              onClick={() => setStammdatenModalOpen(true)}
-              className="btn btn-ghost btn-sm"
-              aria-label="Stammdaten bearbeiten"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          ) : null
-        }
-      />
-      <AuftragDetailTopCards detail={detail} team={team} />
-      <KommunikationCard
-        filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
-        reloadKey={mailCompose.reloadKey + generation}
-        toolbar={
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))}
-          >
-            <Mail className="h-3.5 w-3.5" aria-hidden />
-            E-Mail schreiben
-          </Button>
-        }
-      />
-    </div>
-  )
+  const stammdatenInhalt = <AuftragDetailTopCards detail={detail} team={team} />
 
   const detailsInhalt = (
-    <div className="space-y-4">
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+    <div className="space-y-3">
+      <MockProjektUebersichtCard
+        projekt={projektName}
+        region={projektRegion}
+        preisMin={lead?.preis_min ?? null}
+        preisMax={lead?.preis_max ?? null}
+        quelle={
+          (lead?.funnel_daten as { quelle?: string } | null | undefined)?.quelle?.trim() ||
+          lead?.kanal?.trim() ||
+          null
+        }
+        startDatum={detail.start_datum}
+        endDatum={detail.end_datum}
+        fortschritt={detail.fortschritt ?? null}
+      />
       {leistungenPosBoard}
     </div>
   )
 
   const verlaufInhalt = (
     <MockVerlaufCard>
-      <div className="space-y-4">
-        <NaechsteSchritteCard steps={naechsteSchritte} />
-        <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
-      </div>
+      <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
     </MockVerlaufCard>
   )
 
@@ -963,20 +877,19 @@ export function AuftragDetailClient({
       zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
       gesamtNetto={auftragNettoSumme}
       rechnungen={rechnungenListe}
+      onCreateInvoice={openRechnungErstellen}
     />
   )
 
   const bautagebuchInhalt = (
-    <Card id="auftrag-bautagebuch" title="Bautagebuch" className="scroll-mt-24" bodyClassName="p-4">
-      <AuftragBautagebuchCard
-        auftragId={detail.id}
-        eintraege={detail.auftrag_bautagebuch ?? []}
-        kundeName={name}
-        positionen={detail.auftrag_positionen ?? []}
-        gewerke={gewerke}
-        onChanged={() => refresh()}
-      />
-    </Card>
+    <AuftragBautagebuchCard
+      auftragId={detail.id}
+      eintraege={detail.auftrag_bautagebuch ?? []}
+      kundeName={name}
+      positionen={detail.auftrag_positionen ?? []}
+      gewerke={gewerke}
+      onChanged={() => refresh()}
+    />
   )
 
   const auftragDetailGroups = [
@@ -994,10 +907,23 @@ export function AuftragDetailClient({
       render: () => detailsInhalt,
     },
     {
+      id: 'zahlplan',
+      label: ENTITY_DETAIL_TAB_LABELS.zahlplan,
+      icon: 'calculator',
+      render: () => zahlplanInhalt,
+    },
+    {
+      id: 'bautagebuch',
+      label: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
+      icon: 'clipboard-list',
+      count: detail.auftrag_bautagebuch?.length || undefined,
+      render: () => bautagebuchInhalt,
+    },
+    {
       id: 'verlauf',
       label: ENTITY_DETAIL_TAB_LABELS.verlauf,
       icon: 'history',
-      count: (timelineCount + offeneSchritteCount) || undefined,
+      count: timelineCount || undefined,
       render: () => verlaufInhalt,
     },
     {
@@ -1006,7 +932,7 @@ export function AuftragDetailClient({
       icon: 'files',
       count: dokumenteCount || undefined,
       render: () => (
-        <MockDokumenteCard>
+        <MockDokumenteCard count={dokumenteCount || undefined}>
           <AuftragDokumenteTab
             detail={detail}
             rechnungen={rechnungenListe}
@@ -1023,19 +949,6 @@ export function AuftragDetailClient({
       count: auftragNotizen.trim() ? 1 : undefined,
       render: () => notizenInhalt,
     },
-    {
-      id: 'zahlplan',
-      label: ENTITY_DETAIL_TAB_LABELS.zahlplan,
-      icon: 'calculator',
-      render: () => <MockZahlplanCard>{zahlplanInhalt}</MockZahlplanCard>,
-    },
-    {
-      id: 'bautagebuch',
-      label: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
-      icon: 'clipboard-list',
-      count: detail.auftrag_bautagebuch?.length || undefined,
-      render: () => <MockBautagebuchCard>{bautagebuchInhalt}</MockBautagebuchCard>,
-    },
   ]
 
   return (
@@ -1047,21 +960,8 @@ export function AuftragDetailClient({
       head={{
         backHref,
         backLabel,
-        title: projektName,
-        badges: (
-          <>
-            <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />
-            <StatusBadge
-              variant={auftragTyp.variant}
-              label={auftragTyp.label}
-              title={
-                istBauprojekt
-                  ? 'Bauprojekt: Bautagebuch und erweiterte Baufunktionen'
-                  : 'Standardauftrag ohne Bau-Checkliste'
-              }
-            />
-          </>
-        ),
+        title: name,
+        badges: <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />,
         meta: headMeta,
         actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
@@ -1084,58 +984,11 @@ export function AuftragDetailClient({
                 Auftrag abschließen
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5"
-              onClick={() => {
-                setProjektIstBauprojekt(
-                  detail.ist_bauprojekt === true
-                    ? true
-                    : detail.ist_bauprojekt === false
-                      ? false
-                      : istBauprojekt
-                )
-                setProjektModal(true)
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden />
-              <span className="hidden sm:inline">Bearbeiten</span>
-            </button>
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">Mehr</span>
-                </button>
-              }
-              items={aktionenMenuItems}
-              sheetTitle="Auftrag"
-            />
+            <MockEntityRowMenu items={aktionenMenuItems} title="Auftrag" />
           </div>
         ),
       }}
     >
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
-
-      {hvMeldungLeadId ? (
-        <p className="mb-3 text-sm text-bw-text-muted">
-          Zugehörige HV-Meldung:{' '}
-          <Link href={`/anfragen/${hvMeldungLeadId}`} className="text-bw-link hover:underline">
-            {hvMeldungLabel ?? 'Zur Meldung'}
-          </Link>
-        </p>
-      ) : null}
-
-      {lead ? (
-        <div className="mb-3">
-          <PortalSyncWarning lead={lead} auftragStatus={detail.status} />
-        </div>
-      ) : null}
 
       {err ? (
         <p className="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">

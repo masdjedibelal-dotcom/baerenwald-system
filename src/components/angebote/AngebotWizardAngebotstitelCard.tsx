@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { cn } from '@/lib/utils'
 
@@ -58,20 +58,13 @@ export function AngebotWizardAngebotstitelCard({
   )
 
   return (
-    <Card
-      title={
-        <>
-          <FileText className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
-          Angebotstitel
-        </>
-      }
-    >
+    <MockCard title="Angebotstitel" icon="file-invoice">
       <MobileEditableBlock sheetTitle="Angebotstitel" overview={overview} disabled={disabled}>
         {editForm}
       </MobileEditableBlock>
       <p className="mt-2 hidden text-[11px] text-bw-text-muted md:block">
         Interner Titel für Versand und Übersicht — erscheint im Betreff der Kunden-Mail.
       </p>
-    </Card>
+    </MockCard>
   )
 }

@@ -160,7 +160,7 @@ export function ZahlungserinnerungMailModal({
                     'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
                     stufe === s
                       ? 'border-bw-primary bg-bw-primary/10 text-bw-primary'
-                      : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover/60'
+                      : 'border-bw-border bg-[var(--card)] text-bw-text hover:bg-bw-hover/60'
                   )}
                   onClick={() => setStufe(s)}
                 >

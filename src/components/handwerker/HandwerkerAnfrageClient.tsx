@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import {
@@ -224,7 +224,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
         </div>
       ) : null}
 
-      <Card className="mb-6 space-y-2 p-4">
+      <MockCard className="mb-6 space-y-2 p-4">
         <p className="text-xs font-medium uppercase text-muted">Gewerk</p>
         <p className="text-lg font-bold text-ink">{data.gewerk_name}</p>
         <p className="text-sm text-muted">
@@ -236,7 +236,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
         {data.geplanter_start ? (
           <p className="text-sm text-muted">Geplanter Start: {formatDatum(data.geplanter_start)}</p>
         ) : null}
-      </Card>
+      </MockCard>
 
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-ink">
@@ -275,7 +275,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
         </ul>
       </section>
 
-      <Card className="mb-8 space-y-2 p-4 text-sm">
+      <MockCard className="mb-8 space-y-2 p-4 text-sm">
         <p className="font-semibold text-ink">Bei Fragen</p>
         {data.kontakt_telefon ? (
           <p>
@@ -289,7 +289,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
             {data.kontakt_email}
           </a>
         </p>
-      </Card>
+      </MockCard>
 
       <div className="flex flex-col gap-3">
         <Button

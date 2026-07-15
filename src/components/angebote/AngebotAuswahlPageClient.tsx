@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic'
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AppListScreen } from '@/components/layout/app'
 import {
   AngebotAuswahlPanel,
   type AngebotAuswahlZeile,
@@ -52,7 +51,7 @@ export function AngebotAuswahlPageClient({
   }, [])
 
   return (
-    <AppListScreen>
+    <>
       <div className="px-1 pb-6">
         <AngebotAuswahlPanel
           variant="page"
@@ -81,6 +80,6 @@ export function AngebotAuswahlPageClient({
           }}
         />
       ) : null}
-    </AppListScreen>
+    </>
   )
 }

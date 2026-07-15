@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useState, useTransition } from 'react'
 import { ExternalLink, FileUp, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
@@ -65,7 +65,7 @@ function ZuweisungCard({
 
   return (
     <>
-      <Card
+      <MockCard
         className={cn('space-y-2 p-4 text-sm', abgelehnt && 'border-danger/50 bg-danger/5')}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -202,7 +202,7 @@ function ZuweisungCard({
             ))}
           </ul>
         </Modal>
-      </Card>
+      </MockCard>
     </>
   )
 }
@@ -251,7 +251,7 @@ export function AngebotHandwerkerPartnerSection({
 
   return (
     <section id="handwerker-partner" className="space-y-6 scroll-mt-24">
-      <Card className="p-4 md:p-5">
+      <MockCard className="p-4 md:p-5">
         <h2 className="mb-3 text-sm font-semibold text-bw-text">Handwerker & Partner-Portal</h2>
         {rows.length === 0 ? (
           <p className="text-sm text-bw-text-muted">Keine Handwerker zugewiesen.</p>
@@ -270,7 +270,7 @@ export function AngebotHandwerkerPartnerSection({
             ))}
           </div>
         )}
-      </Card>
+      </MockCard>
 
       <AngebotVersandSection
         mode="handwerker"

@@ -15,21 +15,21 @@ import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
-import { ProjektKette } from '@/components/crm/ProjektKette'
-import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import {
+  MockCard,
   MockDetailShell,
   MockDokumenteCard,
+  MockEntityRowMenu,
+  MockMahnungCard,
+  MockProjektUebersichtCard,
+  MockProp,
   MockVerlaufCard,
+  MockEmpty,
 } from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
-import { Card } from '@/components/ui/Card'
 import {
   CrmDokumenteTabelle,
   type CrmDokumentZeile,
@@ -72,30 +72,12 @@ import {
   type RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { toast } from '@/components/ui/app-toast'
-import { buildRechnungNaechsteSchritte } from '@/lib/naechste-schritte'
 import {
   mahnstufeListenLabel,
   rechnungHatMahnverlauf,
 } from '@/lib/rechnungen/mahnverlauf'
 import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
 import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
-
-function DetailProp({
-  label,
-  children,
-  link,
-}: {
-  label: string
-  children: ReactNode
-  link?: boolean
-}) {
-  return (
-    <div className="prop">
-      <div className="prop-l">{label}</div>
-      <div className={link ? 'prop-v link' : 'prop-v'}>{children}</div>
-    </div>
-  )
-}
 
 function tageSeitFaelligkeit(faelligAm: string | null): number {
   if (!faelligAm) return 0
@@ -458,70 +440,59 @@ export function RechnungDetailClient({
   )
 
   const rechnungsdetailsCard = (
-    <Card collapsible title="Rechnungsdetails">
+    <MockCard title="Rechnungsdetails" icon="receipt">
       <div className="props">
         {detail.rechnungsnummer?.trim() ? (
-          <DetailProp label="Rechnungsnr.">{detail.rechnungsnummer.trim()}</DetailProp>
+          <MockProp label="Rechnungsnr.">{detail.rechnungsnummer.trim()}</MockProp>
         ) : null}
-        <DetailProp label="Belegart">{RECHNUNG_BELEG_TYP_LABELS[belegTyp]}</DetailProp>
-        <DetailProp label="Status">{RECHNUNG_STATUS_LABELS[detail.status]}</DetailProp>
-        <DetailProp label="Kunde" link={Boolean(detail.kunden?.id ?? detail.kunde_id)}>
+        <MockProp label="Belegart">{RECHNUNG_BELEG_TYP_LABELS[belegTyp]}</MockProp>
+        <MockProp label="Status">{RECHNUNG_STATUS_LABELS[detail.status]}</MockProp>
+        <MockProp label="Kunde" link={Boolean(detail.kunden?.id ?? detail.kunde_id)}>
           {detail.kunden?.id ?? detail.kunde_id ? (
-            <Link
-              href={`/kunden/${detail.kunden?.id ?? detail.kunde_id}`}
-              className="font-medium text-bw-link hover:underline"
-            >
+            <Link href={`/kunden/${detail.kunden?.id ?? detail.kunde_id}`}>
               {detail.kunden?.name ?? '—'}
             </Link>
           ) : (
             detail.kunden?.name ?? '—'
           )}
-        </DetailProp>
+        </MockProp>
         {detail.kunden?.ust_id ? (
-          <DetailProp label="Kunden-USt-ID">{detail.kunden.ust_id}</DetailProp>
+          <MockProp label="Kunden-USt-ID">{detail.kunden.ust_id}</MockProp>
         ) : null}
-        <DetailProp label="Rechnungsdatum">{formatDatum(detail.rechnungsdatum)}</DetailProp>
+        <MockProp label="Rechnungsdatum">{formatDatum(detail.rechnungsdatum)}</MockProp>
         {detail.leistungszeitraum_von && detail.leistungszeitraum_bis ? (
-          <DetailProp label="Leistungszeitraum">
+          <MockProp label="Leistungszeitraum">
             {formatDatum(detail.leistungszeitraum_von)} – {formatDatum(detail.leistungszeitraum_bis)}
-          </DetailProp>
+          </MockProp>
         ) : null}
         {detail.faellig_am && belegTyp === 'rechnung' ? (
-          <DetailProp label="Fällig">{formatDatum(detail.faellig_am)}</DetailProp>
+          <MockProp label="Fällig">{formatDatum(detail.faellig_am)}</MockProp>
         ) : null}
-        {mahnLabel ? <DetailProp label="Mahnstufe">{mahnLabel}</DetailProp> : null}
+        {mahnLabel ? <MockProp label="Mahnstufe">{mahnLabel}</MockProp> : null}
         {detail.bezahlt_at ? (
-          <DetailProp label="Bezahlt am">{formatDatum(detail.bezahlt_at)}</DetailProp>
+          <MockProp label="Bezahlt am">{formatDatum(detail.bezahlt_at)}</MockProp>
         ) : null}
         {detail.gesendet_at ? (
-          <DetailProp label="Gesendet am">{formatDatum(detail.gesendet_at)}</DetailProp>
+          <MockProp label="Gesendet am">{formatDatum(detail.gesendet_at)}</MockProp>
         ) : null}
-        {detail.reverse_charge_13b ? <DetailProp label="§ 13b">Reverse Charge</DetailProp> : null}
+        {detail.reverse_charge_13b ? <MockProp label="§ 13b">Reverse Charge</MockProp> : null}
         {detail.auftrag_id ? (
-          <DetailProp label="Zum Auftrag">
-            <Link href={`/auftraege/${detail.auftrag_id}`} className="text-bw-link hover:underline">
-              Auftrag öffnen
-            </Link>
-          </DetailProp>
+          <MockProp label="Zum Auftrag" link>
+            <Link href={`/auftraege/${detail.auftrag_id}`}>Auftrag öffnen</Link>
+          </MockProp>
         ) : null}
         {detail.angebot_id ? (
-          <DetailProp label="Zum Angebot">
-            <Link href={`/angebote/${detail.angebot_id}`} className="text-bw-link hover:underline">
-              Angebot öffnen
-            </Link>
-          </DetailProp>
+          <MockProp label="Zum Angebot" link>
+            <Link href={`/angebote/${detail.angebot_id}`}>Angebot öffnen</Link>
+          </MockProp>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 
   const stammdatenInhalt = (
     <div className="space-y-3">
       {rechnungsdetailsCard}
-      <KommunikationCard
-        filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
-        reloadKey={mailCompose.reloadKey + generation}
-      />
       {ueberfaellig ? (
         <div
           className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
@@ -532,39 +503,36 @@ export function RechnungDetailClient({
         </div>
       ) : null}
       {zeigtMahnverlauf ? (
-        <RechnungMahnverlaufCard
-          rechnung={detail}
-          mahnMails={mahnMails}
-          onSendErinnerung={() => setErinnerungModalOpen(true)}
-          onMailAnsehen={(id) => setEmailPreviewId(id)}
-        />
+        <MockMahnungCard>
+          <RechnungMahnverlaufCard
+            rechnung={detail}
+            mahnMails={mahnMails}
+            onSendErinnerung={() => setErinnerungModalOpen(true)}
+            onMailAnsehen={(id) => setEmailPreviewId(id)}
+          />
+        </MockMahnungCard>
       ) : null}
     </div>
   )
 
   const detailsInhalt = (
     <div className="space-y-3">
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <MockProjektUebersichtCard
+        projekt={
+          detail.rechnungsnummer?.trim() ||
+          detail.kunden?.name?.trim() ||
+          'Rechnung'
+        }
+        region={detail.kunden?.plz}
+      />
       <PosBoard title="Leistungen" positionen={posLines} />
       {summenFooter}
     </div>
   )
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildRechnungNaechsteSchritte({
-        status: detail.status,
-        rechnungId: detail.id,
-        auftragId: detail.auftrag_id,
-        onSenden: detail.status === 'entwurf' ? handleSenden : undefined,
-        onBezahlt: detail.status === 'gesendet' ? () => void setStatus('bezahlt') : undefined,
-      }),
-    [detail.status, detail.id, detail.auftrag_id]
+  const verlaufInhalt = (
+    <MockEmpty icon="history" title="Kein Verlauf" hint="Aktivitäten erscheinen hier" />
   )
-
-  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
-
-  const verlaufInhalt = <div className="space-y-3">{schritteInhalt}</div>
 
   const dokumenteInhalt = (
     <div className="space-y-6">
@@ -608,7 +576,7 @@ export function RechnungDetailClient({
       id: 'verlauf',
       label: ENTITY_DETAIL_TAB_LABELS.verlauf,
       icon: 'history',
-      render: () => <MockVerlaufCard>{verlaufInhalt}</MockVerlaufCard>,
+      render: () => <MockVerlaufCard empty>{null}</MockVerlaufCard>,
     },
     {
       id: 'dokumente',
@@ -650,26 +618,11 @@ export function RechnungDetailClient({
         actions: (
           <>
             {primaryAction}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={aktionenMenuItems}
-              sheetTitle="Rechnung"
-            />
+            <MockEntityRowMenu items={aktionenMenuItems} title="Rechnung" />
           </>
         ),
       }}
     >
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {err ? (
         <p className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">

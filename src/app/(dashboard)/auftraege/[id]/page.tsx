@@ -14,12 +14,14 @@ import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, anlass, kunde_objekt_id, auftraggeber_kunde_id, melder_einheit, vorgang_phase, hv_meldung_status'
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, preis_min, preis_max, anlass, kunde_objekt_id, auftraggeber_kunde_id, melder_einheit, vorgang_phase, hv_meldung_status'
 
 type AuftragLeadRow = Pick<
   Lead,
   | 'id'
   | 'plz'
+  | 'preis_min'
+  | 'preis_max'
   | 'kontakt_name'
   | 'kontakt_email'
   | 'kontakt_telefon'

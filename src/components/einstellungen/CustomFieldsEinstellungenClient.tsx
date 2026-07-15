@@ -12,6 +12,8 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Button } from '@/components/ui/Button'
 import { FilterChips } from '@/components/ui/FilterChips'
 import { EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
@@ -64,7 +66,7 @@ function SortRow({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 py-2"
+      className="list-row"
     >
       <button
         type="button"
@@ -82,12 +84,14 @@ function SortRow({
         </p>
         <EinstellungenListMeta>{labelFeldtyp(f.feld_typ)}</EinstellungenListMeta>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
-        <Pencil className="h-4 w-4" aria-hidden />
-      </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onDelete}>
-        <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
-      </Button>
+      <div className="row-actions always flex gap-1">
+        <button type="button" className="qa-btn" onClick={onEdit} aria-label="Bearbeiten">
+          <Pencil className="h-4 w-4" aria-hidden />
+        </button>
+        <button type="button" className="qa-btn" onClick={onDelete} aria-label="Deaktivieren">
+          <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
+        </button>
+      </div>
     </li>
   )
 }
@@ -204,19 +208,29 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
         onChange={(v) => setTab(v[0] ?? TABS[0].key)}
       />
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={filtered.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-          <ul className="space-y-2">
-            {filtered.map((f) => (
-              <SortRow key={f.id} f={f} onEdit={() => openEdit(f)} onDelete={() => void remove(f)} />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
-
-      <Button type="button" variant="secondary" onClick={openNew}>
-        + Feld hinzufügen
-      </Button>
+      <MockCard
+        title="Benutzerdefinierte Felder"
+        icon="forms"
+        actions={
+          <MockBtn kind="primary" sm onClick={openNew}>
+            + Feld hinzufügen
+          </MockBtn>
+        }
+      >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={filtered.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+            {filtered.length === 0 ? (
+              <p className="text-sm text-bw-text-muted">Noch keine Felder für diesen Bereich.</p>
+            ) : (
+              <ul className="-mx-4">
+                {filtered.map((f) => (
+                  <SortRow key={f.id} f={f} onEdit={() => openEdit(f)} onDelete={() => void remove(f)} />
+                ))}
+              </ul>
+            )}
+          </SortableContext>
+        </DndContext>
+      </MockCard>
 
       <Modal
         open={modal !== null}

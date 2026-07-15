@@ -1,5 +1,5 @@
-import { PageHeader } from '@/components/layout/PageHeader'
 import { KommunikationVorlagenClient } from '@/components/kommunikation/KommunikationVorlagenClient'
+import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import type { KommunikationMailVorlage } from '@/app/(dashboard)/kommunikation/actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -13,7 +13,7 @@ export default async function KommunikationVorlagenPage() {
 
   return (
     <div>
-      <PageHeader description="Textbausteine für „E-Mail schreiben“ in Anfragen, Angeboten, Aufträgen und Rechnungen." />
+      <EinstellungenMeta className="mb-4">Textbausteine für „E-Mail schreiben“ in Anfragen, Angeboten, Aufträgen und Rechnungen.</EinstellungenMeta>
       <KommunikationVorlagenClient initial={(data ?? []) as KommunikationMailVorlage[]} />
     </div>
   )

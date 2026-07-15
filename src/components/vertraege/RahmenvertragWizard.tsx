@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, Download, FileText, X } from 'lucide-react'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -158,7 +158,7 @@ export function RahmenvertragWizard({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner max-w-2xl">
         {step === 1 ? (
-          <Card title="Partner">
+          <MockCard title="Partner">
             <div className="space-y-3 text-sm">
               <p className="font-medium text-bw-text">{handwerkerAnzeigename(hw)}</p>
               {hw.firma ? <p className="text-bw-text-muted">{hw.firma}</p> : null}
@@ -179,11 +179,11 @@ export function RahmenvertragWizard({
                 Leistungen werden in separaten Nachunternehmerverträgen festgelegt.
               </p>
             </div>
-          </Card>
+          </MockCard>
         ) : null}
 
         {step === 2 ? (
-          <Card title="PDF erzeugen">
+          <MockCard title="PDF erzeugen">
             <div className="space-y-4 text-sm">
               <p className="text-bw-text-muted">
                 Der Rahmenvertrag wird im Bärenwald-Design erzeugt und als PDF gespeichert.
@@ -215,7 +215,7 @@ export function RahmenvertragWizard({
                 </div>
               ) : null}
             </div>
-          </Card>
+          </MockCard>
         ) : null}
       </div>
     </AppFlowScreen>

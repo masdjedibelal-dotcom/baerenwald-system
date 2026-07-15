@@ -4,10 +4,9 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Accordion } from '@/components/ui/Accordion'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard, MockProp } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
@@ -23,6 +22,7 @@ import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
 import {
   MockDetailShell,
+  MockEntityRowMenu,
   MockIcon,
   MockUebersichtCard,
 } from '@/components/mock-ui'
@@ -351,9 +351,10 @@ export function HandwerkerDetailClient({
 
   const sidebar = (
     <>
-      <Card
+      <MockCard
         title="Kontakt"
-        action={
+        icon="user"
+        actions={
           <button type="button" onClick={() => setModalOpen(true)} className="btn btn-ghost btn-sm">
             <Pencil className="h-3.5 w-3.5" />
             Bearbeiten
@@ -395,11 +396,11 @@ export function HandwerkerDetailClient({
           />
           <PropertyRow label="Adresse" value={hw.adresse || '—'} editable={false} />
         </div>
-      </Card>
+      </MockCard>
 
       <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
 
-      <Card title="Gewerke">
+      <MockCard title="Gewerke" icon="tool">
         <div className="flex flex-wrap gap-2">
           {gewerkNamen.length === 0 ? (
             <p className="text-sm text-bw-text-muted">Keine Gewerke hinterlegt.</p>
@@ -411,9 +412,9 @@ export function HandwerkerDetailClient({
             ))
           )}
         </div>
-      </Card>
+      </MockCard>
 
-      <Card title="Dokumente">
+      <MockCard title="Dokumente" icon="files">
         <p className="text-sm text-bw-text">
           <span className="font-medium tabular-nums">{dokumenteAnzahl}</span>
           {' '}
@@ -434,17 +435,17 @@ export function HandwerkerDetailClient({
         <p className="mt-2 text-sm text-bw-text-muted">
           Unter Tab „Compliance“ Dateien hochladen, ansehen und löschen.
         </p>
-      </Card>
+      </MockCard>
 
-      <Card title="Bank & Steuer">
+      <MockCard title="Bank & Steuer" icon="building-bank">
         <div className="space-y-1">
           <PropertyRow label="IBAN" value={hw.iban || '—'} editable={false} />
           <PropertyRow label="USt-ID" value={hw.ustid || '—'} editable={false} />
         </div>
-      </Card>
+      </MockCard>
 
       {(hw.bewertung_anzahl ?? 0) > 0 ? (
-        <Card title="Bewertungen">
+        <MockCard title="Bewertungen" icon="star">
           <div className="mb-3 flex items-center gap-2">
             <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
             <span className="text-2xl font-semibold tabular-nums text-bw-text">
@@ -475,7 +476,7 @@ export function HandwerkerDetailClient({
               )
             })}
           </div>
-        </Card>
+        </MockCard>
       ) : null}
     </>
   )
@@ -500,7 +501,7 @@ export function HandwerkerDetailClient({
           <ul className="space-y-3">
             {aktivAuftraege.map((a) => (
               <li key={a.id}>
-                <Card className="p-4 space-y-4">
+                <MockCard key={a.id} title={a.kunde_name ?? 'Auftrag'} icon="briefcase">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
@@ -529,7 +530,7 @@ export function HandwerkerDetailClient({
                       showAuftragLink
                     />
                   </div>
-                </Card>
+                </MockCard>
               </li>
             ))}
           </ul>
@@ -543,7 +544,7 @@ export function HandwerkerDetailClient({
           <ul className="space-y-3 pt-1">
             {fertigeAuftraege.map((a) => (
               <li key={a.id}>
-                <Card className="p-4 space-y-4">
+                <MockCard title={a.kunde_name ?? 'Auftrag'} icon="briefcase">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
@@ -572,7 +573,7 @@ export function HandwerkerDetailClient({
                       showAuftragLink
                     />
                   </div>
-                </Card>
+                </MockCard>
               </li>
             ))}
           </ul>
@@ -582,7 +583,7 @@ export function HandwerkerDetailClient({
   )
 
   const tabNotizen = (
-    <Card>
+    <MockCard title="Notizen" icon="messages">
       <div className="space-y-2">
         <label className="input-label" htmlFor="hw-notizen">
           Notizen
@@ -598,7 +599,7 @@ export function HandwerkerDetailClient({
         <p className="text-xs text-bw-text-muted">Wird automatisch gespeichert.</p>
         {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
       </div>
-    </Card>
+    </MockCard>
   )
 
   const tabCompliance = (
@@ -645,20 +646,7 @@ export function HandwerkerDetailClient({
                 <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Bearbeiten
               </button>
-              <ActionsMenu
-                trigger={
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                    aria-label="Weitere Aktionen"
-                  >
-                    <MoreHorizontal className="h-4 w-4" aria-hidden />
-                    <span className="sr-only">Mehr</span>
-                  </button>
-                }
-                items={handwerkerMenuItems}
-                sheetTitle="Handwerker"
-              />
+              <MockEntityRowMenu items={handwerkerMenuItems} title="Handwerker" />
             </div>
           ),
         }}

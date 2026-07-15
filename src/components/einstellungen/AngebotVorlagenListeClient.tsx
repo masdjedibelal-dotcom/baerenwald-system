@@ -3,14 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Copy, Pencil, Trash2 } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
-import {
-  EinstellungenListBody,
-  EinstellungenListItem,
-  EinstellungenListMeta,
-} from '@/components/einstellungen/EinstellungenUi'
 import type { AngebotVorlage } from '@/lib/types'
 import { duplicateAngebotVorlage, deleteAngebotVorlage } from '@/app/(dashboard)/angebote/actions'
 import { betragAnzeige } from '@/lib/angebot-einfach'
@@ -44,47 +39,60 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
   }
 
   return (
-    <Card
+    <MockCard
       title="Angebot-Vorlagen"
-      action={
+      icon="file-invoice"
+      actions={
         <Link href="/einstellungen/vorlagen/neu" className="btn btn-primary btn-sm">
           + Neue Vorlage
         </Link>
       }
     >
-      <EinstellungenListBody empty={vorlagen.length === 0 ? 'Noch keine Vorlagen angelegt.' : undefined}>
-        {vorlagen.map((v) => (
-          <EinstellungenListItem key={v.id}>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-medium text-bw-text">{v.name}</p>
-              <EinstellungenListMeta>
-                {posCount(v)} Positionen · {betragAnzeige(v.gesamt_fix ?? null, v.gesamt_min, v.gesamt_max)}
-              </EinstellungenListMeta>
+      {vorlagen.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Noch keine Vorlagen angelegt.</p>
+      ) : (
+        <div style={{ margin: -14 }}>
+          <div className="list-row head" style={{ gridTemplateColumns: '1fr auto' }}>
+            <div>Vorlage</div>
+            <div>Aktionen</div>
+          </div>
+          {vorlagen.map((v) => (
+            <div
+              key={v.id}
+              className="list-row"
+              style={{ gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8 }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{v.name}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                  {posCount(v)} Positionen · {betragAnzeige(v.gesamt_fix ?? null, v.gesamt_min, v.gesamt_max)}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <Link
+                  href={`/einstellungen/vorlagen/${v.id}`}
+                  className="btn btn-secondary btn-sm inline-flex items-center gap-1"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Bearbeiten
+                </Link>
+                <MockBtn sm onClick={() => void kopieren(v.id)}>
+                  <Copy className="mr-1 h-4 w-4" aria-hidden />
+                  Kopieren
+                </MockBtn>
+                <button
+                  type="button"
+                  className="qa-btn"
+                  aria-label="Löschen"
+                  onClick={() => void loeschen(v.id, v.name)}
+                >
+                  <Trash2 className="h-4 w-4" style={{ color: 'var(--red)' }} />
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1">
-              <Link
-                href={`/einstellungen/vorlagen/${v.id}`}
-                className="btn btn-secondary btn-sm inline-flex items-center gap-1"
-              >
-                <Pencil className="h-4 w-4" aria-hidden />
-                Bearbeiten
-              </Link>
-              <Button variant="secondary" size="sm" type="button" onClick={() => void kopieren(v.id)}>
-                <Copy className="mr-1 h-4 w-4" aria-hidden />
-                Kopieren
-              </Button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-status-cancel-text"
-                aria-label="Löschen"
-                onClick={() => void loeschen(v.id, v.name)}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-          </EinstellungenListItem>
-        ))}
-      </EinstellungenListBody>
-    </Card>
+          ))}
+        </div>
+      )}
+    </MockCard>
   )
 }

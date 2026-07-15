@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, type ReactNode } from 'react'
-import { Card } from '@/components/ui/Card'
-import { DetailProp } from '@/components/ui/detail-prop'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockProp } from '@/components/mock-ui/MockProp'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import {
   kundeRechnungsempfaengerAusStammdaten,
@@ -15,7 +15,6 @@ export function KundenStammdatenCard({
   kunde,
   fallback,
   title = 'Stammdaten',
-  collapsible = true,
   action,
 }: {
   kunde: Kunde | null | undefined
@@ -30,70 +29,67 @@ export function KundenStammdatenCard({
   )
 
   return (
-    <Card collapsible={collapsible} title={title} action={action}>
+    <MockCard title={title} icon="user" actions={action}>
       {!kunde ? (
-        <p className="text-[13px] text-bw-text-muted">Kein Kunden-Stammdatensatz verknüpft.</p>
+        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Kein Kunden-Stammdatensatz verknüpft.</p>
       ) : (
         <>
           {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+            <p
+              className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950"
+              style={{ marginBottom: 12 }}
+            >
               Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
             </p>
           ) : null}
           <div className="props">
             {kundenStamm.kundennummer ? (
-              <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
+              <MockProp label="Kundennr.">{kundenStamm.kundennummer}</MockProp>
             ) : null}
             {istKundeFirmaPflichtTyp(kunde.typ) ? (
               <>
-                <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
+                <MockProp label="Firma">{kunde.name?.trim() || '—'}</MockProp>
                 {kundenStamm.vorname ? (
-                  <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
+                  <MockProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</MockProp>
                 ) : null}
                 {kundenStamm.nachname ? (
-                  <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
+                  <MockProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</MockProp>
                 ) : null}
               </>
             ) : (
               <>
                 {kundenStamm.vorname ? (
-                  <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp>
+                  <MockProp label="Vorname">{kundenStamm.vorname}</MockProp>
                 ) : null}
-                <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
+                <MockProp label="Nachname">{kundenStamm.nachname || '—'}</MockProp>
               </>
             )}
             {kundenStamm.ansprechpartner && istKundeNurGewerbeTyp(kunde.typ) ? (
-              <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
+              <MockProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</MockProp>
             ) : null}
-            <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
-            <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
-            <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
-            <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
-            <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
-            <DetailProp label="Telefon">
+            <MockProp label="Straße">{kundenStamm.strasse || '—'}</MockProp>
+            <MockProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</MockProp>
+            <MockProp label="Postleitzahl">{kundenStamm.plz || '—'}</MockProp>
+            <MockProp label="Ort">{kundenStamm.ort || '—'}</MockProp>
+            <MockProp label="Kundentyp">{kundentypLabel(kunde.typ)}</MockProp>
+            <MockProp label="Telefon" link>
               {kundenStamm.telefon ? (
-                <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`} className="text-bw-link">
-                  {kundenStamm.telefon}
-                </a>
+                <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
               ) : (
                 '—'
               )}
-            </DetailProp>
-            <DetailProp label="E-Mail">
+            </MockProp>
+            <MockProp label="E-Mail" link>
               {kundenStamm.email ? (
-                <a href={`mailto:${kundenStamm.email}`} className="text-bw-link">
-                  {kundenStamm.email}
-                </a>
+                <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
               ) : (
                 '—'
               )}
-            </DetailProp>
-            {kundenStamm.ust_id ? (
-              <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp>
-            ) : null}
+            </MockProp>
+            {kundenStamm.ust_id ? <MockProp label="USt-IdNr.">{kundenStamm.ust_id}</MockProp> : null}
           </div>
         </>
       )}
-    </Card>
+    </MockCard>
   )
 }

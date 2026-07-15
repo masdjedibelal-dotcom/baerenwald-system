@@ -1,8 +1,8 @@
 'use client'
 
-import { useRef, type ReactNode } from 'react'
+import { useRef } from 'react'
 import { Pencil } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import {
   LeadProjektWasBlock,
   type LeadProjektWasBlockHandle,
@@ -26,14 +26,7 @@ import {
   formatDatumZeit,
 } from '@/lib/utils'
 
-function FunnelProp({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="prop">
-      <div className="prop-l">{label}</div>
-      <div className="prop-v">{children}</div>
-    </div>
-  )
-}
+import { MockProp } from '@/components/mock-ui/MockProp'
 
 function resolveZeitraumAnzeige(
   lead: LeadDetail,
@@ -132,10 +125,10 @@ export function LeadFunnelProjektAnzeige({
       : KANAL_LABELS[lead.kanal] ?? lead.kanal
 
   return (
-    <Card
+    <MockCard
       collapsible
       title="Projekt-Übersicht"
-      action={
+      actions={
         <button
           type="button"
           onClick={() => wasBlockRef.current?.addLeistung()}
@@ -147,18 +140,18 @@ export function LeadFunnelProjektAnzeige({
       }
     >
       <div className="props">
-        {anfrageTyp ? <FunnelProp label="Anfrageart">{anfrageTyp}</FunnelProp> : null}
-        <FunnelProp label="Situation">{sitLabel}</FunnelProp>
-        <FunnelProp label="Bereiche">{bereicheAnzeige}</FunnelProp>
+        {anfrageTyp ? <MockProp label="Anfrageart">{anfrageTyp}</MockProp> : null}
+        <MockProp label="Situation">{sitLabel}</MockProp>
+        <MockProp label="Bereiche">{bereicheAnzeige}</MockProp>
 
         {groessenEntries.map(([bereich, wert]) => (
-          <FunnelProp key={bereich} label={groessePropLabel(bereich)}>
+          <MockProp key={bereich} label={groessePropLabel(bereich)}>
             {groesseDisplay(bereich, wert, norm.groessen_einheiten[bereich])}
-          </FunnelProp>
+          </MockProp>
         ))}
 
         {fachdetailRows.map((entry) => (
-          <FunnelProp
+          <MockProp
             key={entry.configKey}
             label={fachdetailPropLabel(entry.configKey, bereiche)}
           >
@@ -166,35 +159,35 @@ export function LeadFunnelProjektAnzeige({
               .map((v) => fachdetailDisplayLabel(entry.configKey, v))
               .filter(Boolean)
               .join(', ')}
-          </FunnelProp>
+          </MockProp>
         ))}
 
-        <FunnelProp label="PLZ">{plzAnzeige}</FunnelProp>
-        <FunnelProp label="Kundentyp">{ktLabel || '—'}</FunnelProp>
-        <FunnelProp label="Zeitraum">{zeitraumAnzeige}</FunnelProp>
+        <MockProp label="PLZ">{plzAnzeige}</MockProp>
+        <MockProp label="Kundentyp">{ktLabel || '—'}</MockProp>
+        <MockProp label="Zeitraum">{zeitraumAnzeige}</MockProp>
         {norm.labels.dringlichkeit &&
         norm.labels.dringlichkeit !== norm.labels.zeitraum &&
         norm.labels.dringlichkeit !== zeitraumAnzeige ? (
-          <FunnelProp label="Dringlichkeit">{norm.labels.dringlichkeit}</FunnelProp>
+          <MockProp label="Dringlichkeit">{norm.labels.dringlichkeit}</MockProp>
         ) : null}
         {norm.labels.zugaenglichkeit ? (
-          <FunnelProp label="Zugänglichkeit">{norm.labels.zugaenglichkeit}</FunnelProp>
+          <MockProp label="Zugänglichkeit">{norm.labels.zugaenglichkeit}</MockProp>
         ) : null}
         {norm.labels.umfang ? (
-          <FunnelProp label="Umfang / Rhythmus">{norm.labels.umfang}</FunnelProp>
+          <MockProp label="Umfang / Rhythmus">{norm.labels.umfang}</MockProp>
         ) : null}
-        <FunnelProp label="Preisrahmen">
+        <MockProp label="Preisrahmen">
           <span className={hatPreis ? 'font-semibold text-bw-primary' : ''}>
             {budgetAnzeige}
           </span>
-        </FunnelProp>
-        <FunnelProp label="Quelle">{quelleAnzeige}</FunnelProp>
-        <FunnelProp label="Eingegangen">
+        </MockProp>
+        <MockProp label="Quelle">{quelleAnzeige}</MockProp>
+        <MockProp label="Eingegangen">
           {lead.created_at ? formatDatumZeit(lead.created_at) : '—'}
-        </FunnelProp>
+        </MockProp>
 
         {norm.labels.zustand ? (
-          <FunnelProp label="Zustand">{norm.labels.zustand}</FunnelProp>
+          <MockProp label="Zustand">{norm.labels.zustand}</MockProp>
         ) : null}
       </div>
 
@@ -205,6 +198,6 @@ export function LeadFunnelProjektAnzeige({
         preislisten={preislisten}
         onSaved={onSaved}
       />
-    </Card>
+    </MockCard>
   )
 }

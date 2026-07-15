@@ -203,7 +203,7 @@ export function AnfrageDokumenteTab({
                       href={row.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-[var(--card)] text-[#c62828] transition-colors hover:bg-red-50"
                       aria-label={`${row.name} öffnen`}
                     >
                       <FileText className="h-4 w-4" aria-hidden />

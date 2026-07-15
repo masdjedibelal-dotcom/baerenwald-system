@@ -3,11 +3,12 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Copy, Eye, FileText, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
-import { AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
+import { Copy, Eye, FileText, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
@@ -133,12 +134,12 @@ export function AngebotAuswahlPanel({
     })
   }
 
-  function menuItems(a: AngebotAuswahlZeile): ActionsMenuItem[] {
+  function menuItems(a: AngebotAuswahlZeile): EntityMenuItem[] {
     const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
-    const items: ActionsMenuItem[] = [
+    const items: EntityMenuItem[] = [
       {
         label: 'Ansehen',
-        icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
+        icon: 'eye',
         onClick: () => {
           onClose?.()
           router.push(`/angebote/${a.id}`)
@@ -149,25 +150,20 @@ export function AngebotAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: a.status === 'entwurf' ? 'Weiterbearbeiten' : 'Bearbeiten',
-        icon:
-          a.status === 'entwurf' ? (
-            <FileText className="h-[15px] w-[15px]" aria-hidden />
-          ) : (
-            <Pencil className="h-[15px] w-[15px]" aria-hidden />
-          ),
+        icon: a.status === 'entwurf' ? 'file-invoice' : 'pencil',
         onClick: () => handleBearbeiten(a.id, a.status),
       })
     }
 
     items.push({
       label: 'Kopieren',
-      icon: <Copy className="h-[15px] w-[15px]" aria-hidden />,
+      icon: 'copy',
       onClick: () => handleKopieren(a.id),
     })
 
     items.push('sep', {
       label: 'Löschen',
-      icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+      icon: 'trash',
       danger: true,
       onClick: () => handleLoeschen(a.id),
     })
@@ -218,9 +214,8 @@ export function AngebotAuswahlPanel({
       </p>
 
       {offenerEntwurf ? (
-        <div className="rounded-xl border border-bw-primary/30 bg-bw-green-bg/40 p-4">
-          <p className="text-sm font-semibold text-bw-text">Entwurf fortsetzen</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-bw-text-muted">
+        <MockCard title="Entwurf fortsetzen" icon="file-invoice" className="border-[var(--green)]/30 bg-[var(--green-10)]">
+          <p className="text-[13px] leading-relaxed text-bw-text-muted">
             {offenerEntwurf.angebotsnr?.trim() ||
               `AN-${offenerEntwurf.id.slice(0, 8).toUpperCase()}`}
             {' · '}
@@ -235,100 +230,49 @@ export function AngebotAuswahlPanel({
             <Pencil className="h-3.5 w-3.5" aria-hidden />
             Entwurf weiterbearbeiten
           </button>
-        </div>
+        </MockCard>
       ) : null}
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-sm text-bw-text-muted">
-          Noch keine Angebote zu dieser Anfrage.
-        </p>
-      ) : variant === 'page' ? (
-        <ul className="m-0 list-none space-y-3 p-0">
-          {rows.map((a) => {
-            const loading = pending && loadingId === a.id
-            const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
-            const nr = `AN-${a.id.slice(0, 8).toUpperCase()}`
-
-            return (
-              <li key={a.id} className="space-y-2">
-                <AppEntityListRow
-                  href={`/angebote/${a.id}`}
-                  avatar={<ListAvatar name={nr} tone="soft" />}
-                  eyebrow={nr}
-                  title={label}
-                  line2={a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                  line4={betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
-                  badge={<AngebotStatusBadge status={a.status} />}
-                />
-                <div className="flex justify-end px-1">
-                  {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      Bitte warten…
-                    </span>
-                  ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
-                      }
-                      items={menuItems(a)}
-                    />
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <MockEmpty icon="file-invoice" title="Noch keine Angebote" hint="Zu dieser Anfrage existiert noch kein Angebot." />
       ) : (
-        <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
-          {rows.map((a) => {
-            const loading = pending && loadingId === a.id
-            const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
+        <MockCard title="Angebote" icon="file-invoice" flush bodyClassName="p-0">
+          <ul className="m-0 list-none p-0">
+            {rows.map((a) => {
+              const loading = pending && loadingId === a.id
+              const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
+              const nr = `AN-${a.id.slice(0, 8).toUpperCase()}`
 
-            return (
-              <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-bw-text-muted">
-                      AN-{a.id.slice(0, 8).toUpperCase()}
+              return (
+                <li key={a.id} className="list-row">
+                  <div className="min-w-0 flex-1">
+                    <span className="lc-title block">{label}</span>
+                    <span className="lc-sub block">
+                      {nr}
+                      {a.created_at ? ` · ${formatRelativeDate(a.created_at)}` : ''}
                     </span>
-                    <AngebotStatusBadge status={a.status} />
+                    <div className="mt-1">
+                      <AngebotStatusBadge status={a.status} />
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-[13px] text-bw-text-muted">
-                    {a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                    {label ? ` · ${label}` : ''}
-                  </p>
-                </div>
-                <span className="text-[13px] font-medium tabular-nums text-bw-text">
-                  {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
-                </span>
-                <div className="flex shrink-0 items-center">
-                  {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                      Bitte warten…
-                    </span>
-                  ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
-                      }
-                      items={menuItems(a)}
-                    />
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                  <span className="text-[13px] font-medium tabular-nums text-bw-text">
+                    {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  </span>
+                  <div className="row-actions always flex shrink-0 items-center">
+                    {loading ? (
+                      <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        Bitte warten…
+                      </span>
+                    ) : (
+                      <MockEntityRowMenu items={menuItems(a)} title="Angebot" />
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </MockCard>
       )}
 
       {footer}

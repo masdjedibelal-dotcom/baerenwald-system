@@ -1,6 +1,6 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -105,11 +105,11 @@ export function RechnungWizardZahlungCard({
   )
 
   return (
-    <Card title="Zahlungsbedingungen">
+    <MockCard title="Zahlungsbedingungen">
       <MobileEditableBlock sheetTitle="Zahlungsbedingungen" overview={overview}>
         {form}
       </MobileEditableBlock>
-    </Card>
+    </MockCard>
   )
 }
 
@@ -133,7 +133,7 @@ export function RechnungWizardVersandAuswahlCard({
   if (!rechnungen.length) return null
 
   return (
-    <Card title="Rechnung zum Versand">
+    <MockCard title="Rechnung zum Versand">
       <label className="field">
         <span className="field-l">Diese Rechnung wird jetzt verschickt</span>
         <Select
@@ -148,6 +148,6 @@ export function RechnungWizardVersandAuswahlCard({
           }))}
         />
       </label>
-    </Card>
+    </MockCard>
   )
 }

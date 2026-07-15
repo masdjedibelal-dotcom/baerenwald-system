@@ -240,7 +240,7 @@ export function GlobalSearch() {
       role="presentation"
     >
       <div
-        className="w-full max-w-xl animate-slide-up overflow-hidden rounded-xl bg-bw-card shadow-lg"
+        className="w-full max-w-xl animate-slide-up overflow-hidden rounded-xl bg-[var(--card)] shadow-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

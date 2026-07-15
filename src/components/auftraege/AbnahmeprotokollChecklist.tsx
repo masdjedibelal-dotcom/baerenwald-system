@@ -81,7 +81,7 @@ export function AbnahmeprotokollChecklist({
   return (
     <div className="space-y-4">
       {blocks.map((block) => (
-        <div key={block.gewerk} className="overflow-hidden rounded-lg border border-bw-border bg-bw-card">
+        <div key={block.gewerk} className="overflow-hidden rounded-lg border border-bw-border bg-[var(--card)]">
           <div className="border-b border-bw-border bg-bw-hover/80 px-3 py-2">
             <p className="text-[13px] font-semibold text-bw-primary">{block.gewerk}</p>
           </div>

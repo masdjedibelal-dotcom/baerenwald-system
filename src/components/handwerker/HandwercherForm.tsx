@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -100,16 +99,14 @@ export function HandwerkerForm({
 
   return (
     <div>
-      <PageHeader
-        action={
-          <Link
-            href={isNew ? '/handwerker' : `/handwerker/${initial?.id ?? ''}`}
-            className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary"
-          >
-            Zurück
-          </Link>
-        }
-      />
+      <div className="toolbar mb-4 flex justify-end">
+        <Link
+          href={isNew ? '/handwerker' : `/handwerker/${initial?.id ?? ''}`}
+          className="btn btn-ghost btn-sm"
+        >
+          Zurück
+        </Link>
+      </div>
 
       {err ? (
         <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">

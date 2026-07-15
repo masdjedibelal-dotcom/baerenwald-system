@@ -1,7 +1,7 @@
 'use client'
 
 import { ShieldAlert } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import type { OrgFreigabeLogRow, OrgFreigabeStatus } from '@/lib/types'
@@ -27,7 +27,7 @@ export function AngebotOrgFreigabeBanner({
           : 'order'
 
   return (
-    <Card
+    <MockCard
       title={
         <>
           <ShieldAlert className="inline h-4 w-4 text-bw-primary" aria-hidden /> Org-Freigabe
@@ -52,6 +52,6 @@ export function AngebotOrgFreigabeBanner({
           ))}
         </ul>
       ) : null}
-    </Card>
+    </MockCard>
   )
 }

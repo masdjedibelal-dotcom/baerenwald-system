@@ -3,13 +3,12 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { KundeModal } from '@/components/kunden/KundeModal'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
 import {
   MockBtn,
   MockChip,
   MockEmpty,
+  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -20,6 +19,7 @@ import { useListPage } from '@/hooks/useListPage'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { runMockListExport } from '@/lib/mock-list-export'
 import { deleteKunde } from '@/app/actions/kunden'
 import { runDuplicateKunde } from '@/lib/list-actions'
 import { cn } from '@/lib/utils'
@@ -83,7 +83,6 @@ export function KundenListeClient({
   const isPane = mode === 'pane'
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [fName, setFName] = useState('')
@@ -245,7 +244,19 @@ export function KundenListeClient({
               {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
             </span>
           </MockBtn>
-          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+          <MockBtn
+            icon="download"
+            kind="ghost"
+            sm
+            onClick={() =>
+              runMockListExport(
+                exportToCSV,
+                filtered.map(kundeExportRow),
+                EXPORT_FIELDS,
+                'kunden'
+              )
+            }
+          >
             <span className="listbar-btn-label">Export</span>
           </MockBtn>
         </div>
@@ -407,12 +418,7 @@ export function KundenListeClient({
                 onClick={(e) => e.stopPropagation()}
                 style={{ justifyContent: 'flex-end' }}
               >
-                <ActionsMenu
-                  trigger={
-                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-                      <MockIcon n="dots" size={16} />
-                    </button>
-                  }
+                <MockEntityRowMenu
                   items={listEntityMenuItems(
                     'kunde',
                     { name: kundeDisplayName(k), email: k.email, telefon: k.telefon },
@@ -431,7 +437,7 @@ export function KundenListeClient({
                       deleteLabel: kundeDisplayName(k),
                     }
                   )}
-                  sheetTitle="Kunde"
+                  title="Kunde"
                 />
               </div>
             </div>
@@ -449,19 +455,6 @@ export function KundenListeClient({
       />
 
       <KundeModal open={modalOpen} onClose={closeNeuModal} />
-
-      <CsvExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title="Kunden exportieren"
-        fields={EXPORT_FIELDS}
-        onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : kunden
-          const data = source.map(kundeExportRow)
-          const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
-          exportToCSV(data, fields, 'kunden')
-        }}
-      />
     </div>
   )
 }

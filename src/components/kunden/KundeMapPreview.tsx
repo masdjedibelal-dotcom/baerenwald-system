@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { MapPin } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 
 export function KundeMapPreview({
   adresse,
@@ -17,7 +17,7 @@ export function KundeMapPreview({
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
 
   return (
-    <Card flush className="overflow-hidden">
+    <MockCard flush className="overflow-hidden">
       <div
         className="relative flex h-36 flex-col items-center justify-center bg-gradient-to-br from-bw-green-bg to-bw-bg-soft"
         aria-hidden
@@ -43,6 +43,6 @@ export function KundeMapPreview({
           In Google Maps öffnen
         </Link>
       </div>
-    </Card>
+    </MockCard>
   )
 }

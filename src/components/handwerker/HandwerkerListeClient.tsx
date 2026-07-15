@@ -4,14 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
 import {
   MockBadge,
   MockBtn,
   MockChip,
   MockEmpty,
+  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -21,6 +20,7 @@ import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { handwerkerDisplayName } from '@/lib/handwerker-stammdaten'
 import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { runMockListExport } from '@/lib/mock-list-export'
 import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { runDuplicateHandwerker } from '@/lib/list-actions'
 import { cn } from '@/lib/utils'
@@ -101,7 +101,6 @@ export function HandwerkerListeClient({
   const isPane = mode === 'pane'
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [gewerk, setGewerk] = useState('alle')
   const [compOnly, setCompOnly] = useState(false)
@@ -263,7 +262,19 @@ export function HandwerkerListeClient({
               {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
             </span>
           </MockBtn>
-          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+          <MockBtn
+            icon="download"
+            kind="ghost"
+            sm
+            onClick={() =>
+              runMockListExport(
+                exportToCSV,
+                filtered.map(handwerkerExportRow),
+                HANDWERKER_EXPORT_FIELDS,
+                'handwerker'
+              )
+            }
+          >
             <span className="listbar-btn-label">Export</span>
           </MockBtn>
         </div>
@@ -462,12 +473,7 @@ export function HandwerkerListeClient({
                 onClick={(e) => e.stopPropagation()}
                 style={{ justifyContent: 'flex-end' }}
               >
-                <ActionsMenu
-                  trigger={
-                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
-                      <MockIcon n="dots" size={16} />
-                    </button>
-                  }
+                <MockEntityRowMenu
                   items={listEntityMenuItems(
                     'handwerker',
                     { name: handwerkerDisplayName(t), email: t.email, telefon: t.telefon },
@@ -486,7 +492,7 @@ export function HandwerkerListeClient({
                       deleteLabel: handwerkerDisplayName(t),
                     }
                   )}
-                  sheetTitle="Handwerker"
+                  title="Handwerker"
                 />
               </div>
             </div>
@@ -511,19 +517,6 @@ export function HandwerkerListeClient({
           closeNeuModal()
           router.push(`/handwerker/${id}`)
           router.refresh()
-        }}
-      />
-
-      <CsvExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title="Handwerker exportieren"
-        fields={HANDWERKER_EXPORT_FIELDS}
-        onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : rows
-          const data = source.map(handwerkerExportRow)
-          const fields = HANDWERKER_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
-          exportToCSV(data, fields, 'handwerker')
         }}
       />
     </div>

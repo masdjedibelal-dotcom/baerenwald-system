@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import { verifyCrmStaffSession } from '@/app/(auth)/auth-actions'
 
@@ -90,7 +90,7 @@ function ResetPasswordContent() {
           </div>
           <h1 className="text-xl font-semibold text-bw-text">Neues CRM-Passwort</h1>
         </div>
-        <Card>
+        <MockCard>
           {checking ? (
             <p className="text-sm text-bw-text-muted">Link wird geprüft…</p>
           ) : !ready ? (
@@ -137,7 +137,7 @@ function ResetPasswordContent() {
               </button>
             </div>
           )}
-        </Card>
+        </MockCard>
       </div>
     </div>
   )

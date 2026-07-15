@@ -15,7 +15,9 @@ export { MockDetailShell, type MockDetailShellGroup } from '@/components/mock-ui
 export { MockDetailCrumb } from '@/components/mock-ui/MockDetailCrumb'
 export { MockUebersichtCard, type MockUebersichtStat } from '@/components/mock-ui/MockUebersichtCard'
 export { MockProp } from '@/components/mock-ui/MockProp'
+export { MockProjektUebersichtCard } from '@/components/mock-ui/MockProjektUebersichtCard'
 export { MockPopover, MockPopoverMenu, type MockPopoverItem } from '@/components/mock-ui/MockPopover'
+export { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 export {
   MockVerlaufCard,
   MockDokumenteCard,

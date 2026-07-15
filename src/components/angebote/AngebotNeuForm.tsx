@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -381,26 +380,24 @@ export function AngebotNeuForm({
 
   return (
     <div className="pb-28">
-      <PageHeader
-        action={
-          <Link
-            href={
-              modusVorlage
-                ? '/einstellungen/vorlagen'
-                : leadBundle
-                  ? `/anfragen/${leadBundle.lead.id}`
-                  : isEdit && editAngebot
-                    ? `/angebote/${editAngebot.id}`
-                    : istKopie && kopieVon
-                      ? `/angebote/${kopieVon.quelleId}`
-                      : '/angebote'
-            }
-            className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary"
-          >
-            Zurück
-          </Link>
-        }
-      />
+      <div className="toolbar mb-4 flex justify-end">
+        <Link
+          href={
+            modusVorlage
+              ? '/einstellungen/vorlagen'
+              : leadBundle
+                ? `/anfragen/${leadBundle.lead.id}`
+                : isEdit && editAngebot
+                  ? `/angebote/${editAngebot.id}`
+                  : istKopie && kopieVon
+                    ? `/angebote/${kopieVon.quelleId}`
+                    : '/angebote'
+          }
+          className="btn btn-ghost btn-sm"
+        >
+          Zurück
+        </Link>
+      </div>
 
       {error ? (
         <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
@@ -631,7 +628,7 @@ export function AngebotNeuForm({
       ) : null}
 
       {!modusVorlage ? (
-        <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-bw-card/95 px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
+        <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-[var(--card)]/95 px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>

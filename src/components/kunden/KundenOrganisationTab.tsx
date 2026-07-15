@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { Building2, Copy, ExternalLink, Mail } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
@@ -107,7 +107,7 @@ export function KundenOrganisationTab({
   }
 
   return (
-    <Card
+    <MockCard
       title={
         <>
           <Building2 className="inline h-4 w-4 text-bw-primary" aria-hidden /> Organisation & Portal
@@ -239,6 +239,6 @@ export function KundenOrganisationTab({
           </Button>
         </div>
       </div>
-    </Card>
+    </MockCard>
   )
 }

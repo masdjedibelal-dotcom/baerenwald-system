@@ -4,7 +4,7 @@ import { ChevronDown, ExternalLink, Loader2, RefreshCw, Sparkles } from 'lucide-
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/actions'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { gptGalerieUrls, isGptProjektStudio, parseGptProjektStudioFunnel } from '@/lib/gpt-viz/funnel-daten'
 import type { LeadDetail } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -120,15 +120,14 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             : 'Website-KI'
 
   return (
-    <Card
-      collapsible={false}
+    <MockCard
       title={
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="h-4 w-4 text-[#2E7D52]" aria-hidden />
           {istGpt ? 'KI-Anfrage (Website)' : 'KI-Rechner'}
         </span>
       }
-      action={
+      actions={
         <Button
           type="button"
           variant="secondary"
@@ -257,6 +256,6 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
           </details>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 }

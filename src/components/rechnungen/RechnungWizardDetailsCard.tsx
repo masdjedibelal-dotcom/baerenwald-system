@@ -1,6 +1,6 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -204,10 +204,10 @@ export function RechnungWizardDetailsCard({
   )
 
   return (
-    <Card title="Rechnungsdetails">
+    <MockCard title="Rechnungsdetails">
       <MobileEditableBlock sheetTitle="Rechnungsdetails" overview={overview}>
         {form}
       </MobileEditableBlock>
-    </Card>
+    </MockCard>
   )
 }

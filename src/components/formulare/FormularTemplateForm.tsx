@@ -36,9 +36,8 @@ import {
   Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Input } from '@/components/ui/Input'
-import { PageHeader } from '@/components/layout/PageHeader'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
@@ -102,7 +101,7 @@ function SortableFeldRow({
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
-      <div className="rounded-xl border border-bw-border bg-bw-card">
+      <div className="rounded-xl border border-bw-border bg-[var(--card)]">
         <div className="flex flex-wrap items-start gap-2 p-3">
           <button
             type="button"
@@ -318,7 +317,7 @@ export function FormularTemplateForm({
   }
 
   const grundinfoCard = (
-    <Card className="space-y-4 p-4">
+    <MockCard className="space-y-4 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Grundinfo</p>
       <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} required />
       <Select
@@ -363,11 +362,11 @@ export function FormularTemplateForm({
         <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
         Aktiv
       </label>
-    </Card>
+    </MockCard>
   )
 
   const felderCard = (
-    <Card className="p-4">
+    <MockCard className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-bw-text">Felder</h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -456,7 +455,7 @@ export function FormularTemplateForm({
                 )}
               </SortableContext>
             </DndContext>
-    </Card>
+    </MockCard>
   )
 
   const pageActionBar = !embedded ? (
@@ -489,7 +488,7 @@ export function FormularTemplateForm({
                 'inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs',
                 vorschauView === 'phone'
                   ? 'border-bw-accent bg-bw-accent text-white'
-                  : 'border-bw-border bg-bw-card text-bw-text'
+                  : 'border-bw-border bg-[var(--card)] text-bw-text'
               )}
             >
               <Smartphone className="h-4 w-4" />
@@ -502,7 +501,7 @@ export function FormularTemplateForm({
                 'inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs',
                 vorschauView === 'desktop'
                   ? 'border-bw-accent bg-bw-accent text-white'
-                  : 'border-bw-border bg-bw-card text-bw-text'
+                  : 'border-bw-border bg-[var(--card)] text-bw-text'
               )}
             >
               <Monitor className="h-4 w-4" />
@@ -546,18 +545,14 @@ export function FormularTemplateForm({
   return (
     <div className={cn('pb-8', embedded && 'pb-2')}>
       {!embedded ? (
-        <PageHeader
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
-                Vorschau
-              </Button>
-              <Link href="/formulare" className="text-sm font-medium text-bw-link">
-                Zur Liste
-              </Link>
-            </div>
-          }
-        />
+        <div className="toolbar mb-4 flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
+            Vorschau
+          </Button>
+          <Link href="/formulare" className="btn btn-ghost btn-sm">
+            Zur Liste
+          </Link>
+        </div>
       ) : (
         <div className="mb-4 flex flex-wrap gap-1 border-b border-bw-border">
           <button

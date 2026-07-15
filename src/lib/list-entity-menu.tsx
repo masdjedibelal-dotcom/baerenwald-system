@@ -1,11 +1,9 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   buildEntityMenu,
   type EntityMenuHandlers,
+  type EntityMenuItem,
   type EntityMenuType,
 } from '@/lib/entity-menu'
 
@@ -23,8 +21,8 @@ export function listEntityMenuItems(
   type: EntityMenuType,
   entity: EntityLike,
   handlers: EntityMenuHandlers
-): ActionsMenuItem[] {
-  const items = buildEntityMenu(
+): EntityMenuItem[] {
+  return buildEntityMenu(
     type,
     {
       name: entity.name,
@@ -39,14 +37,4 @@ export function listEntityMenuItems(
       ...handlers,
     }
   )
-  return items.map((it) => {
-    if (it === 'sep') return 'sep'
-    return {
-      label: it.label,
-      icon: it.icon ? (<MockIcon n={it.icon} size={15} />) as ReactNode : undefined,
-      hint: it.hint,
-      danger: it.danger,
-      onClick: it.onClick,
-    }
-  })
 }

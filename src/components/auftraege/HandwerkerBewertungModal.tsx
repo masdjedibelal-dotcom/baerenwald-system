@@ -175,7 +175,7 @@ export function HandwerkerBewertungModal({
               return (
                 <div
                   key={z.handwerkerId}
-                  className="rounded-lg border border-bw-border bg-bw-card p-4 shadow-sm"
+                  className="rounded-lg border border-bw-border bg-[var(--card)] p-4 shadow-sm"
                 >
                   <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
                     <div>

@@ -407,8 +407,8 @@ export function KalenderClient() {
 
   return (
     <div>
-      <div className="listbar" style={{ marginBottom: 12 }}>
-        <div className="listbar-chips">
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <div className="chiprow">
           {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
             <MockChip
               key={v}
@@ -419,7 +419,7 @@ export function KalenderClient() {
             </MockChip>
           ))}
         </div>
-        <div className="listbar-actions">
+        <div className="toolbar-actions">
           <MockBtn sm icon="plus" kind="primary" onClick={() => openNeu()}>
             Termin
           </MockBtn>
@@ -530,7 +530,7 @@ export function KalenderClient() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-bw-text">Lead suchen (optional)</label>
                 <input
-                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-card px-3 text-bw-text"
+                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-[var(--card)] px-3 text-bw-text"
                   value={leadQ}
                   onChange={(e) => setLeadQ(e.target.value)}
                   placeholder="Name …"
@@ -558,7 +558,7 @@ export function KalenderClient() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-bw-text">Auftrag suchen (optional)</label>
                 <input
-                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-card px-3 text-bw-text"
+                  className="mb-1 w-full min-h-[44px] rounded-lg border border-bw-border bg-[var(--card)] px-3 text-bw-text"
                   value={auftragQ}
                   onChange={(e) => setAuftragQ(e.target.value)}
                   placeholder="Titel …"

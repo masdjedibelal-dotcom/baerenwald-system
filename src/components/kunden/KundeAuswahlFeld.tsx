@@ -109,7 +109,7 @@ export function KundeAuswahlFeld({
             disabled={disabled}
           />
           {treffer.length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-bw-border bg-bw-card py-1 shadow-lg">
+            <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-bw-border bg-[var(--card)] py-1 shadow-lg">
               {treffer.map((k) => (
                 <li key={k.id}>
                   <button

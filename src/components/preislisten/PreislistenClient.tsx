@@ -3,11 +3,10 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, Pencil} from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { Accordion } from '@/components/ui/Accordion'
+import { Pencil } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -63,38 +62,26 @@ function LeistungsZeile({
   return (
     <div
       className={cn(
-        '-mx-1 flex items-center justify-between rounded-md border-b border-bw-border px-2 py-2.5 transition-colors last:border-0 hover:bg-bw-hover'
+        'list-row',
+        !leistung.aktiv && 'opacity-70'
       )}
     >
       <div className="min-w-0 flex-1">
-        <div
-          className={cn(
-            'text-sm font-medium',
-            leistung.aktiv ? 'text-bw-text' : 'text-bw-text-muted line-through'
-          )}
-        >
+        <span className={cn('lc-title block', !leistung.aktiv && 'line-through text-muted')}>
           {leistung.leistung}
-        </div>
-        <div className="mt-0.5 text-xs text-bw-text-muted">
+        </span>
+        <span className="lc-sub block">
           {leistung.einheit} · {preis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-        </div>
+        </span>
       </div>
-      <div className="ml-2 flex flex-shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onEdit()}
-          className="rounded-md p-1.5 text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
-          aria-label="Bearbeiten"
-        ><Pencil className="h-4 w-4" aria-hidden /></button>
+      <div className="row-actions always flex items-center gap-1">
+        <button type="button" onClick={() => onEdit()} className="qa-btn" aria-label="Bearbeiten">
+          <Pencil className="h-4 w-4" aria-hidden />
+        </button>
         <div onClick={(e) => e.stopPropagation()} className="shrink-0">
           <Toggle checked={leistung.aktiv} onChange={() => onToggle()} />
         </div>
-        <button
-          type="button"
-          onClick={() => onDelete()}
-          className="rounded-md p-1.5 text-bw-text-muted transition-colors hover:text-status-cancel-text"
-          aria-label="Entfernen"
-        >
+        <button type="button" onClick={() => onDelete()} className="qa-btn" aria-label="Entfernen">
           ×
         </button>
       </div>
@@ -396,21 +383,20 @@ export function PreislistenClient({
   }, [gewAll, form.gewerk_id])
 
   return (
-    <div>
-      <PageHeader
-        action={
-          <>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setCsvOpen(true)}>
-              <Upload className="mr-1 inline h-4 w-4" aria-hidden />
-              CSV Import
-            </Button>
-            <Button type="button" variant="primary" size="sm" onClick={openNeuModal}>
-              + Neue Leistung
-            </Button>
-          </>
-        }
-      />
-
+    <MockCard
+      title="Preislisten"
+      icon="list"
+      actions={
+        <>
+          <MockBtn kind="" sm icon="download" onClick={() => setCsvOpen(true)}>
+            CSV Import
+          </MockBtn>
+          <MockBtn kind="primary" sm icon="plus" onClick={openNeuModal}>
+            Neue Leistung
+          </MockBtn>
+        </>
+      }
+    >
       {importBanner ? (
         <p className="mb-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-ink">
           {importBanner}
@@ -423,17 +409,15 @@ export function PreislistenClient({
         </p>
       ) : null}
 
-      <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-medium text-bw-text">Gewerke verwalten</div>
-            <div className="mt-0.5 text-xs text-bw-text-muted">Gewerke anlegen, bearbeiten und deaktivieren</div>
-          </div>
-          <Link href="/einstellungen/preise" className="btn btn-secondary btn-sm shrink-0">
-            Einstellungen
-          </Link>
+      <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-dashed border-bw-border p-3">
+        <div>
+          <div className="text-sm font-medium text-bw-text">Gewerke verwalten</div>
+          <div className="mt-0.5 text-xs text-bw-text-muted">Gewerke anlegen, bearbeiten und deaktivieren</div>
         </div>
-      </Card>
+        <Link href="/einstellungen/preise" className="btn btn-secondary btn-sm shrink-0">
+          Einstellungen
+        </Link>
+      </div>
 
       <h2 className="section-header mb-4">Leistungen</h2>
 
@@ -468,19 +452,28 @@ export function PreislistenClient({
       ) : (
         <div className="space-y-3">
           {groupedEntries.map(([kat, items], idx) => (
-            <Accordion key={kat} title={`${kat} (${items.length})`} defaultOpen={idx === 0}>
-              <div className="px-1 pb-1 pt-0">
+            <MockCard
+              key={kat}
+              collapsible
+              defaultOpen={idx === 0}
+              title={`${kat} (${items.length})`}
+              icon="list"
+              flush
+              bodyClassName="p-0"
+            >
+              <ul className="m-0 list-none p-0">
                 {items.map((l) => (
-                  <LeistungsZeile
-                    key={l.id}
-                    leistung={l}
-                    onEdit={() => openEditLeistung(l)}
-                    onToggle={() => quickToggleAktiv(l)}
-                    onDelete={() => onSoftDelete(l)}
-                  />
+                  <li key={l.id}>
+                    <LeistungsZeile
+                      leistung={l}
+                      onEdit={() => openEditLeistung(l)}
+                      onToggle={() => quickToggleAktiv(l)}
+                      onDelete={() => onSoftDelete(l)}
+                    />
+                  </li>
                 ))}
-              </div>
-            </Accordion>
+              </ul>
+            </MockCard>
           ))}
         </div>
       )}
@@ -597,6 +590,6 @@ export function PreislistenClient({
       </Modal>
 
       <PreislistenCsvImportModal open={csvOpen} onClose={() => setCsvOpen(false)} onDone={onImportDone} />
-    </div>
+    </MockCard>
   )
 }
