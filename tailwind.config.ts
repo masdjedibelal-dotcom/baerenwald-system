@@ -2,69 +2,89 @@ import type { Config } from 'tailwindcss'
 import forms from '@tailwindcss/forms'
 import plugin from 'tailwindcss/plugin'
 
+/** CSS-Var-Farbe mit Tailwind-/Opacity-Support (`bg-bw-border/50`). */
+function withAlpha(cssVar: string) {
+  return ({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue === undefined
+      ? `var(${cssVar})`
+      : `color-mix(in srgb, var(${cssVar}) ${Number(opacityValue) * 100}%, transparent)`
+}
+
+/**
+ * Farben/Radien/Schatten spiegeln die Mock-:root-Tokens in globals.css.
+ * bw-* = Aliase auf Mock-Werte (keine Parallelwelt).
+ * bw-accent bleibt bewusst (Legacy), nichts Neues darauf aufbauen.
+ */
 const config: Config = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}', './src/app/globals.css'],
   theme: {
     extend: {
       colors: {
-        'bw-primary': '#2E7D52',
-        'bw-dark': '#1A3D2B',
-        'bw-mid': '#3D6B4F',
-        'bw-light': '#6B9E80',
-        'bw-pale': '#A8C5A0',
-        'bw-green-bg': '#EAF3DE',
+        'bw-primary': withAlpha('--green'),
+        'bw-dark': withAlpha('--green-dark'),
+        'bw-mid': withAlpha('--text-2'),
+        'bw-light': withAlpha('--text-3'),
+        'bw-pale': withAlpha('--text-4'),
+        'bw-green-bg': withAlpha('--green-50'),
 
-        'bw-accent': '#C4922A',
-        'bw-accent-bg': '#FDF3E3',
+        /* Legacy Gold — behalten, nicht neu verwenden */
+        'bw-accent': withAlpha('--bw-accent'),
+        'bw-accent-bg': withAlpha('--bw-accent-bg'),
 
-        'bw-bg': '#FFFFFF',
-        'app-grouped': '#F2F2F7',
-        'bw-bg-soft': '#EAF3DE',
-        'bw-card': '#FFFFFF',
-        'bw-hover': '#F0F7F2',
-        'bw-border': '#A8C5A0',
-        'bw-border-strong': '#2E7D52',
-        'bw-text': '#14181F',
-        'bw-text-mid': '#3F4750',
-        'bw-text-muted': '#6B7280',
-        'bw-text-subtle': '#9AA1AB',
-        'bw-link': '#2E7D52',
+        'bw-bg': withAlpha('--bg'),
+        'app-grouped': withAlpha('--bg-soft'),
+        'bw-bg-soft': withAlpha('--bg-soft'),
+        'bw-card': withAlpha('--card'),
+        'bw-hover': withAlpha('--bg-soft'),
+        'bw-border': withAlpha('--border'),
+        'bw-border-strong': withAlpha('--border-strong'),
+        'bw-text': withAlpha('--text'),
+        'bw-text-mid': withAlpha('--text-2'),
+        'bw-text-muted': withAlpha('--text-3'),
+        'bw-text-subtle': withAlpha('--text-4'),
+        'bw-link': withAlpha('--green'),
+        'bw-success': withAlpha('--green'),
 
-        'status-new-bg': '#EBF5FB',
-        'status-new-text': '#1D6FA4',
-        'status-contact-bg': '#FEF9E7',
-        'status-contact-text': '#9A7D0A',
-        'status-offer-bg': '#FEF0E6',
-        'status-offer-text': '#C0622B',
-        'status-order-bg': '#EAF3DE',
-        'status-order-text': '#1A5C35',
-        'status-done-bg': '#F2F4F2',
-        'status-done-text': '#4A5568',
-        'status-cancel-bg': '#FDEDEC',
-        'status-cancel-text': '#A93226',
+        green: withAlpha('--green'),
+        'green-dark': withAlpha('--green-dark'),
+        'green-50': withAlpha('--green-50'),
+        'bg-soft': withAlpha('--bg-soft'),
 
-        'sidebar-bg': '#1A3D2B',
-        'sidebar-hover': '#243D2E',
-        'sidebar-active': '#2E7D52',
-        'sidebar-text': '#A8C5A0',
-        'sidebar-muted': '#6B9E80',
+        'status-new-bg': withAlpha('--blue-bg'),
+        'status-new-text': withAlpha('--blue-tx'),
+        'status-contact-bg': withAlpha('--yel-bg'),
+        'status-contact-text': withAlpha('--yel-tx'),
+        'status-offer-bg': withAlpha('--status-offer-bg'),
+        'status-offer-text': withAlpha('--status-offer-text'),
+        'status-order-bg': withAlpha('--grn-bg'),
+        'status-order-text': withAlpha('--grn-tx'),
+        'status-done-bg': withAlpha('--gray-bg'),
+        'status-done-text': withAlpha('--gray-tx'),
+        'status-cancel-bg': withAlpha('--red-bg'),
+        'status-cancel-text': withAlpha('--red-tx'),
 
-        // Legacy (bestehende Komponenten)
-        primary: '#2E7D52',
-        canvas: '#FFFFFF',
-        surface: '#FFFFFF',
-        ink: '#1E1E1E',
-        muted: '#6B7280',
-        border: '#A8C5A0',
-        danger: '#A93226',
-        warning: '#C0622B',
-        sidebar: '#1A3D2B',
-        'bw-success': '#2E7D52',
+        'sidebar-bg': withAlpha('--green-dark'),
+        'sidebar-hover': withAlpha('--sidebar-hover'),
+        'sidebar-active': withAlpha('--green'),
+        'sidebar-text': withAlpha('--sidebar-text'),
+        'sidebar-muted': withAlpha('--sidebar-muted'),
+
+        primary: withAlpha('--green'),
+        canvas: withAlpha('--bg'),
+        surface: withAlpha('--card'),
+        ink: withAlpha('--text'),
+        muted: withAlpha('--text-3'),
+        border: withAlpha('--border'),
+        danger: withAlpha('--red-tx'),
+        warning: '#c0622b',
+        sidebar: withAlpha('--green-dark'),
       },
       fontFamily: {
         sans: [
           '-apple-system',
           'BlinkMacSystemFont',
+          '"SF Pro Text"',
+          '"SF Pro Display"',
           '"Segoe UI"',
           'system-ui',
           'Roboto',
@@ -74,20 +94,22 @@ const config: Config = {
         ],
       },
       fontSize: {
-        xs: ['12px', { lineHeight: '1.4' }],
+        xs: ['11.5px', { lineHeight: '1.4' }],
         sm: ['13px', { lineHeight: '1.5' }],
-        base: ['14px', { lineHeight: '1.6' }],
+        base: ['14px', { lineHeight: '1.5' }],
         md: ['15px', { lineHeight: '1.5' }],
         lg: ['18px', { lineHeight: '1.4' }],
         xl: ['22px', { lineHeight: '1.3' }],
         '2xl': ['28px', { lineHeight: '1.2' }],
+        chip: ['12.5px', { lineHeight: '1.4' }],
       },
       spacing: {
         11: '44px',
         18: '72px',
         22: '88px',
-        'sidebar-rail': '44px',
-        'topbar': '44px',
+        'sidebar-rail': 'var(--sidebar-w)',
+        topbar: 'var(--topbar-h)',
+        'sidebar-expanded': 'var(--sidebar-expanded)',
       },
       borderWidth: {
         hairline: '0.5px',
@@ -96,14 +118,19 @@ const config: Config = {
         sm: '0 1px 2px rgba(0,0,0,0.05)',
         md: '0 2px 8px rgba(0,0,0,0.08)',
         lg: '0 4px 16px rgba(0,0,0,0.12)',
-        card: '0 1px 3px rgba(0,0,0,0.06)',
+        card: 'var(--shadow)',
+        pop: 'var(--shadow-pop)',
       },
       borderRadius: {
         sm: '4px',
         md: '6px',
-        lg: '8px',
-        xl: '12px',
-        '2xl': '16px',
+        lg: 'var(--r-sm)',
+        xl: 'var(--r)',
+        '2xl': 'var(--r-lg)',
+        mock: 'var(--r)',
+        'mock-sm': 'var(--r-sm)',
+        'mock-lg': 'var(--r-lg)',
+        pill: 'var(--r-pill)',
       },
       animation: {
         skeleton: 'skeleton 1.5s ease-in-out infinite',
