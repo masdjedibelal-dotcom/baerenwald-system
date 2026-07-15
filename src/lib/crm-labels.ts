@@ -12,7 +12,6 @@ export const ACTIVITY_SECTIONS = {
 export const CTA = {
   angebotErstellen: 'Angebot vorbereiten',
   angeboteOeffnen: 'Angebote',
-  finanzenOeffnen: 'Finanzen öffnen',
   zurueckUebersicht: 'Zurück zur Übersicht',
 } as const
 

@@ -1,178 +1,84 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeft, Bell, Plus } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
-import { BrandLogo } from '@/components/brand/BrandLogo'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ROUTE_META, SECTION_LABELS } from '@/lib/nav-config'
+import { getDetailRouteMeta } from '@/lib/detail-route-meta'
 
 interface TopBarProps {
   user: User
+  onSearchOpen?: () => void
 }
 
-type Crumb = { label: string; href?: string }
-
-const NEW_SUB = 'neu'
-
-function pathToBreadcrumbs(pathname: string): {
-  title: string
-  parents: Crumb[]
-  cta?: (typeof ROUTE_META)[string]['cta']
-} {
-  if (pathname === '/') return { title: 'Dashboard', parents: [] }
+function pageTitle(pathname: string): string {
+  if (pathname === '/') return 'Dashboard'
   const segments = pathname.split('/').filter(Boolean)
-  const section = segments[0]
+  const section = segments[0] ?? ''
   const sectionHref = `/${section}`
   const meta = ROUTE_META[sectionHref]
-  const sectionLabel = SECTION_LABELS[section] ?? section
+  if (segments.length === 1) return meta?.title ?? SECTION_LABELS[section] ?? section
 
-  if (segments.length === 1) {
-    return { title: meta?.title ?? sectionLabel, parents: [], cta: meta?.cta }
-  }
-
-  if (segments[1] === NEW_SUB) {
-    return {
-      title: meta?.cta?.label ?? `${sectionLabel} – Neu`,
-      parents: [{ label: sectionLabel, href: sectionHref }],
-    }
-  }
-
-  const subTitle = SUB_LABELS[section]?.[segments[1] ?? '']
-  if (subTitle && segments.length === 2) {
-    return { title: subTitle, parents: [{ label: sectionLabel, href: sectionHref }] }
-  }
+  if (segments[1] === 'neu') return meta?.title ? `${meta.title} – Neu` : 'Neu erstellen'
 
   const tail = segments[segments.length - 1] ?? ''
-  const tailLabel =
-    tail === 'bearbeiten'
-      ? 'Bearbeiten'
-      : tail === 'finanzen'
-        ? 'Finanzen'
-        : tail === 'abnahme'
-            ? 'Abnahme'
-            : tail === 'abschluss'
-              ? 'Abschluss'
-              : tail === 'angebote'
-                ? 'Angebote'
-                : tail === 'rechnungen-auswahl'
-                  ? 'Rechnungen'
-                  : tail === 'vorschau'
-                    ? 'Vorschau'
-                    : ''
-
-  return {
-    title: tailLabel || sectionLabel,
-    parents: [{ label: sectionLabel, href: sectionHref }],
-  }
+  if (tail === 'bearbeiten') return 'Bearbeiten'
+  return SECTION_LABELS[section] ?? meta?.title ?? section
 }
 
-export function TopBar({ user }: TopBarProps) {
-  const pathname = usePathname() ?? '/'
-  const router = useRouter()
-  const { title, parents, cta } = pathToBreadcrumbs(pathname)
+function isDetailRoute(pathname: string): boolean {
+  return getDetailRouteMeta(pathname).isDetail
+}
 
-  const parentHref = parents[parents.length - 1]?.href ?? null
+export function TopBar({ user, onSearchOpen }: TopBarProps) {
+  const pathname = usePathname() ?? '/'
+  const title = pageTitle(pathname)
+  const detailMeta = getDetailRouteMeta(pathname)
+  const isDetail = detailMeta.isDetail
+  const sectionLabel = detailMeta.sectionLabel ?? title
 
   return (
-    <>
-      <header
-        className="z-header flex h-12 flex-shrink-0 items-center gap-2 border-b border-bw-border bg-bw-card px-3 md:hidden"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        {parentHref ? (
-          <Link
-            href={parentHref}
-            aria-label="Zurück"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-bw-text-mid transition-colors hover:bg-bw-hover"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
+    <div className="topbar">
+      <div className="topbar-title">
+        {isDetail ? (
+          <>
+            <span>{sectionLabel}</span>
+            <span style={{ color: 'var(--text-3)', fontWeight: 500, marginLeft: 8 }}>Details</span>
+          </>
         ) : (
-          <Link
-            href="/"
-            aria-label="Bärenwald CRM"
-            className="flex shrink-0 items-center"
-          >
-            <BrandLogo variant="green" height={28} priority />
-          </Link>
+          <span>{title}</span>
         )}
+      </div>
 
-        <div className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight text-bw-text">
-          {title}
-        </div>
+      {!isDetail ? (
+        <button
+          type="button"
+          className="topbar-search-trigger"
+          aria-label="Suchen"
+          onClick={() => onSearchOpen?.()}
+        >
+          <MockIcon n="search" size={16} />
+          <span>Suchen…</span>
+        </button>
+      ) : null}
 
-        {cta ? (
-          <button
-            type="button"
-            onClick={() => router.push(cta.href)}
-            aria-label={cta.label}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-bw-primary text-white shadow-sm transition-opacity hover:opacity-90 active:scale-95"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        ) : (
+      <div className="topbar-actions">
+        <button type="button" className="btn ghost sm icon" title="Benachrichtigungen" aria-label="Benachrichtigungen">
+          <MockIcon n="bell" size={16} />
+        </button>
+        {!isDetail ? (
           <Link
             href="/einstellungen/profil"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-bw-primary text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--green)] text-xs font-semibold text-white"
             title={user.email ? `${user.email} — Profil` : 'Profil'}
             aria-label="Profil öffnen"
           >
             {user.email?.[0]?.toUpperCase() ?? 'B'}
           </Link>
-        )}
-      </header>
-
-      <header className="hidden h-11 flex-shrink-0 items-center gap-3 border-b border-bw-border bg-bw-card px-5 md:flex">
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold tracking-tight">
-          {parents.map((p) =>
-            p.href ? (
-              <Link
-                key={p.label}
-                href={p.href}
-                className="font-medium text-bw-text-muted hover:text-bw-text"
-              >
-                {p.label}
-                <span className="mx-2 text-bw-text-subtle">›</span>
-              </Link>
-            ) : (
-              <span key={p.label} className="font-medium text-bw-text-muted">
-                {p.label}
-                <span className="mx-2 text-bw-text-subtle">›</span>
-              </span>
-            )
-          )}
-          <span id="breadcrumb-portal" className="contents" />
-          <span className="truncate">{title}</span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <Link
-            href="/ki-analytics"
-            aria-label="KI Hub"
-            title="KI Hub"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
-          >
-            <Bell className="h-4 w-4" />
-          </Link>
-
-          {cta ? (
-            <button type="button" onClick={() => router.push(cta.href)} className="btn-primary btn-sm">
-              <Plus className="h-3.5 w-3.5" />
-              {cta.label}
-            </button>
-          ) : null}
-
-          <Link
-            href="/einstellungen/profil"
-            className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-bw-primary text-xs font-semibold text-white transition-opacity hover:opacity-90"
-            title={user.email ? `${user.email} — Profil` : 'Profil'}
-            aria-label="Profil öffnen"
-          >
-            {user.email?.[0]?.toUpperCase() ?? 'B'}
-          </Link>
-        </div>
-      </header>
-    </>
+        ) : null}
+      </div>
+    </div>
   )
 }

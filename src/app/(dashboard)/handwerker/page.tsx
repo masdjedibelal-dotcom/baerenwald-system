@@ -1,10 +1,19 @@
-import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import { HandwerkerListeClient } from '@/components/handwerker/HandwerkerListeClient'
+import { loadHandwerkerListe } from '@/lib/handwerker/load-handwerker-liste'
 
-export const metadata: Metadata = {
-  title: 'Handwerker',
-}
+export default async function HandwerkerPage() {
+  const { rows, gewerkeOptionen } = await loadHandwerkerListe()
 
-/** Listen-Inhalt kommt aus `handwerker/layout.tsx` (Master-Detail ab 900px). */
-export default function HandwerkerPage() {
-  return null
+  return (
+    <Suspense
+      fallback={
+        <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Handwerker werden geladen…
+        </div>
+      }
+    >
+      <HandwerkerListeClient rows={rows} gewerkeOptionen={gewerkeOptionen} mode="page" />
+    </Suspense>
+  )
 }

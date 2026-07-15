@@ -1,258 +1,633 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { useMemo } from 'react'
-import { Folders } from 'lucide-react'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { EntityListShell } from '@/components/layout/app'
-import { SearchInput } from '@/components/ui/SearchInput'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
 import {
-  PHASE_LABELS,
-  PHASE_UNTERSTATUS_VALUES,
-  unterstatusLabel,
-} from '@/lib/vorgang/vorgang-labels'
+  MockBtn,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockModal,
+  MockPager,
+  MockSortHead,
+} from '@/components/mock-ui'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useListPage } from '@/hooks/useListPage'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
-  computeVorgaengeKpis,
-  countVorgaengeByPhase,
-} from '@/lib/vorgang/vorgaenge-kpis'
-import type { VorgangListeRow } from '@/lib/vorgang/types'
-import type { VorgangPhase } from '@/lib/vorgang/types'
-import { cn, formatDatumZeit } from '@/lib/utils'
+  runDeleteVorgang,
+  runDuplicateAnfrage,
+  runDuplicateAngebot,
+  runDuplicateAuftrag,
+  runDuplicateRechnung,
+} from '@/lib/list-actions'
+import { PHASE_LABELS } from '@/lib/vorgang/vorgang-labels'
+import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import { cn, formatDatum } from '@/lib/utils'
 
-const GRID_COLS = 'minmax(88px,0.7fr) minmax(100px,0.8fr) minmax(1.6fr,2fr) minmax(140px,1fr)'
+const VORGANG_PHASES = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung'] as const
 
-const KPI_ITEMS = [
-  { key: 'neueAnfragen' as const, label: 'Neue Anfragen' },
-  { key: 'offeneAngebote' as const, label: 'Offene Angebote' },
-  { key: 'aktiveAuftraege' as const, label: 'Aktive Aufträge' },
-  { key: 'offeneRechnungen' as const, label: 'Offene Rechnungen' },
+const PHASE_META: Record<
+  VorgangPhase,
+  { label: string; icon: string }
+> = {
+  anfrage: { label: 'Anfrage', icon: 'inbox' },
+  angebot: { label: 'Angebot', icon: 'file-invoice' },
+  auftrag: { label: 'Auftrag', icon: 'briefcase' },
+  rechnung: { label: 'Rechnung', icon: 'receipt' },
+}
+
+const EXPORT_FIELDS: ExportField[] = [
+  { key: 'kunde', label: 'Kunde' },
+  { key: 'titel', label: 'Vorgang' },
+  { key: 'phase', label: 'Phase' },
+  { key: 'unterstatus', label: 'Status' },
+  { key: 'wert', label: 'Wert' },
+  { key: 'kanal', label: 'Kanal' },
+  { key: 'updated_at', label: 'Aktualisiert' },
 ]
 
-const PHASE_CHIPS: Array<{ id: '' | VorgangPhase; label: string }> = [
-  { id: '', label: 'Alle' },
-  { id: 'anfrage', label: 'Anfrage' },
-  { id: 'angebot', label: 'Angebot' },
-  { id: 'auftrag', label: 'Auftrag' },
-  { id: 'rechnung', label: 'Rechnung' },
-]
+type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
-function phaseBadgeClass(phase: VorgangPhase): string {
-  switch (phase) {
-    case 'anfrage':
-      return 'badge badge-new'
-    case 'angebot':
-      return 'badge badge-offer'
-    case 'auftrag':
-      return 'badge badge-order'
-    case 'rechnung':
-      return 'badge badge-done'
-    default:
-      return 'badge badge-plain'
+function statusKind(phase: VorgangPhase, unterstatus: string): string {
+  const u = unterstatus.toLowerCase()
+  if (u === 'storniert' || u === 'abgebrochen' || u === 'abgelehnt') return 'storniert'
+  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') return 'fertig'
+  if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
+  if (u === 'gesendet' || u === 'abnahme' || u === 'kontaktiert' || u === 'termin') return 'warten'
+  return 'aktiv'
+}
+
+function dateKey(row: VorgangListeRow): string {
+  return row.updatedAt.replace(/\D/g, '')
+}
+
+function toExportRow(row: VorgangListeRow): Record<string, unknown> {
+  return {
+    kunde: row.kundeName ?? '',
+    titel: row.titel,
+    phase: PHASE_LABELS[row.phase],
+    unterstatus: row.unterstatusLabel,
+    wert: row.wertLabel ?? '',
+    kanal: row.kanalMeta ?? '',
+    updated_at: row.updatedAt,
   }
 }
 
-function unterstatusClass(unterstatus: string): string {
-  const u = unterstatus.toLowerCase()
-  if (u === 'storniert' || u === 'abgebrochen') return 'badge badge-cancel'
-  if (u === 'gesendet' || u === 'in_arbeit') return 'badge badge-contacted'
-  if (u === 'bezahlt' || u === 'abgeschlossen') return 'badge badge-done'
-  return 'badge badge-plain badge-no-dot'
+function isVorgangPhase(value: string | null): value is (typeof VORGANG_PHASES)[number] {
+  return value != null && (VORGANG_PHASES as readonly string[]).includes(value)
 }
 
-export function VorgaengeListeClient({ rows }: { rows: VorgangListeRow[] }) {
+export function VorgaengeListeClient({
+  rows,
+  embedded = false,
+  restrictPartnerName,
+}: {
+  rows: VorgangListeRow[]
+  embedded?: boolean
+  restrictPartnerName?: string
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const phaseFilter = (searchParams.get('phase') ?? '') as '' | VorgangPhase
-  const unterstatusFilter = (searchParams.get('unterstatus') ?? '').trim().toLowerCase()
-  const query = (searchParams.get('q') ?? '').trim().toLowerCase()
+  const { exportToCSV } = useExport()
 
-  const kpis = useMemo(() => computeVorgaengeKpis(rows), [rows])
-  const phaseCounts = useMemo(() => countVorgaengeByPhase(rows), [rows])
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<(typeof VORGANG_PHASES)[number]>('alle')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [fKunde, setFKunde] = useState('')
+  const [fTitel, setFTitel] = useState('')
+  const [fWertVon, setFWertVon] = useState('')
+  const [fWertBis, setFWertBis] = useState('')
+  const [fDatumVon, setFDatumVon] = useState('')
+  const [fDatumBis, setFDatumBis] = useState('')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [exportOpen, setExportOpen] = useState(false)
+  const [sortCol, setSortCol] = useState<SortCol | null>('datum')
+  const [sortDir, setSortDir] = useState<1 | -1>(-1)
 
-  const unterstatusCounts = useMemo(() => {
-    if (!phaseFilter) return new Map<string, number>()
-    const m = new Map<string, number>()
-    for (const r of rows) {
-      if (r.phase !== phaseFilter) continue
-      const k = r.unterstatus.toLowerCase()
-      m.set(k, (m.get(k) ?? 0) + 1)
+  const syncPhaseToUrl = useCallback(
+    (phase: (typeof VORGANG_PHASES)[number]) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (phase === 'alle') {
+        params.delete('phase')
+      } else {
+        params.set('phase', phase)
+      }
+      const qs = params.toString()
+      router.replace(qs ? `/vorgaenge?${qs}` : '/vorgaenge', { scroll: false })
+    },
+    [router, searchParams]
+  )
+
+  const setPhaseFilter = useCallback(
+    (phase: (typeof VORGANG_PHASES)[number]) => {
+      setFilter(phase)
+      syncPhaseToUrl(phase)
+    },
+    [syncPhaseToUrl]
+  )
+
+  useEffect(() => {
+    const phase = searchParams.get('phase')
+    if (isVorgangPhase(phase)) {
+      setFilter(phase)
+    } else if (!phase) {
+      setFilter('alle')
     }
-    return m
-  }, [rows, phaseFilter])
+  }, [searchParams])
+
+  const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
+
+  const resetFilters = () => {
+    setPhaseFilter('alle')
+    setStatusFilter([])
+    setQuery('')
+    setFKunde('')
+    setFTitel('')
+    setFWertVon('')
+    setFWertBis('')
+    setFDatumVon('')
+    setFDatumBis('')
+  }
+
+  const activeFilterCount =
+    (filter !== 'alle' ? 1 : 0) +
+    statusFilter.length +
+    (query ? 1 : 0) +
+    (fKunde ? 1 : 0) +
+    (fTitel ? 1 : 0) +
+    (fWertVon ? 1 : 0) +
+    (fWertBis ? 1 : 0) +
+    (fDatumVon ? 1 : 0) +
+    (fDatumBis ? 1 : 0)
+
+  const baseRows = useMemo(() => {
+    if (!restrictPartnerName?.trim()) return rows
+    return filterVorgaengeByPartnerName(rows, restrictPartnerName)
+  }, [rows, restrictPartnerName])
+
+  const statusOptions = useMemo(() => {
+    const s = new Set<string>()
+    baseRows.forEach((v) => s.add(v.unterstatusLabel))
+    return Array.from(s).sort()
+  }, [baseRows])
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const p of VORGANG_PHASES) {
+      c[p] = p === 'alle' ? baseRows.length : baseRows.filter((v) => v.phase === p).length
+    }
+    return c
+  }, [baseRows])
+
+  const filteredBase = useMemo(() => {
+    return baseRows.filter((v) => {
+      if (filter !== 'alle' && v.phase !== filter) return false
+      if (statusFilter.length && !statusFilter.includes(v.unterstatusLabel)) return false
+      if (
+        query &&
+        !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId + ' ' + (v.kanalMeta ?? ''))
+          .toLowerCase()
+          .includes(query.toLowerCase())
+      ) {
+        return false
+      }
+      if (fKunde && !(v.kundeName ?? '').toLowerCase().includes(fKunde.toLowerCase())) return false
+      if (fTitel && !v.titel.toLowerCase().includes(fTitel.toLowerCase())) return false
+      if (fDatumVon && dateKey(v) < fDatumVon.replace(/-/g, '')) return false
+      if (fDatumBis && dateKey(v) > fDatumBis.replace(/-/g, '')) return false
+      return true
+    })
+  }, [
+    baseRows,
+    filter,
+    statusFilter,
+    query,
+    fKunde,
+    fTitel,
+    fDatumVon,
+    fDatumBis,
+  ])
+
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
 
   const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (phaseFilter && r.phase !== phaseFilter) return false
-      if (unterstatusFilter && r.unterstatus.toLowerCase() !== unterstatusFilter) return false
-      if (!query) return true
-      const hay = `${r.titel} ${r.kundeName ?? ''} ${r.unterstatusLabel} ${r.kanalMeta ?? ''}`.toLowerCase()
-      return hay.includes(query)
-    })
-  }, [rows, phaseFilter, unterstatusFilter, query])
+    const sortKeys: Record<SortCol, (v: VorgangListeRow) => string | number> = {
+      kunde: (v) => (v.kundeName ?? '').toLowerCase(),
+      titel: (v) => v.titel.toLowerCase(),
+      phase: (v) => PHASE_META[v.phase].label.toLowerCase(),
+      wert: (v) => 0,
+      datum: (v) => dateKey(v),
+      status: (v) => v.unterstatusLabel.toLowerCase(),
+    }
 
-  function pushParams(mutate: (p: URLSearchParams) => void) {
-    const p = new URLSearchParams(searchParams.toString())
-    mutate(p)
-    router.push(`/vorgaenge?${p.toString()}`)
+    if (!sortCol) return filteredBase
+    const fn = sortKeys[sortCol]
+    const dir = sortDir
+    return [...filteredBase].sort((a, b) => {
+      const av = fn(a)
+      const bv = fn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filteredBase, sortCol, sortDir])
+
+  const selectedCount = Object.values(selected).filter(Boolean).length
+  const toggleSel = (key: string) => setSelected((s) => ({ ...s, [key]: !s[key] }))
+
+  const paginationResetKey = `${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    filtered,
+    12,
+    paginationResetKey
+  )
+
+  function openDetail(href: string) {
+    router.push(href)
   }
 
-  function setPhase(phase: '' | VorgangPhase) {
-    pushParams((p) => {
-      if (phase) p.set('phase', phase)
-      else p.delete('phase')
-      p.delete('unterstatus')
-    })
-  }
-
-  function setUnterstatus(value: string) {
-    pushParams((p) => {
-      if (value) p.set('unterstatus', value)
-      else p.delete('unterstatus')
-    })
-  }
+  const rowMenuItems = useCallback(
+    (v: VorgangListeRow) => {
+      const isAnfrage = v.phase === 'anfrage'
+      const isAngebot = v.phase === 'angebot'
+      const isAuftrag = v.phase === 'auftrag'
+      const isRechnung = v.phase === 'rechnung'
+      const items = buildEntityMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
+        onEdit: () => openDetail(v.detailHref),
+        onCopy: () => {
+          if (isAnfrage) runDuplicateAnfrage(v.leadId, router)
+          else if (isAngebot) runDuplicateAngebot(v.entityId, router)
+          else if (isAuftrag) runDuplicateAuftrag(v.entityId, router)
+          else if (isRechnung) runDuplicateRechnung(v.entityId, router)
+        },
+        onAngebot: isAnfrage ? () => router.push(`/anfragen/${v.leadId}`) : undefined,
+        onAccept: isAngebot ? () => router.push(v.detailHref) : undefined,
+        onComplete: isAuftrag ? () => router.push(v.detailHref) : undefined,
+        onMarkPaid: isRechnung ? () => router.push(v.detailHref) : undefined,
+        onPdf: isAngebot
+          ? () => window.open(`/api/angebote/${v.entityId}/pdf`, '_blank')
+          : isRechnung
+            ? () => window.open(`/api/rechnungen/${v.entityId}/pdf`, '_blank')
+            : undefined,
+        onSend: isAngebot || isRechnung ? () => router.push(v.detailHref) : undefined,
+        onInvoice: isAuftrag ? () => router.push(`/rechnungen/neu?auftrag=${v.entityId}`) : undefined,
+        onDelete: () => runDeleteVorgang(v.leadId, router),
+        deleteLabel: v.titel,
+      })
+      return entityMenuToActionItems(items, (n, size = 15) => <MockIcon n={n} size={size} />)
+    },
+    [router]
+  )
 
   return (
-    <EntityListShell
-      className="min-h-0 flex-1"
-      header={
-        <div className="mb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {KPI_ITEMS.map((item) => (
-              <div
-                key={item.key}
-                className="rounded-xl border border-bw-border bg-bw-card px-3 py-2.5 text-left"
-              >
-                <div className="text-xs text-bw-text-muted">{item.label}</div>
-                <div className="text-xl font-semibold tabular-nums text-bw-text">{kpis[item.key]}</div>
-              </div>
-            ))}
-          </div>
+    <div>
+      {!embedded ? (
+      <>
+      <div className="listbar">
+        <div className="listbar-chips">
+          {VORGANG_PHASES.map((p) => (
+            <MockChip
+              key={p}
+              active={filter === p}
+              onClick={() => setPhaseFilter(p)}
+              count={counts[p]}
+              icon={p !== 'alle' ? PHASE_META[p as VorgangPhase].icon : undefined}
+            >
+              {p === 'alle' ? 'Alle' : PHASE_META[p as VorgangPhase].label}
+            </MockChip>
+          ))}
+        </div>
+        <div className="listbar-actions">
+          <MockBtn
+            icon="filter"
+            kind={activeFilterCount ? 'primary' : 'ghost'}
+            sm
+            onClick={() => setFilterOpen(true)}
+          >
+            <span className="listbar-btn-label">
+              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="checks"
+            kind={selectMode ? 'primary' : 'ghost'}
+            sm
+            onClick={() => {
+              setSelectMode((m) => !m)
+              setSelected({})
+            }}
+          >
+            <span className="listbar-btn-label">
+              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+            </span>
+          </MockBtn>
+          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+            <span className="listbar-btn-label">Export</span>
+          </MockBtn>
+        </div>
+      </div>
 
-          <div className="tabs flex-wrap" role="tablist" aria-label="Phase filtern">
-            {PHASE_CHIPS.map((chip) => {
-              const active = phaseFilter === chip.id
-              const count = chip.id ? phaseCounts[chip.id] : rows.length
-              return (
-                <button
-                  key={chip.id || 'alle'}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setPhase(chip.id)}
-                  className={cn('tab', active && 'active')}
-                >
-                  {chip.label}
-                  <span className="tab-count">{count}</span>
-                </button>
-              )
-            })}
-          </div>
+      <MockModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        icon="filter"
+        title="Filter & Suchen"
+        sub="Vorgänge eingrenzen"
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={resetFilters}>
+              Zurücksetzen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+              Anwenden ({filtered.length})
+            </MockBtn>
+          </>
+        }
+      >
+        <div className="form-section-h">Suche</div>
+        <div className="input" style={{ marginBottom: 16 }}>
+          <MockIcon n="search" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Kunde, Vorgang, Ort, Nummer…"
+            autoFocus
+          />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <label className="field">
+            <span className="field-lbl">Kunde</span>
+            <input
+              className="txt"
+              value={fKunde}
+              onChange={(e) => setFKunde(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </label>
+          <label className="field">
+            <span className="field-lbl">Vorgang</span>
+            <input
+              className="txt"
+              value={fTitel}
+              onChange={(e) => setFTitel(e.target.value)}
+              placeholder="Titel enthält…"
+            />
+          </label>
+        </div>
+        <div className="form-section-h">Phase</div>
+        <div className="chiprow" style={{ marginBottom: 16 }}>
+          {VORGANG_PHASES.map((p) => (
+            <MockChip
+              key={p}
+              active={filter === p}
+              onClick={() => setPhaseFilter(p)}
+              icon={p !== 'alle' ? PHASE_META[p as VorgangPhase].icon : undefined}
+            >
+              {p === 'alle' ? 'Alle' : PHASE_META[p as VorgangPhase].label}
+            </MockChip>
+          ))}
+        </div>
+        <div className="form-section-h">Status</div>
+        <div className="chiprow" style={{ marginBottom: 16 }}>
+          {statusOptions.map((s) => (
+            <MockChip
+              key={s}
+              active={statusFilter.includes(s)}
+              onClick={() =>
+                setStatusFilter((f) => (f.includes(s) ? f.filter((x) => x !== s) : [...f, s]))
+              }
+            >
+              {s}
+            </MockChip>
+          ))}
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <label className="field">
+            <span className="field-lbl">Wert von (€)</span>
+            <input
+              className="txt"
+              type="number"
+              value={fWertVon}
+              onChange={(e) => setFWertVon(e.target.value)}
+              placeholder="0"
+            />
+          </label>
+          <label className="field">
+            <span className="field-lbl">Wert bis (€)</span>
+            <input
+              className="txt"
+              type="number"
+              value={fWertBis}
+              onChange={(e) => setFWertBis(e.target.value)}
+              placeholder="—"
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span className="field-lbl">Datum von</span>
+            <input
+              className="txt"
+              type="date"
+              value={fDatumVon}
+              onChange={(e) => setFDatumVon(e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span className="field-lbl">Datum bis</span>
+            <input
+              className="txt"
+              type="date"
+              value={fDatumBis}
+              onChange={(e) => setFDatumBis(e.target.value)}
+            />
+          </label>
+        </div>
+      </MockModal>
+      </>
+      ) : null}
 
-          {phaseFilter ? (
-            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Unterstatus filtern">
-              <button
-                type="button"
-                onClick={() => setUnterstatus('')}
+      <div className={cn('listcard', selectMode && !embedded && 'vg-selectmode')}>
+        <div className="vg-row head">
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                const allOn = filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
+                if (allOn) setSelected({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((v) => {
+                    n[rowKey(v)] = true
+                  })
+                  setSelected(n)
+                }
+              }}
+            >
+              <span
                 className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  !unterstatusFilter
-                    ? 'border-bw-primary bg-bw-primary/10 text-bw-primary'
-                    : 'border-bw-border bg-bw-card text-bw-text-muted hover:border-bw-primary/40'
+                  'vg-box',
+                  filtered.length > 0 && filtered.every((v) => selected[rowKey(v)]) && 'on'
                 )}
               >
-                Alle Unterstatus
-              </button>
-              {PHASE_UNTERSTATUS_VALUES[phaseFilter].map((u) => {
-                const count = unterstatusCounts.get(u) ?? 0
-                if (!count) return null
-                const active = unterstatusFilter === u
-                return (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => setUnterstatus(active ? '' : u)}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                      active
-                        ? 'border-bw-primary bg-bw-primary/10 text-bw-primary'
-                        : 'border-bw-border bg-bw-card text-bw-text-muted hover:border-bw-primary/40'
-                    )}
-                  >
-                    {unterstatusLabel(phaseFilter, u)}
-                    <span className="ml-1 tabular-nums opacity-70">{count}</span>
-                  </button>
-                )
-              })}
+                {filtered.length > 0 && filtered.every((v) => selected[rowKey(v)]) ? (
+                  <MockIcon n="check" size={12} />
+                ) : null}
+              </span>
             </div>
           ) : null}
+          <MockSortHead col="kunde" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Kunde
+          </MockSortHead>
+          <MockSortHead col="titel" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Vorgang
+          </MockSortHead>
+          <MockSortHead col="phase" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Phase
+          </MockSortHead>
+          <MockSortHead col="wert" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)} right>
+            Wert
+          </MockSortHead>
+          <MockSortHead col="datum" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Datum
+          </MockSortHead>
+          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Status
+          </MockSortHead>
+          <div />
         </div>
-      }
-      filters={
-        <SearchInput
-          value={searchParams.get('q') ?? ''}
-          onChange={(v) => {
-            const p = new URLSearchParams(searchParams.toString())
-            if (v) p.set('q', v)
-            else p.delete('q')
-            router.replace(`/vorgaenge?${p.toString()}`)
-          }}
-          placeholder="Vorgänge durchsuchen…"
-        />
-      }
-    >
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={Folders}
-          title="Keine Vorgänge"
-          description="Für diesen Filter gibt es noch keine Einträge."
-        />
-      ) : (
-        <>
-          <div
-            className="hidden border-b border-bw-border bg-bw-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted lg:grid"
-            style={{ gridTemplateColumns: GRID_COLS }}
-          >
-            <div>Phase</div>
-            <div>Unterstatus</div>
-            <div>Vorgang</div>
-            <div>Meta</div>
-          </div>
-          {filtered.map((row) => (
-            <Link
-              key={row.leadId}
-              href={row.detailHref}
-              className="block border-b border-bw-border px-4 py-3 transition-colors hover:bg-bw-hover"
-            >
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="folder-open"
+            title="Keine Vorgänge"
+            hint="Filter zurücksetzen oder neuen Vorgang anlegen"
+          />
+        ) : (
+          pageItems.map((v) => {
+            const key = rowKey(v)
+            const kind = statusKind(v.phase, v.unterstatus)
+            return (
               <div
-                className="grid w-full gap-2 lg:items-center"
-                style={{ gridTemplateColumns: GRID_COLS }}
+                key={key}
+                className={cn('vg-row', selected[key] && 'sel')}
+                onClick={() => (selectMode ? toggleSel(key) : openDetail(v.detailHref))}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    selectMode ? toggleSel(key) : openDetail(v.detailHref)
+                  }
+                }}
               >
-                <div>
-                  <span className={phaseBadgeClass(row.phase)}>{PHASE_LABELS[row.phase]}</span>
+                {selectMode ? (
+                  <div
+                    className="vg-check"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSel(key)
+                    }}
+                  >
+                    <span className={cn('vg-box', selected[key] && 'on')}>
+                      {selected[key] ? <MockIcon n="check" size={12} /> : null}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="vg-kunde">
+                  <span>{v.kundeName ?? '—'}</span>
                 </div>
-                <div>
-                  <span className={unterstatusClass(row.unterstatus)}>{row.unterstatusLabel}</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-bw-text">{row.titel}</div>
-                  {row.kundeName ? (
-                    <div className="truncate text-xs text-bw-text-muted">{row.kundeName}</div>
-                  ) : null}
-                </div>
-                <div className="text-xs text-bw-text-muted">
-                  <div>{formatDatumZeit(row.updatedAt)}</div>
-                  <div className="truncate">
-                    {[row.kanalMeta, row.wertLabel, row.ueberfaellig ? 'Überfällig' : null]
-                      .filter(Boolean)
-                      .join(' · ')}
+                <div className="vg-vorgang">
+                  <div className="t" title={v.titel}>
+                    {v.titel}
                   </div>
                 </div>
+                <div className="vg-phase">
+                  <span className="ph-neutral">
+                    <MockIcon n={PHASE_META[v.phase].icon} size={13} />
+                    {PHASE_META[v.phase].label}
+                  </span>
+                </div>
+                <div
+                  className="vg-wert"
+                  style={{
+                    textAlign: 'right',
+                    fontWeight: 500,
+                    fontVariantNumeric: 'tabular-nums',
+                    fontSize: 13,
+                  }}
+                >
+                  {v.wertLabel ?? '—'}
+                </div>
+                <div className="vg-datum" style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+                  {formatDatum(v.updatedAt)}
+                </div>
+                <div className="vg-status">
+                  <span className={cn('st-dot', `st-${kind}`)}>
+                    <span className="d" />
+                    {v.unterstatusLabel}
+                  </span>
+                </div>
+                <div className="vg-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
+                  <ActionsMenu
+                    trigger={
+                      <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                        <MockIcon n="dots" size={16} />
+                      </button>
+                    }
+                    items={rowMenuItems(v)}
+                    sheetTitle="Vorgang"
+                  />
+                </div>
               </div>
-            </Link>
-          ))}
-        </>
-      )}
-    </EntityListShell>
+            )
+          })
+        )}
+      </div>
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={embedded ? 5 : pageSize}
+        unit="Vorgänge"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
+
+      {!embedded ? (
+      <CsvExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="Vorgänge exportieren"
+        fields={EXPORT_FIELDS}
+        onDownload={({ scope, keys }) => {
+          const source = scope === 'view' ? filtered : rows
+          const data = source.map(toExportRow)
+          const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
+          exportToCSV(data, fields, 'vorgaenge')
+          toast.success('Export gestartet')
+        }}
+      />
+      ) : null}
+    </div>
   )
 }

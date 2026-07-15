@@ -38,7 +38,6 @@ import {
 import {
   defaultWizardMeta,
   resolveAngebotKundeTyp,
-  formatEurRange,
   initialDokumentTypFromLead,
   leadHatProjektEmpfehlung,
   defaultProjektBeschreibungText,
@@ -69,7 +68,8 @@ import {
 } from '@/lib/templates/angebot-mail'
 import { AngebotWizardFotodokumentation } from '@/components/angebote/AngebotWizardFotodokumentation'
 import { AngebotWizardVizBlock } from '@/components/angebote/AngebotWizardVizBlock'
-import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
+import { PosBoard } from '@/components/posboard/PosBoard'
+import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { AngebotWizardAngebotDetailsCard } from '@/components/angebote/AngebotWizardAngebotDetailsCard'
 import { AngebotWizardMailTexteCard } from '@/components/angebote/AngebotWizardMailTexteCard'
 import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
@@ -95,6 +95,11 @@ import { fetchKundenObjekte, setLeadKundeObjekt } from '@/app/actions/kunden-obj
 import type { KundenObjekt } from '@/lib/types'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { findAnfahrtZeilen } from '@/lib/anfahrt-angebot'
+import {
+  dokumentZeilenToPosBoardLines,
+  posBoardLinesToDokumentZeilen,
+} from '@/lib/posboard/position-adapters'
+import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
@@ -386,6 +391,18 @@ export function AngebotWizard({
         .map(dokumentArtikelToWizardPosition)
     )
   }
+
+  const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
+  const gewerkNames = useMemo(
+    () => gewerke.filter((g) => g.aktiv !== false && g.name).map((g) => g.name),
+    [gewerke]
+  )
+  const handlePosBoardChange = useCallback(
+    (next: PosBoardLine[]) => {
+      syncZeilenToPositions(posBoardLinesToDokumentZeilen(next, zeilen))
+    },
+    [zeilen]
+  )
 
   const notizFotos = useMemo(
     () =>
@@ -934,42 +951,50 @@ export function AngebotWizard({
       <div className="wizard-inner">
           {step === 1 ? (
             <>
-              <WizardSection>
-              <Card title="Anfrage-Daten">
-                <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-                  <Detail label="Kunde" value={name} />
-                  <Detail label="Projekt" value={projekt} />
-                  <Detail
-                    label="Region"
-                    value={[leadState.plz, leadState.kunden?.ort].filter(Boolean).join(' · ') || '—'}
-                  />
-                  <Detail
-                    label="Preisrahmen"
-                    value={
-                      lead.preis_min != null && lead.preis_max != null
-                        ? formatEurRange(lead.preis_min, lead.preis_max)
-                        : '—'
-                    }
-                  />
-                </div>
-              </Card>
-              </WizardSection>
-
               {zeigeObjektAuswahl && kundeId ? (
                 <WizardSection>
-                <KundenObjekteCard
-                  key={kundeId}
-                  variant="select"
-                  kundeId={kundeId}
-                  objekte={objekteListe}
-                  selectedId={meta.kunde_objekt_id ?? leadState.kunde_objekt_id}
-                  onSelect={waehleAngebotObjekt}
-                  onChanged={() => {
-                    router.refresh()
-                  }}
-                />
+                  <KundenObjekteCard
+                    key={kundeId}
+                    variant="select"
+                    kundeId={kundeId}
+                    objekte={objekteListe}
+                    selectedId={meta.kunde_objekt_id ?? leadState.kunde_objekt_id}
+                    onSelect={waehleAngebotObjekt}
+                    onChanged={() => {
+                      router.refresh()
+                    }}
+                  />
                 </WizardSection>
               ) : null}
+
+              <WizardSection>
+                <DokumentGesamtrabattPanel
+                  zeilen={zeilen}
+                  onChange={syncZeilenToPositions}
+                  className="mb-4"
+                />
+                <PosBoard
+                  title="Positionen"
+                  positionen={posBoardLines}
+                  onChange={handlePosBoardChange}
+                  showUst
+                  gewerke={gewerkNames}
+                  hideAddGewerk={dokumentTyp === 'einfach'}
+                  makeNew={
+                    dokumentTyp === 'einfach'
+                      ? () => ({
+                          gewerk: meta.leistungsumfang.trim() || projekt,
+                          name: '',
+                          beschreibung: '',
+                          menge: 1,
+                          einheit: 'Stück',
+                          preis: 0,
+                          ust: 19,
+                        })
+                      : undefined
+                  }
+                />
+              </WizardSection>
 
               <WizardSection>
                 <h2 className="wizard-step-heading">Dokumenttyp</h2>
@@ -1028,32 +1053,7 @@ export function AngebotWizard({
                 </div>
               </WizardSection>
 
-              {dokumentTyp === 'projekt' ? (
-                <div className="wizard-projekt-flow">
-              <AngebotWizardProjektBeschreibungCard
-                titel={meta.leistungsumfang}
-                onTitelChange={patchProjektTitel}
-                beschreibung={projektbeschreibung}
-                onBeschreibungChange={setProjektbeschreibung}
-                beschreibungPlaceholder="Kurzbeschreibung für das PDF…"
-                disabled={saving}
-              />
-
-              <WizardProjektDivider />
-
-              <WizardProjektSection>
-                <AngebotWizardPositionenByGewerk
-                  zeilen={zeilen}
-                  onChange={syncZeilenToPositions}
-                  gewerke={gewerke}
-                  preislisten={preislisten}
-                  firm={firm}
-                  titel="Positionen"
-                  untertitel="Pro Gewerk eigener Abschnitt — Anfahrt je Gewerk separat"
-                />
-              </WizardProjektSection>
-                </div>
-              ) : dokumentTyp === 'einfach' ? (
+              {dokumentTyp === 'projekt' || dokumentTyp === 'einfach' ? (
                 <div className="wizard-projekt-flow">
                   <AngebotWizardProjektBeschreibungCard
                     titel={meta.leistungsumfang}
@@ -1064,27 +1064,6 @@ export function AngebotWizard({
                     disabled={saving}
                   />
 
-                  <WizardProjektDivider />
-
-                  <WizardProjektSection>
-                    <AngebotWizardPositionenByGewerk
-                      zeilen={zeilen}
-                      onChange={syncZeilenToPositions}
-                      gewerke={gewerke}
-                      preislisten={preislisten}
-                      firm={firm}
-                      titel="Positionen"
-                      untertitel="Gewerk-Titel und Beschreibung bearbeiten, Positionen darunter erfassen"
-                      hideGewerkAddRow
-                      ensureInitialGewerkBlock
-                      defaultGewerkTitel={meta.leistungsumfang.trim() || projekt}
-                    />
-                  </WizardProjektSection>
-                </div>
-              ) : null}
-
-              {dokumentTyp === 'projekt' || dokumentTyp === 'einfach' ? (
-                <>
                   <WizardProjektDivider />
 
                   <AngebotWizardFotodokumentation
@@ -1101,7 +1080,7 @@ export function AngebotWizard({
                   <WizardProjektDivider />
 
                   <AngebotWizardVizBlock angebotId={angebotId} disabled={saving} />
-                </>
+                </div>
               ) : null}
             </>
           ) : null}
@@ -1263,15 +1242,6 @@ export function AngebotWizard({
   )
 
   return createPortal(wizard, document.body)
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-xs text-bw-text-muted">{label}</span>
-      <p className="text-[13px] font-medium text-bw-text">{value}</p>
-    </div>
-  )
 }
 
 function PropRow({

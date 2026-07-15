@@ -2,35 +2,27 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import {
-  ListFilterSection,
-  ListMobileStack,
-  ListGridShell,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { StatusBadge } from '@/components/ui/StatusBadge'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
+import { KundeModal } from '@/components/kunden/KundeModal'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { useExport, type ExportField } from '@/hooks/useExport'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
 import {
-  getZeitraumRange,
-  datumInZeitraum,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
-import { cn } from '@/lib/utils'
-import type { Kunde } from '@/lib/types'
+  MockBtn,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockModal,
+  MockPager,
+  MockSortHead,
+} from '@/components/mock-ui'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useListPage } from '@/hooks/useListPage'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
-import { KundeModal } from '@/components/kunden/KundeModal'
-import { FilterChips } from '@/components/ui/FilterChips'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { deleteKunde } from '@/app/actions/kunden'
+import { runDuplicateKunde } from '@/lib/list-actions'
+import { cn } from '@/lib/utils'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -44,38 +36,37 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'created_at', label: 'Erstellt am' },
 ]
 
-function formatEur(n: number | null | undefined) {
-  if (n == null || Number.isNaN(n)) return '—'
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
-function kundeRegion(k: KundeListeZeile) {
-  const plz = k.plz?.trim()
-  const ort = k.ort?.trim()
-  if (plz && ort) return `${plz} ${ort}`
-  return plz || ort || '—'
-}
-
-function kundeListStatusBadge(k: KundeListeZeile) {
-  const auf = k.anzahl_auftraege ?? 0
-  if (auf > 0) return <StatusBadge status="order" label="Aktiv" />
-  if ((k.anzahl_leads ?? 0) > 0) return <StatusBadge status="contacted" label="Interessent" />
-  return <StatusBadge status="new" label="Neu" />
-}
-
-const KUNDEN_GRID_COLS = '42px minmax(200px,2fr) minmax(160px,1.2fr) minmax(100px,1fr) 80px 120px 90px'
-
-type SortRow = {
-  row: KundeListeZeile
-  name: string
-  projekte: number
-  umsatz: number
-}
+const KUNDE_ROW_GRID = '1.4fr 1fr 1.2fr 1.6fr 60px'
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
+type SortCol = 'name' | 'type' | 'tel' | 'mail'
 
-function kundeListenName(k: KundeListeZeile): string {
-  return kundeDisplayName(k)
+function kundeTypLabel(typ: string | null | undefined): string {
+  const t = (typ ?? '').toLowerCase()
+  if (t === 'gewerbe') return 'Gewerbe'
+  if (t === 'hausverwaltung') return 'Hausverwaltung'
+  return 'Privat'
+}
+
+function kundeTypKey(typ: string | null | undefined): TypListenFilter {
+  const t = (typ ?? '').toLowerCase()
+  if (t === 'gewerbe') return 'gewerbe'
+  if (t === 'hausverwaltung') return 'hausverwaltung'
+  return 'privat'
+}
+
+function kundeExportRow(k: KundeListeZeile): Record<string, unknown> {
+  return {
+    name: kundeDisplayName(k),
+    kundennummer: k.kundennummer ?? '',
+    email: k.email ?? '',
+    telefon: k.telefon ?? '',
+    typ: kundeTypLabel(k.typ),
+    plz: k.plz ?? '',
+    ort: k.ort ?? '',
+    gesamt_umsatz: k.gesamt_umsatz ?? '',
+    created_at: k.created_at,
+  }
 }
 
 export function KundenListeClient({
@@ -89,310 +80,375 @@ export function KundenListeClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { exportToCSV } = useExport()
-  const [exportOpen, setExportOpen] = useState(false)
+  const isPane = mode === 'pane'
+
   const [modalOpen, setModalOpen] = useState(false)
-  const [editKunde, setEditKunde] = useState<Kunde | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
+  const [fName, setFName] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [sel, setSel] = useState<Record<string, boolean>>({})
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
+
+  const { exportToCSV } = useExport()
 
   function closeNeuModal() {
     setModalOpen(false)
-    setEditKunde(null)
     const params = new URLSearchParams(searchParams.toString())
     params.delete('neu')
     const q = params.toString()
     router.replace(q ? `/kunden?${q}` : '/kunden', { scroll: false })
   }
 
-  function openNeuModal() {
-    setEditKunde(null)
-    setModalOpen(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('neu', '1')
-    router.replace(`/kunden?${params.toString()}`, { scroll: false })
-  }
-
   useEffect(() => {
-    if (searchParams.get('neu') === '1') {
-      setEditKunde(null)
-      setModalOpen(true)
-    }
+    if (searchParams.get('neu') === '1') setModalOpen(true)
   }, [searchParams])
-
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
-  )
 
   const typCounts = useMemo(() => {
     let privat = 0
     let gewerbe = 0
     let hausverwaltung = 0
     for (const k of kunden) {
-      const t = (k.typ || '').toLowerCase()
-      if (t === 'gewerbe') gewerbe++
-      else if (t === 'hausverwaltung') hausverwaltung++
+      const key = kundeTypKey(k.typ)
+      if (key === 'gewerbe') gewerbe++
+      else if (key === 'hausverwaltung') hausverwaltung++
       else privat++
     }
     return { alle: kunden.length, privat, gewerbe, hausverwaltung }
   }, [kunden])
 
-  const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return kunden.filter((k) => {
-      if (typFilter !== 'alle' && (k.typ || '').toLowerCase() !== typFilter) return false
-      if (dateRange && !datumInZeitraum(k.created_at, dateRange)) return false
-      if (!needle) return true
-      const pool = [
-        kundeListenName(k),
-        k.name,
-        k.email ?? '',
-        k.telefon ?? '',
-        k.kundennummer ?? '',
-        k.plz ?? '',
-        k.ort ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-      return pool.includes(needle)
-    })
-  }, [kunden, typFilter, debouncedQ, dateRange])
+  const activeFilterCount =
+    (typFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((k) => ({
-        row: k,
-        name: kundeListenName(k),
-        projekte: k.anzahl_auftraege ?? 0,
-        umsatz: k.gesamt_umsatz ?? 0,
-      })),
-    [filtered]
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return kunden.filter((k) => {
+      if (typFilter !== 'alle' && kundeTypKey(k.typ) !== typFilter) return false
+      const name = kundeDisplayName(k)
+      if (
+        q &&
+        !(name + ' ' + (k.telefon ?? '') + ' ' + (k.email ?? '') + ' ' + (k.kundennummer ?? ''))
+          .toLowerCase()
+          .includes(q)
+      ) {
+        return false
+      }
+      if (fName && !name.toLowerCase().includes(fName.toLowerCase())) return false
+      return true
+    })
+  }, [kunden, typFilter, query, fName])
+
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered
+    const dir = sortDir
+    const keyFn = (k: KundeListeZeile): string => {
+      switch (sortCol) {
+        case 'name':
+          return kundeDisplayName(k).toLowerCase()
+        case 'type':
+          return kundeTypLabel(k.typ).toLowerCase()
+        case 'tel':
+          return k.telefon ?? ''
+        case 'mail':
+          return (k.email ?? '').toLowerCase()
+        default:
+          return ''
+      }
+    }
+    return [...filtered].sort((a, b) => {
+      const av = keyFn(a)
+      const bv = keyFn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sortCol, sortDir])
+
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
+
+  const resetFilters = () => {
+    setTypFilter('alle')
+    setQuery('')
+    setFName('')
+  }
+
+  const toggle = (id: string) => setSel((s) => ({ ...s, [id]: !s[id] }))
+  const selectedCount = Object.values(sel).filter(Boolean).length
+
+  const paginationResetKey = `${typFilter}|${query}|${fName}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    sorted,
+    10,
+    paginationResetKey
   )
 
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
-
-  const hasFilters = !!(typFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
-
-  function resetFilters() {
-    setTypFilter('alle')
-    setQ('')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-  }
-
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    // Kundentyp steht bereits in FilterChips
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'z',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
-    return t
-  }, [typFilter, zeitraum, q])
-
-  function toExportRow(k: KundeListeZeile) {
-    return {
-      name: kundeListenName(k),
-      kundennummer: k.kundennummer ?? '',
-      email: k.email ?? '',
-      telefon: k.telefon ?? '',
-      typ: k.typ,
-      plz: k.plz ?? '',
-      ort: k.ort ?? '',
-      gesamt_umsatz: k.gesamt_umsatz ?? '',
-      created_at: k.created_at,
-    }
-  }
+  const rowGrid = (selectMode ? '40px ' : '') + KUNDE_ROW_GRID
 
   function openDetail(id: string) {
     router.push(`/kunden/${id}`)
   }
 
-  const isPane = mode === 'pane'
-
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-      <ListFilterSection
-        chipGroups={[
-          {
-            label: 'Kundentyp',
-            options: [
-              { label: 'Alle', value: 'alle', count: typCounts.alle },
-              { label: 'Privat', value: 'privat', count: typCounts.privat },
-              { label: 'Gewerbe', value: 'gewerbe', count: typCounts.gewerbe },
-              { label: 'Hausverwaltung', value: 'hausverwaltung', count: typCounts.hausverwaltung },
-            ],
-            selected: [typFilter],
-            onChange: (vals) => setTypFilter((vals[0] as TypListenFilter) || 'alle'),
-          },
-        ]}
+    <div>
+      <div className="listbar">
+        <div className="listbar-chips">
+          <MockChip active={typFilter === 'alle'} onClick={() => setTypFilter('alle')} count={typCounts.alle}>
+            Alle
+          </MockChip>
+          <MockChip active={typFilter === 'privat'} onClick={() => setTypFilter('privat')} count={typCounts.privat}>
+            Privat
+          </MockChip>
+          <MockChip
+            active={typFilter === 'hausverwaltung'}
+            onClick={() => setTypFilter('hausverwaltung')}
+            count={typCounts.hausverwaltung}
+          >
+            Hausverwaltung
+          </MockChip>
+          <MockChip active={typFilter === 'gewerbe'} onClick={() => setTypFilter('gewerbe')} count={typCounts.gewerbe}>
+            Gewerbe
+          </MockChip>
+        </div>
+        <div className="listbar-actions">
+          <MockBtn
+            icon="filter"
+            kind={activeFilterCount ? 'primary' : 'ghost'}
+            sm
+            onClick={() => setFilterOpen(true)}
+          >
+            <span className="listbar-btn-label">
+              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="checks"
+            kind={selectMode ? 'primary' : 'ghost'}
+            sm
+            onClick={() => {
+              setSelectMode((m) => !m)
+              setSel({})
+            }}
+          >
+            <span className="listbar-btn-label">
+              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+            </span>
+          </MockBtn>
+          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+            <span className="listbar-btn-label">Export</span>
+          </MockBtn>
+        </div>
+      </div>
+
+      <MockModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        icon="filter"
+        title="Filter & Suchen"
+        sub="Kunden eingrenzen"
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={resetFilters}>
+              Zurücksetzen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+              Anwenden ({filtered.length})
+            </MockBtn>
+          </>
+        }
       >
-        <ListFilterBar
-          hideStatusFilter
-          statusLabel="—"
-          statusOptions={[{ value: '', label: '—' }]}
-          statusValue=""
-          onStatusChange={() => {}}
-          zeitraumValue={zeitraum}
-          onZeitraumChange={setZeitraum}
-          showCustomDates={zeitraum === 'benutzerdefiniert'}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={setCustomFrom}
-          onCustomToChange={setCustomTo}
-          searchValue={q}
-          onSearchChange={setQ}
-          searchPlaceholder="Name, E-Mail, Telefon, Nr."
-          onReset={resetFilters}
-          hasActiveFilters={hasFilters}
-          tags={filterTags}
-          onExportClick={() => setExportOpen(true)}
-          resultCount={filtered.length}
-          sort={{
-            options: [
-              { field: 'name', label: 'Kunde' },
-              { field: 'projekte', label: 'Aufträge' },
-              { field: 'umsatz', label: 'Umsatz' },
-            ],
-            currentField: field,
-            currentDir: dir,
-            onSort: (f) => (f ? handleSort(f) : resetSort()),
-          }}
-        />
-      </ListFilterSection>
-      }
-    >
-      <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
+        <div className="form-section-h">Suche</div>
+        <div className="input" style={{ marginBottom: 16 }}>
+          <MockIcon n="search" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, Telefon, E-Mail…"
+            autoFocus
+          />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <label className="field">
+            <span className="field-lbl">Name</span>
+            <input
+              className="txt"
+              value={fName}
+              onChange={(e) => setFName(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </label>
+        </div>
+        <div className="form-section-h">Typ</div>
+        <div className="chiprow">
+          {(['alle', 'privat', 'hausverwaltung', 'gewerbe'] as const).map((t) => (
+            <MockChip key={t} active={typFilter === t} onClick={() => setTypFilter(t)}>
+              {t === 'alle' ? 'Alle' : t === 'privat' ? 'Privat' : t === 'hausverwaltung' ? 'Hausverwaltung' : 'Gewerbe'}
+            </MockChip>
+          ))}
+        </div>
+      </MockModal>
 
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={kunden.length === 0 ? 'Noch keine Kunden' : 'Keine Treffer'}
-          description={
-            kunden.length === 0
-              ? 'Kunden werden automatisch angelegt, wenn Anfragen eingehen, oder du legst sie manuell an.'
-              : 'Filter anpassen.'
-          }
-          action={
-            kunden.length === 0 ? (
-              <button type="button" className="btn btn-primary btn-sm" onClick={openNeuModal}>
-                + Ersten Kunden anlegen
-              </button>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
-            {sorted.map(({ row: k }) => (
-              <AppEntityListRow
-                key={k.id}
-                href={isPane ? `/kunden/${k.id}` : undefined}
-                onClick={isPane ? undefined : () => openDetail(k.id)}
-                className={cn(selectedId === k.id && 'ring-2 ring-bw-primary/40')}
-                avatar={<ListAvatar name={kundeListenName(k)} />}
-                title={kundeListenName(k)}
-                line2={`${k.telefon?.trim() || k.email?.trim() || '—'} · ${kundeRegion(k)}`}
-                line3={
-                  k.kundennummer?.trim()
-                    ? `Nr. ${k.kundennummer.trim()} · ${k.anzahl_auftraege ?? 0} Aufträge`
-                    : `${k.anzahl_auftraege ?? 0} Aufträge`
-                }
-                line4={(k.gesamt_umsatz ?? 0) > 0 ? formatEur(k.gesamt_umsatz) : undefined}
-                badge={kundeListStatusBadge(k)}
-              />
-            ))}
-          </ListMobileStack>
-
-          <ListGridShell minWidth="880px" className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}>
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: rowGrid }}>
+          {selectMode ? (
             <div
-              className="list-row-grid head"
-              style={{ gridTemplateColumns: KUNDEN_GRID_COLS }}
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                const allOn = filtered.length > 0 && filtered.every((k) => sel[k.id])
+                if (allOn) setSel({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((k) => {
+                    n[k.id] = true
+                  })
+                  setSel(n)
+                }
+              }}
             >
-              <div />
-              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Kontakt</div>
-              <div>Region</div>
-              <SortableHeader
-                label="Aufträge"
-                field="projekte"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-                className="justify-end text-right"
-              />
-              <SortableHeader
-                label="Umsatz"
-                field="umsatz"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-                className="justify-end text-right"
-              />
-              <div>Status</div>
-            </div>
-              {sorted.map(({ row: k }) => (
-              <div
-                key={k.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openDetail(k.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openDetail(k.id)
-                  }
-                }}
-                className={cn('list-row-grid', selectedId === k.id && isPane && 'ring-2 ring-bw-primary/40')}
-                style={{ gridTemplateColumns: KUNDEN_GRID_COLS }}
+              <span
+                className={cn(
+                  'vg-box',
+                  filtered.length > 0 && filtered.every((k) => sel[k.id]) && 'on'
+                )}
               >
-                <ListAvatar name={kundeListenName(k)} />
-                <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">{kundeListenName(k)}</p>
-                  <p className="truncate text-xs text-bw-text-muted">{k.kundennummer ?? '—'}</p>
-                </div>
-                <div className="min-w-0 text-[12.5px]">
-                  {k.telefon?.trim() ? (
-                    <p className="truncate text-bw-primary">{k.telefon}</p>
-                  ) : null}
-                  <p className="truncate text-bw-text-muted">{k.email?.trim() || '—'}</p>
-                </div>
-                <p className="truncate text-[13px] text-bw-text">{kundeRegion(k)}</p>
-                <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                  {k.anzahl_auftraege ?? 0}
-                </p>
-                <p
-                  className={cn(
-                    'text-right text-[13px] font-medium tabular-nums',
-                    (k.gesamt_umsatz ?? 0) > 0 ? 'text-bw-primary' : 'text-bw-text-muted'
-                  )}
-                >
-                  {formatEur(k.gesamt_umsatz)}
-                </p>
-                {kundeListStatusBadge(k)}
-              </div>
-            ))}
-          </ListGridShell>
-        </>
-      )}
+                {filtered.length > 0 && filtered.every((k) => sel[k.id]) ? (
+                  <MockIcon n="check" size={12} />
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Kunde
+          </MockSortHead>
+          <MockSortHead col="type" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Typ
+          </MockSortHead>
+          <MockSortHead col="tel" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Telefon
+          </MockSortHead>
+          <MockSortHead col="mail" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Email
+          </MockSortHead>
+          <div />
+        </div>
 
-      <KundeModal open={modalOpen} onClose={closeNeuModal} editKunde={editKunde} />
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="users"
+            title={kunden.length === 0 ? 'Keine Kunden' : 'Keine Treffer'}
+            hint={
+              kunden.length === 0
+                ? 'Lege Kunden an, um sie hier zu verwalten.'
+                : 'Filter zurücksetzen oder neuen Kunden anlegen'
+            }
+          />
+        ) : (
+          pageItems.map((k) => (
+            <div
+              key={k.id}
+              className={cn('list-row', sel[k.id] && 'sel', selectedId === k.id && isPane && 'ring-2 ring-[var(--green)]')}
+              style={{ gridTemplateColumns: rowGrid }}
+              onClick={() => (selectMode ? toggle(k.id) : openDetail(k.id))}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  selectMode ? toggle(k.id) : openDetail(k.id)
+                }
+              }}
+            >
+              {selectMode ? (
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggle(k.id)
+                  }}
+                >
+                  <span className={cn('vg-box', sel[k.id] && 'on')}>
+                    {sel[k.id] ? <MockIcon n="check" size={12} /> : null}
+                  </span>
+                </div>
+              ) : null}
+              <div className="lc-title" style={{ fontWeight: 600 }}>
+                {kundeDisplayName(k)}
+              </div>
+              <div className="lc-pills">
+                <span className="pill-tag">{kundeTypLabel(k.typ)}</span>
+              </div>
+              <div style={{ color: 'var(--text-2)' }}>{k.telefon?.trim() || '—'}</div>
+              <div
+                style={{
+                  color: 'var(--text-2)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {k.email?.trim() || '—'}
+              </div>
+              <div
+                className="row-actions always"
+                onClick={(e) => e.stopPropagation()}
+                style={{ justifyContent: 'flex-end' }}
+              >
+                <ActionsMenu
+                  trigger={
+                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                      <MockIcon n="dots" size={16} />
+                    </button>
+                  }
+                  items={listEntityMenuItems(
+                    'kunde',
+                    { name: kundeDisplayName(k), email: k.email, telefon: k.telefon },
+                    {
+                      onEdit: () => openDetail(k.id),
+                      onCopy: () => runDuplicateKunde(k.id, router),
+                      onDelete: () => {
+                        void deleteKunde(k.id).then((r) => {
+                          if (!r.ok) toast.error(r.message)
+                          else {
+                            toast.success('Kunde gelöscht')
+                            router.refresh()
+                          }
+                        })
+                      },
+                      deleteLabel: kundeDisplayName(k),
+                    }
+                  )}
+                  sheetTitle="Kunde"
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Kunden"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
+
+      <KundeModal open={modalOpen} onClose={closeNeuModal} />
 
       <CsvExportModal
         open={exportOpen}
@@ -401,11 +457,11 @@ export function KundenListeClient({
         fields={EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
           const source = scope === 'view' ? filtered : kunden
-          const data = source.map(toExportRow)
+          const data = source.map(kundeExportRow)
           const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
           exportToCSV(data, fields, 'kunden')
         }}
       />
-    </EntityListShell>
+    </div>
   )
 }

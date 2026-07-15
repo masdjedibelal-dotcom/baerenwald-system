@@ -1,4 +1,5 @@
-/** Listen-Inhalt kommt aus `rechnungen/layout.tsx` (Master-Detail ab 900px). */
+import { redirect } from 'next/navigation'
+
 export default function RechnungenPage() {
-  return null
+  redirect('/vorgaenge?phase=rechnung')
 }

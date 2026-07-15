@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { ListGridShell } from '@/components/layout/ListPageParts'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { Textarea } from '@/components/ui/Textarea'
@@ -41,9 +40,16 @@ import {
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
-import { DetailResponsiveTabs } from '@/components/layout/app'
+import {
+  MockDetailShell,
+  MockDokumenteCard,
+  MockNotizComposer,
+  MockNotizenCard,
+  MockUebersichtCard,
+} from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
@@ -183,11 +189,6 @@ function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) 
   return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
 }
 
-type KundeDetailTab = 'stammdaten' | 'organisation' | 'anfragen' | 'angebote' | 'auftraege' | 'dokumente'
-
-const DESKTOP_KUNDE_TABS_BASE: KundeDetailTab[] = ['anfragen', 'angebote', 'auftraege', 'dokumente']
-const MOBILE_KUNDE_TABS_BASE: KundeDetailTab[] = ['stammdaten', 'anfragen', 'angebote', 'auftraege', 'dokumente']
-
 export function KundeDetailClient({
   kunde: initialKunde,
   customFieldDefs,
@@ -205,7 +206,6 @@ export function KundeDetailClient({
   const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
-  const [tab, setTab] = useState<KundeDetailTab>('anfragen')
   const [interneNotiz, setInterneNotiz] = useState(initialKunde.notizen ?? '')
   const [pending, startTransition] = useTransition()
   const [customValues, setCustomValues] = useState(initialValues)
@@ -420,88 +420,16 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const desktopKundeTabIds = useMemo((): KundeDetailTab[] => {
-    if (!zeigtOrganisationTab) return DESKTOP_KUNDE_TABS_BASE
-    return ['organisation', ...DESKTOP_KUNDE_TABS_BASE]
-  }, [zeigtOrganisationTab])
-
-  const mobileKundeTabIds = useMemo((): KundeDetailTab[] => {
-    if (!zeigtOrganisationTab) return MOBILE_KUNDE_TABS_BASE
-    const rest = MOBILE_KUNDE_TABS_BASE.filter((t) => t !== 'stammdaten')
-    return ['stammdaten', 'organisation', ...rest]
-  }, [zeigtOrganisationTab])
-
-  const desktopDetailTabs = useMemo(
-    () => {
-      const tabs = [
-        ...(zeigtOrganisationTab
-          ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
-          : []),
-        {
-          id: 'anfragen' as const,
-          label: 'Anfragen',
-          icon: Mail,
-          count: anfragenCount || undefined,
-        },
-        {
-          id: 'angebote' as const,
-          label: 'Angebote',
-          icon: FileText,
-          count: angeboteCount || undefined,
-        },
-        {
-          id: 'auftraege' as const,
-          label: 'Aufträge',
-          icon: Briefcase,
-          count: auftraegeCount || undefined,
-        },
-        {
-          id: 'dokumente' as const,
-          label: 'Dokumente',
-          icon: ListChecks,
-          count: dokumenteCount || undefined,
-        },
-      ]
-      return tabs
-    },
-    [anfragenCount, angeboteCount, auftraegeCount, dokumenteCount, zeigtOrganisationTab]
-  )
-
-  const mobileDetailTabs = useMemo(
-    () => {
-      const tabs = [
-        { id: 'stammdaten' as const, label: entityDetailTabLabel('stammdaten'), icon: LayoutGrid },
-        ...(zeigtOrganisationTab
-          ? [{ id: 'organisation' as const, label: 'Organisation', icon: Building2 }]
-          : []),
-        {
-          id: 'anfragen' as const,
-          label: 'Anfragen',
-          icon: Mail,
-          count: anfragenCount || undefined,
-        },
-        {
-          id: 'angebote' as const,
-          label: 'Angebote',
-          icon: FileText,
-          count: angeboteCount || undefined,
-        },
-        {
-          id: 'auftraege' as const,
-          label: 'Aufträge',
-          icon: Briefcase,
-          count: auftraegeCount || undefined,
-        },
-        {
-          id: 'dokumente' as const,
-          label: 'Dokumente',
-          icon: ListChecks,
-          count: dokumenteCount || undefined,
-        },
-      ]
-      return tabs
-    },
-    [anfragenCount, angeboteCount, auftraegeCount, dokumenteCount, zeigtOrganisationTab]
+  const kundeUebersichtStats = useMemo(
+    () => [
+      { icon: 'inbox', label: 'Anfragen', value: String(anfragenCount) },
+      { icon: 'file-invoice', label: 'Angebote', value: String(angeboteCount) },
+      { icon: 'tool', label: 'Aufträge', value: String(auftraegeCount) },
+      { icon: 'calculator', label: 'Umsatz', value: formatEur(kunde.gesamt_umsatz) },
+      { icon: 'trending-up', label: 'Ø Auftrag', value: formatEur(avgAuftrag) },
+      { icon: 'clock', label: 'Offen', value: formatEur(offenSumme) },
+    ],
+    [anfragenCount, angeboteCount, auftraegeCount, kunde.gesamt_umsatz, avgAuftrag, offenSumme]
   )
 
   const ueberfaellig = useMemo(() => {
@@ -745,25 +673,7 @@ export function KundeDetailClient({
     </Card>
   )
 
-  const kpiRow = (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-      {[
-        ['Anfragen', String(anfragenCount)],
-        ['Angebote', String(angeboteCount)],
-        ['Aufträge', String(auftraegeCount)],
-        ['Umsatz', formatEur(kunde.gesamt_umsatz)],
-        ['Ø Auftrag', formatEur(avgAuftrag)],
-        ['Offen', formatEur(offenSumme)],
-      ].map(([label, value]) => (
-        <div key={label} className="rounded-lg border border-bw-border bg-bw-card px-3 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-bw-text-muted">{label}</div>
-          <div className="mt-0.5 text-base font-semibold tabular-nums text-bw-text">{value}</div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const fixedOverview = (
+  const tabStammdaten = (
     <div className="space-y-3">
       {stammdatenCard}
       <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
@@ -776,18 +686,26 @@ export function KundeDetailClient({
           onChanged={() => refresh()}
         />
       ) : null}
-      <Card title="Interne Notiz" collapsible>
-        <p className="mb-2 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
-        <Textarea
-          placeholder="Interne Kundennotiz…"
-          value={interneNotiz}
-          onChange={(e) => setInterneNotiz(e.target.value)}
-          rows={5}
-        />
-      </Card>
-      {kpiRow}
       <KommunikationCard filter={{ kundeId: kunde.id }} reloadKey={mailCompose.reloadKey + generation} />
     </div>
+  )
+
+  const tabNotizen = (
+    <MockNotizenCard
+      notes={
+        interneNotiz.trim()
+          ? [{ text: interneNotiz.trim(), autor: 'Interne Notiz', time: 'Auto-Save' }]
+          : []
+      }
+      composer={
+        <MockNotizComposer
+          value={interneNotiz}
+          onChange={setInterneNotiz}
+          onSubmit={() => {}}
+          placeholder="Interne Kundennotiz…"
+        />
+      }
+    />
   )
 
   const tabDokumenteInhalt = (
@@ -1172,32 +1090,41 @@ export function KundeDetailClient({
     ansprechperson || kunde.ansprechpartner || null,
   ].filter(Boolean) as string[]
 
-  const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
-    return [
-      {
-        label: 'Neue Anfrage',
-        icon: <Mail className="h-4 w-4" aria-hidden />,
-        onClick: () => router.push(kundeNeueAnfrageHref(kunde.id)),
-      },
-      {
-        label: 'Neues Angebot',
-        icon: <FileText className="h-4 w-4" aria-hidden />,
-        onClick: () => router.push(kundeNeuesAngebotHref(kunde)),
-      },
-      {
-        label: 'Neuer Auftrag',
-        icon: <Briefcase className="h-4 w-4" aria-hidden />,
-        onClick: () => router.push(kundeNeuerAuftragHref(kunde)),
-      },
-      'sep',
-      {
-        label: 'MeinBärenwald-Einladung',
-        icon: <FileText className="h-4 w-4" aria-hidden />,
-        hint: !kunde.email ? 'Keine E-Mail' : undefined,
-        onClick: () => void openPortalModal(),
-      },
-    ]
-  }, [kunde, router])
+  const kundeMenuItems = useMemo(
+    () =>
+      listEntityMenuItems(
+        'kunde',
+        {
+          name: kundeDisplayName(kunde),
+          mail: kunde.email,
+          tel: kunde.telefon,
+        },
+        {
+          onPortal: () => void openPortalModal(),
+          onPortalLink: () => void openPortalModal(),
+          mail: kunde.email,
+          tel: kunde.telefon,
+          extra: [
+            {
+              icon: 'inbox',
+              label: 'Neue Anfrage',
+              onClick: () => router.push(kundeNeueAnfrageHref(kunde.id)),
+            },
+            {
+              icon: 'file-invoice',
+              label: 'Neues Angebot',
+              onClick: () => router.push(kundeNeuesAngebotHref(kunde)),
+            },
+            {
+              icon: 'briefcase',
+              label: 'Neuer Auftrag',
+              onClick: () => router.push(kundeNeuerAuftragHref(kunde)),
+            },
+          ],
+        }
+      ),
+    [kunde, router]
+  )
 
   const tabOrganisation = zeigtOrganisationTab ? (
     <KundenOrganisationTab
@@ -1208,34 +1135,77 @@ export function KundeDetailClient({
     />
   ) : null
 
-  const stammdatenInhalt = fixedOverview
-
-  const desktopTabContent =
-    tab === 'organisation'
-      ? tabOrganisation
-      : tab === 'anfragen'
-        ? tabAnfragen
-        : tab === 'angebote'
-          ? tabAngebote
-          : tab === 'auftraege'
-            ? tabAuftraege
-            : tabDokumenteInhalt
-
-  const mobileTabContent =
-    tab === 'stammdaten'
-      ? stammdatenInhalt
-      : tab === 'organisation'
-        ? tabOrganisation
-        : tab === 'anfragen'
-          ? tabAnfragen
-          : tab === 'angebote'
-            ? tabAngebote
-            : tab === 'auftraege'
-              ? tabAuftraege
-              : tabDokumenteInhalt
+  const kundeDetailGroups = [
+    {
+      id: 'uebersicht',
+      label: 'Übersicht',
+      icon: 'layout-dashboard',
+      render: () => <MockUebersichtCard stats={kundeUebersichtStats} />,
+    },
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => tabStammdaten,
+    },
+    ...(zeigtOrganisationTab
+      ? [
+          {
+            id: 'organisation',
+            label: 'Organisation',
+            icon: 'building',
+            render: () => tabOrganisation,
+          },
+        ]
+      : []),
+    {
+      id: 'anfragen',
+      label: 'Anfragen',
+      icon: 'inbox',
+      count: anfragenCount || undefined,
+      render: () => tabAnfragen,
+    },
+    {
+      id: 'angebote',
+      label: 'Angebote',
+      icon: 'file-invoice',
+      count: angeboteCount || undefined,
+      render: () => tabAngebote,
+    },
+    {
+      id: 'auftraege',
+      label: 'Aufträge',
+      icon: 'briefcase',
+      count: auftraegeCount || undefined,
+      render: () => tabAuftraege,
+    },
+    {
+      id: 'rechnungen',
+      label: 'Rechnungen',
+      icon: 'receipt',
+      count: rechnungen.length || undefined,
+      render: () => tabRechnungen,
+    },
+    {
+      id: 'dokumente',
+      label: 'Dokumente',
+      icon: 'files',
+      count: dokumenteCount || undefined,
+      render: () => <MockDokumenteCard>{tabDokumenteInhalt}</MockDokumenteCard>,
+    },
+    {
+      id: 'notizen',
+      label: 'Notizen',
+      icon: 'messages',
+      count: interneNotiz.trim() ? 1 : undefined,
+      render: () => tabNotizen,
+    },
+  ]
 
   return (
     <EntityDetailLayout
+      breadcrumbTitle={kundeDisplayName(kunde)}
+      crumbSectionLabel="Kunden"
       head={{
         backHref: '/kunden',
         backLabel: 'Zurück zu Kunden',
@@ -1283,23 +1253,7 @@ export function KundeDetailClient({
         kundeId={kunde.id}
         showKunde={kunde.portal_modus === 'organisation' || Boolean(kunde.auth_user_id)}
       />
-      <DetailResponsiveTabs
-        tab={tab}
-        onTabChange={setTab}
-        desktopOverview={fixedOverview}
-        desktopTabs={
-          <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
-        }
-        mobileTabs={
-          <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
-        }
-        desktopTabContent={desktopTabContent}
-        mobileTabContent={mobileTabContent}
-        mobileDefaultTab="stammdaten"
-        desktopDefaultTab="anfragen"
-        mobileTabIds={mobileKundeTabIds}
-        desktopTabIds={desktopKundeTabIds}
-      />
+      <MockDetailShell defaultGroup="uebersicht" groups={kundeDetailGroups} />
 
       <Modal
         open={portalModalOpen}

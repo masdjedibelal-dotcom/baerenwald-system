@@ -4,48 +4,38 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export type DetailHeadProps = {
-  /** @deprecated Zurück nur über TopBar (mobil) / Master-Detail — wird nicht mehr gerendert */
+  /** @deprecated Zurück nur über DetailCrumb / TopBar */
   backHref?: string
   backLabel?: string
-  /** Spec §3: „Zurück zu den Vorgängen · Phase › Titel“ */
   breadcrumb?: ReactNode
   title: ReactNode
   sub?: ReactNode
-  /** Chips unter Titel (PLZ, Betrag, Kanal …) */
   meta?: ReactNode
   badges?: ReactNode
   actions?: ReactNode
-  /** Stärkerer Projekt-Kopf mit Trennlinie */
   variant?: 'default' | 'project'
   className?: string
 }
 
-/** Kompakter Detail-Kopf: Titel, Badge, Aktionen — ohne Rahmen, ohne Avatar. */
+/** Mock detail-head: .dh-title, .dh-meta, .dh-titlerow */
 export function DetailHead({
   title,
   sub,
   meta,
   badges,
   actions,
-  breadcrumb,
-  variant = 'project',
   className,
 }: DetailHeadProps) {
-  return (
-    <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
-      {breadcrumb ? <div className="mb-1">{breadcrumb}</div> : null}
-      <div className="detail-head-top">
-        <div className="detail-head-main min-w-0 flex-1">
-          <div className="detail-head-title">{title}</div>
-          {badges ? (
-            <div className="detail-head-badges mt-2 flex flex-wrap items-center gap-1.5">{badges}</div>
-          ) : null}
-          {sub ? <div className="detail-head-sub">{sub}</div> : null}
-          {meta ? <div className="detail-head-meta">{meta}</div> : null}
-        </div>
+  const metaContent = meta ?? badges
 
-        {actions ? <div className="detail-head-actions min-w-0">{actions}</div> : null}
+  return (
+    <header className={cn('detail-head', className)}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="dh-title">{title}</div>
+        {sub ? <div className="sub">{sub}</div> : null}
+        {metaContent ? <div className="dh-meta">{metaContent}</div> : null}
       </div>
+      {actions ? <div className="detail-head-actions shrink-0">{actions}</div> : null}
     </header>
   )
 }

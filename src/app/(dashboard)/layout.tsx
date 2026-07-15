@@ -8,13 +8,8 @@ import { ensureUnifiedTeamAccount } from '@/lib/auth/unified-team-account'
 import { ensureStandardTemplates } from '@/lib/standard-templates'
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { BottomNav } from '@/components/layout/BottomNav'
-import { TopBar } from '@/components/layout/TopBar'
-import { FloatingAction } from '@/components/layout/FloatingAction'
-import { DemoModeBanner } from '@/components/dashboard/DemoModeBanner'
+import { DashboardShell } from '@/components/layout/DashboardShell'
 import { isDemoTestUserEmail } from '@/lib/is-demo-user'
-import { ToastProvider } from '@/components/ui'
 
 export const metadata: Metadata = {
   title: {
@@ -103,24 +98,9 @@ export default async function DashboardLayout({
 
     return (
       <DashboardProviders datenschutzHintDismissed={datenschutzHintDismissed}>
-        <div className="flex h-dvh max-h-dvh overflow-hidden bg-bw-bg">
-          <Sidebar />
-
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:ml-0">
-            <TopBar user={user} />
-
-            <main className="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-bw-bg px-4 max-md:scroll-pb-mobile-nav max-md:pb-mobile-nav has-[[data-app-master-detail]]:min-[900px]:px-0 md:px-6 md:pb-6">
-              {showDemoBanner ? <DemoModeBanner /> : null}
-              <div className="pt-2 md:pt-4 has-[[data-list-filter-sticky]]:pt-0">
-                {children}
-              </div>
-            </main>
-          </div>
-
-          <BottomNav />
-          <FloatingAction />
-          <ToastProvider />
-        </div>
+        <DashboardShell user={user} showDemoBanner={showDemoBanner}>
+          {children}
+        </DashboardShell>
       </DashboardProviders>
     )
   } catch (e) {

@@ -1,23 +1,37 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { Mail, MoreHorizontal, Pencil } from 'lucide-react'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { DetailProp } from '@/components/ui/detail-prop'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { DetailHead } from '@/components/layout/DetailHead'
+import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { createClient } from '@/lib/supabase'
+import { toast } from '@/components/ui/app-toast'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
-import { PartnerTypBadge } from '@/components/partner/PartnerNetzwerkClient'
+import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { deletePartner } from '@/app/(dashboard)/partner/actions'
+import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
+import { runDuplicatePartner } from '@/lib/list-actions'
+import type { VorgangListeRow } from '@/lib/vorgang/types'
+import {
+  MockBadge,
+  MockCard,
+  MockDetailCrumb,
+  MockDetailShell,
+  MockDokumenteCard,
+  MockEmpty,
+  MockIcon,
+  MockProp,
+  MockUebersichtCard,
+} from '@/components/mock-ui'
 
 function websiteHref(raw: string): string {
   const t = raw.trim()
@@ -29,10 +43,13 @@ function websiteHref(raw: string): string {
 export function PartnerDetailClient({
   partner: initial,
   kategorien,
+  vorgaengeRows = [],
 }: {
   partner: PartnerRow
   kategorien: PartnerKategorie[]
+  vorgaengeRows?: VorgangListeRow[]
 }) {
+  const router = useRouter()
   const { refresh } = useCrmRefresh()
   const isMobile = useIsMobile()
   const [partner, setPartner] = useState(initial)
@@ -40,6 +57,7 @@ export function PartnerDetailClient({
   const [edit, setEdit] = useState<PartnerRow | null>(null)
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
+
   useEffect(() => {
     setPartner(initial)
   }, [initial])
@@ -51,32 +69,56 @@ export function PartnerDetailClient({
     }
   }, [editOpen, partner])
 
-  const headSub = [
-    partner.partner_kategorien?.name,
-    partner.subkategorie?.trim(),
-    partner.ansprechpartner?.trim(),
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const partnerVorgaenge = useMemo(() => {
+    return filterVorgaengeByPartnerName(vorgaengeRows, partner.name, [
+      partner.subkategorie?.trim() ?? '',
+      partner.ansprechpartner?.trim() ?? '',
+    ].filter(Boolean))
+  }, [vorgaengeRows, partner.name, partner.subkategorie, partner.ansprechpartner])
 
-  const partnerMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = []
-    if (partner.email?.trim()) {
-      items.push({
-        label: 'E-Mail schreiben',
-        icon: <Mail className="h-4 w-4" aria-hidden />,
-        onClick: () => {
-          window.location.href = `mailto:${partner.email}`
-        },
-      })
-    }
-    items.push({
-      label: 'Bearbeiten',
-      icon: <Pencil className="h-4 w-4" aria-hidden />,
-      onClick: () => setEditOpen(true),
-    })
-    return items
-  }, [partner.email])
+  const uebersichtStats = useMemo(() => {
+    const anfragen = partnerVorgaenge.filter((v) => v.phase === 'anfrage').length
+    const angebote = partnerVorgaenge.filter((v) => v.phase === 'angebot').length
+    const auftraege = partnerVorgaenge.filter((v) => v.phase === 'auftrag').length
+    const umsatz = partnerVorgaenge
+      .filter((v) => v.phase === 'rechnung' && v.unterstatus === 'bezahlt')
+      .length
+    return [
+      { icon: 'inbox', label: 'Vermittelt', value: String(anfragen) },
+      { icon: 'file-invoice', label: 'Angebote', value: String(angebote) },
+      { icon: 'tool', label: 'Aufträge', value: String(auftraege) },
+      { icon: 'calculator', label: 'Umsatz', value: umsatz > 0 ? `${umsatz} Rechn.` : '0 €' },
+      {
+        icon: 'trending-up',
+        label: 'Ø Vorgang',
+        value: partnerVorgaenge.length > 0 ? String(Math.round(partnerVorgaenge.length / 3)) : '—',
+      },
+      { icon: 'clock', label: 'Offen', value: String(partnerVorgaenge.filter((v) => v.needsAction).length) },
+    ]
+  }, [partnerVorgaenge])
+
+  const partnerMenuItems = useMemo(
+    () =>
+      listEntityMenuItems(
+        'partner',
+        { name: partner.name, email: partner.email, telefon: partner.telefon },
+        {
+          onEdit: () => setEditOpen(true),
+          onCopy: () => runDuplicatePartner(partner.id, router),
+          onDelete: () => {
+            void deletePartner(partner.id).then((r) => {
+              if (!r.ok) toast.error(r.message)
+              else {
+                toast.success('Partner gelöscht')
+                router.push('/partner')
+              }
+            })
+          },
+          deleteLabel: partner.name,
+        }
+      ),
+    [partner, router]
+  )
 
   async function savePartner() {
     if (!edit) return
@@ -119,112 +161,154 @@ export function PartnerDetailClient({
     })
   }
 
-  const partnerdetailsCard = (
-    <Card
-      collapsible
-      title="Partnerdetails"
-      action={
-        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      }
-    >
-      <div className="props">
-        <DetailProp label="Typ">
-          <PartnerTypBadge partner={partner} />
-        </DetailProp>
-        <DetailProp label="Kategorie">{partner.partner_kategorien?.name?.trim() || '—'}</DetailProp>
-        <DetailProp label="Subkategorie">{partner.subkategorie?.trim() || '—'}</DetailProp>
-        <DetailProp label="Status">
-          {partner.aktiv ? (
-            <StatusBadge status="order" label="Aktiv" />
-          ) : (
-            <StatusBadge status="cancel" label="Inaktiv" />
-          )}
-        </DetailProp>
-        <DetailProp label="Ansprechpartner">{partner.ansprechpartner?.trim() || '—'}</DetailProp>
-        <DetailProp label="Telefon">
-          {partner.telefon?.trim() ? (
-            <a href={`tel:${partner.telefon.replace(/\s/g, '')}`}>{partner.telefon}</a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="E-Mail">
-          {partner.email?.trim() ? (
-            <a href={`mailto:${partner.email}`}>{partner.email}</a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="Webseite">
-          {partner.website?.trim() ? (
-            <a href={websiteHref(partner.website)} target="_blank" rel="noopener noreferrer">
-              {partner.website.trim()}
-            </a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="Adresse">{partner.adresse?.trim() || '—'}</DetailProp>
-      </div>
-    </Card>
-  )
-
-  const notizenCard = (
-    <Card collapsible title="Notizen">
-      {partner.notizen?.trim() ? (
-        <div className="whitespace-pre-wrap break-words rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text">
-          {partner.notizen}
-        </div>
-      ) : (
-        <p className="text-sm text-bw-text-muted">Keine Notizen hinterlegt.</p>
-      )}
-    </Card>
-  )
+  const kategorieName = partner.partner_kategorien?.name?.trim() || '—'
 
   return (
-    <EntityDetailLayout
-      head={{
-        backHref: '/partner',
-        backLabel: 'Zurück zu Partner',
-        title: (
-          <div className="detail-head-title-row">
-            <span>{partner.name}</span>
-            <PartnerTypBadge partner={partner} />
-          </div>
-        ),
-        sub: headSub || undefined,
-        actions: (
+    <div className="pb-6">
+      <MockDetailCrumb
+        backHref="/partner"
+        backLabel="Zurück zu Partner"
+        sectionLabel="Partner"
+        entityTitle={partner.name}
+      />
+
+      <DetailHead
+        title={partner.name}
+        meta={
           <>
-            {partner.email?.trim() ? (
-              <a href={`mailto:${partner.email}`} className="btn btn-primary btn-sm inline-flex shrink-0 gap-1.5">
-                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                E-Mail
-              </a>
+            <MockBadge kind={partner.aktiv ? 'aktiv' : 'storniert'}>
+              {partner.aktiv ? 'Aktiv' : 'Inaktiv'}
+            </MockBadge>
+            <span>{kategorieName}</span>
+            {partner.subkategorie?.trim() ? (
+              <>
+                <span className="sep">·</span>
+                <span>{partner.subkategorie.trim()}</span>
+              </>
             ) : null}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={partnerMenuItems}
-              sheetTitle="Partner"
-            />
           </>
-        ),
-      }}
-    >
-      <div className="space-y-3">
-        {partnerdetailsCard}
-        {notizenCard}
-      </div>
+        }
+        actions={
+          <ActionsMenu
+            trigger={
+              <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                <MockIcon n="dots" size={18} />
+              </button>
+            }
+            items={partnerMenuItems}
+            sheetTitle="Partner"
+          />
+        }
+      />
+
+      <MockDetailShell
+        defaultGroup="uebersicht"
+        groups={[
+          {
+            id: 'uebersicht',
+            label: 'Übersicht',
+            icon: 'layout-dashboard',
+            render: () => <MockUebersichtCard stats={uebersichtStats} />,
+          },
+          {
+            id: 'stammdaten',
+            label: 'Stammdaten',
+            icon: 'clipboard-list',
+            render: () => (
+              <MockCard title="Kontakt">
+                <div className="props">
+                  <MockProp label="Firma">{partner.name}</MockProp>
+                  <MockProp label="Kategorie">{kategorieName}</MockProp>
+                  <MockProp label="Ansprechpartner">{partner.ansprechpartner?.trim() || '—'}</MockProp>
+                  <MockProp label="Telefon" link>
+                    {partner.telefon?.trim() ? (
+                      <a href={`tel:${partner.telefon.replace(/\s/g, '')}`}>{partner.telefon}</a>
+                    ) : (
+                      '—'
+                    )}
+                  </MockProp>
+                  <MockProp label="E-Mail" link>
+                    {partner.email?.trim() ? (
+                      <a href={`mailto:${partner.email}`}>{partner.email}</a>
+                    ) : (
+                      '—'
+                    )}
+                  </MockProp>
+                  {partner.website?.trim() ? (
+                    <MockProp label="Webseite" link>
+                      <a href={websiteHref(partner.website)} target="_blank" rel="noopener noreferrer">
+                        {partner.website.trim()}
+                      </a>
+                    </MockProp>
+                  ) : null}
+                  {partner.adresse?.trim() ? (
+                    <MockProp label="Adresse">{partner.adresse.trim()}</MockProp>
+                  ) : null}
+                </div>
+              </MockCard>
+            ),
+          },
+          {
+            id: 'vorgaenge',
+            label: 'Vorgänge',
+            icon: 'folders',
+            count: partnerVorgaenge.length || undefined,
+            render: () =>
+              partnerVorgaenge.length > 0 ? (
+                <VorgaengeListeClient
+                  rows={vorgaengeRows}
+                  embedded
+                  restrictPartnerName={partner.name}
+                />
+              ) : (
+                <MockCard title="Vorgänge">
+                  <MockEmpty
+                    icon="folders"
+                    title="Noch keine Vorgänge"
+                    hint="Vermittelte Anfragen mit Partnerbezug erscheinen hier."
+                  />
+                </MockCard>
+              ),
+          },
+          {
+            id: 'dokumente',
+            label: 'Dokumente',
+            icon: 'files',
+            render: () => (
+              <MockDokumenteCard empty={!partner.website?.trim() && !partner.notizen?.trim()}>
+                {partner.website?.trim() ? (
+                  <div className="props">
+                    <MockProp label="Webseite" link>
+                      <a href={websiteHref(partner.website)} target="_blank" rel="noopener noreferrer">
+                        {partner.website.trim()}
+                      </a>
+                    </MockProp>
+                  </div>
+                ) : null}
+                {partner.notizen?.trim() ? (
+                  <p className="whitespace-pre-wrap break-words text-sm" style={{ marginTop: 12 }}>
+                    {partner.notizen.trim()}
+                  </p>
+                ) : null}
+              </MockDokumenteCard>
+            ),
+          },
+          {
+            id: 'notizen',
+            label: 'Notizen',
+            icon: 'messages',
+            render: () => (
+              <MockCard title="Notizen">
+                {partner.notizen?.trim() ? (
+                  <div className="whitespace-pre-wrap break-words text-sm">{partner.notizen}</div>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Keine Notizen hinterlegt.</p>
+                )}
+              </MockCard>
+            ),
+          },
+        ]}
+      />
 
       {edit && editOpen
         ? (() => {
@@ -341,6 +425,6 @@ export function PartnerDetailClient({
             )
           })()
         : null}
-    </EntityDetailLayout>
+    </div>
   )
 }

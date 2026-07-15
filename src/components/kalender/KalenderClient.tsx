@@ -9,15 +9,13 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import { MockBtn, MockChip, MockModal } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
-import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 import {
   deleteKalenderTermin,
@@ -342,8 +340,7 @@ export function KalenderClient() {
     await load()
   }
 
-  async function submitForm(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveTermin() {
     startTransition(async () => {
       const res = await saveKalenderTermin({
         id: editing?.id,
@@ -363,10 +360,15 @@ export function KalenderClient() {
         toast.error(res.message)
         return
       }
-      toast.success('Termin gespeichert')
+      toast.success(editing ? 'Termin gespeichert' : `Termin „${fTitel || 'Neuer Termin'}“ angelegt`)
       setModalOpen(false)
       await load()
     })
+  }
+
+  async function submitForm(e: React.FormEvent) {
+    e.preventDefault()
+    await saveTermin()
   }
 
   async function onDelete() {
@@ -393,65 +395,35 @@ export function KalenderClient() {
   if (!mounted) {
     return (
       <div>
-        <PageHeader
-          action={
-            <Button type="button" variant="primary" size="sm" disabled>
-              + Termin
-            </Button>
-          }
-        />
-        <div className="rounded-lg border border-bw-border bg-bw-card p-8 text-center text-sm text-bw-text-muted">
-          Kalender wird geladen …
+        <div className="listbar" style={{ marginBottom: 12 }}>
+          <div className="listbar-chips">
+            <MockChip active>Monat</MockChip>
+          </div>
         </div>
+        <div className="empty">Kalender wird geladen …</div>
       </div>
     )
   }
 
   return (
     <div>
-      <PageHeader
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="hidden flex-wrap gap-1 md:flex">
-              {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => changeUiView(v)}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                    uiView === v
-                      ? 'border-bw-primary bg-bw-primary text-white'
-                      : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
-                  )}
-                >
-                  {v === 'tag' ? 'Tag' : v === 'woche' ? 'Woche' : v === 'monat' ? 'Monat' : 'Liste'}
-                </button>
-              ))}
-            </div>
-            <Button type="button" variant="primary" size="sm" onClick={() => openNeu()}>
-              + Termin
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="mb-3 flex flex-wrap gap-1 md:hidden">
-        {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => changeUiView(v)}
-            className={cn(
-              'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-              uiView === v
-                ? 'border-bw-primary bg-bw-primary text-white'
-                : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover'
-            )}
-          >
-            {v === 'tag' ? 'Tag' : v === 'woche' ? 'Woche' : v === 'monat' ? 'Monat' : 'Liste'}
-          </button>
-        ))}
+      <div className="listbar" style={{ marginBottom: 12 }}>
+        <div className="listbar-chips">
+          {(['tag', 'woche', 'monat', 'liste'] as const).map((v) => (
+            <MockChip
+              key={v}
+              active={uiView === v}
+              onClick={() => changeUiView(v)}
+            >
+              {v === 'tag' ? 'Tag' : v === 'woche' ? 'Woche' : v === 'monat' ? 'Monat' : 'Liste'}
+            </MockChip>
+          ))}
+        </div>
+        <div className="listbar-actions">
+          <MockBtn sm icon="plus" kind="primary" onClick={() => openNeu()}>
+            Termin
+          </MockBtn>
+        </div>
       </div>
 
       {loadErr ? (
@@ -460,7 +432,7 @@ export function KalenderClient() {
         </p>
       ) : null}
 
-      <div className="fc-root-wrapper rounded-lg border border-bw-border bg-bw-card p-2 shadow-card md:p-3">
+      <div className="listcard" style={{ padding: 8 }}>
         <FullCalendar
           ref={calendarRef}
           key={`${initialView}`}
@@ -505,11 +477,28 @@ export function KalenderClient() {
         <KalenderTeamAuslastung members={teamAuslastung} />
       </div>
 
-      <Modal
+      <MockModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
-        size="md"
+        icon={editing ? 'calendar-event' : 'calendar-plus'}
+        title={editing ? editing.titel : 'Neuer Termin'}
+        sub="Kalender"
+        footer={
+          <>
+            <MockBtn sm kind="ghost" onClick={() => setModalOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            {editing ? (
+              <MockBtn sm kind="ghost" icon="trash" onClick={() => void onDelete()}>
+                Löschen
+              </MockBtn>
+            ) : null}
+            <MockBtn sm kind="primary" icon="check" onClick={() => void saveTermin()}>
+              {editing ? 'Speichern' : 'Termin anlegen'}
+            </MockBtn>
+          </>
+        }
       >
             <form onSubmit={submitForm} className="space-y-4 max-h-[60vh] overflow-y-auto">
               <Input label="Titel" value={fTitel} onChange={(e) => setFTitel(e.target.value)} required />
@@ -598,21 +587,8 @@ export function KalenderClient() {
                 <input type="checkbox" checked={fErledigt} onChange={(e) => setFErledigt(e.target.checked)} />
                 Erledigt
               </label>
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button type="submit" variant="primary" loading={pending} className="flex-1">
-                  Speichern
-                </Button>
-                {editing ? (
-                  <Button type="button" variant="danger" onClick={() => void onDelete()}>
-                    Löschen
-                  </Button>
-                ) : null}
-                <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
-                  Abbrechen
-                </Button>
-              </div>
             </form>
-      </Modal>
+      </MockModal>
     </div>
   )
 }

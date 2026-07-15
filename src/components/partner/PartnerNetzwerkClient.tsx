@@ -1,32 +1,26 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import {
-  ListFilterSection,
-  ListMobileStack,
-  ListGridShell,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
 import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { useExport, type ExportField } from '@/hooks/useExport'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
 import {
-  getZeitraumRange,
-  datumInZeitraum,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
+  MockBadge,
+  MockBtn,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockModal,
+  MockPager,
+  MockSortHead,
+} from '@/components/mock-ui'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useListPage } from '@/hooks/useListPage'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { deletePartner } from '@/app/(dashboard)/partner/actions'
+import { runDuplicatePartner } from '@/lib/list-actions'
 import { cn } from '@/lib/utils'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 
 export type PartnerKategorie = {
   id: string
@@ -52,24 +46,30 @@ export type PartnerRow = {
   partner_kategorien: { name: string; slug: string; sort_order: number } | null
 }
 
+const MOCK_KATS = ['Versicherung', 'Finanzierung', 'Makler', 'Planung', 'Logistik']
+
 const PARTNER_EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
   { key: 'kategorie', label: 'Kategorie' },
-  { key: 'subkategorie', label: 'Subkategorie' },
+  { key: 'ansprechpartner', label: 'Ansprechpartner' },
   { key: 'telefon', label: 'Telefon' },
   { key: 'email', label: 'E-Mail' },
   { key: 'adresse', label: 'Adresse' },
 ]
 
-const PARTNER_GRID_COLS = '42px minmax(200px,2fr) minmax(160px,1.2fr) minmax(120px,1fr) 100px 90px'
+const PARTNER_ROW_GRID = '1.6fr 1fr 1.2fr 1.1fr 1.5fr 90px 60px'
 
-type TypListenFilter = 'alle' | 'partner' | 'netzwerk'
+type SortCol = 'name' | 'category' | 'contact' | 'tel' | 'mail'
+
+function partnerKategorieName(p: PartnerRow): string {
+  return p.partner_kategorien?.name?.trim() || p.subkategorie?.trim() || '—'
+}
 
 function partnerExportRow(p: PartnerRow): Record<string, unknown> {
   return {
     name: p.name,
-    kategorie: p.partner_kategorien?.name ?? '',
-    subkategorie: p.subkategorie ?? '',
+    kategorie: partnerKategorieName(p),
+    ansprechpartner: p.ansprechpartner ?? '',
     telefon: p.telefon ?? '',
     email: p.email ?? '',
     adresse: p.adresse ?? '',
@@ -88,24 +88,21 @@ function partnerTypBadgeCls(p: PartnerRow): string {
 
 export function PartnerTypBadge({ partner }: { partner: Pick<PartnerRow, 'partner_typ'> }) {
   return (
-    <span className={cn('badge-no-dot inline-flex rounded-full px-2 py-0.5 text-xs font-medium', partnerTypBadgeCls(partner as PartnerRow))}>
+    <span
+      className={cn(
+        'badge-no-dot inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+        partnerTypBadgeCls(partner as PartnerRow)
+      )}
+    >
       {partnerTypLabel(partner as PartnerRow)}
     </span>
   )
 }
 
-function partnerAktivBadge(p: PartnerRow) {
-  return p.aktiv ? (
-    <StatusBadge status="order" label="Aktiv" />
-  ) : (
-    <StatusBadge status="cancel" label="Inaktiv" />
-  )
-}
-
-type SortRow = {
-  row: PartnerRow
-  name: string
-  kategorie: string
+function matchesKategorie(p: PartnerRow, kategorie: string): boolean {
+  if (kategorie === 'alle') return true
+  const name = (p.partner_kategorien?.name ?? p.subkategorie ?? '').toLowerCase()
+  return name.includes(kategorie.toLowerCase())
 }
 
 export function PartnerNetzwerkClient({
@@ -120,292 +117,371 @@ export function PartnerNetzwerkClient({
   selectedId?: string | null
 }) {
   const router = useRouter()
-  const { exportToCSV } = useExport()
-  const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
-  const [brancheFilter, setBrancheFilter] = useState('alle')
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
+  const isPane = mode === 'pane'
+
   const [exportOpen, setExportOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [kategorie, setKategorie] = useState('alle')
+  const [fName, setFName] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [sel, setSel] = useState<Record<string, boolean>>({})
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
 
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
-  )
+  const { exportToCSV } = useExport()
 
-  const typCounts = useMemo(() => {
-    let partner = 0
-    let netzwerk = 0
-    for (const p of partners) {
-      if ((p.partner_typ ?? 'partner') === 'netzwerk') netzwerk++
-      else partner++
-    }
-    return { alle: partners.length, partner, netzwerk }
-  }, [partners])
-
-  const imTyp = useMemo(() => {
-    if (typFilter === 'alle') return partners
-    return partners.filter((p) => (p.partner_typ ?? 'partner') === typFilter)
-  }, [partners, typFilter])
-
-  const brancheCounts = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const p of imTyp) {
-      if (!p.kategorie_id) continue
-      m.set(p.kategorie_id, (m.get(p.kategorie_id) ?? 0) + 1)
-    }
-    return m
-  }, [imTyp])
-
-  const kategorienMitNutzung = useMemo(() => {
-    return [...kategorien].sort((a, b) => a.sort_order - b.sort_order)
+  const kategorieChips = useMemo(() => {
+    const fromDb = [...kategorien]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((k) => k.name)
+    return Array.from(new Set([...MOCK_KATS, ...fromDb]))
   }, [kategorien])
 
-  const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return imTyp.filter((p) => {
-      if (brancheFilter !== 'alle' && p.kategorie_id !== brancheFilter) return false
-      if (dateRange && !datumInZeitraum(p.created_at, dateRange)) return false
-      if (!needle) return true
-      const hay = [
-        p.name,
-        p.subkategorie ?? '',
-        p.partner_kategorien?.name ?? '',
-        p.telefon ?? '',
-        p.email ?? '',
-        p.adresse ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-      return hay.includes(needle)
-    })
-  }, [imTyp, brancheFilter, dateRange, debouncedQ])
+  const activeFilterCount = (kategorie !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((p) => ({
-        row: p,
-        name: p.name,
-        kategorie: p.partner_kategorien?.name ?? '',
-      })),
-    [filtered]
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return partners.filter((p) => {
+      if (!matchesKategorie(p, kategorie)) return false
+      if (
+        q &&
+        !(
+          p.name +
+          ' ' +
+          partnerKategorieName(p) +
+          ' ' +
+          (p.ansprechpartner ?? '') +
+          ' ' +
+          (p.telefon ?? '') +
+          ' ' +
+          (p.email ?? '')
+        )
+          .toLowerCase()
+          .includes(q)
+      ) {
+        return false
+      }
+      if (fName && !p.name.toLowerCase().includes(fName.toLowerCase())) return false
+      return true
+    })
+  }, [partners, kategorie, query, fName])
+
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered
+    const dir = sortDir
+    const keyFn = (p: PartnerRow): string => {
+      switch (sortCol) {
+        case 'name':
+          return p.name.toLowerCase()
+        case 'category':
+          return partnerKategorieName(p).toLowerCase()
+        case 'contact':
+          return (p.ansprechpartner ?? '').toLowerCase()
+        case 'tel':
+          return p.telefon ?? ''
+        case 'mail':
+          return (p.email ?? '').toLowerCase()
+        default:
+          return ''
+      }
+    }
+    return [...filtered].sort((a, b) => {
+      const av = keyFn(a)
+      const bv = keyFn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sortCol, sortDir])
+
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
+
+  const resetFilters = () => {
+    setKategorie('alle')
+    setQuery('')
+    setFName('')
+  }
+
+  const toggle = (id: string) => setSel((s) => ({ ...s, [id]: !s[id] }))
+  const selectedCount = Object.values(sel).filter(Boolean).length
+
+  const paginationResetKey = `${kategorie}|${query}|${fName}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    sorted,
+    10,
+    paginationResetKey
   )
 
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
-
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    if (typFilter !== 'alle') {
-      t.push({
-        id: 'typ',
-        label: typFilter === 'netzwerk' ? 'Netzwerk' : 'Partner',
-        onRemove: () => setTypFilter('alle'),
-      })
-    }
-    if (brancheFilter !== 'alle') {
-      const label = kategorien.find((k) => k.id === brancheFilter)?.name ?? 'Branche'
-      t.push({ id: 'br', label, onRemove: () => setBrancheFilter('alle') })
-    }
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'z',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) {
-      t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
-    }
-    return t
-  }, [typFilter, brancheFilter, zeitraum, q, kategorien])
-
-  const hasActiveFilters = !!(typFilter !== 'alle' || brancheFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
-
-  function resetFilters() {
-    setTypFilter('alle')
-    setBrancheFilter('alle')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-    setQ('')
-    resetSort()
-  }
+  const rowGrid = (selectMode ? '40px ' : '') + PARTNER_ROW_GRID
 
   function openDetail(id: string) {
     router.push(`/partner/${id}`)
   }
 
-  const isPane = mode === 'pane'
-
-  const sortOptions = [
-    { field: 'name', label: 'Name' },
-    { field: 'kategorie', label: 'Kategorie' },
-  ]
-
-  const typChipOptions = useMemo(
-    () => [
-      { label: 'Alle', value: 'alle', count: typCounts.alle },
-      { label: 'Partner', value: 'partner', count: typCounts.partner },
-      { label: 'Netzwerk', value: 'netzwerk', count: typCounts.netzwerk },
-    ],
-    [typCounts]
-  )
-
-  const brancheChipOptions = useMemo(
-    () => [
-      { label: 'Alle Branchen', value: 'alle', count: imTyp.length },
-      ...kategorienMitNutzung.map((k) => ({
-        label: k.name,
-        value: k.id,
-        count: brancheCounts.get(k.id) ?? 0,
-      })),
-    ],
-    [imTyp.length, kategorienMitNutzung, brancheCounts]
-  )
+  const chipItems = ['alle', ...kategorieChips]
 
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-      <ListFilterSection
-        chipGroups={[
-          {
-            label: 'Typ',
-            options: typChipOptions,
-            selected: [typFilter],
-            onChange: (vals) => {
-              setTypFilter((vals[0] as TypListenFilter) || 'alle')
-              setBrancheFilter('alle')
-            },
-          },
-          {
-            label: 'Branche',
-            options: brancheChipOptions,
-            selected: [brancheFilter],
-            onChange: (vals) => setBrancheFilter(vals[0] || 'alle'),
-          },
-        ]}
+    <div>
+      <div className="listbar">
+        <div className="listbar-chips">
+          {chipItems.map((k) => (
+            <MockChip
+              key={k}
+              active={kategorie === k}
+              onClick={() => setKategorie(k)}
+              count={k === 'alle' ? partners.length : undefined}
+            >
+              {k === 'alle' ? 'Alle' : k}
+            </MockChip>
+          ))}
+        </div>
+        <div className="listbar-actions">
+          <MockBtn
+            icon="filter"
+            kind={activeFilterCount ? 'primary' : 'ghost'}
+            sm
+            onClick={() => setFilterOpen(true)}
+          >
+            <span className="listbar-btn-label">
+              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="checks"
+            kind={selectMode ? 'primary' : 'ghost'}
+            sm
+            onClick={() => {
+              setSelectMode((m) => !m)
+              setSel({})
+            }}
+          >
+            <span className="listbar-btn-label">
+              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+            </span>
+          </MockBtn>
+          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+            <span className="listbar-btn-label">Export</span>
+          </MockBtn>
+        </div>
+      </div>
+
+      <MockModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        icon="filter"
+        title="Filter & Suchen"
+        sub="Partner eingrenzen"
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={resetFilters}>
+              Zurücksetzen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+              Anwenden ({filtered.length})
+            </MockBtn>
+          </>
+        }
       >
-        <ListFilterBar
-          hideStatusFilter
-          statusLabel="—"
-          statusOptions={[{ value: '', label: '—' }]}
-          statusValue=""
-          onStatusChange={() => {}}
-          zeitraumValue={zeitraum}
-          onZeitraumChange={setZeitraum}
-          showCustomDates={zeitraum === 'benutzerdefiniert'}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={setCustomFrom}
-          onCustomToChange={setCustomTo}
-          searchValue={q}
-          onSearchChange={setQ}
-          searchPlaceholder="Name, Kategorie, Telefon, E-Mail, Adresse"
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-          tags={filterTags}
-          onExportClick={() => setExportOpen(true)}
-          resultCount={filtered.length}
-          sort={{
-            options: sortOptions,
-            currentField: field,
-            currentDir: dir,
-            onSort: (f) => (f ? handleSort(f) : resetSort()),
-          }}
-        />
-      </ListFilterSection>
-      }
-    >
-      <PageHeader className="hidden md:block" />
+        <div className="form-section-h">Suche</div>
+        <div className="input" style={{ marginBottom: 16 }}>
+          <MockIcon n="search" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, Kategorie, Ansprechpartner…"
+            autoFocus
+          />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <label className="field">
+            <span className="field-lbl">Name</span>
+            <input
+              className="txt"
+              value={fName}
+              onChange={(e) => setFName(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </label>
+        </div>
+        <div className="form-section-h">Kategorie</div>
+        <div className="chiprow">
+          {chipItems.map((k) => (
+            <MockChip key={k} active={kategorie === k} onClick={() => setKategorie(k)}>
+              {k === 'alle' ? 'Alle' : k}
+            </MockChip>
+          ))}
+        </div>
+      </MockModal>
 
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={imTyp.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
-          description={
-            imTyp.length === 0
-              ? 'Erfassen Sie Lieferanten und Partner für Ihr Netzwerk.'
-              : 'Passe Filter oder Suche an.'
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
-            {sorted.map(({ row: p }) => (
-              <AppEntityListRow
-                key={p.id}
-                href={isPane ? `/partner/${p.id}` : undefined}
-                onClick={isPane ? undefined : () => openDetail(p.id)}
-                className={cn(selectedId === p.id && 'ring-2 ring-bw-primary/40')}
-                avatar={<ListAvatar name={p.name} />}
-                title={p.name}
-                line2={p.partner_kategorien?.name ?? '—'}
-                line3={
-                  [
-                    [p.telefon?.trim(), p.email?.trim()].filter(Boolean).join(' · '),
-                    p.aktiv ? 'Aktiv' : 'Inaktiv',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '—'
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: rowGrid }}>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                const allOn = filtered.length > 0 && filtered.every((p) => sel[p.id])
+                if (allOn) setSel({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((p) => {
+                    n[p.id] = true
+                  })
+                  setSel(n)
                 }
-                line4={p.subkategorie?.trim() || undefined}
-                badge={<PartnerTypBadge partner={p} />}
-              />
-            ))}
-          </ListMobileStack>
-
-          <ListGridShell minWidth="880px" className="hidden md:block">
-            <div className="list-row-grid head" style={{ gridTemplateColumns: PARTNER_GRID_COLS }}>
-              <div />
-              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Kontakt</div>
-              <SortableHeader
-                label="Kategorie"
-                field="kategorie"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-              />
-              <div>Typ</div>
-              <div>Status</div>
-            </div>
-            {sorted.map(({ row: p }) => (
-              <Link
-                key={p.id}
-                href={`/partner/${p.id}`}
-                onClick={isPane ? (e) => e.preventDefault() : undefined}
+              }}
+            >
+              <span
                 className={cn(
-                  'list-row-grid',
-                  selectedId === p.id && isPane && 'ring-2 ring-bw-primary/40'
+                  'vg-box',
+                  filtered.length > 0 && filtered.every((p) => sel[p.id]) && 'on'
                 )}
-                style={{ gridTemplateColumns: PARTNER_GRID_COLS }}
               >
-                <ListAvatar name={p.name} />
-                <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">{p.name}</p>
-                  <p className="truncate text-xs text-bw-text-muted">{p.subkategorie?.trim() || '—'}</p>
+                {filtered.length > 0 && filtered.every((p) => sel[p.id]) ? (
+                  <MockIcon n="check" size={12} />
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Name
+          </MockSortHead>
+          <MockSortHead col="category" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Kategorie
+          </MockSortHead>
+          <MockSortHead col="contact" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Ansprechpartner
+          </MockSortHead>
+          <MockSortHead col="tel" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Telefon
+          </MockSortHead>
+          <MockSortHead col="mail" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Email
+          </MockSortHead>
+          <div>Status</div>
+          <div />
+        </div>
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="users"
+            title={partners.length === 0 ? 'Keine Partner' : 'Keine Treffer'}
+            hint={
+              partners.length === 0
+                ? 'Erfassen Sie Lieferanten und Partner für Ihr Netzwerk.'
+                : 'Filter zurücksetzen oder Suche anpassen'
+            }
+          />
+        ) : (
+          pageItems.map((p) => (
+            <div
+              key={p.id}
+              className={cn('list-row', sel[p.id] && 'sel', selectedId === p.id && isPane && 'ring-2 ring-[var(--green)]')}
+              style={{ gridTemplateColumns: rowGrid }}
+              onClick={() => (selectMode ? toggle(p.id) : openDetail(p.id))}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  selectMode ? toggle(p.id) : openDetail(p.id)
+                }
+              }}
+            >
+              {selectMode ? (
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggle(p.id)
+                  }}
+                >
+                  <span className={cn('vg-box', sel[p.id] && 'on')}>
+                    {sel[p.id] ? <MockIcon n="check" size={12} /> : null}
+                  </span>
                 </div>
-                <div className="min-w-0 text-[12.5px]">
-                  {p.telefon?.trim() ? (
-                    <p className="truncate text-bw-primary">{p.telefon}</p>
-                  ) : null}
-                  <p className="truncate text-bw-text-muted">{p.email?.trim() || '—'}</p>
-                </div>
-                <p className="truncate text-[13px] text-bw-text">{p.partner_kategorien?.name ?? '—'}</p>
-                <PartnerTypBadge partner={p} />
-                {partnerAktivBadge(p)}
-              </Link>
-            ))}
-          </ListGridShell>
-        </>
-      )}
+              ) : null}
+              <div className="lc-title" style={{ fontWeight: 600 }}>
+                {p.name}
+              </div>
+              <div className="lc-pills">
+                <span className="pill-tag">{partnerKategorieName(p)}</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{p.ansprechpartner?.trim() || '—'}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{p.telefon?.trim() || '—'}</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-2)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {p.email?.trim() || '—'}
+              </div>
+              <div className="lc-status">
+                <MockBadge kind={p.aktiv ? 'aktiv' : 'fertig'}>
+                  {p.aktiv ? 'Aktiv' : 'Verfügbar'}
+                </MockBadge>
+              </div>
+              <div
+                className="row-actions always"
+                onClick={(e) => e.stopPropagation()}
+                style={{ justifyContent: 'flex-end' }}
+              >
+                <ActionsMenu
+                  trigger={
+                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                      <MockIcon n="dots" size={16} />
+                    </button>
+                  }
+                  items={listEntityMenuItems(
+                    'partner',
+                    { name: p.name, email: p.email, telefon: p.telefon },
+                    {
+                      onEdit: () => openDetail(p.id),
+                      onCopy: () => runDuplicatePartner(p.id, router),
+                      onDelete: () => {
+                        void deletePartner(p.id).then((r) => {
+                          if (!r.ok) toast.error(r.message)
+                          else {
+                            toast.success('Partner gelöscht')
+                            router.refresh()
+                          }
+                        })
+                      },
+                      deleteLabel: p.name,
+                    }
+                  )}
+                  sheetTitle="Partner"
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Partner"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
 
       <CsvExportModal
         open={exportOpen}
@@ -419,6 +495,6 @@ export function PartnerNetzwerkClient({
           exportToCSV(data, fields, 'partner')
         }}
       />
-    </EntityListShell>
+    </div>
   )
 }

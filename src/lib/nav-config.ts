@@ -2,13 +2,13 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   Folders,
-  Receipt,
   HardHat,
   Users,
   Building2,
   Calendar,
   Settings,
   Sparkles,
+  Wrench,
 } from 'lucide-react'
 
 export type NavItemDef = {
@@ -24,7 +24,7 @@ export type NavGroupDef = {
   items: NavItemDef[]
 }
 
-/** Gruppierte Sidebar-Navigation (Desktop). */
+/** Mock-NAV: Baerenwald CRM (standalone) (2).html */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
     id: 'arbeit',
@@ -39,48 +39,46 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
     label: 'Stammdaten',
     items: [
       { href: '/kunden', icon: Users, label: 'Kunden' },
-      { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
+      { href: '/handwerker', icon: Wrench, label: 'Handwerker' },
       { href: '/partner', icon: Building2, label: 'Partner' },
     ],
   },
   {
-    id: 'finanzen',
-    label: 'Finanzen',
-    items: [{ href: '/rechnungen', icon: Receipt, label: 'Rechnungen' }],
-  },
-  {
     id: 'planung',
     label: 'Planung',
-    items: [
-      { href: '/kalender', icon: Calendar, label: 'Kalender' },
-      { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub' },
-    ],
+    items: [{ href: '/kalender', icon: Calendar, label: 'Kalender' }],
   },
 ]
 
-/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
 export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS[0].items
-
-/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
 export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).flatMap((g) => g.items)
 
-/** Mobile BottomNav (5 Slots + Mehr). */
+/** Mock BottomNav: Dashboard · Vorgänge · [+] · Kalender · Mehr */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { href: '/vorgaenge', icon: Folders, label: 'Vorgänge' },
   { href: '/kalender', icon: Calendar, label: 'Kalender' },
 ]
 
-/** Mobile Mehr-Sheet. */
-export const MORE_SHEET_NAV: NavItemDef[] = [
-  { href: '/kunden', icon: Users, label: 'Kunden' },
-  { href: '/rechnungen', icon: Receipt, label: 'Rechnungen' },
-  { href: '/handwerker', icon: HardHat, label: 'Handwerker' },
-  { href: '/partner', icon: Building2, label: 'Partner' },
-  { href: '/kalender', icon: Calendar, label: 'Kalender' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub' },
-  { href: '/einstellungen', icon: Settings, label: 'Einstellungen' },
+/** Mock Mehr-Screen Kacheln (1:1 Mock — ohne Rechnungen) */
+export const MEHR_TILE_NAV: Array<{
+  href: string
+  icon: LucideIcon
+  label: string
+  desc: string
+}> = [
+  { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
+  { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
+  { href: '/partner', icon: Building2, label: 'Partner', desc: 'Netzwerk' },
+  { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
+
+/** Legacy Mehr-Sheet (Fallback) */
+export const MORE_SHEET_NAV: NavItemDef[] = MEHR_TILE_NAV.map((t) => ({
+  href: t.href,
+  icon: t.icon,
+  label: t.label,
+}))
 
 export type RouteCta = { label: string; href: string }
 
@@ -89,20 +87,21 @@ export type RouteMetaDef = {
   cta?: RouteCta
 }
 
-/** TopBar-Titel und CTAs pro Listen-Route. */
+/** TopBar-Titel pro Route (Mock: kein CTA in TopBar — FAB/Neu-Popover). */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
-  '/vorgaenge': { title: 'Vorgänge', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
-  '/anfragen': { title: 'Anfragen', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
-  '/auftraege': { title: 'Aufträge' },
-  '/rechnungen': { title: 'Rechnungen', cta: { label: 'Neue Rechnung', href: '/rechnungen/neu' } },
-  '/handwerker': { title: 'Handwerker', cta: { label: 'Neuer Handwerker', href: '/handwerker?neu=1' } },
-  '/kunden': { title: 'Kunden', cta: { label: 'Neuer Kunde', href: '/kunden?neu=1' } },
-  '/partner': { title: 'Partner', cta: { label: 'Neuer Partner', href: '/partner?neu=1' } },
+  '/vorgaenge': { title: 'Vorgänge' },
+  '/anfragen': { title: 'Anfrage' },
+  '/auftraege': { title: 'Auftrag' },
+  '/rechnungen': { title: 'Rechnung' },
+  '/handwerker': { title: 'Handwerker' },
+  '/kunden': { title: 'Kunden' },
+  '/partner': { title: 'Partner' },
   '/kalender': { title: 'Kalender' },
-  '/angebote': { title: 'Angebote' },
+  '/angebote': { title: 'Angebot' },
   '/einstellungen': { title: 'Einstellungen' },
-  '/ki-analytics': { title: 'KI Hub' },
+  '/mehr': { title: 'Mehr' },
+  '/neu': { title: 'Neu erstellen' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -116,7 +115,7 @@ export const SECTION_LABELS: Record<string, string> = {
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
-  'ki-analytics': 'KI Hub',
+  mehr: 'Mehr',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {
@@ -128,7 +127,7 @@ export const SUB_LABELS: Record<string, Record<string, string>> = {
     formulare: 'Formulare',
     email: 'Benachrichtigungen',
     kommunikation: 'Textbausteine',
-    integration: 'Integrationen',
+    sicherheit: 'Sicherheit & DSGVO',
     compliance: 'Compliance',
     datenschutz: 'Datenschutz & DSGVO',
     felder: 'Custom Fields',

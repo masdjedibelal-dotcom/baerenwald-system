@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { CheckCircle, XCircle, Info, X } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 type ToastType = 'success' | 'error' | 'info'
@@ -19,6 +19,7 @@ function formatMessage(title: string, opts?: { description?: string }): string {
   return title
 }
 
+/** Mock-Toast: unten zentriert, grün mit Check — wie Standalone-Mock */
 export const toast = {
   success: (msg: string) => dispatchToast?.('success', msg),
   error: (msg: string) => dispatchToast?.('error', msg),
@@ -27,10 +28,10 @@ export const toast = {
     dispatchToast?.('info', formatMessage(title, opts)),
 }
 
-const icons = {
-  success: CheckCircle,
-  error: XCircle,
-  info: Info,
+const AUTO_MS: Record<ToastType, number> = {
+  success: 2600,
+  error: 4000,
+  info: 2600,
 }
 
 export function ToastProvider() {
@@ -39,10 +40,9 @@ export function ToastProvider() {
   const push = useCallback((type: ToastType, message: string) => {
     const id = Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { id, type, message }])
-    const ms = type === 'error' ? 5000 : 3000
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, ms)
+    }, AUTO_MS[type])
   }, [])
 
   useEffect(() => {
@@ -52,36 +52,17 @@ export function ToastProvider() {
     }
   }, [push])
 
+  const active = toasts[toasts.length - 1]
+  if (!active) return null
+
   return (
     <div
-      className="pointer-events-none fixed right-4 top-14 z-toast flex w-full max-w-md flex-col gap-2 px-4 md:top-16 md:px-0"
-      style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      className={cn('mock-toast', active.type === 'error' && 'error')}
+      role="status"
+      aria-live="polite"
     >
-      {toasts.map((t) => {
-        const Icon = icons[t.type]
-        return (
-          <div
-            key={t.id}
-            className={cn(
-              'pointer-events-auto flex items-center gap-3 rounded-lg border bg-bw-card px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
-              t.type === 'success' && 'border-status-order-bg text-status-order-text',
-              t.type === 'error' && 'border-status-cancel-bg text-status-cancel-text',
-              t.type === 'info' && 'border-status-new-bg text-status-new-text'
-            )}
-          >
-            <Icon className="h-5 w-5 shrink-0" aria-hidden />
-            <span className="min-w-0 flex-1">{t.message}</span>
-            <button
-              type="button"
-              onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-              className="text-current opacity-60 hover:opacity-100"
-              aria-label="Schließen"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )
-      })}
+      {active.type !== 'error' ? <MockIcon n="check" size={16} /> : null}
+      <span>{active.message}</span>
     </div>
   )
 }

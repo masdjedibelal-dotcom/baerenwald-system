@@ -3,96 +3,63 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { FileText } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
+import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { runDuplicateAngebot } from '@/lib/list-actions'
 import {
-  ListFilterSection,
-  ListGridShell,
-  ListMobileStack,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+  MockBadge,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockPager,
+  MockSortHead,
+  MockToolbar,
+} from '@/components/mock-ui'
+import { useListPage } from '@/hooks/useListPage'
 import {
+  ANGEBOT_EINFACH_LABELS,
   betragAnzeige,
   kundeNameAusAngebot,
+  leistungAnzeige,
   matchesEinfachFilter,
   resolveStatusEinfach,
   type AngebotStatusEinfach,
 } from '@/lib/angebot-einfach'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
-import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import {
-  datumInZeitraum,
-  getZeitraumRange,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
-import { BEREICH_LABELS, cn, formatDatumZeit } from '@/lib/utils'
-import { formatRegionFromKunde } from '@/lib/list-display-helpers'
-import { angebotInAngebotePipeline } from '@/lib/crm/pipeline-liste-filter'
-import {
-  filterAktiveAngeboteListe,
-  zaehleWeitereVersionen,
-} from '@/lib/angebote/angebot-lebenszyklus'
-import { findeAngebotGruppe } from '@/lib/angebote/gruppierung-angebote-liste'
-import { gruppierenNachKunde } from '@/lib/crm/liste-gruppierung'
+import { cn, formatDatumZeit } from '@/lib/utils'
 import type { AngebotListeEintrag } from '@/lib/types'
 
-type FilterKey = '' | AngebotStatusEinfach
+type ChipFilterKey = '' | 'entwurf' | 'gesendet' | 'angenommen' | 'abgelehnt'
 
-/** Gleiche Spaltenstruktur wie Anfragen-Liste */
-const ANGEBOTE_GRID_COLS =
-  '42px minmax(160px,1.6fr) minmax(120px,1.1fr) minmax(130px,1.2fr) minmax(128px,0.95fr) minmax(72px,0.75fr) 100px 100px'
+const CHIP_FILTERS: ChipFilterKey[] = ['', 'entwurf', 'gesendet', 'angenommen', 'abgelehnt']
 
-const FILTER_ORDER: FilterKey[] = [
-  '',
-  'entwurf',
-  'gesendet',
-  'angenommen',
-  'abgelehnt',
-  'abgelaufen',
-  'ersetzt',
-]
-
-const FILTER_LABELS: Record<FilterKey, string> = {
+const FILTER_LABELS: Record<ChipFilterKey, string> = {
   '': 'Alle',
   entwurf: 'Entwurf',
   gesendet: 'Gesendet',
   angenommen: 'Angenommen',
   abgelehnt: 'Abgelehnt',
-  abgelaufen: 'Abgelaufen',
-  ersetzt: 'Ersetzt',
 }
 
-type SortRow = {
-  angebot: AngebotListeEintrag
-  kunde: string
-  created_at: string
-  betrag: number
-  status: AngebotStatusEinfach
-}
+const ANGEBOT_ROW_GRID = '110px 1.6fr 1.4fr 120px 110px 100px 40px'
 
-function angebotSituation(a: AngebotListeEintrag): string {
+type SortCol = 'nr' | 'angebot' | 'kunde' | 'betrag' | 'created_at' | 'status'
+
+function angebotTitel(a: AngebotListeEintrag): string {
+  const lf = leistungAnzeige(a)
+  if (lf !== '—') return lf
   const situation = a.leads?.situation
   return situation ? leadSituationDisplay(situation) || '—' : '—'
 }
 
-function angebotBereiche(a: AngebotListeEintrag): string {
-  const lead = a.leads
-  if (!lead) return '—'
-  const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
-  if (!bereiche.length) return '—'
-  return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-}
-
-function angebotRegion(a: AngebotListeEintrag): string {
-  return formatRegionFromKunde({ plz: a.leads?.plz ?? a.kunden?.plz, kunden: a.kunden })
+function angebotBadgeKind(st: AngebotStatusEinfach): string {
+  if (st === 'entwurf') return 'neu'
+  if (st === 'gesendet') return 'warten'
+  if (st === 'angenommen') return 'fertig'
+  if (st === 'abgelehnt' || st === 'abgelaufen') return 'storniert'
+  return 'plain'
 }
 
 export function AngeboteListeClient({
@@ -109,457 +76,264 @@ export function AngeboteListeClient({
   selectedId?: string | null
 }) {
   const router = useRouter()
-  const [statusFilter, setStatusFilter] = useState<FilterKey>('')
-  const [pipelineOnly, setPipelineOnly] = useState(true)
-  const [darstellung, setDarstellung] = useState<'liste' | 'kunde'>('liste')
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
-  const [q, setQ] = useState('')
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
+  const isPane = mode === 'pane'
 
-  const angebotIdsMitAuftragSet = useMemo(
-    () => new Set(angebotIdsMitAuftrag),
-    [angebotIdsMitAuftrag]
-  )
-  const angebotIdsMitRechnungSet = useMemo(
-    () => new Set(angebotIdsMitRechnung),
-    [angebotIdsMitRechnung]
-  )
-
-  const pipelineAngebote = useMemo(
-    () =>
-      angebote.filter((a) =>
-        angebotInAngebotePipeline(a, angebotIdsMitAuftragSet, angebotIdsMitRechnungSet)
-      ),
-    [angebote, angebotIdsMitAuftragSet, angebotIdsMitRechnungSet]
-  )
-  const pipelineGrouped = useMemo(
-    () => filterAktiveAngeboteListe(pipelineAngebote),
-    [pipelineAngebote]
-  )
-  const baseAngebote = pipelineOnly ? pipelineGrouped : angebote
-  const listSourceForVersionCount = pipelineOnly ? pipelineAngebote : angebote
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ChipFilterKey>('')
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
 
   const statusCounts = useMemo(() => {
-    const c: Partial<Record<FilterKey, number>> = { '': baseAngebote.length }
-    for (const a of baseAngebote) {
-      for (const key of FILTER_ORDER) {
+    const c: Partial<Record<ChipFilterKey, number>> = { '': angebote.length }
+    for (const a of angebote) {
+      for (const key of CHIP_FILTERS) {
         if (!key) continue
         if (matchesEinfachFilter(a, key)) c[key] = (c[key] ?? 0) + 1
       }
     }
     return c
-  }, [baseAngebote])
-
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
-  )
+  }, [angebote])
 
   const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return baseAngebote.filter((a) => {
+    const needle = query.trim().toLowerCase()
+    return angebote.filter((a) => {
       if (!matchesEinfachFilter(a, statusFilter)) return false
-      if (dateRange && !datumInZeitraum(a.created_at, dateRange)) return false
       if (!needle) return true
       const name = kundeNameAusAngebot(a).toLowerCase()
       const nr = (a.angebotsnr ?? a.id).toLowerCase()
-      const situation = angebotSituation(a).toLowerCase()
-      const bereiche = angebotBereiche(a).toLowerCase()
-      return (
-        name.includes(needle) ||
-        nr.includes(needle) ||
-        situation.includes(needle) ||
-        bereiche.includes(needle)
-      )
+      const titel = angebotTitel(a).toLowerCase()
+      return name.includes(needle) || nr.includes(needle) || titel.includes(needle)
     })
-  }, [baseAngebote, statusFilter, debouncedQ, dateRange])
+  }, [angebote, statusFilter, query])
 
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((a) => ({
-        angebot: a,
-        kunde: kundeNameAusAngebot(a),
-        created_at: a.created_at,
-        betrag: a.gesamt_fix ?? a.gesamt_max ?? a.gesamt_min ?? 0,
-        status: resolveStatusEinfach(a),
-      })),
-    [filtered]
-  )
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
 
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
-
-  const kundenGruppen = useMemo(
-    () =>
-      gruppierenNachKunde(
-        sorted.map((r) => r.angebot),
-        (a) => a.kunde_id ?? null,
-        (a) => kundeNameAusAngebot(a)
-      ),
-    [sorted]
-  )
-
-  const displayRows = useMemo(() => {
-    const rows: Array<{
-      angebot: AngebotListeEintrag
-      isVersion?: boolean
-      groupKey: string
-      weitere: number
-    }> = []
-    for (const { angebot: a } of sorted) {
-      const gruppe = pipelineOnly ? findeAngebotGruppe(a, listSourceForVersionCount) : null
-      const groupKey = gruppe?.key ?? a.id
-      const weitere = pipelineOnly ? zaehleWeitereVersionen(a, listSourceForVersionCount) : 0
-      rows.push({ angebot: a, groupKey, weitere })
-      if (pipelineOnly && gruppe && expandedGroups.has(groupKey)) {
-        for (const w of gruppe.weitere) {
-          rows.push({ angebot: w, isVersion: true, groupKey, weitere: 0 })
-        }
+  const sorted = useMemo(() => {
+    const keyFn = (a: AngebotListeEintrag): string | number => {
+      switch (sortCol) {
+        case 'nr':
+          return (a.angebotsnr ?? a.id).toLowerCase()
+        case 'angebot':
+          return angebotTitel(a).toLowerCase()
+        case 'kunde':
+          return kundeNameAusAngebot(a).toLowerCase()
+        case 'betrag':
+          return a.gesamt_fix ?? a.gesamt_max ?? a.gesamt_min ?? 0
+        case 'created_at':
+          return a.created_at ?? ''
+        case 'status':
+          return resolveStatusEinfach(a)
+        default:
+          return a.created_at ?? ''
       }
     }
-    return rows
-  }, [sorted, pipelineOnly, listSourceForVersionCount, expandedGroups])
-
-  function toggleVersionGroup(key: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
+    const dir = sortDir
+    return [...filtered].sort((a, b) => {
+      const av = keyFn(a)
+      const bv = keyFn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
     })
-  }
+  }, [filtered, sortCol, sortDir])
 
-  const hasFilters = !!(statusFilter || zeitraum !== 'alle' || q.trim() || !pipelineOnly || darstellung !== 'liste')
-
-  function resetAllFilters() {
-    setStatusFilter('')
-    setPipelineOnly(true)
-    setDarstellung('liste')
-    setExpandedGroups(new Set())
-    setQ('')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-    resetSort()
-  }
-
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'zeitraum',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) {
-      t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
-    }
-    return t
-  }, [zeitraum, q])
+  const paginationResetKey = `${statusFilter}|${query}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    sorted,
+    10,
+    paginationResetKey
+  )
 
   function openDetail(id: string) {
     router.push(`/angebote/${id}`)
   }
 
-  const isPane = mode === 'pane'
-
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-      <ListFilterSection
-        chipGroups={[
-          {
-            label: 'Ansicht',
-            options: [
-              { label: 'Pipeline', value: 'pipeline', count: pipelineGrouped.length },
-              { label: 'Alle', value: 'all', count: angebote.length },
-            ],
-            selected: [pipelineOnly ? 'pipeline' : 'all'],
-            onChange: (v) => setPipelineOnly((v[0] ?? 'pipeline') === 'pipeline'),
-          },
-          {
-            label: 'Status',
-            options: FILTER_ORDER.map((key) => ({
-              value: key,
-              label: FILTER_LABELS[key],
-              count: statusCounts[key],
-            })),
-            selected: [statusFilter],
-            onChange: (v) => setStatusFilter((v[0] ?? '') as FilterKey),
-          },
-          {
-            label: 'Darstellung',
-            options: [
-              { label: 'Liste', value: 'liste', count: filtered.length },
-              { label: 'Nach Kunde', value: 'kunde', count: kundenGruppen.length },
-            ],
-            selected: [darstellung],
-            onChange: (v) => setDarstellung((v[0] ?? 'liste') as 'liste' | 'kunde'),
-          },
-        ]}
-      >
-        <ListFilterBar
-          hideStatusFilter
-          statusLabel="Status"
-          statusOptions={[{ value: '', label: '—' }]}
-          statusValue=""
-          onStatusChange={() => {}}
-          zeitraumValue={zeitraum}
-          onZeitraumChange={setZeitraum}
-          showCustomDates={zeitraum === 'benutzerdefiniert'}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={setCustomFrom}
-          onCustomToChange={setCustomTo}
-          searchValue={q}
-          onSearchChange={setQ}
-          searchPlaceholder="Suchen…"
-          onReset={resetAllFilters}
-          hasActiveFilters={hasFilters}
-          tags={filterTags}
-          resultCount={filtered.length}
-          sort={{
-            options: [
-              { field: 'kunde', label: 'Name' },
-              { field: 'created_at', label: 'Erstellt' },
-              { field: 'betrag', label: 'Betrag' },
-              { field: 'status', label: 'Status' },
-            ],
-            currentField: field,
-            currentDir: dir,
-            onSort: (f) => (f ? handleSort(f) : resetSort()),
-          }}
-        />
-      </ListFilterSection>
-      }
-    >
-      <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
+    <div>
+      <MockToolbar query={query} onQueryChange={setQuery} placeholder="Angebote suchen..." />
 
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title={
-            angebote.length === 0
-              ? 'Noch keine Angebote'
-              : pipelineOnly && pipelineAngebote.length === 0
-                ? 'Keine Angebote in der Pipeline'
-                : 'Keine Treffer'
-          }
-          description={
-            angebote.length === 0
-              ? 'Erstelle ein Angebot aus einer Anfrage.'
-              : pipelineOnly && pipelineAngebote.length === 0
-                ? 'Angenommene oder abgeschlossene Angebote findest du unter „Alle“.'
-                : 'Passe Filter oder Suche an.'
-          }
-          action={
-            angebote.length === 0 && !isPane ? (
-              <Link href="/anfragen" className="btn btn-primary btn-sm">
-                Zu Anfragen
-              </Link>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
-            {darstellung === 'kunde'
-              ? kundenGruppen.map((gruppe) => (
-                  <div key={gruppe.key} className="space-y-2">
-                    <p className="px-1 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-                      {gruppe.label} ({gruppe.items.length})
-                    </p>
-                    {gruppe.items.map((a) => {
-                      const st = resolveStatusEinfach(a)
-                      const name = kundeNameAusAngebot(a)
-                      return (
-                        <AppEntityListRow
-                          key={a.id}
-                          href={isPane ? `/angebote/${a.id}` : undefined}
-                          onClick={isPane ? undefined : () => openDetail(a.id)}
-                          className={cn(selectedId === a.id && 'ring-2 ring-bw-primary/40')}
-                          avatar={<ListAvatar name={name} />}
-                          title={name}
-                          line2={`${angebotSituation(a)} · ${angebotBereiche(a)}`}
-                          line3={a.created_at ? formatDatumZeit(a.created_at) : '—'}
-                          line4={betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
-                          badge={<AngebotEinfachStatusBadge status={st} />}
-                        />
-                      )
-                    })}
-                  </div>
-                ))
-              : displayRows.map(({ angebot: a, isVersion, groupKey, weitere }) => {
-              const st = resolveStatusEinfach(a)
-              const name = kundeNameAusAngebot(a)
-              return (
-                <AppEntityListRow
-                  key={a.id}
-                  href={isPane ? `/angebote/${a.id}` : undefined}
-                  onClick={isPane ? undefined : () => openDetail(a.id)}
-                  className={cn(
-                    selectedId === a.id && 'ring-2 ring-bw-primary/40',
-                    isVersion && 'ml-4 border-l-2 border-bw-border pl-3'
-                  )}
-                  avatar={<ListAvatar name={name} />}
-                  title={name}
-                  line2={`${angebotSituation(a)} · ${angebotBereiche(a)}`}
-                  line3={a.created_at ? formatDatumZeit(a.created_at) : '—'}
-                  line4={
-                    weitere > 0 ? (
-                      <button
-                        type="button"
-                        className="text-left text-[11px] text-bw-link hover:underline"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          toggleVersionGroup(groupKey)
-                        }}
-                      >
-                        {expandedGroups.has(groupKey)
-                          ? 'Versionen einklappen'
-                          : `+${weitere} ältere Version${weitere === 1 ? '' : 'en'} anzeigen`}
-                        {' · '}
-                        {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
-                      </button>
-                    ) : (
-                      betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)
-                    )
+      <div className="chiprow">
+        {CHIP_FILTERS.map((key) => (
+          <MockChip
+            key={key || 'alle'}
+            active={statusFilter === key}
+            count={statusCounts[key]}
+            onClick={() => setStatusFilter(key)}
+          >
+            {FILTER_LABELS[key]}
+          </MockChip>
+        ))}
+      </div>
+
+      <div className="listcard">
+        <div className="list-row head" style={{ gridTemplateColumns: ANGEBOT_ROW_GRID }}>
+          <MockSortHead col="nr" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Nr.
+          </MockSortHead>
+          <MockSortHead
+            col="angebot"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+          >
+            Angebot
+          </MockSortHead>
+          <MockSortHead col="kunde" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Kunde
+          </MockSortHead>
+          <MockSortHead
+            col="betrag"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            right
+          >
+            Betrag
+          </MockSortHead>
+          <MockSortHead
+            col="created_at"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+          >
+            Erstellt
+          </MockSortHead>
+          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Status
+          </MockSortHead>
+          <div />
+        </div>
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="file-invoice"
+            title={angebote.length === 0 ? 'Noch keine Angebote' : 'Keine Treffer'}
+            hint={
+              angebote.length === 0
+                ? 'Erstelle ein Angebot aus einer Anfrage.'
+                : 'Suchbegriff anpassen oder Filter zurücksetzen'
+            }
+          />
+        ) : (
+          pageItems.map((a) => {
+            const st = resolveStatusEinfach(a)
+            const name = kundeNameAusAngebot(a)
+            return (
+              <div
+                key={a.id}
+                role="button"
+                tabIndex={0}
+                className={cn(
+                  'list-row',
+                  selectedId === a.id && isPane && 'active',
+                  selectedId === a.id && isPane && 'ring-2 ring-[var(--green)]'
+                )}
+                style={{ gridTemplateColumns: ANGEBOT_ROW_GRID }}
+                onClick={() => openDetail(a.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDetail(a.id)
                   }
-                  badge={<AngebotEinfachStatusBadge status={st} />}
-                />
-              )
-            })}
-          </ListMobileStack>
-
-          <ListGridShell minWidth="1020px" className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}>
-            <div className="list-row-grid head" style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}>
-              <div />
-              <SortableHeader label="Name" field="kunde" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Situation</div>
-              <div>Bereiche</div>
-              <SortableHeader
-                label="Erstellt"
-                field="created_at"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-              />
-              <div>Region</div>
-              <div className="text-right">
-                <SortableHeader
-                  label="Betrag"
-                  field="betrag"
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={handleSort}
-                />
-              </div>
-              <SortableHeader label="Status" field="status" currentField={field} currentDir={dir} onSort={handleSort} />
-            </div>
-            {darstellung === 'kunde'
-              ? kundenGruppen.map((gruppe) => (
-                  <div key={gruppe.key} className="col-span-full space-y-1">
-                    <p className="list-row-grid px-3 py-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-                      {gruppe.label} ({gruppe.items.length})
-                    </p>
-                    {gruppe.items.map((a) => {
-                      const st = resolveStatusEinfach(a)
-                      const name = kundeNameAusAngebot(a)
-                      return (
-                        <div
-                          key={a.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => openDetail(a.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              openDetail(a.id)
-                            }
-                          }}
-                          className="list-row-grid"
-                          style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}
-                        >
-                          <ListAvatar name={name} />
-                          <p className="list-row-primary truncate">{name}</p>
-                          <p className="truncate text-[13px] text-bw-text">{angebotSituation(a)}</p>
-                          <p className="truncate text-[13px] text-bw-text-muted">{angebotBereiche(a)}</p>
-                          <p className="truncate text-[13px] tabular-nums text-bw-text-muted">
-                            {a.created_at ? formatDatumZeit(a.created_at) : '—'}
-                          </p>
-                          <p className="truncate text-[13px] text-bw-text-muted">{angebotRegion(a)}</p>
-                          <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                            {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
-                          </p>
-                          <AngebotEinfachStatusBadge status={st} />
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))
-              : displayRows.map(({ angebot: a, isVersion, groupKey, weitere }) => {
-              const st = resolveStatusEinfach(a)
-              const name = kundeNameAusAngebot(a)
-              return (
+                }}
+              >
                 <div
-                  key={a.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openDetail(a.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      openDetail(a.id)
-                    }
+                  style={{
+                    color: 'var(--text-3)',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: 12,
                   }}
-                  className={cn('list-row-grid', isVersion && 'bg-bw-hover/30')}
-                  style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}
                 >
-                  <ListAvatar name={name} />
-                  <div className="min-w-0">
-                    <p className={cn('list-row-primary truncate', isVersion && 'pl-2')}>{name}</p>
-                    {weitere > 0 ? (
-                      <button
-                        type="button"
-                        className="truncate text-[11px] text-bw-link hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleVersionGroup(groupKey)
-                        }}
-                      >
-                        {expandedGroups.has(groupKey)
-                          ? 'Versionen einklappen'
-                          : `+${weitere} ältere Version${weitere === 1 ? '' : 'en'}`}
-                      </button>
-                    ) : isVersion ? (
-                      <p className="truncate text-[11px] text-bw-text-muted">Ältere Version</p>
-                    ) : null}
-                  </div>
-                  <p className="truncate text-[13px] text-bw-text">{angebotSituation(a)}</p>
-                  <p className="truncate text-[13px] text-bw-text-muted">{angebotBereiche(a)}</p>
-                  <p className="truncate text-[13px] tabular-nums text-bw-text-muted">
-                    {a.created_at ? formatDatumZeit(a.created_at) : '—'}
-                  </p>
-                  <p className="truncate text-[13px] text-bw-text-muted">{angebotRegion(a)}</p>
-                  <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                    {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
-                  </p>
-                  <AngebotEinfachStatusBadge status={st} />
+                  {a.angebotsnr ?? a.id.slice(0, 8)}
                 </div>
-              )
-            })}
-          </ListGridShell>
-        </>
-      )}
-    </EntityListShell>
+                <div className="lc-title" style={{ fontWeight: 600 }}>
+                  {angebotTitel(a)}
+                </div>
+                <div style={{ color: 'var(--text-2)' }}>{name}</div>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    textAlign: 'right',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
+                </div>
+                <div style={{ color: 'var(--text-3)' }}>
+                  {a.created_at ? formatDatumZeit(a.created_at) : '—'}
+                </div>
+                <div className="lc-status">
+                  <MockBadge kind={angebotBadgeKind(st)}>{ANGEBOT_EINFACH_LABELS[st]}</MockBadge>
+                </div>
+                <div
+                  className="row-actions always"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ justifyContent: 'flex-end' }}
+                >
+                  <ActionsMenu
+                    trigger={
+                      <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                        <MockIcon n="dots" size={16} />
+                      </button>
+                    }
+                    items={listEntityMenuItems(
+                      'angebot',
+                      {
+                        titel: angebotTitel(a),
+                        name,
+                        status: st,
+                      },
+                      {
+                        onEdit: () => openDetail(a.id),
+                        onCopy: () => runDuplicateAngebot(a.id, router),
+                        onPdf: () => window.open(`/api/angebote/${a.id}/pdf`, '_blank'),
+                        onSend: () => openDetail(a.id),
+                        onDelete: () => {
+                          void deleteAngebot(a.id).then((r) => {
+                            if ('error' in r) toast.error(r.error)
+                            else {
+                              toast.success('Angebot gelöscht')
+                              router.refresh()
+                            }
+                          })
+                        },
+                        deleteLabel: angebotTitel(a),
+                      }
+                    )}
+                    sheetTitle="Angebot"
+                  />
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {angebote.length === 0 && !isPane ? (
+        <div style={{ marginTop: 12 }}>
+          <Link href="/anfragen" className="btn btn-primary btn-sm">
+            Zu Anfragen
+          </Link>
+        </div>
+      ) : null}
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Angebote"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
+    </div>
   )
 }

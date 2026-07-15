@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { PartnerDetailClient } from '@/components/partner/PartnerDetailClient'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
+import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
 
 export async function generateMetadata({
   params,
@@ -26,11 +27,14 @@ export default async function PartnerDetailPage({ params }: { params: Promise<{ 
 
   if (pErr || kErr || !partner) notFound()
 
+  const { rows: vorgaengeRows } = await loadVorgaengeListe()
+
   return (
     <div>
       <PartnerDetailClient
         partner={partner as PartnerRow}
         kategorien={(kategorien ?? []) as PartnerKategorie[]}
+        vorgaengeRows={vorgaengeRows}
       />
     </div>
   )

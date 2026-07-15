@@ -632,3 +632,72 @@ export async function getPartnerPortalLoginHint(
     ),
   }
 }
+
+export async function duplicateHandwerker(
+  handwerkerId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: src, error: loadErr } = await supabase
+    .from('handwerker')
+    .select('*')
+    .eq('id', handwerkerId)
+    .maybeSingle()
+  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+
+  const row = src as Record<string, unknown>
+  const payload: Record<string, unknown> = { ...row }
+  delete payload.id
+  delete payload.created_at
+  delete payload.updated_at
+  delete payload.auth_user_id
+  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
+  if (payload.email) payload.email = null
+
+  const { data: inserted, error: insErr } = await supabase
+    .from('handwerker')
+    .insert(payload)
+    .select('id')
+    .single()
+
+  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
+  revalidatePath('/handwerker')
+  return { ok: true, id: inserted.id as string }
+}
+
+export async function deleteHandwerker(
+  handwerkerId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const id = handwerkerId.trim()
+  if (!id) return { ok: false, message: 'Handwerker-ID fehlt.' }
+
+  const { data: hw } = await supabase.from('handwerker').select('id, auth_user_id').eq('id', id).maybeSingle()
+  if (!hw?.id) return { ok: false, message: 'Handwerker nicht gefunden.' }
+  if ((hw as { auth_user_id?: string | null }).auth_user_id) {
+    return {
+      ok: false,
+      message: 'Handwerker mit Portal-Konto kann nicht gelöscht werden.',
+    }
+  }
+
+  const checks = await Promise.all([
+    supabase.from('auftrag_positionen').select('id', { count: 'exact', head: true }).eq('handwerker_id', id),
+    supabase.from('angebot_handwerker').select('id', { count: 'exact', head: true }).eq('handwerker_id', id),
+    supabase.from('auftrag_handwerker').select('id', { count: 'exact', head: true }).eq('handwerker_id', id),
+  ])
+
+  const refs = (checks[0].count ?? 0) + (checks[1].count ?? 0) + (checks[2].count ?? 0)
+  if (refs > 0) {
+    return {
+      ok: false,
+      message: `Handwerker ist noch in ${refs} Angebot(en)/Auftrag(en) zugewiesen.`,
+    }
+  }
+
+  const { error } = await supabase.from('handwerker').delete().eq('id', id)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/handwerker')
+  revalidatePath(`/handwerker/${id}`)
+  return { ok: true }
+}

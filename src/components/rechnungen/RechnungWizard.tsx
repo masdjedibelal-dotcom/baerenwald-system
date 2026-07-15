@@ -17,7 +17,8 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/app-toast'
-import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
+import { PosBoard } from '@/components/posboard/PosBoard'
+import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import { RechnungWizardDetailsCard } from '@/components/rechnungen/RechnungWizardDetailsCard'
 import { RechnungWizardZahlungCard, RechnungWizardVersandAuswahlCard } from '@/components/rechnungen/RechnungWizardZahlungCard'
@@ -60,6 +61,11 @@ import { isValidEmail } from '@/lib/email-recipients'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { cn } from '@/lib/utils'
+import {
+  dokumentZeilenToPosBoardLines,
+  posBoardLinesToDokumentZeilen,
+} from '@/lib/posboard/position-adapters'
+import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import {
   rechnungDokumentBezeichnung,
   zahlungsplanVorlage50_50,
@@ -209,6 +215,19 @@ export function RechnungWizard({
         defaultMwstSatz: defaultMwst,
       }),
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
+  )
+
+  const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
+  const gewerkNames = useMemo(
+    () => gewerke.filter((g) => g.aktiv !== false && g.name).map((g) => g.name),
+    [gewerke]
+  )
+  const handlePosBoardChange = useCallback(
+    (next: PosBoardLine[]) => {
+      setZeilen(posBoardLinesToDokumentZeilen(next, zeilen))
+      setDraftDirty(true)
+    },
+    [zeilen]
   )
 
   const kostenaufstellungPdf = useMemo(
@@ -802,18 +821,13 @@ export function RechnungWizard({
                   }
                 />
               )}
-              <AngebotWizardPositionenByGewerk
-                zeilen={zeilen}
-                onChange={setZeilen}
-                gewerke={gewerke}
-                preislisten={preislisten}
-                firm={firm}
-                titel="Rechnungspositionen"
-                untertitel={
-                  standalone
-                    ? 'Leistungen frei erfassen — ohne Anfrage oder Angebot.'
-                    : 'Positionen aus Auftrag — Leistungszuordnung pro Abschlag in Schritt 2.'
-                }
+              <DokumentGesamtrabattPanel zeilen={zeilen} onChange={setZeilen} className="mb-4" />
+              <PosBoard
+                title="Rechnungspositionen"
+                positionen={posBoardLines}
+                onChange={handlePosBoardChange}
+                showUst
+                gewerke={gewerkNames}
               />
               <Card title="Summe (Vorschau)">
                 <div className="grid gap-2 text-sm sm:grid-cols-2">

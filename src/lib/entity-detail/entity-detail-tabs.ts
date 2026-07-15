@@ -30,9 +30,8 @@ export function entityDetailTabLabel(tabId: string): string {
     leistung: ENTITY_DETAIL_TAB_LABELS.leistung,
     positionen: ENTITY_DETAIL_TAB_LABELS.positionen,
     uebersicht: ENTITY_DETAIL_TAB_LABELS.uebersicht,
-    finanzen: 'Finanzen',
-    compliance: 'Compliance',
-    baustelle: 'Baustelle',
+    zahlplan: ENTITY_DETAIL_TAB_LABELS.zahlplan,
+    bautagebuch: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
     visualisierungen: 'Visualisierungen',
   }
   return map[tabId] ?? tabId

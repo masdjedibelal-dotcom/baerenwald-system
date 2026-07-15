@@ -1,124 +1,471 @@
 'use client'
 
-import { UserPlus } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
-import type { AngebotPosition, AuftragPosition } from '@/lib/types'
+import { useMemo, useState, type ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockModal } from '@/components/mock-ui/MockModal'
+import { PositionModal } from '@/components/posboard/PositionModal'
+import {
+  PosTable,
+  posTableMenuIcon,
+  type PosTableBadge,
+  type PosTableGroup,
+} from '@/components/posboard/PosTable'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { cn } from '@/lib/utils'
+import {
+  neuePosBoardLine,
+  posBoardLineNetto,
+  type PosBoardLine,
+} from '@/lib/posboard/pos-board-line'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+
+export type PosBoardBadge = PosTableBadge
+
+export type PosBoardBulkAction = {
+  icon?: string
+  label: string
+  onClick: () => void
+}
 
 export type PosBoardProps = {
+  positionen: PosBoardLine[]
+  onChange?: (next: PosBoardLine[]) => void
+  showUst?: boolean
   title?: string
-  positionen: AngebotPosition[]
-  onChange?: (next: AngebotPosition[]) => void
-  readOnly?: boolean
-  className?: string
-  /** Auftrag-Modus: HW-Badge + Zuweisen pro Zeile (Spec §6). */
-  auftragPositionen?: AuftragPosition[]
-  onAssignHandwerker?: (positionIds: string[]) => void
+  renderEditor?: (
+    position: PosBoardLine,
+    helpers: {
+      onChange: (patch: Partial<PosBoardLine>) => void
+      onClose: () => void
+      onRemove: () => void
+    }
+  ) => ReactNode
+  lineOf?: (p: PosBoardLine) => number
+  preisLabelOf?: (p: PosBoardLine) => string
+  mengeLabelOf?: (p: PosBoardLine) => string
+  badgeOf?: (p: PosBoardLine) => PosBoardBadge | null
+  makeNew?: (gewerk: string) => Omit<PosBoardLine, 'id'>
+  itemExtraActions?: (
+    group: PosTableGroup,
+    item: { id: string }
+  ) => ActionsMenuItem[]
+  groupExtraActions?: (group: PosTableGroup) => ActionsMenuItem[]
+  selectable?: boolean
+  bulkActions?: (selected: PosBoardLine[], clearSel: () => void) => PosBoardBulkAction[]
+  hideAddGewerk?: boolean
+  gewerke?: string[]
   headerAction?: ReactNode
+  className?: string
 }
 
-function lineTotal(p: AngebotPosition): number {
-  const menge = Number(p.menge) || 0
-  const einzel = Number(p.vk_netto ?? p.gesamt_min ?? 0)
-  return menge * einzel
+function gewerkOf(p: PosBoardLine): string {
+  return p.gewerk?.trim() || 'Allgemein'
 }
 
-function auftragById(
-  items: AuftragPosition[] | undefined
-): Map<string, AuftragPosition> {
-  const m = new Map<string, AuftragPosition>()
-  for (const p of items ?? []) m.set(p.id, p)
-  return m
+function defaultMengeLabel(p: PosBoardLine): string {
+  return `${p.menge != null ? p.menge + ' ' : ''}${p.einheit || ''}`.trim()
 }
 
-/** PosBoard v2 — gruppiert nach Gewerk; optional HW-Zeilen im Auftrag. */
 export function PosBoard({
-  title = 'Leistungen',
   positionen,
-  onChange: _onChange,
-  readOnly = false,
-  className,
-  auftragPositionen,
-  onAssignHandwerker,
+  onChange,
+  showUst = true,
+  title,
+  renderEditor,
+  lineOf,
+  preisLabelOf,
+  mengeLabelOf,
+  badgeOf,
+  makeNew,
+  itemExtraActions,
+  groupExtraActions,
+  selectable,
+  bulkActions,
+  hideAddGewerk = false,
+  gewerke = [],
   headerAction,
+  className,
 }: PosBoardProps) {
-  const auftragMap = auftragById(auftragPositionen)
-  const showHw = Boolean(auftragPositionen?.length && onAssignHandwerker)
+  const editable = Boolean(onChange)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [gEdit, setGEdit] = useState<string | null>(null)
+  const [gName, setGName] = useState('')
+  const [sel, setSel] = useState<Record<string, boolean>>({})
 
-  const groups = new Map<string, AngebotPosition[]>()
-  for (const p of positionen) {
-    const g = p.gewerk_name?.trim() || p.gewerk_id || 'Allgemein'
-    const arr = groups.get(g) ?? []
-    arr.push(p)
-    groups.set(g, arr)
+  const _line = lineOf ?? posBoardLineNetto
+
+  const update = (id: string, patch: Partial<PosBoardLine>) => {
+    if (!onChange) return
+    onChange(positionen.map((p) => (p.id === id ? { ...p, ...patch } : p)))
   }
 
-  const netto = positionen.reduce((s, p) => s + lineTotal(p), 0)
+  const remove = (id: string) => {
+    if (!onChange) return
+    onChange(positionen.filter((p) => p.id !== id))
+    if (editId === id) setEditId(null)
+    setSel((s) => {
+      const n = { ...s }
+      delete n[id]
+      return n
+    })
+  }
+
+  const dup = (id: string) => {
+    if (!onChange) return
+    const i = positionen.findIndex((p) => p.id === id)
+    if (i < 0) return
+    const src = positionen[i]
+    const copy: PosBoardLine = {
+      ...src,
+      id: neuePosBoardLine().id,
+      name: `${src.name || 'Position'} (Kopie)`,
+    }
+    const arr = [...positionen]
+    arr.splice(i + 1, 0, copy)
+    onChange(arr)
+  }
+
+  const add = (gewerk: string) => {
+    if (!onChange) return
+    const id = neuePosBoardLine().id
+    const np: PosBoardLine = makeNew
+      ? { ...makeNew(gewerk), id }
+      : neuePosBoardLine({ gewerk: gewerk || '', id })
+    onChange([...positionen, np])
+    setEditId(id)
+  }
+
+  const addGewerk = () => {
+    const names = new Set(positionen.map(gewerkOf))
+    let n = 1
+    let name = 'Neues Gewerk'
+    while (names.has(name)) {
+      name = `Neues Gewerk ${++n}`
+    }
+    add(name)
+  }
+
+  const renameGewerk = (from: string, to: string) => {
+    if (!onChange) return
+    onChange(positionen.map((p) => (gewerkOf(p) === from ? { ...p, gewerk: to } : p)))
+  }
+
+  const copyGewerk = (gewerk: string) => {
+    if (!onChange) return
+    const src = positionen.filter((p) => gewerkOf(p) === gewerk)
+    const copies = src.map((p, i) => ({
+      ...p,
+      id: `${neuePosBoardLine().id}-${i}`,
+      gewerk: `${gewerk} (Kopie)`,
+    }))
+    onChange([...positionen, ...copies])
+  }
+
+  const deleteGewerk = (gewerk: string) => {
+    if (!onChange) return
+    onChange(positionen.filter((p) => gewerkOf(p) !== gewerk))
+  }
+
+  const reorder = (draggedId: string, targetId: string) => {
+    if (!onChange || draggedId === targetId) return
+    const from = positionen.findIndex((p) => p.id === draggedId)
+    const targetPos = positionen.find((p) => p.id === targetId)
+    if (from < 0 || !targetPos) return
+    const moved = { ...positionen[from], gewerk: gewerkOf(targetPos) }
+    const arr = positionen.filter((p) => p.id !== draggedId)
+    const to = arr.findIndex((p) => p.id === targetId)
+    arr.splice(to < 0 ? arr.length : to, 0, moved)
+    onChange(arr)
+  }
+
+  const dropToGroup = (draggedId: string, gewerk: string) => {
+    if (!onChange) return
+    const from = positionen.findIndex((p) => p.id === draggedId)
+    if (from < 0) return
+    const moved = { ...positionen[from], gewerk }
+    const arr = positionen.filter((p) => p.id !== draggedId)
+    let lastIdx = -1
+    arr.forEach((p, i) => {
+      if (gewerkOf(p) === gewerk) lastIdx = i
+    })
+    arr.splice(lastIdx + 1, 0, moved)
+    onChange(arr)
+  }
+
+  const netto = positionen.reduce((s, p) => s + _line(p), 0)
+  const ust = positionen.reduce(
+    (s, p) => s + _line(p) * ((p.ust != null ? Number(p.ust) : 19) / 100),
+    0
+  )
+  const brutto = netto + ust
+
+  const groups = useMemo((): PosTableGroup[] => {
+    const map = new Map<string, PosBoardLine[]>()
+    positionen.forEach((p) => {
+      const g = gewerkOf(p)
+      const arr = map.get(g) ?? []
+      arr.push(p)
+      map.set(g, arr)
+    })
+    return Array.from(map.entries()).map(([gewerk, arr], gi) => ({
+      id: `g${gi}`,
+      gewerk,
+      items: arr.map((p: PosBoardLine) => ({
+        id: p.id,
+        name:
+          p.name != null && p.name !== ''
+            ? p.name
+            : p.beschreibung || '(ohne Bezeichnung)',
+        beschreibung: p.name != null && p.name !== '' ? p.beschreibung : '',
+        mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
+        preisLabel: preisLabelOf ? preisLabelOf(p) : formatEurBetrag(_line(p)),
+        badge: badgeOf ? badgeOf(p) : null,
+      })),
+    }))
+  }, [positionen, mengeLabelOf, preisLabelOf, badgeOf, _line])
+
+  const itemActions = editable
+    ? (g: PosTableGroup, it: { id: string }) => {
+        const items: ActionsMenuItem[] = [
+          {
+            label: 'Bearbeiten',
+            icon: posTableMenuIcon('pencil'),
+            onClick: () => setEditId(it.id),
+          },
+          {
+            label: 'Kopieren',
+            icon: posTableMenuIcon('copy'),
+            onClick: () => dup(it.id),
+          },
+          ...(itemExtraActions?.(g, it) ?? []),
+          'sep',
+          {
+            label: 'Löschen',
+            icon: posTableMenuIcon('trash'),
+            danger: true,
+            onClick: () => remove(it.id),
+          },
+        ]
+        return items
+      }
+    : undefined
+
+  const groupActions = editable
+    ? (g: PosTableGroup) => {
+        const items: ActionsMenuItem[] = [
+          {
+            label: 'Position hinzufügen',
+            icon: posTableMenuIcon('plus'),
+            onClick: () => add(g.gewerk),
+          },
+          {
+            label: 'Gewerk bearbeiten',
+            icon: posTableMenuIcon('pencil'),
+            onClick: () => {
+              setGEdit(g.gewerk)
+              setGName(g.gewerk)
+            },
+          },
+          {
+            label: 'Gewerk kopieren',
+            icon: posTableMenuIcon('copy'),
+            onClick: () => copyGewerk(g.gewerk),
+          },
+          ...(groupExtraActions?.(g) ?? []),
+          'sep',
+          {
+            label: 'Gewerk löschen',
+            icon: posTableMenuIcon('trash'),
+            danger: true,
+            onClick: () => deleteGewerk(g.gewerk),
+          },
+        ]
+        return items
+      }
+    : undefined
+
+  const toggleItem = (id: string) => setSel((s) => ({ ...s, [id]: !s[id] }))
+  const toggleGroup = (items: { id: string }[], allSel: boolean) =>
+    setSel((s) => {
+      const n = { ...s }
+      items.forEach((it) => {
+        if (allSel) delete n[it.id]
+        else n[it.id] = true
+      })
+      return n
+    })
+
+  const selectedIds = Object.keys(sel).filter((k) => sel[k])
+  const selectedPositions = positionen.filter((p) => sel[p.id])
+  const clearSel = () => setSel({})
+
+  const editP = positionen.find((p) => p.id === editId)
+  const helpers = editP
+    ? {
+        onChange: (patch: Partial<PosBoardLine>) => update(editP.id, patch),
+        onClose: () => setEditId(null),
+        onRemove: () => remove(editP.id),
+      }
+    : null
+
+  const gewerkOptions = useMemo(() => {
+    const fromLines = positionen.map((p) => gewerkOf(p))
+    return Array.from(new Set([...gewerke, ...fromLines]))
+  }, [positionen, gewerke])
 
   return (
-    <section className={cn('rounded-xl border border-bw-border bg-bw-card', className)}>
-      <div className="flex items-center justify-between gap-2 border-b border-bw-border px-4 py-3">
-        <h3 className="text-sm font-semibold text-bw-text">{title}</h3>
-        {headerAction}
-      </div>
-      <div className="divide-y divide-bw-border">
-        {Array.from(groups.entries()).map(([gewerk, items]) => (
-          <div key={gewerk} className="px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-              {gewerk}
-            </div>
-            <ul className="space-y-3">
-              {items.map((p) => {
-                const ap = auftragMap.get(p.id)
-                return (
-                  <li
-                    key={p.id}
-                    className="flex items-start justify-between gap-3 text-sm"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-bw-text">
-                        {p.leistung_name || p.leistung || p.beschreibung || 'Position'}
-                      </div>
-                      <div className="text-xs text-bw-text-muted">
-                        {p.menge} {p.einheit}
-                      </div>
-                      {showHw && ap ? (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          {ap.handwerker?.name ? (
-                            <span className="text-xs text-bw-text-muted">{ap.handwerker.name}</span>
-                          ) : null}
-                          <HandwerkerAntwortChip pos={ap} />
-                          {!readOnly && onAssignHandwerker ? (
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded-md border border-bw-border px-2 py-0.5 text-[11px] font-medium text-bw-primary hover:bg-bw-hover"
-                              onClick={() => onAssignHandwerker([ap.id])}
-                            >
-                              <UserPlus className="h-3 w-3" aria-hidden />
-                              Zuweisen
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 font-medium tabular-nums text-bw-text">
-                      {formatEurBetrag(lineTotal(p))}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+    <div className={className}>
+      {title ? (
+        <div
+          className="section-h"
+          style={{
+            margin: '2px 2px 10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+          }}
+        >
+          <span>{title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {headerAction}
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+              {positionen.length} {positionen.length === 1 ? 'Position' : 'Positionen'}
+            </span>
           </div>
-        ))}
-        {positionen.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-bw-text-muted">Noch keine Positionen.</div>
-        ) : null}
-      </div>
-      <div className="flex justify-end border-t border-bw-border px-4 py-3 text-sm font-semibold text-bw-text">
-        Netto {formatEurBetrag(netto)}
-      </div>
-    </section>
+        </div>
+      ) : null}
+      {selectable && selectedIds.length > 0 ? (
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            marginBottom: 10,
+            background: 'var(--green-dark)',
+            color: '#fff',
+            borderRadius: 10,
+            boxShadow: 'var(--shadow-pop)',
+          }}
+        >
+          <MockIcon n="checks" size={16} />
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{selectedIds.length} ausgewählt</span>
+          <div style={{ flex: 1 }} />
+          {(bulkActions ? bulkActions(selectedPositions, clearSel) : []).map((a, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={a.onClick}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: 'rgba(255,255,255,0.16)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {a.icon ? <MockIcon n={a.icon} size={15} /> : null}
+              {a.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={clearSel}
+            title="Auswahl aufheben"
+            style={{
+              display: 'inline-flex',
+              padding: 6,
+              borderRadius: 8,
+              border: 'none',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.8)',
+              cursor: 'pointer',
+            }}
+          >
+            <MockIcon n="x" size={16} />
+          </button>
+        </div>
+      ) : null}
+      <PosTable
+        groups={groups}
+        onAddItem={editable ? (g) => add(g.gewerk) : undefined}
+        onAddGroup={editable && !hideAddGewerk ? addGewerk : undefined}
+        groupActions={groupActions}
+        itemActions={itemActions}
+        selectable={selectable}
+        selected={sel}
+        onToggleItem={toggleItem}
+        onToggleGroup={toggleGroup}
+        dnd={editable}
+        onReorder={reorder}
+        onDropToGroup={dropToGroup}
+        showTotals={showUst !== false}
+        netto={netto}
+        ust={ust}
+        brutto={brutto}
+      />
+      {editP && helpers
+        ? renderEditor
+          ? renderEditor(editP, helpers)
+          : (
+              <PositionModal
+                position={editP}
+                onChange={helpers.onChange}
+                onClose={helpers.onClose}
+                onRemove={editable ? helpers.onRemove : undefined}
+                showUst={showUst}
+                gewerke={gewerkOptions}
+              />
+            )
+        : null}
+      {gEdit != null ? (
+        <MockModal
+          open
+          onClose={() => setGEdit(null)}
+          icon="folder"
+          title="Gewerk bearbeiten"
+          sub={gEdit}
+          footer={
+            <>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                sm
+                kind="primary"
+                icon="check"
+                onClick={() => {
+                  if (gName.trim() && gName.trim() !== gEdit) renameGewerk(gEdit, gName.trim())
+                  setGEdit(null)
+                }}
+              >
+                Speichern
+              </MockBtn>
+            </>
+          }
+        >
+          <div className="field">
+            <div className="field-label">Gewerk-Bezeichnung</div>
+            <input
+              className="txt"
+              value={gName}
+              onChange={(e) => setGName(e.target.value)}
+              placeholder="z.B. Sanitär · Heizung"
+              autoFocus
+            />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
+            Benennt das Gewerk für alle Positionen dieser Gruppe um.
+          </div>
+        </MockModal>
+      ) : null}
+    </div>
   )
 }

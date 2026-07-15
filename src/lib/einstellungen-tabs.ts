@@ -4,7 +4,7 @@ import {
   Building2,
   FileText,
   List,
-  Plug,
+  ShieldCheck,
   UserCircle,
   Users,
 } from 'lucide-react'
@@ -16,13 +16,14 @@ export type EinstellungenTabId =
   | 'preise'
   | 'formulare'
   | 'benachrichtigungen'
-  | 'integration'
+  | 'sicherheit'
 
 export type EinstellungenTabDef = {
   id: EinstellungenTabId
   href: string
   label: string
   icon: LucideIcon
+  mockIcon: string
   /** Pfade, bei denen dieser Tab als aktiv gilt (inkl. Legacy-Redirects). */
   matchPrefixes: string[]
 }
@@ -33,6 +34,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/profil',
     label: 'Profil',
     icon: UserCircle,
+    mockIcon: 'users',
     matchPrefixes: ['/einstellungen/profil'],
   },
   {
@@ -40,6 +42,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/firma',
     label: 'Firma',
     icon: Building2,
+    mockIcon: 'building',
     matchPrefixes: ['/einstellungen/firma'],
   },
   {
@@ -47,6 +50,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/benutzer',
     label: 'Team',
     icon: Users,
+    mockIcon: 'users',
     matchPrefixes: ['/einstellungen/benutzer'],
   },
   {
@@ -54,6 +58,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/preise',
     label: 'Preislisten',
     icon: List,
+    mockIcon: 'list',
     matchPrefixes: [
       '/einstellungen/preise',
       '/einstellungen/gewerke',
@@ -66,21 +71,25 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/formulare',
     label: 'Formulare',
     icon: FileText,
+    mockIcon: 'forms',
     matchPrefixes: ['/einstellungen/formulare'],
   },
   {
     id: 'benachrichtigungen',
     href: '/einstellungen/email',
-    label: 'Kommunikation',
+    label: 'Benachrichtigungen',
     icon: Bell,
+    mockIcon: 'bell',
     matchPrefixes: ['/einstellungen/email', '/einstellungen/kommunikation'],
   },
   {
-    id: 'integration',
-    href: '/einstellungen/integration',
-    label: 'Integrationen',
-    icon: Plug,
+    id: 'sicherheit',
+    href: '/einstellungen/sicherheit',
+    label: 'Sicherheit & DSGVO',
+    icon: ShieldCheck,
+    mockIcon: 'shield-check',
     matchPrefixes: [
+      '/einstellungen/sicherheit',
       '/einstellungen/integration',
       '/einstellungen/compliance',
       '/einstellungen/datenschutz',

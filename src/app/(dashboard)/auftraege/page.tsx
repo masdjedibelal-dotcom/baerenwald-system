@@ -1,4 +1,5 @@
-/** Listen-Inhalt kommt aus `auftraege/layout.tsx` (Master-Detail ab 900px). */
+import { redirect } from 'next/navigation'
+
 export default function AuftraegePage() {
-  return null
+  redirect('/vorgaenge?phase=auftrag')
 }

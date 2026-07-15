@@ -26,9 +26,12 @@ import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
-import { DetailResponsiveTabs } from '@/components/layout/app'
+import {
+  MockDetailShell,
+  MockDokumenteCard,
+  MockVerlaufCard,
+} from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { Card } from '@/components/ui/Card'
@@ -42,7 +45,8 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { LeadTimelineList } from '@/components/anfragen/LeadTimelineList'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/actions'
@@ -60,9 +64,10 @@ import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbei
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
+import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
 import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
-import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -85,7 +90,7 @@ import { angebotStatusDisplay } from '@/lib/status/status-display'
 import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
 import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
 import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
-import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/AngebotPositionenV3Tab'
+import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import type { AngebotDetail, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
@@ -101,12 +106,6 @@ import {
   handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
-
-type Tab = 'stammdaten' | 'leistung' | 'schritte' | 'positionen' | 'aktivitaet' | 'dokumente' | 'visualisierungen'
-
-const DESKTOP_ANGEBOT_TABS: Tab[] = ['schritte', 'positionen', 'visualisierungen', 'aktivitaet', 'dokumente']
-const MOBILE_ANGEBOT_TABS: Tab[] = ['stammdaten', 'leistung', 'schritte', 'visualisierungen', 'aktivitaet', 'dokumente']
 
 export function AngebotDetailPageClient({
   detail,
@@ -132,7 +131,6 @@ export function AngebotDetailPageClient({
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
-  const [tab, setTab] = useState<Tab>('schritte')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -352,108 +350,114 @@ export function AngebotDetailPageClient({
     })
   }
 
-  const detailHeadMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = []
+  const detailHeadMenuItems = useMemo(
+    () => {
+      const menuStatus =
+        statusEinfach === 'abgelaufen' ? 'gesendet' : statusEinfach
+      const extra: Array<
+        | 'sep'
+        | { icon?: string; label: string; hint?: string; danger?: boolean; onClick: () => void }
+      > = [
+        {
+          icon: 'mail',
+          label: 'E-Mail schreiben',
+          hint: kundeEmail ? undefined : 'E-Mail im Modal eintragen',
+          onClick: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
+        },
+      ]
 
-    if (kannBearbeiten) {
-      items.push({
-        label: 'Bearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: openWizardBearbeiten,
-      })
-    }
-
-    items.push({
-      label: 'E-Mail schreiben',
-      icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
-      hint: kundeEmail ? undefined : 'E-Mail im Modal eintragen',
-      onClick: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
-    })
-
-    const workflow: ActionsMenuItem[] = []
-    if (kannVerlaengern) {
-      workflow.push({
-        label: 'Verlängern',
-        icon: <CalendarClock className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: openVerlaengernModal,
-      })
-    }
-    if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
-      if (!detail.nachgefasst_am && statusEinfach === 'gesendet') {
-        workflow.push({
-          label: 'Nachfassen',
-          icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
-          hint: 'Erinnerungs-Mail an Kunden',
-          onClick: () =>
-            run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet'),
+      if (kannVerlaengern) {
+        extra.push({
+          icon: 'calendar-event',
+          label: 'Verlängern',
+          onClick: openVerlaengernModal,
         })
       }
-      workflow.push({
-        label: 'Erneut senden',
-        icon: <Send className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet'),
-      })
-      workflow.push({
-        label: 'Abgelehnt',
-        icon: <CircleX className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => setAblehnOpen(true),
-      })
-    }
 
-    if (statusEinfach === 'entwurf' && !auftragId) {
-      workflow.push({
-        label: 'Angebot annehmen',
-        icon: <Check className="h-[15px] w-[15px]" aria-hidden />,
-        hint: 'Auch ohne vorherigen Versand',
-        onClick: openAcceptModal,
-      })
-    }
-
-    if (workflow.length > 0) {
-      items.push('sep', ...workflow)
-    }
-
-    items.push('sep', {
-      label: 'PDF herunterladen',
-      icon: <Download className="h-[15px] w-[15px]" aria-hidden />,
-      onClick: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
-    })
-
-    if (!auftragId) {
-      items.push('sep', {
-        label: 'Löschen',
-        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
-        danger: true,
-        onClick: () => {
-          if (!window.confirm('Angebot wirklich löschen?')) return
-          startTransition(async () => {
-            const r = await deleteAngebot(detail.id)
-            if ('error' in r) {
-              toast.error(r.error)
-              return
-            }
-            toast.success('Angebot gelöscht')
-            if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
-            else router.push('/angebote')
+      if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
+        if (!detail.nachgefasst_am && statusEinfach === 'gesendet') {
+          extra.push({
+            icon: 'mail',
+            label: 'Nachfassen',
+            hint: 'Erinnerungs-Mail an Kunden',
+            onClick: () =>
+              run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet'),
           })
-        },
-      })
-    }
+        }
+        extra.push({
+          icon: 'circle-x',
+          label: 'Abgelehnt',
+          onClick: () => setAblehnOpen(true),
+        })
+      }
 
-    return items
-  }, [
-    kannBearbeiten,
-    kundeEmail,
-    detail.id,
-    detail.lead_id,
-    detail.nachgefasst_am,
-    kannVerlaengern,
-    statusEinfach,
-    mailCompose,
-    auftragId,
-    router,
-    openAcceptModal,
-  ])
+      if (statusEinfach === 'entwurf' && !auftragId) {
+        extra.push({
+          icon: 'check',
+          label: 'Angebot annehmen',
+          hint: 'Auch ohne vorherigen Versand',
+          onClick: openAcceptModal,
+        })
+      }
+
+      return listEntityMenuItems(
+        'angebot',
+        {
+          titel: detail.angebotsnr ?? kundeNameAusAngebot(detail),
+          status: menuStatus,
+        },
+        {
+          onEdit: kannBearbeiten ? openWizardBearbeiten : undefined,
+          onAccept:
+            statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
+              ? openAcceptModal
+              : undefined,
+          onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
+          onSend:
+            statusEinfach !== 'angenommen' && statusEinfach !== 'abgelehnt'
+              ? () => {
+                  if (statusEinfach === 'entwurf') {
+                    run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')
+                  } else {
+                    run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet')
+                  }
+                }
+              : undefined,
+          onDelete: !auftragId
+            ? () => {
+                startTransition(async () => {
+                  const r = await deleteAngebot(detail.id)
+                  if ('error' in r) {
+                    toast.error(r.error)
+                    return
+                  }
+                  toast.success('Angebot gelöscht')
+                  if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
+                  else router.push('/angebote')
+                })
+              }
+            : undefined,
+          deleteLabel: detail.angebotsnr ?? kundeNameAusAngebot(detail),
+          extra,
+        }
+      )
+    },
+    [
+      auftragId,
+      detail,
+      kannBearbeiten,
+      kannVerlaengern,
+      kundeEmail,
+      mailCompose,
+      openAcceptModal,
+      openVerlaengernModal,
+      openWizardBearbeiten,
+      router,
+      run,
+      startTransition,
+      statusEinfach,
+    ]
+  )
 
   const detailPrimaryBtnClass =
     'btn btn-primary btn-sm inline-flex flex-1 justify-center gap-1.5 sm:flex-none md:flex-none'
@@ -585,79 +589,6 @@ export function AngebotDetailPageClient({
     [naechsteSchritte]
   )
 
-  const desktopDetailTabs = useMemo(
-    () => [
-      {
-        id: 'schritte',
-        label: 'Nächste Schritte',
-        icon: ListChecks,
-        count: offeneSchritteCount || undefined,
-      },
-      {
-        id: 'positionen',
-        label: 'Positionen',
-        icon: List,
-        count: positionenAnzeigeCount || undefined,
-      },
-      {
-        id: 'aktivitaet',
-        label: ACTIVITY_SECTIONS.verlauf,
-        icon: History,
-        count: timelineCount || undefined,
-      },
-      {
-        id: 'visualisierungen',
-        label: 'Visualisierungen',
-        icon: Sparkles,
-        count: kiVisualisierungen.length || undefined,
-      },
-      {
-        id: 'dokumente',
-        label: ACTIVITY_SECTIONS.dokumente,
-        icon: Paperclip,
-        count: anhaengeCount || undefined,
-      },
-    ],
-    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount, kiVisualisierungen.length]
-  )
-
-  const mobileDetailTabs = useMemo(
-    () => [
-      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
-      {
-        id: 'leistung',
-        label: 'Leistungsübersicht',
-        icon: List,
-        count: positionenAnzeigeCount || undefined,
-      },
-      {
-        id: 'schritte',
-        label: 'Nächste Schritte',
-        icon: ListChecks,
-        count: offeneSchritteCount || undefined,
-      },
-      {
-        id: 'aktivitaet',
-        label: ACTIVITY_SECTIONS.verlauf,
-        icon: History,
-        count: timelineCount || undefined,
-      },
-      {
-        id: 'visualisierungen',
-        label: 'Visualisierungen',
-        icon: Sparkles,
-        count: kiVisualisierungen.length || undefined,
-      },
-      {
-        id: 'dokumente',
-        label: ACTIVITY_SECTIONS.dokumente,
-        icon: Paperclip,
-        count: anhaengeCount || undefined,
-      },
-    ],
-    [offeneSchritteCount, positionenAnzeigeCount, timelineCount, anhaengeCount, kiVisualisierungen.length]
-  )
-
   const formatEur = (n: number) =>
     n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
@@ -725,13 +656,17 @@ export function AngebotDetailPageClient({
   )
 
   const positionenTab = (
-    <AngebotPositionenV3Tab
-      angebotId={detail.id}
-      positionen={detail.positionen ?? []}
-      gewerke={gewerke}
-      editable={positionenBearbeitbar}
-      onChanged={() => refresh()}
+    <PosBoard
+      title="Leistungen"
+      positionen={angebotPositionenToPosBoardLines(detail.positionen ?? [])}
     />
+  )
+
+  const detailsInhalt = (
+    <div className="space-y-3">
+      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      {positionenTab}
+    </div>
   )
 
   const stammdatenInhalt = (
@@ -795,82 +730,57 @@ export function AngebotDetailPageClient({
     </div>
   )
 
-  const fixedOverview = (
+  const verlaufInhalt = (
     <div className="space-y-3">
-      {auftragId ? (
-        <div className="rounded-lg border border-bw-primary/25 bg-bw-primary/5 px-3 py-2.5 text-sm">
-          <p className="font-medium text-bw-text">Verkauf abgeschlossen</p>
-          <p className="mt-0.5 text-bw-text-muted">
-            Dieses Angebot wurde angenommen. Weiter im{' '}
-            <Link href={`/auftraege/${auftragId}`} className="font-medium text-bw-link hover:underline">
-              Auftrag
-            </Link>
-            {projektKontext?.rechnungen?.length
-              ? ` (${projektKontext.rechnungen.length} Rechnung${projektKontext.rechnungen.length === 1 ? '' : 'en'})`
-              : ''}
-            .
-          </p>
-        </div>
-      ) : statusEinfach === 'angenommen' ? (
-        <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-sm">
-          <p className="font-medium text-bw-text">Angenommen — Auftrag fehlt noch</p>
-          <p className="mt-0.5 text-bw-text-muted">
-            Legen Sie den Auftrag an, um mit der Ausführung und Abrechnung zu starten.
-          </p>
-        </div>
-      ) : null}
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
-      <PosBoard title="Leistungen" positionen={detail.positionen ?? []} readOnly />
-      <AngebotOrgFreigabeBanner
-        orgFreigabeStatus={orgFreigabeStatus}
-        orgFreigabeLog={lead?.org_freigabe_log}
+      {offeneSchritteCount > 0 ? <NaechsteSchritteCard steps={naechsteSchritte} /> : null}
+      <LeadTimelineList
+        events={timelineInitial}
+        fallbackCreatedAt={detail.created_at}
+        fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
       />
-      {stammdatenInhalt}
     </div>
   )
 
-  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
-
-  const aktivitaetInhalt = (
-    <LeadTimelineList
-      events={timelineInitial}
-      fallbackCreatedAt={detail.created_at}
-      fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
-    />
-  )
-
   const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
-  const visualisierungenInhalt = (
-    <AngebotVisualisierungenTab angebotId={detail.id} sessions={kiVisualisierungen} />
-  )
 
-  const desktopTabContent =
-    tab === 'schritte' ? (
-      schritteInhalt
-    ) : tab === 'positionen' ? (
-      positionenTab
-    ) : tab === 'visualisierungen' ? (
-      visualisierungenInhalt
-    ) : tab === 'aktivitaet' ? (
-      aktivitaetInhalt
-    ) : tab === 'dokumente' ? (
-      dokumenteInhalt
-    ) : null
-
-  const mobileTabContent =
-    tab === 'stammdaten' ? (
-      stammdatenInhalt
-    ) : tab === 'leistung' ? (
-      positionenTab
-    ) : tab === 'schritte' ? (
-      schritteInhalt
-    ) : tab === 'visualisierungen' ? (
-      visualisierungenInhalt
-    ) : tab === 'aktivitaet' ? (
-      aktivitaetInhalt
-    ) : tab === 'dokumente' ? (
-      dokumenteInhalt
-    ) : null
+  const angebotDetailGroups = [
+    {
+      id: 'stammdaten',
+      label: ENTITY_DETAIL_TAB_LABELS.stammdaten,
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'details',
+      label: ENTITY_DETAIL_TAB_LABELS.details,
+      icon: 'list-numbers',
+      count: positionenAnzeigeCount || undefined,
+      render: () => detailsInhalt,
+    },
+    {
+      id: 'verlauf',
+      label: ENTITY_DETAIL_TAB_LABELS.verlauf,
+      icon: 'history',
+      count: timelineCount || undefined,
+      render: () => <MockVerlaufCard>{verlaufInhalt}</MockVerlaufCard>,
+    },
+    {
+      id: 'dokumente',
+      label: ENTITY_DETAIL_TAB_LABELS.dokumente,
+      icon: 'files',
+      count: anhaengeCount || undefined,
+      render: () => <MockDokumenteCard>{dokumenteInhalt}</MockDokumenteCard>,
+    },
+    {
+      id: 'visualisierungen',
+      label: 'Visualisierungen',
+      icon: 'sparkles',
+      count: kiVisualisierungen.length || undefined,
+      render: () => (
+        <AngebotVisualisierungenTab angebotId={detail.id} sessions={kiVisualisierungen} />
+      ),
+    },
+  ]
 
   return (
     <EntityDetailLayout
@@ -915,23 +825,7 @@ export function AngebotDetailPageClient({
         </p>
       ) : null}
 
-      <DetailResponsiveTabs
-        tab={tab}
-        onTabChange={setTab}
-        desktopOverview={fixedOverview}
-        desktopTabs={
-          <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as Tab)} />
-        }
-        mobileTabs={
-          <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as Tab)} />
-        }
-        desktopTabContent={desktopTabContent}
-        mobileTabContent={mobileTabContent}
-        mobileDefaultTab="stammdaten"
-        desktopDefaultTab="schritte"
-        mobileTabIds={MOBILE_ANGEBOT_TABS}
-        desktopTabIds={DESKTOP_ANGEBOT_TABS}
-      />
+      <MockDetailShell defaultGroup="stammdaten" groups={angebotDetailGroups} />
 
       {wizardOpen && lead ? (
         <AngebotWizard

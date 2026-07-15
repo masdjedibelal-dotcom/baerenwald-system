@@ -3,10 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { AuftraegeListeClient } from '@/components/auftraege/AuftraegeListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
 import { auftragIdFromPath, auftraegeFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { AuftragListeEintrag } from '@/lib/types'
 import type { AuftragPipelineKontext } from '@/lib/crm/projekt-pipeline'
@@ -23,7 +20,6 @@ export function AuftraegeMasterDetailShell({
   const pathname = usePathname()
   const selectedId = auftragIdFromPath(pathname)
   const fullBleed = auftraegeFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/auftraege'
 
   return (
     <AppMasterDetailLayout
@@ -41,20 +37,12 @@ export function AuftraegeMasterDetailShell({
           <AuftraegeListeClient
             auftraege={auftraege}
             pipelineKontextByAuftragId={pipelineKontextByAuftragId}
-            mode="pane"
-            selectedId={selectedId}
+            mode="page"
           />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Auftrag auswählen"
-          description="Wähle links einen Auftrag für Baustelle, Finanzen und Dokumente."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

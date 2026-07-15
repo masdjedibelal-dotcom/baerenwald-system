@@ -7,9 +7,6 @@ import {
 } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { loadRechnungenForAuftrag } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { listVertraegeFuerAuftrag, loadRahmenVertraegeForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
-import { loadAuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
-import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
-import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/actions'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
@@ -48,9 +45,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       vertraegeListe,
       firm,
       team,
-      finanzenPayload,
-      complianceTypen,
-      partnerDokumente,
     ] = await Promise.all([
       loadAuftragDetail(params.id),
       listFormularTemplates(),
@@ -60,9 +54,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       listVertraegeFuerAuftrag(params.id),
       fetchFirmenEinstellungen(supabase),
       loadCrmTeamMitglieder(),
-      loadAuftragFinanzenClientPayload(params.id),
-      loadComplianceTypen(),
-      loadPartnerDokumenteForAuftrag(params.id),
     ])
 
     if (!detail) notFound()
@@ -140,9 +131,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         rechnungenListe={rechnungenListe}
         vertraegeListe={vertraegeListe}
         firm={firm}
-        finanzenPayload={finanzenPayload}
-        complianceTypen={complianceTypen}
-        partnerDokumente={partnerDokumente}
         rahmenVertraegeByHandwerker={Object.fromEntries(rahmenVertraegeByHandwerker)}
         projektKontext={projektKontext}
         hvMeldungLeadId={hvMeldungLeadId}

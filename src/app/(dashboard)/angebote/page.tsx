@@ -1,4 +1,5 @@
-/** Listen-Inhalt kommt aus `angebote/layout.tsx` (Master-Detail ab 900px). */
+import { redirect } from 'next/navigation'
+
 export default function AngebotePage() {
-  return null
+  redirect('/vorgaenge?phase=angebot')
 }

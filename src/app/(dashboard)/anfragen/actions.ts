@@ -929,15 +929,12 @@ export async function deleteLeadNotizRow(
   return { ok: true }
 }
 
-/** Anfrage (Lead) dauerhaft löschen — abhängige Zeilen entfallen per ON DELETE CASCADE. */
+/** Anfrage (Lead) dauerhaft löschen — delegiert an deleteVorgang (gesamte Pipeline). */
 export async function deleteAnfrage(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase.from('leads').delete().eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  revalidatePath('/anfragen')
-  return { ok: true }
+  const { deleteVorgang } = await import('@/app/(dashboard)/vorgaenge/actions')
+  return deleteVorgang(leadId)
 }
 
 async function insertLeadTimelineEntry(

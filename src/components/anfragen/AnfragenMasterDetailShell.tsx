@@ -3,10 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { AnfragenListeClient } from '@/components/anfragen/AnfragenListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
 import {
   anfrageIdFromPath,
   anfragenFullBleedSubRoute,
@@ -23,7 +20,6 @@ export function AnfragenMasterDetailShell({
   const pathname = usePathname()
   const selectedId = anfrageIdFromPath(pathname)
   const fullBleed = anfragenFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/anfragen'
 
   return (
     <AppMasterDetailLayout
@@ -38,18 +34,11 @@ export function AnfragenMasterDetailShell({
             </div>
           }
         >
-          <AnfragenListeClient leads={leads} mode="pane" selectedId={selectedId} />
+          <AnfragenListeClient leads={leads} mode="page" />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Anfrage auswählen"
-          description="Wähle links eine Anfrage, um Details, Angebote und Aktivität zu sehen."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

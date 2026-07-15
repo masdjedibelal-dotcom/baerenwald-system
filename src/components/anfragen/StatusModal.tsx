@@ -6,6 +6,7 @@ import {
   CircleX,
   HelpCircle,
   Info,
+  PhoneOff,
   Save,
   type LucideIcon,
 } from 'lucide-react'
@@ -15,6 +16,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import {
   loadCrmTeamFuerTermin,
   saveLeadAlsVerloren,
+  saveLeadNichtErreichbar,
   saveLeadRueckfrage,
   saveLeadTerminVereinbart,
 } from '@/app/(dashboard)/anfragen/actions'
@@ -32,7 +34,7 @@ import { anfrageAdresseAusPayload, formatAnfrageAdresseZeile } from '@/lib/anfra
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
 
-export type StatusModalKind = 'termin' | 'rueckfrage' | 'verloren'
+export type StatusModalKind = 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -44,6 +46,7 @@ const META: Record<
 > = {
   termin: { title: 'Termin vereinbart', icon: Calendar, saveLabel: 'Termin speichern' },
   rueckfrage: { title: 'Warte auf Antwort', icon: HelpCircle, saveLabel: 'Speichern' },
+  nicht_erreichbar: { title: 'Nicht erreichbar', icon: PhoneOff, saveLabel: 'Wiedervorlage speichern' },
   verloren: {
     title: 'Verloren',
     icon: CircleX,
@@ -68,6 +71,7 @@ export function StatusModal({
   const [datum, setDatum] = useState(todayISO())
   const [uhrzeit, setUhrzeit] = useState('10:00')
   const [notiz, setNotiz] = useState('')
+  const [wiedervorlage, setWiedervorlage] = useState(todayISO())
   const [grund, setGrund] = useState('zu_teuer')
   const [mitarbeiterId, setMitarbeiterId] = useState('')
   const [team, setTeam] = useState<CrmTeamMitglied[]>([])
@@ -107,6 +111,7 @@ export function StatusModal({
     setUhrzeit('10:00')
     setNotiz('')
     setGrund('zu_teuer')
+    setWiedervorlage(todayISO())
     setMitarbeiterId('')
     setMailToggle(true)
     setMailDraft(null)
@@ -185,12 +190,25 @@ export function StatusModal({
         return
       }
       res = await saveLeadRueckfrage({ leadId: lead.id, notiz: notiz.trim() })
-    } else {
+    } else if (kind === 'nicht_erreichbar') {
+      if (!wiedervorlage.trim()) {
+        setSaving(false)
+        toast.error('Bitte Wiedervorlage-Datum wählen.')
+        return
+      }
+      res = await saveLeadNichtErreichbar({
+        leadId: lead.id,
+        kontaktName,
+        wiedervorlage: wiedervorlage.trim(),
+      })
+    } else if (kind === 'verloren') {
       res = await saveLeadAlsVerloren({
         leadId: lead.id,
         grund,
         notiz: notiz.trim() || null,
       })
+    } else {
+      res = { ok: false, message: 'Unbekannter Status.' }
     }
 
     setSaving(false)
@@ -201,9 +219,13 @@ export function StatusModal({
     toast.success(
       kind === 'termin' && mailToggle && mailDraft?.to.length
         ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
-        : kind === 'verloren'
-          ? 'Anfrage als verloren markiert.'
-          : 'Gespeichert'
+        : kind === 'nicht_erreichbar'
+          ? `Wiedervorlage angelegt · ${wiedervorlage.trim()}`
+          : kind === 'rueckfrage'
+            ? 'Rückfrage notiert'
+            : kind === 'verloren'
+              ? 'Anfrage als verloren markiert.'
+              : 'Gespeichert'
     )
     onClose()
     onSaved?.()
@@ -316,6 +338,28 @@ export function StatusModal({
                       Status bleibt <strong>„Kontaktiert“</strong>, der Eintrag erscheint in der Timeline.
                     </>
                   )}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {kind === 'nicht_erreichbar' ? (
+            <div className="space-y-3">
+              <label>
+                <span className="input-label">Wiedervorlage *</span>
+                <input
+                  type="date"
+                  className="input"
+                  value={wiedervorlage}
+                  min={todayISO()}
+                  onChange={(e) => setWiedervorlage(e.target.value)}
+                  required
+                />
+              </label>
+              <div className="status-hint status-hint-neutral">
+                <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+                <span>
+                  Eintrag in der Timeline — Rückruf am gewählten Datum planen.
                 </span>
               </div>
             </div>

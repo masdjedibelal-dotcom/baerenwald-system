@@ -8,27 +8,26 @@ import {
   ArrowRight,
   Briefcase,
   Calendar,
-  CircleX,
   MapPin,
   FileText,
-  HelpCircle,
   History,
   LayoutGrid,
   Layers,
   ListChecks,
   MoreHorizontal,
   StickyNote,
-  Mail,
   Pencil,
   Sparkles,
-  Trash2,
 } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
-import { DetailResponsiveTabs } from '@/components/layout/app'
+import {
+  MockDetailShell,
+  MockDokumenteCard,
+  MockVerlaufCard,
+} from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { LeadNaechsteSchritteCard, buildLeadNaechsteSchritte } from '@/components/anfragen/LeadNaechsteSchritteCard'
 import {
@@ -50,7 +49,8 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
@@ -77,7 +77,6 @@ import type { KundenObjekt } from '@/lib/types'
 import type { ObjektAkteReadOnlyPayload } from '@/lib/objektakte/types'
 import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
 import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
-import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import type { AngebotPosition } from '@/lib/types'
 
 const AngebotWizard = dynamic(
@@ -97,6 +96,7 @@ const KundeModal = dynamic(
 )
 import { toast } from '@/components/ui/app-toast'
 import { deleteAnfrage, weiterfuehrenAlsProjekt } from '@/app/(dashboard)/anfragen/actions'
+import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
 import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { findeNeuestenEntwurf, hatNurEntwuerfe } from '@/lib/angebote/angebot-lebenszyklus'
@@ -111,18 +111,6 @@ import {
   formatRelativeDate,
 } from '@/lib/utils'
 import { isEchterFreitext } from '@/lib/lead-display-helpers'
-
-type DetailTab = 'stammdaten' | 'projekt' | 'schritte' | 'timeline' | 'notizen' | 'dokumente'
-
-const DESKTOP_DETAIL_TABS: DetailTab[] = ['schritte', 'timeline', 'notizen', 'dokumente']
-const MOBILE_DETAIL_TABS: DetailTab[] = [
-  'stammdaten',
-  'projekt',
-  'schritte',
-  'timeline',
-  'notizen',
-  'dokumente',
-]
 
 function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
@@ -190,7 +178,6 @@ export function AnfrageDetailClient({
   const [lead, setLead] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [angebotWizardOpen, setAngebotWizardOpen] = useState(false)
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
@@ -199,7 +186,6 @@ export function AnfrageDetailClient({
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
 
-  const [tab, setTab] = useState<DetailTab>('schritte')
   const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
   const [objekteListe, setObjekteListe] = useState<KundenObjekt[]>(kundenObjekte)
 
@@ -549,140 +535,72 @@ export function AnfrageDetailClient({
     [naechsteSchritte]
   )
 
-  const desktopDetailTabs = useMemo(
-    () => [
-      {
-        id: 'schritte',
-        label: 'Nächste Schritte',
-        icon: ListChecks,
-        count: offeneSchritteCount || undefined,
-      },
-      {
-        id: 'timeline',
-        label: entityDetailTabLabel('timeline'),
-        icon: History,
-        count: timelineItems.length || undefined,
-      },
-      {
-        id: 'notizen',
-        label: ACTIVITY_SECTIONS.notizen,
-        icon: StickyNote,
-        count: notizenRows.length || undefined,
-      },
-      {
-        id: 'dokumente',
-        label: ACTIVITY_SECTIONS.dokumente,
-        icon: FileText,
-        count: dokumenteCount || undefined,
-      },
-    ],
-    [offeneSchritteCount, timelineItems.length, notizenRows.length, dokumenteCount]
-  )
-
-  const mobileDetailTabs = useMemo(
-    () => [
-      { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
-      { id: 'projekt', label: entityDetailTabLabel('projekt'), icon: Layers },
-      {
-        id: 'schritte',
-        label: 'Nächste Schritte',
-        icon: ListChecks,
-        count: offeneSchritteCount || undefined,
-      },
-      {
-        id: 'timeline',
-        label: entityDetailTabLabel('timeline'),
-        icon: History,
-        count: timelineItems.length || undefined,
-      },
-      {
-        id: 'notizen',
-        label: ACTIVITY_SECTIONS.notizen,
-        icon: StickyNote,
-        count: notizenRows.length || undefined,
-      },
-      {
-        id: 'dokumente',
-        label: ACTIVITY_SECTIONS.dokumente,
-        icon: FileText,
-        count: dokumenteCount || undefined,
-      },
-    ],
-    [offeneSchritteCount, timelineItems.length, notizenRows.length, dokumenteCount]
-  )
-
-  const detailHeadMenuItems = useMemo((): ActionsMenuItem[] => {
-    return [
-      {
-        label: 'Bearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => setBearbeitenOpen(true),
-      },
-      {
-        label: 'E-Mail schreiben',
-        icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
-        hint: leadEmail?.trim() ? undefined : 'E-Mail im Modal eintragen',
-        onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
-      },
-      ...(lead.anlass === 'meldung'
-        ? ([
+  const detailHeadMenuItems = useMemo(
+    () =>
+      listEntityMenuItems(
+        'anfrage',
+        {
+          name: leadKontaktAnzeigeName(lead),
+          tel: lead.kontakt_telefon,
+          status: lead.status,
+        },
+        {
+          onEdit: () => setBearbeitenOpen(true),
+          onStatus: (kind) => setStatusModalKind(kind),
+          onAngebot: openAngebotErstellen,
+          tel: lead.kontakt_telefon,
+          onDelete: () => {
+            startTransition(async () => {
+              const r = await deleteAnfrage(lead.id)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              toast.success('Anfrage gelöscht')
+              router.push('/anfragen')
+              refresh()
+            })
+          },
+          deleteLabel: leadKontaktAnzeigeName(lead),
+          extra: [
             {
-              label: 'Als Projekt weiterführen',
-              icon: <Briefcase className="h-[15px] w-[15px]" aria-hidden />,
-              onClick: () => {
-                startTransition(async () => {
-                  const r = await weiterfuehrenAlsProjekt(lead.id)
-                  if (!r.ok) {
-                    toast.error(r.message)
-                    return
-                  }
-                  toast.success('Projekt-Anfrage angelegt')
-                  router.push(`/anfragen/${r.id}`)
-                })
-              },
+              icon: 'mail',
+              label: 'E-Mail schreiben',
+              hint: leadEmail?.trim() ? undefined : 'E-Mail im Modal eintragen',
+              onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
             },
-          ] satisfies ActionsMenuItem[])
-        : []),
-      'sep',
-      {
-        label: 'Termin vereinbart',
-        icon: <Calendar className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => setStatusModalKind('termin'),
-      },
-      {
-        label: 'Warte auf Antwort',
-        icon: <HelpCircle className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => setStatusModalKind('rueckfrage'),
-      },
-      {
-        label: 'Verloren',
-        icon: <CircleX className="h-[15px] w-[15px]" aria-hidden />,
-        danger: true,
-        onClick: () => setStatusModalKind('verloren'),
-      },
-      'sep',
-      {
-        label: 'Anfrage löschen',
-        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
-        danger: true,
-        onClick: () => setDeleteConfirmOpen(true),
-      },
+            ...(lead.anlass === 'meldung'
+              ? [
+                  {
+                    icon: 'briefcase',
+                    label: 'Als Projekt weiterführen',
+                    onClick: () => {
+                      startTransition(async () => {
+                        const r = await weiterfuehrenAlsProjekt(lead.id)
+                        if (!r.ok) {
+                          toast.error(r.message)
+                          return
+                        }
+                        toast.success('Projekt-Anfrage angelegt')
+                        router.push(`/anfragen/${r.id}`)
+                      })
+                    },
+                  },
+                ]
+              : []),
+          ],
+        }
+      ),
+    [
+      lead,
+      leadEmail,
+      mailCompose,
+      openAngebotErstellen,
+      refresh,
+      router,
+      startTransition,
     ]
-  }, [lead.id, lead.anlass, leadEmail, mailCompose, router, startTransition])
-
-  function fuehreAnfrageLoeschen() {
-    startTransition(async () => {
-      const r = await deleteAnfrage(lead.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Anfrage gelöscht')
-      setDeleteConfirmOpen(false)
-      router.push('/anfragen')
-      refresh()
-    })
-  }
+  )
 
   const headMeta = (
     <DetailMetaRow>
@@ -768,65 +686,70 @@ export function AnfrageDetailClient({
     </div>
   )
 
-  const fixedOverview = (
-    <div className="space-y-3">
-      {stammdatenCard}
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
-      {projektuebersichtCards}
-      <PosBoard title="Leistungen" positionen={posBoardPositionen} readOnly />
-      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
-      <LeadTermineCard
-        leadId={lead.id}
-        termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
-        notizen={notizenRows}
-        onReload={() => refresh()}
-      />
-    </div>
-  )
-
   const schritteInhalt = (
     <LeadNaechsteSchritteCard steps={naechsteSchritte} />
   )
 
-  const desktopTabContent =
-    tab === 'schritte' ? (
-      schritteInhalt
-    ) : tab === 'timeline' ? (
-      timelineTab
-    ) : tab === 'notizen' ? (
-      <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
-    ) : tab === 'dokumente' ? (
-      <AnfrageDokumenteTab
-        leadId={lead.id}
-        dokumente={dokumenteRows}
-        angebote={angeboteListe}
-        onReload={() => refresh()}
-      />
-    ) : null
+  const verlaufInhalt = (
+    <div className="space-y-3">
+      {offeneSchritteCount > 0 ? schritteInhalt : null}
+      <MockVerlaufCard>{timelineTab}</MockVerlaufCard>
+    </div>
+  )
 
-  const mobileTabContent =
-    tab === 'stammdaten' ? (
-      stammdatenInhalt
-    ) : tab === 'projekt' ? (
-      <EntityDetailsTab
-        projektKontext={projektKontext}
-        positionen={posBoardPositionen}
-        overview={projektuebersichtCards}
-      />
-    ) : tab === 'schritte' ? (
-      schritteInhalt
-    ) : tab === 'timeline' ? (
-      timelineTab
-    ) : tab === 'notizen' ? (
-      <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
-    ) : tab === 'dokumente' ? (
-      <AnfrageDokumenteTab
-        leadId={lead.id}
-        dokumente={dokumenteRows}
-        angebote={angeboteListe}
-        onReload={() => refresh()}
-      />
-    ) : null
+  const anfrageDetailGroups = [
+    {
+      id: 'stammdaten',
+      label: ENTITY_DETAIL_TAB_LABELS.stammdaten,
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'details',
+      label: ENTITY_DETAIL_TAB_LABELS.details,
+      icon: 'layers',
+      count: posBoardPositionen.length || undefined,
+      render: () => (
+        <EntityDetailsTab
+          projektKontext={projektKontext}
+          positionen={posBoardPositionen}
+          overview={projektuebersichtCards}
+        />
+      ),
+    },
+    {
+      id: 'verlauf',
+      label: ENTITY_DETAIL_TAB_LABELS.verlauf,
+      icon: 'history',
+      count: (offeneSchritteCount + timelineItems.length) || undefined,
+      render: () => verlaufInhalt,
+    },
+    {
+      id: 'dokumente',
+      label: ENTITY_DETAIL_TAB_LABELS.dokumente,
+      icon: 'files',
+      count: dokumenteCount || undefined,
+      render: () => (
+        <MockDokumenteCard>
+          <AnfrageDokumenteTab
+            leadId={lead.id}
+            dokumente={dokumenteRows}
+            angebote={angeboteListe}
+            onReload={() => refresh()}
+          />
+        </MockDokumenteCard>
+      ),
+    },
+    {
+      id: 'notizen',
+      label: ENTITY_DETAIL_TAB_LABELS.notizen,
+      icon: 'messages',
+      count: notizenRows.length || undefined,
+      render: () => (
+        <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
+      ),
+    },
+  ]
 
   const kiAnalyseCard =
     !hatKiVertrieb && lead.ki_zusammenfassung?.trim() ? (
@@ -841,25 +764,7 @@ export function AnfrageDetailClient({
       </details>
     ) : null
 
-  const main = (
-    <DetailResponsiveTabs
-      tab={tab}
-      onTabChange={setTab}
-      desktopOverview={fixedOverview}
-      desktopTabs={
-        <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
-      }
-      mobileTabs={
-        <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as DetailTab)} />
-      }
-      desktopTabContent={desktopTabContent}
-      mobileTabContent={mobileTabContent}
-      mobileDefaultTab="stammdaten"
-      desktopDefaultTab="schritte"
-      mobileTabIds={MOBILE_DETAIL_TABS}
-      desktopTabIds={DESKTOP_DETAIL_TABS}
-    />
-  )
+  const main = <MockDetailShell defaultGroup="stammdaten" groups={anfrageDetailGroups} />
 
   return (
     <EntityDetailLayout
@@ -977,23 +882,6 @@ export function AnfrageDetailClient({
           refresh()
         }}
       />
-
-      <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Anfrage löschen">
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed text-bw-text-muted">
-            Die Anfrage wird dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden — zugehörige Einträge zu
-            diesem Lead (z.&nbsp;B. Notizen, Termine) werden mit entfernt, soweit in der Datenbank vorgesehen.
-          </p>
-          <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setDeleteConfirmOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="danger" loading={pending} onClick={fuehreAnfrageLoeschen}>
-              Endgültig löschen
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {kunde ? (
         <KundeModal

@@ -298,7 +298,7 @@ export function LeadOrgKontextBlock({
                 Melderdaten löschen
               </Button>
               <Link
-                href="/einstellungen/integration?section=datenschutz"
+                href="/einstellungen/sicherheit"
                 className="inline-flex items-center text-[12px] text-bw-primary hover:underline"
               >
                 Datenschutz-Modul →

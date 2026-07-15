@@ -1,10 +1,19 @@
-import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import { PartnerNetzwerkClient } from '@/components/partner/PartnerNetzwerkClient'
+import { loadPartnerListe } from '@/lib/partner/load-partner-liste'
 
-export const metadata: Metadata = {
-  title: 'Partner',
-}
+export default async function PartnerPage() {
+  const { partners, kategorien } = await loadPartnerListe()
 
-/** Listen-Inhalt kommt aus `partner/layout.tsx` (Master-Detail ab 900px). */
-export default function PartnerPage() {
-  return null
+  return (
+    <Suspense
+      fallback={
+        <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Partner werden geladen…
+        </div>
+      }
+    >
+      <PartnerNetzwerkClient partners={partners} kategorien={kategorien} mode="page" />
+    </Suspense>
+  )
 }

@@ -1,88 +1,53 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import { Inbox, Sparkles } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import {
-  ListFilterSection,
-  ListGridShell,
-  ListMobileStack,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { KanalBadge, LeadStatusBadge } from '@/components/ui/Badge'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { useExport, type ExportField } from '@/hooks/useExport'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
+import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
+import {
+  MockBadge,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockPager,
+  MockPopover,
+  MockToolbar,
+} from '@/components/mock-ui'
+import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { runDeleteVorgang, runDuplicateAnfrage } from '@/lib/list-actions'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useListPage } from '@/hooks/useListPage'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
-import { isGptProjektStudio } from '@/lib/gpt-viz/funnel-daten'
-import {
-  ANFRAGEN_ANLASS_FILTER_OPTS,
-  ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS,
-  leadMatchesAnlassFilter,
-  leadMatchesOrgSpezialFilter,
-  type AnfragenAnlassFilter,
-  type AnfragenOrgSpezialFilter,
-} from '@/lib/crm/anfragen-org-filter'
-import { ANLASS_LABELS } from '@/lib/org/org-portal-helpers'
-import {
-  ANFRAGEN_STATUS_FILTER_ORDER,
-  leadInAnfragenPipeline,
-  leadStatusInAnfragenListe,
-  type AnfragenStatusFilter,
-} from '@/lib/crm/pipeline-liste-filter'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import { leadKontaktAnzeigeName, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import {
   BEREICH_LABELS,
   KANAL_LABELS,
   STATUS_LABELS,
-  anfragenPreisSpaltenLabel,
   cn,
-  formatDatumZeit,
+  formatLeadListDatum,
 } from '@/lib/utils'
-import {
-  getZeitraumRange,
-  datumInZeitraum,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
-import { leadKontaktAnzeigeName, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
-import type { LeadKanal, LeadStatus, LeadWithAngebote } from '@/lib/types'
-import { LEAD_ABGEBROCHEN_LABEL } from '@/lib/crm-labels'
+import type { LeadStatus, LeadWithAngebote } from '@/lib/types'
 
-const ANFRAGEN_GRID_COLS =
-  '42px minmax(160px,1.6fr) minmax(120px,1.1fr) minmax(130px,1.2fr) minmax(128px,0.95fr) minmax(72px,0.75fr) 100px 100px'
+type AnfragenChipFilter = '' | 'neu' | 'kontaktiert' | 'termin' | 'angebot'
 
-const KANAL_FILTERS: { value: '' | LeadKanal; label: string }[] = [
-  { value: '', label: 'Alle Kanäle' },
-  { value: 'website', label: 'Website' },
-  { value: 'telefon', label: 'Telefon' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'email', label: 'E-Mail' },
-  { value: 'vor_ort', label: 'Vor Ort' },
-  { value: 'hv_melder_link', label: 'Melde-Link' },
-  { value: 'hv_direkt', label: 'HV-Portal (direkt)' },
-  { value: 'hv_einladung', label: 'HV-Einladung' },
-  { value: 'hv_katalog', label: 'HV-Katalog' },
-  { value: 'hv_manuell', label: 'HV manuell' },
-  { value: 'org_portal', label: 'Auftraggeber-Portal' },
-  { value: 'org_funnel', label: 'Org-Projekt' },
-  { value: 'org_service', label: 'Org-Servicepaket' },
-  { value: 'sonstiges', label: 'Sonstiges' },
-]
+const ANFRAGEN_ROW_GRID = '110px 1.6fr 1.4fr 120px 110px 100px 116px'
 
-function anfragenStatusFilterLabel(status: AnfragenStatusFilter): string {
-  if (status === '') return 'Alle'
-  if (status === 'abgebrochen') return LEAD_ABGEBROCHEN_LABEL
-  return STATUS_LABELS[status]
+const CHIP_ORDER: AnfragenChipFilter[] = ['', 'neu', 'kontaktiert', 'termin', 'angebot']
+
+const CHIP_LABELS: Record<AnfragenChipFilter, string> = {
+  '': 'Alle',
+  neu: 'Neu',
+  kontaktiert: 'Kontaktiert',
+  termin: 'Termin',
+  angebot: 'Angebot',
 }
+
+const LIST_STATUSES: LeadStatus[] = ['neu', 'kontaktiert', 'termin', 'angebot']
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -115,41 +80,124 @@ function leadTel(lead: LeadWithAngebote) {
   return lead.kontakt_telefon ?? ''
 }
 
-function leadProjektBereicheChips(lead: LeadWithAngebote) {
-  return bereicheFuerAnzeige(lead.bereiche, lead.situation)
+function formatAnfrageNr(lead: LeadWithAngebote): string {
+  const d = new Date(lead.created_at)
+  const year = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear()
+  const seq = lead.id.replace(/-/g, '').slice(-4).toUpperCase()
+  return `L-${year}-${seq}`
 }
 
-function leadRegion(lead: LeadWithAngebote) {
-  const plz = lead.plz?.trim()
-  const k = lead.kunden
-  const ort =
-    k && typeof k === 'object' && 'ort' in k && typeof (k as { ort?: string }).ort === 'string'
-      ? (k as { ort: string }).ort.trim()
-      : ''
-  if (plz && ort) return `${plz} ${ort}`
-  return plz || ort || '—'
+function leadAnfrageTitel(lead: LeadWithAngebote): string {
+  const situation = leadSituationDisplay(lead.situation)
+  const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
+  const bereicheText = bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
+  return situation || bereicheText || '—'
 }
 
-function leadSituationText(lead: LeadWithAngebote) {
-  return leadSituationDisplay(lead.situation) || '—'
+function leadEingangAnzeige(lead: LeadWithAngebote): string {
+  if (!lead.created_at) return '—'
+  const datePart = formatLeadListDatum(lead.created_at)
+  const d = new Date(lead.created_at)
+  if (Number.isNaN(d.getTime())) return datePart
+  const timePart = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return `${datePart} · ${timePart}`
 }
 
-function leadBereicheText(lead: LeadWithAngebote) {
-  const bereiche = leadProjektBereicheChips(lead)
-  if (!bereiche.length) return '—'
-  return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
+function leadStatusMockBadge(status: LeadStatus): { kind: string; label: string } {
+  const kindMap: Partial<Record<LeadStatus, string>> = {
+    neu: 'neu',
+    kontaktiert: 'aktiv',
+    termin: 'aktiv',
+    angebot: 'warten',
+    auftrag: 'fertig',
+    abgeschlossen: 'fertig',
+    abgebrochen: 'storniert',
+  }
+  return {
+    kind: kindMap[status] ?? 'plain',
+    label: STATUS_LABELS[status] ?? status,
+  }
 }
 
-function leadEingegangen(lead: LeadWithAngebote) {
-  return lead.created_at ? formatDatumZeit(lead.created_at) : '—'
+const STATUS_POPOVER_OPTIONS: LeadStatus[] = [
+  'neu',
+  'kontaktiert',
+  'termin',
+  'angebot',
+  'auftrag',
+  'abgebrochen',
+]
+
+const STATUS_DOT_COLOR: Partial<Record<LeadStatus, string>> = {
+  neu: 'var(--blue-tx)',
+  kontaktiert: 'var(--blue-tx)',
+  termin: 'var(--grn-tx)',
+  angebot: '#D9A800',
+  auftrag: 'var(--green)',
+  abgebrochen: 'var(--red-tx)',
 }
 
-type SortRow = {
+function LeadStatusBadgePopover({
+  lead,
+  onUpdated,
+}: {
   lead: LeadWithAngebote
-  name: string
-  created_at: string
-  preis_min: number | null
-  status: LeadStatus
+  onUpdated: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [pending, startTransition] = useTransition()
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const badge = leadStatusMockBadge(lead.status)
+
+  return (
+    <span
+      ref={anchorRef}
+      onClick={(e) => {
+        e.stopPropagation()
+        setOpen(true)
+      }}
+      style={{ cursor: 'pointer' }}
+    >
+      <MockBadge kind={badge.kind}>{badge.label}</MockBadge>
+      <MockPopover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right" width={200}>
+        <div className="pop-h">Status setzen</div>
+        {STATUS_POPOVER_OPTIONS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className="pop-item"
+            disabled={pending}
+            onClick={() => {
+              startTransition(async () => {
+                const r = await updateLeadStatus(lead.id, s)
+                if (!r.ok) {
+                  toast.error(r.message)
+                  return
+                }
+                toast.success(`Status: ${STATUS_LABELS[s] ?? s}`)
+                setOpen(false)
+                onUpdated()
+              })
+            }}
+          >
+            <span
+              className="dot"
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: STATUS_DOT_COLOR[s] ?? 'var(--text-3)',
+              }}
+            />
+            {STATUS_LABELS[s] ?? s}
+            {lead.status === s ? (
+              <MockIcon n="check" size={14} style={{ marginLeft: 'auto', color: 'var(--green)' }} />
+            ) : null}
+          </button>
+        ))}
+      </MockPopover>
+    </span>
+  )
 }
 
 function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
@@ -175,28 +223,12 @@ function toExportRow(lead: LeadWithAngebote): Record<string, unknown> {
   }
 }
 
-function leadPipelineMeta(lead: LeadWithAngebote) {
-  return (
-    <span className="flex flex-wrap items-center gap-1">
-      {isGptProjektStudio(lead.funnel_daten) ? (
-        <span className="inline-flex items-center gap-0.5 rounded-md border border-[#2E7D52]/30 bg-[#EAF3DE] px-1.5 py-0.5 text-[10px] font-semibold text-[#1A3D2B]">
-          <Sparkles className="h-3 w-3" aria-hidden />
-          KI
-        </span>
-      ) : null}
-      <PipelineKontextBadge lead={lead} />
-      {lead.kanal ? <KanalBadge kanal={lead.kanal} className="!min-h-[22px] !text-[10px]" /> : null}
-    </span>
-  )
-}
-
 export function AnfragenListeClient({
   leads,
   mode = 'page',
   selectedId = null,
 }: {
   leads: LeadWithAngebote[]
-  /** `pane` = schmale Master-Spalte ab 900px */
   mode?: 'page' | 'pane'
   selectedId?: string | null
 }) {
@@ -205,354 +237,157 @@ export function AnfragenListeClient({
   const { exportToCSV } = useExport()
   const [exportOpen, setExportOpen] = useState(false)
   const [neuOpen, setNeuOpen] = useState(false)
+  const [filter, setFilter] = useState<AnfragenChipFilter>('')
+  const [q, setQ] = useState('')
+  const debouncedQ = useDebouncedValue(q, 300)
+
   const defaultKundeId = searchParams.get('kunde_id')
   const zielNachAnlage = searchParams.get('ziel')
+  const isPane = mode === 'pane'
 
   function closeNeuSheet() {
     setNeuOpen(false)
     const params = new URLSearchParams(searchParams.toString())
     params.delete('neu')
-    const q = params.toString()
-    router.replace(q ? `/anfragen?${q}` : '/anfragen', { scroll: false })
-  }
-
-  function openNeuSheet() {
-    setNeuOpen(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('neu', '1')
-    router.replace(`/anfragen?${params.toString()}`, { scroll: false })
+    const query = params.toString()
+    router.replace(query ? `/anfragen?${query}` : '/anfragen', { scroll: false })
   }
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') setNeuOpen(true)
   }, [searchParams])
 
-  const [statusFilter, setStatusFilter] = useState<AnfragenStatusFilter>('')
-  const [kanal, setKanal] = useState<'' | LeadKanal>('')
-  const [anlassFilter, setAnlassFilter] = useState<AnfragenAnlassFilter>('')
-  const [orgSpezialFilter, setOrgSpezialFilter] = useState<AnfragenOrgSpezialFilter>('')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-
-  useEffect(() => {
-    const st = searchParams.get('status') as LeadStatus | null
-    const z = searchParams.get('zeitraum')
-    if (st && ANFRAGEN_STATUS_FILTER_ORDER.includes(st)) setStatusFilter(st)
-    if (z === 'heute') setZeitraum('heute')
-    if (z === 'diese_woche') setZeitraum('diese_woche')
-    if (z === 'dieser_monat') setZeitraum('dieser_monat')
-  }, [searchParams])
-
-  const anfragenLeads = useMemo(
-    () => leads.filter((l) => leadStatusInAnfragenListe(l.status)),
+  const listBase = useMemo(
+    () => leads.filter((l) => LIST_STATUSES.includes(l.status)),
     [leads]
   )
 
-  const pipelineLeads = useMemo(() => anfragenLeads.filter(leadInAnfragenPipeline), [anfragenLeads])
-
-  const statusCounts = useMemo(() => {
-    const c: Record<string, number> = {
-      '': pipelineLeads.length,
+  const counts = useMemo(() => {
+    const c: Record<AnfragenChipFilter, number> = {
+      '': listBase.length,
+      neu: 0,
+      kontaktiert: 0,
+      termin: 0,
+      angebot: 0,
     }
-    for (const l of anfragenLeads) {
-      c[l.status] = (c[l.status] ?? 0) + 1
+    for (const l of listBase) {
+      if (l.status === 'neu' || l.status === 'kontaktiert' || l.status === 'termin' || l.status === 'angebot') {
+        c[l.status]++
+      }
     }
     return c
-  }, [anfragenLeads, pipelineLeads.length])
-
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
-  )
+  }, [listBase])
 
   const filtered = useMemo(() => {
     const needle = debouncedQ.trim().toLowerCase()
-    return anfragenLeads.filter((l) => {
-      if (statusFilter) {
-        if (l.status !== statusFilter) return false
-      } else if (!leadInAnfragenPipeline(l)) {
-        return false
-      }
-      if (kanal && l.kanal !== kanal) return false
-      if (!leadMatchesAnlassFilter(l, anlassFilter)) return false
-      if (!leadMatchesOrgSpezialFilter(l, orgSpezialFilter)) return false
-      if (dateRange && !datumInZeitraum(l.created_at, dateRange)) return false
-      if (!needle) return true
-      const name = leadName(l).toLowerCase()
-      const mail = leadEmail(l).toLowerCase()
-      const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
-      return name.includes(needle) || mail.includes(needle) || tel.includes(needle)
-    })
-  }, [anfragenLeads, statusFilter, kanal, anlassFilter, orgSpezialFilter, debouncedQ, dateRange])
-
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((lead) => ({
-        lead,
-        name: leadName(lead),
-        created_at: lead.created_at,
-        preis_min: lead.preis_min,
-        status: lead.status,
-      })),
-    [filtered]
-  )
-
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
-
-  const hasFilters = !!(
-    statusFilter ||
-    kanal ||
-    anlassFilter ||
-    orgSpezialFilter ||
-    zeitraum !== 'alle' ||
-    q.trim()
-  )
-
-  function resetAllFilters() {
-    setStatusFilter('')
-    setKanal('')
-    setAnlassFilter('')
-    setOrgSpezialFilter('')
-    setQ('')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-  }
-
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    // Status steht bereits in FilterChips — kein Tag doppelt anzeigen
-    if (kanal) {
-      t.push({ id: 'kanal', label: KANAL_LABELS[kanal], onRemove: () => setKanal('') })
-    }
-    if (anlassFilter) {
-      t.push({
-        id: 'anlass',
-        label: ANLASS_LABELS[anlassFilter] ?? anlassFilter,
-        onRemove: () => setAnlassFilter(''),
+    return listBase
+      .filter((l) => {
+        if (filter && l.status !== filter) return false
+        if (!needle) return true
+        const anfrage = leadAnfrageTitel(l).toLowerCase()
+        const name = leadName(l).toLowerCase()
+        const tel = leadTel(l).replace(/\s/g, '').toLowerCase()
+        return (
+          name.includes(needle) ||
+          anfrage.includes(needle) ||
+          tel.includes(needle) ||
+          formatAnfrageNr(l).toLowerCase().includes(needle)
+        )
       })
-    }
-    if (orgSpezialFilter) {
-      const label =
-        ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS.find((o) => o.value === orgSpezialFilter)?.label ??
-        orgSpezialFilter
-      t.push({ id: 'org_spezial', label, onRemove: () => setOrgSpezialFilter('') })
-    }
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'zeitraum',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) {
-      t.push({ id: 'q', label: `„${q.trim()}“`, onRemove: () => setQ('') })
-    }
-    return t
-  }, [kanal, anlassFilter, orgSpezialFilter, zeitraum, q])
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  }, [listBase, filter, debouncedQ])
+
+  const paginationResetKey = `${filter}|${debouncedQ}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    filtered,
+    10,
+    paginationResetKey
+  )
 
   function openDetail(leadId: string) {
     router.push(`/anfragen/${leadId}`)
   }
 
-  const isPane = mode === 'pane'
-
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-        <ListFilterSection
-          chipGroups={[
-            {
-              label: 'Pipeline',
-              options: ANFRAGEN_STATUS_FILTER_ORDER.map((st) => ({
-                label: anfragenStatusFilterLabel(st),
-                value: st,
-                count:
-                  st === ''
-                    ? pipelineLeads.length
-                    : statusCounts[st] ?? 0,
-              })),
-              selected: [statusFilter],
-              onChange: (v) => setStatusFilter((v[0] ?? '') as AnfragenStatusFilter),
-            },
-            {
-              label: 'Anlass',
-              options: ANFRAGEN_ANLASS_FILTER_OPTS.map((o) => ({
-                label: o.label,
-                value: o.value,
-              })),
-              selected: [anlassFilter],
-              onChange: (v) => setAnlassFilter((v[0] ?? '') as AnfragenAnlassFilter),
-            },
-            {
-              label: 'Org-Status',
-              options: ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS.map((o) => ({
-                label: o.label,
-                value: o.value,
-              })),
-              selected: [orgSpezialFilter],
-              onChange: (v) => setOrgSpezialFilter((v[0] ?? '') as AnfragenOrgSpezialFilter),
-            },
-          ]}
-        >
-          <ListFilterBar
-            hideStatusFilter
-            statusLabel="Status"
-            statusOptions={[{ value: '', label: '—' }]}
-            statusValue=""
-            onStatusChange={() => {}}
-            secondaryFilter={{
-              label: 'Kanal',
-              options: KANAL_FILTERS.map((o) => ({ value: o.value, label: o.label })),
-              value: kanal,
-              onChange: (v) => setKanal(v as '' | LeadKanal),
-            }}
-            zeitraumValue={zeitraum}
-            onZeitraumChange={setZeitraum}
-            showCustomDates={zeitraum === 'benutzerdefiniert'}
-            customFrom={customFrom}
-            customTo={customTo}
-            onCustomFromChange={setCustomFrom}
-            onCustomToChange={setCustomTo}
-            searchValue={q}
-            onSearchChange={setQ}
-            searchPlaceholder="Suchen…"
-            onReset={resetAllFilters}
-            hasActiveFilters={hasFilters}
-            tags={filterTags}
-            onExportClick={() => setExportOpen(true)}
-            resultCount={filtered.length}
-            sort={{
-              options: [
-                { field: 'name', label: 'Name' },
-                { field: 'created_at', label: 'Datum' },
-                { field: 'preis_min', label: anfragenPreisSpaltenLabel() },
-                { field: 'status', label: 'Status' },
-              ],
-              currentField: field,
-              currentDir: dir,
-              onSort: (f) => (f ? handleSort(f) : resetSort()),
-            }}
+    <div>
+      <MockToolbar
+        query={q}
+        onQueryChange={setQ}
+        placeholder="Anfragen suchen..."
+        onFilterClick={() => {}}
+        onExportClick={() => setExportOpen(true)}
+      />
+
+      <div className="chiprow">
+        {CHIP_ORDER.map((chip) => (
+          <MockChip
+            key={chip || 'alle'}
+            active={filter === chip}
+            count={counts[chip]}
+            onClick={() => setFilter(chip)}
+          >
+            {CHIP_LABELS[chip]}
+          </MockChip>
+        ))}
+      </div>
+
+      <div className="listcard">
+        <div className="list-row head" style={{ gridTemplateColumns: ANFRAGEN_ROW_GRID }}>
+          <div>Nr.</div>
+          <div>Anfrage</div>
+          <div>Kunde</div>
+          <div style={{ textAlign: 'right' }}>Betrag</div>
+          <div>Eingang</div>
+          <div>Status</div>
+          <div />
+        </div>
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="inbox-off"
+            title={listBase.length === 0 ? 'Noch keine Anfragen' : 'Keine Anfragen gefunden'}
+            hint={
+              listBase.length === 0
+                ? 'Anfragen kommen über die Website oder du legst sie manuell an.'
+                : 'Suchbegriff anpassen oder Filter zurücksetzen'
+            }
           />
-        </ListFilterSection>
-      }
-    >
-      <PageHeader className={cn(isPane ? 'hidden' : 'hidden md:block')} />
-
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title={
-            anfragenLeads.length === 0
-              ? 'Noch keine Anfragen'
-              : pipelineLeads.length === 0 && !statusFilter
-                ? 'Keine Anfragen in der Pipeline'
-                : 'Keine Treffer'
-          }
-          description={
-            anfragenLeads.length === 0
-              ? 'Anfragen kommen automatisch über die Website oder du legst sie manuell an.'
-              : pipelineLeads.length === 0 && !statusFilter
-                ? 'Sobald ein Angebot erstellt wird, erscheint der Vorgang unter Angebote.'
-                : 'Passe Filter oder Suche an.'
-          }
-          action={
-            anfragenLeads.length === 0 ? (
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setNeuOpen(true)}>
-                + Erste Anfrage anlegen
-              </button>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
-            {sorted.map(({ lead }) => (
-              <AppEntityListRow
-                key={lead.id}
-                href={isPane ? `/anfragen/${lead.id}` : undefined}
-                onClick={isPane ? undefined : () => openDetail(lead.id)}
-                className={cn(selectedId === lead.id && 'ring-2 ring-bw-primary/40')}
-                avatar={<ListAvatar name={leadName(lead)} />}
-                eyebrow={leadPipelineMeta(lead)}
-                title={leadName(lead)}
-                line2={`${leadSituationText(lead)} · ${leadBereicheText(lead)}`}
-                line3={leadEingegangen(lead)}
-                line4={resolveLeadPreisAnzeige(
-                  lead.kanal,
-                  lead.budget_ca,
-                  lead.preis_min,
-                  lead.preis_max,
-                  lead.funnel_daten
-                )}
-                badge={<LeadStatusBadge status={lead.status} />}
-              />
-            ))}
-          </ListMobileStack>
-
-          <ListGridShell minWidth="1020px" className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}>
-            <div className="list-row-grid head" style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}>
-              <div />
-              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Situation</div>
-              <div>Bereiche</div>
-              <SortableHeader
-                label="Eingegangen"
-                field="created_at"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-              />
-              <div>Region</div>
-              <div className="text-right">
-                <SortableHeader
-                  label={anfragenPreisSpaltenLabel()}
-                  field="preis_min"
-                  currentField={field}
-                  currentDir={dir}
-                  onSort={handleSort}
-                />
-              </div>
-              <SortableHeader label="Status" field="status" currentField={field} currentDir={dir} onSort={handleSort} />
-            </div>
-            {sorted.map(({ lead }) => (
+        ) : (
+          pageItems.map((lead) => {
+            const telDigits = leadTel(lead).replace(/\D/g, '')
+            return (
               <div
                 key={lead.id}
+                className={cn('list-row', selectedId === lead.id && isPane && 'active')}
+                style={{ gridTemplateColumns: ANFRAGEN_ROW_GRID }}
+                onClick={() => openDetail(lead.id)}
                 role="button"
                 tabIndex={0}
-                onClick={() => openDetail(lead.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     openDetail(lead.id)
                   }
                 }}
-                className="list-row-grid"
-                style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}
               >
-                <ListAvatar name={leadName(lead)} />
-                <div className="min-w-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-1">{leadPipelineMeta(lead)}</div>
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">
-                    {isGptProjektStudio(lead.funnel_daten) ? (
-                      <Sparkles className="mr-1 inline h-3 w-3 text-[#2E7D52]" aria-hidden />
-                    ) : null}
-                    {leadName(lead)}
-                  </p>
+                <div
+                  style={{
+                    color: 'var(--text-3)',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: 12,
+                  }}
+                >
+                  {formatAnfrageNr(lead)}
                 </div>
-                <p className="truncate text-[13px] text-bw-text">{leadSituationText(lead)}</p>
-                <p className="truncate text-[13px] text-bw-text-muted">{leadBereicheText(lead)}</p>
-                <p className="truncate text-[13px] tabular-nums text-bw-text-muted">{leadEingegangen(lead)}</p>
-                <p className="truncate text-[13px] text-bw-text-muted">{leadRegion(lead)}</p>
-                <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                <div style={{ fontWeight: 600 }}>{leadAnfrageTitel(lead)}</div>
+                <div style={{ color: 'var(--text-2)' }}>{leadName(lead)}</div>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    textAlign: 'right',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
                   {resolveLeadPreisAnzeige(
                     lead.kanal,
                     lead.budget_ca,
@@ -560,15 +395,73 @@ export function AnfragenListeClient({
                     lead.preis_max,
                     lead.funnel_daten
                   )}
-                </p>
-                <span className="flex justify-end">
-                  <LeadStatusBadge status={lead.status} />
-                </span>
+                </div>
+                <div style={{ color: 'var(--text-3)' }}>{leadEingangAnzeige(lead)}</div>
+                <LeadStatusBadgePopover lead={lead} onUpdated={() => router.refresh()} />
+                <div
+                  className="row-actions"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ justifyContent: 'flex-end' }}
+                >
+                  {telDigits ? (
+                    <>
+                      <button
+                        type="button"
+                        className="qa-btn"
+                        title="Anrufen"
+                        onClick={() => window.open(`tel:${telDigits}`)}
+                      >
+                        <MockIcon n="phone" size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="qa-btn"
+                        title="WhatsApp"
+                        onClick={() => window.open(`https://wa.me/${telDigits}`, '_blank')}
+                      >
+                        <MockIcon n="brand-whatsapp" size={15} />
+                      </button>
+                    </>
+                  ) : null}
+                  <ActionsMenu
+                    trigger={
+                      <button type="button" className="qa-btn" title="Mehr" aria-label="Aktionen">
+                        <MockIcon n="dots" size={15} />
+                      </button>
+                    }
+                    items={listEntityMenuItems(
+                      'anfrage',
+                      {
+                        name: leadKontaktAnzeigeName(lead),
+                        tel: lead.kontakt_telefon,
+                        mail: lead.kontakt_email,
+                        status: lead.status,
+                      },
+                      {
+                        onEdit: () => openDetail(lead.id),
+                        onAngebot: () => router.push(`/anfragen/${lead.id}`),
+                        onCopy: () => runDuplicateAnfrage(lead.id, router),
+                        onDelete: () => runDeleteVorgang(lead.id, router),
+                        deleteLabel: leadKontaktAnzeigeName(lead),
+                      }
+                    )}
+                    sheetTitle="Anfrage"
+                  />
+                </div>
               </div>
-            ))}
-          </ListGridShell>
-        </>
-      )}
+            )
+          })
+        )}
+      </div>
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Anfragen"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
 
       <AnfrageNeuSheet
         open={neuOpen}
@@ -591,12 +484,12 @@ export function AnfragenListeClient({
         title="Anfragen exportieren"
         fields={EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : anfragenLeads
+          const source = scope === 'view' ? filtered : listBase
           const data = source.map(toExportRow)
           const fields = EXPORT_FIELDS.filter((f) => keys.includes(f.key))
           exportToCSV(data, fields, 'anfragen')
         }}
       />
-    </EntityListShell>
+    </div>
   )
 }

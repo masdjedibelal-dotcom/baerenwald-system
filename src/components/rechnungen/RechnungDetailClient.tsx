@@ -5,34 +5,27 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import {
   AlertTriangle,
-  Briefcase,
   Download,
   FileMinus,
-  FileText,
-  History,
-  LayoutGrid,
-  List,
-  ListChecks,
-  Mail,
   MoreHorizontal,
-  Paperclip,
   Pencil,
-  Receipt,
   Send,
-  User,
 } from 'lucide-react'
-import { DetailHead } from '@/components/layout/DetailHead'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { ENTITY_DETAIL_TAB_LABELS } from '@/lib/entity-detail/entity-detail-tabs'
 import { PosBoard } from '@/components/posboard/PosBoard'
+import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
 import { ProjektKette } from '@/components/crm/ProjektKette'
 import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
-import { DetailResponsiveTabs } from '@/components/layout/app'
+import {
+  MockDetailShell,
+  MockDokumenteCard,
+  MockVerlaufCard,
+} from '@/components/mock-ui'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
-import { DetailAccordion } from '@/components/ui/DetailAccordion'
 import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
@@ -86,7 +79,6 @@ import {
 } from '@/lib/rechnungen/mahnverlauf'
 import { resolveVorgangFromCrmEntities } from '@/lib/vorgang/resolve-from-crm-entities'
 import { vorgangBackNav } from '@/lib/vorgang/vorgang-back-nav'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 
 function DetailProp({
   label,
@@ -125,11 +117,6 @@ function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
   return <StatusBadge status="done" label="Entwurf" />
 }
 
-type RechnungDetailTab = 'stammdaten' | 'leistung' | 'schritte' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
-
-const DESKTOP_RECHNUNG_TABS: RechnungDetailTab[] = ['uebersicht', 'positionen', 'aktivitaet', 'dokumente']
-const MOBILE_RECHNUNG_TABS: RechnungDetailTab[] = ['stammdaten', 'leistung', 'schritte', 'aktivitaet', 'dokumente']
-
 export function RechnungDetailClient({
   detail: initial,
   kleinunternehmerFirma,
@@ -156,11 +143,11 @@ export function RechnungDetailClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [tab, setTab] = useState<RechnungDetailTab>('uebersicht')
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
+  const posLines = useMemo(() => angebotPositionenToPosBoardLines(pos), [pos])
   const berechnung = useMemo(
     () =>
       berechneRechnung(pos, {
@@ -293,90 +280,84 @@ export function RechnungDetailClient({
     })
   }
 
-  const aktionenMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'E-Mail schreiben',
-        icon: <Mail className="h-[15px] w-[15px]" aria-hidden />,
-        hint: detail.kunden?.email?.trim() ? undefined : 'Keine E-Mail-Adresse',
-        onClick: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
-      },
-      {
-        label: 'PDF öffnen',
-        icon: <Download className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
-      },
-    ]
-
-    if (rechnungDarfImWizardBearbeitetWerden(detail.status) && detail.auftrag_id) {
-      items.push({
-        label: 'Im Wizard bearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: openWizard,
-      })
-    }
-
-    if (detail.status === 'entwurf') {
-      items.push({
-        label: 'Als gesendet markieren',
-        icon: <Send className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => void setStatus('gesendet'),
-      })
-    }
-
-    if (detail.status === 'gesendet') {
-      items.push(
+  const aktionenMenuItems = useMemo(
+    () => {
+      const erledigt = detail.status === 'bezahlt' || detail.status === 'storniert'
+      const extra: Array<
+        | 'sep'
+        | { icon?: string; label: string; hint?: string; danger?: boolean; onClick: () => void }
+      > = [
         {
-          label: 'Als bezahlt markieren',
-          icon: <Receipt className="h-[15px] w-[15px]" aria-hidden />,
-          onClick: () => void setStatus('bezahlt'),
+          icon: 'mail',
+          label: 'E-Mail schreiben',
+          hint: detail.kunden?.email?.trim() ? undefined : 'Keine E-Mail-Adresse',
+          onClick: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
+        },
+      ]
+
+      if (detail.status === 'gesendet') {
+        extra.push({
+          icon: 'alert-triangle',
+          label: 'Zahlungserinnerung senden',
+          onClick: () => setErinnerungModalOpen(true),
+        })
+      }
+
+      if (
+        belegTyp === 'rechnung' &&
+        detail.status !== 'storniert' &&
+        detail.status !== 'bezahlt'
+      ) {
+        extra.push('sep', {
+          icon: 'file-minus',
+          label: 'Gutschrift erstellen',
+          onClick: handleGutschrift,
+        })
+        extra.push({
+          icon: 'alert-triangle',
+          label: 'Nur stornieren',
+          danger: true,
+          onClick: () => void setStatus('storniert'),
+        })
+      }
+
+      if (detail.kunden?.id || detail.kunde_id) {
+        extra.push('sep', {
+          icon: 'user',
+          label: 'Zum Kunden',
+          onClick: () =>
+            router.push(`/kunden/${detail.kunden?.id ?? detail.kunde_id}`),
+        })
+      }
+
+      return listEntityMenuItems(
+        'rechnung',
+        {
+          titel: detail.rechnungsnummer ?? 'Rechnung',
+          status: detail.status,
         },
         {
-          label: 'Zahlungserinnerung senden',
-          icon: <AlertTriangle className="h-[15px] w-[15px]" aria-hidden />,
-          onClick: () => setErinnerungModalOpen(true),
+          onEdit2:
+            rechnungDarfImWizardBearbeitetWerden(detail.status) && detail.auftrag_id
+              ? openWizard
+              : undefined,
+          onMarkPaid: detail.status === 'gesendet' ? () => void setStatus('bezahlt') : undefined,
+          onPdf: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+          onSend: !erledigt
+            ? () => {
+                if (detail.status === 'entwurf') void setStatus('gesendet')
+              }
+            : undefined,
+          onToAuftrag: detail.auftrag_id
+            ? () => router.push(`/auftraege/${detail.auftrag_id}`)
+            : undefined,
+          extra,
         }
       )
-    }
-
-    if (
-      belegTyp === 'rechnung' &&
-      detail.status !== 'storniert' &&
-      detail.status !== 'bezahlt'
-    ) {
-      items.push('sep', {
-        label: 'Gutschrift erstellen',
-        icon: <FileMinus className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: handleGutschrift,
-      })
-      items.push({
-        label: 'Nur stornieren',
-        icon: <AlertTriangle className="h-[15px] w-[15px]" aria-hidden />,
-        danger: true,
-        onClick: () => void setStatus('storniert'),
-      })
-    }
-
-    if (detail.kunden?.id || detail.kunde_id) {
-      items.push('sep', {
-        label: 'Zum Kunden',
-        icon: <User className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () =>
-          router.push(`/kunden/${detail.kunden?.id ?? detail.kunde_id}`),
-      })
-    }
-
-    if (detail.auftrag_id) {
-      items.push({
-        label: 'Zum Auftrag',
-        icon: <Briefcase className="h-[15px] w-[15px]" aria-hidden />,
-        onClick: () => router.push(`/auftraege/${detail.auftrag_id}`),
-      })
-    }
-
-    return items
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail, belegTyp, pdfHref, router])
+    [detail, belegTyp, pdfHref, router]
+  )
 
   const headSub = [
     RECHNUNG_BELEG_TYP_LABELS[belegTyp],
@@ -534,43 +515,13 @@ export function RechnungDetailClient({
     </Card>
   )
 
-  const positionenTab = (
-    <div className="overflow-hidden rounded-lg border border-bw-border bg-bw-card shadow-card">
-      {pos.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-bw-text-muted">Keine Positionen.</p>
-      ) : (
-        <ul className="divide-y divide-bw-border">
-          {pos.map((p, i) => (
-            <li key={p.id ?? i} className="px-4 py-3">
-              <p className="text-sm font-medium text-bw-text">
-                {i + 1}. {(p.beschreibung || p.leistung_name || p.leistung || 'Leistung').trim()}
-              </p>
-              <p className="mt-1 text-xs text-bw-text-muted">
-                Lohn {formatEurBetrag(p.lohn_netto * (p.menge || 1))} · Material{' '}
-                {formatEurBetrag(p.material_netto * (p.menge || 1))}
-                {p.gewerk_name ? ` · ${p.gewerk_name}` : ''}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-      {summenFooter}
-    </div>
-  )
-
-  const fixedOverview = (
+  const stammdatenInhalt = (
     <div className="space-y-3">
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       {rechnungsdetailsCard}
-      <PosBoard title="Leistungen" positionen={pos} readOnly />
-      {zeigtMahnverlauf ? (
-        <RechnungMahnverlaufCard
-          rechnung={detail}
-          mahnMails={mahnMails}
-          onSendErinnerung={() => setErinnerungModalOpen(true)}
-          onMailAnsehen={(id) => setEmailPreviewId(id)}
-        />
-      ) : null}
+      <KommunikationCard
+        filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
+        reloadKey={mailCompose.reloadKey + generation}
+      />
       {ueberfaellig ? (
         <div
           className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
@@ -580,6 +531,22 @@ export function RechnungDetailClient({
           {tageUeberfaellig === 1 ? '' : 'en'} überfällig.
         </div>
       ) : null}
+      {zeigtMahnverlauf ? (
+        <RechnungMahnverlaufCard
+          rechnung={detail}
+          mahnMails={mahnMails}
+          onSendErinnerung={() => setErinnerungModalOpen(true)}
+          onMailAnsehen={(id) => setEmailPreviewId(id)}
+        />
+      ) : null}
+    </div>
+  )
+
+  const detailsInhalt = (
+    <div className="space-y-3">
+      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
+      <PosBoard title="Leistungen" positionen={posLines} />
+      {summenFooter}
     </div>
   )
 
@@ -597,24 +564,7 @@ export function RechnungDetailClient({
 
   const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
 
-  const aktivitaetInhalt = (
-    <DetailAccordion
-      mobileOnly
-      sections={[
-        {
-          id: 'kommunikation',
-          title: ACTIVITY_SECTIONS.kommunikation,
-          defaultOpen: true,
-          content: (
-            <KommunikationCard
-              filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
-              reloadKey={mailCompose.reloadKey + generation}
-            />
-          ),
-        },
-      ]}
-    />
-  )
+  const verlaufInhalt = <div className="space-y-3">{schritteInhalt}</div>
 
   const dokumenteInhalt = (
     <div className="space-y-6">
@@ -640,39 +590,33 @@ export function RechnungDetailClient({
     </div>
   )
 
-  const desktopDetailTabs = [
-    { id: 'uebersicht', label: 'Übersicht', icon: LayoutGrid },
-    { id: 'positionen', label: 'Positionen', icon: FileText, count: pos.length || undefined },
-    { id: 'aktivitaet', label: entityDetailTabLabel('timeline'), icon: History },
-    { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
+  const rechnungDetailGroups = [
+    {
+      id: 'stammdaten',
+      label: ENTITY_DETAIL_TAB_LABELS.stammdaten,
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'details',
+      label: ENTITY_DETAIL_TAB_LABELS.details,
+      icon: 'list-numbers',
+      count: pos.length || undefined,
+      render: () => detailsInhalt,
+    },
+    {
+      id: 'verlauf',
+      label: ENTITY_DETAIL_TAB_LABELS.verlauf,
+      icon: 'history',
+      render: () => <MockVerlaufCard>{verlaufInhalt}</MockVerlaufCard>,
+    },
+    {
+      id: 'dokumente',
+      label: ENTITY_DETAIL_TAB_LABELS.dokumente,
+      icon: 'files',
+      render: () => <MockDokumenteCard>{dokumenteInhalt}</MockDokumenteCard>,
+    },
   ]
-
-  const mobileDetailTabs = [
-    { id: 'stammdaten', label: 'Stammdaten', icon: LayoutGrid },
-    { id: 'leistung', label: 'Leistungsübersicht', icon: List, count: pos.length || undefined },
-    { id: 'schritte', label: 'Nächste Schritte', icon: ListChecks },
-    { id: 'aktivitaet', label: entityDetailTabLabel('timeline'), icon: History },
-    { id: 'dokumente', label: 'Dokumente', icon: Paperclip },
-  ]
-
-  const desktopTabContent = (
-    <>
-      {tab === 'uebersicht' ? schritteInhalt : null}
-      {tab === 'positionen' ? positionenTab : null}
-      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
-      {tab === 'dokumente' ? dokumenteInhalt : null}
-    </>
-  )
-
-  const mobileTabContent = (
-    <>
-      {tab === 'stammdaten' ? fixedOverview : null}
-      {tab === 'leistung' ? positionenTab : null}
-      {tab === 'schritte' ? schritteInhalt : null}
-      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
-      {tab === 'dokumente' ? dokumenteInhalt : null}
-    </>
-  )
 
   return (
     <EntityDetailLayout
@@ -733,31 +677,7 @@ export function RechnungDetailClient({
         </p>
       ) : null}
 
-      <DetailResponsiveTabs
-        tab={tab}
-        onTabChange={setTab}
-        desktopOverview={fixedOverview}
-        desktopTabs={
-          <DetailTabBar
-            tabs={desktopDetailTabs}
-            value={tab}
-            onChange={(id) => setTab(id as RechnungDetailTab)}
-          />
-        }
-        mobileTabs={
-          <DetailTabBar
-            tabs={mobileDetailTabs}
-            value={tab}
-            onChange={(id) => setTab(id as RechnungDetailTab)}
-          />
-        }
-        desktopTabContent={desktopTabContent}
-        mobileTabContent={mobileTabContent}
-        mobileDefaultTab="stammdaten"
-        desktopDefaultTab="uebersicht"
-        mobileTabIds={MOBILE_RECHNUNG_TABS}
-        desktopTabIds={DESKTOP_RECHNUNG_TABS}
-      />
+      <MockDetailShell defaultGroup="stammdaten" groups={rechnungDetailGroups} />
 
       {wizardOpen && wizardBootstrap && firm ? (
         <ClientOnly>

@@ -65,7 +65,11 @@ export function ActionsMenu({
           {trigger}
         </span>
         {open && !isMobile ? (
-          <div className={cn('menu-panel', align === 'left' && 'left-0 right-auto')} role="menu">
+          <div
+            className={cn('menu', align === 'left' && 'right-auto left-0')}
+            style={align === 'left' ? { right: 'auto', left: 0 } : undefined}
+            role="menu"
+          >
             {items.map((it, i) => {
               if (it === 'sep') return <div key={`sep-${i}`} className="menu-sep" role="separator" />
               return (
@@ -73,7 +77,7 @@ export function ActionsMenu({
                   key={it.label}
                   type="button"
                   role="menuitem"
-                  className={cn('menu-item', it.danger && 'menu-item-danger')}
+                  className={cn('menu-item', it.danger && 'danger')}
                   onClick={() => {
                     setOpen(false)
                     it.onClick()

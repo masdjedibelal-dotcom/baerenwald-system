@@ -37,7 +37,7 @@ export async function updateDatenschutzFrist(
     .update({ frist_monate: input.frist_monate, aktiv: input.aktiv })
     .eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   return { ok: true }
 }
 
@@ -58,7 +58,7 @@ export async function addDatenschutzAufschub(input: {
     erstellt_von: uid,
   })
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   return { ok: true }
 }
 
@@ -81,7 +81,7 @@ export async function createDatenschutzAnfrage(input: {
     status: 'offen',
   })
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   return { ok: true }
 }
 
@@ -126,7 +126,7 @@ export async function loescheMelderDaten(
     userId: uid,
   })
   if (!r.ok) return r
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   revalidatePath(`/anfragen/${leadId}`)
   return { ok: true }
 }
@@ -140,7 +140,7 @@ export async function anonymisiereKunde(
   if (!uid) return { ok: false, message: 'Nicht angemeldet' }
   const r = await anonymisiereKundeLib(kundeId, uid, grund)
   if (!r.ok) return r
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   return { ok: true }
 }
 
@@ -161,6 +161,6 @@ export async function updateDatenschutzAnfrage(
 
   const { error } = await supabaseAdmin.from('datenschutz_anfragen').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidatePath('/einstellungen/sicherheit')
   return { ok: true }
 }

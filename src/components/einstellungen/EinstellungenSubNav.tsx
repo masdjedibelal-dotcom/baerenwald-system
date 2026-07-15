@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 const tabs = [
   { href: '/einstellungen', label: 'Allgemein', icon: Settings, exact: true },
   { href: '/handwerker', label: 'Compliance-Dokumente', icon: FileCheck, exact: false },
-  { href: '/einstellungen/datenschutz', label: 'Datenschutz', icon: Shield, exact: false },
+  { href: '/einstellungen/sicherheit', label: 'Sicherheit & DSGVO', icon: Shield, exact: false },
 ] as const
 
 export function EinstellungenSubNav() {

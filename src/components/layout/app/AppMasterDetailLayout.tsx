@@ -15,7 +15,7 @@ export function AppMasterDetailLayout({
   list: ReactNode
   children: ReactNode
   selectedId?: string | null
-  /** Unterseiten (Wizard, Neu) ohne Split-Layout */
+  /** Unterseiten (Wizard, Neu) ohne Listen-Wrapper */
   fullBleed?: boolean
 }) {
   const pathname = usePathname()
@@ -26,38 +26,28 @@ export function AppMasterDetailLayout({
     return <div className="min-w-0">{children}</div>
   }
 
+  /** Mock-Optik: volle Listenbreite — keine Split-Ansicht mit Karten-Spalte. */
+  if (isListRoot && !hasSelection) {
+    return (
+      <div data-app-list-page="" className={cn('app-list-page min-w-0')}>
+        {list}
+      </div>
+    )
+  }
+
+  /** Detail: volle Breite, Navigation über TopBar/Breadcrumb. */
   return (
     <div
-      className={cn(
-        'app-master-detail',
-        hasSelection && 'app-master-detail--selected',
-        isListRoot && 'app-master-detail--list-root'
-      )}
-      data-app-master-detail=""
+      data-app-detail-page=""
       data-selected-id={selectedId ?? undefined}
+      className={cn('app-detail-page min-w-0')}
     >
-      <aside
-        className={cn(
-          'app-master-detail-list',
-          hasSelection && 'max-[899px]:hidden'
-        )}
-        aria-label="Liste"
-      >
-        {list}
-      </aside>
-      <section
-        className={cn(
-          'app-master-detail-main min-w-0',
-          isListRoot && !hasSelection && 'max-[899px]:hidden'
-        )}
-        aria-label="Detail"
-      >
-        <div className="app-detail-pane min-w-0">{children}</div>
-      </section>
+      {children}
     </div>
   )
 }
 
+/** @deprecated Mock nutzt keine Split-Placeholder mehr. */
 export function AppMasterDetailPlaceholder({
   title,
   description,

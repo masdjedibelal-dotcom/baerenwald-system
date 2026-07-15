@@ -3,10 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { AngeboteListeClient } from '@/components/angebote/AngeboteListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
 import { angebotIdFromPath, angeboteFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { AngebotListeEintrag } from '@/lib/types'
 
@@ -24,7 +21,6 @@ export function AngeboteMasterDetailShell({
   const pathname = usePathname()
   const selectedId = angebotIdFromPath(pathname)
   const fullBleed = angeboteFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/angebote'
 
   return (
     <AppMasterDetailLayout
@@ -43,20 +39,12 @@ export function AngeboteMasterDetailShell({
             angebote={angebote}
             angebotIdsMitAuftrag={angebotIdsMitAuftrag}
             angebotIdsMitRechnung={angebotIdsMitRechnung}
-            mode="pane"
-            selectedId={selectedId}
+            mode="page"
           />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Angebot auswählen"
-          description="Wähle links ein Angebot für Details, Positionen und Versand."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

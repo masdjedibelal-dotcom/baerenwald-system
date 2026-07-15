@@ -389,7 +389,7 @@ function InlineActions({
           {model.info.hint ? <p className="mt-1 text-xs text-bw-text-muted">{model.info.hint}</p> : null}
           {model.info.href ? (
             <Link href={model.info.href} className="mt-2 inline-block text-sm font-medium text-bw-link underline">
-              Öffnen
+              Details anzeigen
             </Link>
           ) : null}
         </div>
@@ -484,7 +484,7 @@ export function StatusActions({ typ, status, id, data, onAction, disabled, layou
             {model.info.hint ? <p className="mt-1 text-xs text-muted">{model.info.hint}</p> : null}
             {model.info.href ? (
               <Link href={model.info.href} className="mt-2 inline-block text-sm font-medium text-primary underline">
-                Öffnen
+                Details anzeigen
               </Link>
             ) : null}
           </div>

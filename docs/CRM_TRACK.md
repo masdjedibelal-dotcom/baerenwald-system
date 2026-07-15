@@ -77,8 +77,24 @@ Wir starten den abgestimmten CRM-Plan in diesem Repo. Referenzen: Baerenwald CRM
 
 ---
 
+## Phase E — Design-Wave Mock (Option A) 🔄
+
+**Plan:** [DESIGN_WAVE_MOCK.md](./DESIGN_WAVE_MOCK.md)
+
+| ID | Inhalt | Status |
+|----|--------|--------|
+| **E0** | Foundation + Layout-Umbau (kein Split, volle Tabellen) | ✅ |
+| **E1** | Listen — alle auf `mode="page"` + Pagination | 🔄 |
+| **E2** | Shell (FAB, TopBar-Suche) | teilweise |
+| **E3** | Dashboard „Heute“ | offen |
+| **E4** | Detail-Screens einheitlich | offen |
+| **E5** | Wizards/Modals | teilweise (Phase D) |
+
+---
+
 ## Verwandte Docs
 
+- [DESIGN_WAVE_MOCK.md](./DESIGN_WAVE_MOCK.md) — Mock-Optik global
 - [ENTWICKLER-SPEC.md](./ENTWICKLER-SPEC.md) — Domänenregeln & Abnahme
 - [ORGANISATION_PORTAL_BACKEND.md](./ORGANISATION_PORTAL_BACKEND.md) — Portal-fertig, CRM-Handoff-Details
 - [DESIGN_GAP_ANALYSE_PORTALE.md](./DESIGN_GAP_ANALYSE_PORTALE.md) — Portal-Design (P0-1 PortalShell)

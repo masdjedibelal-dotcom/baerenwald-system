@@ -3,10 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { RechnungenListeClient } from '@/components/rechnungen/RechnungenListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
 import {
   rechnungIdFromPath,
   rechnungenFullBleedSubRoute,
@@ -23,7 +20,6 @@ export function RechnungenMasterDetailShell({
   const pathname = usePathname()
   const selectedId = rechnungIdFromPath(pathname)
   const fullBleed = rechnungenFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/rechnungen'
 
   return (
     <AppMasterDetailLayout
@@ -38,18 +34,11 @@ export function RechnungenMasterDetailShell({
             </div>
           }
         >
-          <RechnungenListeClient rows={rows} mode="pane" selectedId={selectedId} />
+          <RechnungenListeClient rows={rows} mode="page" />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Rechnung auswählen"
-          description="Wähle links eine Rechnung für Details, PDF und Zahlungsstatus."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

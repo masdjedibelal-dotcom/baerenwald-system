@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Accordion } from '@/components/ui/Accordion'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
@@ -20,9 +20,12 @@ import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerCompl
 import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
 import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { CrmPortalOpenButtons } from '@/components/portal/CrmPortalOpenButtons'
-import { AppDetailScreen } from '@/components/layout/app'
+import {
+  MockDetailShell,
+  MockIcon,
+  MockUebersichtCard,
+} from '@/components/mock-ui'
 import {
   Briefcase,
   FileSignature,
@@ -133,7 +136,6 @@ export function HandwerkerDetailClient({
     [payload.dokumente]
   )
 
-  const [tab, setTab] = useState<'stammdaten' | 'auftraege' | 'compliance' | 'notizen'>('stammdaten')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -334,16 +336,18 @@ export function HandwerkerDetailClient({
     return () => clearTimeout(timer)
   }, [portalModalOpen, portalText, hw.id])
 
-  const handwerkerMenuItems = useMemo((): ActionsMenuItem[] => {
-    return [
-      {
-        label: 'Partner-Portal-Einladung',
-        icon: <FileText className="h-4 w-4" aria-hidden />,
-        hint: !hw.email ? 'Keine E-Mail' : undefined,
-        onClick: () => void openPortalModal(),
-      },
-    ]
-  }, [hw.email])
+  const handwerkerMenuItems = useMemo(
+    () =>
+      listEntityMenuItems(
+        'handwerker',
+        { name: handwerkerDisplayName(hw), email: hw.email, telefon: hw.telefon },
+        {
+          onPortal: () => void openPortalModal(),
+          onPortalLink: () => void openPortalModal(),
+        }
+      ),
+    [hw, openPortalModal]
+  )
 
   const sidebar = (
     <>
@@ -476,29 +480,14 @@ export function HandwerkerDetailClient({
     </>
   )
 
-  const detailTabs = useMemo(
+  const hwUebersichtStats = useMemo(
     () => [
-      { id: 'stammdaten', label: entityDetailTabLabel('uebersicht'), icon: LayoutGrid },
-      {
-        id: 'auftraege',
-        label: 'Aufträge',
-        icon: Briefcase,
-        count: aktivAuftraege.length + fertigeAuftraege.length || undefined,
-      },
-      {
-        id: 'notizen',
-        label: entityDetailTabLabel('notizen'),
-        icon: MessageSquare,
-        count: hw.notizen?.trim() ? 1 : undefined,
-      },
-      {
-        id: 'compliance',
-        label: 'Compliance',
-        icon: Shield,
-        count: dokumenteAnzahl || undefined,
-      },
+      { icon: 'briefcase', label: 'Aktive Aufträge', value: aktivAuftraege.length },
+      { icon: 'checks', label: 'Abgeschlossen', value: fertigeAuftraege.length },
+      { icon: 'star', label: 'Bewertung', value: formatHandwerkerBewertung(hw.bewertung_gesamt) },
+      { icon: 'shield', label: 'Compliance', value: hw.compliance_status ?? '—' },
     ],
-    [aktivAuftraege.length, fertigeAuftraege.length, hw.notizen, dokumenteAnzahl]
+    [aktivAuftraege.length, fertigeAuftraege.length, hw.bewertung_gesamt, hw.compliance_status]
   )
 
   const tabAuftraege = (
@@ -626,6 +615,8 @@ export function HandwerkerDetailClient({
   return (
     <>
       <EntityDetailLayout
+        breadcrumbTitle={handwerkerDisplayName(hw)}
+        crumbSectionLabel="Handwerker"
         head={{
           backHref: '/handwerker',
           backLabel: 'Zurück zu Handwerker',
@@ -673,16 +664,44 @@ export function HandwerkerDetailClient({
         }}
       >
         <CrmPortalOpenButtons handwerkerId={hw.id} showHandwerker />
-        <AppDetailScreen
-          tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
-        >
-          <div className="min-w-0 space-y-3">
-            {tab === 'stammdaten' ? sidebar : null}
-            {tab === 'auftraege' ? tabAuftraege : null}
-            {tab === 'notizen' ? tabNotizen : null}
-            {tab === 'compliance' ? tabCompliance : null}
-          </div>
-        </AppDetailScreen>
+        <MockDetailShell
+          defaultGroup="uebersicht"
+          groups={[
+            {
+              id: 'uebersicht',
+              label: 'Übersicht',
+              icon: 'layout-dashboard',
+              render: () => <MockUebersichtCard stats={hwUebersichtStats} />,
+            },
+            {
+              id: 'stammdaten',
+              label: 'Stammdaten',
+              icon: 'clipboard-list',
+              render: () => sidebar,
+            },
+            {
+              id: 'auftraege',
+              label: 'Aufträge',
+              icon: 'briefcase',
+              count: aktivAuftraege.length + fertigeAuftraege.length || undefined,
+              render: () => tabAuftraege,
+            },
+            {
+              id: 'compliance',
+              label: 'Compliance',
+              icon: 'shield',
+              count: dokumenteAnzahl || undefined,
+              render: () => tabCompliance,
+            },
+            {
+              id: 'notizen',
+              label: 'Notizen',
+              icon: 'messages',
+              count: hw.notizen?.trim() ? 1 : undefined,
+              render: () => tabNotizen,
+            },
+          ]}
+        />
       </EntityDetailLayout>
 
       {(() => {

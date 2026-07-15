@@ -243,3 +243,80 @@ export async function searchKundenGlobal(
 
   return Array.from(byId.values())
 }
+
+export async function duplicateKunde(
+  kundeId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const { data: src, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('*').eq('id', kundeId).maybeSingle()
+  )
+  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
+
+  const row = src as Record<string, unknown>
+  const payload: Record<string, unknown> = { ...row }
+  delete payload.id
+  delete payload.created_at
+  delete payload.updated_at
+  delete payload.auth_user_id
+  delete payload.kundennummer
+  delete payload.gesamt_umsatz
+  delete payload.letzte_aktivitaet
+  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
+  if (payload.email) payload.email = null
+
+  const { data: inserted, error: insErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').insert(payload).select('id').single()
+  )
+  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
+
+  const id = (inserted as { id: string }).id
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true, id }
+}
+
+export async function deleteKunde(
+  kundeId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const id = kundeId.trim()
+  if (!id) return { ok: false, message: 'Kunden-ID fehlt.' }
+
+  const { data: kunde } = await supabase.from('kunden').select('id, auth_user_id').eq('id', id).maybeSingle()
+  if (!kunde?.id) return { ok: false, message: 'Kunde nicht gefunden.' }
+  if ((kunde as { auth_user_id?: string | null }).auth_user_id) {
+    return {
+      ok: false,
+      message: 'Kunde mit Portal-Konto kann nicht gelöscht werden — bitte zuerst Portal-Zugang entfernen.',
+    }
+  }
+
+  const checks = await Promise.all([
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('kunde_id', id),
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('auftraggeber_kunde_id', id),
+    supabase.from('angebote').select('id', { count: 'exact', head: true }).eq('kunde_id', id),
+    supabase.from('auftraege').select('id', { count: 'exact', head: true }).eq('kunde_id', id),
+    supabase.from('rechnungen').select('id', { count: 'exact', head: true }).eq('kunde_id', id),
+  ])
+
+  const refs =
+    (checks[0].count ?? 0) +
+    (checks[1].count ?? 0) +
+    (checks[2].count ?? 0) +
+    (checks[3].count ?? 0) +
+    (checks[4].count ?? 0)
+
+  if (refs > 0) {
+    return {
+      ok: false,
+      message: `Kunde ist noch in ${refs} Vorgang/Vorgängen verknüpft. Bitte zuerst die Vorgänge löschen.`,
+    }
+  }
+
+  const { error } = await supabase.from('kunden').delete().eq('id', id)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true }
+}

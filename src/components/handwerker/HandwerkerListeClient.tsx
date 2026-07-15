@@ -1,33 +1,28 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import {
-  ListFilterSection,
-  ListMobileStack,
-  ListGridShell,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { useExport, type ExportField } from '@/hooks/useExport'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import {
-  getZeitraumRange,
-  datumInZeitraum,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
-import { ComplianceBadge, normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
-import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
+import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
+import { CsvExportModal } from '@/components/ui/CsvExportModal'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { toast } from '@/components/ui/app-toast'
+import {
+  MockBadge,
+  MockBtn,
+  MockChip,
+  MockEmpty,
+  MockIcon,
+  MockModal,
+  MockPager,
+  MockSortHead,
+} from '@/components/mock-ui'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useListPage } from '@/hooks/useListPage'
+import { handwerkerDisplayName } from '@/lib/handwerker-stammdaten'
+import { listEntityMenuItems } from '@/lib/list-entity-menu'
+import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
+import { runDuplicateHandwerker } from '@/lib/list-actions'
 import { cn } from '@/lib/utils'
 
 export type HandwerkerZeile = {
@@ -49,6 +44,8 @@ export type HandwerkerZeile = {
 
 export type GewerkOption = { slug: string; name: string }
 
+const MOCK_GEWERK_CHIPS = ['Sanitär', 'Elektrik', 'Fliesen', 'Maler', 'Boden']
+
 const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
   { key: 'firma', label: 'Firmenname' },
   { key: 'vorname', label: 'Vorname GF' },
@@ -59,22 +56,11 @@ const HANDWERKER_EXPORT_FIELDS: ExportField[] = [
   { key: 'compliance_status', label: 'Compliance' },
 ]
 
-const HANDWERKER_GRID_COLS =
-  '42px minmax(180px,1.5fr) minmax(140px,1fr) minmax(180px,1.2fr) 100px'
+const HW_ROW_GRID =
+  'minmax(120px,1.6fr) minmax(90px,1fr) 118px minmax(120px,1.6fr) 72px 96px 40px'
 
 function gewerkeStr(h: HandwerkerZeile): string {
-  const n = h.gewerk_namen?.length ? h.gewerk_namen.join(', ') : gewerkeStrRaw(h.gewerke)
-  return n
-}
-
-function gewerkeStrRaw(g: unknown): string {
-  if (g == null || g === '') return ''
-  if (typeof g === 'string') return g
-  try {
-    return JSON.stringify(g)
-  } catch {
-    return String(g)
-  }
+  return h.gewerk_namen?.length ? h.gewerk_namen.join(', ') : ''
 }
 
 function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
@@ -90,25 +76,14 @@ function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
   }
 }
 
-function complianceRank(h: HandwerkerZeile): number {
-  const k = normalizeComplianceBadgeKey(h.compliance_status)
-  if (k === 'ok') return 0
-  if (k === 'bald_ablaufend') return 1
-  if (k === 'unvollstaendig') return 2
-  return 3
+function matchesGewerk(h: HandwerkerZeile, gewerk: string): boolean {
+  if (gewerk === 'alle') return true
+  const names = (h.gewerk_namen ?? []).map((n) => n.toLowerCase())
+  const needle = gewerk.toLowerCase()
+  return names.some((n) => n.includes(needle))
 }
 
-function dokumenteKurzlabel(h: HandwerkerZeile): string {
-  const n = h.docs_vorhanden ?? 0
-  return n === 1 ? '1 Dokument' : `${n} Dokumente`
-}
-
-type SortRow = {
-  row: HandwerkerZeile
-  name: string
-  gewerk: string
-  compliance: number
-}
+type SortCol = 'name' | 'category' | 'tel' | 'mail' | 'rating' | 'status'
 
 export function HandwerkerListeClient({
   rows,
@@ -123,10 +98,21 @@ export function HandwerkerListeClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const einsatzFilterAktiv = searchParams.get('filter') === 'einsatz'
   const isPane = mode === 'pane'
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [gewerk, setGewerk] = useState('alle')
+  const [compOnly, setCompOnly] = useState(false)
+  const [fName, setFName] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [sel, setSel] = useState<Record<string, boolean>>({})
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
+
+  const { exportToCSV } = useExport()
 
   function closeNeuModal() {
     setModalOpen(false)
@@ -136,296 +122,386 @@ export function HandwerkerListeClient({
     router.replace(q ? `/handwerker?${q}` : '/handwerker', { scroll: false })
   }
 
-  function openNeuModal() {
-    setModalOpen(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('neu', '1')
-    router.replace(`/handwerker?${params.toString()}`, { scroll: false })
-  }
-
   useEffect(() => {
     if (searchParams.get('neu') === '1') setModalOpen(true)
   }, [searchParams])
 
-  const listRows = useMemo(() => {
-    if (!einsatzFilterAktiv) return rows
-    return rows.filter((h) => h.aktiver_einsatz)
-  }, [rows, einsatzFilterAktiv])
-  const { exportToCSV } = useExport()
-  const [exportOpen, setExportOpen] = useState(false)
-  const [gewerkChip, setGewerkChip] = useState('alle')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
+  const gewerkChips = useMemo(() => {
+    const fromDb = gewerkeOptionen.map((g) => g.name).slice(0, 5)
+    const merged = Array.from(new Set([...MOCK_GEWERK_CHIPS, ...fromDb])).slice(0, 5)
+    return merged
+  }, [gewerkeOptionen])
 
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
+  const compReviewCount = useMemo(
+    () => rows.filter((t) => normalizeComplianceBadgeKey(t.compliance_status) !== 'ok').length,
+    [rows]
   )
+
+  const activeFilterCount =
+    (gewerk !== 'alle' ? 1 : 0) + (compOnly ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
   const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return listRows.filter((h) => {
-      if (gewerkChip !== 'alle') {
-        const names = (h.gewerk_namen ?? []).map((x) => x.toLowerCase())
-        const slug = gewerkChip.toLowerCase()
-        const opt = gewerkeOptionen.find((g) => g.slug === gewerkChip)
-        const matchName = opt ? names.some((n) => n.includes(opt.name.toLowerCase())) : false
-        const matchSlug = names.some((n) => n.includes(slug)) || gewerkeStrRaw(h.gewerke).toLowerCase().includes(slug)
-        if (!matchName && !matchSlug) return false
+    const q = query.trim().toLowerCase()
+    return rows.filter((t) => {
+      if (!matchesGewerk(t, gewerk)) return false
+      if (compOnly && normalizeComplianceBadgeKey(t.compliance_status) === 'ok') return false
+      const name = handwerkerDisplayName(t)
+      if (q && !(name + ' ' + gewerkeStr(t) + ' ' + (t.telefon ?? '') + ' ' + (t.email ?? '')).toLowerCase().includes(q)) {
+        return false
       }
-      if (dateRange && !datumInZeitraum(h.created_at, dateRange)) return false
-      if (!needle) return true
-      const pool = [
-        handwerkerDisplayName(h),
-        handwerkerGfName(h),
-        h.email ?? '',
-        h.telefon ?? '',
-        gewerkeStr(h),
-      ]
-        .join(' ')
-        .toLowerCase()
-      return pool.includes(needle)
+      if (fName && !name.toLowerCase().includes(fName.toLowerCase())) return false
+      return true
     })
-  }, [listRows, gewerkChip, debouncedQ, dateRange, gewerkeOptionen])
+  }, [rows, gewerk, compOnly, query, fName])
 
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((h) => ({
-        row: h,
-        name: handwerkerDisplayName(h),
-        gewerk: gewerkeStr(h),
-        compliance: complianceRank(h),
-      })),
-    [filtered]
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered
+    const dir = sortDir
+    const keyFn = (t: HandwerkerZeile): string | number => {
+      switch (sortCol) {
+        case 'name':
+          return handwerkerDisplayName(t).toLowerCase()
+        case 'category':
+          return gewerkeStr(t).toLowerCase()
+        case 'tel':
+          return t.telefon ?? ''
+        case 'mail':
+          return (t.email ?? '').toLowerCase()
+        case 'rating':
+          return 0
+        case 'status':
+          return t.aktiver_einsatz ? 1 : 0
+        default:
+          return ''
+      }
+    }
+    return [...filtered].sort((a, b) => {
+      const av = keyFn(a)
+      const bv = keyFn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sortCol, sortDir])
+
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
+
+  const resetFilters = () => {
+    setGewerk('alle')
+    setCompOnly(false)
+    setQuery('')
+    setFName('')
+  }
+
+  const toggle = (id: string) => setSel((s) => ({ ...s, [id]: !s[id] }))
+  const selectedCount = Object.values(sel).filter(Boolean).length
+
+  const paginationResetKey = `${gewerk}|${compOnly}|${query}|${fName}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    sorted,
+    10,
+    paginationResetKey
   )
 
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
-
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    if (gewerkChip !== 'alle') {
-      const label = gewerkeOptionen.find((g) => g.slug === gewerkChip)?.name ?? gewerkChip
-      t.push({ id: 'gw', label, onRemove: () => setGewerkChip('alle') })
-    }
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'z',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) {
-      t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
-    }
-    return t
-  }, [gewerkChip, zeitraum, q, gewerkeOptionen])
-
-  const hasActiveFilters = !!(gewerkChip !== 'alle' || zeitraum !== 'alle' || q.trim())
-
-  function resetFilters() {
-    setGewerkChip('alle')
-    setQ('')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-    resetSort()
-  }
+  const rowGrid = (selectMode ? '40px ' : '') + HW_ROW_GRID
 
   function openDetail(id: string) {
     router.push(`/handwerker/${id}`)
   }
 
-  const gewerkChipOptions = useMemo(
-    () => [{ label: 'Alle', value: 'alle' }, ...gewerkeOptionen.map((g) => ({ label: g.name, value: g.slug }))],
-    [gewerkeOptionen]
-  )
-
-  const sortOptions = [
-    { field: 'name', label: 'Firma' },
-    { field: 'gewerk', label: 'Gewerk' },
-    { field: 'compliance', label: 'Compliance' },
-  ]
-
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-        <>
-          {einsatzFilterAktiv ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bw-border bg-bw-card px-4 py-3 text-sm text-bw-text shadow-sm">
-              <span>Nur Handwercher mit Auftrag (Status zugewiesen oder in Arbeit).</span>
-              <Link
-                href="/handwerker"
-                className="whitespace-nowrap text-sm font-medium text-bw-link hover:underline"
+    <div>
+      <div className="listbar">
+        <div className="listbar-chips">
+          <MockChip active={gewerk === 'alle'} onClick={() => setGewerk('alle')} count={rows.length}>
+            Alle Gewerke
+          </MockChip>
+          {gewerkChips.map((g) => (
+            <MockChip key={g} active={gewerk === g} onClick={() => setGewerk(g)}>
+              {g}
+            </MockChip>
+          ))}
+          <MockChip
+            active={compOnly}
+            icon="alert-triangle"
+            count={compReviewCount}
+            onClick={() => setCompOnly((v) => !v)}
+          >
+            Compliance
+          </MockChip>
+        </div>
+        <div className="listbar-actions">
+          <MockBtn
+            icon="filter"
+            kind={activeFilterCount ? 'primary' : 'ghost'}
+            sm
+            onClick={() => setFilterOpen(true)}
+          >
+            <span className="listbar-btn-label">
+              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="checks"
+            kind={selectMode ? 'primary' : 'ghost'}
+            sm
+            onClick={() => {
+              setSelectMode((m) => !m)
+              setSel({})
+            }}
+          >
+            <span className="listbar-btn-label">
+              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+            </span>
+          </MockBtn>
+          <MockBtn icon="download" kind="ghost" sm onClick={() => setExportOpen(true)}>
+            <span className="listbar-btn-label">Export</span>
+          </MockBtn>
+        </div>
+      </div>
+
+      <MockModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        icon="filter"
+        title="Filter & Suchen"
+        sub="Handwerker eingrenzen"
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={resetFilters}>
+              Zurücksetzen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+              Anwenden ({filtered.length})
+            </MockBtn>
+          </>
+        }
+      >
+        <div className="form-section-h">Suche</div>
+        <div className="input" style={{ marginBottom: 16 }}>
+          <MockIcon n="search" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, Gewerk, Telefon, E-Mail…"
+            autoFocus
+          />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <label className="field">
+            <span className="field-lbl">Name</span>
+            <input
+              className="txt"
+              value={fName}
+              onChange={(e) => setFName(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </label>
+        </div>
+        <div className="form-section-h">Gewerk</div>
+        <div className="chiprow" style={{ marginBottom: 16 }}>
+          {['alle', ...gewerkChips].map((g) => (
+            <MockChip key={g} active={gewerk === g} onClick={() => setGewerk(g)}>
+              {g === 'alle' ? 'Alle' : g}
+            </MockChip>
+          ))}
+        </div>
+        <div className="form-section-h">Compliance</div>
+        <div className="chiprow">
+          <MockChip active={!compOnly} onClick={() => setCompOnly(false)}>
+            Alle
+          </MockChip>
+          <MockChip active={compOnly} onClick={() => setCompOnly(true)}>
+            Nur zu prüfen
+          </MockChip>
+        </div>
+      </MockModal>
+
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: rowGrid }}>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                const allOn = filtered.length > 0 && filtered.every((t) => sel[t.id])
+                if (allOn) setSel({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((t) => {
+                    n[t.id] = true
+                  })
+                  setSel(n)
+                }
+              }}
+            >
+              <span
+                className={cn(
+                  'vg-box',
+                  filtered.length > 0 && filtered.every((t) => sel[t.id]) && 'on'
+                )}
               >
-                Alle Handwercher anzeigen
-              </Link>
+                {filtered.length > 0 && filtered.every((t) => sel[t.id]) ? (
+                  <MockIcon n="check" size={12} />
+                ) : null}
+              </span>
             </div>
           ) : null}
-
-          <ListFilterSection
-            chipGroups={[
-              {
-                label: 'Gewerk',
-                options: gewerkChipOptions,
-                selected: [gewerkChip],
-                onChange: (v) => setGewerkChip(v[0] ?? 'alle'),
-              },
-            ]}
+          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Name
+          </MockSortHead>
+          <MockSortHead col="category" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Gewerk
+          </MockSortHead>
+          <MockSortHead col="tel" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Telefon
+          </MockSortHead>
+          <MockSortHead col="mail" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Email
+          </MockSortHead>
+          <MockSortHead
+            col="rating"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            right
           >
-            <ListFilterBar
-              hideStatusFilter
-              statusLabel="—"
-              statusOptions={[{ value: '', label: '—' }]}
-              statusValue=""
-              onStatusChange={() => {}}
-              zeitraumValue={zeitraum}
-              onZeitraumChange={setZeitraum}
-              showCustomDates={zeitraum === 'benutzerdefiniert'}
-              customFrom={customFrom}
-              customTo={customTo}
-              onCustomFromChange={setCustomFrom}
-              onCustomToChange={setCustomTo}
-              searchValue={q}
-              onSearchChange={setQ}
-              searchPlaceholder="Name, Firma, E-Mail, Telefon"
-              onReset={resetFilters}
-              hasActiveFilters={hasActiveFilters}
-              tags={filterTags}
-              onExportClick={() => setExportOpen(true)}
-              resultCount={filtered.length}
-              sort={{
-                options: sortOptions,
-                currentField: field,
-                currentDir: dir,
-                onSort: (f) => (f ? handleSort(f) : resetSort()),
+            Bewertung
+          </MockSortHead>
+          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Status
+          </MockSortHead>
+          <div />
+        </div>
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="tool"
+            title={rows.length === 0 ? 'Keine Handwerker' : 'Keine Treffer'}
+            hint={
+              rows.length === 0
+                ? 'Lege Handwerker an, um sie hier zu verwalten.'
+                : 'Filter zurücksetzen oder neuen Handwerker anlegen'
+            }
+          />
+        ) : (
+          pageItems.map((t) => (
+            <div
+              key={t.id}
+              className={cn('list-row', sel[t.id] && 'sel', selectedId === t.id && isPane && 'ring-2 ring-[var(--green)]')}
+              style={{ gridTemplateColumns: rowGrid }}
+              onClick={() => (selectMode ? toggle(t.id) : openDetail(t.id))}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  selectMode ? toggle(t.id) : openDetail(t.id)
+                }
               }}
-              toolbarEnd={
-                <select
-                  aria-label="Sortieren"
-                  value={field ?? ''}
-                  onChange={(e) => (e.target.value ? handleSort(e.target.value) : resetSort())}
-                  className="list-filter-select hidden md:block"
+            >
+              {selectMode ? (
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggle(t.id)
+                  }}
                 >
-                  <option value="">Sortieren</option>
-                  {sortOptions.map((o) => (
-                    <option key={o.field} value={o.field}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              }
-            />
-          </ListFilterSection>
-        </>
-      }
-    >
-      {!isPane ? <PageHeader className="hidden md:block" /> : null}
-
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={listRows.length === 0 ? 'Keine Handwerker' : 'Keine Treffer'}
-          description={
-            rows.length === 0
-              ? 'Lege Handwerker an, um sie hier zu verwalten.'
-              : 'Passe Filter oder Suche an.'
-          }
-          action={
-            rows.length === 0 ? (
-              <button type="button" className="btn btn-primary btn-sm" onClick={openNeuModal}>
-                + Ersten Handwerker anlegen
-              </button>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack
-            className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}
-          >
-            {sorted.map(({ row: h }) => {
-              const gewerkeLabel = (h.gewerk_namen ?? []).slice(0, 3).join(', ') || '—'
-              return (
-                <AppEntityListRow
-                  key={h.id}
-                  href={isPane ? `/handwerker/${h.id}` : undefined}
-                  onClick={isPane ? undefined : () => openDetail(h.id)}
-                  className={cn(selectedId === h.id && 'ring-2 ring-bw-primary/40')}
-                  avatar={<ListAvatar name={handwerkerDisplayName(h)} />}
-                  title={handwerkerDisplayName(h)}
-                  line2={handwerkerGfName(h) || gewerkeLabel}
-                  line3={
-                    [h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'
-                  }
-                  line4={dokumenteKurzlabel(h)}
-                  badge={<ComplianceBadge status={h.compliance_status} />}
-                />
-              )
-            })}
-          </ListMobileStack>
-
-          <ListGridShell
-            minWidth="880px"
-            className={cn('hidden md:block', isPane && 'min-[900px]:hidden')}
-          >
-            <div className="list-row-grid head" style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}>
-              <div />
-              <SortableHeader label="Firma" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <div>Geschäftsführer</div>
-              <SortableHeader label="Gewerke" field="gewerk" currentField={field} currentDir={dir} onSort={handleSort} />
-              <SortableHeader
-                label="Compliance"
-                field="compliance"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-              />
-            </div>
-            {sorted.map(({ row: h }) => (
-              <div
-                key={h.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openDetail(h.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openDetail(h.id)
-                  }
-                }}
-                className={cn(
-                  'list-row-grid',
-                  selectedId === h.id && isPane && 'ring-2 ring-bw-primary/40'
-                )}
-                style={{ gridTemplateColumns: HANDWERKER_GRID_COLS }}
-              >
-                <ListAvatar name={handwerkerDisplayName(h)} />
-                <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-bw-text">
-                    {handwerkerDisplayName(h)}
-                  </p>
-                  <p className="truncate text-xs text-bw-text-muted">
-                    {[h.telefon?.trim(), h.email?.trim()].filter(Boolean).join(' · ') || '—'}
-                  </p>
+                  <span className={cn('vg-box', sel[t.id] && 'on')}>
+                    {sel[t.id] ? <MockIcon n="check" size={12} /> : null}
+                  </span>
                 </div>
-                <p className="truncate text-[13px] text-bw-text">{handwerkerGfName(h) || '—'}</p>
-                <p className="truncate text-[12.5px] text-bw-text-muted">
-                  {(h.gewerk_namen ?? []).join(' · ') || '—'}
-                </p>
-                <ComplianceBadge status={h.compliance_status} />
+              ) : null}
+              <div className="lc-title" style={{ fontWeight: 600 }}>
+                {handwerkerDisplayName(t)}
               </div>
-            ))}
-          </ListGridShell>
-        </>
-      )}
+              <div className="lc-pills" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {(t.gewerk_namen ?? []).length ? (
+                  (t.gewerk_namen ?? []).map((g, i) => (
+                    <span key={i} className="pill-tag">
+                      {g}
+                    </span>
+                  ))
+                ) : (
+                  <span className="pill-tag">—</span>
+                )}
+              </div>
+              <div style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t.telefon?.trim() || '—'}</div>
+              <div
+                style={{
+                  color: 'var(--text-2)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t.email?.trim() || '—'}
+              </div>
+              <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 12 }}>
+                —
+              </div>
+              <div className="lc-status">
+                <MockBadge kind={t.aktiver_einsatz ? 'aktiv' : 'fertig'}>
+                  {t.aktiver_einsatz ? 'Aktiv' : 'Verfügbar'}
+                </MockBadge>
+              </div>
+              <div
+                className="row-actions always"
+                onClick={(e) => e.stopPropagation()}
+                style={{ justifyContent: 'flex-end' }}
+              >
+                <ActionsMenu
+                  trigger={
+                    <button type="button" className="qa-btn" title="Aktionen" aria-label="Aktionen">
+                      <MockIcon n="dots" size={16} />
+                    </button>
+                  }
+                  items={listEntityMenuItems(
+                    'handwerker',
+                    { name: handwerkerDisplayName(t), email: t.email, telefon: t.telefon },
+                    {
+                      onEdit: () => openDetail(t.id),
+                      onCopy: () => runDuplicateHandwerker(t.id, router),
+                      onDelete: () => {
+                        void deleteHandwerker(t.id).then((r) => {
+                          if (!r.ok) toast.error(r.message)
+                          else {
+                            toast.success('Handwerker gelöscht')
+                            router.refresh()
+                          }
+                        })
+                      },
+                      deleteLabel: handwerkerDisplayName(t),
+                    }
+                  )}
+                  sheetTitle="Handwerker"
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Handwerker"
+        onPageChange={(p) => setPageIndex(p - 1)}
+      />
 
       <HandwerkerModal
         open={modalOpen}
@@ -444,12 +520,12 @@ export function HandwerkerListeClient({
         title="Handwerker exportieren"
         fields={HANDWERKER_EXPORT_FIELDS}
         onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : listRows
+          const source = scope === 'view' ? filtered : rows
           const data = source.map(handwerkerExportRow)
           const fields = HANDWERKER_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
           exportToCSV(data, fields, 'handwerker')
         }}
       />
-    </EntityListShell>
+    </div>
   )
 }
