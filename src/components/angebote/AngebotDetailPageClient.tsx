@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ProjektKette } from '@/components/crm/ProjektKette'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailProp } from '@/components/ui/detail-prop'
@@ -21,7 +20,6 @@ import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { LeadTimelineList } from '@/components/anfragen/LeadTimelineList'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/actions'
 import { toast } from '@/components/ui/app-toast'
@@ -38,12 +36,11 @@ import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbei
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
-import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
-import { AngebotVisualisierungenTab } from '@/components/angebote/AngebotVisualisierungenTab'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import {
   angebotSummenBrutto,
   betragAnzeige,
@@ -65,7 +62,6 @@ import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/Ange
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import type { AngebotDetail, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
-import type { KiVisualisierung } from '@/lib/visualize/types'
 import { cn, formatAnfragePreisAnzeige, formatDatum, formatDatumZeit, KANAL_LABELS, SITUATION_LABELS } from '@/lib/utils'
 import {
   KUNDE_ABLEHNUNG_GRUND_LABELS,
@@ -84,7 +80,6 @@ type AngebotDetailTab =
   | 'details'
   | 'verlauf'
   | 'dokumente'
-  | 'visualisierungen'
   | 'notizen'
 
 const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
@@ -92,7 +87,6 @@ const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'details',
   'verlauf',
   'dokumente',
-  'visualisierungen',
   'notizen',
 ])
 
@@ -118,8 +112,8 @@ export function AngebotDetailPageClient({
   wizardPreislisten,
   wizardFirm,
   lead,
-  kiVisualisierungen = [],
-  projektKontext,
+  kiVisualisierungen: _kiVisualisierungen = [],
+  projektKontext: _projektKontext,
 }: {
   detail: AngebotDetail
   timeline: LeadTimelineRow[]
@@ -128,12 +122,12 @@ export function AngebotDetailPageClient({
   wizardPreislisten: Preisliste[]
   wizardFirm: FirmenEinstellungen
   lead: LeadDetail | null
-  kiVisualisierungen?: KiVisualisierung[]
+  kiVisualisierungen?: import('@/lib/visualize/types').KiVisualisierung[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { refresh, generation } = useCrmRefresh()
+  const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
   const [mainTab, setMainTab] = useState<AngebotDetailTab>('stammdaten')
   const [acceptOpen, setAcceptOpen] = useState(false)
@@ -161,9 +155,14 @@ export function AngebotDetailPageClient({
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
 
   useEffect(() => {
-    const tab = resolveAngebotDetailTabFromQuery(searchParams.get('tab'))
+    const raw = searchParams.get('tab')
+    if ((raw ?? '').trim().toLowerCase() === 'visualisierungen') {
+      router.push(`/angebote/${detail.id}/visualisierung`)
+      return
+    }
+    const tab = resolveAngebotDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
-  }, [searchParams])
+  }, [searchParams, detail.id, router])
 
   const orgFreigabeStatus = lead?.org_freigabe_status ?? null
 
@@ -370,6 +369,13 @@ export function AngebotDetailPageClient({
       onClick: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
     })
 
+    // Relocated from DetailShell tab (Positivliste P0) → eigene Route /angebote/[id]/visualisierung
+    items.push({
+      label: 'Visualisierungen',
+      icon: mockMenuIcon('photo'),
+      onClick: () => router.push(`/angebote/${detail.id}/visualisierung`),
+    })
+
     if (kannVersenden) {
       items.push({
         label: 'Versenden',
@@ -478,8 +484,8 @@ export function AngebotDetailPageClient({
             href="#angebot-versand-handwerker"
             className={detailPrimaryBtnClass}
           >
-            Handwerker einholen
-            <MockIcon n="send" size={14} />
+            Angebot versenden
+            <MockIcon ctx="btn" n="send" size={14} />
           </Link>
         )
       }
@@ -491,7 +497,7 @@ export function AngebotDetailPageClient({
           onClick={() => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')}
         >
           An Kunden senden
-          <MockIcon n="send" size={14} />
+          <MockIcon ctx="btn" n="send" size={14} />
         </button>
       )
     }
@@ -503,7 +509,7 @@ export function AngebotDetailPageClient({
           disabled={pending}
           onClick={openAcceptModal}
         >
-          <MockIcon n="check" size={14} />
+          <MockIcon ctx="btn" n="check" size={14} />
           Angebot annehmen
         </button>
       )
@@ -512,7 +518,7 @@ export function AngebotDetailPageClient({
       return (
         <Link href={`/auftraege/${auftragId}`} className={detailPrimaryBtnClass}>
           Zum Auftrag
-          <MockIcon n="external-link" size={14} />
+          <MockIcon ctx="btn" n="external-link" size={14} />
         </Link>
       )
     }
@@ -555,7 +561,7 @@ export function AngebotDetailPageClient({
             className="btn btn-ghost btn-sm"
             aria-label="Stammdaten bearbeiten"
           >
-            <MockIcon n="pencil" size={15} />
+            <MockIcon ctx="btn" n="pencil" size={15} />
           </button>
         ) : null
       }
@@ -709,37 +715,16 @@ export function AngebotDetailPageClient({
     />
   )
 
-  const verkaufBanner = auftragId ? (
-    <div className="rounded-lg border border-bw-primary/25 bg-bw-primary/5 px-3 py-2.5 text-sm">
-      <p className="font-medium text-bw-text">Verkauf abgeschlossen</p>
-      <p className="mt-0.5 text-bw-text-muted">
-        Dieses Angebot wurde angenommen. Weiter im{' '}
-        <Link href={`/auftraege/${auftragId}`} className="font-medium text-bw-link hover:underline">
-          Auftrag
-        </Link>
-        {projektKontext?.rechnungen?.length
-          ? ` (${projektKontext.rechnungen.length} Rechnung${projektKontext.rechnungen.length === 1 ? '' : 'en'})`
-          : ''}
-        .
-      </p>
-    </div>
-  ) : statusEinfach === 'angenommen' ? (
-    <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-sm">
-      <p className="font-medium text-bw-text">Angenommen — Auftrag fehlt noch</p>
-      <p className="mt-0.5 text-bw-text-muted">
-        Legen Sie den Auftrag an, um mit der Ausführung und Abrechnung zu starten.
-      </p>
-    </div>
-  ) : null
-
   const stammdatenInhalt = (
     <>
-      {verkaufBanner}
-      <AngebotOrgFreigabeBanner
-        orgFreigabeStatus={orgFreigabeStatus}
-        orgFreigabeLog={lead?.org_freigabe_log}
-      />
       {kundeCard}
+      {kunde?.id ? (
+        <p className="text-sm">
+          <Link href={`/kunden/${kunde.id}`} className="font-medium text-bw-link hover:underline">
+            Kundenakte öffnen
+          </Link>
+        </p>
+      ) : null}
       <NaechsteSchritteCard steps={naechsteSchritte} />
       <AngebotVersandSection
         mode="kunde"
@@ -780,31 +765,9 @@ export function AngebotDetailPageClient({
   )
 
   const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
-  const visualisierungenInhalt = (
-    <AngebotVisualisierungenTab angebotId={detail.id} sessions={kiVisualisierungen} />
-  )
 
   const notizenInhalt = (
-    <KommunikationCard
-      filter={{
-        angebotId: detail.id,
-        leadId: detail.lead_id ?? undefined,
-        kundeId: detail.kunde_id ?? undefined,
-      }}
-      reloadKey={mailCompose.reloadKey + generation}
-      toolbar={
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id))}
-        >
-          <MockIcon n="mail" size={15} />
-          E-Mail schreiben
-        </Button>
-      }
-    />
+    <p className="text-sm text-bw-text-muted">Keine Notizen</p>
   )
 
   const detailShellGroups: DetailShellGroup[] = [
@@ -817,7 +780,7 @@ export function AngebotDetailPageClient({
     {
       id: 'details',
       label: 'Details',
-      icon: 'list-numbers',
+      icon: 'list-details',
       count: positionenAnzeigeCount || undefined,
       render: () => detailsInhalt,
     },
@@ -836,13 +799,6 @@ export function AngebotDetailPageClient({
       render: () => dokumenteInhalt,
     },
     {
-      id: 'visualisierungen',
-      label: 'Visualisierungen',
-      icon: 'photo',
-      count: kiVisualisierungen.length || undefined,
-      render: () => visualisierungenInhalt,
-    },
-    {
       id: 'notizen',
       label: ACTIVITY_SECTIONS.notizen,
       icon: 'messages',
@@ -853,11 +809,22 @@ export function AngebotDetailPageClient({
   return (
     <div className="space-y-4 pb-0">
       <DetailHead
-        backHref="/angebote"
-        backLabel="Zurück zu Angebote"
+        backHref="/vorgaenge?tab=angebot"
+        backLabel="Zurück zu den Vorgängen"
         title={kundeName}
         badges={
-          <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />
+            {lead ? (
+              <PipelineKontextBadge
+                lead={{
+                  kanal: lead.kanal,
+                  auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
+                  anlass: lead.anlass,
+                }}
+              />
+            ) : null}
+          </span>
         }
         meta={headMeta}
         actions={
@@ -871,7 +838,7 @@ export function AngebotDetailPageClient({
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >
-                  <MockIcon n="dots" size={18} />
+                  <MockIcon ctx="btn" n="dots" size={18} />
                   <span className="sr-only">Mehr</span>
                 </button>
               }
@@ -881,8 +848,6 @@ export function AngebotDetailPageClient({
           </div>
         }
       />
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {statusEinfach === 'abgelehnt' ? (
         <p className="rounded-lg border border-bw-border px-3 py-2 text-sm text-bw-text-muted">
@@ -1020,7 +985,7 @@ export function AngebotDetailPageClient({
                   hint={KUNDE_MAIL_BCC_HINT}
                 />
                 <p className="mb-1 mt-4 inline-flex items-center gap-1 text-xs font-medium text-bw-text-muted">
-                  <MockIcon n="mail" size={14} />
+                  <MockIcon ctx="btn" n="mail" size={14} />
                   Vorschau
                 </p>
                 {aufPreviewLoading ? (

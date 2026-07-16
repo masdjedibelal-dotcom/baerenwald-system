@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Anfragen',
 }
 
-export const revalidate = 60
-
-/** Listen-Inhalt kommt aus `anfragen/layout.tsx` (Master-Detail ab 900px). */
+/** Positivliste: Phasen-Listen laufen über Vorgänge (Phase-Filter). */
 export default function AnfragenPage() {
-  return null
+  redirect('/vorgaenge?tab=anfrage')
 }

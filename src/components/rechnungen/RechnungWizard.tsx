@@ -3,136 +3,165 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Pencil,
-  Plus,
-  Save,
-  Send,
-  X,
-} from 'lucide-react'
-import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { WizardShell } from '@/components/layout/WizardShell'
+import { MockField } from '@/components/mock-ui/MockForm'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
-import { AngebotWizardPositionenByGewerk } from '@/components/angebote/AngebotWizardPositionenByGewerk'
-import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
-import { RechnungWizardDetailsCard } from '@/components/rechnungen/RechnungWizardDetailsCard'
-import { RechnungWizardZahlungCard, RechnungWizardVersandAuswahlCard } from '@/components/rechnungen/RechnungWizardZahlungCard'
-import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
-import { KundeModal } from '@/components/kunden/KundeModal'
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
-  loadRechnungWizardKunde,
   saveRechnungWizardDraft,
   sendRechnungWizard,
   syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
-import { searchKunden } from '@/app/(dashboard)/angebote/actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import type {
-  AbschlagRechnungEntwurf,
-  RechnungWizardBootstrap,
-  RechnungWizardMeta,
-} from '@/lib/rechnungen/rechnung-wizard-types'
-import { defaultRechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
-  angebotPositionenToDokumentZeilen,
   dokumentZeilenToAngebotPositionen,
   formatEurBetrag,
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import { normalizeAngebotPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
-import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
-import { kannHinweis35aAngebot } from '@/lib/angebote/angebot-rechtshinweise'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
   berechneRechnung,
-  kundeKannReverseCharge13b,
   parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
-import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { cn } from '@/lib/utils'
 import {
-  rechnungDokumentBezeichnung,
-  zahlungsplanVorlage50_50,
+  dokumentZeilenToPosBoardLines,
+  posBoardLineNetto,
+  posBoardLinesToDokumentZeilen,
+  type PosBoardLine,
+} from '@/lib/posboard/pos-board-line'
+import type {
+  AbschlagRechnungEntwurf,
+  RechnungWizardBootstrap,
+  RechnungWizardMeta,
+} from '@/lib/rechnungen/rechnung-wizard-types'
+import {
+  neueZahlungsplanZeile,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
+import type { Gewerk, Preisliste } from '@/lib/types'
+import {
+  faelligAmFromZahlfrist,
+  formatDateDeYmd,
+  plusDaysIso,
+  type ZahlfristSeg,
+  zahlfristSegFromFaelligAm,
+} from '@/lib/zahlfrist'
 
-function addDaysIso(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T12:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+type Rate = {
+  id: string
+  label: string
+  prozent: number
+  faellig: string
 }
 
-function gesamtNettoFromBootstrap(bootstrap: RechnungWizardBootstrap): number {
-  if (bootstrap.abschlag?.gesamtNetto) return bootstrap.abschlag.gesamtNetto
-  const pos = normalizeAngebotPositionen(bootstrap.positionen)
-  let netto = 0
-  for (const p of pos) {
-    if (p.gewerk_slug === '__freitext__' && p.leistung === 'abschlag') continue
-    netto += (p.lohn_netto + p.material_netto) * (p.menge || 1)
+type Versandweg = 'portal' | 'email' | 'post'
+type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos'
+
+const ANLAGEN_DEF: Array<{
+  key: AnlagenKey
+  label: string
+  sub: string
+  locked?: boolean
+}> = [
+  { key: 'rechnung', label: 'Rechnung (PDF)', sub: 'Pflichtdokument', locked: true },
+  {
+    key: 'leistungsnachweis',
+    label: 'Leistungsnachweis',
+    sub: 'Positionen & Mengen aus dem Auftrag',
+  },
+  {
+    key: 'bautagebuch',
+    label: 'Bautagebuch-Export',
+    sub: 'Einträge & Fotos der Baustelle',
+  },
+  { key: 'abnahme', label: 'Abnahmeprotokoll', sub: 'Unterschriebene Abnahme' },
+  { key: 'fotos', label: 'Fotodokumentation', sub: 'Vorher/Nachher-Bilder' },
+]
+
+const WIZARD_STEPS = [
+  { id: 1, label: 'Positionen' },
+  { id: 2, label: 'Zahlplan' },
+  { id: 3, label: 'Paket & Versand' },
+]
+
+function formatDateDe(ymd: string): string {
+  return formatDateDeYmd(ymd)
+}
+
+function mkRate(label: string, prozent: number, tage: number): Rate {
+  return {
+    id: `rate-${Math.random().toString(36).slice(2, 9)}`,
+    label,
+    prozent,
+    faellig: plusDaysIso(tage),
   }
-  return netto
 }
 
-function Step({
-  n,
-  label,
-  active,
-  done,
-}: {
-  n: number
-  label: string
-  active: boolean
-  done: boolean
-}) {
-  return (
-    <div className={cn('step', active && 'active', done && 'done')}>
-      <span className="step-n">
-        {done ? <Check strokeWidth={3} aria-hidden /> : n}
-      </span>
-      <span>{label}</span>
-    </div>
-  )
+const PRESETS: Record<string, Array<[string, number, number]>> = {
+  '30 / 40 / 30': [
+    ['1. Abschlag', 30, 14],
+    ['2. Abschlag', 40, 45],
+    ['Schlussrechnung', 30, 75],
+  ],
+  '50 / 50': [
+    ['Anzahlung', 50, 14],
+    ['Schlussrechnung', 50, 60],
+  ],
+  'Anzahlung 30% + Rest': [
+    ['Anzahlung', 30, 7],
+    ['Schlussrechnung', 70, 60],
+  ],
 }
 
-function PropRow({
-  label,
-  value,
-  bold,
-  link,
-}: {
-  label: string
-  value: string
-  bold?: boolean
-  link?: boolean
-}) {
-  return (
-    <div className="prop">
-      <div className="prop-l">{label}</div>
-      <div className={cn('prop-v', link && 'link', bold && 'font-medium')}>{value}</div>
-    </div>
-  )
+function ratesToZahlungsplan(raten: Rate[]): Zahlungsplan {
+  return {
+    modus: 'abschlagsplan',
+    zeilen: raten.map((r) =>
+      neueZahlungsplanZeile({
+        id: r.id,
+        titel: r.label,
+        typ: 'prozent',
+        wert: r.prozent,
+      })
+    ),
+  }
 }
 
+function planToRates(plan: Zahlungsplan | null | undefined): Rate[] {
+  if (!plan?.zeilen.length) {
+    return [
+      mkRate('1. Abschlag', 30, 14),
+      mkRate('2. Abschlag', 40, 45),
+      mkRate('Schlussrechnung', 30, 75),
+    ]
+  }
+  return plan.zeilen.map((z, i) => ({
+    id: z.id,
+    label: z.titel,
+    prozent: z.typ === 'rest' ? 0 : Number(z.wert) || 0,
+    faellig: plusDaysIso(14 + i * 30),
+  }))
+}
+
+/**
+ * Rechnungs-Wizard 1:1 Mock:
+ * Positionen (PosBoard) → Zahlplan → Paket & Versand
+ */
 export function RechnungWizard({
   bootstrap,
   gewerke,
   preislisten,
   firm: firmProp,
-  zahlungszielTage = 14,
-  initialKundeId,
   onClose,
   onDone,
 }: {
@@ -147,27 +176,17 @@ export function RechnungWizard({
 }) {
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
-  const standalone = bootstrap.standalone === true
-  const modus = bootstrap.modus ?? 'voll'
-  const [zahlungsplan, setZahlungsplan] = useState<Zahlungsplan>(
-    () => bootstrap.zahlungsplan?.zeilen.length ? bootstrap.zahlungsplan : zahlungsplanVorlage50_50()
-  )
-  const gesamtNettoBasis =
-    bootstrap.gesamtNetto ??
-    bootstrap.abschlag?.gesamtNetto ??
-    gesamtNettoFromBootstrap(bootstrap)
-  const [kunde, setKunde] = useState(bootstrap.kunde)
-  const [kundeId, setKundeId] = useState(bootstrap.kundeId)
-  const [kundeSuch, setKundeSuch] = useState('')
-  const [kundeHits, setKundeHits] = useState<Kunde[]>([])
-  const [kundeNeuModalOpen, setKundeNeuModalOpen] = useState(false)
-  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
-  const [mailTo, setMailTo] = useState<string[]>(() => {
-    const e = bootstrap.kunde?.email?.trim()
-    return e && isValidEmail(e) ? [e] : []
-  })
-  const [mailCc, setMailCc] = useState<string[]>([])
-  const mailRecipientsInitRef = useRef(false)
+  const brand = firm.firmenname?.trim() || 'Bärenwald München'
+  const kundeName =
+    bootstrap.kunde?.name?.trim() ||
+    [bootstrap.kunde?.vorname, bootstrap.kunde?.nachname].filter(Boolean).join(' ') ||
+    'Kunde'
+  const kundeEmail = (bootstrap.kunde?.email || '').trim()
+  const auftragLabel =
+    bootstrap.auftragsReferenz?.trim() ||
+    bootstrap.projektTitel?.trim() ||
+    bootstrap.auftragId?.slice(0, 8)?.toUpperCase() ||
+    '—'
 
   const initialZeilen = useMemo(
     () =>
@@ -182,48 +201,61 @@ export function RechnungWizard({
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
-  const [meta, setMeta] = useState<RechnungWizardMeta>(() => {
-    const m = bootstrap.meta
-    if (modus === 'abschlag' && m.zahlungsart !== 'abschlaege') {
-      return { ...m, zahlungsart: 'abschlaege' }
-    }
-    return m
+  const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
+  const [mode, setMode] = useState<'einzel' | 'plan'>(() =>
+    bootstrap.meta.zahlungsart === 'abschlaege' || bootstrap.modus === 'abschlag'
+      ? 'plan'
+      : 'einzel'
+  )
+  const [raten, setRaten] = useState<Rate[]>(() => planToRates(bootstrap.zahlungsplan))
+  const [aktivRate, setAktivRate] = useState<string | null>(null)
+  const [versandweg, setVersandweg] = useState<Versandweg>('portal')
+  const [anlagen, setAnlagen] = useState<Record<AnlagenKey, boolean>>({
+    rechnung: true,
+    leistungsnachweis: true,
+    bautagebuch: false,
+    abnahme: false,
+    fotos: false,
   })
-  const istAbschlag = meta.zahlungsart === 'abschlaege'
+  const [einleitung, setEinleitung] = useState(
+    () =>
+      bootstrap.meta.einleitung?.trim() ||
+      `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
+  )
+  const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
+  const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
+  const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
   const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
-    bootstrap.rechnungsnummer?.trim() || 'Entwurf'
+    bootstrap.rechnungsnummer?.trim() || ''
   )
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(() =>
-    bootstrap.rechnungId ? new Date() : null
-  )
   const savedSnapshotRef = useRef<string | null>(null)
 
-  const draftSnapshot = useMemo(() => JSON.stringify({ zeilen, meta }), [zeilen, meta])
+  const kundeId = bootstrap.kundeId
+  const istPlan = mode === 'plan'
 
   useEffect(() => {
-    if (savedSnapshotRef.current === null) {
-      savedSnapshotRef.current = draftSnapshot
-      return
+    setMounted(true)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
     }
-    setDraftDirty(draftSnapshot !== savedSnapshotRef.current)
-  }, [draftSnapshot])
+  }, [])
 
-  const rechnungsempfaenger = useMemo(
-    () => kundeRechnungsempfaengerAusStammdaten(kunde),
-    [kunde]
-  )
+  useEffect(() => {
+    if (mode === 'plan' && !aktivRate && raten[0]) setAktivRate(raten[0].id)
+  }, [mode, aktivRate, raten])
 
-  const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
-  const defaultMwst = Math.max(0, parseInt(firm.mwst_satz, 10) || DEFAULT_MWST_SATZ)
   const positionenBerechnet = useMemo(
     () => dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
     [zeilen, firm, gewerke]
   )
+  const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
+  const defaultMwst = Math.max(0, parseInt(firm.mwst_satz, 10) || DEFAULT_MWST_SATZ)
   const berechnung = useMemo(
     () =>
       berechneRechnung(positionenBerechnet, {
@@ -234,81 +266,87 @@ export function RechnungWizard({
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
   )
 
-  const kostenaufstellungPdf = useMemo(
-    () => summenKostenaufstellungAusPositionen(positionenBerechnet),
-    [positionenBerechnet]
-  )
-  const lohnNettoPdf = kostenaufstellungPdf?.lohn_netto ?? 0
+  const brutto = berechnung.brutto
+  const lohnAnteil = berechnung.lohn_netto
+  const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
+  const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
 
-  const hinweis35aErlaubt = kannHinweis35aAngebot(kunde?.typ, firm, lohnNettoPdf)
-  const zeigt13b = kundeKannReverseCharge13b(kunde?.typ)
+  const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
+  const prozentSumme = raten.reduce((s, r) => s + (Number(r.prozent) || 0), 0)
+  const planOk = !istPlan || prozentSumme === 100
+  const selRate = raten.find((r) => r.id === aktivRate) ?? null
+  const rateBrutto = (r: Rate) => Math.round((brutto * (Number(r.prozent) || 0)) / 100)
+  const rTitel =
+    istPlan && selRate
+      ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.label}`
+      : `${bootstrap.projektTitel || auftragLabel} — Schlussrechnung`
+  const rBrutto = istPlan && selRate ? rateBrutto(selRate) : brutto
+  const rFaellig = istPlan && selRate ? selRate.faellig : einzelFaellig
+  const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
+  const previewNr = rechnungsnummer.trim() || 'RE-Entwurf'
+  const activeVersandId = versandRechnungId ?? rechnungId
 
-  const aktiveVersandRechnung = useMemo(
-    () => abschlagRechnungen.find((r) => r.id === versandRechnungId) ?? null,
-    [abschlagRechnungen, versandRechnungId]
-  )
-
-  const previewRechnungId = istAbschlag ? versandRechnungId : rechnungId
-  const previewRechnungsnummer =
-    aktiveVersandRechnung?.rechnungsnummer?.trim() ||
-    rechnungsnummer.trim() ||
-    'Entwurf'
-
-  useEffect(() => {
-    setMounted(true)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [])
-
-  const applyKunde = useCallback(
-    (next: NonNullable<RechnungWizardBootstrap['kunde']>, nextZahlungsziel?: number) => {
-      setKunde(next)
-      setKundeId(next.id)
-      setKundeHits([])
-      setKundeSuch(kundeDisplayName(next))
-      const zt = nextZahlungsziel ?? zahlungszielTage
-      setMeta((m) => {
-        const defaults = defaultRechnungWizardMeta(zt, {
-          rechnungsdatum: m.rechnungsdatum,
-          leistungszeitraum_von: m.leistungszeitraum_von,
-          leistungszeitraum_bis: m.leistungszeitraum_bis,
-          kundeTyp: next.typ,
-          firm,
-        })
-        return {
-          ...m,
-          faellig_am: addDaysIso(m.rechnungsdatum || defaults.rechnungsdatum, zt),
-          hinweis_35a: defaults.hinweis_35a,
-          einleitung: defaults.einleitung,
-          zahlungsbedingungen:
-            m.zahlungsart === 'standard' ? defaults.zahlungsbedingungen : m.zahlungsbedingungen,
-        }
-      })
-    },
-    [firm, zahlungszielTage]
-  )
-
-  useEffect(() => {
-    const id = initialKundeId?.trim()
-    if (!standalone || !id) return
-    void loadRechnungWizardKunde(id).then((res) => {
-      if (res.ok) applyKunde(res.kunde, res.zahlungszielTage)
-    })
-  }, [standalone, initialKundeId, applyKunde])
-
-  function onKundeSuche(q: string) {
-    setKundeSuch(q)
-    if (q.trim().length < 2) {
-      setKundeHits([])
-      return
-    }
-    void searchKunden(q).then((res) => setKundeHits(res.kunden))
+  function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
+    setZahlfrist(seg)
+    const nextDatum = seg === 'datum' ? datum : faelligAmFromZahlfrist(seg, datum)
+    if (seg === 'datum') setZahlfristDatum(nextDatum)
+    else setZahlfristDatum(nextDatum)
+    setMeta((m) => ({ ...m, faellig_am: faelligAmFromZahlfrist(seg, nextDatum) }))
   }
 
-  const persistDraft = useCallback(
-    async (opts?: { notify?: boolean }): Promise<string | null> => {
+  const draftSnapshot = useMemo(
+    () => JSON.stringify({ zeilen, meta, mode, raten, einleitung }),
+    [zeilen, meta, mode, raten, einleitung]
+  )
+  useEffect(() => {
+    if (savedSnapshotRef.current === null) {
+      savedSnapshotRef.current = draftSnapshot
+      return
+    }
+    setDraftDirty(draftSnapshot !== savedSnapshotRef.current)
+  }, [draftSnapshot])
+
+  function onPosBoardChange(next: PosBoardLine[]) {
+    setZeilen(posBoardLinesToDokumentZeilen(next, zeilen))
+  }
+
+  function applyPreset(name: string) {
+    const rows = PRESETS[name]
+    if (!rows) return
+    setRaten(rows.map(([l, p, t]) => mkRate(l, p, t)))
+    setAktivRate(null)
+  }
+
+  function updRate(id: string, patch: Partial<Rate>) {
+    setRaten((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  }
+
+  function rmRate(id: string) {
+    setRaten((prev) => prev.filter((r) => r.id !== id))
+    setAktivRate((cur) => (cur === id ? null : cur))
+  }
+
+  function addRate() {
+    setRaten((prev) => [...prev, mkRate(`${prev.length + 1}. Abschlag`, 0, 30)])
+  }
+
+  function toggleAnlage(k: AnlagenKey) {
+    setAnlagen((a) => ({ ...a, [k]: !a[k] }))
+  }
+
+  function buildMetaForSave(): RechnungWizardMeta {
+    return {
+      ...meta,
+      einleitung,
+      mail_einleitung: einleitung,
+      zahlungsart: istPlan ? 'abschlaege' : 'standard',
+      abschlag_zeile_id: istPlan ? aktivRate : null,
+      faellig_am: rFaellig,
+    }
+  }
+
+  const persistEinzel = useCallback(
+    async (): Promise<string | null> => {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
         toast.error('Mindestens eine Position erforderlich.')
@@ -318,39 +356,11 @@ export function RechnungWizard({
         toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
         return null
       }
-      if (!meta.rechnungsdatum || !meta.faellig_am) {
-        toast.error('Rechnungsdatum und Fälligkeit sind Pflicht.')
-        return null
-      }
-
-      if (istAbschlag) {
-        if (!bootstrap.auftragId?.trim()) {
-          toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
-          return null
-        }
-        if (!zahlungsplan.zeilen.length) {
-          toast.error('Bitte Abschlagsplan mit mindestens einer Zeile anlegen.')
-          return null
-        }
-        setSaving(true)
-        const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, zahlungsplan)
-        setSaving(false)
-        if (!planSave.ok) {
-          toast.error(planSave.message)
-          return null
-        }
-        savedSnapshotRef.current = draftSnapshot
-        setDraftDirty(false)
-        setLastSavedAt(new Date())
-        if (opts?.notify) toast.success('Abschlagsplan gespeichert')
-        return versandRechnungId ?? rechnungId
-      }
-
       if (!kundeId?.trim()) {
-        toast.error('Bitte zuerst einen Kunden wählen oder anlegen.')
+        toast.error('Kein Kunde verknüpft.')
         return null
       }
-
+      const nextMeta = buildMetaForSave()
       setSaving(true)
       const res = await saveRechnungWizardDraft({
         rechnungId,
@@ -358,8 +368,8 @@ export function RechnungWizard({
         angebot_id: bootstrap.angebotId,
         kunde_id: kundeId,
         positionen: positionenBerechnet,
-        meta,
-        modus,
+        meta: nextMeta,
+        modus: bootstrap.modus ?? 'voll',
         zahlungsplan: null,
         zahlungsplanSpeichern: false,
       })
@@ -371,161 +381,151 @@ export function RechnungWizard({
       setRechnungId(res.rechnungId)
       setVersandRechnungId(res.rechnungId)
       if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
+      setMeta(nextMeta)
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
-      setLastSavedAt(new Date())
-      if (opts?.notify) {
-        toast.success(
-          res.rechnungsnummer?.trim()
-            ? `Entwurf gespeichert (${res.rechnungsnummer.trim()})`
-            : 'Entwurf gespeichert'
-        )
-      }
       return res.rechnungId
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildMeta uses current closure
     [
       zeilen,
-      meta,
+      kundeId,
       rechnungId,
-      versandRechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
-      kundeId,
+      bootstrap.modus,
       positionenBerechnet,
       draftSnapshot,
-      modus,
-      istAbschlag,
-      zahlungsplan,
+      meta,
+      einleitung,
+      istPlan,
+      aktivRate,
+      rFaellig,
     ]
   )
 
-  const createAbschlagEntwuerfe = useCallback(async (): Promise<boolean> => {
+  const persistPlan = useCallback(async (): Promise<string | null> => {
     if (!bootstrap.auftragId?.trim()) {
       toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
-      return false
+      return null
     }
     if (!kundeId?.trim()) {
-      toast.error('Bitte zuerst einen Kunden wählen.')
-      return false
+      toast.error('Kein Kunde verknüpft.')
+      return null
     }
+    if (!planOk) {
+      toast.error('Zahlplan-Summe muss 100% sein.')
+      return null
+    }
+    const plan = ratesToZahlungsplan(raten)
+    const nextMeta = buildMetaForSave()
     setSaving(true)
+    const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
+    if (!planSave.ok) {
+      setSaving(false)
+      toast.error(planSave.message)
+      return null
+    }
     const res = await createAllAbschlagRechnungenFromWizard({
       auftrag_id: bootstrap.auftragId,
       angebot_id: bootstrap.angebotId,
       kunde_id: kundeId,
       positionen: positionenBerechnet,
-      meta,
-      zahlungsplan,
-      versandZeileId: meta.abschlag_zeile_id,
+      meta: nextMeta,
+      zahlungsplan: plan,
+      versandZeileId: aktivRate,
     })
     setSaving(false)
     if (!res.ok) {
       toast.error(res.message)
-      return false
+      return null
     }
     setAbschlagRechnungen(res.rechnungen)
     setVersandRechnungId(res.versandRechnungId)
     setRechnungId(res.versandRechnungId)
     const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
     if (nr?.trim()) setRechnungsnummer(nr.trim())
+    setMeta(nextMeta)
     savedSnapshotRef.current = draftSnapshot
     setDraftDirty(false)
-    setLastSavedAt(new Date())
-    toast.success(`${res.rechnungen.length} Rechnungen erstellt`)
-    return true
+    return res.versandRechnungId
   }, [
     bootstrap.auftragId,
     bootstrap.angebotId,
     kundeId,
+    planOk,
+    raten,
     positionenBerechnet,
-    meta,
-    zahlungsplan,
+    aktivRate,
     draftSnapshot,
+    meta,
+    einleitung,
+    istPlan,
+    rFaellig,
   ])
 
-  async function handleWeiter() {
-    if (step === 1) {
-      if (!kundeId?.trim() || !kunde) {
-        toast.error('Bitte einen Kunden wählen oder neu anlegen.')
-        return
-      }
-      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      if (!artikel.length) {
-        toast.error('Bitte mindestens eine Position anlegen.')
-        return
-      }
-      if (artikel.some((z) => !z.bezeichnung.trim())) {
-        toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
-        return
-      }
-    }
-    if (step === 2 && istAbschlag) {
-      const ok = await createAbschlagEntwuerfe()
-      if (!ok) return
-      setStep(3)
+  async function handleFinish() {
+    if (!planOk) {
+      toast.error('Zahlplan-Summe muss 100% sein.')
       return
     }
-    if (step === 2) {
-      const id = await persistDraft({ notify: true })
-      if (!id) return
-      setStep(3)
-      return
-    }
-    const id = await persistDraft({ notify: true })
+    const id = istPlan ? await persistPlan() : await persistEinzel()
     if (!id) return
-    setStep((s) => Math.min(3, s + 1))
-  }
 
-  async function handlePdf() {
-    const id = previewRechnungId ?? rechnungId ?? (await persistDraft())
-    if (!id) return
-    try {
-      const res = await fetch('/api/rechnung-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rechnungId: id }),
-      })
+    const mailTo =
+      kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
+    const nextMeta = buildMetaForSave()
+    const nrLabel = () =>
+      abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
+      (id === activeVersandId ? rechnungsnummer.trim() : '') ||
+      previewNr
+
+    // Post: ohne E-Mail finalisieren
+    if (versandweg === 'post') {
+      setSaving(true)
+      await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
+      const res = await finalizeRechnungWizardWithoutMail(id)
+      setSaving(false)
       if (!res.ok) {
-        let msg = await res.text()
-        try {
-          const j = JSON.parse(msg) as { error?: string }
-          if (j.error) msg = j.error
-        } catch {
-          /* noop */
-        }
-        toast.error(msg || 'PDF konnte nicht erzeugt werden')
+        toast.error(res.message)
         return
       }
-      const blob = await res.blob()
-      const u = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = u
-      const docLabel = aktiveVersandRechnung
-        ? rechnungDokumentBezeichnung(aktiveVersandRechnung.rechnungArt, aktiveVersandRechnung.index)
-        : 'Rechnung'
-      a.download = `${docLabel.replace(/\s+/g, '_')}_${previewRechnungsnummer.replace(/\s+/g, '_')}.pdf`
-      a.click()
-      URL.revokeObjectURL(u)
-      toast.success('PDF heruntergeladen')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Download fehlgeschlagen')
-    }
-  }
-
-  async function handleSend() {
-    if (!mailTo.length) {
-      toast.error('Bitte mindestens eine E-Mail-Adresse angeben.')
+      toast.success(
+        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt & drucken · ${formatEurBetrag(rBrutto)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
       return
     }
-    const id = previewRechnungId ?? rechnungId
-    if (!id) {
-      toast.error('Keine Rechnung zum Versand ausgewählt.')
+
+    // Portal ohne E-Mail: bereitstellen
+    if (versandweg === 'portal' && !mailTo.length) {
+      setSaving(true)
+      await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
+      const res = await finalizeRechnungWizardWithoutMail(id)
+      setSaving(false)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
+      return
+    }
+
+    if (!mailTo.length) {
+      toast.error('Keine Kunden-E-Mail hinterlegt — Versand nicht möglich.')
       return
     }
     setSaving(true)
     const sync = await syncRechnungWizardMetaToEntwurf(id, {
-      kunde_id: bootstrap.kundeId,
-      meta,
+      kunde_id: kundeId,
+      meta: nextMeta,
     })
     if (!sync.ok) {
       setSaving(false)
@@ -535,498 +535,850 @@ export function RechnungWizard({
     const res = await sendRechnungWizard({
       rechnungId: id,
       mailTo,
-      mailCc,
+      mailCc: [],
     })
-    setSaving(false)
-    if (!res.ok) {
-      toast.error(res.message)
-      return
-    }
-    toast.success('Rechnung versendet')
-    if (onDone) onDone(id)
-    else onClose()
-    router.refresh()
-  }
-
-  async function handleSaveWithoutMail() {
-    const id = previewRechnungId ?? rechnungId ?? (await persistDraft())
-    if (!id) return
-    setSaving(true)
-    await syncRechnungWizardMetaToEntwurf(id, {
-      kunde_id: kundeId,
-      meta,
-    })
-    const res = await finalizeRechnungWizardWithoutMail(id)
     setSaving(false)
     if (!res.ok) {
       toast.error(res.message)
       return
     }
     toast.success(
-      res.rechnungsnummer
-        ? `Rechnung ${res.rechnungsnummer} gespeichert (ohne Versand)`
-        : 'Rechnung gespeichert (ohne Versand)'
+      `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
     )
-    if (onDone) onDone(id)
-    else onClose()
+    onDone?.(id)
+    onClose()
     router.refresh()
   }
 
-  const previewSrc = previewRechnungId
-    ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(previewRechnungId)}&preview=html`
-    : null
+  function handleRequestClose() {
+    if (draftDirty && !saving) {
+      const ok = window.confirm(
+        'Es gibt ungespeicherte Änderungen. Wizard schließen und Änderungen verwerfen?'
+      )
+      if (!ok) return
+    }
+    onClose()
+  }
 
-  const pdfName = aktiveVersandRechnung
-    ? `${rechnungDokumentBezeichnung(aktiveVersandRechnung.rechnungArt, aktiveVersandRechnung.index)}-${previewRechnungsnummer}.pdf`
-    : `Rechnung-${previewRechnungsnummer}.pdf`
-  const projektTitel =
-    bootstrap.projektTitel?.trim() ||
-    (standalone ? 'Direktrechnung' : bootstrap.auftragsReferenz)
-  const wizardTitel = istAbschlag ? 'Abschlagsrechnungen erstellen' : 'Rechnung erstellen'
-  const step1Label = standalone ? 'Kunde & Leistungen' : 'Leistungen'
+  function handleWeiter() {
+    if (step === 2 && istPlan && !planOk) {
+      toast.error('Zahlplan-Summe muss 100% sein.')
+      return
+    }
+    setStep((s) => Math.min(3, s + 1))
+  }
 
-  useEffect(() => {
-    if (step !== 3) return
-    if (mailRecipientsInitRef.current) return
-    const e = (rechnungsempfaenger.email || '').trim()
-    if (e && isValidEmail(e)) setMailTo([e])
-    setMailCc([])
-    mailRecipientsInitRef.current = true
-  }, [step, rechnungsempfaenger.email])
+  if (!mounted) return null
 
-  if (!mounted || typeof document === 'undefined') return null
+  const finishLabel = `Rechnung erstellen & ${versandweg === 'post' ? 'drucken' : 'senden'}`
 
-  const wizardMobileActions =
+  const desktopActions = (
+    <div className="wizard-nav-actions">
+      {step > 1 ? (
+        <MockBtn kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)}>
+          Zurück
+        </MockBtn>
+      ) : null}
+      {step < 3 ? (
+        <MockBtn kind="primary" icon="chevron-right" onClick={handleWeiter}>
+          Weiter
+        </MockBtn>
+      ) : (
+        <MockBtn
+          kind="primary"
+          icon="send"
+          disabled={saving || !planOk}
+          onClick={() => void handleFinish()}
+        >
+          {finishLabel}
+        </MockBtn>
+      )}
+    </div>
+  )
+
+  const mobileActions =
     step < 3 ? (
       <>
         {step > 1 ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="wizard-mobile-toolbar__back shrink-0 px-2"
-            onClick={() => setStep((s) => s - 1)}
-            aria-label="Zurück"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
         ) : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="wizard-mobile-toolbar__save shrink-0 px-2.5"
-          disabled={saving}
-          onClick={() => void persistDraft({ notify: true })}
-          aria-label="Speichern"
-        >
-          <Save className="h-4 w-4" aria-hidden />
-        </Button>
-        <Button
-          size="sm"
-          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
-          disabled={saving}
-          onClick={() => void handleWeiter()}
-        >
+        <MockBtn sm kind="primary" onClick={handleWeiter}>
           Weiter
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        </MockBtn>
       </>
     ) : (
       <>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="wizard-mobile-toolbar__save shrink-0 px-2"
-          disabled={saving}
-          onClick={() => void handleSaveWithoutMail()}
-          aria-label="Ohne E-Mail speichern"
+        <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
+        <MockBtn
+          sm
+          kind="primary"
+          icon="send"
+          disabled={saving || !planOk}
+          onClick={() => void handleFinish()}
         >
-          <Save className="h-4 w-4" aria-hidden />
-        </Button>
-        <Button
-          size="sm"
-          className="wizard-mobile-toolbar__next shrink-0 gap-1 px-2.5"
-          disabled={saving}
-          onClick={() => void handleSend()}
-        >
-          <Send className="h-4 w-4" />
-          Senden
-        </Button>
+          {versandweg === 'post' ? 'Drucken' : 'Senden'}
+        </MockBtn>
       </>
     )
 
-  const wizardHeader = (
-    <>
-      <WizardMobileToolbar
-        onClose={onClose}
-        totalSteps={3}
-        currentStep={step}
-        stepLabel={`Schritt ${step}`}
-        actions={wizardMobileActions}
-      />
-      <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center">
-      <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Schließen">
-        <X className="h-4 w-4" />
-      </button>
-      <div className="h-6 w-px shrink-0 bg-bw-border" aria-hidden />
-      <div className="title-block min-w-0">
-        <div className="ttl">{wizardTitel}</div>
-        <div className="sub">
-          {projektTitel}
-          {bootstrap.auftragsReferenz ? ` · ${bootstrap.auftragsReferenz}` : ''}
-        </div>
-      </div>
-      <div className="flex-1" />
-      <div className="stepper" role="navigation" aria-label="Fortschritt">
-        <Step n={1} label={step1Label} active={step === 1} done={step > 1} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={2} label="Finalisieren" active={step === 2} done={step > 2} />
-        <ChevronRight className="step-arrow h-3.5 w-3.5" aria-hidden />
-        <Step n={3} label="Versenden" active={step === 3} done={false} />
-      </div>
-      <div className="flex-1" />
-      <div className="wizard-nav-actions">
-        {step > 1 ? (
-          <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Zurück
-          </Button>
-        ) : null}
-        {step < 3 ? (
-          <>
-            <Button
-              variant="secondary"
-              disabled={saving}
-              onClick={() => void persistDraft({ notify: true })}
-              className="gap-1.5"
-            >
-              <Save className="h-3.5 w-3.5" aria-hidden />
-              Speichern
-            </Button>
-            <Button disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
-              Weiter
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="secondary"
-              disabled={saving}
-              onClick={() => void handleSaveWithoutMail()}
-              className="gap-1.5"
-            >
-              <Save className="h-3.5 w-3.5" aria-hidden />
-              Ohne E-Mail speichern
-            </Button>
-            <Button disabled={saving} onClick={() => void handleSend()} className="gap-1.5">
-              <Send className="h-3.5 w-3.5" aria-hidden />
-              An Kunden senden
-            </Button>
-          </>
-        )}
-        {lastSavedAt ? (
-          <span className={cn('text-xs text-bw-text-muted', draftDirty && 'wizard-save-status--dirty')}>
-            Gespeichert {lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        ) : saving ? (
-          <span className="text-xs wizard-save-status--saving">Speichere…</span>
-        ) : null}
-      </div>
-      </div>
-    </>
-  )
+  const wege: Array<{ key: Versandweg; label: string; icon: string; sub: string }> = [
+    {
+      key: 'portal',
+      label: 'Kundenportal',
+      icon: 'layout-dashboard',
+      sub: 'Freigabe & Download im Portal',
+    },
+    { key: 'email', label: 'E-Mail', icon: 'mail', sub: `PDF-Anhang an ${kundeName}` },
+    { key: 'post', label: 'Post', icon: 'building', sub: 'Ausdruck & Briefversand' },
+  ]
 
   const wizard = (
-    <AppFlowScreen className="wizard-flow" header={wizardHeader}>
-      <div className="wizard-inner">
-          {step === 1 ? (
-            <div className="space-y-6">
-              {standalone ? (
-                <Card title="Rechnungsempfänger">
-                  {kunde ? (
-                    <div className="space-y-3">
-                      <KundenStammdatenCard
-                        kunde={kunde as Kunde}
-                        collapsible={false}
-                        action={
-                          <button
-                            type="button"
-                            onClick={() => setStammdatenModalOpen(true)}
-                            className="btn btn-ghost btn-sm"
-                            aria-label="Stammdaten bearbeiten"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
+    <WizardShell
+      className="wizard-flow"
+      title="Rechnung erstellen"
+      steps={WIZARD_STEPS}
+      currentStep={step}
+      onClose={handleRequestClose}
+      mobileActions={mobileActions}
+      desktopActions={desktopActions}
+    >
+      {step === 1 ? (
+        <>
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            <span>Leistungen · Gesamtumfang</span>
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+              Auftrag {auftragLabel} · {kundeName}
+            </span>
+          </div>
+          <PosBoard
+            positionen={posBoardLines}
+            onChange={onPosBoardChange}
+            showUst
+            gewerke={gewerkNamen}
+          />
+        </>
+      ) : null}
+
+      {step === 2 ? (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 16,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
+              Zahlungsweise
+            </div>
+            <div className="seg" role="group" aria-label="Zahlungsweise">
+              <button
+                type="button"
+                className={mode === 'einzel' ? 'on' : undefined}
+                onClick={() => setMode('einzel')}
+              >
+                Einzelrechnung
+              </button>
+              <button
+                type="button"
+                className={mode === 'plan' ? 'on' : undefined}
+                onClick={() => setMode('plan')}
+              >
+                Zahlplan (Abschläge)
+              </button>
+            </div>
+            <div style={{ flex: 1 }} />
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+              Gesamt{' '}
+              <b style={{ color: 'var(--green)' }}>{formatEurBetrag(brutto)}</b> brutto
+            </div>
+          </div>
+
+          {istPlan ? (
+            <>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-3)',
+                    alignSelf: 'center',
+                    marginRight: 2,
+                  }}
+                >
+                  Vorlage:
+                </span>
+                {Object.keys(PRESETS).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => applyPreset(name)}
+                    style={{
+                      padding: '5px 11px',
+                      borderRadius: 8,
+                      border: '0.5px solid var(--border)',
+                      background: 'var(--card)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <div
+                style={{
+                  border: '0.5px solid var(--border)',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: 'var(--card)',
+                  boxShadow: 'var(--shadow)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 84px 120px 150px 34px',
+                    gap: 10,
+                    padding: '9px 14px',
+                    background: 'var(--bg-soft)',
+                    borderBottom: '0.5px solid var(--border)',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    color: 'var(--text-2)',
+                  }}
+                >
+                  <div>Bezeichnung</div>
+                  <div style={{ textAlign: 'right' }}>Anteil</div>
+                  <div style={{ textAlign: 'right' }}>Betrag brutto</div>
+                  <div>Fällig</div>
+                  <div />
+                </div>
+                {raten.map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 84px 120px 150px 34px',
+                      gap: 10,
+                      padding: '8px 14px',
+                      borderBottom: '0.5px solid var(--border)',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <input
+                      className="input"
+                      value={r.label}
+                      onChange={(e) => updRate(r.id, { label: e.target.value })}
+                      style={{ height: 32 }}
+                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        className="input"
+                        type="number"
+                        value={r.prozent}
+                        onChange={(e) =>
+                          updRate(r.id, { prozent: Number(e.target.value) || 0 })
                         }
+                        style={{ textAlign: 'right', paddingRight: 22, height: 32 }}
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setKunde(null)
-                          setKundeId('')
-                          setKundeSuch('')
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: 12,
+                          color: 'var(--text-3)',
                         }}
                       >
-                        Anderen Kunden wählen
-                      </Button>
+                        %
+                      </span>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <Input
-                        label="Kunde suchen"
-                        value={kundeSuch}
-                        onChange={(e) => onKundeSuche(e.target.value)}
-                        placeholder="Name, E-Mail oder Telefon (mind. 2 Zeichen)"
-                      />
-                      {kundeHits.length > 0 ? (
-                        <ul className="max-h-48 overflow-auto rounded-lg border border-bw-border">
-                          {kundeHits.map((hit) => (
-                            <li key={hit.id}>
-                              <button
-                                type="button"
-                                className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-bw-hover"
-                                onClick={() => {
-                                  void loadRechnungWizardKunde(hit.id).then((res) => {
-                                    if (!res.ok) {
-                                      toast.error(res.message)
-                                      return
-                                    }
-                                    applyKunde(res.kunde, res.zahlungszielTage)
-                                  })
-                                }}
-                              >
-                                <span className="font-medium">{kundeDisplayName(hit)}</span>
-                                <span className="text-xs text-bw-text-muted">
-                                  {[hit.email, hit.telefon].filter(Boolean).join(' · ') || hit.typ}
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setKundeNeuModalOpen(true)}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Neuer Kunde
-                      </Button>
-                    </div>
-                  )}
-                </Card>
-              ) : (
-                <KundenStammdatenCard
-                  kunde={kunde as Kunde | null}
-                  collapsible={false}
-                  action={
-                    kunde ? (
-                      <button
-                        type="button"
-                        onClick={() => setStammdatenModalOpen(true)}
-                        className="btn btn-ghost btn-sm"
-                        aria-label="Stammdaten bearbeiten"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null
-                  }
-                />
-              )}
-              <AngebotWizardPositionenByGewerk
-                zeilen={zeilen}
-                onChange={setZeilen}
-                gewerke={gewerke}
-                preislisten={preislisten}
-                firm={firm}
-                titel="Rechnungspositionen"
-                untertitel={
-                  standalone
-                    ? 'Leistungen frei erfassen — ohne Anfrage oder Angebot.'
-                    : 'Positionen aus Auftrag — Leistungszuordnung pro Abschlag in Schritt 2.'
-                }
-              />
-              <Card title="Summe (Vorschau)" collapsible={false}>
-                <div className="props">
-                  <PropRow label="Netto" value={formatEurBetrag(berechnung.netto)} bold />
-                  <PropRow label="Brutto" value={formatEurBetrag(berechnung.brutto)} bold />
-                </div>
-              </Card>
-            </div>
-          ) : null}
-
-          {step === 2 ? (
-            <div className="max-w-2xl space-y-4">
-              <RechnungWizardZahlungCard
-                meta={meta}
-                onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-                zahlungsplan={zahlungsplan}
-                onZahlungsplanChange={setZahlungsplan}
-                gesamtNetto={gesamtNettoBasis}
-                zahlungszielTage={zahlungszielTage}
-                positionen={positionenBerechnet}
-                allowAbschlag={Boolean(bootstrap.auftragId?.trim())}
-              />
-              <RechnungWizardDetailsCard
-                meta={meta}
-                onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-                onRechnungsdatumChange={(value) =>
-                  setMeta((m) => ({
-                    ...m,
-                    rechnungsdatum: value,
-                    faellig_am: addDaysIso(value, zahlungszielTage),
-                  }))
-                }
-                zeigt13b={zeigt13b}
-                hinweis35aErlaubt={hinweis35aErlaubt}
-                lohnNettoPdf={lohnNettoPdf}
-              />
-            </div>
-          ) : null}
-
-          {step === 3 ? (
-            <div>
-              {istAbschlag && abschlagRechnungen.length > 0 ? (
-                <RechnungWizardVersandAuswahlCard
-                  rechnungen={abschlagRechnungen.filter((r) => r.status === 'entwurf')}
-                  versandRechnungId={versandRechnungId}
-                  onVersandRechnungChange={(id) => {
-                    setVersandRechnungId(id)
-                    setRechnungId(id)
-                    const nr = abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer
-                    if (nr?.trim()) setRechnungsnummer(nr.trim())
-                  }}
-                />
-              ) : null}
-              <p className="mb-4 mt-4 rounded-lg border border-bw-border bg-bw-hover/50 px-3 py-2 text-[13px] text-bw-text-muted">
-                Optional: Rechnung ohne E-Mail speichern — der Versand an den Kunden erfolgt gesammelt
-                in der Abschlussdokumentation (Abnahmeprotokoll → Rechnung → Abschluss-PDF).
-              </p>
-              <Card
-                title="Rechnungsempfänger"
-                action={
-                  kunde ? (
-                    <button
-                      type="button"
-                      onClick={() => setStammdatenModalOpen(true)}
-                      className="btn btn-ghost btn-sm"
+                    <div
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 600,
+                        fontVariantNumeric: 'tabular-nums',
+                        fontSize: 13,
+                      }}
                     >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null
-                }
-              >
-                {rechnungsempfaenger.fehlendeRechnungsfelder.length > 0 ? (
-                  <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-950">
-                    Für Rechnungen fehlen: {rechnungsempfaenger.fehlendeRechnungsfelder.join(', ')}.
-                  </p>
-                ) : null}
-                <div className="props">
-                  {rechnungsempfaenger.kundennummer ? (
-                    <PropRow label="Kundennr." value={rechnungsempfaenger.kundennummer} />
-                  ) : null}
-                  <PropRow label="Name" value={rechnungsempfaenger.name} bold />
-                  <PropRow
-                    label="E-Mail"
-                    value={rechnungsempfaenger.email || '—'}
-                    link={Boolean(rechnungsempfaenger.email)}
-                  />
-                  <PropRow label="Anhang" value={pdfName} />
-                </div>
-              </Card>
-
-              <div className="mt-4">
-                <AngebotWizardVersandEmpfaengerCard
-                  mailTo={mailTo}
-                  onMailToChange={setMailTo}
-                  mailCc={mailCc}
-                  onMailCcChange={setMailCc}
-                  disabled={saving}
-                  dokumentLabel={
-                    aktiveVersandRechnung
-                      ? rechnungDokumentBezeichnung(
-                          aktiveVersandRechnung.rechnungArt,
-                          aktiveVersandRechnung.index
-                        )
-                      : 'Rechnung'
-                  }
-                />
-              </div>
-
-              <Card
-                title="Rechnungs-Vorschau"
-                flush
-                bodyClassName="p-0"
-                className="mt-4"
-                action={
-                  <Button
+                      {formatEurBetrag(rateBrutto(r))}
+                    </div>
+                    <input
+                      className="input"
+                      type="date"
+                      value={r.faellig}
+                      onChange={(e) => updRate(r.id, { faellig: e.target.value })}
+                      style={{ height: 32, fontSize: 12 }}
+                    />
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="trash"
+                      title="Entfernen"
+                      onClick={() => rmRate(r.id)}
+                    />
+                  </div>
+                ))}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 14px',
+                    gap: 10,
+                  }}
+                >
+                  <button
                     type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={!previewRechnungId || saving}
-                    onClick={() => void handlePdf()}
+                    className="pt-add"
+                    style={{ border: 'none', padding: 0, width: 'auto' }}
+                    onClick={addRate}
                   >
-                    <Download className="h-4 w-4" />
-                    PDF
-                  </Button>
-                }
+                    <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
+                  </button>
+                  <div style={{ flex: 1 }} />
+                  <span
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color:
+                        prozentSumme === 100
+                          ? 'var(--green)'
+                          : 'var(--danger, #c0392b)',
+                    }}
+                  >
+                    Summe {prozentSumme}%
+                    {prozentSumme !== 100 ? ' · muss 100% sein' : ''}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div
+                style={{
+                  padding: 16,
+                  border: '0.5px solid var(--border)',
+                  borderRadius: 10,
+                  background: 'var(--bg-soft)',
+                  fontSize: 13,
+                  color: 'var(--text-2)',
+                }}
               >
-                {previewSrc ? (
-                  <iframe
-                    src={previewSrc}
-                    title="Rechnungs-Vorschau"
-                    className="wizard-angebot-preview rounded-none border-0"
+                Der Gesamtbetrag von <b>{formatEurBetrag(brutto)}</b> brutto wird als eine Rechnung
+                gestellt.
+              </div>
+              <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung">
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <MockZahlfristSeg
+                    value={zahlfrist}
+                    onChange={(v) => applyZahlfrist(v)}
+                    aria-label="Zahlungsziel / Zahlfrist"
                   />
-                ) : (
-                  <p className="px-4 py-8 text-center text-[13px] text-bw-text-muted">
-                    Entwurf wird vorbereitet…
-                  </p>
-                )}
-              </Card>
+                  {zahlfrist === 'datum' ? (
+                    <div style={{ width: 180 }}>
+                      <input
+                        type="date"
+                        className="input"
+                        value={zahlfristDatum}
+                        onChange={(e) => applyZahlfrist('datum', e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </MockField>
             </div>
-          ) : null}
-        </div>
+          )}
+        </>
+      ) : null}
 
-      {kunde ? (
-        <KundeModal
-          open={stammdatenModalOpen}
-          onClose={() => setStammdatenModalOpen(false)}
-          editKunde={kunde as Kunde}
-          stayOnPage
-          onSaved={(id) => {
-            toast.success('Stammdaten gespeichert')
-            setStammdatenModalOpen(false)
-            const reloadId = id ?? kunde.id
-            void loadRechnungWizardKunde(reloadId).then((res) => {
-              if (res.ok) applyKunde(res.kunde, res.zahlungszielTage)
-            })
-          }}
-        />
+      {step === 3 ? (
+        <>
+          {istPlan ? (
+            <>
+              <div
+                className="section-h"
+                style={{
+                  marginBottom: 8,
+                  textTransform: 'none',
+                  letterSpacing: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: 'var(--text)',
+                }}
+              >
+                Welche Rechnung jetzt erstellen?
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                {raten.map((r) => {
+                  const on = aktivRate === r.id
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setAktivRate(r.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 12px',
+                        border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                        background: on ? 'var(--green-50)' : 'var(--card)',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 17,
+                          height: 17,
+                          borderRadius: 20,
+                          border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                          background: on ? 'var(--green)' : 'transparent',
+                          display: 'grid',
+                          placeItems: 'center',
+                          color: '#fff',
+                        }}
+                      >
+                        {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
+                      </span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{r.label}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                          {r.prozent}% · fällig {formatDateDe(r.faellig)}
+                        </div>
+                      </div>
+                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatEurBetrag(rateBrutto(r))}
+                      </b>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : null}
+
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 10,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Dokumentpaket{' '}
+            <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+              · {anlagenCount} Anlage{anlagenCount === 1 ? '' : 'n'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+            {ANLAGEN_DEF.map((a) => {
+              const on = !!anlagen[a.key]
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  disabled={a.locked}
+                  onClick={() => !a.locked && toggleAnlage(a.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 11,
+                    padding: '10px 12px',
+                    border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                    background: on ? 'var(--green-50)' : 'var(--card)',
+                    borderRadius: 9,
+                    cursor: a.locked ? 'default' : 'pointer',
+                    textAlign: 'left',
+                    opacity: a.locked && !on ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 5,
+                      border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                      background: on ? 'var(--green)' : 'transparent',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flex: '0 0 auto',
+                      color: '#fff',
+                    }}
+                  >
+                    {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {a.label}
+                      {a.locked ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: 'var(--text-3)',
+                            fontWeight: 400,
+                            marginLeft: 6,
+                          }}
+                        >
+                          (immer dabei)
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{a.sub}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 10,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Versandweg
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              marginBottom: 18,
+            }}
+          >
+            {wege.map((w) => {
+              const on = versandweg === w.key
+              return (
+                <button
+                  key={w.key}
+                  type="button"
+                  onClick={() => setVersandweg(w.key)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 5,
+                    padding: '12px',
+                    border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                    background: on ? 'var(--green-50)' : 'var(--card)',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <MockIcon
+                    ctx="default"
+                    n={w.icon}
+                    size={18}
+                    style={{ color: on ? 'var(--green)' : 'var(--text-2)' }}
+                  />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{w.label}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.35 }}>
+                    {w.sub}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 10,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Steuerliche Hinweise
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+            {(
+              [
+                {
+                  on: meta.hinweis_35a,
+                  set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
+                  label: '§35a EStG-Hinweis ausweisen',
+                  sub: 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
+                },
+                {
+                  on: meta.reverse_charge_13b,
+                  set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
+                  label: 'Reverse-Charge (§13b UStG)',
+                  sub: 'Steuerschuldnerschaft des Leistungsempfängers',
+                },
+              ] as const
+            ).map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => c.set(!c.on)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 11,
+                  padding: '10px 12px',
+                  border: `1px solid ${c.on ? 'var(--green)' : 'var(--border)'}`,
+                  background: c.on ? 'var(--green-50)' : 'var(--card)',
+                  borderRadius: 9,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    border: `1.5px solid ${c.on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                    background: c.on ? 'var(--green)' : 'transparent',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flex: '0 0 auto',
+                    color: '#fff',
+                  }}
+                >
+                  {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{c.sub}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="form-grid form-grid--sheet" style={{ marginBottom: 16 }}>
+            <MockField label="Rechnungstitel" full>
+              <input className="input" value={rTitel} readOnly />
+            </MockField>
+            <MockField label="Empfänger">
+              <input className="input" value={kundeName} readOnly />
+            </MockField>
+            <MockField label="Fällig am">
+              <input
+                className="input"
+                type="date"
+                value={rFaellig}
+                readOnly={istPlan}
+                onChange={
+                  istPlan
+                    ? undefined
+                    : (e) => applyZahlfrist('datum', e.target.value)
+                }
+              />
+            </MockField>
+            <MockField label="Einleitung" full>
+              <textarea
+                className="input ta"
+                rows={3}
+                value={einleitung}
+                onChange={(e) => setEinleitung(e.target.value)}
+              />
+            </MockField>
+          </div>
+
+          <div className="mail-preview" style={{ maxWidth: 720, margin: '0 auto' }}>
+            <div className="mail-h" style={{ padding: '14px 18px' }}>
+              <div className="brand">{brand}</div>
+              <div className="subj">
+                {previewNr} · {rTitel}
+              </div>
+            </div>
+            <div className="mail-body">
+              <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{einleitung}</p>
+              {istPlan ? (
+                <div
+                  style={{
+                    margin: '14px 0',
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 6,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {raten.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderBottom: '0.5px solid var(--border)',
+                        fontSize: 12,
+                        background: r.id === aktivRate ? 'var(--green-50)' : 'transparent',
+                      }}
+                    >
+                      <span>
+                        {r.label}
+                        {r.id === aktivRate ? ' · diese Rechnung' : ''} · fällig{' '}
+                        {formatDateDe(r.faellig)}
+                      </span>
+                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatEurBetrag(rateBrutto(r))}
+                      </b>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    margin: '14px 0',
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 6,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {posBoardLines.map((p) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderBottom: '0.5px solid var(--border)',
+                        fontSize: 12,
+                      }}
+                    >
+                      <span>
+                        {p.name || '—'} · {p.menge} {p.einheit}
+                      </span>
+                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatEurBetrag(posBoardLineNetto(p))}
+                      </b>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  padding: '6px 2px',
+                }}
+              >
+                <span>{istPlan ? 'Dieser Rechnungsbetrag' : 'Rechnungsbetrag'}</span>
+                <span style={{ color: 'var(--green)', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatEurBetrag(rBrutto)}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+                Fällig am {formatDateDe(rFaellig)}
+                {istPlan ? ` · Teil eines Zahlplans über ${formatEurBetrag(brutto)}` : ''}
+              </div>
+              {meta.hinweis_35a ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: '10px 12px',
+                    background: 'var(--bg-soft)',
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    color: 'var(--text-2)',
+                  }}
+                >
+                  <b>Hinweis nach §35a EStG:</b> Im Rechnungsbetrag sind Lohn-/Arbeitskosten in Höhe
+                  von {formatEurBetrag(lohnAnteil)} enthalten. Diese sind für haushaltsnahe
+                  Handwerkerleistungen steuerlich begünstigt.
+                </div>
+              ) : null}
+              {meta.reverse_charge_13b ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '10px 12px',
+                    background: 'var(--bg-soft)',
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    color: 'var(--text-2)',
+                  }}
+                >
+                  <b>Steuerschuldnerschaft des Leistungsempfängers (§13b UStG):</b> Die Umsatzsteuer
+                  wird nicht gesondert ausgewiesen; die Steuer schuldet der Leistungsempfänger
+                  (Reverse-Charge).
+                </div>
+              ) : null}
+              {anlagenCount > 0 ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    marginTop: 12,
+                    paddingTop: 12,
+                    borderTop: '0.5px solid var(--border)',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11.5,
+                      color: 'var(--text-3)',
+                      alignSelf: 'center',
+                      marginRight: 2,
+                    }}
+                  >
+                    Anlagen:
+                  </span>
+                  {ANLAGEN_DEF.filter((a) => anlagen[a.key]).map((a) => (
+                    <span
+                      key={a.key}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: 11.5,
+                        padding: '3px 9px',
+                        borderRadius: 20,
+                        background: 'var(--bg-soft)',
+                        border: '0.5px solid var(--border)',
+                      }}
+                    >
+                      <MockIcon ctx="default" n="file-text" size={11} />
+                      {a.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="mail-foot">
+              {brand} · an {kundeName}
+            </div>
+          </div>
+        </>
       ) : null}
-      {standalone ? (
-        <KundeModal
-          open={kundeNeuModalOpen}
-          onClose={() => setKundeNeuModalOpen(false)}
-          stayOnPage
-          onSaved={(id) => {
-            if (!id) return
-            setKundeNeuModalOpen(false)
-            void loadRechnungWizardKunde(id).then((res) => {
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              applyKunde(res.kunde, res.zahlungszielTage)
-              toast.success('Kunde angelegt — Rechnung kann fortgesetzt werden.')
-            })
-          }}
-        />
-      ) : null}
-    </AppFlowScreen>
+    </WizardShell>
   )
 
   return createPortal(wizard, document.body)

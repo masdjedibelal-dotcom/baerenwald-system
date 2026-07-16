@@ -10,6 +10,9 @@ const LEAD_UNTERSTATUS: Record<string, string> = {
 
 const ANGEBOT_UNTERSTATUS: Record<string, string> = {
   entwurf: 'Entwurf',
+  gesendet_handwerker: 'Gesendet Handwerker',
+  handwerker_akzeptiert: 'Handwerker akzeptiert',
+  gesendet_kunde: 'Gesendet Kunde',
   gesendet: 'Gesendet',
   angenommen: 'Angenommen',
   abgelehnt: 'Abgelehnt',
@@ -88,7 +91,18 @@ export const PHASE_LABELS: Record<VorgangPhase, string> = {
 /** Kanonische Unterstatus-Werte pro Phase (Spec §8 Filter). */
 export const PHASE_UNTERSTATUS_VALUES: Record<VorgangPhase, readonly string[]> = {
   anfrage: ['neu', 'kontaktiert', 'termin', 'abgebrochen', 'storniert'],
-  angebot: ['entwurf', 'gesendet', 'angenommen', 'abgelehnt', 'abgelaufen', 'ersetzt', 'storniert'],
+  angebot: [
+    'entwurf',
+    'gesendet_handwerker',
+    'handwerker_akzeptiert',
+    'gesendet_kunde',
+    'gesendet',
+    'angenommen',
+    'abgelehnt',
+    'abgelaufen',
+    'ersetzt',
+    'storniert',
+  ],
   auftrag: ['offen', 'in_arbeit', 'abnahme', 'abgeschlossen', 'storniert'],
   rechnung: ['entwurf', 'gesendet', 'bezahlt', 'storniert'],
 }

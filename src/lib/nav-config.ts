@@ -9,6 +9,8 @@ export type NavItemDef = {
   iconName: string
   label: string
   exact?: boolean
+  /** Zusätzliche Pfade, die diesen Eintrag aktiv markieren (z. B. Phasen-Routen unter Vorgänge). */
+  activeAlso?: string[]
 }
 
 export type NavGroupDef = {
@@ -21,7 +23,8 @@ function nav(
   href: string,
   iconName: string,
   label: string,
-  exact?: boolean
+  exact?: boolean,
+  activeAlso?: string[]
 ): NavItemDef {
   return {
     href,
@@ -29,14 +32,14 @@ function nav(
     icon: resolveMockIcon(iconName),
     label,
     exact,
+    activeAlso,
   }
 }
 
 /**
- * Sidebar-Navigation — Icons 1:1 aus dem Mock-Vokabular
- * (Handwerker = `tool`, nicht HardHat; Rechnungen = `receipt`).
- * Getrennte Listen (Anfragen/Angebote/Aufträge) bleiben funktional;
- * Mock-Sidebar fasst sie zu „Vorgänge“ (`folders`) zusammen — Struktur = Schritt 3.
+ * Sidebar = Mock-Positivliste NAV:
+ * Arbeit: Dashboard, Vorgänge · Stammdaten: Kunden, Handwerker, Partner · Planung: Kalender
+ * Phasen-Listen (/anfragen …) bleiben erreichbar über Dashboard/Vorgänge, nicht als Sidebar-Einträge.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -44,9 +47,12 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
     label: 'Arbeit',
     items: [
       nav('/', 'layout-dashboard', 'Dashboard', true),
-      nav('/anfragen', 'inbox', 'Anfragen'),
-      nav('/angebote', 'file-invoice', 'Angebote'),
-      nav('/auftraege', 'briefcase', 'Aufträge'),
+      nav('/vorgaenge', 'folders', 'Vorgänge', false, [
+        '/anfragen',
+        '/angebote',
+        '/auftraege',
+        '/rechnungen',
+      ]),
     ],
   },
   {
@@ -59,17 +65,9 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    id: 'finanzen',
-    label: 'Finanzen',
-    items: [nav('/rechnungen', 'receipt', 'Rechnungen')],
-  },
-  {
     id: 'planung',
     label: 'Planung',
-    items: [
-      nav('/kalender', 'calendar', 'Kalender'),
-      nav('/ki-analytics', 'activity', 'KI Hub'),
-    ],
+    items: [nav('/kalender', 'calendar', 'Kalender')],
   },
 ]
 
@@ -79,15 +77,19 @@ export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS[0].items
 /** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
 export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).flatMap((g) => g.items)
 
-/** Mobile BottomNav (5 Slots + Mehr). */
+/** Mobile BottomNav = Mock MOBILE_PRIMARY: Dashboard, Vorgänge, Kalender (+ FAB + Mehr). */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/', 'layout-dashboard', 'Dashboard', true),
-  nav('/anfragen', 'inbox', 'Anfragen'),
-  nav('/angebote', 'file-invoice', 'Angebote'),
-  nav('/auftraege', 'briefcase', 'Aufträge'),
+  nav('/vorgaenge', 'folders', 'Vorgänge', false, [
+    '/anfragen',
+    '/angebote',
+    '/auftraege',
+    '/rechnungen',
+  ]),
+  nav('/kalender', 'calendar', 'Kalender'),
 ]
 
-/** Mobile Mehr-Screen (Kachel-Grid). */
+/** Mobile Mehr-Screen (Kachel-Grid) — Mock MEHR_ITEMS. */
 export const MEHR_TILE_NAV: Array<{
   href: string
   icon: LucideIcon
@@ -100,17 +102,6 @@ export const MEHR_TILE_NAV: Array<{
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
-/** Mobile Mehr-Sheet. */
-export const MORE_SHEET_NAV: NavItemDef[] = [
-  nav('/kunden', 'users', 'Kunden'),
-  nav('/rechnungen', 'receipt', 'Rechnungen'),
-  nav('/handwerker', 'tool', 'Handwerker'),
-  nav('/partner', 'building', 'Partner'),
-  nav('/kalender', 'calendar', 'Kalender'),
-  nav('/ki-analytics', 'activity', 'KI Hub'),
-  nav('/einstellungen', 'settings', 'Einstellungen'),
-]
-
 export type RouteCta = { label: string; href: string }
 
 export type RouteMetaDef = {
@@ -121,6 +112,7 @@ export type RouteMetaDef = {
 /** TopBar-Titel und CTAs pro Listen-Route. */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
+  '/vorgaenge': { title: 'Vorgänge' },
   '/anfragen': { title: 'Anfragen', cta: { label: 'Neue Anfrage', href: '/anfragen/neu' } },
   '/auftraege': { title: 'Aufträge' },
   '/rechnungen': { title: 'Rechnungen', cta: { label: 'Neue Rechnung', href: '/rechnungen/neu' } },
@@ -130,10 +122,12 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/kalender': { title: 'Kalender' },
   '/angebote': { title: 'Angebote' },
   '/einstellungen': { title: 'Einstellungen' },
+  '/mehr': { title: 'Mehr' },
   '/ki-analytics': { title: 'KI Hub' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
+  vorgaenge: 'Vorgänge',
   anfragen: 'Anfragen',
   auftraege: 'Aufträge',
   rechnungen: 'Rechnungen',
@@ -143,6 +137,7 @@ export const SECTION_LABELS: Record<string, string> = {
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
+  mehr: 'Mehr',
   'ki-analytics': 'KI Hub',
 }
 
@@ -163,4 +158,13 @@ export const SUB_LABELS: Record<string, Record<string, string>> = {
     preisliste: 'Preisliste',
     vorlagen: 'Angebot-Vorlagen',
   },
+}
+
+/** Hilfsfunktion: aktiver Nav-Eintrag inkl. Phasen-Routen. */
+export function navItemIsActive(item: NavItemDef, pathname: string): boolean {
+  if (item.exact) return pathname === item.href
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true
+  return (item.activeAlso ?? []).some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  )
 }

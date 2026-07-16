@@ -24,7 +24,7 @@ import {
   runDuplicateAuftrag,
   runDuplicateRechnung,
 } from '@/lib/list-actions'
-import { PHASE_LABELS } from '@/lib/vorgang/vorgang-labels'
+import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { cn, formatDatum } from '@/lib/utils'
 
@@ -52,8 +52,9 @@ const EXPORT_FIELDS: ExportField[] = [
 
 type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
-function statusKind(phase: VorgangPhase, unterstatus: string): string {
-  const u = unterstatus.toLowerCase()
+function statusKind(row: VorgangListeRow): string {
+  if (row.badges.wartet_freigabe) return 'warten'
+  const u = row.unterstatus.toLowerCase()
   if (u === 'storniert' || u === 'abgebrochen' || u === 'abgelehnt') return 'storniert'
   if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') return 'fertig'
   if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
@@ -61,8 +62,26 @@ function statusKind(phase: VorgangPhase, unterstatus: string): string {
   return 'aktiv'
 }
 
+function statusLabel(row: VorgangListeRow): string {
+  if (row.badges.wartet_freigabe) return 'Wartet auf Freigabe'
+  return row.unterstatusLabel
+}
+
 function dateKey(row: VorgangListeRow): string {
   return row.updatedAt.replace(/\D/g, '')
+}
+
+/** Parse Anzeige „1.234 €“ → Euro-Zahl für Wert-Filter/Sort. */
+function wertEuro(row: VorgangListeRow): number | null {
+  if (!row.wertLabel) return null
+  const n = Number(
+    row.wertLabel
+      .replace(/\s/g, '')
+      .replace(/€/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.')
+  )
+  return Number.isFinite(n) ? n : null
 }
 
 function toExportRow(row: VorgangListeRow): Record<string, unknown> {
@@ -112,10 +131,11 @@ export function VorgaengeListeClient({
   const syncPhaseToUrl = useCallback(
     (phase: (typeof VORGANG_PHASES)[number]) => {
       const params = new URLSearchParams(searchParams.toString())
+      params.delete('phase')
       if (phase === 'alle') {
-        params.delete('phase')
+        params.delete('tab')
       } else {
-        params.set('phase', phase)
+        params.set('tab', phase)
       }
       const qs = params.toString()
       router.replace(qs ? `/vorgaenge?${qs}` : '/vorgaenge', { scroll: false })
@@ -126,16 +146,17 @@ export function VorgaengeListeClient({
   const setPhaseFilter = useCallback(
     (phase: (typeof VORGANG_PHASES)[number]) => {
       setFilter(phase)
+      setStatusFilter([])
       syncPhaseToUrl(phase)
     },
     [syncPhaseToUrl]
   )
 
   useEffect(() => {
-    const phase = searchParams.get('phase')
-    if (isVorgangPhase(phase)) {
-      setFilter(phase)
-    } else if (!phase) {
+    const tab = searchParams.get('tab') ?? searchParams.get('phase')
+    if (isVorgangPhase(tab)) {
+      setFilter(tab)
+    } else if (!tab) {
       setFilter('alle')
     }
   }, [searchParams])
@@ -171,10 +192,22 @@ export function VorgaengeListeClient({
   }, [rows, restrictPartnerName])
 
   const statusOptions = useMemo(() => {
-    const s = new Set<string>()
-    baseRows.forEach((v) => s.add(v.unterstatusLabel))
-    return Array.from(s).sort()
-  }, [baseRows])
+    // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
+    if (filter !== 'alle' && filter in PHASE_UNTERSTATUS_VALUES) {
+      const phase = filter as VorgangPhase
+      return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
+        value: u,
+        label: unterstatusLabel(phase, u),
+      }))
+    }
+    const byKey = new Map<string, string>()
+    for (const v of baseRows) {
+      if (!byKey.has(v.unterstatus)) byKey.set(v.unterstatus, v.unterstatusLabel)
+    }
+    return Array.from(byKey.entries())
+      .sort((a, b) => a[1].localeCompare(b[1], 'de'))
+      .map(([value, label]) => ({ value, label }))
+  }, [baseRows, filter])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -187,10 +220,10 @@ export function VorgaengeListeClient({
   const filteredBase = useMemo(() => {
     return baseRows.filter((v) => {
       if (filter !== 'alle' && v.phase !== filter) return false
-      if (statusFilter.length && !statusFilter.includes(v.unterstatusLabel)) return false
+      if (statusFilter.length && !statusFilter.includes(v.unterstatus)) return false
       if (
         query &&
-        !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId + ' ' + (v.kanalMeta ?? ''))
+        !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId)
           .toLowerCase()
           .includes(query.toLowerCase())
       ) {
@@ -198,6 +231,15 @@ export function VorgaengeListeClient({
       }
       if (fKunde && !(v.kundeName ?? '').toLowerCase().includes(fKunde.toLowerCase())) return false
       if (fTitel && !v.titel.toLowerCase().includes(fTitel.toLowerCase())) return false
+      const euro = wertEuro(v)
+      if (fWertVon) {
+        const min = Number(fWertVon)
+        if (Number.isFinite(min) && (euro == null || euro < min)) return false
+      }
+      if (fWertBis) {
+        const max = Number(fWertBis)
+        if (Number.isFinite(max) && (euro == null || euro > max)) return false
+      }
       if (fDatumVon && dateKey(v) < fDatumVon.replace(/-/g, '')) return false
       if (fDatumBis && dateKey(v) > fDatumBis.replace(/-/g, '')) return false
       return true
@@ -209,6 +251,8 @@ export function VorgaengeListeClient({
     query,
     fKunde,
     fTitel,
+    fWertVon,
+    fWertBis,
     fDatumVon,
     fDatumBis,
   ])
@@ -229,7 +273,7 @@ export function VorgaengeListeClient({
       kunde: (v) => (v.kundeName ?? '').toLowerCase(),
       titel: (v) => v.titel.toLowerCase(),
       phase: (v) => PHASE_META[v.phase].label.toLowerCase(),
-      wert: (v) => 0,
+      wert: (v) => wertEuro(v) ?? -1,
       datum: (v) => dateKey(v),
       status: (v) => v.unterstatusLabel.toLowerCase(),
     }
@@ -248,6 +292,33 @@ export function VorgaengeListeClient({
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (key: string) => setSelected((s) => ({ ...s, [key]: !s[key] }))
+
+  const selectedRows = useMemo(
+    () => filtered.filter((v) => selected[rowKey(v)]),
+    [filtered, selected]
+  )
+
+  const bulkExport = useCallback(() => {
+    runMockListExport(
+      exportToCSV,
+      selectedRows.map(toExportRow),
+      EXPORT_FIELDS,
+      'vorgaenge-auswahl'
+    )
+  }, [exportToCSV, selectedRows])
+
+  const bulkDelete = useCallback(() => {
+    const leadIds = Array.from(new Set(selectedRows.map((v) => v.leadId)))
+    for (const leadId of leadIds) {
+      runDeleteVorgang(leadId, router)
+    }
+    setSelected({})
+  }, [router, selectedRows])
+
+  const bulkOpen = useCallback(() => {
+    const row = selectedRows[0]
+    if (row) router.push(row.detailHref)
+  }, [router, selectedRows])
 
   const paginationResetKey = `${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
@@ -372,7 +443,7 @@ export function VorgaengeListeClient({
       >
         <div className="form-section-h">Suche</div>
         <div className="input" style={{ marginBottom: 16 }}>
-          <MockIcon n="search" />
+          <MockIcon ctx="default" n="search" />
           <input
             type="text"
             value={query}
@@ -418,13 +489,15 @@ export function VorgaengeListeClient({
         <div className="chiprow" style={{ marginBottom: 16 }}>
           {statusOptions.map((s) => (
             <MockChip
-              key={s}
-              active={statusFilter.includes(s)}
+              key={s.value}
+              active={statusFilter.includes(s.value)}
               onClick={() =>
-                setStatusFilter((f) => (f.includes(s) ? f.filter((x) => x !== s) : [...f, s]))
+                setStatusFilter((f) =>
+                  f.includes(s.value) ? f.filter((x) => x !== s.value) : [...f, s.value]
+                )
               }
             >
-              {s}
+              {s.label}
             </MockChip>
           ))}
         </div>
@@ -474,6 +547,34 @@ export function VorgaengeListeClient({
       </>
       ) : null}
 
+      {!embedded && selectMode && selectedCount > 0 ? (
+        <div className="bulkbar">
+          <span>
+            <b>{selectedCount}</b> ausgewählt
+          </span>
+          <div style={{ flex: 1 }} />
+          {selectedCount === 1 ? (
+            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
+              Öffnen
+            </MockBtn>
+          ) : null}
+          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
+            Export
+          </MockBtn>
+          <MockBtn kind="danger" sm icon="trash" onClick={bulkDelete}>
+            Löschen
+          </MockBtn>
+          <MockBtn
+            kind="ghost"
+            sm
+            className="qa-btn"
+            icon="x"
+            onClick={() => setSelected({})}
+            title="Auswahl aufheben"
+          />
+        </div>
+      ) : null}
+
       <div className={cn('listcard', selectMode && !embedded && 'vg-selectmode')}>
         <div className="vg-row head">
           {selectMode ? (
@@ -499,7 +600,7 @@ export function VorgaengeListeClient({
                 )}
               >
                 {filtered.length > 0 && filtered.every((v) => selected[rowKey(v)]) ? (
-                  <MockIcon n="check" size={12} />
+                  <MockIcon ctx="default" n="check" size={12} />
                 ) : null}
               </span>
             </div>
@@ -534,7 +635,8 @@ export function VorgaengeListeClient({
         ) : (
           pageItems.map((v) => {
             const key = rowKey(v)
-            const kind = statusKind(v.phase, v.unterstatus)
+            const kind = statusKind(v)
+            const label = statusLabel(v)
             return (
               <div
                 key={key}
@@ -558,7 +660,7 @@ export function VorgaengeListeClient({
                     }}
                   >
                     <span className={cn('vg-box', selected[key] && 'on')}>
-                      {selected[key] ? <MockIcon n="check" size={12} /> : null}
+                      {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
                     </span>
                   </div>
                 ) : null}
@@ -572,7 +674,7 @@ export function VorgaengeListeClient({
                 </div>
                 <div className="vg-phase">
                   <span className="ph-neutral">
-                    <MockIcon n={PHASE_META[v.phase].icon} size={13} />
+                    <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
                     {PHASE_META[v.phase].label}
                   </span>
                 </div>
@@ -593,7 +695,7 @@ export function VorgaengeListeClient({
                 <div className="vg-status">
                   <span className={cn('st-dot', `st-${kind}`)}>
                     <span className="d" />
-                    {v.unterstatusLabel}
+                    {label}
                   </span>
                 </div>
                 <div className="vg-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>

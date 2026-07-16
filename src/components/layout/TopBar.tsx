@@ -106,7 +106,7 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
             aria-label="Suchen"
             onClick={() => onSearchOpen?.()}
           >
-            <MockIcon n="search" size={18} />
+            <MockIcon ctx="default" n="search" size={18} />
           </button>
           {cta ? (
             <button
@@ -115,7 +115,7 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
               aria-label={cta.label}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--green)] text-white"
             >
-              <MockIcon n="plus" size={18} />
+              <MockIcon ctx="default" n="plus" size={18} />
             </button>
           ) : (
             <Link
@@ -152,7 +152,7 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
 
         {isListRoot ? (
           <button type="button" className="topbar-search-trigger" onClick={() => onSearchOpen?.()}>
-            <MockIcon n="search" size={16} />
+            <MockIcon ctx="default" n="search" size={16} />
             <span>Suchen…</span>
           </button>
         ) : (
@@ -166,12 +166,12 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
             title="Benachrichtigungen"
             aria-label="Benachrichtigungen"
           >
-            <MockIcon n="bell" size={16} />
+            <MockIcon ctx="default" n="bell" size={16} />
           </button>
 
           {cta ? (
             <button type="button" onClick={() => router.push(cta.href)} className="btn btn-primary btn-sm">
-              <MockIcon n="plus" size={14} />
+              <MockIcon ctx="default" n="plus" size={14} />
               {cta.label}
             </button>
           ) : null}

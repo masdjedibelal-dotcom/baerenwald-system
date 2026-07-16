@@ -16,7 +16,9 @@ export function DetailMetaChip({ icon: Icon, children, className }: Props) {
         className
       )}
     >
-      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-bw-light" aria-hidden /> : null}
+      {Icon ? (
+        <Icon className="icon-lucide icon-ctx-default h-3.5 w-3.5 shrink-0" aria-hidden />
+      ) : null}
       {children}
     </span>
   )

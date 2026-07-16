@@ -39,7 +39,7 @@ export function MockDetailShell({
             className={`dshell-navitem${active === gr.id ? ' active' : ''}`}
             onClick={() => setActive(gr.id)}
           >
-            <MockIcon n={gr.icon} size={16} />
+            <MockIcon ctx="nav" n={gr.icon} size={16} />
             <span>{gr.label}</span>
             {gr.count != null ? <span className="dshell-count">{gr.count}</span> : null}
           </button>
@@ -49,7 +49,7 @@ export function MockDetailShell({
         {groups.map((gr) => (
           <div key={gr.id} className={`dshell-group${active === gr.id ? ' active' : ''}`}>
             <div className="dshell-group-h">
-              <MockIcon n={gr.icon} size={15} />
+              <MockIcon ctx="nav" n={gr.icon} size={15} />
               {gr.label}
             </div>
             <div className="dshell-cards">{gr.render()}</div>

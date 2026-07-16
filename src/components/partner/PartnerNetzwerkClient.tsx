@@ -1,32 +1,23 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
 import {
-  ListFilterSection,
-  ListMobileStack,
-  ListGridShell,
-} from '@/components/layout/ListPageParts'
-import { EntityListShell, AppEntityListRow } from '@/components/layout/app'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterBar, type FilterTag } from '@/components/ui/ListFilterBar'
-import { CsvExportModal } from '@/components/ui/CsvExportModal'
-import { SortableHeader } from '@/components/ui/SortableHeader'
-import { useExport, type ExportField } from '@/hooks/useExport'
-import { useSort } from '@/hooks/useSort'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import {
-  getZeitraumRange,
-  datumInZeitraum,
-  zeitraumLabel,
-  type ZeitraumPreset,
-} from '@/lib/listZeitraum'
-import { cn } from '@/lib/utils'
+  MockBtn,
+  MockChip,
+  MockEmpty,
+  MockEntityRowMenu,
+  MockIcon,
+  MockModal,
+  MockPager,
+  MockSortHead,
+} from '@/components/mock-ui'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { useExport, type ExportField } from '@/hooks/useExport'
+import { useListPage } from '@/hooks/useListPage'
+import { runMockListExport } from '@/lib/mock-list-export'
+import { listSortDirNum } from '@/lib/list-mock-sort'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 
 export type PartnerKategorie = {
   id: string
@@ -52,46 +43,25 @@ export type PartnerRow = {
   partner_kategorien: { name: string; slug: string; sort_order: number } | null
 }
 
-const PARTNER_EXPORT_FIELDS: ExportField[] = [
+const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
   { key: 'kategorie', label: 'Kategorie' },
-  { key: 'subkategorie', label: 'Subkategorie' },
   { key: 'telefon', label: 'Telefon' },
   { key: 'email', label: 'E-Mail' },
-  { key: 'adresse', label: 'Adresse' },
 ]
 
-const PARTNER_GRID_COLS = '1.6fr 1fr 1.2fr 1.1fr 1.5fr 90px 60px'
+const MOCK_KATEGORIEN = ['Versicherung', 'Finanzierung', 'Makler', 'Planung', 'Logistik'] as const
+const GRID_COLS = '1.6fr 1fr 1.2fr 1.1fr 1.5fr 90px 40px'
 
-type TypListenFilter = 'alle' | 'partner' | 'netzwerk'
+type SortCol = 'name' | 'kategorie' | 'telefon' | 'email' | 'status'
 
 function partnerExportRow(p: PartnerRow): Record<string, unknown> {
   return {
     name: p.name,
     kategorie: p.partner_kategorien?.name ?? '',
-    subkategorie: p.subkategorie ?? '',
     telefon: p.telefon ?? '',
     email: p.email ?? '',
-    adresse: p.adresse ?? '',
   }
-}
-
-function partnerTypLabel(p: PartnerRow): string {
-  return (p.partner_typ ?? 'partner') === 'netzwerk' ? 'Netzwerk' : 'Partner'
-}
-
-export function PartnerTypBadge({ partner }: { partner: Pick<PartnerRow, 'partner_typ'> }) {
-  const isNetzwerk = (partner.partner_typ ?? 'partner') === 'netzwerk'
-  return (
-    <span
-      className={cn(
-        'badge badge-no-dot',
-        isNetzwerk ? 'bg-violet-50 text-violet-800' : 'bg-bw-green-bg text-bw-primary'
-      )}
-    >
-      {partnerTypLabel(partner as PartnerRow)}
-    </span>
-  )
 }
 
 function partnerAktivBadge(p: PartnerRow) {
@@ -102,323 +72,325 @@ function partnerAktivBadge(p: PartnerRow) {
   )
 }
 
-type SortRow = {
-  row: PartnerRow
-  name: string
-  kategorie: string
+/** @deprecated Positivliste nutzt Kategorie-Badge in der Liste, nicht Partner/Netzwerk-Typ. */
+export function PartnerTypBadge(_props: { partner: Pick<PartnerRow, 'partner_typ'> }) {
+  return null
 }
 
 export function PartnerNetzwerkClient({
   partners,
   kategorien,
-  mode = 'page',
-  selectedId = null,
 }: {
   partners: PartnerRow[]
   kategorien: PartnerKategorie[]
-  mode?: 'page' | 'pane'
-  selectedId?: string | null
 }) {
   const router = useRouter()
   const { exportToCSV } = useExport()
-  const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
-  const [brancheFilter, setBrancheFilter] = useState('alle')
-  const [zeitraum, setZeitraum] = useState<ZeitraumPreset>('alle')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
-  const [exportOpen, setExportOpen] = useState(false)
 
-  const dateRange = useMemo(
-    () => getZeitraumRange(zeitraum, customFrom, customTo),
-    [zeitraum, customFrom, customTo]
-  )
+  const [kategorieFilter, setKategorieFilter] = useState('alle')
+  const [query, setQuery] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [sortCol, setSortCol] = useState<SortCol | null>('name')
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
 
-  const typCounts = useMemo(() => {
-    let partner = 0
-    let netzwerk = 0
-    for (const p of partners) {
-      if ((p.partner_typ ?? 'partner') === 'netzwerk') netzwerk++
-      else partner++
+  const kategorieChipOptions = useMemo(() => {
+    const byName = new Map(kategorien.map((k) => [k.name.toLowerCase(), k]))
+    const opts: { label: string; value: string; count: number }[] = [
+      { label: 'Alle', value: 'alle', count: partners.length },
+    ]
+    for (const name of MOCK_KATEGORIEN) {
+      const kat = byName.get(name.toLowerCase())
+      if (kat) {
+        opts.push({
+          label: name,
+          value: kat.id,
+          count: partners.filter((p) => p.kategorie_id === kat.id).length,
+        })
+      } else {
+        opts.push({
+          label: name,
+          value: `name:${name.toLowerCase()}`,
+          count: partners.filter((p) => p.partner_kategorien?.name?.toLowerCase() === name.toLowerCase())
+            .length,
+        })
+      }
     }
-    return { alle: partners.length, partner, netzwerk }
-  }, [partners])
-
-  const imTyp = useMemo(() => {
-    if (typFilter === 'alle') return partners
-    return partners.filter((p) => (p.partner_typ ?? 'partner') === typFilter)
-  }, [partners, typFilter])
-
-  const brancheCounts = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const p of imTyp) {
-      if (!p.kategorie_id) continue
-      m.set(p.kategorie_id, (m.get(p.kategorie_id) ?? 0) + 1)
+    for (const k of [...kategorien].sort((a, b) => a.sort_order - b.sort_order)) {
+      if (MOCK_KATEGORIEN.some((m) => m.toLowerCase() === k.name.toLowerCase())) continue
+      opts.push({
+        label: k.name,
+        value: k.id,
+        count: partners.filter((p) => p.kategorie_id === k.id).length,
+      })
     }
-    return m
-  }, [imTyp])
+    return opts
+  }, [kategorien, partners])
 
-  const kategorienMitNutzung = useMemo(() => {
-    return [...kategorien].sort((a, b) => a.sort_order - b.sort_order)
-  }, [kategorien])
-
-  const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return imTyp.filter((p) => {
-      if (brancheFilter !== 'alle' && p.kategorie_id !== brancheFilter) return false
-      if (dateRange && !datumInZeitraum(p.created_at, dateRange)) return false
+  const filteredBase = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return partners.filter((p) => {
+      if (kategorieFilter !== 'alle') {
+        if (kategorieFilter.startsWith('name:')) {
+          const n = kategorieFilter.slice(5)
+          if (p.partner_kategorien?.name?.toLowerCase() !== n) return false
+        } else if (p.kategorie_id !== kategorieFilter) return false
+      }
       if (!needle) return true
       const hay = [
         p.name,
-        p.subkategorie ?? '',
         p.partner_kategorien?.name ?? '',
+        p.ansprechpartner ?? '',
         p.telefon ?? '',
         p.email ?? '',
-        p.adresse ?? '',
       ]
         .join(' ')
         .toLowerCase()
       return hay.includes(needle)
     })
-  }, [imTyp, brancheFilter, dateRange, debouncedQ])
+  }, [partners, kategorieFilter, query])
 
-  const sortRows: SortRow[] = useMemo(
-    () =>
-      filtered.map((p) => ({
-        row: p,
-        name: p.name,
-        kategorie: p.partner_kategorien?.name ?? '',
-      })),
-    [filtered]
-  )
+  const toggleSort = (col: SortCol) => {
+    setSortCol((c) => {
+      if (c === col) {
+        setSortDir((d) => (d === 1 ? -1 : 1))
+        return col
+      }
+      setSortDir(1)
+      return col
+    })
+  }
 
-  const { sorted, field, dir, handleSort, resetSort } = useSort(sortRows)
+  const filtered = useMemo(() => {
+    const sortKeys: Record<SortCol, (p: PartnerRow) => string> = {
+      name: (p) => p.name.toLowerCase(),
+      kategorie: (p) => (p.partner_kategorien?.name ?? '').toLowerCase(),
+      telefon: (p) => (p.telefon ?? '').toLowerCase(),
+      email: (p) => (p.email ?? '').toLowerCase(),
+      status: (p) => (p.aktiv ? 'aktiv' : 'inaktiv'),
+    }
+    if (!sortCol) return filteredBase
+    const fn = sortKeys[sortCol]
+    const dir = sortDir
+    return [...filteredBase].sort((a, b) => {
+      const av = fn(a)
+      const bv = fn(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filteredBase, sortCol, sortDir])
 
-  const filterTags = useMemo((): FilterTag[] => {
-    const t: FilterTag[] = []
-    if (typFilter !== 'alle') {
-      t.push({
-        id: 'typ',
-        label: typFilter === 'netzwerk' ? 'Netzwerk' : 'Partner',
-        onRemove: () => setTypFilter('alle'),
-      })
-    }
-    if (brancheFilter !== 'alle') {
-      const label = kategorien.find((k) => k.id === brancheFilter)?.name ?? 'Branche'
-      t.push({ id: 'br', label, onRemove: () => setBrancheFilter('alle') })
-    }
-    if (zeitraum !== 'alle') {
-      t.push({
-        id: 'z',
-        label: zeitraumLabel(zeitraum),
-        onRemove: () => {
-          setZeitraum('alle')
-          setCustomFrom('')
-          setCustomTo('')
-        },
-      })
-    }
-    if (q.trim()) {
-      t.push({ id: 'q', label: q.trim(), onRemove: () => setQ('') })
-    }
-    return t
-  }, [typFilter, brancheFilter, zeitraum, q, kategorien])
-
-  const hasActiveFilters = !!(typFilter !== 'alle' || brancheFilter !== 'alle' || zeitraum !== 'alle' || q.trim())
+  const activeFilterCount = (kategorieFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0)
 
   function resetFilters() {
-    setTypFilter('alle')
-    setBrancheFilter('alle')
-    setZeitraum('alle')
-    setCustomFrom('')
-    setCustomTo('')
-    setQ('')
-    resetSort()
+    setKategorieFilter('alle')
+    setQuery('')
   }
+
+  const selectedCount = Object.values(selected).filter(Boolean).length
+  const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
+
+  const paginationResetKey = `${kategorieFilter}|${query}|${sortCol}|${sortDir}`
+  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
+    filtered,
+    10,
+    paginationResetKey
+  )
 
   function openDetail(id: string) {
     router.push(`/partner/${id}`)
   }
 
-  const isPane = mode === 'pane'
+  function rowMenuItems(p: PartnerRow): EntityMenuItem[] {
+    return [
+      {
+        label: 'Öffnen',
+        icon: 'eye',
+        onClick: () => openDetail(p.id),
+      },
+      {
+        label: 'Bearbeiten',
+        icon: 'pencil',
+        onClick: () => openDetail(p.id),
+      },
+    ]
+  }
 
-  const sortOptions = [
-    { field: 'name', label: 'Name' },
-    { field: 'kategorie', label: 'Kategorie' },
-  ]
-
-  const typChipOptions = useMemo(
-    () => [
-      { label: 'Alle', value: 'alle', count: typCounts.alle },
-      { label: 'Partner', value: 'partner', count: typCounts.partner },
-      { label: 'Netzwerk', value: 'netzwerk', count: typCounts.netzwerk },
-    ],
-    [typCounts]
-  )
-
-  const brancheChipOptions = useMemo(
-    () => [
-      { label: 'Alle Branchen', value: 'alle', count: imTyp.length },
-      ...kategorienMitNutzung.map((k) => ({
-        label: k.name,
-        value: k.id,
-        count: brancheCounts.get(k.id) ?? 0,
-      })),
-    ],
-    [imTyp.length, kategorienMitNutzung, brancheCounts]
-  )
+  const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
 
   return (
-    <EntityListShell
-      mode={mode}
-      filters={
-      <ListFilterSection
-        chipGroups={[
-          {
-            label: 'Typ',
-            options: typChipOptions,
-            selected: [typFilter],
-            onChange: (vals) => {
-              setTypFilter((vals[0] as TypListenFilter) || 'alle')
-              setBrancheFilter('alle')
-            },
-          },
-          {
-            label: 'Branche',
-            options: brancheChipOptions,
-            selected: [brancheFilter],
-            onChange: (vals) => setBrancheFilter(vals[0] || 'alle'),
-          },
-        ]}
+    <div>
+      <div className="listbar">
+        <div className="listbar-chips">
+          {kategorieChipOptions.map((o) => (
+            <MockChip
+              key={o.value}
+              active={kategorieFilter === o.value}
+              count={o.count}
+              onClick={() => setKategorieFilter(o.value)}
+            >
+              {o.label}
+            </MockChip>
+          ))}
+        </div>
+        <div className="listbar-actions">
+          <MockBtn
+            icon="filter"
+            kind={activeFilterCount ? 'primary' : 'ghost'}
+            sm
+            onClick={() => setFilterOpen(true)}
+          >
+            <span className="listbar-btn-label">
+              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="checks"
+            kind={selectMode ? 'primary' : 'ghost'}
+            sm
+            onClick={() => {
+              setSelectMode((m) => !m)
+              setSelected({})
+            }}
+          >
+            <span className="listbar-btn-label">
+              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+            </span>
+          </MockBtn>
+          <MockBtn
+            icon="download"
+            kind="ghost"
+            sm
+            onClick={() =>
+              runMockListExport(
+                exportToCSV,
+                (filtered.length ? filtered : partners).map(partnerExportRow),
+                EXPORT_FIELDS,
+                'partner'
+              )
+            }
+          >
+            <span className="listbar-btn-label">Export</span>
+          </MockBtn>
+        </div>
+      </div>
+
+      <MockModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        icon="filter"
+        title="Filter & Suchen"
+        sub="Partner eingrenzen"
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={resetFilters}>
+              Zurücksetzen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+              Anwenden ({filtered.length})
+            </MockBtn>
+          </>
+        }
       >
-        <ListFilterBar
-          hideStatusFilter
-          statusLabel="—"
-          statusOptions={[{ value: '', label: '—' }]}
-          statusValue=""
-          onStatusChange={() => {}}
-          zeitraumValue={zeitraum}
-          onZeitraumChange={setZeitraum}
-          showCustomDates={zeitraum === 'benutzerdefiniert'}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={setCustomFrom}
-          onCustomToChange={setCustomTo}
-          searchValue={q}
-          onSearchChange={setQ}
-          searchPlaceholder="Name, Kategorie, Telefon, E-Mail, Adresse"
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-          tags={filterTags}
-          onExportClick={() => setExportOpen(true)}
-          resultCount={filtered.length}
-          sort={{
-            options: sortOptions,
-            currentField: field,
-            currentDir: dir,
-            onSort: (f) => (f ? handleSort(f) : resetSort()),
-          }}
-        />
-      </ListFilterSection>
-      }
-    >
-      <PageHeader className="hidden md:block" />
+        <div className="form-section-h">Suche</div>
+        <div className="input" style={{ marginBottom: 16 }}>
+          <MockIcon ctx="default" n="search" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, Kategorie, Telefon, E-Mail…"
+            autoFocus
+          />
+        </div>
+        <div className="form-section-h">Kategorie</div>
+        <div className="chiprow">
+          {kategorieChipOptions.map((o) => (
+            <MockChip
+              key={o.value}
+              active={kategorieFilter === o.value}
+              onClick={() => setKategorieFilter(o.value)}
+            >
+              {o.label}
+            </MockChip>
+          ))}
+        </div>
+      </MockModal>
 
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={imTyp.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
-          description={
-            imTyp.length === 0
-              ? 'Erfassen Sie Lieferanten und Partner für Ihr Netzwerk.'
-              : 'Passe Filter oder Suche an.'
-          }
-        />
-      ) : (
-        <>
-          <ListMobileStack className={cn(isPane && 'min-[900px]:flex min-[900px]:flex-col min-[900px]:gap-2')}>
-            {sorted.map(({ row: p }) => (
-              <AppEntityListRow
-                key={p.id}
-                href={isPane ? `/partner/${p.id}` : undefined}
-                onClick={isPane ? undefined : () => openDetail(p.id)}
-                className={cn(selectedId === p.id && 'ring-2 ring-bw-primary/40')}
-                avatar={<ListAvatar name={p.name} />}
-                title={p.name}
-                line2={p.partner_kategorien?.name ?? '—'}
-                line3={
-                  [
-                    [p.telefon?.trim(), p.email?.trim()].filter(Boolean).join(' · '),
-                    p.aktiv ? 'Aktiv' : 'Inaktiv',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '—'
+      <div className="listcard">
+        <div className="list-row-grid head" style={{ gridTemplateColumns: GRID_COLS }}>
+          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+            Name
+          </MockSortHead>
+          <MockSortHead col="kategorie" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+            Kategorie
+          </MockSortHead>
+          <div>Ansprechpartner</div>
+          <MockSortHead col="telefon" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+            Telefon
+          </MockSortHead>
+          <MockSortHead col="email" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+            Email
+          </MockSortHead>
+          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+            Status
+          </MockSortHead>
+          <div aria-hidden />
+        </div>
+
+        {pageItems.length === 0 ? (
+          <MockEmpty
+            icon="building"
+            title={partners.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
+            hint="Filter zurücksetzen oder Partner anlegen"
+          />
+        ) : (
+          pageItems.map((p) => (
+            <div
+              key={p.id}
+              role="button"
+              tabIndex={0}
+              className={`list-row-grid${selectMode && selected[p.id] ? ' sel' : ''}`}
+              style={{ gridTemplateColumns: GRID_COLS }}
+              onClick={() => (selectMode ? toggleSel(p.id) : openDetail(p.id))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  selectMode ? toggleSel(p.id) : openDetail(p.id)
                 }
-                line4={p.subkategorie?.trim() || undefined}
-                badge={<PartnerTypBadge partner={p} />}
-              />
-            ))}
-          </ListMobileStack>
-
-          <ListGridShell minWidth="880px" className="hidden md:block">
-            <div className="list-row-grid head" style={{ gridTemplateColumns: PARTNER_GRID_COLS }}>
-              <SortableHeader label="Name" field="name" currentField={field} currentDir={dir} onSort={handleSort} />
-              <SortableHeader
-                label="Kategorie"
-                field="kategorie"
-                currentField={field}
-                currentDir={dir}
-                onSort={handleSort}
-              />
-              <div>Ansprechpartner</div>
-              <div>Telefon</div>
-              <div>Email</div>
-              <div>Status</div>
-              <div aria-hidden />
-            </div>
-            {sorted.map(({ row: p }) => (
-              <Link
-                key={p.id}
-                href={`/partner/${p.id}`}
-                onClick={isPane ? (e) => e.preventDefault() : undefined}
-                className={cn(
-                  'list-row-grid',
-                  selectedId === p.id && isPane && 'ring-2 ring-bw-primary/40'
+              }}
+            >
+              <p className="list-row-primary truncate">{p.name}</p>
+              <div>
+                {p.partner_kategorien?.name ? (
+                  <span className="pill-tag">{p.partner_kategorien.name}</span>
+                ) : (
+                  <span className="text-[13px] text-bw-text-muted">—</span>
                 )}
-                style={{ gridTemplateColumns: PARTNER_GRID_COLS }}
-              >
-                <p className="list-row-primary truncate">{p.name}</p>
-                <div>
-                  {p.partner_kategorien?.name ? (
-                    <span className="pill-tag">{p.partner_kategorien.name}</span>
-                  ) : (
-                    <span className="text-[13px] text-bw-text-muted">—</span>
-                  )}
-                </div>
-                <p className="truncate text-[13px] text-bw-text">{p.ansprechpartner?.trim() || '—'}</p>
-                <p className="truncate text-[13px] text-bw-text">{p.telefon?.trim() || '—'}</p>
-                <p className="truncate text-[13px] text-bw-text">{p.email?.trim() || '—'}</p>
-                {partnerAktivBadge(p)}
-                <div aria-hidden />
-              </Link>
-            ))}
-          </ListGridShell>
-        </>
-      )}
+              </div>
+              <p className="truncate text-[13px] text-bw-text">{p.ansprechpartner?.trim() || '—'}</p>
+              <p className="truncate text-[13px] text-bw-text">{p.telefon?.trim() || '—'}</p>
+              <p className="truncate text-[13px] text-bw-text">{p.email?.trim() || '—'}</p>
+              {partnerAktivBadge(p)}
+              <div className="vg-actions" onClick={(e) => e.stopPropagation()}>
+                <MockEntityRowMenu items={rowMenuItems(p)} title="Partner" />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
-      <CsvExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title="Partner exportieren"
-        fields={PARTNER_EXPORT_FIELDS}
-        onDownload={({ scope, keys }) => {
-          const source = scope === 'view' ? filtered : partners
-          const data = source.map(partnerExportRow)
-          const fields = PARTNER_EXPORT_FIELDS.filter((f) => keys.includes(f.key))
-          exportToCSV(data, fields, 'partner')
-        }}
+      <MockPager
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        unit="Partner"
+        onPageChange={(p) => setPageIndex(p - 1)}
       />
-    </EntityListShell>
+    </div>
   )
 }

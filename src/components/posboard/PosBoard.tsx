@@ -350,7 +350,7 @@ export function PosBoard({
             boxShadow: 'var(--shadow-pop)',
           }}
         >
-          <MockIcon n="checks" size={16} />
+          <MockIcon ctx="default" n="checks" size={16} />
           <span style={{ fontWeight: 600, fontSize: 13 }}>{selectedIds.length} ausgewählt</span>
           <div style={{ flex: 1 }} />
           {(bulkActions ? bulkActions(selectedPositions, clearSel) : []).map((a, i) => (
@@ -372,7 +372,7 @@ export function PosBoard({
                 cursor: 'pointer',
               }}
             >
-              {a.icon ? <MockIcon n={a.icon} size={15} /> : null}
+              {a.icon ? <MockIcon ctx="default" n={a.icon} size={15} /> : null}
               {a.label}
             </button>
           ))}
@@ -390,7 +390,7 @@ export function PosBoard({
               cursor: 'pointer',
             }}
           >
-            <MockIcon n="x" size={16} />
+            <MockIcon ctx="default" n="x" size={16} />
           </button>
         </div>
       ) : null}

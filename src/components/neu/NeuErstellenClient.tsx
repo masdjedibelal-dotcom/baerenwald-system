@@ -220,7 +220,7 @@ export function NeuErstellenClient() {
     <div className="neu-wiz">
       <div className="neu-wiz-top">
         <button type="button" className="qa-btn" title="Abbrechen" onClick={() => router.push(backHref)}>
-          <MockIcon n="x" size={18} />
+          <MockIcon ctx="emphasis" n="x" size={18} />
         </button>
         <div className="neu-wiz-ttl">{wizTitel}</div>
       </div>
@@ -242,7 +242,7 @@ export function NeuErstellenClient() {
                   }}
                 >
                   <div className="ico">
-                    <MockIcon n={o.ic} size={22} />
+                    <MockIcon ctx="emphasis" n={o.ic} size={22} />
                   </div>
                   <div className="t">{o.label}</div>
                   <div className="d">{o.d}</div>
@@ -390,7 +390,7 @@ export function NeuErstellenClient() {
                   toast.message('Auftrag', {
                     description: 'Aufträge entstehen aus angenommenen Angeboten — bitte zuerst Angebot anlegen.',
                   })
-                  router.push('/vorgaenge?phase=auftrag')
+                  router.push('/vorgaenge?tab=auftrag')
                 }}
               >
                 Auftrag anlegen

@@ -17,20 +17,10 @@ import { Textarea } from '@/components/ui/Textarea'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
-import { ProjektComplianceCheckliste } from '@/components/handwerker/ProjektComplianceCheckliste'
 import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { AppDetailScreen } from '@/components/layout/app'
-import {
-  FileSignature,
-  MoreHorizontal,
-  Phone,
-  Mail,
-  Pencil,
-  Star,
-  User,
-} from 'lucide-react'
-import { mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -129,7 +119,7 @@ export function HandwerkerDetailClient({
     [payload.dokumente]
   )
 
-  const [tab, setTab] = useState<'stammdaten' | 'auftraege' | 'compliance' | 'notizen'>('stammdaten')
+  const [tab, setTab] = useState<'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'>('uebersicht')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -335,6 +325,16 @@ export function HandwerkerDetailClient({
   const handwerkerMenuItems = useMemo((): ActionsMenuItem[] => {
     const items: ActionsMenuItem[] = [
       {
+        label: 'Bearbeiten',
+        icon: mockMenuIcon('pencil', 16),
+        onClick: () => setModalOpen(true),
+      },
+      {
+        label: 'Rahmenvertrag',
+        icon: mockMenuIcon('file-pencil', 16),
+        onClick: () => void openRahmenvertrag(),
+      },
+      {
         label: 'Partner-Portal-Einladung',
         icon: mockMenuIcon('external-link', 16),
         hint: !hw.email ? 'Keine E-Mail' : undefined,
@@ -367,13 +367,33 @@ export function HandwerkerDetailClient({
     return items
   }, [hw, isCrmAdmin, hasPortalAccount, impersonating])
 
+  const tabUebersicht = (
+    <div className="space-y-3">
+      <Card title="Kontakt">
+        <div className="space-y-1">
+          <PropertyRow label="Firmenname" value={handwerkerDisplayName(hw)} editable={false} />
+          <PropertyRow label="Telefon" value={hw.telefon || '—'} editable={false} />
+          <PropertyRow label="E-Mail" value={hw.email || '—'} editable={false} />
+        </div>
+      </Card>
+      <Card title="Compliance">
+        <div className="space-y-2">
+          <ComplianceBadge status={hw.compliance_status} />
+          <p className="text-sm text-bw-text-muted">
+            Nachweise und Dokumente unter Tab „Dokumente“.
+          </p>
+        </div>
+      </Card>
+    </div>
+  )
+
   const sidebar = (
     <>
       <Card
         title="Kontakt"
         action={
           <button type="button" onClick={() => setModalOpen(true)} className="btn btn-ghost btn-sm">
-            <Pencil className="h-3.5 w-3.5" />
+            <MockIcon ctx="btn" n="pencil" size={14} />
             Bearbeiten
           </button>
         }
@@ -461,63 +481,30 @@ export function HandwerkerDetailClient({
         </div>
       </Card>
 
-      {(hw.bewertung_anzahl ?? 0) > 0 ? (
-        <Card title="Bewertungen">
-          <div className="mb-3 flex items-center gap-2">
-            <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
-            <span className="text-2xl font-semibold tabular-nums text-bw-text">
-              {formatHandwerkerBewertung(hw.bewertung_gesamt)}
-            </span>
-            <span className="text-sm text-bw-text-muted">
-              Ø · {hw.bewertung_anzahl} {hw.bewertung_anzahl === 1 ? 'Bewertung' : 'Bewertungen'}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {HANDWERKER_BEWERTUNG_KATEGORIEN.map((kat) => {
-              const keyMap = {
-                qualitaet: hw.bewertung_qualitaet,
-                termintreue: hw.bewertung_termintreue,
-                sauberkeit: hw.bewertung_sauberkeit,
-                kommunikation: hw.bewertung_kommunikation,
-                preis_leistung: hw.bewertung_preis_leistung,
-              } as const
-              const val = keyMap[kat.key]
-              return (
-                <div key={kat.key} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-bw-text-muted">{kat.label}</span>
-                  <span className="inline-flex items-center gap-1 font-medium tabular-nums text-bw-text">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
-                    {formatHandwerkerBewertung(val)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      ) : null}
     </>
   )
 
   const detailTabs = useMemo(
     () => [
-      { id: 'stammdaten', label: 'Übersicht', iconName: 'layout-dashboard' },
+      { id: 'uebersicht', label: 'Übersicht', iconName: 'layout-dashboard' },
+      { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
       {
-        id: 'auftraege',
-        label: 'Aufträge',
-        iconName: 'briefcase',
+        id: 'vorgaenge',
+        label: 'Vorgänge',
+        iconName: 'folders',
         count: aktivAuftraege.length + fertigeAuftraege.length || undefined,
+      },
+      {
+        id: 'dokumente',
+        label: 'Dokumente',
+        iconName: 'files',
+        count: dokumenteAnzahl || undefined,
       },
       {
         id: 'notizen',
         label: 'Notizen',
         iconName: 'messages',
         count: hw.notizen?.trim() ? 1 : undefined,
-      },
-      {
-        id: 'compliance',
-        label: 'Compliance',
-        iconName: 'shield-check',
-        count: dokumenteAnzahl || undefined,
       },
     ],
     [aktivAuftraege.length, fertigeAuftraege.length, hw.notizen, dokumenteAnzahl]
@@ -546,22 +533,6 @@ export function HandwerkerDetailClient({
                       Zum Auftrag
                     </Link>
                   </div>
-                  <div className="border-t border-bw-border pt-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-                      Projekt-Compliance
-                    </p>
-                    <ProjektComplianceCheckliste
-                      handwerkerId={hw.id}
-                      auftragId={a.id}
-                      auftragTitel={a.titel}
-                      dokumente={payload.dokumente}
-                      complianceTypen={complianceTypen}
-                      handwerkerGewerke={hwGewerkSlugs}
-                      gewerke={gewerke}
-                      compact
-                      showAuftragLink
-                    />
-                  </div>
                 </Card>
               </li>
             ))}
@@ -588,22 +559,6 @@ export function HandwerkerDetailClient({
                     <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
                       Zum Auftrag
                     </Link>
-                  </div>
-                  <div className="border-t border-bw-border pt-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-                      Projekt-Compliance
-                    </p>
-                    <ProjektComplianceCheckliste
-                      handwerkerId={hw.id}
-                      auftragId={a.id}
-                      auftragTitel={a.titel}
-                      dokumente={payload.dokumente}
-                      complianceTypen={complianceTypen}
-                      handwerkerGewerke={hwGewerkSlugs}
-                      gewerke={gewerke}
-                      compact
-                      showAuftragLink
-                    />
                   </div>
                 </Card>
               </li>
@@ -661,35 +616,20 @@ export function HandwerkerDetailClient({
         }
         badges={<ComplianceBadge status={hw.compliance_status} />}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {hasPortalAccount ? (
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900">
-                Portal-Konto aktiv
-              </span>
-            ) : null}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={openRahmenvertrag}>
-              <FileSignature className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Rahmenvertrag
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
-              <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Bearbeiten
-            </button>
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={handwerkerMenuItems}
-              sheetTitle="Handwerker"
-            />
-          </div>
+          <ActionsMenu
+            trigger={
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                aria-label="Weitere Aktionen"
+              >
+                <MockIcon ctx="btn" n="dots" size={16} />
+                <span className="sr-only">Mehr</span>
+              </button>
+            }
+            items={handwerkerMenuItems}
+            sheetTitle="Handwerker"
+          />
         }
       />
 
@@ -697,10 +637,11 @@ export function HandwerkerDetailClient({
         tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
       >
         <div className="min-w-0 space-y-3">
+          {tab === 'uebersicht' ? tabUebersicht : null}
           {tab === 'stammdaten' ? sidebar : null}
-          {tab === 'auftraege' ? tabAuftraege : null}
+          {tab === 'vorgaenge' ? tabAuftraege : null}
           {tab === 'notizen' ? tabNotizen : null}
-          {tab === 'compliance' ? tabCompliance : null}
+          {tab === 'dokumente' ? tabCompliance : null}
         </div>
       </AppDetailScreen>
 

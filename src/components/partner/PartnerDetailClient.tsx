@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { Mail, MoreHorizontal, Pencil } from 'lucide-react'
-import { mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { DetailTabBar } from '@/components/ui/detail-tab-bar'
+import { AppDetailScreen } from '@/components/layout/app'
+import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockEmpty } from '@/components/mock-ui'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -18,7 +20,8 @@ import { Textarea } from '@/components/ui/Textarea'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { createClient } from '@/lib/supabase'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
-import { PartnerTypBadge } from '@/components/partner/PartnerNetzwerkClient'
+
+type PartnerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
 
 function websiteHref(raw: string): string {
   const t = raw.trim()
@@ -41,6 +44,7 @@ export function PartnerDetailClient({
   const [edit, setEdit] = useState<PartnerRow | null>(null)
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
+  const [tab, setTab] = useState<PartnerDetailTab>('uebersicht')
   useEffect(() => {
     setPartner(initial)
   }, [initial])
@@ -61,21 +65,22 @@ export function PartnerDetailClient({
     .join(' · ')
 
   const partnerMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = []
+    const items: ActionsMenuItem[] = [
+      {
+        label: 'Bearbeiten',
+        icon: mockMenuIcon('pencil', 16),
+        onClick: () => setEditOpen(true),
+      },
+    ]
     if (partner.email?.trim()) {
       items.push({
-        label: 'E-Mail schreiben',
+        label: 'Mail schreiben',
         icon: mockMenuIcon('mail', 16),
         onClick: () => {
           window.location.href = `mailto:${partner.email}`
         },
       })
     }
-    items.push({
-      label: 'Bearbeiten',
-      icon: mockMenuIcon('pencil', 16),
-      onClick: () => setEditOpen(true),
-    })
     return items
   }, [partner.email])
 
@@ -120,29 +125,11 @@ export function PartnerDetailClient({
     })
   }
 
-  const partnerdetailsCard = (
-    <Card
-      collapsible
-      title="Partnerdetails"
-      action={
-        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      }
-    >
+  const kontaktCard = (
+    <Card title="Kontakt">
       <div className="props">
-        <DetailProp label="Typ">
-          <PartnerTypBadge partner={partner} />
-        </DetailProp>
+        <DetailProp label="Firma">{partner.name}</DetailProp>
         <DetailProp label="Kategorie">{partner.partner_kategorien?.name?.trim() || '—'}</DetailProp>
-        <DetailProp label="Subkategorie">{partner.subkategorie?.trim() || '—'}</DetailProp>
-        <DetailProp label="Status">
-          {partner.aktiv ? (
-            <StatusBadge status="order" label="Aktiv" />
-          ) : (
-            <StatusBadge status="cancel" label="Inaktiv" />
-          )}
-        </DetailProp>
         <DetailProp label="Ansprechpartner">{partner.ansprechpartner?.trim() || '—'}</DetailProp>
         <DetailProp label="Telefon">
           {partner.telefon?.trim() ? (
@@ -156,6 +143,30 @@ export function PartnerDetailClient({
             <a href={`mailto:${partner.email}`}>{partner.email}</a>
           ) : (
             '—'
+          )}
+        </DetailProp>
+      </div>
+    </Card>
+  )
+
+  const stammdatenCard = (
+    <Card
+      collapsible
+      title="Stammdaten"
+      action={
+        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
+          <MockIcon ctx="btn" n="pencil" size={14} />
+        </button>
+      }
+    >
+      <div className="props">
+        <DetailProp label="Kategorie">{partner.partner_kategorien?.name?.trim() || '—'}</DetailProp>
+        <DetailProp label="Subkategorie">{partner.subkategorie?.trim() || '—'}</DetailProp>
+        <DetailProp label="Status">
+          {partner.aktiv ? (
+            <StatusBadge status="order" label="Aktiv" />
+          ) : (
+            <StatusBadge status="cancel" label="Inaktiv" />
           )}
         </DetailProp>
         <DetailProp label="Webseite">
@@ -184,6 +195,14 @@ export function PartnerDetailClient({
     </Card>
   )
 
+  const detailTabs = [
+    { id: 'uebersicht', label: 'Übersicht', iconName: 'layout-dashboard' },
+    { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
+    { id: 'vorgaenge', label: 'Vorgänge', iconName: 'folders' },
+    { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
+    { id: 'notizen', label: 'Notizen', iconName: 'messages' },
+  ]
+
   return (
     <div className="space-y-4 pb-6">
       <DetailHead
@@ -192,40 +211,57 @@ export function PartnerDetailClient({
         title={
           <div className="detail-head-title-row">
             <span>{partner.name}</span>
-            <PartnerTypBadge partner={partner} />
+            {partner.aktiv ? (
+              <StatusBadge status="order" label="Aktiv" />
+            ) : (
+              <StatusBadge status="cancel" label="Inaktiv" />
+            )}
+            {partner.partner_kategorien?.name ? (
+              <span className="pill-tag">{partner.partner_kategorien.name}</span>
+            ) : null}
           </div>
         }
         sub={headSub || undefined}
+        badges={
+          partner.partner_kategorien?.name ? (
+            <span className="text-sm text-bw-text-muted">Kategorie · {partner.partner_kategorien.name}</span>
+          ) : undefined
+        }
         actions={
-          <>
-            {partner.email?.trim() ? (
-              <a href={`mailto:${partner.email}`} className="btn btn-primary btn-sm inline-flex shrink-0 gap-1.5">
-                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                E-Mail
-              </a>
-            ) : null}
-            <ActionsMenu
-              trigger={
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Mehr</span>
-                </button>
-              }
-              items={partnerMenuItems}
-              sheetTitle="Partner"
-            />
-          </>
+          <ActionsMenu
+            trigger={
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                aria-label="Weitere Aktionen"
+              >
+                <MockIcon ctx="btn" n="dots" size={16} />
+                <span className="sr-only">Mehr</span>
+              </button>
+            }
+            items={partnerMenuItems}
+            sheetTitle="Partner"
+          />
         }
       />
 
-      <div className="space-y-3">
-        {partnerdetailsCard}
-        {notizenCard}
-      </div>
+      <AppDetailScreen
+        tabs={
+          <DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as PartnerDetailTab)} />
+        }
+      >
+        <div className="min-w-0 space-y-3">
+          {tab === 'uebersicht' ? kontaktCard : null}
+          {tab === 'stammdaten' ? stammdatenCard : null}
+          {tab === 'vorgaenge' ? (
+            <MockEmpty icon="folders" title="Keine Vorgänge" hint="Vermittelte Vorgänge erscheinen hier" />
+          ) : null}
+          {tab === 'dokumente' ? (
+            <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien zum Partner erscheinen hier" />
+          ) : null}
+          {tab === 'notizen' ? notizenCard : null}
+        </div>
+      </AppDetailScreen>
 
       {edit && editOpen
         ? (() => {

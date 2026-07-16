@@ -46,13 +46,13 @@ export function MockEntityRowMenu({
             setOpen((o) => !o)
           }}
         >
-          <MockIcon n="dots" size={16} />
+          <MockIcon ctx="row" n="dots" size={16} />
         </button>
       </span>
       <MockPopover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right">
         <MockPopoverMenu
           items={toPopoverItems(items)}
-          iconFn={(n) => <MockIcon n={n} size={15} />}
+          iconFn={(n) => <MockIcon ctx="row" n={n} size={15} />}
           onItemClick={() => setOpen(false)}
         />
       </MockPopover>

@@ -16,7 +16,7 @@ export function IconText({
 }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <Icon className={cn('h-3.5 w-3.5 shrink-0', iconClassName)} aria-hidden />
+      <Icon className={cn('icon-lucide icon-ctx-default h-3.5 w-3.5 shrink-0', iconClassName)} aria-hidden />
       <span>{children}</span>
     </span>
   )

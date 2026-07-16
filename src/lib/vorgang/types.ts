@@ -57,6 +57,7 @@ export type ResolvedVorgangBadges = {
   wartet_freigabe?: boolean
 }
 
+/** Kanonischer Output von `resolveVorgang()` — einzige Resolver-Output-Shape. */
 export type ResolvedVorgang = {
   phase: VorgangPhase
   unterstatus: string

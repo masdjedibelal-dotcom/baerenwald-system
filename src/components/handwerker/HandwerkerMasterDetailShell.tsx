@@ -3,11 +3,8 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { HandwerkerListeClient } from '@/components/handwerker/HandwerkerListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
-import { handwerkerFullBleedSubRoute, handwerkerIdFromPath } from '@/lib/crm/master-detail-paths'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
+import { handwerkerFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { GewerkOption, HandwerkerZeile } from '@/components/handwerker/HandwerkerListeClient'
 
 export function HandwerkerMasterDetailShell({
@@ -20,14 +17,11 @@ export function HandwerkerMasterDetailShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const selectedId = handwerkerIdFromPath(pathname)
   const fullBleed = handwerkerFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/handwerker'
 
   return (
     <AppMasterDetailLayout
       basePath="/handwerker"
-      selectedId={selectedId}
       fullBleed={fullBleed}
       list={
         <Suspense
@@ -37,23 +31,11 @@ export function HandwerkerMasterDetailShell({
             </div>
           }
         >
-          <HandwerkerListeClient
-            rows={rows}
-            gewerkeOptionen={gewerkeOptionen}
-            mode="pane"
-            selectedId={selectedId}
-          />
+          <HandwerkerListeClient rows={rows} gewerkeOptionen={gewerkeOptionen} />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Handwerker auswählen"
-          description="Wähle links einen Handwerker für Stammdaten, Aufträge und Compliance."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

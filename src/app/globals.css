@@ -289,6 +289,10 @@
     color: var(--green-dark);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   }
+  .sidebar-icon.active .mock-icon,
+  .sidebar-icon.active .icon-ctx-sidebar {
+    color: inherit;
+  }
   .sidebar-label {
     font-size: 13.5px;
     font-weight: 500;
@@ -3271,13 +3275,105 @@
     color: var(--icon-row-hover);
   }
 
-  .mock-icon {
+  /*
+   * Mock/Tabler: stroke-only. span.mock-icon wraps inline SVG.
+   * Ohne fill:none am SVG füllt der Browser schwarz (computed fill: rgb(0,0,0)).
+   */
+  .mock-icon,
+  .icon-lucide {
+    fill: none;
+    stroke: currentColor;
+    color: inherit;
+  }
+
+  .mock-icon svg,
+  .icon-lucide svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+  }
+
+  .mock-icon.mock-icon-filled,
+  .mock-icon.mock-icon-filled svg,
+  .icon-lucide.mock-icon-filled {
+    fill: currentColor;
+  }
+
+  .mock-icon.icon-ctx-default,
+  .icon-lucide.icon-ctx-default {
     color: var(--icon-default);
   }
 
-  .sidebar-icon .mock-icon,
-  .dshell-navitem .mock-icon,
-  .qa-btn .mock-icon {
+  .mock-icon.icon-ctx-emphasis,
+  .icon-lucide.icon-ctx-emphasis {
+    color: var(--icon-emphasis);
+  }
+
+  .mock-icon.icon-ctx-nav,
+  .icon-lucide.icon-ctx-nav {
+    color: var(--icon-nav);
+  }
+
+  .mock-icon.icon-ctx-tab,
+  .icon-lucide.icon-ctx-tab {
+    color: var(--icon-nav);
+  }
+
+  .mock-icon.icon-ctx-sidebar,
+  .icon-lucide.icon-ctx-sidebar {
+    color: var(--icon-sidebar);
+  }
+
+  .mock-icon.icon-ctx-row,
+  .icon-lucide.icon-ctx-row {
+    color: var(--icon-row);
+  }
+
+  .mock-icon.icon-ctx-btn,
+  .icon-lucide.icon-ctx-btn {
+    color: inherit;
+  }
+
+  .mock-icon.icon-ctx-empty,
+  .icon-lucide.icon-ctx-empty {
+    color: var(--icon-muted);
+  }
+
+  /* Sidebar / BottomNav: Icons erben Elternfarbe (weiß / gedämpft-weiß) */
+  .sidebar-icon .icon-ctx-sidebar,
+  .sidebar-toggle .icon-ctx-sidebar,
+  .bottomnav-item .icon-ctx-sidebar,
+  .bottomnav-cta-fab .icon-ctx-sidebar {
+    color: inherit;
+  }
+
+  .dshell-navitem:hover .icon-ctx-nav {
+    color: var(--icon-emphasis);
+  }
+
+  .dshell-navitem.active .icon-ctx-nav {
+    color: var(--icon-nav-active);
+  }
+
+  .tab:hover .icon-ctx-tab {
+    color: var(--icon-emphasis);
+  }
+
+  .tab.active .icon-ctx-tab {
+    color: var(--icon-active);
+  }
+
+  .qa-btn:hover .icon-ctx-row {
+    color: var(--icon-row-hover);
+  }
+
+  .chip .icon-ctx-default {
+    color: inherit;
+  }
+
+  .pager-btn .icon-ctx-default {
     color: inherit;
   }
 
@@ -5203,8 +5299,6 @@
     --app-text-xs: calc(0.75rem * var(--app-font-scale));
     --app-text-sm: calc(0.8125rem * var(--app-font-scale));
     --app-text-base: calc(0.875rem * var(--app-font-scale));
-    --app-master-detail-list-width: min(22rem, 38vw);
-    /** Abstand Detail-Inhalt ↔ Listen-Trenner (Master-Detail, ab 900px). */
     --app-detail-pane-padding-x: 1.25rem;
     --app-detail-pane-padding-y: 1rem;
   }
@@ -5330,75 +5424,6 @@
 
   .app-flow-footer {
     @apply shrink-0 border-t border-bw-border bg-bw-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))];
-  }
-
-  /** iPad / Tablet: Liste + Detail nebeneinander (ab 900px). */
-  .app-master-detail {
-    @apply min-w-0;
-  }
-
-  @media (min-width: 900px) {
-    .app-master-detail {
-      @apply grid min-h-[calc(100dvh-8rem)];
-      grid-template-columns: var(--app-master-detail-list-width) minmax(0, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
-    }
-
-    .app-master-detail-list {
-      display: contents;
-    }
-
-    .app-master-detail-list > .app-list-screen {
-      display: contents;
-    }
-
-    .app-master-detail-list .app-list-filters {
-      @apply static z-auto col-span-full row-start-1 mx-0 border-b border-[var(--app-separator)] bg-[var(--app-card)] px-4 py-3;
-      grid-column: 1 / -1;
-    }
-
-    .app-master-detail-list .app-list-content {
-      @apply col-start-1 row-start-2 min-h-0 overflow-y-auto bg-transparent px-3 py-2;
-      grid-column: 1;
-    }
-
-    .app-master-detail-list .entity-list-pane {
-      @apply flex flex-col gap-2;
-    }
-
-    .app-master-detail-list .list-mobile-stack {
-      @apply m-0 flex list-none flex-col gap-2 p-0;
-    }
-
-    .app-master-detail-list .listcard,
-    .app-master-detail-list .list-grid-shell,
-    .app-master-detail-list .list-table-shell,
-    .app-master-detail-list .list-sort-row {
-      @apply hidden;
-    }
-
-    .app-master-detail-main {
-      @apply col-start-2 row-start-2 min-h-0 overflow-y-auto rounded-none border-l border-[var(--app-separator)] bg-[var(--app-card)] shadow-none;
-    }
-
-    .app-master-detail-main .app-detail-pane {
-      box-sizing: border-box;
-      min-height: 100%;
-      padding-inline: var(--app-detail-pane-padding-x);
-      padding-block: var(--app-detail-pane-padding-y);
-    }
-
-    .app-master-detail-placeholder {
-      @apply col-start-2 row-start-2 min-h-[320px] flex-1 items-center justify-center rounded-none border-0 border-l border-[var(--app-separator)] bg-transparent px-5 shadow-none;
-    }
-  }
-
-  /** Mobil: Detail nutzt <main>-Padding; kein doppeltes Pane-Padding. */
-  @media (max-width: 899px) {
-    .app-master-detail-main .app-detail-pane {
-      padding-inline: 0;
-      padding-block: 0;
-    }
   }
 
   /**

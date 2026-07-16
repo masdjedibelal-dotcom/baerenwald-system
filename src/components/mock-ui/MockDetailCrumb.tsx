@@ -39,7 +39,7 @@ export function MockDetailCrumb({
           fontWeight: 500,
         }}
       >
-        <MockIcon n="arrow-left" size={15} />
+        <MockIcon ctx="nav" n="arrow-left" size={15} />
         {backLabel}
       </Link>
       <span style={{ color: 'var(--text-3)', minWidth: 0 }}>

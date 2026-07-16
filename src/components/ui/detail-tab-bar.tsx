@@ -42,9 +42,9 @@ export function DetailTabBar({
             className={cn('tab', active && 'active')}
           >
             {tab.iconName ? (
-              <MockIcon n={tab.iconName} size="1em" className="opacity-70" />
+              <MockIcon ctx="tab" n={tab.iconName} size="1em" />
             ) : Icon ? (
-              <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+              <Icon className="icon-lucide icon-ctx-tab h-4 w-4 shrink-0" aria-hidden />
             ) : null}
             {tab.label}
             {tab.count !== undefined ? <span className="tab-count">{tab.count}</span> : null}

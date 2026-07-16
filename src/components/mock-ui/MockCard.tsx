@@ -45,7 +45,7 @@ export function MockCard({
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
           >
-            {icon ? <MockIcon n={icon} size={16} /> : null}
+            {icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : null}
             <span className="min-w-0 flex-1">{title}</span>
             <ChevronDown
               className={cn('h-4 w-4 shrink-0 text-muted transition-transform', open && 'rotate-180')}
@@ -65,7 +65,7 @@ export function MockCard({
         <div className="card-h">
           {title ? (
             <div className="card-title">
-              {icon ? <MockIcon n={icon} size={16} /> : null}
+              {icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : null}
               {title}
             </div>
           ) : (

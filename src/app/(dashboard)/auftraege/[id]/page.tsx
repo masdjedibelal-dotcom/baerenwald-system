@@ -16,7 +16,7 @@ import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten'
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
@@ -60,7 +60,15 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
 
     let lead: Pick<
       Lead,
-      'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
+      | 'id'
+      | 'plz'
+      | 'kontakt_name'
+      | 'kontakt_email'
+      | 'kontakt_telefon'
+      | 'funnel_daten'
+      | 'kanal'
+      | 'auftraggeber_kunde_id'
+      | 'anlass'
     > | null = null
 
     const [leadTimeline, projektKontext] = await Promise.all([

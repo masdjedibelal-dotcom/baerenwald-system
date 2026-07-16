@@ -10,6 +10,22 @@ import type {
   VorgangRechnungInput,
 } from '@/lib/vorgang/types'
 
+/**
+ * Kanonischer Vorgang-Resolver (final Spec):
+ * - Phase nie aus vorgang_phase lesen — immer aus Entity-Kette ableiten
+ * - Storno-Regel: neueste nicht-stornierte Entität gewinnt (Rechnung > Auftrag > Angebot > Anfrage)
+ * - Actor-Priorität: freigabe > handwerker > kunde > bw
+ * - Output-Shape: `ResolvedVorgang` in `@/lib/vorgang/types`
+ */
+
+/** Actor-Priorität (höher = wichtiger). */
+export const ACTOR_PRIORITY: Record<VorgangActor, number> = {
+  freigabe: 4,
+  handwerker: 3,
+  kunde: 2,
+  bw: 1,
+}
+
 function entityTs(x: { updated_at?: string | null; created_at: string }): string {
   return x.updated_at?.trim() || x.created_at
 }
@@ -19,7 +35,11 @@ function pickNewest<T>(items: T[], ts: (x: T) => string): T | null {
   return [...items].sort((a, b) => ts(b).localeCompare(ts(a)))[0] ?? null
 }
 
-function mapAngebotStatusEinfach(angebot: VorgangAngebotInput): string {
+/**
+ * Unterstatus für Angebote: `status_einfach` hat Vorrang (inkl. Fine-Stages).
+ * Legacy-`status` wird auf status_einfach-Äquivalent gemappt.
+ */
+export function mapAngebotStatusEinfach(angebot: VorgangAngebotInput): string {
   const einfach = angebot.status_einfach?.trim().toLowerCase()
   if (einfach) return einfach
   const legacy = (angebot.status ?? '').trim().toLowerCase()
@@ -27,8 +47,12 @@ function mapAngebotStatusEinfach(angebot: VorgangAngebotInput): string {
     case 'entwurf':
       return 'entwurf'
     case 'gesendet_handwerker':
+      return 'gesendet_handwerker'
     case 'handwerker_akzeptiert':
+      return 'handwerker_akzeptiert'
     case 'gesendet_kunde':
+      return 'gesendet_kunde'
+    case 'gesendet':
       return 'gesendet'
     case 'kunde_akzeptiert':
       return 'angenommen'
@@ -41,7 +65,7 @@ function mapAngebotStatusEinfach(angebot: VorgangAngebotInput): string {
 
 export function isAngebotStorniert(angebot: VorgangAngebotInput): boolean {
   const einfach = mapAngebotStatusEinfach(angebot)
-  return einfach === 'abgelehnt' || einfach === 'ersetzt'
+  return einfach === 'abgelehnt' || einfach === 'ersetzt' || einfach === 'storniert'
 }
 
 export function isAuftragStorniert(auftrag: VorgangAuftragInput): boolean {
@@ -66,7 +90,6 @@ function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): st
   if (forceStorniert) return 'storniert'
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
-  if (s === 'abgebrochen') return 'abgebrochen'
   return 'neu'
 }
 
@@ -93,6 +116,11 @@ function isUeberfaellig(faellig: string | null | undefined, now = new Date()): b
   return due < today
 }
 
+/** Angebot wartet auf Kundenantwort (Fine-Stages + flat). */
+function angebotWartetAufKunde(status: string): boolean {
+  return status === 'gesendet' || status === 'gesendet_kunde'
+}
+
 function resolveActor(
   input: ResolveVorgangInput,
   phase: VorgangPhase,
@@ -108,31 +136,26 @@ function resolveActor(
   const lead = input.lead
   const candidates: { actor: VorgangActor; rank: number }[] = []
 
+  // Actor freigabe / Badge nur bei org_freigabe_status=ausstehend
   if ((lead.org_freigabe_status ?? '').trim() === 'ausstehend') {
-    candidates.push({ actor: 'freigabe', rank: 4 })
+    candidates.push({ actor: 'freigabe', rank: ACTOR_PRIORITY.freigabe })
   }
 
-  if (
-    phase === 'auftrag' &&
-    auftragAktiv &&
-    (auftragAktiv.handwerkerAktionOffen ||
-      auftragAktiv.status === 'offen' ||
-      auftragAktiv.status === 'in_arbeit')
-  ) {
-    if (auftragAktiv.handwerkerAktionOffen) {
-      candidates.push({ actor: 'handwerker', rank: 3 })
-    }
+  if (phase === 'auftrag' && auftragAktiv?.handwerkerAktionOffen) {
+    candidates.push({ actor: 'handwerker', rank: ACTOR_PRIORITY.handwerker })
   }
 
   if (phase === 'angebot' && angebotAktiv) {
     const st = mapAngebotStatusEinfach(angebotAktiv)
-    if (st === 'gesendet') {
-      candidates.push({ actor: 'kunde', rank: 2 })
+    if (angebotWartetAufKunde(st)) {
+      candidates.push({ actor: 'kunde', rank: ACTOR_PRIORITY.kunde })
+    } else if (st === 'gesendet_handwerker') {
+      candidates.push({ actor: 'handwerker', rank: ACTOR_PRIORITY.handwerker })
     }
   }
 
   if (badges.notfall) {
-    candidates.push({ actor: 'bw', rank: 1 })
+    candidates.push({ actor: 'bw', rank: ACTOR_PRIORITY.bw })
   }
 
   if (!candidates.length) {
@@ -151,6 +174,7 @@ type PhasePick = {
   updatedAt: string
 }
 
+/** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage). */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []
@@ -235,7 +259,7 @@ function buildTitel(input: ResolveVorgangInput): string {
   return lead.kontakt_name?.trim() || 'Vorgang'
 }
 
-/** Kanonische Ableitung — nie aus vorgang_phase lesen. */
+/** Kanonische Ableitung — nie aus vorgang_phase lesen. Output: `ResolvedVorgang`. */
 export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
   const lead = input.lead
   const angebote = input.angebote ?? []
@@ -251,12 +275,14 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const angebotAktiv =
     pick.phase === 'angebot'
-      ? angebote.find((a) => a.id === pick.entityId) ?? pickNewestActive(angebote, isAngebotStorniert, entityTs)
+      ? angebote.find((a) => a.id === pick.entityId) ??
+        pickNewestActive(angebote, isAngebotStorniert, entityTs)
       : pickNewestActive(angebote, isAngebotStorniert, entityTs)
 
   const auftragAktiv =
     pick.phase === 'auftrag'
-      ? auftraege.find((a) => a.id === pick.entityId) ?? pickNewestActive(auftraege, isAuftragStorniert, entityTs)
+      ? auftraege.find((a) => a.id === pick.entityId) ??
+        pickNewestActive(auftraege, isAuftragStorniert, entityTs)
       : pickNewestActive(auftraege, isAuftragStorniert, entityTs)
 
   const rechnungAktiv =

@@ -3,32 +3,13 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
-import {
-  AlertTriangle,
-  Briefcase,
-  Download,
-  FileMinus,
-  FileText,
-  History,
-  List,
-  Mail,
-  MoreHorizontal,
-  Pencil,
-  Receipt,
-  Send,
-  User,
-} from 'lucide-react'
-import { mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ProjektKette } from '@/components/crm/ProjektKette'
-import { ProjektUebersichtCard } from '@/components/crm/ProjektUebersichtCard'
 import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { DetailAccordion } from '@/components/ui/DetailAccordion'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
 import { Card } from '@/components/ui/Card'
@@ -74,12 +55,12 @@ import {
   type RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { toast } from '@/components/ui/app-toast'
-import { buildRechnungNaechsteSchritte } from '@/lib/naechste-schritte'
 import {
   mahnstufeListenLabel,
   rechnungHatMahnverlauf,
 } from '@/lib/rechnungen/mahnverlauf'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
 
 function DetailProp({
   label,
@@ -118,10 +99,10 @@ function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
   return <StatusBadge status="done" label="Entwurf" />
 }
 
-type RechnungDetailTab = 'stammdaten' | 'leistung' | 'schritte' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
+type RechnungDetailTab = 'stammdaten' | 'leistung' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
 
 const DESKTOP_RECHNUNG_TABS: RechnungDetailTab[] = ['uebersicht', 'positionen', 'aktivitaet', 'dokumente']
-const MOBILE_RECHNUNG_TABS: RechnungDetailTab[] = ['stammdaten', 'leistung', 'schritte', 'aktivitaet', 'dokumente']
+const MOBILE_RECHNUNG_TABS: RechnungDetailTab[] = ['stammdaten', 'leistung', 'aktivitaet', 'dokumente']
 
 export function RechnungDetailClient({
   detail: initial,
@@ -131,6 +112,7 @@ export function RechnungDetailClient({
   firm,
   mahnMails = [],
   projektKontext,
+  pipelineLead = null,
 }: {
   detail: Rechnung
   kleinunternehmerFirma: boolean
@@ -139,9 +121,10 @@ export function RechnungDetailClient({
   firm?: FirmenEinstellungen
   mahnMails?: RechnungMahnMailZeile[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
+  pipelineLead?: PipelineKontextLead | null
 }) {
   const router = useRouter()
-  const { refresh, generation } = useCrmRefresh()
+  const { refresh } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
@@ -362,8 +345,8 @@ export function RechnungDetailClient({
     if (detail.status === 'entwurf') {
       return (
         <Button type="button" variant="primary" size="sm" loading={pending} onClick={handleSenden}>
-          <Send className="h-3.5 w-3.5" aria-hidden />
-          Rechnung senden
+          <MockIcon ctx="btn" n="send" size={14} />
+          Versenden
         </Button>
       )
     }
@@ -377,7 +360,7 @@ export function RechnungDetailClient({
               size="sm"
               onClick={() => setErinnerungModalOpen(true)}
             >
-              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+              <MockIcon ctx="btn" n="alert-triangle" size={14} />
               Zahlungserinnerung
             </Button>
           ) : null}
@@ -388,7 +371,7 @@ export function RechnungDetailClient({
             loading={pending}
             onClick={() => void setStatus('bezahlt')}
           >
-            Als bezahlt markieren
+            Bezahlt
           </Button>
         </div>
       )
@@ -400,7 +383,7 @@ export function RechnungDetailClient({
         rel="noopener noreferrer"
         className="btn btn-primary btn-sm inline-flex gap-1.5"
       >
-        <Download className="h-3.5 w-3.5" aria-hidden />
+        <MockIcon ctx="btn" n="download" size={14} />
         PDF öffnen
       </a>
     )
@@ -447,7 +430,7 @@ export function RechnungDetailClient({
   )
 
   const rechnungsdetailsCard = (
-    <Card collapsible title="Rechnungsdetails">
+    <Card collapsible title="Rechnungsdaten">
       <div className="props">
         {detail.rechnungsnummer?.trim() ? (
           <DetailProp label="Rechnungsnr.">{detail.rechnungsnummer.trim()}</DetailProp>
@@ -530,7 +513,6 @@ export function RechnungDetailClient({
 
   const fixedOverview = (
     <div className="space-y-3">
-      {projektKontext ? <ProjektUebersichtCard kontext={projektKontext} /> : null}
       {rechnungsdetailsCard}
       {zeigtMahnverlauf ? (
         <RechnungMahnverlaufCard
@@ -552,38 +534,7 @@ export function RechnungDetailClient({
     </div>
   )
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildRechnungNaechsteSchritte({
-        status: detail.status,
-        rechnungId: detail.id,
-        auftragId: detail.auftrag_id,
-        onSenden: detail.status === 'entwurf' ? handleSenden : undefined,
-        onBezahlt: detail.status === 'gesendet' ? () => void setStatus('bezahlt') : undefined,
-      }),
-    [detail.status, detail.id, detail.auftrag_id]
-  )
-
-  const schritteInhalt = <NaechsteSchritteCard steps={naechsteSchritte} />
-
-  const aktivitaetInhalt = (
-    <DetailAccordion
-      mobileOnly
-      sections={[
-        {
-          id: 'kommunikation',
-          title: ACTIVITY_SECTIONS.kommunikation,
-          defaultOpen: true,
-          content: (
-            <KommunikationCard
-              filter={{ rechnungId: detail.id, kundeId: detail.kunde_id ?? detail.kunden?.id }}
-              reloadKey={mailCompose.reloadKey + generation}
-            />
-          ),
-        },
-      ]}
-    />
-  )
+  const aktivitaetInhalt = <DetailAccordion mobileOnly sections={[]} />
 
   const dokumenteInhalt = (
     <div className="space-y-6">
@@ -610,23 +561,22 @@ export function RechnungDetailClient({
   )
 
   const desktopDetailTabs = [
-    { id: 'uebersicht', label: 'Übersicht', iconName: 'layout-dashboard' },
-    { id: 'positionen', label: 'Positionen', iconName: 'list-numbers', count: pos.length || undefined },
-    { id: 'aktivitaet', label: 'Aktivität', iconName: 'history' },
+    { id: 'uebersicht', label: 'Stammdaten', iconName: 'layout-dashboard' },
+    { id: 'positionen', label: 'Details', iconName: 'list-numbers', count: pos.length || undefined },
+    { id: 'aktivitaet', label: 'Verlauf', iconName: 'history' },
     { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
   ]
 
   const mobileDetailTabs = [
     { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
-    { id: 'leistung', label: 'Leistungsübersicht', iconName: 'list-numbers', count: pos.length || undefined },
-    { id: 'schritte', label: 'Nächste Schritte', iconName: 'checklist' },
-    { id: 'aktivitaet', label: 'Aktivität', iconName: 'history' },
+    { id: 'leistung', label: 'Details', iconName: 'list-numbers', count: pos.length || undefined },
+    { id: 'aktivitaet', label: 'Verlauf', iconName: 'history' },
     { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
   ]
 
   const desktopTabContent = (
     <>
-      {tab === 'uebersicht' ? schritteInhalt : null}
+      {tab === 'uebersicht' ? fixedOverview : null}
       {tab === 'positionen' ? positionenTab : null}
       {tab === 'aktivitaet' ? aktivitaetInhalt : null}
       {tab === 'dokumente' ? dokumenteInhalt : null}
@@ -637,7 +587,6 @@ export function RechnungDetailClient({
     <>
       {tab === 'stammdaten' ? fixedOverview : null}
       {tab === 'leistung' ? positionenTab : null}
-      {tab === 'schritte' ? schritteInhalt : null}
       {tab === 'aktivitaet' ? aktivitaetInhalt : null}
       {tab === 'dokumente' ? dokumenteInhalt : null}
     </>
@@ -646,8 +595,8 @@ export function RechnungDetailClient({
   return (
     <div className="space-y-4 pb-6">
       <DetailHead
-        backHref="/rechnungen"
-        backLabel="Zurück zu Rechnungen"
+        backHref="/vorgaenge?tab=rechnung"
+        backLabel="Zurück zu den Vorgängen"
         title={
           <div className="detail-head-title-row">
             <span>{titel}</span>
@@ -657,6 +606,7 @@ export function RechnungDetailClient({
                 {mahnLabel}
               </span>
             ) : null}
+            {pipelineLead ? <PipelineKontextBadge lead={pipelineLead} /> : null}
           </div>
         }
         sub={
@@ -679,7 +629,7 @@ export function RechnungDetailClient({
                   className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
                   aria-label="Weitere Aktionen"
                 >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  <MockIcon ctx="btn" n="dots" size={16} />
                   <span className="sr-only">Mehr</span>
                 </button>
               }
@@ -689,8 +639,6 @@ export function RechnungDetailClient({
           </>
         }
       />
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {err ? (
         <p className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">

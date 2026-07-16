@@ -3,15 +3,16 @@
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 
-/** Bestehende CRM-Routen (Variante B — kein /neu-Hub). */
-const NEU_ITEMS: Array<'sep' | { ic: string; label: string; href: string; desc?: string }> = [
-  { ic: 'inbox', label: 'Anfrage', href: '/anfragen/neu', desc: 'Neue Anfrage anlegen' },
-  { ic: 'file-invoice', label: 'Angebot', href: '/angebote/neu', desc: 'Angebot erstellen' },
-  { ic: 'receipt', label: 'Rechnung', href: '/rechnungen/neu', desc: 'Rechnung erstellen' },
+/** Mock Neu-Popover — Labels 1:1 Positivliste, bestehende CRM-Routen. */
+const NEU_ITEMS: Array<'sep' | { ic: string; label: string; href: string }> = [
+  { ic: 'inbox', label: 'Anfrage', href: '/anfragen/neu' },
+  { ic: 'file-invoice', label: 'Angebot', href: '/angebote/neu' },
+  { ic: 'briefcase', label: 'Auftrag', href: '/neu?art=auftrag' },
+  { ic: 'receipt', label: 'Rechnung', href: '/rechnungen/neu' },
   'sep',
-  { ic: 'users', label: 'Kunde', href: '/kunden?neu=1', desc: 'Kundenstammdaten' },
-  { ic: 'tool', label: 'Handwerker', href: '/handwerker?neu=1', desc: 'Handwerker anlegen' },
-  { ic: 'building', label: 'Partner', href: '/partner?neu=1', desc: 'Partner anlegen' },
+  { ic: 'users', label: 'Kunde', href: '/kunden?neu=1' },
+  { ic: 'tool', label: 'Handwerker', href: '/handwerker?neu=1' },
+  { ic: 'building', label: 'Partner', href: '/partner?neu=1' },
 ]
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -25,9 +26,9 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
         className="neu-pop"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Neu erstellen"
+        aria-label="Neuen Vorgang erstellen"
       >
-        <div className="neu-pop-head">Neu erstellen</div>
+        <div className="neu-pop-head">Neuen Vorgang erstellen</div>
         {NEU_ITEMS.map((it, i) =>
           it === 'sep' ? (
             <div key={`sep-${i}`} className="neu-pop-sep" />
@@ -42,11 +43,10 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
               }}
             >
               <span className="neu-pop-ico">
-                <MockIcon n={it.ic} size={18} />
+                <MockIcon ctx="default" n={it.ic} size={18} />
               </span>
               <span className="neu-pop-txt">
                 <span className="l">{it.label}</span>
-                {it.desc ? <span className="d">{it.desc}</span> : null}
               </span>
             </button>
           )

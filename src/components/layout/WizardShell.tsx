@@ -62,7 +62,7 @@ export function WizardShell({
             <nav className="stepper hidden lg:flex" aria-label="Fortschritt">
               {steps.map((s, i) => (
                 <Fragment key={s.id}>
-                  {i > 0 ? <MockIcon n="chevron-right" size={14} className="step-arrow" /> : null}
+                  {i > 0 ? <MockIcon ctx="default" n="chevron-right" size={14} className="step-arrow" /> : null}
                   <div
                     className={cn(
                       'step',
@@ -71,7 +71,7 @@ export function WizardShell({
                     )}
                   >
                     <div className="step-n">
-                      {s.id < currentStep ? <MockIcon n="check" size={11} /> : s.id}
+                      {s.id < currentStep ? <MockIcon ctx="default" n="check" size={11} /> : s.id}
                     </div>
                     <span>{s.label}</span>
                   </div>

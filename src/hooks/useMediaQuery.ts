@@ -15,8 +15,3 @@ export function useMediaQuery(query: string): boolean {
 
   return matches
 }
-
-/** Viewport ≥ 900px — iPad Master-Detail / Tablet-Desktop. */
-export function useIsMasterDetailViewport(): boolean {
-  return useMediaQuery('(min-width: 900px)')
-}

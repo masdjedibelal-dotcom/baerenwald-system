@@ -4,18 +4,10 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Sparkles } from 'lucide-react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ProjektKette } from '@/components/crm/ProjektKette'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { LeadNaechsteSchritteCard, buildLeadNaechsteSchritte } from '@/components/anfragen/LeadNaechsteSchritteCard'
-import {
-  dedupeKalenderTermineAnzeige,
-  normalizeKalenderTermineList,
-} from '@/lib/anfragen/normalize-kalender-termine'
-import { istLeadTerminAnzeige } from '@/lib/kalender-internes-todo'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import {
   isEchterFreitext,
@@ -33,16 +25,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeadFunnelProjektAnzeige } from '@/components/anfragen/LeadFunnelProjektAnzeige'
-import { LeadOrgKontextBlock } from '@/components/anfragen/LeadOrgKontextBlock'
-import { LeadGptStudioBlock, leadHatKiVertriebsDaten } from '@/components/anfragen/LeadGptStudioBlock'
 import { LeadNotizenListeTab } from '@/components/anfragen/AnfrageLeadTabsShared'
-import { LeadTermineCard } from '@/components/anfragen/LeadTermineCard'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
@@ -368,7 +357,7 @@ export function AnfrageDetailClient({
             className="btn btn-ghost btn-sm"
             aria-label="Stammdaten bearbeiten"
           >
-            <MockIcon n="pencil" size={15} />
+            <MockIcon ctx="btn" n="pencil" size={15} />
           </button>
         ) : null
       }
@@ -460,68 +449,16 @@ export function AnfrageDetailClient({
     if (href) router.push(`${href}#angebot-versand-kunde`)
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
-  const primaryCtaLabel = useMemo(() => {
-    if (!hasAngebote) return CTA.angebotErstellen
-    if (!angebotFlowSnapshot?.handwerkerErledigt) return 'Handwerker einholen'
-    if (!angebotFlowSnapshot?.angebotAnKundeGesendet) return 'An Kunden senden'
-    return CTA.angeboteOeffnen
-  }, [hasAngebote, angebotFlowSnapshot])
+  const primaryCtaLabel = CTA.angebotErstellen
 
   const primaryCtaAction = useCallback(() => {
-    if (!hasAngebote) {
-      openAngebotErstellen()
-      return
-    }
-    if (!angebotFlowSnapshot?.handwerkerErledigt) {
-      openHandwerkerEinholen()
-      return
-    }
-    if (!angebotFlowSnapshot?.angebotAnKundeGesendet) {
-      openAngebotAnKunde()
-      return
-    }
     openAngebotErstellen()
-  }, [
-    hasAngebote,
-    angebotFlowSnapshot,
-    openAngebotErstellen,
-    openHandwerkerEinholen,
-    openAngebotAnKunde,
-  ])
+  }, [openAngebotErstellen])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
     setAngebotWizardBootstrap(null)
   }, [])
-
-  const hatTermin = useMemo(() => {
-    const unique = dedupeKalenderTermineAnzeige(
-      normalizeKalenderTermineList(lead.kalender_termine as KalenderTermin[] | null | undefined)
-    ).filter(istLeadTerminAnzeige)
-    return unique.length > 0
-  }, [lead.kalender_termine])
-
-  const naechsteSchritte = useMemo(
-    () =>
-      buildLeadNaechsteSchritte({
-        hatTermin,
-        handwerkerErledigt: angebotFlowSnapshot?.handwerkerErledigt ?? false,
-        angebotAnKundeGesendet: angebotFlowSnapshot?.angebotAnKundeGesendet ?? false,
-        angebotHref:
-          angebotFlowSnapshot?.angebotHref ??
-          (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : undefined),
-        onTerminClick: () => setStatusModalKind('termin'),
-        onHandwerkerEinholen: openHandwerkerEinholen,
-        onAngebotAnKunde: openAngebotAnKunde,
-      }),
-    [
-      angeboteListe,
-      hatTermin,
-      angebotFlowSnapshot,
-      openHandwerkerEinholen,
-      openAngebotAnKunde,
-    ]
-  )
 
   const detailHeadMenuItems = useMemo((): ActionsMenuItem[] => {
     const items: ActionsMenuItem[] = [
@@ -572,6 +509,28 @@ export function AnfrageDetailClient({
       icon: mockMenuIcon('file-invoice'),
       onClick: () => openAngebotErstellen(),
     })
+
+    if (hasAngebote && !angebotFlowSnapshot?.handwerkerErledigt) {
+      items.push({
+        label: 'Handwerker einholen',
+        icon: mockMenuIcon('tool'),
+        onClick: () => openHandwerkerEinholen(),
+      })
+    }
+    if (hasAngebote && angebotFlowSnapshot?.handwerkerErledigt && !angebotFlowSnapshot?.angebotAnKundeGesendet) {
+      items.push({
+        label: 'An Kunden senden',
+        icon: mockMenuIcon('send'),
+        onClick: () => openAngebotAnKunde(),
+      })
+    }
+    if (auftragId) {
+      items.push({
+        label: 'Zum Auftrag',
+        icon: mockMenuIcon('briefcase'),
+        onClick: () => router.push(`/auftraege/${auftragId}`),
+      })
+    }
 
     items.push('sep', {
       label: 'Mail schreiben',
@@ -628,6 +587,11 @@ export function AnfrageDetailClient({
     leadTelefon,
     mailCompose,
     openAngebotErstellen,
+    openHandwerkerEinholen,
+    openAngebotAnKunde,
+    hasAngebote,
+    angebotFlowSnapshot,
+    auftragId,
     router,
     startTransition,
     isCrmAdmin,
@@ -643,7 +607,7 @@ export function AnfrageDetailClient({
       }
       toast.success('Anfrage gelöscht')
       setDeleteConfirmOpen(false)
-      router.push('/anfragen')
+      router.push('/vorgaenge?tab=anfrage')
       refresh()
     })
   }
@@ -687,18 +651,9 @@ export function AnfrageDetailClient({
     </>
   )
 
-  const hatKiVertrieb = leadHatKiVertriebsDaten(lead)
-
   const stammdatenInhalt = (
     <>
       {stammdatenCard}
-      <LeadTermineCard
-        leadId={lead.id}
-        termine={lead.kalender_termine as KalenderTermin[] | null | undefined}
-        notizen={notizenRows}
-        onReload={() => refresh()}
-      />
-      <LeadNaechsteSchritteCard steps={naechsteSchritte} />
     </>
   )
 
@@ -710,8 +665,6 @@ export function AnfrageDetailClient({
         preislisten={wizardPreislisten}
         onSaved={() => refresh()}
       />
-      {hatKiVertrieb ? <LeadGptStudioBlock lead={lead} /> : null}
-      <LeadOrgKontextBlock lead={lead} />
       {objekteCard}
       {isEchterFreitext(lead.kontakt_nachricht) ? (
         <Card title="Nachricht vom Kunden">
@@ -722,10 +675,7 @@ export function AnfrageDetailClient({
   )
 
   const notizenInhalt = (
-    <>
-      <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
-      <KommunikationCard filter={{ leadId: lead.id }} reloadKey={mailCompose.reloadKey + generation} />
-    </>
+    <LeadNotizenListeTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
   )
 
   const detailShellGroups: DetailShellGroup[] = [
@@ -771,33 +721,30 @@ export function AnfrageDetailClient({
     },
   ]
 
-  const kiAnalyseCard =
-    !hatKiVertrieb && lead.ki_zusammenfassung?.trim() ? (
-      <details className="group rounded-lg border border-[#2E7D52] bg-[#EAF3DE]">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-[#2E7D52] marker:content-none [&::-webkit-details-marker]:hidden">
-          <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          KI Vertriebs-Analyse
-        </summary>
-        <p className="whitespace-pre-wrap border-t border-[#2E7D52]/25 px-4 pb-3.5 pt-2 text-[13px] leading-relaxed text-[#1A3D2B]">
-          {lead.ki_zusammenfassung.trim()}
-        </p>
-      </details>
-    ) : null
-
-
   return (
     <div className="space-y-4 pb-6">
       <DetailHead
-        backHref="/anfragen"
-        backLabel="Zurück zu Anfragen"
+        backHref="/vorgaenge?tab=anfrage"
+        backLabel="Zurück zu den Vorgängen"
         title={kundenName(lead)}
-        badges={(() => {
-          const s = anfrageStatusDisplay(lead.status)
-          if (lead.status === 'angebot') {
-            return <StatusBadge status="offer" label={s.label} />
-          }
-          return <StatusBadge label={s.label} variant={s.variant} />
-        })()}
+        badges={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {(() => {
+              const s = anfrageStatusDisplay(lead.status)
+              if (lead.status === 'angebot') {
+                return <StatusBadge status="offer" label={s.label} />
+              }
+              return <StatusBadge label={s.label} variant={s.variant} />
+            })()}
+            <PipelineKontextBadge
+              lead={{
+                kanal: lead.kanal,
+                auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
+                anlass: lead.anlass,
+              }}
+            />
+          </span>
+        }
         meta={headMeta}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2">
@@ -807,17 +754,8 @@ export function AnfrageDetailClient({
               onClick={primaryCtaAction}
             >
               {primaryCtaLabel}
-              <MockIcon n="arrow-right" size={15} />
+              <MockIcon ctx="btn" n="arrow-right" size={15} />
             </button>
-            {auftragId ? (
-              <Link
-                href={`/auftraege/${auftragId}`}
-                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5"
-              >
-                <MockIcon n="briefcase" size={15} />
-                <span className="hidden sm:inline">Auftrag</span>
-              </Link>
-            ) : null}
             <ActionsMenu
               trigger={
                 <button
@@ -826,7 +764,7 @@ export function AnfrageDetailClient({
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >
-                  <MockIcon n="dots" size={18} />
+                  <MockIcon ctx="btn" n="dots" size={18} />
                   <span className="sr-only">Mehr</span>
                 </button>
               }
@@ -836,10 +774,6 @@ export function AnfrageDetailClient({
           </div>
         }
       />
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
-
-      {kiAnalyseCard}
 
       <DetailShell
         groups={detailShellGroups}

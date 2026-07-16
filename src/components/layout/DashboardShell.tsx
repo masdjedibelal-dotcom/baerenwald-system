@@ -53,7 +53,7 @@ export function DashboardShell({
           aria-label="Neu erstellen"
           onClick={() => setNeuOpen(true)}
         >
-          <MockIcon n="plus" size={26} />
+          <MockIcon ctx="btn" n="plus" size={26} />
         </button>
       </div>
 

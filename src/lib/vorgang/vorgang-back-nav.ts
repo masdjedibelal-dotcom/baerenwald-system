@@ -5,7 +5,7 @@ export function vorgangBackNav(phase?: VorgangPhase | null): {
   backLabel: string
 } {
   return {
-    backHref: phase ? `/vorgaenge?phase=${phase}` : '/vorgaenge',
+    backHref: phase ? `/vorgaenge?tab=${phase}` : '/vorgaenge',
     backLabel: 'Zurück zu den Vorgängen',
   }
 }

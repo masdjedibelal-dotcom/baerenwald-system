@@ -19,7 +19,7 @@ export function MockChip({
 }) {
   return (
     <button type="button" className={cn('chip', active && 'active')} onClick={onClick}>
-      {icon ? <MockIcon n={icon} size={14} /> : null}
+      {icon ? <MockIcon ctx="btn" n={icon} size={14} /> : null}
       {children}
       {count != null ? <span className="chip-count">{count}</span> : null}
     </button>
@@ -61,7 +61,7 @@ export function MockBtn({
       title={title}
       disabled={disabled}
     >
-      {icon ? <MockIcon n={icon} size={sm ? 14 : 15} /> : null}
+      {icon ? <MockIcon ctx="btn" n={icon} size={sm ? 14 : 15} /> : null}
       {children}
     </button>
   )
@@ -112,7 +112,7 @@ export function MockPager({
           onClick={() => onPageChange(page - 1)}
           title="Zurück"
         >
-          <MockIcon n="chevron-left" size={16} />
+          <MockIcon ctx="btn" n="chevron-left" size={16} />
         </button>
         {nums.map((n, i) =>
           n === '…' ? (
@@ -137,7 +137,7 @@ export function MockPager({
           onClick={() => onPageChange(page + 1)}
           title="Weiter"
         >
-          <MockIcon n="chevron-right" size={16} />
+          <MockIcon ctx="btn" n="chevron-right" size={16} />
         </button>
       </div>
     </div>
@@ -173,8 +173,8 @@ export function MockSortHead({
       }}
     >
       {children}
-      <MockIcon
-        n={sortCol === col ? (sortDir === 1 ? 'arrow-up' : 'arrow-down') : 'arrows-sort'}
+      <MockIcon ctx="default"
+        n={sortCol === col ? (sortDir === 1 ? 'arrow-up' : 'arrow-down') : 'arrows-exchange'}
         size={12}
         style={{ opacity: sortCol === col ? 1 : 0.35 }}
       />

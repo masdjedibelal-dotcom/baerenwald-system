@@ -80,7 +80,7 @@ export function MockDashboardClient({
             onClick={() => router.push(k.href)}
           >
             <div className="kpi-ico">
-              <MockIcon n={k.icon} size={19} />
+              <MockIcon ctx="default" n={k.icon} size={19} />
             </div>
             <div style={{ minWidth: 0 }}>
               <div className="kpi-val">{k.value}</div>

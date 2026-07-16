@@ -114,6 +114,197 @@ Belal selbst — Cursor überspringt. Hinweis: Keine Testszenarien mit einer E-M
 | `/angebote/neu` | Wizard zurück / Legacy-Redirect bleiben | **Legacy-Redirect bleiben** | Create läuft über Anfrage; kein Wizard-Stateverlust auf dieser Route |
 | Build-Regression crm-access | belassen / split | **`crm-access-server.ts`** | `next/headers` darf nicht Client-Login pullen |
 
+---
 
+## Konsolidierung 2026-07-16 (A0/A)
 
+| Konflikt | Gewählt | Begründung |
+|----------|---------|------------|
+| `docs/ENTSCHEIDUNGSLOG.md` | **code-Clone (`9110c1a`)** | Vollständiger (Nr. 1–8a) |
+| `package-lock.json` | **code-Clone** | Lockfile zum Funktionsstand |
+| `src/.../anfragen/[id]/page.tsx` | **code-Clone** | Funktional + Mock-Detail |
+| `src/.../formulare/[id]/vorschau/page.tsx` | **code-Clone** | — |
+| `src/.../impersonation/actions.ts` | **code-Clone** | Impersonation vollständig |
+| `src/.../rechnungen/wizard-actions.ts` | **code-Clone** | inkl. Standalone-Bootstrap |
+| `src/.../handwerker/.../antwort/route.ts` | **code-Clone** | HW-Mail-Fix |
+| `src/.../RechnungDetailClient.tsx` | **code-Clone** | Wizard-Edit ohne Auftrag |
+| `src/.../RechnungWizard.tsx` | **code-Clone** | onDone/onClose-Race-Fix |
+
+Basis-Historie: **Desktop `008fb9e`** (`fa0f59d` + Nr. 1–7d). Funktionsbaum: **Merge `9110c1a`** (Vorgänge, PosBoard, mock-design-system).
+
+---
+
+## Nr. 1–2 Review (Wiederaufnahme 2026-07-16)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Split-Screen Master-Detail | Behalten / Entfernen | **Entfernen** | Vollbreiten-Liste; Zeilenklick → Detail-Route |
+| Sort-Header | SortableHeader (Lucide) / MockSortHead | **MockSortHead** | Hybrid beenden |
+| Status-Badges in Listen | LeadStatusBadge / MockBadge | **LeadStatusMockBadge** | Mock-Badge-Kinds |
+| ListFilterBar | Sofort ersetzen / schrittweise | **Schrittweise** | Filter-Logik komplex; Toolbar-Klassen bleiben |
+| ListToolbar.tsx | Behalten / Löschen | **Löschen** | OP-5 freigegeben, 0 Imports |
+| MasterDetailShell-Wrapper | Sofort löschen / Ersetzungsliste | **Ersetzungsliste** | Regel 4 — siehe `docs/LISTEN-ERSETZUNG.md` |
+
+## Nr. 3 — WizardShell verdrahten
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Shell-Integration | AppFlowScreen behalten / WizardShell | **WizardShell** in Angebot- + Rechnungs-Wizard | Mock-Stepper + MockBtn-Header; `createPortal` bleibt |
+
+## Mock-Only Sweep 2026-07-16
+
+| Element | getragene Funktion | Daten bleiben erhalten ja/nein | Ersatz-Zugang (Pfad oder "aktuell nirgends") |
+|-------|----------|---------|------------|
+| Anfrage-Detail: KI-Vertriebs-Analyse (`AnfrageDetailClient`) | Zusatz-Analysepanel im Detailkopf | ja | aktuell nirgends |
+| Anfrage-Detail: ProjektKette (`AnfrageDetailClient`) | Kontextkette Anfrage→Angebot→Auftrag | ja | über direkte Detail-Routen |
+| Anfrage-Liste: KI-Badge/Sparkles (`AnfragenListeClient`) | KI-Markierung in Listenzeile | ja | aktuell nirgends |
+| Angebot-Detail: Verkauf-/Auftrag-Banner (`AngebotDetailPageClient`) | Status-Hinweis oberhalb Stammdaten | ja | Status/Schritte im Detailtab |
+| Angebot-Detail: Org-Freigabe-Banner (`AngebotDetailPageClient`) | zusätzlicher Freigabe-Hinweisblock | ja | aktuell nirgends |
+| Angebot-Detail: ProjektKette (`AngebotDetailPageClient`) | Kontextkette über Projekt | ja | über direkte Detail-Routen |
+| Auftrag-Detail: TopCards (`AuftragDetailClient`) | KPI-/Top-Metrik-Karten im Stammdaten-Tab | ja | aktuell nirgends |
+| Auftrag-Detail: ProjektKette (`AuftragDetailClient`) | Kontextkette Projektobjekte | ja | über direkte Detail-Routen |
+| Auftrag-Detail: Notizen-Kommunikationsblock (`AuftragDetailClient`) | Mail-/Kommunikations-Historie | ja | aktuell nirgends |
+| Rechnung-Detail: ProjektKette (`RechnungDetailClient`) | Kontextkette über Projekt | ja | über direkte Detail-Routen |
+| Rechnung-Detail: Projektübersicht-Card (`RechnungDetailClient`) | Projektkontext in Übersicht | ja | aktuell nirgends |
+| Rechnung-Detail: Aktivität-Kommunikation (`RechnungDetailClient`) | Kommunikationsliste in Aktivität | ja | aktuell nirgends |
+| Kunden-Detail: KPI-Row (`KundeDetailClient`) | aggregierte Kennzahlenkarten | ja | aktuell nirgends |
+| Kunden-Detail: Kommunikationskarte (`KundeDetailClient`) | Kundenkommunikation im Stammdaten-Overview | ja | aktuell nirgends |
+| Kunden-Detail: Einbehalte + Offene-Posten-Sektion (`KundeDetailClient`) | Zusatzblöcke unter Rechnungen | ja | aktuell nirgends |
+| Kunden-/Handwerker-Detail: Portal-Konto-Statuschip | visuelle Konto-Info im Kopf | ja | aktuell nirgends |
+| Handwerker-Detail: Bewertungs-Card (`HandwerkerDetailClient`) | aggregierte Sternebewertung | ja | aktuell nirgends |
+| Handwerker-Detail: Projekt-Compliance-Block in Aufträgen | Zusatz-Compliance je Auftragskarte | ja | Tab `Compliance` im Handwerker-Detail |
+
+---
+
+## Nr. 8a — Shell Positivliste (2026-07-16)
+
+Format: **Element** | **Funktion** | **neuer Ort** (oder „entfällt, Daten bleiben in DB“)
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| Sidebar: Anfragen / Angebote / Aufträge | Navigation zu Phasen-Listen | Dashboard-KPIs/Phasen + Vorgänge (`activeAlso` / Deep-Links `/anfragen` …) |
+| Sidebar: Rechnungen (unter Finanzen) | Navigation Rechnungs-Liste | Dashboard + Vorgänge Phase Rechnung |
+| Sidebar: KI Hub | Navigation KI-Analytics | entfällt in Nav; Route `/ki-analytics` bleibt (OFFENE-PUNKTE) |
+| Sidebar: Abmelden | `signOut` → Login | Mehr-Screen (`/mehr`) Button Abmelden |
+| Bottom-Nav: MoreSheet (Bottom-Sheet) | Kurz-Nav + Abmelden | Mehr-Screen `/mehr` (Mock: `navigate("mehr")`); MoreSheet gelöscht |
+| Neu-Popover: Auftrag → `/auftraege?neu=1` | Neuen Auftrag anlegen | `/neu?art=auftrag` (bestehender Neu-Screen) |
+
+---
+
+## Nr. 8b — Listen Positivliste (2026-07-16)
+
+Format: **Element** | **Funktion** | **neuer Ort**
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| `/anfragen` Listen-UI (AnfragenListeClient) | Anfragen filtern/browsen | `/vorgaenge?phase=anfrage` (Redirect) |
+| `/angebote` Listen-UI | Angebote filtern/browsen | `/vorgaenge?phase=angebot` (Redirect) |
+| `/auftraege` Listen-UI | Aufträge filtern/browsen | `/vorgaenge?phase=auftrag` (Redirect) |
+| `/rechnungen` Listen-UI | Rechnungen filtern/browsen | `/vorgaenge?phase=rechnung` (Redirect) |
+| LegacyDemoAnfragenBanner | Demo-Leads löschen | entfällt, Daten bleiben in DB (SQL/Admin) |
+| Master-Detail-Split CSS + Placeholder | Split-View Liste\|Detail | entfällt; Vollbreite Liste bzw. Detail-Route |
+| ListRowQuickActions (Anfragen) | Telefon/WA-Schnellaktionen | Vorgänge entityMenu (Anrufen) wo verdrahtet |
+| Phasen-Listen Filter-Chips (Pipeline/Anlass/Org/Kanal/…) | Eingrenzen | Vorgänge-Filter-Modal + Phasen-Chips |
+| Aufträge `?selected=` Deep-Link | Detail ohne Zeilenklick | Detail-Route `/auftraege/[id]` |
+
+---
+
+## Nr. 8c — Detail-Screens Positivliste (2026-07-16)
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| Anfrage: KI-Block (`LeadGptStudioBlock`) | KI-Vertriebs-Analyse | entfällt, Daten bleiben in DB |
+| Anfrage: Kommunikation in Notizen | Mail-Historie | ⋯ „Mail schreiben“ |
+| Anfrage: CTAs Handwerker/Kunde/Auftrag | Funnel-Schritte | ⋯-Menü |
+| Anfrage: Termine-/Nächste-Schritte-Cards | Termin & Schritte | Termin über ⋯ Status-Modal; Rest entfällt UI |
+| Angebot: Tab Visualisierungen | KI-Sessions | ⋯ → `/angebote/[id]/visualisierung` |
+| Angebot: Kommunikation in Notizen | Mail-Historie | ⋯ „Mail schreiben“ |
+| Angebot: CTA „Handwerker einholen“ | HW-Versand | Primär „Angebot versenden“ (gleicher Anker) |
+| Auftrag: Tab Compliance | Checkliste | Dokumente-Tab (Bauprojekt) |
+| Auftrag: Header „Bearbeiten“ | Projekt bearbeiten | ⋯ „Bearbeiten“ |
+| Auftrag: Nächste-Schritte-Card | Pipeline-Hinweise | entfällt UI; CTAs Abschließen/Rechnung bleiben |
+| Rechnung: Nächste-Schritte-Card | Schritte | entfällt UI; CTAs Versenden/Bezahlt |
+| Alle Details: Zurück zur Phasen-Liste | Navigation | `/vorgaenge?phase=…` |
+
+---
+
+## Nr. 8d — Stammdaten Positivliste (2026-07-16)
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| Kunden-Liste: ListFilterBar/Zeitraum/Umsatz-Sort | Filter/Sortierung | Mock-Listbar: Filter & Suchen, Chips, MockPager (10) |
+| Kunden-Liste: Status-Badge/Interessent in Mobile | Listen-Status | entfällt UI |
+| Kunden-Liste: KPI-Spalten Umsatz/Aufträge | Sort-Optionen | entfällt; Sort Name/Typ/Telefon/Email |
+| Kunden-Detail: getrennte Tabs Anfragen/Angebote/Aufträge | Phasen-Übersicht | Tab „Vorgänge“ (kombiniert) |
+| Kunden-Detail: Tab Organisation | HV-Portal/Org-Verwaltung | ⋯ „Organisation“ → Stammdaten-Tab-Inhalt |
+| Kunden-Detail: Header E-Mail-Button | Mail an Kunde | ⋯ „Mail schreiben“ |
+| Kunden-Detail: Interne Notiz in Overview | Notizen | Tab „Notizen“ |
+| Handwerker-Liste: Einsatz-Banner (`?filter=einsatz`) | Deep-Link-Filter | entfällt UI |
+| Handwerker-Liste: ComplianceBadge in Status-Spalte | Compliance-Anzeige | Status „Aktiv“/„Verfügbar“; Compliance-Chip + Filter „Nur zu prüfen“ |
+| Handwerker-Liste: Chip „Alle“ | Gewerk-Filter | Chip „Alle Gewerke“ + Mock-Gewerke + Compliance |
+| Handwerker-Detail: Tab Compliance | Nachweis-Upload | Tab „Dokumente“ |
+| Handwerker-Detail: Header Bearbeiten/Rahmenvertrag | Stammdaten/Wizard | ⋯-Menü |
+| Partner-Liste: Chips Partner/Netzwerk | Typ-Filter | entfällt; Kategorie-Chips laut Mock |
+| Partner-Liste: PartnerTypBadge in Zeilen | Typ-Anzeige | entfällt UI |
+| Partner-Detail: PartnerTypBadge / E-Mail-CTA | Typ/Mail | Kategorie-Badge; ⋯ „Mail schreiben“ |
+| Partner-Detail: flache Ein-Seiten-Ansicht | Detail-Navigation | Tabs Übersicht/Stammdaten/Vorgänge/Dokumente/Notizen |
+
+---
+
+## Nr. 8e — Wizards Positivliste (2026-07-16)
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| Angebots-Wizard Schritt 1: Anfrage-Daten, Dokumenttyp, Fotos, KI-Viz | Zusatz-UI | entfällt UI; Daten bleiben im Lead/Entwurf |
+| Angebots-Wizard Schritt 1 Label „Leistungen“ | Stepper | „Positionen · {Projekt}“ |
+| Angebots-Wizard Schritt 2: Rechtliche Hinweise | §35a/13b-Toggles | entfällt UI (OFFENE-PUNKTE) |
+| Angebots-Wizard Finish „Erstellen und versenden“ | Versand | „Angebot versenden“ |
+| Rechnungs-Wizard Schritte Finalisieren/Versenden | Stepper | „Positionen“ / „Zahlplan“ / „Paket & Versand“ |
+| Rechnungs-Wizard Schritt 2: Rechnungsdetails | Meta-Felder | Schritt 3 „Paket & Versand“ |
+
+---
+
+## Nr. 9a — Resolver (2026-07-16)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Fine-Stages in `status_einfach` | Flatten auf gesendet / Behalten | **Behalten** | OP-4; Labels + Actor gesendet_kunde/kunde |
+| Tests | Manuell / `test:crm-vorgang` | **6 Fixtures + Shape-Assert** | Spec: alle grün vor Nav |
+
+## Nr. 9b — Chips auf Resolver (2026-07-16)
+
+| Element | Funktion | neuer Ort |
+|---------|----------|-----------|
+| Angebot Fine-Stage-Chips (Listen) | Filter HW/Kunde-Stufen | Vorgänge Filter-Modal Status = Resolver-`unterstatus` (Phase Angebot) |
+| OP-3/OP-4 | Zurückgestellt | erledigt |
+
+---
+
+## Nr. 9c — Vorgänge + Sidebar (2026-07-16)
+
+| Frage / Element | Optionen | Gewählt | Begründung |
+|-----------------|----------|---------|------------|
+| Phasen-URL | `?phase=` / `?tab=` | **`?tab=` schreiben**, `tab` dann `phase` lesen | Redirect-Kompatibilität; neue Links einheitlich `tab` |
+| Listen-Spalten | Mock inkl. Aktion | **Kunde · Vorgang · Phase · Wert · Datum · Status · ⋯** | Keine Aktion/NeedsAction-Spalte, keine Kontext-Badges in Zeilen |
+| „Wartet auf Freigabe“ | Actor-Label / Badge | **Nur `badges.wartet_freigabe`** in Status-Spalte | Actor/needsAction bleiben intern (Resolver) |
+| Multi-Select Bulk | Mock ohne Leiste | **Bulkbar: Export, Löschen, Öffnen (1×)** | Keine Dummy-Buttons; fehlende Bulk-Aktionen → OFFENE-PUNKTE |
+| Phasen-Redirects | `/anfragen` … | **`/vorgaenge?tab=…`** | Ein Einstieg „Vorgänge“ |
+| Sidebar-Nav | Getrennte Phasen + KI Hub | **Positivliste: Dashboard, Vorgänge, Stammdaten, Kalender** | KI Hub: Funktionsschutz Deep-Link `/ki-analytics`, nicht in Nav |
+| PipelineKontextBadge | — | **Detail-Header** Anfrage/Angebot/Auftrag/Rechnung | Lead-Kanal/HV-Kontext sichtbar wo Lead-Daten da |
+| Aktiver Sidebar-Eintrag | Grün/Weiß | **Weiße Pill, `--green-dark` Text/Icon** | `.sidebar-icon.active` + Icon inherit |
+
+---
+
+## Mock-Referenz v7 + Wizard-Erweiterungen (2026-07-16)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Kanonische Referenz | v4 / v6 / **v7** | **`Baerenwald CRM (standalone) (7).html`** | Auftrag: neueste Standalone ersetzt ältere |
+| Gegencheck Alt-Funktionen | Improvisieren / STOPP | **Alle 4 gefunden** (Zahlfrist, §35a EStG, Reverse-Charge §13b, Vorschau) nach Gzip-Decode des Bundles | Ohne Treffer: STOPP laut Auftrag |
+| E-Mail-Versanddialog | 1:1 Mock / Delta | **Funktions-Delta** — CRM-Dialog unverändert | Explizit; Gate prüft nicht gegen Mock |
+| Angebots-PDF | Redesign / Delta | **Funktions-Delta** — Renderer unverändert | Explizit; Gate prüft nicht gegen Mock |
+| Angebot Doctype-Labels | einfach/projekt / einfach/komplex | **UI: Einfaches / Komplexes Angebot**; Persistenz weiter `einfach`/`projekt` | Mock-Text „Komplexes Angebot“, DB-Typ bleibt `projekt` |
+| Angebot Steps | 3 / 5 | **5:** Typ & Projekt → Positionen → Finalisieren → Vorschau → Versenden | Positivliste v7 |
+| Rechnung Steuer-UI | Alte Card-Labels / Mock-Checkboxen | **Mock-Texte** in Paket & Versand; PDF über `hinweis_35a` / `reverse_charge_13b` | Hinweisblöcke ein-/ausblenden in Preview + PDF |
+| Umsetzung | — | **Angebot 5 Steps + Zahlfrist; Rechnung Zahlfrist (Einzel) + Steuer-Checkboxen** | Feldlogik alt (`zahlungsbedingungen` / `faellig_am` / Meta-Flags); Optik v7 |
 

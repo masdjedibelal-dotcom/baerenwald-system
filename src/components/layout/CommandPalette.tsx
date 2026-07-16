@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     >
       <div className="cmdk" role="dialog" aria-modal="true" aria-label="Suche">
         <div className="cmdk-input">
-          <MockIcon n="search" size={18} style={{ color: 'var(--text-3)' }} />
+          <MockIcon ctx="default" n="search" size={18} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -159,7 +159,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     router.push(c.href)
                   }}
                 >
-                  <MockIcon n={c.icon || 'arrow-right'} size={16} />
+                  <MockIcon ctx="default" n={c.icon || 'arrow-right'} size={16} />
                   <span style={{ flex: 1 }}>{c.label}</span>
                   {c.sub ? <span className="hint">{c.sub}</span> : null}
                 </button>
@@ -175,7 +175,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   className="cmdk-item"
                   onClick={() => setQ(r)}
                 >
-                  <MockIcon n="clock" size={16} style={{ color: 'var(--text-3)' }} />
+                  <MockIcon ctx="default" n="clock" size={16} />
                   <span style={{ flex: 1 }}>{r}</span>
                 </button>
               ))}

@@ -47,6 +47,18 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     angebotId: rec.angebot_id,
   })
 
+  let pipelineLead: { kanal?: string | null; auftraggeber_kunde_id?: string | null; anlass?: string | null } | null =
+    null
+  const leadId = projektKontext.lead?.id
+  if (leadId) {
+    const { data: leadRow } = await supabase
+      .from('leads')
+      .select('kanal, auftraggeber_kunde_id, anlass')
+      .eq('id', leadId)
+      .maybeSingle()
+    if (leadRow) pipelineLead = leadRow
+  }
+
   return (
     <RechnungDetailClient
       detail={data as Rechnung}
@@ -56,6 +68,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       firm={firm}
       mahnMails={mahnRes.data ?? []}
       projektKontext={projektKontext}
+      pipelineLead={pipelineLead}
     />
   )
 }

@@ -7,19 +7,16 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { MapPin } from 'lucide-react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { ProjektKette } from '@/components/crm/ProjektKette'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
+import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { AuftragFinanzenClient } from '@/components/auftraege/AuftragFinanzenClient'
 import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
 import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
-import { KommunikationCard } from '@/components/kommunikation/KommunikationCard'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
-import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
-import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
@@ -36,25 +33,20 @@ import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPos
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
-  zaehleAuftragComplianceOffen,
 } from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import {
-  completeAuftragAbnahme,
   createFormularEintragUndEmail,
-  startAuftragArbeit,
-  setAuftragZurAbnahme,
   updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
-import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
-import { auftragStatusDisplay, auftragTypDisplay } from '@/lib/status/status-display'
+import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -96,7 +88,6 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
-import { buildAuftragNaechsteSchritte } from '@/lib/naechste-schritte'
 import type { AngebotHandwerkerRow, LeadDetail } from '@/lib/types'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
@@ -115,7 +106,15 @@ type GewerkOpt = { id: string; name: string; slug: string }
 
 type AuftragLeadSnapshot = Pick<
   Lead,
-  'id' | 'plz' | 'kontakt_name' | 'kontakt_email' | 'kontakt_telefon' | 'funnel_daten'
+  | 'id'
+  | 'plz'
+  | 'kontakt_name'
+  | 'kontakt_email'
+  | 'kontakt_telefon'
+  | 'funnel_daten'
+  | 'kanal'
+  | 'auftraggeber_kunde_id'
+  | 'anlass'
 >
 
 type AuftragDetailTab =
@@ -124,7 +123,6 @@ type AuftragDetailTab =
   | 'baustelle'
   | 'aktivitaet'
   | 'dokumente'
-  | 'compliance'
   | 'finanzen'
   | 'notizen'
 
@@ -134,7 +132,6 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'baustelle',
   'aktivitaet',
   'dokumente',
-  'compliance',
   'finanzen',
   'notizen',
 ])
@@ -148,6 +145,7 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
   if (tab === 'zahlplan') return 'finanzen'
   if (tab === 'bautagebuch') return 'baustelle'
   if (tab === 'verlauf') return 'aktivitaet'
+  if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
   if (tab === 'kommunikation') return 'notizen'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
   return null
@@ -207,8 +205,12 @@ export function AuftragDetailClient({
 
   useEffect(() => {
     const tab = resolveAuftragDetailTabFromQuery(searchParams.get('tab'))
+    if (tab === 'notizen' && !initial.notizen?.trim()) {
+      setMainTab('stammdaten')
+      return
+    }
     if (tab) setMainTab(tab)
-  }, [searchParams])
+  }, [searchParams, initial.notizen])
   const [projektModal, setProjektModal] = useState(false)
   const [projektTitel, setProjektTitel] = useState('')
   const [projektStart, setProjektStart] = useState('')
@@ -353,7 +355,7 @@ export function AuftragDetailClient({
     if (typeof window === 'undefined') return
     const hash = window.location.hash
     if (hash === '#dokumentation') setMainTab('dokumente')
-    if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('compliance')
+    if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('dokumente')
   }, [])
 
   useEffect(() => {
@@ -400,7 +402,6 @@ export function AuftragDetailClient({
   )
 
   const auftragStatus = useMemo(() => auftragStatusDisplay(detail.status), [detail.status])
-  const auftragTyp = useMemo(() => auftragTypDisplay(istBauprojekt), [istBauprojekt])
 
   const projektName = auftragTitel(detail)
   const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
@@ -435,60 +436,6 @@ export function AuftragDetailClient({
       phase: 'vorab',
     })
   }
-
-  const onStatusAction = useCallback(
-    (action: string, payload?: unknown) => {
-      const p = (payload ?? {}) as Record<string, unknown>
-      if (action === 'navigate' && typeof p.href === 'string') {
-        if (p.href.startsWith('/api/')) {
-          window.open(p.href, '_blank', 'noopener,noreferrer')
-          return
-        }
-        router.push(p.href)
-        return
-      }
-      if (action === 'auftrag.start_arbeit') {
-        run(() => startAuftragArbeit(detail.id))
-        return
-      }
-      if (action === 'auftrag.zur_abnahme') {
-        run(() => setAuftragZurAbnahme(detail.id))
-        return
-      }
-      if (action === 'auftrag.abnahme_abschliessen') {
-        run(() => completeAuftragAbnahme(detail.id))
-        return
-      }
-      if (action === 'auftrag.formular_hw') {
-        const z = (detail.auftrag_handwerker ?? [])[0]
-        if (!z?.handwerker_id || !z.gewerk_id) {
-          toast.message('Kein Handwerker', { description: 'Bitte zuerst Gewerke zuordnen.' })
-          return
-        }
-        openFormModal(z.gewerk_id, z.handwerker_id, z.handwerker?.email ?? '')
-        return
-      }
-      if (action === 'auftrag.nachtrag') {
-        setMainTab('dokumente')
-        return
-      }
-      if (action === 'auftrag.mangel') {
-        router.push(`/auftraege/${detail.id}/abnahme/maengel`)
-        return
-      }
-      if (action === 'auftrag.baustopp') {
-        setMainTab('dokumente')
-        return
-      }
-      if (action === 'auftrag.mail_kunde' || action === 'auftrag.abnahme_mail' || action === 'auftrag.termin') {
-        toast.message('Kalender & E-Mail', { description: 'Bitte Kalender bzw. bestehende Formular-/Mail-Funktion nutzen.' })
-      }
-      if (action === 'auftrag.bewertung') {
-        toast.message('Bewertung', { description: 'Google-Link in den Einstellungen hinterlegen (NEXT_PUBLIC_GOOGLE_BEWERTUNG_URL).' })
-      }
-    },
-    [detail.id, detail.auftrag_handwerker, router]
-  )
 
   const istAbgeschlossen = detail.status === 'abgeschlossen'
 
@@ -702,11 +649,6 @@ export function AuftragDetailClient({
     [detail, rechnungenListe, vertraegeListe]
   )
 
-  const complianceCount = useMemo(
-    () => zaehleAuftragComplianceOffen(detail, complianceTypen, partnerDokumente, gewerke as Gewerk[]),
-    [detail, complianceTypen, partnerDokumente, gewerke]
-  )
-
   const handwerkerKontext = useMemo(
     () => ({
       kundeName: name,
@@ -719,21 +661,6 @@ export function AuftragDetailClient({
     }),
     [name, detail.kunden, detail.start_datum, detail.end_datum, detail.notizen]
   )
-
-  const hatAbnahme = Boolean(detail.abnahme_protokoll_url)
-  const hatRechnung = rechnungenListe.length > 0
-  const [offeneMaengelProtokoll, setOffeneMaengelProtokoll] = useState(0)
-  const offeneMaengelPunch = useMemo(() => {
-    const rows = detail.punch_list ?? []
-    return rows.filter((p) => p.status === 'offen' || p.status === 'in_bearbeitung').length
-  }, [detail.punch_list])
-  const offeneMaengelCount = Math.max(offeneMaengelPunch, offeneMaengelProtokoll)
-
-  useEffect(() => {
-    void loadAbnahmeprotokollSummary(detail.id).then((s) => {
-      setOffeneMaengelProtokoll(s ? countOffeneMaengel(s.maengel) : 0)
-    })
-  }, [detail.id, detail.abnahme_protokoll_url])
 
   const angebotHandwerker = useMemo((): AngebotHandwerkerRow[] => {
     const raw = detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null | undefined
@@ -750,47 +677,9 @@ export function AuftragDetailClient({
     return (ang as { titel?: string } | null)?.titel?.trim() || detail.titel?.trim() || 'Projekt'
   }, [detail.angebote, detail.titel])
 
-  const naechsteSchritte = useMemo(
-    () =>
-      buildAuftragNaechsteSchritte({
-        status: detail.status,
-        auftragId: detail.id,
-        angebotId: detail.angebot_id,
-        hatAbnahme,
-        hatRechnung,
-        positionen: detail.auftrag_positionen ?? [],
-        auftragHandwerkerCount: detail.auftrag_handwerker?.length ?? 0,
-        angebotHandwerker,
-        bautagebuchCount: detail.auftrag_bautagebuch?.length ?? 0,
-        onHandwerkerZuweisen: () => setMainTab('leistung'),
-        onBautagebuch: () => setMainTab('baustelle'),
-        onHwAngebot: detail.angebot_id
-          ? () => router.push(`/angebote/${detail.angebot_id}`)
-          : undefined,
-        onAbschluss: openAbschluss,
-        onRechnung: openRechnungErstellen,
-        offeneMaengelCount,
-        onMaengel: () => router.push(`/auftraege/${detail.id}/abnahme/maengel`),
-      }),
-    [
-      detail.status,
-      detail.id,
-      detail.angebot_id,
-      detail.auftrag_positionen,
-      detail.auftrag_handwerker,
-      detail.auftrag_bautagebuch,
-      hatAbnahme,
-      hatRechnung,
-      angebotHandwerker,
-      offeneMaengelCount,
-      openAbschluss,
-      openRechnungErstellen,
-      router,
-    ]
-  )
-
   const stammdatenInhalt = (
     <>
+      <AuftragDetailTopCards detail={detail} team={team} />
       <KundenStammdatenCard
         kunde={kunde}
         collapsible={false}
@@ -813,13 +702,11 @@ export function AuftragDetailClient({
               className="btn btn-ghost btn-sm"
               aria-label="Stammdaten bearbeiten"
             >
-              <MockIcon n="pencil" size={15} />
+              <MockIcon ctx="btn" n="pencil" size={15} />
             </button>
           ) : null
         }
       />
-      <AuftragDetailTopCards detail={detail} team={team} />
-      <NaechsteSchritteCard steps={naechsteSchritte} />
     </>
   )
 
@@ -935,24 +822,11 @@ export function AuftragDetailClient({
     </>
   )
 
-  const notizenInhalt = (
-    <KommunikationCard
-      filter={{ auftragId: detail.id, kundeId: detail.kunde_id ?? undefined }}
-      reloadKey={mailCompose.reloadKey + generation}
-      toolbar={
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))}
-        >
-          <MockIcon n="mail" size={15} />
-          E-Mail schreiben
-        </Button>
-      }
-    />
-  )
+  const notizenInhalt = detail.notizen?.trim() ? (
+    <Card title="Notizen" collapsible={false}>
+      <p className="whitespace-pre-wrap text-sm text-bw-text">{detail.notizen.trim()}</p>
+    </Card>
+  ) : null
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -993,66 +867,56 @@ export function AuftragDetailClient({
       icon: 'files',
       count: dokumenteCount || undefined,
       render: () => (
-        <AuftragDokumenteTab
-          detail={detail}
-          rechnungen={rechnungenListe}
-          vertraege={vertraegeListe}
-          onChanged={() => refresh()}
-        />
+        <>
+          <AuftragDokumenteTab
+            detail={detail}
+            rechnungen={rechnungenListe}
+            vertraege={vertraegeListe}
+            onChanged={() => refresh()}
+          />
+          {istBauprojekt ? (
+            <AuftragComplianceTab
+              detail={detail}
+              complianceTypen={complianceTypen}
+              partnerDokumente={partnerDokumente}
+              gewerke={gewerke as Gewerk[]}
+              onChanged={() => refresh()}
+            />
+          ) : null}
+        </>
       ),
     },
-    ...(istBauprojekt
+    ...(detail.notizen?.trim()
       ? ([
           {
-            id: 'compliance',
-            label: 'Compliance',
-            icon: 'shield-check',
-            count: complianceCount || undefined,
-            render: () => (
-              <AuftragComplianceTab
-                detail={detail}
-                complianceTypen={complianceTypen}
-                partnerDokumente={partnerDokumente}
-                gewerke={gewerke as Gewerk[]}
-                onChanged={() => refresh()}
-              />
-            ),
+            id: 'notizen',
+            label: ACTIVITY_SECTIONS.notizen,
+            icon: 'messages',
+            render: () => notizenInhalt,
           },
         ] as DetailShellGroup[])
       : []),
-    {
-      id: 'notizen',
-      label: ACTIVITY_SECTIONS.notizen,
-      icon: 'messages',
-      render: () => notizenInhalt,
-    },
   ]
-
-  useEffect(() => {
-    if (mainTab === 'compliance' && !istBauprojekt) {
-      setMainTab('stammdaten')
-    }
-  }, [mainTab, istBauprojekt])
 
   return (
     <div className="space-y-4 pb-0">
       <DetailHead
-        backHref="/auftraege"
-        backLabel="Zurück zu Aufträge"
+        backHref="/vorgaenge?tab=auftrag"
+        backLabel="Zurück zu den Vorgängen"
         title={projektName}
         badges={
-          <>
+          <span className="inline-flex flex-wrap items-center gap-2">
             <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />
-            <StatusBadge
-              variant={auftragTyp.variant}
-              label={auftragTyp.label}
-              title={
-                istBauprojekt
-                  ? 'Bauprojekt: Bautagebuch, Compliance-Checkliste'
-                  : 'Standardauftrag ohne Bau-Checkliste'
-              }
-            />
-          </>
+            {lead ? (
+              <PipelineKontextBadge
+                lead={{
+                  kanal: lead.kanal,
+                  auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
+                  anlass: lead.anlass,
+                }}
+              />
+            ) : null}
+          </span>
         }
         meta={headMeta}
         actions={
@@ -1063,7 +927,7 @@ export function AuftragDetailClient({
                 className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
                 onClick={() => openRechnungErstellen()}
               >
-                <MockIcon n="file-invoice" size={15} />
+                <MockIcon ctx="btn" n="file-invoice" size={15} />
                 Rechnung erstellen
               </button>
             ) : (
@@ -1072,18 +936,10 @@ export function AuftragDetailClient({
                 className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
                 onClick={openAbschluss}
               >
-                <MockIcon n="checks" size={15} />
+                <MockIcon ctx="btn" n="checks" size={15} />
                 Auftrag abschließen
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5"
-              onClick={openProjektBearbeiten}
-            >
-              <MockIcon n="pencil" size={15} />
-              <span className="hidden sm:inline">Bearbeiten</span>
-            </button>
             <ActionsMenu
               trigger={
                 <button
@@ -1092,7 +948,7 @@ export function AuftragDetailClient({
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >
-                  <MockIcon n="dots" size={18} />
+                  <MockIcon ctx="btn" n="dots" size={18} />
                   <span className="sr-only">Mehr</span>
                 </button>
               }
@@ -1102,8 +958,6 @@ export function AuftragDetailClient({
           </div>
         }
       />
-
-      {projektKontext ? <ProjektKette kontext={projektKontext} /> : null}
 
       {err ? (
         <p className="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">

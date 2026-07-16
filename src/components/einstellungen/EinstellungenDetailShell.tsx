@@ -28,7 +28,7 @@ export function EinstellungenDetailShell({
               href={tab.href}
               className={`dshell-navitem${isActive ? ' active' : ''}`}
             >
-              <MockIcon n={tab.mockIcon} size={16} />
+              <MockIcon ctx="nav" n={tab.mockIcon} size={16} />
               <span>{tab.label}</span>
               {count != null ? <span className="dshell-count">{count}</span> : null}
             </Link>

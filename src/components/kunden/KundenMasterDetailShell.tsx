@@ -3,11 +3,8 @@
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { KundenListeClient } from '@/components/kunden/KundenListeClient'
-import {
-  AppMasterDetailLayout,
-  AppMasterDetailPlaceholder,
-} from '@/components/layout/app/AppMasterDetailLayout'
-import { kundeIdFromPath, kundenFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
+import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
+import { kundenFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 
 export function KundenMasterDetailShell({
@@ -18,14 +15,11 @@ export function KundenMasterDetailShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const selectedId = kundeIdFromPath(pathname)
   const fullBleed = kundenFullBleedSubRoute(pathname)
-  const isListRoot = pathname === '/kunden'
 
   return (
     <AppMasterDetailLayout
       basePath="/kunden"
-      selectedId={selectedId}
       fullBleed={fullBleed}
       list={
         <Suspense
@@ -35,18 +29,11 @@ export function KundenMasterDetailShell({
             </div>
           }
         >
-          <KundenListeClient kunden={kunden} mode="pane" selectedId={selectedId} />
+          <KundenListeClient kunden={kunden} />
         </Suspense>
       }
     >
-      {isListRoot ? (
-        <AppMasterDetailPlaceholder
-          title="Kunde auswählen"
-          description="Wähle links einen Kunden für Stammdaten, Anfragen, Aufträge und Aktivität."
-        />
-      ) : (
-        children
-      )}
+      {children}
     </AppMasterDetailLayout>
   )
 }

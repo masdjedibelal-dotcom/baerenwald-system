@@ -40,7 +40,7 @@ export function DetailShell({ groups, value, onChange, className }: DetailShellP
               onClick={() => onChange(gr.id)}
               aria-current={isActive ? 'page' : undefined}
             >
-              <MockIcon n={gr.icon} size={16} />
+              <MockIcon ctx="nav" n={gr.icon} size={16} />
               <span>{gr.label}</span>
               {gr.count != null ? <span className="dshell-count">{gr.count}</span> : null}
             </button>

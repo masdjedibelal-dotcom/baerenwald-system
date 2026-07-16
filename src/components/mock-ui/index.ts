@@ -1,4 +1,5 @@
 export { MockIcon, mockMenuIcon, type MockIconProps } from './MockIcon'
+export { LeadStatusMockBadge } from './LeadStatusMockBadge'
 export { DetailShell, type DetailShellGroup, type DetailShellProps } from './DetailShell'
 export {
   MockBadge,

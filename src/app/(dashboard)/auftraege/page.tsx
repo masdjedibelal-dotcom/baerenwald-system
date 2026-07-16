@@ -1,4 +1,11 @@
-/** Listen-Inhalt kommt aus `auftraege/layout.tsx` (Master-Detail ab 900px). */
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Aufträge',
+}
+
+/** Positivliste: Phasen-Listen laufen über Vorgänge (Phase-Filter). */
 export default function AuftraegePage() {
-  return null
+  redirect('/vorgaenge?tab=auftrag')
 }

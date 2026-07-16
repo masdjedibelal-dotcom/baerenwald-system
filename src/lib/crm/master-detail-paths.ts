@@ -1,4 +1,4 @@
-/** Client-sichere Pfad-Helfer für Master-Detail-Layouts (kein server-only). */
+/** Client-sichere Pfad-Helfer für Entity-Routen (Liste vs. Detail / Full-Bleed). */
 
 export function anfrageIdFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/anfragen\/([^/]+)/)

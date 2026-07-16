@@ -83,6 +83,7 @@ export function wizardPositionenAlsFestpreis(rows: WizardPosition[]): WizardPosi
 /** Keys persistiert z. B. in angebote.zahlungsbedingungen */
 export type AngebotWizardZahlungsbedingung =
   | 'sofort_netto'
+  | '7_tage'
   | '14_tage'
   | '30_tage'
   | 'anzahlung_50'
@@ -91,6 +92,7 @@ export type AngebotWizardZahlungsbedingung =
 
 export const ZAHLUNGSBEDINGUNGEN_LABELS: Record<AngebotWizardZahlungsbedingung, string> = {
   sofort_netto: 'Zahlbar sofort, rein netto.',
+  '7_tage': 'Zahlbar innerhalb von 7 Tagen nach Rechnungsstellung.',
   '14_tage': 'Zahlbar innerhalb von 14 Tagen nach Rechnungsstellung.',
   '30_tage': 'Zahlbar innerhalb von 30 Tagen nach Rechnungsstellung.',
   anzahlung_50:
@@ -186,6 +188,8 @@ export type AngebotWizardMeta = {
   leistungsumfang: string
   hinweise: string
   zahlungsbedingungen: AngebotWizardZahlungsbedingung
+  /** Freies Zahlungsziel-Datum wenn Segment „Datum“ (Mock-Zahlfrist) */
+  zahlfrist_datum?: string
   /** Legacy in wizard_meta — Standard du, keine eigene DB-Spalte */
   anrede?: 'du' | 'sie'
   /** Anfahrtskosten-Pauschale als Position */
@@ -311,6 +315,7 @@ export function parseAngebotWizardMetaFromNotizen(
       fallback.leistungsumfang,
     hinweise: wm?.hinweise?.trim() || spalten?.hinweise?.trim() || fallback.hinweise,
     zahlungsbedingungen,
+    zahlfrist_datum: wm?.zahlfrist_datum?.trim() || fallback.zahlfrist_datum,
     anrede,
     mit_anfahrt: wm?.mit_anfahrt ?? fallback.mit_anfahrt,
     hinweis_35a: wm?.hinweis_35a ?? fallback.hinweis_35a,
@@ -332,7 +337,8 @@ export function defaultWizardMeta(
   const recht = defaultAngebotRechtshinweise(kundeTyp, firm ?? defaultFirmenEinstellungen())
   return {
     titel: `Angebot ${projektLabel} — ${kundenName}`,
-    gueltig_bis: plusDaysYmd(30),
+    /** Mock: plusDaysISO(14) */
+    gueltig_bis: plusDaysYmd(14),
     einleitung: defaultAngebotEinleitungText(effAnrede, leistungsumfang),
     schluss: defaultAngebotSchlussText(effAnrede),
     leistungsumfang: leistungsumfangAusLead,

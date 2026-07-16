@@ -2,68 +2,59 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { MoreSheet } from './MoreSheet'
-import { BOTTOM_NAV_ITEMS } from '@/lib/nav-config'
+import { BOTTOM_NAV_ITEMS, navItemIsActive } from '@/lib/nav-config'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
+/**
+ * Mock Bottom-Nav: MOBILE_PRIMARY (Dashboard, Vorgänge, Kalender)
+ * → 2 Tabs | FAB | restliche Tabs | Mehr → /mehr
+ */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'
-  const [moreOpen, setMoreOpen] = useState(false)
-
-  const isActive = (href: string, exact = false) => {
-    if (exact) return pathname === href
-    return pathname.startsWith(href)
-  }
-
-  const mid = Math.ceil(BOTTOM_NAV_ITEMS.length / 2)
-  const left = BOTTOM_NAV_ITEMS.slice(0, mid)
-  const right = BOTTOM_NAV_ITEMS.slice(mid)
+  const left = BOTTOM_NAV_ITEMS.slice(0, 2)
+  const right = BOTTOM_NAV_ITEMS.slice(2)
+  const mehrActive = pathname === '/mehr' || pathname.startsWith('/mehr/')
 
   return (
-    <>
-      <nav className="bottomnav" aria-label="Mobile Navigation">
-        {left.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn('bottomnav-item', isActive(item.href, item.exact) && 'active')}
-          >
-            <MockIcon n={item.iconName} size={20} />
-            <span>{item.label}</span>
-          </Link>
-        ))}
-
-        <button
-          type="button"
-          className="bottomnav-cta"
-          aria-label="Neu erstellen"
-          onClick={() => onNeuOpen?.()}
+    <nav className="bottomnav" aria-label="Mobile Navigation">
+      {left.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn('bottomnav-item', navItemIsActive(item, pathname) && 'active')}
         >
-          <span className="bottomnav-cta-fab">
-            <MockIcon n="plus" size={24} />
-          </span>
-        </button>
+          <MockIcon ctx="sidebar" n={item.iconName} size={22} />
+          <span>{item.label}</span>
+        </Link>
+      ))}
 
-        {right.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn('bottomnav-item', isActive(item.href, item.exact) && 'active')}
-          >
-            <MockIcon n={item.iconName} size={20} />
-            <span>{item.label}</span>
-          </Link>
-        ))}
+      <button
+        type="button"
+        className="bottomnav-cta"
+        aria-label="Neu erstellen"
+        onClick={() => onNeuOpen?.()}
+      >
+        <span className="bottomnav-cta-fab">
+          <MockIcon ctx="sidebar" n="plus" size={26} />
+        </span>
+      </button>
 
-        <button type="button" className="bottomnav-item" onClick={() => setMoreOpen(true)}>
-          <MockIcon n="dots" size={20} />
-          <span>Mehr</span>
-        </button>
-      </nav>
+      {right.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn('bottomnav-item', navItemIsActive(item, pathname) && 'active')}
+        >
+          <MockIcon ctx="sidebar" n={item.iconName} size={22} />
+          <span>{item.label}</span>
+        </Link>
+      ))}
 
-      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
-    </>
+      <Link href="/mehr" className={cn('bottomnav-item', mehrActive && 'active')}>
+        <MockIcon ctx="sidebar" n="dots" size={22} />
+        <span>Mehr</span>
+      </Link>
+    </nav>
   )
 }

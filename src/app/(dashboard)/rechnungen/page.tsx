@@ -1,4 +1,11 @@
-/** Listen-Inhalt kommt aus `rechnungen/layout.tsx` (Master-Detail ab 900px). */
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Rechnungen',
+}
+
+/** Positivliste: Phasen-Listen laufen über Vorgänge (Phase-Filter). */
 export default function RechnungenPage() {
-  return null
+  redirect('/vorgaenge?tab=rechnung')
 }

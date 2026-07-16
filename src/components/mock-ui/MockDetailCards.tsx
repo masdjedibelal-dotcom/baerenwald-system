@@ -111,7 +111,7 @@ export function MockNotizComposer({
         onClick={onSubmit}
         title="Notiz speichern"
       >
-        <MockIcon n="send" size={16} />
+        <MockIcon ctx="default" n="send" size={16} />
       </button>
     </div>
   )

@@ -207,7 +207,7 @@ export function AuftragDokumenteTab({
             disabled={busy}
             onClick={() => fileRef.current?.click()}
           >
-            <MockIcon n="upload" size={15} />
+            <MockIcon ctx="btn" n="upload" size={15} />
             Datei hochladen
           </button>
         }
@@ -252,7 +252,7 @@ export function AuftragDokumenteTab({
             if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click()
           }}
         >
-          <MockIcon n="cloud-upload" size={18} />
+          <MockIcon ctx="btn" n="cloud-upload" size={18} />
           {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
         </div>
 
@@ -281,7 +281,7 @@ export function AuftragDokumenteTab({
                 row.beschreibung?.toLowerCase().includes('foto')
               return (
                 <div key={row.id} className="list-row" style={{ cursor: 'default' }}>
-                  <MockIcon
+                  <MockIcon ctx="row"
                     n={isFoto ? 'photo' : 'file-text'}
                     size={18}
                     className="text-bw-text-muted"
@@ -360,7 +360,7 @@ export function AuftragDokumenteTab({
                             setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
                           }}
                         >
-                          <MockIcon n="pencil" size={15} />
+                          <MockIcon ctx="row" n="pencil" size={15} />
                         </button>
                         <button
                           type="button"
@@ -368,7 +368,7 @@ export function AuftragDokumenteTab({
                           title="Löschen"
                           onClick={() => removeRow(row)}
                         >
-                          <MockIcon n="trash" size={15} />
+                          <MockIcon ctx="row" n="trash" size={15} />
                         </button>
                       </>
                     ) : null}

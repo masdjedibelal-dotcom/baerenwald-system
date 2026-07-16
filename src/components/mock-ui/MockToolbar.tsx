@@ -22,7 +22,7 @@ export function MockToolbar({
   return (
     <div className="toolbar">
       <div className="input" style={{ flex: 1, maxWidth: 360 }}>
-        <MockIcon n="search" />
+        <MockIcon ctx="default" n="search" />
         <input
           type="text"
           value={query}

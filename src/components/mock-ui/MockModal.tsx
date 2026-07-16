@@ -44,7 +44,7 @@ export function MockModal({
         <div className="modal-h">
           {icon ? (
             <div className="icon">
-              <MockIcon n={icon} size={16} />
+              <MockIcon ctx="emphasis" n={icon} size={16} />
             </div>
           ) : null}
           <div style={{ flex: 1 }}>

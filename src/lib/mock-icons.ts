@@ -95,14 +95,34 @@ import {
 } from 'lucide-react'
 
 /**
+ * Mock/Tabler stroke-width im 24-ViewBox (= ≈1.5px bei 18px Icon-Größe).
+ * Siehe embedded `__ICON_SVGS` im Mock-Standalone (stroke-width="2").
+ */
+export const MOCK_ICON_STROKE_WIDTH = 2
+
+/**
+ * Nur diese Mock-Namen dürfen gefüllt sein (wie Tabler `*-filled`).
+ * Alles andere: fill="none" + stroke="currentColor".
+ */
+export const FILLED_MOCK_ICONS = new Set<string>([
+  'circle-check-filled',
+  'map-pin-filled',
+  'player-play-filled',
+  'star-filled',
+])
+
+/**
  * Mock-Icon-Namen (Tabler/`Icon n="…"`) → lucide-react.
  * Kein generischer Fallback — unbekannte Namen scheitern bewusst.
+ * Mapping nur Outline-Glyphen (Lucide stroke); Filled-Namen → Outline + CSS fill allowlist.
  */
 export const ICON_MAP = {
   activity: Activity,
   'alert-triangle': AlertTriangle,
   'arrow-left': ArrowLeft,
   'arrow-right': ArrowRight,
+  'arrow-up': ChevronUp,
+  'arrow-down': ChevronDown,
   'arrows-exchange': ArrowLeftRight,
   bell: Bell,
   'brand-google': Globe,

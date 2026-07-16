@@ -49,7 +49,7 @@ function SelectBox({ on }: { on: boolean }) {
         cursor: 'pointer',
       }}
     >
-      {on ? <MockIcon n="check" size={11} /> : null}
+      {on ? <MockIcon ctx="default" n="check" size={11} /> : null}
     </span>
   )
 }
@@ -201,7 +201,7 @@ export function PosTable({
                   <div className="pt2-ctrl">
                     {dnd ? (
                       <span className="drag" title="Ziehen zum Sortieren">
-                        <MockIcon n="grip-vertical" size={15} />
+                        <MockIcon ctx="default" n="grip-vertical" size={15} />
                       </span>
                     ) : null}
                     {selectable ? (
@@ -230,7 +230,7 @@ export function PosTable({
                       <span className="pt-name">{it.name}</span>
                       {it.badge ? (
                         <MockBadge kind={it.badge.kind}>
-                          {it.badge.icon ? <MockIcon n={it.badge.icon} size={10} /> : null}
+                          {it.badge.icon ? <MockIcon ctx="default" n={it.badge.icon} size={10} /> : null}
                           {it.badge.label}
                         </MockBadge>
                       ) : null}
@@ -252,7 +252,7 @@ export function PosTable({
                 onClick={() => onAddItem(g)}
                 style={{ borderBottom: '0.5px solid var(--border)' }}
               >
-                <MockIcon n="plus" size={13} /> Position hinzufügen
+                <MockIcon ctx="default" n="plus" size={13} /> Position hinzufügen
               </button>
             ) : null}
           </div>
@@ -269,7 +269,7 @@ export function PosTable({
             borderBottom: showTotals ? '0.5px solid var(--border)' : 'none',
           }}
         >
-          <MockIcon n="plus" size={14} /> Gewerk hinzufügen
+          <MockIcon ctx="default" n="plus" size={14} /> Gewerk hinzufügen
         </button>
       ) : null}
       {showTotals ? (
@@ -295,5 +295,5 @@ export function PosTable({
 export type PosTableActionItem = EntityMenuItem
 
 export function posTableMenuIcon(icon: string): ReactNode {
-  return <MockIcon n={icon} size={15} />
+  return <MockIcon ctx="default" n={icon} size={15} />
 }
