@@ -23,6 +23,8 @@ export type EinstellungenTabDef = {
   href: string
   label: string
   icon: LucideIcon
+  /** Mock-Icon-Name für DetailShell-Nav. */
+  mockIcon: string
   /** Pfade, bei denen dieser Tab als aktiv gilt (inkl. Legacy-Redirects). */
   matchPrefixes: string[]
 }
@@ -33,6 +35,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/profil',
     label: 'Profil',
     icon: UserCircle,
+    mockIcon: 'user',
     matchPrefixes: ['/einstellungen/profil'],
   },
   {
@@ -40,6 +43,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/firma',
     label: 'Firma',
     icon: Building2,
+    mockIcon: 'building',
     matchPrefixes: ['/einstellungen/firma'],
   },
   {
@@ -47,6 +51,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/benutzer',
     label: 'Team',
     icon: Users,
+    mockIcon: 'users',
     matchPrefixes: ['/einstellungen/benutzer'],
   },
   {
@@ -54,6 +59,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/preise',
     label: 'Preislisten',
     icon: List,
+    mockIcon: 'list',
     matchPrefixes: [
       '/einstellungen/preise',
       '/einstellungen/gewerke',
@@ -66,6 +72,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/formulare',
     label: 'Formulare',
     icon: FileText,
+    mockIcon: 'file-text',
     matchPrefixes: ['/einstellungen/formulare'],
   },
   {
@@ -73,6 +80,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/email',
     label: 'Kommunikation',
     icon: Bell,
+    mockIcon: 'bell',
     matchPrefixes: ['/einstellungen/email', '/einstellungen/kommunikation'],
   },
   {
@@ -80,6 +88,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     href: '/einstellungen/integration',
     label: 'Integrationen',
     icon: Plug,
+    mockIcon: 'plug',
     matchPrefixes: [
       '/einstellungen/integration',
       '/einstellungen/compliance',

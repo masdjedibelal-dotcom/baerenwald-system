@@ -595,3 +595,35 @@ export async function getPartnerPortalLoginHint(
     ),
   }
 }
+
+/** Stammdaten-Kopie für Listen-⋯-Menü. */
+export async function duplicateHandwerker(
+  handwerkerId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: src, error: loadErr } = await supabase
+    .from('handwerker')
+    .select('*')
+    .eq('id', handwerkerId)
+    .maybeSingle()
+  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+
+  const row = src as Record<string, unknown>
+  const payload: Record<string, unknown> = { ...row }
+  delete payload.id
+  delete payload.created_at
+  delete payload.updated_at
+  delete payload.auth_user_id
+  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
+  if (payload.email) payload.email = null
+
+  const { data: inserted, error: insErr } = await supabase
+    .from('handwerker')
+    .insert(payload)
+    .select('id')
+    .single()
+
+  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
+  revalidatePath('/handwerker')
+  return { ok: true, id: inserted.id as string }
+}

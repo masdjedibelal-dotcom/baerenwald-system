@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 import {
   ICON_MAP,
@@ -17,6 +18,7 @@ export type MockIconProps = {
   /** z. B. für `star-filled` */
   fill?: string
   title?: string
+  style?: CSSProperties
 }
 
 /**
@@ -30,6 +32,7 @@ export function MockIcon({
   strokeWidth = 2,
   fill,
   title,
+  style,
 }: MockIconProps) {
   if (!isMockIconName(n)) {
     if (process.env.NODE_ENV !== 'production') {
@@ -40,16 +43,14 @@ export function MockIcon({
 
   const Icon = ICON_MAP[n]
   const dim = typeof size === 'number' ? size : undefined
-  const style =
-    typeof size === 'string'
-      ? { width: size, height: size }
-      : undefined
+  const sizeStyle: CSSProperties | undefined =
+    typeof size === 'string' ? { width: size, height: size } : undefined
 
   return (
     <Icon
       className={cn('mock-icon shrink-0', className)}
       size={dim}
-      style={style}
+      style={{ ...sizeStyle, ...style }}
       strokeWidth={strokeWidth}
       fill={fill}
       aria-hidden={title ? undefined : true}

@@ -1,5 +1,11 @@
 import type { User } from '@supabase/supabase-js'
 
+const BAERENWALD_PRIMARY_STAFF_EMAIL = 'info@baerenwald-muenchen.de'
+
+export function isBaerenwaldPrimaryStaffEmail(email: string | null | undefined): boolean {
+  return email?.trim().toLowerCase() === BAERENWALD_PRIMARY_STAFF_EMAIL
+}
+
 /**
  * Vertrauenswürdige Admin-Erkennung (client-sicher, kein next/headers):
  * 1. app_metadata.crm_role / app_metadata.is_crm_admin (kanonisch)
@@ -7,6 +13,7 @@ import type { User } from '@supabase/supabase-js'
  */
 export function isCrmAdmin(user: User | null | undefined): boolean {
   if (!user) return false
+  if (isBaerenwaldPrimaryStaffEmail(user.email)) return true
   const app = (user.app_metadata ?? {}) as {
     crm_role?: string
     is_crm_admin?: boolean

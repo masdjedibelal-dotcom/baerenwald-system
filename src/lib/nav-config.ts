@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { Building2, Settings, Users, Wrench } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 
 export type NavItemDef = {
@@ -84,6 +85,19 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/anfragen', 'inbox', 'Anfragen'),
   nav('/angebote', 'file-invoice', 'Angebote'),
   nav('/auftraege', 'briefcase', 'Aufträge'),
+]
+
+/** Mobile Mehr-Screen (Kachel-Grid). */
+export const MEHR_TILE_NAV: Array<{
+  href: string
+  icon: LucideIcon
+  label: string
+  desc: string
+}> = [
+  { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
+  { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
+  { href: '/partner', icon: Building2, label: 'Partner', desc: 'Netzwerk' },
+  { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
 /** Mobile Mehr-Sheet. */

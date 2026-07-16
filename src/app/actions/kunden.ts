@@ -243,3 +243,35 @@ export async function searchKundenGlobal(
 
   return Array.from(byId.values())
 }
+
+/** Stammdaten-Kopie für Listen-⋯-Menü. */
+export async function duplicateKunde(
+  kundeId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const { data: src, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('*').eq('id', kundeId).maybeSingle()
+  )
+  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
+
+  const row = src as Record<string, unknown>
+  const payload: Record<string, unknown> = { ...row }
+  delete payload.id
+  delete payload.created_at
+  delete payload.updated_at
+  delete payload.auth_user_id
+  delete payload.kundennummer
+  delete payload.gesamt_umsatz
+  delete payload.letzte_aktivitaet
+  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
+  if (payload.email) payload.email = null
+
+  const { data: inserted, error: insErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').insert(payload).select('id').single()
+  )
+  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
+
+  const id = (inserted as { id: string }).id
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true, id }
+}
