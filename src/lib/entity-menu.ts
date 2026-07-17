@@ -43,6 +43,9 @@ export type EntityMenuHandlers = {
   deleteMenuLabel?: string
   tel?: string | null
   mail?: string | null
+  /** Override statt tel:/mailto: (CRM-Compose etc.) */
+  onCall?: () => void
+  onMail?: () => void
   extra?: EntityMenuItem[]
 }
 
@@ -84,8 +87,8 @@ export function buildEntityMenu(
   if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
   if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
 
+  /* Portal-Aktionen ohne Sep davor — wie Mock-Screenshot (Gruppe mit Bearbeiten/Kopieren) */
   if (h.onPortal) {
-    A.push('sep')
     A.push({ icon: 'external-link', label: 'Admin Login', onClick: h.onPortal })
     const linkLabel =
       type === 'handwerker'
@@ -124,8 +127,10 @@ export function buildEntityMenu(
   }
 
   if (type === 'angebot') {
-    const versendet = st === 'gesendet_kunde' || st === 'gesendet'
-    const erledigt = st === 'kunde_akzeptiert' || st === 'abgelehnt' || st === 'angenommen'
+    const versendet =
+      st === 'gesendet_kunde' || st === 'gesendet' || st === 'abgelaufen'
+    const erledigt =
+      st === 'kunde_akzeptiert' || st === 'abgelehnt' || st === 'angenommen'
     const jeVersendet = Boolean(st && st !== 'entwurf')
     const before = A.length
     A.push('sep')
@@ -180,19 +185,27 @@ export function buildEntityMenu(
 
   ;(h.extra ?? []).forEach((c) => A.push(c))
 
-  if (tel || mail) A.push('sep')
-  if (tel) {
+  const showCall = Boolean(tel) || Boolean(h.onCall)
+  const showMail = Boolean(mail) || Boolean(h.onMail)
+  if (showCall || showMail) A.push('sep')
+  if (showCall) {
     A.push({
       icon: 'phone',
       label: 'Anrufen',
-      onClick: () => window.open(`tel:${String(tel).replace(/\D/g, '')}`),
+      onClick: () => {
+        if (h.onCall) h.onCall()
+        else if (tel) window.open(`tel:${String(tel).replace(/\D/g, '')}`)
+      },
     })
   }
-  if (mail) {
+  if (showMail) {
     A.push({
       icon: 'mail',
       label: 'Mail schreiben',
-      onClick: () => window.open(`mailto:${mail}`),
+      onClick: () => {
+        if (h.onMail) h.onMail()
+        else if (mail) window.open(`mailto:${mail}`)
+      },
     })
   }
 

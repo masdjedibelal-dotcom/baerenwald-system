@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardCheck, ClipboardList, Download, ExternalLink, Plus, Trash2, Wrench } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteAbnahmeprotokoll,
@@ -13,7 +14,30 @@ import {
   type AbnahmeprotokollListeEintrag,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatDatum } from '@/lib/utils'
+
+function statusBadge(p: AbnahmeprotokollListeEintrag) {
+  if (p.an_kunde_gesendet_at) {
+    return (
+      <MockBadge kind="aktiv">
+        <MockIcon ctx="row" n="check" size={10} /> Gesendet
+      </MockBadge>
+    )
+  }
+  if (p.pdf_url) {
+    return (
+      <MockBadge kind="aktiv">
+        <MockIcon ctx="row" n="file-text" size={10} /> PDF
+      </MockBadge>
+    )
+  }
+  return (
+    <MockBadge kind="fertig">
+      <MockIcon ctx="row" n="file-pencil" size={10} /> Entwurf
+    </MockBadge>
+  )
+}
 
 export function AuftragAbnahmeprotokollCard({
   auftragId,
@@ -38,6 +62,10 @@ export function AuftragAbnahmeprotokollCard({
     reload()
   }, [reload])
 
+  function erstellen() {
+    router.push(`/auftraege/${auftragId}/abnahme/erstellen`)
+  }
+
   function loeschen(id: string) {
     if (!window.confirm('Abnahmeprotokoll wirklich löschen?')) return
     startTransition(async () => {
@@ -52,117 +80,127 @@ export function AuftragAbnahmeprotokollCard({
     })
   }
 
+  function rowMenu(p: AbnahmeprotokollListeEintrag): EntityMenuItem[] {
+    const items: EntityMenuItem[] = []
+    if (p.pdf_url) {
+      items.push(
+        {
+          icon: 'external-link',
+          label: 'PDF öffnen',
+          onClick: () => window.open(p.pdf_url!, '_blank', 'noopener,noreferrer'),
+        },
+        {
+          icon: 'download',
+          label: 'Download',
+          onClick: () => {
+            const a = document.createElement('a')
+            a.href = p.pdf_url!
+            a.download = ''
+            a.click()
+          },
+        },
+        'sep'
+      )
+    }
+    items.push({
+      icon: 'trash',
+      label: 'Löschen',
+      danger: true,
+      onClick: () => loeschen(p.id),
+    })
+    return items
+  }
+
   return (
-    <Card
+    <MockCard
       id="auftrag-abnahmeprotokoll"
-      title="Abnahmeprotokoll"
+      title={liste.length ? `Abnahmeprotokoll · ${liste.length}` : 'Abnahmeprotokoll'}
+      icon="checklist"
       className="scroll-mt-24"
-      bodyClassName="p-4"
-      action={
-        <div className="flex flex-wrap gap-2">
+      actions={
+        <>
           {liste.length > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
+            <MockBtn
+              sm
+              kind="ghost"
+              icon="clipboard-list"
               onClick={() => router.push(`/auftraege/${auftragId}/abnahme`)}
             >
-              <ClipboardList className="mr-1.5 h-4 w-4" aria-hidden />
               Vor Ort
-            </Button>
+            </MockBtn>
           ) : null}
           {offeneMaengel > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
+            <MockBtn
+              sm
+              kind="ghost"
+              icon="tool"
               onClick={() => router.push(`/auftraege/${auftragId}/abnahme/maengel`)}
             >
-              <Wrench className="mr-1.5 h-4 w-4" aria-hidden />
               Mängel ({offeneMaengel})
-            </Button>
+            </MockBtn>
           ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
-          >
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-            Neu
-          </Button>
-        </div>
+          <MockBtn sm kind="primary" icon="plus" onClick={erstellen} disabled={pending}>
+            Protokoll erstellen
+          </MockBtn>
+        </>
       }
     >
       {offeneMaengel > 0 ? (
-        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          <strong>{offeneMaengel}</strong> offene Mängel — bitte unter „Mängel bearbeiten“ nacharbeiten und
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '10px 12px',
+            borderRadius: 10,
+            border: '0.5px solid var(--amber-border, #f0d9a8)',
+            background: 'var(--amber-50, #fff8eb)',
+            fontSize: 13,
+            color: 'var(--text-2)',
+          }}
+        >
+          <strong>{offeneMaengel}</strong> offene Mängel — bitte unter „Mängel“ nacharbeiten und
           dokumentieren.
-        </p>
+        </div>
       ) : null}
 
       {liste.length === 0 ? (
-        <div className="space-y-3">
-          <p className="text-sm text-bw-text-muted">
-            Checkliste aus Gewerken und Leistungen — PDF zum Ausdrucken oder digital vor Ort ausfüllen.
-          </p>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
-          >
-            <ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />
-            Abnahmeprotokoll erstellen
-          </Button>
+        <div className="abnahme-empty">
+          <MockIcon ctx="empty" n="checklist" size={26} />
+          <div className="abnahme-empty__title">Noch kein Abnahmeprotokoll</div>
+          <div className="abnahme-empty__text">
+            Checkliste aus Gewerken und Leistungen — per Wizard erstellen, PDF speichern oder vor Ort
+            ausfüllen.
+          </div>
+          <MockBtn kind="primary" icon="plus" onClick={erstellen}>
+            Protokoll erstellen
+          </MockBtn>
         </div>
       ) : (
-        <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+        <div className="abnahme-table-wrap">
+          <div className="list-row head abnahme-row" aria-hidden>
+            <div>Bezeichnung</div>
+            <div>Abnahme</div>
+            <div>Erstellt</div>
+            <div>Status</div>
+            <div />
+          </div>
           {liste.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-bw-text">
-                  Abnahme {formatDatum(p.abnahme_datum)}
-                </p>
-                <p className="text-[12px] text-bw-text-muted">
-                  Erstellt {formatDatum(p.created_at.slice(0, 10))}
-                  {p.an_kunde_gesendet_at ? ' · An Kunde gesendet' : ''}
-                </p>
+            <div key={p.id} className="list-row abnahme-row">
+              <div className="abnahme-row__label">
+                <MockIcon ctx="row" n="checklist" size={16} className="abnahme-row__ico" />
+                <span>Abnahme {formatDatum(p.abnahme_datum)}</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {p.pdf_url ? (
-                  <>
-                    <a
-                      href={p.pdf_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn ghost sm"
-                    >
-                      <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-                      PDF öffnen
-                    </a>
-                    <a href={p.pdf_url} download className="btn ghost sm">
-                      <Download className="mr-1.5 h-4 w-4" aria-hidden />
-                      Download
-                    </a>
-                  </>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700"
-                  loading={pending}
-                  onClick={() => loeschen(p.id)}
-                  aria-label="Protokoll löschen"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </Button>
+              <div className="abnahme-row__datum">{formatDatum(p.abnahme_datum)}</div>
+              <div className="abnahme-row__datum">
+                {p.created_at ? formatDatum(p.created_at.slice(0, 10)) : '—'}
               </div>
-            </li>
+              <div>{statusBadge(p)}</div>
+              <div className="abnahme-row__menu">
+                <MockEntityRowMenu items={rowMenu(p)} title="Protokoll" />
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-    </Card>
+    </MockCard>
   )
 }

@@ -16,9 +16,9 @@ export function AuftragAbnahmeFlowClient({
     <AbnahmeprotokollFillFlow
       auftragId={auftragId}
       kundeName={kundeName}
-      onClose={() => router.push(`/auftraege/${auftragId}`)}
+      onClose={() => router.push(`/auftraege/${auftragId}?tab=abnahme`)}
       onDone={() => {
-        router.push(`/auftraege/${auftragId}`)
+        router.push(`/auftraege/${auftragId}?tab=abnahme`)
         router.refresh()
       }}
     />

@@ -1,8 +1,9 @@
 'use client'
 
-import { AlertTriangle, Mail } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Timeline, type TimelineItem } from '@/components/ui/timeline'
 import {
   aktuelleMahnstufeNummer,
@@ -28,11 +29,14 @@ export function RechnungMahnverlaufCard({
   mahnMails = [],
   onSendErinnerung,
   onMailAnsehen,
+  empty,
 }: {
   rechnung: RechnungMahnKontext & { rechnungsnummer?: string | null }
   mahnMails?: RechnungMahnMailZeile[]
   onSendErinnerung?: (stufe: 1 | 2) => void
   onMailAnsehen?: (emailLogId: string) => void
+  /** Wenn true: leerer Zustand (keine Mahnung relevant) */
+  empty?: boolean
 }) {
   const stufen = buildRechnungMahnverlauf(rechnung)
   const naechste = naechsteZahlungserinnerungStufe(rechnung)
@@ -65,52 +69,81 @@ export function RechnungMahnverlaufCard({
         ? 'Interne Warnung aktiv'
         : `Aktuelle Mahnstufe ${aktuelle}`
 
+  if (empty) {
+    return (
+      <MockCard title="Mahnverlauf" icon="mail-forward">
+        <MockEmpty
+          icon="mail-forward"
+          title="Kein Mahnverlauf"
+          hint="Mahnungen erscheinen hier, sobald die Rechnung versendet und fällig ist."
+        />
+      </MockCard>
+    )
+  }
+
   return (
-    <Card collapsible title="Mahnverlauf" defaultOpen>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-bw-text">
-              Alle Mahnstufen gehören zur Rechnung{' '}
-              <strong>{rechnung.rechnungsnummer?.trim() || '—'}</strong> — es werden keine
-              separaten Rechnungen angelegt.
-            </p>
-            <p className="mt-1 text-xs text-bw-text-muted">{statusHint}</p>
+    <MockCard
+      title="Mahnverlauf"
+      icon="mail-forward"
+      actions={
+        naechste && onSendErinnerung ? (
+          <MockBtn sm kind="primary" icon="alert-triangle" onClick={() => onSendErinnerung(naechste)}>
+            {naechste === 1 ? '1. Erinnerung' : '2. Erinnerung'}
+          </MockBtn>
+        ) : null
+      }
+    >
+      <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+        Alle Mahnstufen gehören zur Rechnung{' '}
+        <strong>{rechnung.rechnungsnummer?.trim() || '—'}</strong> — es werden keine separaten
+        Rechnungen angelegt.
+      </p>
+      <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>{statusHint}</p>
+
+      <Timeline items={timelineItems} />
+
+      {mahnMails.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--text-4)',
+              marginBottom: 8,
+            }}
+          >
+            <MockIcon ctx="default" n="mail" size={13} />
+            Versandte Mahn-E-Mails
           </div>
-          {naechste && onSendErinnerung ? (
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => onSendErinnerung(naechste)}
-            >
-              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-              {naechste === 1 ? '1. Erinnerung senden' : '2. Erinnerung senden'}
-            </Button>
-          ) : null}
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {mahnMails.map((m) => (
+              <li
+                key={m.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+                  {m.betreff}
+                </span>
+                <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                  {formatZeitpunkt(m.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-
-        <Timeline items={timelineItems} />
-
-        {mahnMails.length > 0 ? (
-          <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-bw-text-muted">
-              <Mail className="h-3.5 w-3.5" aria-hidden />
-              Versandte Mahn-E-Mails
-            </p>
-            <ul className="space-y-1.5">
-              {mahnMails.map((m) => (
-                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 truncate text-bw-text">{m.betreff}</span>
-                  <span className="shrink-0 text-xs text-bw-text-muted">
-                    {formatZeitpunkt(m.created_at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-    </Card>
+      ) : null}
+    </MockCard>
   )
 }

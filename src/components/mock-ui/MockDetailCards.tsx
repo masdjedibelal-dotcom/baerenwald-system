@@ -80,17 +80,21 @@ export function MockNotizComposer({
   onChange,
   onSubmit,
   placeholder = 'Notiz schreiben…  (Enter senden · Shift+Enter neue Zeile)',
+  disabled,
 }: {
   value: string
   onChange: (v: string) => void
   onSubmit: () => void
   placeholder?: string
+  disabled?: boolean
 }) {
+  const canSend = Boolean(value.trim()) && !disabled
   return (
     <div className="note-composer">
       <textarea
         rows={1}
         value={value}
+        disabled={disabled}
         onChange={(e) => {
           onChange(e.target.value)
           e.target.style.height = 'auto'
@@ -99,7 +103,7 @@ export function MockNotizComposer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            if (value.trim()) onSubmit()
+            if (canSend) onSubmit()
           }
         }}
         placeholder={placeholder}
@@ -107,7 +111,7 @@ export function MockNotizComposer({
       <button
         type="button"
         className="note-send"
-        disabled={!value.trim()}
+        disabled={!canSend}
         onClick={onSubmit}
         title="Notiz speichern"
       >

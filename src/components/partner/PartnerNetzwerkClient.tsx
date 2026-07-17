@@ -14,11 +14,13 @@ import {
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { EntityMenuItem } from '@/lib/entity-menu'
+import { cn } from '@/lib/utils'
 
 export type PartnerKategorie = {
   id: string
@@ -52,9 +54,9 @@ const EXPORT_FIELDS: ExportField[] = [
 ]
 
 const MOCK_KATEGORIEN = ['Versicherung', 'Finanzierung', 'Makler', 'Planung', 'Logistik'] as const
-const GRID_COLS = '1.6fr 1fr 1.2fr 1.1fr 1.5fr 90px 40px'
+const COLS = '1.6fr 1fr 1.2fr 1.1fr 1.5fr 90px 60px'
 
-type SortCol = 'name' | 'kategorie' | 'telefon' | 'email' | 'status'
+type SortCol = 'name' | 'kategorie' | 'ansprechpartner' | 'telefon' | 'email' | 'status'
 
 function partnerExportRow(p: PartnerRow): Record<string, unknown> {
   return {
@@ -90,6 +92,7 @@ export function PartnerNetzwerkClient({
 
   const [kategorieFilter, setKategorieFilter] = useState('alle')
   const [query, setQuery] = useState('')
+  const [fName, setFName] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
@@ -98,39 +101,27 @@ export function PartnerNetzwerkClient({
 
   const kategorieChipOptions = useMemo(() => {
     const byName = new Map(kategorien.map((k) => [k.name.toLowerCase(), k]))
-    const opts: { label: string; value: string; count: number }[] = [
+    const opts: { label: string; value: string; count?: number }[] = [
       { label: 'Alle', value: 'alle', count: partners.length },
     ]
     for (const name of MOCK_KATEGORIEN) {
       const kat = byName.get(name.toLowerCase())
       if (kat) {
-        opts.push({
-          label: name,
-          value: kat.id,
-          count: partners.filter((p) => p.kategorie_id === kat.id).length,
-        })
+        opts.push({ label: name, value: kat.id })
       } else {
-        opts.push({
-          label: name,
-          value: `name:${name.toLowerCase()}`,
-          count: partners.filter((p) => p.partner_kategorien?.name?.toLowerCase() === name.toLowerCase())
-            .length,
-        })
+        opts.push({ label: name, value: `name:${name.toLowerCase()}` })
       }
     }
     for (const k of [...kategorien].sort((a, b) => a.sort_order - b.sort_order)) {
       if (MOCK_KATEGORIEN.some((m) => m.toLowerCase() === k.name.toLowerCase())) continue
-      opts.push({
-        label: k.name,
-        value: k.id,
-        count: partners.filter((p) => p.kategorie_id === k.id).length,
-      })
+      opts.push({ label: k.name, value: k.id })
     }
     return opts
   }, [kategorien, partners])
 
   const filteredBase = useMemo(() => {
     const needle = query.trim().toLowerCase()
+    const nameNeedle = fName.trim().toLowerCase()
     return partners.filter((p) => {
       if (kategorieFilter !== 'alle') {
         if (kategorieFilter.startsWith('name:')) {
@@ -138,6 +129,7 @@ export function PartnerNetzwerkClient({
           if (p.partner_kategorien?.name?.toLowerCase() !== n) return false
         } else if (p.kategorie_id !== kategorieFilter) return false
       }
+      if (nameNeedle && !p.name.toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
       const hay = [
         p.name,
@@ -150,7 +142,7 @@ export function PartnerNetzwerkClient({
         .toLowerCase()
       return hay.includes(needle)
     })
-  }, [partners, kategorieFilter, query])
+  }, [partners, kategorieFilter, query, fName])
 
   const toggleSort = (col: SortCol) => {
     setSortCol((c) => {
@@ -167,6 +159,7 @@ export function PartnerNetzwerkClient({
     const sortKeys: Record<SortCol, (p: PartnerRow) => string> = {
       name: (p) => p.name.toLowerCase(),
       kategorie: (p) => (p.partner_kategorien?.name ?? '').toLowerCase(),
+      ansprechpartner: (p) => (p.ansprechpartner ?? '').toLowerCase(),
       telefon: (p) => (p.telefon ?? '').toLowerCase(),
       email: (p) => (p.email ?? '').toLowerCase(),
       status: (p) => (p.aktiv ? 'aktiv' : 'inaktiv'),
@@ -183,17 +176,21 @@ export function PartnerNetzwerkClient({
     })
   }, [filteredBase, sortCol, sortDir])
 
-  const activeFilterCount = (kategorieFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0)
+  const activeFilterCount =
+    (kategorieFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
   function resetFilters() {
     setKategorieFilter('alle')
     setQuery('')
+    setFName('')
   }
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
+  const allSelected = filtered.length > 0 && filtered.every((p) => selected[p.id])
+  const gridCols = (selectMode ? '40px ' : '') + COLS
 
-  const paginationResetKey = `${kategorieFilter}|${query}|${sortCol}|${sortDir}`
+  const paginationResetKey = `${kategorieFilter}|${query}|${fName}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
     filtered,
     10,
@@ -206,16 +203,8 @@ export function PartnerNetzwerkClient({
 
   function rowMenuItems(p: PartnerRow): EntityMenuItem[] {
     return [
-      {
-        label: 'Öffnen',
-        icon: 'eye',
-        onClick: () => openDetail(p.id),
-      },
-      {
-        label: 'Bearbeiten',
-        icon: 'pencil',
-        onClick: () => openDetail(p.id),
-      },
+      { label: 'Öffnen', icon: 'eye', onClick: () => openDetail(p.id) },
+      { label: 'Bearbeiten', icon: 'pencil', onClick: () => openDetail(p.id) },
     ]
   }
 
@@ -303,9 +292,21 @@ export function PartnerNetzwerkClient({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, Kategorie, Telefon, E-Mail…"
+            placeholder="Name, Kategorie, Ansprechpartner…"
             autoFocus
           />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <MockField label="Name">
+            <div className="input">
+              <input
+                type="text"
+                value={fName}
+                onChange={(e) => setFName(e.target.value)}
+                placeholder="Name enthält…"
+              />
+            </div>
+          </MockField>
         </div>
         <div className="form-section-h">Kategorie</div>
         <div className="chiprow">
@@ -321,24 +322,54 @@ export function PartnerNetzwerkClient({
         </div>
       </MockModal>
 
-      <div className="listcard">
-        <div className="list-row-grid head" style={{ gridTemplateColumns: GRID_COLS }}>
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (allSelected) setSelected({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((p) => {
+                    n[p.id] = true
+                  })
+                  setSelected(n)
+                }
+              }}
+            >
+              <span className={cn('vg-box', allSelected && 'on')}>
+                {allSelected ? <MockIcon ctx="default" n="check" size={12} /> : null}
+              </span>
+            </div>
+          ) : null}
           <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Name
           </MockSortHead>
-          <MockSortHead col="kategorie" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="kategorie"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+          >
             Kategorie
           </MockSortHead>
-          <div>Ansprechpartner</div>
+          <MockSortHead
+            col="ansprechpartner"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+          >
+            Ansprechpartner
+          </MockSortHead>
           <MockSortHead col="telefon" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Telefon
           </MockSortHead>
           <MockSortHead col="email" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Email
           </MockSortHead>
-          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
-            Status
-          </MockSortHead>
+          <div>Status</div>
           <div aria-hidden />
         </div>
 
@@ -354,8 +385,8 @@ export function PartnerNetzwerkClient({
               key={p.id}
               role="button"
               tabIndex={0}
-              className={`list-row-grid${selectMode && selected[p.id] ? ' sel' : ''}`}
-              style={{ gridTemplateColumns: GRID_COLS }}
+              className={cn('list-row', selected[p.id] && 'sel')}
+              style={{ gridTemplateColumns: gridCols }}
               onClick={() => (selectMode ? toggleSel(p.id) : openDetail(p.id))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -364,19 +395,50 @@ export function PartnerNetzwerkClient({
                 }
               }}
             >
-              <p className="list-row-primary truncate">{p.name}</p>
-              <div>
+              {selectMode ? (
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(p.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[p.id] && 'on')}>
+                    {selected[p.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
+              ) : null}
+              <div className="lc-title" style={{ fontWeight: 600 }}>
+                {p.name}
+              </div>
+              <div className="lc-pills">
                 {p.partner_kategorien?.name ? (
                   <span className="pill-tag">{p.partner_kategorien.name}</span>
                 ) : (
-                  <span className="text-[13px] text-bw-text-muted">—</span>
+                  <span style={{ color: 'var(--text-3)' }}>—</span>
                 )}
               </div>
-              <p className="truncate text-[13px] text-bw-text">{p.ansprechpartner?.trim() || '—'}</p>
-              <p className="truncate text-[13px] text-bw-text">{p.telefon?.trim() || '—'}</p>
-              <p className="truncate text-[13px] text-bw-text">{p.email?.trim() || '—'}</p>
-              {partnerAktivBadge(p)}
-              <div className="vg-actions" onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                {p.ansprechpartner?.trim() || '—'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{p.telefon?.trim() || '—'}</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-2)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {p.email?.trim() || '—'}
+              </div>
+              <div className="lc-status">{partnerAktivBadge(p)}</div>
+              <div
+                className="row-actions always"
+                onClick={(e) => e.stopPropagation()}
+                style={{ justifyContent: 'flex-end' }}
+              >
                 <MockEntityRowMenu items={rowMenuItems(p)} title="Partner" />
               </div>
             </div>

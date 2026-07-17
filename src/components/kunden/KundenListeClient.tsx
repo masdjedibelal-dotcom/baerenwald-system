@@ -12,6 +12,7 @@ import {
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
@@ -20,6 +21,7 @@ import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import type { EntityMenuItem } from '@/lib/entity-menu'
+import { cn } from '@/lib/utils'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -31,7 +33,7 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'ort', label: 'Ort' },
 ]
 
-const GRID_COLS = '1.4fr 1fr 1.2fr 1.6fr 40px'
+const COLS = '1.4fr 1fr 1.2fr 1.6fr 60px'
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
 type SortCol = 'name' | 'typ' | 'telefon' | 'email'
@@ -67,6 +69,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [query, setQuery] = useState('')
+  const [fName, setFName] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
@@ -79,13 +82,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
     params.delete('neu')
     const q = params.toString()
     router.replace(q ? `/kunden?${q}` : '/kunden', { scroll: false })
-  }
-
-  function openNeuModal() {
-    setModalOpen(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('neu', '1')
-    router.replace(`/kunden?${params.toString()}`, { scroll: false })
   }
 
   useEffect(() => {
@@ -107,15 +103,17 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
 
   const filteredBase = useMemo(() => {
     const needle = query.trim().toLowerCase()
+    const nameNeedle = fName.trim().toLowerCase()
     return kunden.filter((k) => {
       if (typFilter !== 'alle' && (k.typ || '').toLowerCase() !== typFilter) return false
+      if (nameNeedle && !kundeListenName(k).toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
       const pool = [kundeListenName(k), k.name, k.email ?? '', k.telefon ?? '', k.kundennummer ?? '']
         .join(' ')
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [kunden, typFilter, query])
+  }, [kunden, typFilter, query, fName])
 
   const toggleSort = (col: SortCol) => {
     setSortCol((c) => {
@@ -147,17 +145,22 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
     })
   }, [filteredBase, sortCol, sortDir])
 
-  const activeFilterCount = (typFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0)
+  const activeFilterCount =
+    (typFilter !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
   function resetFilters() {
     setTypFilter('alle')
     setQuery('')
+    setFName('')
   }
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
+  const allSelected = filtered.length > 0 && filtered.every((k) => selected[k.id])
 
-  const paginationResetKey = `${typFilter}|${query}|${sortCol}|${sortDir}`
+  const gridCols = (selectMode ? '40px ' : '') + COLS
+
+  const paginationResetKey = `${typFilter}|${query}|${fName}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
     filtered,
     10,
@@ -170,11 +173,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
 
   function rowMenuItems(k: KundeListeZeile): EntityMenuItem[] {
     return [
-      {
-        label: 'Öffnen',
-        icon: 'eye',
-        onClick: () => openDetail(k.id),
-      },
+      { label: 'Öffnen', icon: 'eye', onClick: () => openDetail(k.id) },
       {
         label: 'Bearbeiten',
         icon: 'pencil',
@@ -278,7 +277,19 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
             autoFocus
           />
         </div>
-        <div className="form-section-h">Kundentyp</div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <MockField label="Name">
+            <div className="input">
+              <input
+                type="text"
+                value={fName}
+                onChange={(e) => setFName(e.target.value)}
+                placeholder="Name enthält…"
+              />
+            </div>
+          </MockField>
+        </div>
+        <div className="form-section-h">Typ</div>
         <div className="chiprow">
           {(
             [
@@ -295,8 +306,28 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         </div>
       </MockModal>
 
-      <div className="listcard">
-        <div className="list-row-grid head" style={{ gridTemplateColumns: GRID_COLS }}>
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (allSelected) setSelected({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((k) => {
+                    n[k.id] = true
+                  })
+                  setSelected(n)
+                }
+              }}
+            >
+              <span className={cn('vg-box', allSelected && 'on')}>
+                {allSelected ? <MockIcon ctx="default" n="check" size={12} /> : null}
+              </span>
+            </div>
+          ) : null}
           <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Kunde
           </MockSortHead>
@@ -328,8 +359,8 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
               key={k.id}
               role="button"
               tabIndex={0}
-              className={`list-row-grid${selectMode && selected[k.id] ? ' sel' : ''}`}
-              style={{ gridTemplateColumns: GRID_COLS }}
+              className={cn('list-row', selected[k.id] && 'sel')}
+              style={{ gridTemplateColumns: gridCols }}
               onClick={() => (selectMode ? toggleSel(k.id) : openDetail(k.id))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -338,13 +369,41 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
                 }
               }}
             >
-              <p className="list-row-primary truncate">{kundeListenName(k)}</p>
-              <div>
+              {selectMode ? (
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(k.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[k.id] && 'on')}>
+                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
+              ) : null}
+              <div className="lc-title" style={{ fontWeight: 600 }}>
+                {kundeListenName(k)}
+              </div>
+              <div className="lc-pills">
                 <span className="pill-tag">{kundeTypLabel(k.typ)}</span>
               </div>
-              <p className="truncate text-[13px] text-bw-text">{k.telefon?.trim() || '—'}</p>
-              <p className="truncate text-[13px] text-bw-text">{k.email?.trim() || '—'}</p>
-              <div className="vg-actions" onClick={(e) => e.stopPropagation()}>
+              <div style={{ color: 'var(--text-2)' }}>{k.telefon?.trim() || '—'}</div>
+              <div
+                style={{
+                  color: 'var(--text-2)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {k.email?.trim() || '—'}
+              </div>
+              <div
+                className="row-actions always"
+                onClick={(e) => e.stopPropagation()}
+                style={{ justifyContent: 'flex-end' }}
+              >
                 <MockEntityRowMenu items={rowMenuItems(k)} title="Kunde" />
               </div>
             </div>

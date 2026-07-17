@@ -6,12 +6,13 @@ export type TimelineItem = {
   id?: string
   text: string
   time: string
-  /** offen = grauer Punkt, sonst grün (erledigt/aktiv) */
+  /** offen = grauer Punkt (`tl-item gray`), sonst grün */
   state?: 'open' | 'done' | 'active'
   linkLabel?: string
   onLinkClick?: () => void
 }
 
+/** Mock-Timeline: `.timeline` + `.tl-item` (+ `.gray` für offen). */
 export function Timeline({ items, className }: { items: TimelineItem[]; className?: string }) {
   if (!items.length) {
     return <p className="text-sm text-bw-text-muted">Keine Aktivität.</p>
@@ -20,26 +21,21 @@ export function Timeline({ items, className }: { items: TimelineItem[]; classNam
   return (
     <div className={cn('timeline', className)}>
       {items.map((item, i) => {
-        const dotCls =
-          item.state === 'open'
-            ? 'timeline-dot-pending'
-            : item.state === 'active'
-              ? 'timeline-dot-active'
-              : 'timeline-dot-done'
+        const isOpen = item.state === 'open'
         return (
-          <div key={item.id ?? i} className="timeline-item last:pb-0">
-            <span className={dotCls} aria-hidden />
-            <p className="text-[13px] leading-snug text-bw-text">{item.text}</p>
+          <div key={item.id ?? i} className={cn('tl-item', isOpen && 'gray')}>
+            <div className="tl-text">{item.text}</div>
             {item.linkLabel && item.onLinkClick ? (
               <button
                 type="button"
                 onClick={item.onLinkClick}
-                className="mt-1 text-xs font-medium text-bw-green hover:underline"
+                className="link"
+                style={{ display: 'block', fontSize: 12, marginTop: 2, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
               >
                 {item.linkLabel}
               </button>
             ) : null}
-            <p className="mt-0.5 text-xs text-bw-text-muted">{item.time}</p>
+            <div className="tl-time">{item.time}</div>
           </div>
         )
       })}

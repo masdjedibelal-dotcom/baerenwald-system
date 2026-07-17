@@ -246,6 +246,16 @@ export async function addAngebotPosition(
   return { ok: true, id }
 }
 
+/** PosBoard / Mock: gesamtes Positions-Array ersetzen (Autosave). */
+export async function replaceAngebotPositionen(
+  angebotId: string,
+  positionen: AngebotPosition[]
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await assertAngebotEditable(angebotId)
+  if (!gate.ok) return gate
+  return persistAngebotPositionen(gate.supabase!, angebotId, positionen)
+}
+
 export async function bulkDeleteAngebotPositionen(
   angebotId: string,
   positionIds: string[]

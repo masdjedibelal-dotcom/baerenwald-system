@@ -72,7 +72,7 @@ export function AbnahmeprotokollCreateWizard({
     setPunkte(buildAbnahmePunkteInitial({ positionen, angebotPositionen, gewerke }))
   }, [positionen, angebotPositionen, gewerke])
 
-  const onClose = () => router.push(`/auftraege/${auftragId}`)
+  const onClose = () => router.push(`/auftraege/${auftragId}?tab=abnahme`)
 
   function weiter() {
     if (step === 1) {
@@ -103,7 +103,7 @@ export function AbnahmeprotokollCreateWizard({
       }
       downloadPdfFromBase64(r.pdfBase64, r.filename)
       toast.success('Abnahmeprotokoll erstellt')
-      router.push(`/auftraege/${auftragId}`)
+      router.push(`/auftraege/${auftragId}?tab=abnahme`)
       router.refresh()
     })
   }

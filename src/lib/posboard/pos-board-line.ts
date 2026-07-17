@@ -68,6 +68,7 @@ export function posBoardLineToAngebotPosition(
   const vk = Math.round((Number(line.preis) || 0) * 100) / 100
   const lineTotal = Math.round(vk * m * 100) / 100
   return {
+    ...(base ?? {}),
     id: line.id,
     gewerk_id: base?.gewerk_id ?? '',
     gewerk_name: line.gewerk,
@@ -85,19 +86,23 @@ export function posBoardLineToAngebotPosition(
     einheit: line.einheit,
     mwst_satz: line.ust ?? 19,
     preis_typ: 'fix',
-    ...base,
+    einkaufspreis: base?.einkaufspreis,
   }
 }
 
-export function posBoardLinesFromAngebotPositionen(items: AngebotPosition[]): PosBoardLine[] {
-  return items.map(posBoardLineFromAngebotPosition)
+export function posBoardLinesFromAngebotPositionen(
+  items: AngebotPosition[] | null | undefined
+): PosBoardLine[] {
+  const list = Array.isArray(items) ? items : []
+  return list.map(posBoardLineFromAngebotPosition)
 }
 
 export function posBoardLinesToAngebotPositionen(
-  lines: PosBoardLine[],
+  lines: PosBoardLine[] | null | undefined,
   baseById?: Map<string, Partial<AngebotPosition>>
 ): AngebotPosition[] {
-  return lines.map((line) => posBoardLineToAngebotPosition(line, baseById?.get(line.id)))
+  const list = Array.isArray(lines) ? lines : []
+  return list.map((line) => posBoardLineToAngebotPosition(line, baseById?.get(line.id)))
 }
 
 export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoardLine {

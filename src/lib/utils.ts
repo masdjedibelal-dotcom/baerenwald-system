@@ -404,3 +404,12 @@ export function formatLeadListDatum(iso: string): string {
   if (diffDays < 7) return d.toLocaleDateString('de-DE', { weekday: 'short' })
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
 }
+
+/** Mock-Timeline-Zeit: „Heute · 09:12“ / „Gestern · 16:40“. */
+export function formatTimelineStamp(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const day = formatLeadListDatum(iso)
+  const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return `${day} · ${time}`
+}

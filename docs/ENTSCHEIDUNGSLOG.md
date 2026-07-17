@@ -4,6 +4,161 @@ Format: **Frage** | Optionen | **gewählt** | Begründung
 
 ---
 
+## Aktionen-Popover + Zurück-Crumb Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Menü-Quelle | Ad-hoc Items / **`buildEntityMenu`** | **entityMenu** Anfrage + Auftrag | Standalone Mock; gleiche Reihenfolge Liste/Detail |
+| Desktop-Panel | `menu-panel` / **`.menu`** | **`.menu` + `.menu-item`** | Mock Standalone `Menu`-Komponente |
+| Sep vor Admin Login | wie Mock-JS / **wie Screenshot** | **kein Sep** (Edit/Copy/Portal eine Gruppe) | Mock-Screenshot Anfrage-Detail |
+| „Als Projekt weiterführen“ | im ⋯-Menü / **weg** | **weg** | nicht im Mock-Menü |
+| Löschen-Farbe | nur Text / **Text+Icon rot** | **`.menu-item.danger` + Icon inherit** | Mock: trash rot |
+| „Als verloren“ | danger / **normal** | **normal** | Nur Löschen ist danger |
+| Zurück-Link | versteckt / **MockDetailCrumb** | **`EntityDetailLayout` + Crumb** | „Zurück zu den Vorgängen · Anfragen › …“ |
+| Nicht erreichbar | fehlen / **StatusModal** | **`nicht_erreichbar` + Wiedervorlage** | Mock Status-Menü |
+
+---
+
+## Anfrage Notizen-Tab Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Layout | Alt Compose+Note-UI / **Mock NotizenCard** | **`MockCard` + `.note` + `MockNotizComposer`** | Standalone Mock (7) |
+| Composer | Textarea+Foto-Toolbar / **Chat-Composer Enter/Send** | **note-composer + note-send** | Mock: Enter senden, Shift+Enter Zeile |
+| Foto-Upload im Composer | Behalten / **weglassen** | **weglassen** | Mock hat keinen Foto-Upload; bestehende Fotos bleiben sichtbar |
+| Zeitstempel | DatumZeit / **Timeline-Stamp** | **`formatTimelineStamp`** | Wie Verlauf („Heute · HH:MM“) |
+
+---
+
+## Anfrage Dokumente-Tab Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Layout | Alte Tabelle / **Mock `DokumenteCard`** | **`MockDokumenteCard` + Dropzone + `dok-list`/`list-row`** | Standalone Mock (7) |
+| Freigabe | Nur Anzeige / **Checkbox Kunde/intern** | **Checkbox** wie Mock | UI-State lokal (kein DB-Feld) |
+| Beschreibung/Name-Edit | Persistenz / **lokaler Edit-Modus** | **lokal** (Bearbeiten via Modal) | Spalten fehlen in `lead_dokumente` |
+| Angebote in Liste | Ausblenden / **mit anzeigen** | **mit anzeigen** (kein Löschen) | bisherige CRM-Logik |
+
+---
+
+## Stammdaten-Listen Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| DOM-Klassen | `list-row-grid` / **Mock `list-row` + lc-*** | **`list-row`, `lc-title`, `lc-pills`, `lc-status`, `row-actions always`** | Standalone Mock (7); Screenshots Kunden/HW/Partner |
+| CSS `.list-row` | Flex (CRM-Extension) / **Grid** | **`display: grid`** | Flex brach Tabellen-Spalten; Ursache für Abweichung vom Mock |
+| Auswahlmodus | Nur Highlight / **Checkbox-Spalte** | **`vg-check` / `vg-box` wie Mock** | Auswählen togglet 40px-Spalte |
+| Handwerker-Bewertung | Fake-Zahlen / **„—“ + Stern** | **Platzhalter „—“** (OP-8d-04, keine DB) | Spalte bleibt sichtbar wie Mock |
+| Topbar-CTA Neu | Behalten / **Entfernen** | **Entfernen** bei Kunden/HW/Partner | Mock: Neu nur FAB + Neu-Popover |
+
+---
+
+## Anfrage-Detail Mock HV + CTA (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| HV-Stammdaten | Volle Kundenkarte / **HV-3-Karten + schlanke Props** | **`HvMeldungKontextCards` + `AnfrageStammdatenCard`** | Mock Screenshots |
+| Melder-Rolle | DB-Feld / **abgeleitet „Mieter“** | **Mieter** bei melder-Kanal/`erfassung_von` | Kein `melder_rolle`-Feld |
+| Primär-CTA | Immer erstellen / **statusabhängig** | **Erstellen** · **Annehmen** wenn `angebotAnKundeGesendet` | User: versendet → annehmen |
+| Annehmen-Aktion | Nur Navigation / **Accept + Auftrag** | **`acceptAngebotAndCreateAuftrag`** | Wie Angebots-Detail |
+
+---
+
+## Angebot Details PosBoard (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Positionen-UI | V3-Tab / **PosBoard Leistungen** | **PosBoard + showUst** | Mock: Gewerk-Gruppen, Preise, Netto/MwSt/Brutto |
+| Persistenz | add/update Diff / **replaceAngebotPositionen** | **Replace-All Debounce** | analog Anfrage was_zeilen |
+| Projekt-Übersicht | schwere CRM-Props / **Mock + Footer** | **Angebot · Gesamt (DB) · Erstellt · Gültig bis** | Mock extras |
+
+---
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Stammdaten-Felder | Avatar+Kunde-Link / **Name·Tel·Mail·Region·Quelle·Eingegangen** | **wie Mock-Screenshot** | flache Props, kein Card-Border |
+| Details-Übersicht | schwere CRM-Props / **MockProjektUebersicht + Footer** | **Projekt + Angebot/Gesamt/Erstellt/Gültig bis** | Mock `ProjektUebersicht` + extras |
+| ⋯-Menü | CRM-Extras / **entityMenu angebot** | **Mock-Items** | siehe vorheriger Eintrag |
+
+---
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Menü-Quelle | Ad-hoc CRM-Items / **`buildEntityMenu('angebot')`** | **entityMenu** | Mock-Screenshot: Bearbeiten·Kopieren·Portal·PDF·Anrufen·Mail·Löschen |
+| CRM-Extras im ⋯ | behalten / **raus** | **raus** | Visualisierung, Verlängern, Nachfassen, Abgelehnt nicht im Mock-Menü |
+
+---
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Layout | DetailHead only / **EntityDetailLayout** | **Crumb + DetailShell** | wie Anfrage; Mock `Zurück · Angebote › …` |
+| Stammdaten | KundenStammdatenCard / **Mock-Props** | **`AngebotStammdatenCard`** | Mock: Avatar, Tel, Mail, Region, Kundenakte |
+| Nächste Schritte | behalten / **entfernen** | **entfernen** | nicht im Mock |
+| Handwerker-Versand | Stammdaten-Card / **entfernen** | **entfernen** | Mock ohne „An Handwerker senden“ |
+| Kunden-Versand | Stammdaten-Block / **Modal via CTA** | **Modal only** | Primary „Angebot versenden“ bleibt |
+
+---
+
+## Anfrage Details Live-Funnel + Mock (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Live-Funnel-Felder | weglassen (Mock-pur) / **zusätzlich im Prop-Design** | **`extraRows` + `footerRows`** | Nutzer: Live-Daten in Details, gleiches `.prop`-Inline-Design |
+| Reihenfolge | nur Funnel / Mock-Kern + Extras | **Projekt → Beschreibung → Funnel → Region → Preisrahmen → Quelle → Eingegangen** | Mock-Kern bleibt; Live ergänzt |
+
+---
+
+## Anfrage Details-Tab Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Details-Inhalt | Funnel-Props + Objekte / **Projekt-Übersicht + PosBoard** | **`AnfrageDetailsTab`** | Mock `LeadDetailsTab` |
+| Projekt-Props | Viele Funnel-Felder / **Projekt, Beschreibung, Region, Preisrahmen, Quelle** | **Mock-Props** | Positivliste + Standalone |
+| Leistungen | LeadProjektWasBlock / **PosBoard „Leistungen“** | **PosBoard**, speichert `was_zeilen` | Mock PosBoard |
+
+---
+
+## Anfrage Verlauf Mock 1:1 (2026-07-17)
+
+| Frage | Optionen | Gewählt | Begründung |
+|-------|----------|---------|------------|
+| Timeline-DOM | Tailwind dots / **Mock `tl-item`** | **`.tl-item` / `.tl-text` / `.tl-time`** | Standalone VerlaufCard |
+| Hülle | Nackt / **Card „Verlauf“** | **`MockVerlaufCard`** | Mock |
+| Offene Steps | Nur DB / **+ offen** | **Angebot erstellen / Auftragsbestätigung** mit `offen` | Mock LEAD_TIMELINE |
+| Zeitformat | relativ „vor 2h“ / **Heute · HH:MM** | **`formatTimelineStamp`** | Screenshot |
+
+---
+
+## Angebot Aktivitätstab = Anfrage (2026-07-17)
+
+| Tab | Vorher | Jetzt | Begründung |
+|-----|--------|-------|------------|
+| Verlauf | `LeadTimelineList` (EntityTimeline) | **`MockVerlaufCard` + `Timeline`** + Projektkontext + offene Schritte | 1:1 Anfrage |
+| Dokumente | `CrmDokumenteTabelle` | **`AnfrageDokumenteTab`** (bei Lead) / Mock-Fallback | Upload + Liste wie Anfrage |
+| Notizen | Platzhalter „Keine Notizen“ | **`AnfrageNotizenTab`** (Lead-Notizen) | Gleiches Composer-/Listen-Design |
+
+---
+
+## Auftrag Stammdaten = Mock Kontaktkarte (2026-07-17)
+
+| Tab | Vorher | Jetzt | Begründung |
+|-----|--------|-------|------------|
+| Stammdaten | Auftragsdaten + KundenStammdaten | **`AuftragStammdatenCard`** (Name/Tel/Mail/Region/Quelle/Eingegangen) | Mock OrderDetail |
+| Details | nur Positionen | **Auftragsdaten + Kundenstammdaten + Positionen** | Live-Blöcke verschoben |
+
+---
+
+## Auftrag Details = Mock (2026-07-17)
+
+| Block | Inhalt | Begründung |
+|-------|--------|------------|
+| Auftragsdaten | Auftrag · Beginn · Ende · Projektleitung · Auftragswert (grün) | Mock OrderDetail |
+| Projekt-Übersicht | Projekt · Beschreibung · Region · Preisrahmen · Quelle · Zeitraum · Fortschritt | wie Anfrage/Angebot |
+| Leistungen | **PosBoard** (`replaceAuftragPositionenFromPosBoard`) | Mock; ersetzt Positionen-Steuerung in Details |
+| Kundenstammdaten | entfernt aus Details | gehört nicht in Mock-Details |
+
+---
+
 ## Dashboard Mock 1:1 (2026-07-17)
 
 | Element | Funktion | Entscheidung |

@@ -4,6 +4,24 @@
  * Keine Klasse darf parallel in globals.css existieren.
  */
 
+/* ============ Shared keyframes (von .wizard / .modal / .sheet genutzt) ============ */
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slidein {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes sheetup {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes modalpop {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 /* ============ App Shell ============ */
 .app {
   display: grid;
@@ -915,6 +933,17 @@
   max-width: 100%;
   box-sizing: border-box;
 }
+.dash-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  width: 100%;
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
 .phase-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1003,12 +1032,14 @@
 }
 .page::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
-/* Small note */
+/* Small note — Mock 1:1 */
 .note {
   background: var(--bg-soft);
+  border: none;
   border-radius: var(--r-sm);
   padding: 10px 12px;
   font-size: 12.5px;
+  line-height: 1.5;
   color: var(--text-2);
 }
 .note .meta { color: var(--text-3); font-size: 11.5px; margin-bottom: 2px; }
@@ -1016,8 +1047,29 @@
 /* Notizen-Composer (unten, chat-artig) */
 .note-composer { display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--border-strong); border-radius: 12px; padding: 8px 8px 8px 12px; background: var(--card); transition: border-color .15s, box-shadow .15s; }
 .note-composer:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-50); }
-.note-composer textarea { flex: 1; border: none; outline: none; resize: none; background: transparent; font: inherit; font-size: 13px; line-height: 1.5; color: var(--text); padding: 4px 0; max-height: 140px; }
-.note-composer textarea::placeholder { color: var(--text-4); }
+.note-composer textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px !important;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 4px 0;
+  max-height: 140px;
+}
+.note-composer textarea::placeholder {
+  font-family: inherit;
+  font-size: 13px !important;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  color: var(--text-4);
+}
 .note-send { width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 9px; background: var(--green); color: #fff; display: grid; place-items: center; cursor: pointer; transition: opacity .15s, transform .1s; }
 .note-send:disabled { opacity: .4; cursor: default; }
 .note-send:not(:disabled):active { transform: scale(.94); }
@@ -1057,7 +1109,7 @@
   position: fixed;
   inset: 0;
   background: rgba(20, 24, 31, 0.32);
-  z-index: 200;
+  z-index: 320;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1435,35 +1487,73 @@
 }
 
 /* ============ Wizard layout (Angebot) — Vollbild-Screen ============ */
-.wizard {
+.wizard,
+.app-flow-screen {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  background: var(--bg);
+  z-index: 400;
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  background: #ffffff;
+  color: var(--text);
   display: grid;
   grid-template-rows: auto 1fr;
+  overflow: hidden;
   animation: fadein 160ms ease;
 }
 .wizard-inner-shell {
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0;
-  background: var(--bg);
+  height: 100%;
+  width: 100%;
+  background: #ffffff;
 }
-.wizard-top {
-  background: var(--card);
+.wizard-top,
+.app-flow-header {
+  background: #ffffff;
   border-bottom: 0.5px solid var(--border);
   display: flex;
   align-items: center;
   padding: 0 20px;
   gap: 16px;
-  height: 56px;
+  min-height: 56px;
+  flex-shrink: 0;
 }
-.wizard-top .title-block { display: flex; flex-direction: column; gap: 0; line-height: 1.1; }
-.wizard-top .ttl { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
-.wizard-top .sub { font-size: 12px; color: var(--text-3); }
-.wizard-body { overflow-y: auto; padding: 24px; }
-.wizard-inner { max-width: 960px; margin: 0 auto; }
+.wizard-top .title-block,
+.app-flow-header .title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.1;
+}
+.wizard-top .ttl,
+.app-flow-header .ttl {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.wizard-top .sub,
+.app-flow-header .sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wizard-body,
+.app-flow-body {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--bg-soft, #f6f7f6);
+  -webkit-overflow-scrolling: touch;
+}
+.wizard-inner {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
 
 /* Position row (Angebot edit) */
 .pos-edit {
@@ -4426,7 +4516,8 @@ textarea.input {
 }
 
 .modal-overlay {
-    @apply z-modal fixed inset-0 flex animate-fade-in items-end justify-center bg-black/40 p-0 md:items-center md:p-4;
+    @apply fixed inset-0 flex animate-fade-in items-end justify-center bg-black/40 p-0 md:items-center md:p-4;
+    z-index: 320;
   }
 
 .modal-header {
@@ -4464,8 +4555,37 @@ textarea.input {
     @apply flex w-full cursor-pointer items-center gap-2.5 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-[13px] font-medium text-bw-text transition-colors hover:bg-bw-bg-soft;
   }
 
+.menu-item-ico {
+    display: inline-flex;
+    width: 18px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+  }
+
+.menu-item.danger {
+    color: var(--red-tx);
+  }
+
+.menu-item.danger:hover {
+    background: var(--red-bg);
+  }
+
+.menu-item.danger .mock-icon,
+  .menu-item.danger .menu-item-ico {
+    color: var(--red-tx);
+  }
+
 .menu-item-danger {
-    @apply text-status-cancel-text hover:bg-status-cancel-bg/40;
+    color: var(--red-tx);
+  }
+
+.menu-item-danger:hover {
+    background: var(--red-bg);
+  }
+
+.menu-item-danger .mock-icon {
+    color: var(--red-tx);
   }
 
 .menu-item-hint {
@@ -5734,14 +5854,21 @@ textarea.input {
   }
 
 .timeline {
-    @apply relative;
+    position: relative;
+    padding-left: 18px;
   }
 
 .timeline::before {
     content: '';
-    @apply absolute bottom-0 left-4 top-0 w-px bg-bw-border;
+    position: absolute;
+    left: 5px;
+    top: 4px;
+    bottom: 4px;
+    width: 1px;
+    background: var(--border);
   }
 
+/* Alt-Klassen (nicht mehr von Timeline.tsx) — behalten für Legacy */
 .timeline-item {
     @apply relative pb-6 pl-10;
   }
@@ -5771,10 +5898,10 @@ textarea.input {
     @apply grid grid-cols-1 gap-4 md:grid-cols-2;
   }
 
+/* Mock-Parität: `.list-row` ist CSS-Grid (nicht Flex) — Spalten via inline gridTemplateColumns */
 .list-row {
-    display: flex;
+    display: grid;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     padding: 11px 14px;
     font-size: 13px;
@@ -7355,21 +7482,31 @@ textarea.input {
     @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text;
   }
 
+/* Mock `.note` 1:1 — kein grüner Rand (CRM-Override entfernt) */
 .note {
-    @apply rounded-md border-l-2 border-bw-primary bg-bw-bg-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-bw-text-mid;
-  }
+  background: var(--bg-soft);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.note .meta,
+.note-meta {
+  color: var(--text-3);
+  font-size: 11.5px;
+  margin-bottom: 2px;
+}
 
 .note-plain {
-    @apply rounded-lg border border-bw-border bg-bw-card px-3 py-2.5 text-[12.5px] leading-relaxed text-bw-text-mid;
-  }
-
-.note-meta {
-    @apply mb-0.5 text-[11.5px] text-bw-text-muted;
-  }
+  @apply rounded-lg border border-bw-border bg-bw-card px-3 py-2.5 text-[12.5px] leading-relaxed text-bw-text-mid;
+}
 
 .note-plain-meta {
-    @apply mb-2 text-[12px] leading-snug;
-  }
+  @apply mb-2 text-[12px] leading-snug;
+}
 
 .termin-marker {
     @apply block w-[3px] shrink-0 self-stretch rounded-sm;
@@ -7552,43 +7689,7 @@ textarea.input {
   @apply border-bw-border bg-bw-hover text-bw-text;
 }
 
-/* Bautagebuch (Auftrag-Detail) */
-.auftrag-bautagebuch {
-  @apply space-y-4;
-}
-
-.bt-list-toolbar {
-  @apply mb-1 flex items-center justify-between gap-2;
-}
-
-.bt-empty-row {
-  @apply flex items-center justify-between rounded-md border border-dashed border-bw-border px-3 py-4;
-}
-
-.bt-add-trigger {
-  @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-bw-border bg-bw-card text-bw-primary transition-colors hover:bg-bw-hover active:bg-bw-hover;
-}
-
-.bt-add-close {
-  @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text;
-}
-
-.bt-add-card {
-  @apply relative overflow-hidden rounded-md border border-bw-border bg-bw-bg-soft/80 p-3;
-}
-
-.bt-add-title {
-  @apply mb-2 text-[12px] font-semibold uppercase tracking-wide text-bw-text-muted;
-}
-
-.bt-add-fields {
-  @apply grid gap-2 md:grid-cols-2;
-}
-
-.bt-add-fields .field-full {
-  @apply md:col-span-2;
-}
-
+/* Bautagebuch — Mock-Liste (.bt-entry Grid); Foto-Thumbs auch Abnahme/Formulare */
 .bt-foto-grid {
   @apply mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4;
 }
@@ -7603,67 +7704,6 @@ textarea.input {
 
 .bt-foto-remove {
   @apply absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white;
-}
-
-.bt-entry {
-  @apply border-b border-bw-border bg-bw-card last:border-b-0;
-}
-
-.bt-entry-head {
-  @apply grid w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-bw-hover/60;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-}
-
-.bt-entry-title {
-  @apply truncate text-[13px] font-semibold leading-snug text-bw-text;
-}
-
-.bt-entry-meta {
-  @apply mt-0.5 text-[11px] text-bw-text-muted;
-}
-
-.bt-entry-badges {
-  @apply flex shrink-0 flex-wrap items-center justify-end gap-1;
-}
-
-.bt-badge {
-  @apply rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide;
-}
-
-.bt-badge-live {
-  @apply bg-emerald-100 text-emerald-900;
-}
-
-.bt-badge-draft {
-  @apply bg-bw-hover text-bw-text-muted;
-}
-
-.bt-badge-sent {
-  @apply bg-blue-100 text-blue-900;
-}
-
-.bt-entry.open .bt-entry-head {
-  @apply border-b border-bw-border bg-bw-green-bg/35;
-}
-
-.bt-entry-body {
-  @apply space-y-3 px-3 py-3;
-}
-
-.bt-entry-actions {
-  @apply flex flex-wrap gap-2 border-t border-bw-border pt-3;
-}
-
-.bt-entry-actions .btn {
-  @apply h-8 min-h-0 text-[12px];
-}
-
-.bt-kunden-preview {
-  @apply rounded-md border border-dashed border-bw-primary/35 bg-bw-green-bg/25 p-3;
-}
-
-.bt-kunden-preview-card {
-  @apply mt-2 rounded-lg border border-bw-border bg-white p-3 shadow-sm;
 }
 
 /** Stacking — CRM Shell (Prompt 1+2+A) */
@@ -7817,39 +7857,44 @@ textarea.input {
 }
 
 .app-flow-screen {
-  @apply fixed inset-0 z-[180] grid grid-rows-[auto_1fr_auto] overflow-hidden bg-bw-bg;
+  /* Basis in Block „Wizard layout“ oben — hier nur Footer-Zeile für 3-Row-Grid */
+  grid-template-rows: auto 1fr auto;
 }
 
 .app-flow-header {
-  @apply shrink-0 border-b border-bw-border bg-bw-card px-4 py-3;
+  @apply shrink-0 border-b border-bw-border;
+  background: #ffffff;
 }
 
 .app-flow-body {
-  @apply min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4;
+  @apply min-h-0 overflow-y-auto overflow-x-hidden;
 }
 
 .app-flow-footer {
-  @apply shrink-0 border-t border-bw-border bg-bw-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))];
+  @apply shrink-0 border-t border-bw-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))];
+  background: #ffffff;
 }
 
 /**
  * Vollbild-Wizards (Mock .wizard / .wizard-inner-shell):
- * Shell ist fullscreen (kein inset Radius/Schatten — Mock hat keins).
- * Inhaltsbreite: .wizard-inner max-width 960px; Cards: --r / --shadow.
+ * Shell ist fullscreen mit weißem Hintergrund; Inhalt zentriert via .wizard-inner.
  */
 .wizard-flow {
-  @apply z-[200] animate-fade-in bg-bw-bg;
+  z-index: 400;
+  background: #ffffff !important;
+  color: var(--text);
+  animation: fadein 160ms ease;
 }
 
 .wizard-flow .app-flow-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  /* Mock .wizard-top: height 56, pad 0 20, gap 16 — min-height erlaubt CRM-Subtitel */
   min-height: 56px;
   padding: 0 20px;
   gap: 16px;
-  @apply border-b border-hairline border-bw-border bg-bw-card;
+  background: #ffffff;
+  @apply border-b border-hairline border-bw-border;
 }
 
 .wizard-flow .title-block {
@@ -7872,8 +7917,15 @@ textarea.input {
 }
 
 .wizard-flow .app-flow-body {
-  /* Mock .wizard-body: padding 24px */
   @apply overflow-x-hidden overflow-y-auto p-4 md:p-6;
+  background: var(--bg-soft, #f6f7f6);
+}
+
+.wizard-flow .wizard-inner {
+  max-width: 960px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Wizard-Kontext: Nav-Buttons Mock .btn (32px / radius 9) — nicht .btn.sm */
@@ -7959,14 +8011,19 @@ textarea.input {
 
 @media (max-width: 768px) {
   .wizard,
+  .app-flow-screen,
   .wizard-flow {
-    @apply grid-rows-[auto_1fr_auto];
+    grid-template-rows: auto 1fr auto;
+    height: 100dvh;
+    width: 100vw;
+    background: #ffffff !important;
   }
 
   .wizard-top,
   .wizard-flow .app-flow-header {
     flex-wrap: nowrap;
     @apply gap-0 px-0 py-0;
+    background: #ffffff;
   }
 
   .wizard-header-desktop {
@@ -8008,6 +8065,7 @@ textarea.input {
   .wizard-body,
   .wizard-flow .app-flow-body {
     @apply p-4 pb-[max(1rem,env(safe-area-inset-bottom))];
+    background: var(--bg-soft, #f6f7f6);
   }
 
   .wizard-mobile-footer {
@@ -8407,6 +8465,71 @@ textarea.input {
   max-width: 380px;
   margin-inline: auto;
   line-height: 1.45;
+}
+
+/* Abnahmeprotokoll — Tabellenliste (wie Zahlplan) */
+.abnahme-table-wrap {
+  margin: 0 -16px -14px;
+}
+.list-row.abnahme-row {
+  grid-template-columns: 1fr 110px 110px 120px 34px;
+  cursor: default;
+  align-items: center;
+}
+.abnahme-row__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 0;
+}
+.abnahme-row__ico {
+  flex-shrink: 0;
+  color: var(--text-4);
+}
+.abnahme-row__datum {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.abnahme-row__menu {
+  display: flex;
+  justify-content: flex-end;
+}
+.abnahme-empty {
+  padding: 26px 16px;
+  text-align: center;
+  color: var(--text-3);
+}
+.abnahme-empty__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-top: 10px;
+}
+.abnahme-empty__text {
+  font-size: 12.5px;
+  margin-top: 4px;
+  margin-bottom: 16px;
+  max-width: 400px;
+  margin-inline: auto;
+  line-height: 1.45;
+}
+@media (max-width: 760px) {
+  .list-row.abnahme-row {
+    grid-template-columns: 1fr 34px;
+    gap: 6px 10px;
+  }
+  .list-row.abnahme-row.head {
+    display: none;
+  }
+  .abnahme-row__datum {
+    display: none;
+  }
+  .abnahme-row > div:nth-child(4) {
+    grid-column: 1;
+  }
 }
 .zahlplan-editor-presets {
   display: flex;

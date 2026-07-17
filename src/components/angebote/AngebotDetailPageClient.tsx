@@ -1,74 +1,70 @@
 'use client'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailProp } from '@/components/ui/detail-prop'
-import { NaechsteSchritteCard } from '@/components/crm/NaechsteSchritteCard'
-import { Card } from '@/components/ui/Card'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
-import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { Modal } from '@/components/ui/Modal'
-import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { LeadTimelineList } from '@/components/anfragen/LeadTimelineList'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
+import { Timeline } from '@/components/ui/timeline'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
+import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateAngebot } from '@/lib/list-actions'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/actions'
 import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
-  markAngebotAbgelehntEinfach,
   resendAngebotEinfach,
   sendAngebotEinfach,
-  sendAngebotNachfassManuellAction,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
-import { extendAngebotGueltigkeit } from '@/app/(dashboard)/angebote/extend-gueltigkeit-action'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
+import { openMieterStatusPreview, openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
+import { AngebotDetailsTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
-import { KundeModal } from '@/components/kunden/KundeModal'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import {
-  angebotSummenBrutto,
   betragAnzeige,
-  daysUntil,
   addDaysYmd,
-  erinnerungGeplantAm,
-  erinnerungReferenzAm,
-  gesendetAmWert,
-  gueltigBisClass,
-  gueltigBisTone,
   heuteYmd,
   kundeNameAusAngebot,
   leistungAnzeige,
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
 import { angebotStatusDisplay } from '@/lib/status/status-display'
-import { angebotWizardZahlungLabel, angebotDarfImWizardBearbeitetWerden, parseZahlungsbedingungenKey, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
-import { AngebotPositionenV3Tab } from '@/components/angebote/positionen-v3/AngebotPositionenV3Tab'
+import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
-import type { AngebotDetail, Gewerk, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
-import { cn, formatAnfragePreisAnzeige, formatDatum, formatDatumZeit, KANAL_LABELS, SITUATION_LABELS } from '@/lib/utils'
-import {
-  KUNDE_ABLEHNUNG_GRUND_LABELS,
-  KUNDE_ABLEHNUNG_GRUND_OPTIONS,
-} from '@/lib/angebote/ablehnung-labels'
-import { buildAngebotNaechsteSchritte } from '@/lib/naechste-schritte'
+import type {
+  AngebotDetail,
+  Gewerk,
+  LeadDetail,
+  LeadDokumentRow,
+  LeadNotizRow,
+  LeadTimelineRow,
+  Preisliste,
+} from '@/lib/types'
+import { formatDatum, formatTimelineStamp, SITUATION_LABELS } from '@/lib/utils'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
@@ -114,7 +110,7 @@ export function AngebotDetailPageClient({
   wizardFirm,
   lead,
   kiVisualisierungen: _kiVisualisierungen = [],
-  projektKontext: _projektKontext,
+  projektKontext,
 }: {
   detail: AngebotDetail
   timeline: LeadTimelineRow[]
@@ -131,6 +127,7 @@ export function AngebotDetailPageClient({
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
   const [mainTab, setMainTab] = useState<AngebotDetailTab>('stammdaten')
+  const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -139,21 +136,13 @@ export function AngebotDetailPageClient({
   const [aufCc, setAufCc] = useState<string[]>([])
   const [aufPreviewHtml, setAufPreviewHtml] = useState('')
   const [aufPreviewLoading, setAufPreviewLoading] = useState(false)
-  const [ablehnOpen, setAblehnOpen] = useState(false)
-  const [abGrund, setAbGrund] = useState('zu_teuer')
-  const [abNotiz, setAbNotiz] = useState('')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
   const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
-  const [verlaengernOpen, setVerlaengernOpen] = useState(false)
-  const [verlaengernDatum, setVerlaengernDatum] = useState(() => {
-    const raw = detail.gueltig_bis?.slice(0, 10)
-    if (raw && raw > heuteYmd()) return raw
-    return addDaysYmd(heuteYmd(), 30)
-  })
-  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
+  const [impersonating, setImpersonating] = useState(false)
+  const isCrmAdmin = useIsCrmAdmin()
 
   useEffect(() => {
     const raw = searchParams.get('tab')
@@ -169,7 +158,6 @@ export function AngebotDetailPageClient({
 
   const statusEinfach = resolveStatusEinfach(detail)
   const angebotStatus = useMemo(() => angebotStatusDisplay(detail), [detail])
-  const kannVerlaengern = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
   const positionenAnzeigeCount = useMemo(
     () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)).length,
@@ -245,7 +233,6 @@ export function AngebotDetailPageClient({
   }, [acceptOpen, detail.id, aufStart, aufEnde])
 
   const kundeName = kundeNameAusAngebot(detail)
-  const summen = useMemo(() => angebotSummenBrutto(detail.positionen ?? []), [detail.positionen])
   const summenMail = useMemo(
     () => summenAusPositionen(detail.positionen ?? [], 19),
     [detail.positionen]
@@ -255,19 +242,127 @@ export function AngebotDetailPageClient({
     (statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
     darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status) &&
     Boolean(kunde?.email?.trim())
-  const gueltigTone = gueltigBisTone(detail.gueltig_bis)
-  const tageRest = daysUntil(detail.gueltig_bis)
-  const gesendetAm = gesendetAmWert(detail)
-  const zahlungLabel = angebotWizardZahlungLabel(
-    parseZahlungsbedingungenKey(
-      detail.zahlungsbedingungen,
-      detail.kunden?.typ ?? detail.leads?.kundentyp
-    )
+
+  const timelineSorted = useMemo(
+    () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
+    [timelineInitial]
   )
 
-  const timelineCount = timelineInitial.length || 1
+  const notizenRows = useMemo(() => {
+    const raw = lead?.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [lead?.lead_notizen])
 
-  const anhaengeCount = useMemo(() => anzahlAngebotAnhaenge(detail), [detail])
+  const dokumenteRows = useMemo(() => {
+    const raw = lead?.lead_dokumente
+    if (!Array.isArray(raw)) return [] as LeadDokumentRow[]
+    return [...raw].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [lead?.lead_dokumente])
+
+  const timelineItems = useMemo(() => {
+    type Row = {
+      id: string
+      text: string
+      time: string
+      state: 'done' | 'open' | 'active'
+      ts: number
+      linkLabel?: string
+      onLinkClick?: () => void
+    }
+
+    const fromEvents: Row[] = timelineSorted.map((ev) => ({
+      id: ev.id,
+      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
+      time: formatTimelineStamp(ev.created_at),
+      state: 'done' as const,
+      ts: new Date(ev.created_at).getTime(),
+      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
+      onLinkClick: ev.email_log_id
+        ? () => setEmailPreviewId(ev.email_log_id!)
+        : undefined,
+    }))
+
+    let basis: Row[] = fromEvents
+    if (basis.length === 0 && detail.created_at) {
+      basis = [
+        {
+          id: 'angebot-erstellt',
+          text: `Angebot erstellt${detail.angebotsnr?.trim() ? ` — ${detail.angebotsnr.trim()}` : ''}`,
+          time: formatTimelineStamp(detail.created_at),
+          state: 'done',
+          ts: new Date(detail.created_at).getTime(),
+        },
+      ]
+    }
+
+    let merged: Row[] = basis
+    if (projektKontext) {
+      const enriched = ergaenzeTimelineMitProjektKontext(
+        basis.map((b) => ({
+          id: b.id,
+          ts: b.ts,
+          text: b.text,
+          time: b.time,
+          state: b.state === 'active' ? 'active' : 'done',
+          linkLabel: b.linkLabel,
+        })),
+        projektKontext
+      )
+      merged = enriched.map((item) => ({
+        id: item.id,
+        text: item.text,
+        time: item.time,
+        state: item.state,
+        ts: item.ts,
+        linkLabel: item.linkLabel,
+        onLinkClick: item.href
+          ? () => router.push(item.href!)
+          : basis.find((b) => b.id === item.id)?.onLinkClick,
+      }))
+    }
+
+    const openSteps: Row[] = []
+    if (!auftragId && statusEinfach !== 'angenommen') {
+      if (statusEinfach === 'entwurf') {
+        openSteps.push({
+          id: 'open-versand',
+          text: 'Angebot an Kunden senden',
+          time: 'offen',
+          state: 'open',
+          ts: Number.MAX_SAFE_INTEGER - 1,
+        })
+      }
+      openSteps.push({
+        id: 'open-auftrag',
+        text: 'Auftragsbestätigung',
+        time: 'offen',
+        state: 'open',
+        ts: Number.MAX_SAFE_INTEGER,
+      })
+    }
+
+    return [...merged, ...openSteps].map(({ ts: _ts, ...rest }) => rest)
+  }, [
+    timelineSorted,
+    projektKontext,
+    router,
+    detail.created_at,
+    detail.angebotsnr,
+    auftragId,
+    statusEinfach,
+  ])
+
+  const anhaengeCount = useMemo(() => {
+    const hasLead = Boolean(detail.lead_id ?? lead?.id)
+    return anzahlAngebotAnhaenge(detail, dokumenteRows, {
+      includeFotos: !hasLead,
+    })
+  }, [detail, dokumenteRows, lead?.id])
 
   const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
   const projektTitel = useMemo(() => {
@@ -288,12 +383,6 @@ export function AngebotDetailPageClient({
         .join(' · ')}
     </span>
   )
-
-  function openVerlaengernModal() {
-    const raw = detail.gueltig_bis?.slice(0, 10)
-    setVerlaengernDatum(raw && raw > heuteYmd() ? raw : addDaysYmd(heuteYmd(), 30))
-    setVerlaengernOpen(true)
-  }
 
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail = kunde?.email?.trim() ?? ''
@@ -335,142 +424,105 @@ export function AngebotDetailPageClient({
     })
   }
 
-  const kannAnnehmen =
-    ((statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId) ||
-    (statusEinfach === 'entwurf' && !auftragId)
-
   const kannVersenden =
     statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert'
   const kannErneutSenden = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
-  const detailHeadMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = []
+  const detailHeadMenuItems = useMemo(() => {
+    const erledigt =
+      statusEinfach === 'angenommen' ||
+      statusEinfach === 'abgelehnt' ||
+      Boolean(auftragId)
+    const versendet = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
-    if (kannBearbeiten) {
-      items.push({
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil'),
-        onClick: openWizardBearbeiten,
-      })
-      items.push('sep')
-    }
-
-    if (kannAnnehmen) {
-      items.push({
-        label: 'Angebot annehmen',
-        icon: mockMenuIcon('check'),
-        hint: statusEinfach === 'entwurf' ? 'Auch ohne vorherigen Versand' : undefined,
-        onClick: openAcceptModal,
-      })
-    }
-
-    items.push({
-      label: 'PDF herunterladen',
-      icon: mockMenuIcon('download'),
-      onClick: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
-    })
-
-    // Relocated from DetailShell tab (Positivliste P0) → eigene Route /angebote/[id]/visualisierung
-    items.push({
-      label: 'Visualisierungen',
-      icon: mockMenuIcon('photo'),
-      onClick: () => router.push(`/angebote/${detail.id}/visualisierung`),
-    })
-
-    if (kannVersenden) {
-      items.push({
-        label: 'Versenden',
-        icon: mockMenuIcon('send'),
-        onClick: openAngebotVersandModal,
-      })
-    } else if (kannErneutSenden) {
-      items.push({
-        label: 'Erneut senden',
-        icon: mockMenuIcon('send'),
-        onClick: () => run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet'),
-      })
-    }
-
-    if (kannVerlaengern) {
-      items.push({
-        label: 'Verlängern',
-        icon: mockMenuIcon('calendar-event'),
-        onClick: openVerlaengernModal,
-      })
-    }
-    if (statusEinfach === 'gesendet' && !detail.nachgefasst_am) {
-      items.push({
-        label: 'Nachfassen',
-        icon: mockMenuIcon('mail-forward'),
-        hint: 'Erinnerungs-Mail an Kunden',
-        onClick: () =>
-          run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet'),
-      })
-    }
-    if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
-      items.push({
-        label: 'Abgelehnt',
-        icon: mockMenuIcon('circle-x'),
-        onClick: () => setAblehnOpen(true),
-      })
-    }
-
-    items.push('sep')
-    items.push({
-      label: 'Mail schreiben',
-      icon: mockMenuIcon('mail'),
-      hint: kundeEmail ? undefined : 'E-Mail im Modal eintragen',
-      onClick: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
-    })
-
-    if (kundeTelefon) {
-      items.push({
-        label: 'Anrufen',
-        icon: mockMenuIcon('phone'),
-        onClick: () => {
-          window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'angebot',
+        {
+          name: kundeName,
+          status: statusEinfach,
+          statusKey: statusEinfach,
         },
-      })
-    }
-
-    if (!auftragId) {
-      items.push('sep', {
-        label: 'Löschen',
-        icon: mockMenuIcon('trash'),
-        danger: true,
-        onClick: () => {
-          if (!window.confirm('Angebot wirklich löschen?')) return
-          startTransition(async () => {
-            const r = await deleteAngebot(detail.id)
-            if ('error' in r) {
-              toast.error(r.error)
+        {
+          onEdit: kannBearbeiten ? openWizardBearbeiten : undefined,
+          onCopy: () => runDuplicateAngebot(detail.id, router),
+          onPortal: () => {
+            if (!isCrmAdmin) {
+              toast.error('Admin Login nur für CRM-Admins')
               return
             }
-            toast.success('Angebot gelöscht')
-            if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
-            else router.push('/angebote')
-          })
-        },
-      })
-    }
-
-    return items
+            if (impersonating) return
+            setImpersonating(true)
+            const run = detail.lead_id
+              ? openMieterStatusPreview(detail.lead_id)
+              : detail.kunde_id
+                ? openPortalAsKunde(detail.kunde_id)
+                : Promise.resolve({ ok: false as const, message: 'Kein Portal-Zugang verknüpft' })
+            void run.then((r) => {
+              setImpersonating(false)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              window.open(r.url, '_blank', 'noopener,noreferrer')
+            })
+          },
+          onPortalLink: () => {
+            toast.message('Kundenportal-Link', {
+              description: 'Versand über Kundenakte oder Auftrag.',
+            })
+          },
+          onAccept: versendet && !auftragId ? openAcceptModal : undefined,
+          onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
+          onSend: !erledigt
+            ? kannErneutSenden
+              ? () => run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet')
+              : kannVersenden
+                ? openAngebotVersandModal
+                : undefined
+            : undefined,
+          tel: kundeTelefon || null,
+          mail: kundeEmail || null,
+          onCall: kundeTelefon
+            ? () => {
+                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+              }
+            : undefined,
+          onMail: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
+          onDelete: () => {
+            startTransition(async () => {
+              const r = await deleteAngebot(detail.id)
+              if ('error' in r) {
+                toast.error(r.error)
+                return
+              }
+              toast.success('Angebot gelöscht')
+              if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
+              else router.push('/angebote')
+            })
+          },
+          deleteLabel: kundeName,
+        }
+      ),
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
   }, [
     kannBearbeiten,
-    kannAnnehmen,
     kannVersenden,
     kannErneutSenden,
     kundeEmail,
     kundeTelefon,
+    kundeName,
     detail.id,
     detail.lead_id,
-    detail.nachgefasst_am,
-    detail.status,
-    kannVerlaengern,
+    detail.kunde_id,
     statusEinfach,
     mailCompose,
     auftragId,
     router,
+    isCrmAdmin,
+    impersonating,
+    startTransition,
   ])
 
   const detailPrimaryBtnClass =
@@ -481,13 +533,15 @@ export function AngebotDetailPageClient({
     if (statusEinfach === 'entwurf') {
       if (!darfAngebotAnKundeSenden(hwRows, detail.status)) {
         return (
-          <Link
-            href="#angebot-versand-handwerker"
+          <button
+            type="button"
             className={detailPrimaryBtnClass}
+            disabled={pending}
+            onClick={openAngebotVersandModal}
           >
             Angebot versenden
             <MockIcon ctx="btn" n="send" size={14} />
-          </Link>
+          </button>
         )
       }
       return (
@@ -518,258 +572,62 @@ export function AngebotDetailPageClient({
     if (statusEinfach === 'angenommen' && auftragId) {
       return (
         <Link href={`/auftraege/${auftragId}`} className={detailPrimaryBtnClass}>
+          <MockIcon ctx="btn" n="briefcase" size={14} />
           Zum Auftrag
-          <MockIcon ctx="btn" n="external-link" size={14} />
         </Link>
       )
     }
     return null
   })()
 
-  const nachfassText = (() => {
-    if (statusEinfach === 'entwurf') return '— (noch nicht gesendet)'
-    if (detail.nachgefasst_am) {
-      return `Nachfass gesendet: ${formatDatumZeit(detail.nachgefasst_am)}`
-    }
-    const ref = erinnerungReferenzAm(detail)
-    const geplant = erinnerungGeplantAm(ref)
-    if (geplant) {
-      return `Nachfass geplant: ${formatDatum(geplant.slice(0, 10))} (7 Tage nach Versand, falls keine Rückmeldung)`
-    }
-    return '—'
-  })()
-
-  const kundeCard = (
-    <KundenStammdatenCard
-      kunde={kunde}
-      collapsible={false}
-      fallback={
-        lead
-          ? {
-              plz: lead.plz,
-              kontakt_name: lead.kontakt_name,
-              kontakt_email: lead.kontakt_email,
-              kontakt_telefon: lead.kontakt_telefon,
-              funnel_daten: lead.funnel_daten,
-            }
-          : null
-      }
-      action={
-        kunde ? (
-          <button
-            type="button"
-            onClick={() => setStammdatenModalOpen(true)}
-            className="btn ghost sm"
-            aria-label="Stammdaten bearbeiten"
-          >
-            <MockIcon ctx="btn" n="pencil" size={15} />
-          </button>
-        ) : null
-      }
-    />
-  )
-
-  const naechsteSchritte = useMemo(
-    () =>
-      buildAngebotNaechsteSchritte({
-        status: statusEinfach,
-        angebotId: detail.id,
-        auftragId,
-        nachgefasst: Boolean(detail.nachgefasst_am),
-        onNachfassen:
-          (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !detail.nachgefasst_am
-            ? () => run(() => sendAngebotNachfassManuellAction(detail.id), 'Nachfass-Mail gesendet')
-            : undefined,
-        onAuftragAnlegen:
-          statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
-            ? () => {
-                setAufBetreff('')
-                setAufTo([])
-                setAufCc([])
-                setAufPreviewHtml('')
-                setAcceptOpen(true)
-              }
-            : undefined,
-      }),
-    [
-      statusEinfach,
-      detail.id,
-      detail.nachgefasst_am,
-      auftragId,
-    ]
-  )
-
-  const formatEur = (n: number) =>
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-
-  const regionAnzeige = useMemo(() => {
-    const plz = lead?.plz?.trim() || kunde?.plz?.trim() || ''
-    const ort = kunde?.ort?.trim() || ''
-    return [plz, ort].filter(Boolean).join(' ')
-  }, [lead?.plz, kunde?.plz, kunde?.ort])
-
-  const preisrahmenAnzeige = useMemo(() => {
-    if (!lead) return null
-    const raw = formatAnfragePreisAnzeige(
-      lead.kanal,
-      lead.budget_ca,
-      lead.preis_min,
-      lead.preis_max,
-      lead.funnel_daten
-    )
-    return raw !== '—' ? raw : null
-  }, [lead])
-
-  const beschreibungAnzeige =
-    lead?.notizen?.trim() ||
-    lead?.kontakt_nachricht?.trim() ||
-    detail.projektbeschreibung?.trim() ||
-    ''
-
-  const angebotNrLabel =
-    detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
-
-  const projektUebersichtCard = (
-    <Card title="Projekt-Übersicht" collapsible={false}>
-      <div className="props">
-        <DetailProp label="Projekt">{projektTitel}</DetailProp>
-        {beschreibungAnzeige ? (
-          <DetailProp label="Beschreibung">{beschreibungAnzeige}</DetailProp>
-        ) : null}
-        {regionAnzeige ? <DetailProp label="Region">{regionAnzeige}</DetailProp> : null}
-        {preisrahmenAnzeige ? (
-          <DetailProp label="Preisrahmen">{preisrahmenAnzeige}</DetailProp>
-        ) : null}
-        {lead ? (
-          <DetailProp label="Quelle">{KANAL_LABELS[lead.kanal] ?? lead.kanal}</DetailProp>
-        ) : null}
-        <DetailProp label="Angebot">{angebotNrLabel}</DetailProp>
-        <DetailProp label="Gesamt">
-          <span className="font-semibold tabular-nums text-bw-primary">
-            {betragLabel || '—'}
-          </span>
-        </DetailProp>
-        <DetailProp label="Erstellt">{formatDatumZeit(detail.created_at)}</DetailProp>
-        <DetailProp label="Gültig bis">
-          <span className={gueltigBisClass(gueltigTone)}>
-            {detail.gueltig_bis ? formatDatum(detail.gueltig_bis) : '—'}
-          </span>
-          {tageRest != null && tageRest >= 0 && tageRest < 14 ? (
-            <span
-              className={cn(
-                'ml-2 inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium',
-                gueltigTone === 'danger' ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'
-              )}
-            >
-              Läuft in {tageRest} Tag{tageRest === 1 ? '' : 'en'} ab
-            </span>
-          ) : null}
-          {tageRest != null && tageRest < 0 ? (
-            <span className="ml-2 inline-flex rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-800">
-              Abgelaufen
-            </span>
-          ) : null}
-        </DetailProp>
-        <DetailProp label="Zahlung">{zahlungLabel}</DetailProp>
-        <DetailProp label="Netto">
-          <span className="tabular-nums">{formatEur(summen.netto)}</span>
-        </DetailProp>
-        <DetailProp label={`MwSt ${summen.mwstSatz}%`}>
-          <span className="tabular-nums">{formatEur(summen.mwst)}</span>
-        </DetailProp>
-        <DetailProp label="Brutto">
-          <span className="font-semibold tabular-nums text-bw-primary">{formatEur(summen.brutto)}</span>
-        </DetailProp>
-        {detail.kunden_objekte ? (
-          <DetailProp label="Objekt (Ausführungsort)">
-            {kundenObjektKurzlabel(detail.kunden_objekte)}
-          </DetailProp>
-        ) : null}
-        <DetailProp label="Gesendet am">{gesendetAm ? formatDatumZeit(gesendetAm) : '—'}</DetailProp>
-        <DetailProp label="An">{kunde?.email?.trim() || '—'}</DetailProp>
-        <DetailProp label="Nachfass">{nachfassText}</DetailProp>
-        {detail.lead_id ? (
-          <DetailProp label="Zur Anfrage">
-            <Link href={`/anfragen/${detail.lead_id}`} className="text-bw-link hover:underline">
-              Anfrage öffnen
-            </Link>
-          </DetailProp>
-        ) : null}
-        {auftragId ? (
-          <DetailProp label="Zum Auftrag">
-            <Link href={`/auftraege/${auftragId}`} className="text-bw-link hover:underline">
-              Auftrag öffnen
-            </Link>
-          </DetailProp>
-        ) : null}
-      </div>
-    </Card>
-  )
-
-  const positionenTab = (
-    <AngebotPositionenV3Tab
-      angebotId={detail.id}
-      positionen={detail.positionen ?? []}
-      gewerke={gewerke}
-      editable={positionenBearbeitbar}
-      onChanged={() => refresh()}
-    />
-  )
-
-  const stammdatenInhalt = (
-    <>
-      {kundeCard}
-      {kunde?.id ? (
-        <p className="text-sm">
-          <Link href={`/kunden/${kunde.id}`} className="font-medium text-bw-link hover:underline">
-            Kundenakte öffnen
-          </Link>
-        </p>
-      ) : null}
-      <NaechsteSchritteCard steps={naechsteSchritte} />
-      <AngebotVersandSection
-        mode="kunde"
-        detail={detail}
-        bruttoMin={summenMail.bruttoMin}
-        bruttoMax={summenMail.bruttoMax}
-        positionen={detail.positionen ?? []}
-        gueltigBis={gueltigBisYmd}
-        kundeModalOpen={kundeVersandOpen}
-        onKundeModalOpenChange={setKundeVersandOpen}
-        onKundeSent={() => refresh()}
-      />
-      <AngebotVersandSection
-        mode="handwerker"
-        detail={detail}
-        bruttoMin={summenMail.bruttoMin}
-        bruttoMax={summenMail.bruttoMax}
-        positionen={detail.positionen ?? []}
-        gueltigBis={gueltigBisYmd}
-        auftragId={auftragId}
-      />
-    </>
-  )
+  const stammdatenInhalt = <AngebotStammdatenCard detail={detail} lead={lead} />
 
   const detailsInhalt = (
-    <>
-      {projektUebersichtCard}
-      {positionenTab}
-    </>
+    <AngebotDetailsTab
+      detail={detail}
+      lead={lead}
+      gewerke={gewerke}
+      editable={positionenBearbeitbar}
+      onSaved={() => refresh()}
+    />
   )
 
   const verlaufInhalt = (
-    <LeadTimelineList
-      events={timelineInitial}
-      fallbackCreatedAt={detail.created_at}
-      fallbackCreatedLabel={`Erstellt am ${formatDatumZeit(detail.created_at)}`}
+    <>
+      <MockVerlaufCard empty={timelineItems.length === 0}>
+        <Timeline items={timelineItems} />
+      </MockVerlaufCard>
+      <EmailLogPreviewModal
+        emailLogId={emailPreviewId}
+        open={Boolean(emailPreviewId)}
+        onClose={() => setEmailPreviewId(null)}
+      />
+    </>
+  )
+
+  const dokumenteInhalt = (
+    <AngebotAnhaengeTab
+      detail={detail}
+      leadId={detail.lead_id ?? lead?.id ?? null}
+      dokumente={dokumenteRows}
+      onReload={() => refresh()}
     />
   )
 
-  const dokumenteInhalt = <AngebotAnhaengeTab detail={detail} />
-
-  const notizenInhalt = (
-    <p className="text-sm text-bw-text-muted">Keine Notizen</p>
-  )
+  const notizenInhalt =
+    detail.lead_id || lead?.id ? (
+      <AnfrageNotizenTab
+        leadId={(detail.lead_id ?? lead?.id)!}
+        notizen={notizenRows}
+        onReload={() => refresh()}
+      />
+    ) : (
+      <MockCard title="Notizen · 0" icon="messages">
+        <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+          Noch keine Notizen — dieses Angebot ist keiner Anfrage zugeordnet.
+        </div>
+      </MockCard>
+    )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -789,7 +647,7 @@ export function AngebotDetailPageClient({
       id: 'verlauf',
       label: ACTIVITY_SECTIONS.verlauf,
       icon: 'history',
-      count: timelineCount || undefined,
+      count: timelineItems.length || undefined,
       render: () => verlaufInhalt,
     },
     {
@@ -803,17 +661,26 @@ export function AngebotDetailPageClient({
       id: 'notizen',
       label: ACTIVITY_SECTIONS.notizen,
       icon: 'messages',
+      count: notizenRows.length || undefined,
       render: () => notizenInhalt,
     },
   ]
 
   return (
-    <div className="space-y-4 pb-0">
-      <DetailHead
-        backHref="/vorgaenge?tab=angebot"
-        backLabel="Zurück zu den Vorgängen"
-        title={kundeName}
-        badges={
+    <EntityDetailLayout
+      phase="angebot"
+      breadcrumbTitle={
+        projektTitel && projektTitel !== '—'
+          ? `${projektTitel} — ${kundeName}`
+          : kundeName
+      }
+      crumbBackHref="/vorgaenge?tab=angebot"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbSectionLabel="Angebote"
+      className="space-y-4 pb-0"
+      head={{
+        title: kundeName,
+        badges: (
           <span className="inline-flex flex-wrap items-center gap-2">
             <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
             {lead ? (
@@ -826,30 +693,24 @@ export function AngebotDetailPageClient({
               />
             ) : null}
           </span>
-        }
-        meta={headMeta}
-        actions={
+        ),
+        meta: headMeta,
+        actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}
             <ActionsMenu
               trigger={
-                <button
-                  type="button"
-                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn ghost max-md:px-2"
-                  aria-label="Weitere Aktionen"
-                  title="Aktionen"
-                >
+                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
                   <MockIcon ctx="btn" n="dots" size={18} />
-                  <span className="sr-only">Mehr</span>
                 </button>
               }
               items={detailHeadMenuItems}
               sheetTitle="Angebot"
             />
           </div>
-        }
-      />
-
+        ),
+      }}
+    >
       {statusEinfach === 'abgelehnt' ? (
         <p className="rounded-lg border border-bw-border px-3 py-2 text-sm text-bw-text-muted">
           Abgelehnt
@@ -862,6 +723,19 @@ export function AngebotDetailPageClient({
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as AngebotDetailTab)}
+      />
+
+      {/* Kunden-Versand nur als Modal (Primary-CTA / Menü) — kein Stammdaten-Block */}
+      <AngebotVersandSection
+        mode="kunde"
+        detail={detail}
+        bruttoMin={summenMail.bruttoMin}
+        bruttoMax={summenMail.bruttoMax}
+        positionen={detail.positionen ?? []}
+        gueltigBis={gueltigBisYmd}
+        kundeModalOpen={kundeVersandOpen}
+        onKundeModalOpenChange={setKundeVersandOpen}
+        onKundeSent={() => refresh()}
       />
 
       {wizardOpen && lead ? (
@@ -889,50 +763,6 @@ export function AngebotDetailPageClient({
           onBearbeiten={openWizardMitBootstrap}
         />
       ) : null}
-
-      <Modal open={verlaengernOpen} onClose={() => setVerlaengernOpen(false)} title="Gültigkeit verlängern">
-        <div className="space-y-4">
-          <p className="text-sm text-bw-text-muted">
-            Wähle das neue Gültigkeitsdatum. In 7 Tagen erhält der Kunde automatisch eine Erinnerungs-Mail,
-            dass das Angebot bis zu diesem Datum gültig ist.
-          </p>
-          <Input
-            label="Gültig bis"
-            type="date"
-            min={addDaysYmd(heuteYmd(), 1)}
-            value={verlaengernDatum}
-            onChange={(e) => setVerlaengernDatum(e.target.value)}
-            required
-          />
-          <div className="rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2 text-xs text-bw-text-muted">
-            Erinnerung geplant:{' '}
-            {formatDatum(addDaysYmd(heuteYmd(), 7))} · Auslauf: {formatDatum(verlaengernDatum)}
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setVerlaengernOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              loading={pending}
-              onClick={() =>
-                run(async () => {
-                  const res = await extendAngebotGueltigkeit({
-                    angebotId: detail.id,
-                    gueltigBis: verlaengernDatum,
-                  })
-                  if (!res.ok) return res
-                  setVerlaengernOpen(false)
-                  return res
-                }, 'Gültigkeit verlängert — Erinnerung in 7 Tagen geplant')
-              }
-            >
-              Speichern
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       <Modal open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
         <div className="space-y-4">
@@ -1074,61 +904,7 @@ export function AngebotDetailPageClient({
         </div>
       </Modal>
 
-      <Modal open={ablehnOpen} onClose={() => setAblehnOpen(false)} title="Angebot abgelehnt">
-        <div className="space-y-3">
-          <Select
-            label="Grund"
-            value={abGrund}
-            onChange={(e) => setAbGrund(e.target.value)}
-            options={KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
-              value: v,
-              label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
-            }))}
-          />
-          <Textarea
-            label="Notiz (optional)"
-            value={abNotiz}
-            onChange={(e) => setAbNotiz(e.target.value)}
-            rows={3}
-          />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setAblehnOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              loading={pending}
-              onClick={() =>
-                run(
-                  () => markAngebotAbgelehntEinfach({ angebotId: detail.id, grund: abGrund, notiz: abNotiz }),
-                  'Als abgelehnt markiert'
-                )
-              }
-            >
-              Speichern
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {kunde ? (
-        <KundeModal
-          open={stammdatenModalOpen}
-          onClose={() => setStammdatenModalOpen(false)}
-          editKunde={kunde}
-          leadFunnelDaten={lead?.funnel_daten}
-          stayOnPage
-          revalidateAnfrageId={lead?.id}
-          onSaved={() => {
-            toast.success('Stammdaten gespeichert')
-            setStammdatenModalOpen(false)
-            refresh()
-          }}
-        />
-      ) : null}
-
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }

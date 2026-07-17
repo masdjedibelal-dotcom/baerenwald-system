@@ -2,6 +2,7 @@
 
 import { DatenschutzHintModal } from '@/components/datenschutz/DatenschutzHintModal'
 import { ChunkLoadRecovery } from '@/components/layout/ChunkLoadRecovery'
+import { ConfirmDeleteProvider } from '@/components/ui/confirm-delete'
 
 export function DashboardProviders({
   children,
@@ -11,10 +12,10 @@ export function DashboardProviders({
   datenschutzHintDismissed?: boolean
 }) {
   return (
-    <>
+    <ConfirmDeleteProvider>
       {children}
       <DatenschutzHintModal dismissedOnServer={datenschutzHintDismissed} />
       <ChunkLoadRecovery />
-    </>
+    </ConfirmDeleteProvider>
   )
 }

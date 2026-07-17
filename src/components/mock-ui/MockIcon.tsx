@@ -56,7 +56,7 @@ export function MockIcon({
 }: MockIconProps) {
   if (!isMockIconName(n)) {
     if (process.env.NODE_ENV !== 'production') {
-      throw new Error(`Unbekanntes Mock-Icon: "${n}"`)
+      console.error(`Unbekanntes Mock-Icon: "${n}"`)
     }
     return null
   }
@@ -64,7 +64,7 @@ export function MockIcon({
   const raw = getMockIconSvg(n)
   if (!raw) {
     if (process.env.NODE_ENV !== 'production') {
-      throw new Error(`Kein Tabler-SVG für Mock-Icon: "${n}"`)
+      console.error(`Kein Tabler-SVG für Mock-Icon: "${n}"`)
     }
     return null
   }

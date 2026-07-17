@@ -14,6 +14,7 @@ import {
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
@@ -22,6 +23,7 @@ import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
+import { cn } from '@/lib/utils'
 
 export type HandwerkerZeile = {
   id: string
@@ -51,7 +53,7 @@ const EXPORT_FIELDS: ExportField[] = [
 ]
 
 const MOCK_GEWERK_NAMES = ['Sanitär', 'Elektrik', 'Fliesen', 'Maler', 'Boden'] as const
-const GRID_COLS = 'minmax(120px,1.6fr) minmax(90px,1fr) 118px minmax(120px,1.6fr) 72px 96px 40px'
+const COLS = 'minmax(120px,1.6fr) minmax(90px,1fr) 118px minmax(120px,1.6fr) 72px 96px 40px'
 
 type SortCol = 'name' | 'gewerk' | 'telefon' | 'email' | 'bewertung' | 'status'
 
@@ -95,6 +97,16 @@ function resolveGewerkChipValue(name: string, gewerkeOptionen: GewerkOption[]): 
   return opt?.slug ?? name.toLowerCase()
 }
 
+function matchesGewerk(h: HandwerkerZeile, gewerkChip: string, gewerkeOptionen: GewerkOption[]): boolean {
+  const names = (h.gewerk_namen ?? []).map((x) => x.toLowerCase())
+  const opt = gewerkeOptionen.find((g) => g.slug === gewerkChip)
+  const matchName = opt ? names.some((n) => n.includes(opt.name.toLowerCase())) : false
+  const matchSlug =
+    names.some((n) => n.includes(gewerkChip)) ||
+    gewerkeStrRaw(h.gewerke).toLowerCase().includes(gewerkChip)
+  return matchName || matchSlug
+}
+
 export function HandwerkerListeClient({
   rows,
   gewerkeOptionen,
@@ -109,6 +121,7 @@ export function HandwerkerListeClient({
   const [modalOpen, setModalOpen] = useState(false)
   const [gewerkChip, setGewerkChip] = useState('alle')
   const [query, setQuery] = useState('')
+  const [fName, setFName] = useState('')
   const [nurZuPruefen, setNurZuPruefen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -124,41 +137,42 @@ export function HandwerkerListeClient({
     router.replace(q ? `/handwerker?${q}` : '/handwerker', { scroll: false })
   }
 
-  function openNeuModal() {
-    setModalOpen(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('neu', '1')
-    router.replace(`/handwerker?${params.toString()}`, { scroll: false })
-  }
-
   useEffect(() => {
     if (searchParams.get('neu') === '1') setModalOpen(true)
   }, [searchParams])
 
+  const complianceCount = useMemo(
+    () => rows.filter((h) => isComplianceNichtOk(h)).length,
+    [rows]
+  )
+
   const gewerkChipOptions = useMemo(() => {
-    const opts: { label: string; value: string }[] = [{ label: 'Alle Gewerke', value: 'alle' }]
+    const opts: { label: string; value: string; count?: number; icon?: string }[] = [
+      { label: 'Alle Gewerke', value: 'alle', count: rows.length },
+    ]
     for (const name of MOCK_GEWERK_NAMES) {
       opts.push({ label: name, value: resolveGewerkChipValue(name, gewerkeOptionen) })
     }
-    opts.push({ label: 'Compliance', value: 'compliance' })
+    opts.push({
+      label: 'Compliance',
+      value: 'compliance',
+      count: complianceCount,
+      icon: 'alert-triangle',
+    })
     return opts
-  }, [gewerkeOptionen])
+  }, [gewerkeOptionen, rows.length, complianceCount])
 
   const filteredBase = useMemo(() => {
     const needle = query.trim().toLowerCase()
+    const nameNeedle = fName.trim().toLowerCase()
     return rows.filter((h) => {
       if (gewerkChip === 'compliance') {
         if (!isComplianceNichtOk(h)) return false
       } else if (gewerkChip !== 'alle') {
-        const names = (h.gewerk_namen ?? []).map((x) => x.toLowerCase())
-        const opt = gewerkeOptionen.find((g) => g.slug === gewerkChip)
-        const matchName = opt ? names.some((n) => n.includes(opt.name.toLowerCase())) : false
-        const matchSlug =
-          names.some((n) => n.includes(gewerkChip)) ||
-          gewerkeStrRaw(h.gewerke).toLowerCase().includes(gewerkChip)
-        if (!matchName && !matchSlug) return false
+        if (!matchesGewerk(h, gewerkChip, gewerkeOptionen)) return false
       }
       if (nurZuPruefen && !isComplianceNichtOk(h)) return false
+      if (nameNeedle && !handwerkerDisplayName(h).toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
       const pool = [
         handwerkerDisplayName(h),
@@ -171,7 +185,7 @@ export function HandwerkerListeClient({
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [rows, gewerkChip, nurZuPruefen, query, gewerkeOptionen])
+  }, [rows, gewerkChip, nurZuPruefen, query, fName, gewerkeOptionen])
 
   const toggleSort = (col: SortCol) => {
     setSortCol((c) => {
@@ -206,18 +220,21 @@ export function HandwerkerListeClient({
   }, [filteredBase, sortCol, sortDir])
 
   const activeFilterCount =
-    (gewerkChip !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (nurZuPruefen ? 1 : 0)
+    (gewerkChip !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0) + (nurZuPruefen ? 1 : 0)
 
   function resetFilters() {
     setGewerkChip('alle')
     setQuery('')
+    setFName('')
     setNurZuPruefen(false)
   }
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
+  const allSelected = filtered.length > 0 && filtered.every((h) => selected[h.id])
+  const gridCols = (selectMode ? '40px ' : '') + COLS
 
-  const paginationResetKey = `${gewerkChip}|${query}|${nurZuPruefen}|${sortCol}|${sortDir}`
+  const paginationResetKey = `${gewerkChip}|${query}|${fName}|${nurZuPruefen}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
     filtered,
     10,
@@ -230,16 +247,8 @@ export function HandwerkerListeClient({
 
   function rowMenuItems(h: HandwerkerZeile): EntityMenuItem[] {
     return [
-      {
-        label: 'Öffnen',
-        icon: 'eye',
-        onClick: () => openDetail(h.id),
-      },
-      {
-        label: 'Bearbeiten',
-        icon: 'pencil',
-        onClick: () => openDetail(h.id),
-      },
+      { label: 'Öffnen', icon: 'eye', onClick: () => openDetail(h.id) },
+      { label: 'Bearbeiten', icon: 'pencil', onClick: () => openDetail(h.id) },
     ]
   }
 
@@ -250,7 +259,13 @@ export function HandwerkerListeClient({
       <div className="listbar">
         <div className="listbar-chips">
           {gewerkChipOptions.map((o) => (
-            <MockChip key={o.value} active={gewerkChip === o.value} onClick={() => setGewerkChip(o.value)}>
+            <MockChip
+              key={o.value}
+              active={gewerkChip === o.value}
+              count={o.count}
+              icon={o.icon}
+              onClick={() => setGewerkChip(o.value)}
+            >
               {o.label}
             </MockChip>
           ))}
@@ -322,20 +337,66 @@ export function HandwerkerListeClient({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, Telefon, E-Mail…"
+            placeholder="Name, Gewerk, Telefon, E-Mail…"
             autoFocus
           />
         </div>
+        <div className="form-grid" style={{ marginBottom: 16 }}>
+          <MockField label="Name">
+            <div className="input">
+              <input
+                type="text"
+                value={fName}
+                onChange={(e) => setFName(e.target.value)}
+                placeholder="Name enthält…"
+              />
+            </div>
+          </MockField>
+        </div>
+        <div className="form-section-h">Gewerk</div>
+        <div className="chiprow" style={{ marginBottom: 16 }}>
+          {(['alle', ...MOCK_GEWERK_NAMES] as const).map((g) => {
+            const value = g === 'alle' ? 'alle' : resolveGewerkChipValue(g, gewerkeOptionen)
+            return (
+              <MockChip key={g} active={gewerkChip === value} onClick={() => setGewerkChip(value)}>
+                {g === 'alle' ? 'Alle' : g}
+              </MockChip>
+            )
+          })}
+        </div>
         <div className="form-section-h">Compliance</div>
         <div className="chiprow">
-          <MockChip active={nurZuPruefen} onClick={() => setNurZuPruefen((v) => !v)}>
+          <MockChip active={!nurZuPruefen} onClick={() => setNurZuPruefen(false)}>
+            Alle
+          </MockChip>
+          <MockChip active={nurZuPruefen} onClick={() => setNurZuPruefen(true)}>
             Nur zu prüfen
           </MockChip>
         </div>
       </MockModal>
 
-      <div className="listcard">
-        <div className="list-row-grid head" style={{ gridTemplateColumns: GRID_COLS }}>
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+        <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (allSelected) setSelected({})
+                else {
+                  const n: Record<string, boolean> = {}
+                  filtered.forEach((h) => {
+                    n[h.id] = true
+                  })
+                  setSelected(n)
+                }
+              }}
+            >
+              <span className={cn('vg-box', allSelected && 'on')}>
+                {allSelected ? <MockIcon ctx="default" n="check" size={12} /> : null}
+              </span>
+            </div>
+          ) : null}
           <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Name
           </MockSortHead>
@@ -348,7 +409,13 @@ export function HandwerkerListeClient({
           <MockSortHead col="email" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
             Email
           </MockSortHead>
-          <MockSortHead col="bewertung" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="bewertung"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            right
+          >
             Bewertung
           </MockSortHead>
           <MockSortHead col="status" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
@@ -367,13 +434,19 @@ export function HandwerkerListeClient({
           pageItems.map((h) => {
             const gewerke = h.gewerk_namen ?? []
             const gewerkeFallback = gewerke.length === 0 ? gewerkeStr(h) : ''
+            const pills =
+              gewerke.length > 0
+                ? gewerke.slice(0, 3)
+                : gewerkeFallback
+                  ? gewerkeFallback.split(/[·,]/).map((g) => g.trim()).filter(Boolean).slice(0, 3)
+                  : []
             return (
               <div
                 key={h.id}
                 role="button"
                 tabIndex={0}
-                className={`list-row-grid${selectMode && selected[h.id] ? ' sel' : ''}`}
-                style={{ gridTemplateColumns: GRID_COLS }}
+                className={cn('list-row', selected[h.id] && 'sel')}
+                style={{ gridTemplateColumns: gridCols }}
                 onClick={() => (selectMode ? toggleSel(h.id) : openDetail(h.id))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -382,27 +455,58 @@ export function HandwerkerListeClient({
                   }
                 }}
               >
-                <p className="list-row-primary truncate">{handwerkerDisplayName(h)}</p>
-                <div className="flex min-w-0 flex-wrap gap-1">
-                  {gewerke.length > 0 ? (
-                    gewerke.slice(0, 3).map((g) => (
+                {selectMode ? (
+                  <div
+                    className="vg-check"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSel(h.id)
+                    }}
+                  >
+                    <span className={cn('vg-box', selected[h.id] && 'on')}>
+                      {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="lc-title" style={{ fontWeight: 600 }}>
+                  {handwerkerDisplayName(h)}
+                </div>
+                <div className="lc-pills" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {pills.length > 0 ? (
+                    pills.map((g) => (
                       <span key={g} className="pill-tag">
                         {g}
                       </span>
                     ))
                   ) : (
-                    <span className="truncate text-[13px] text-bw-text-muted">
-                      {gewerkeFallback || '—'}
-                    </span>
+                    <span style={{ color: 'var(--text-3)' }}>—</span>
                   )}
                 </div>
-                <p className="truncate whitespace-nowrap text-[13px] text-bw-text">
+                <div style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
                   {h.telefon?.trim() || '—'}
-                </p>
-                <p className="truncate text-[13px] text-bw-text">{h.email?.trim() || '—'}</p>
-                <p className="text-center text-[13px] text-bw-text-muted">—</p>
-                {handwerkerStatusBadge(h)}
-                <div className="vg-actions" onClick={(e) => e.stopPropagation()}>
+                </div>
+                <div
+                  style={{
+                    color: 'var(--text-2)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {h.email?.trim() || '—'}
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span className="rating" style={{ color: 'var(--text-4)' }}>
+                    <MockIcon ctx="default" n="star-filled" size={12} />
+                    —
+                  </span>
+                </div>
+                <div className="lc-status">{handwerkerStatusBadge(h)}</div>
+                <div
+                  className="row-actions always"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ justifyContent: 'flex-end' }}
+                >
                   <MockEntityRowMenu items={rowMenuItems(h)} title="Handwerker" />
                 </div>
               </div>

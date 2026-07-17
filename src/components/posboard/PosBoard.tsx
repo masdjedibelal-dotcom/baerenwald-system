@@ -66,7 +66,7 @@ function defaultMengeLabel(p: PosBoardLine): string {
 }
 
 export function PosBoard({
-  positionen,
+  positionen: positionenProp,
   onChange,
   showUst = true,
   title,
@@ -85,6 +85,7 @@ export function PosBoard({
   headerAction,
   className,
 }: PosBoardProps) {
+  const positionen = Array.isArray(positionenProp) ? positionenProp : []
   const editable = Boolean(onChange)
   const [editId, setEditId] = useState<string | null>(null)
   const [gEdit, setGEdit] = useState<string | null>(null)

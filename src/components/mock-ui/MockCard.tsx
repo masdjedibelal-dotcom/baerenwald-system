@@ -64,7 +64,7 @@ export function MockCard({
       {showHeader ? (
         <div className="card-h">
           {title ? (
-            <div className="card-title">
+            <div className="card-title title">
               {icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : null}
               {title}
             </div>

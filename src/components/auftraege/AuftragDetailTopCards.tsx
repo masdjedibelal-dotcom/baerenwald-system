@@ -1,17 +1,20 @@
 'use client'
 
-import Link from 'next/link'
 import { useTransition } from 'react'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockProp } from '@/components/mock-ui/MockProp'
 import { updateAuftragBetreuer } from '@/app/(dashboard)/auftraege/actions'
 import { formatAuftragsNr, auftragWertAnzeige } from '@/lib/auftraege/auftrag-liste-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AuftragDetail } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { DetailProp } from '@/components/ui/detail-prop'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 
+/**
+ * Mock Auftragsdaten — Auftrag · Beginn · Ende · Projektleitung · Auftragswert
+ * (ohne Kunde/Region — die gehören in Projekt-Übersicht / Stammdaten).
+ */
 export function AuftragDetailTopCards({
   detail,
   team,
@@ -22,9 +25,9 @@ export function AuftragDetailTopCards({
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
   const nr = formatAuftragsNr(detail)
-  const ort = detail.kunden?.ort?.trim() || detail.kunden?.plz?.trim() || '—'
   const wert = auftragWertAnzeige(detail)
   const betreuerId = detail.betreuer_id?.trim() ?? ''
+  const betreuerName = team.find((m) => m.id === betreuerId)?.name?.trim()
 
   function onBetreuerChange(nextId: string) {
     startTransition(async () => {
@@ -39,32 +42,23 @@ export function AuftragDetailTopCards({
   }
 
   return (
-    <Card title="Auftragsdaten">
+    <MockCard title="Auftragsdaten">
       <div className="props">
-        <DetailProp label="Auftrag">{nr}</DetailProp>
-        <DetailProp label="Kunde">
-          {detail.kunden?.id ? (
-            <Link href={`/kunden/${detail.kunden.id}`} className="font-medium text-bw-link">
-              {detail.kunden.name}
-            </Link>
-          ) : (
-            detail.kunden?.name ?? '—'
-          )}
-        </DetailProp>
-        <DetailProp label="Region">{ort}</DetailProp>
-        <DetailProp label="Beginn">
+        <MockProp label="Auftrag">{nr}</MockProp>
+        <MockProp label="Beginn">
           {detail.start_datum ? formatDatum(detail.start_datum) : '—'}
-        </DetailProp>
-        <DetailProp label="Ende geplant">
+        </MockProp>
+        <MockProp label="Ende geplant">
           {detail.end_datum ? formatDatum(detail.end_datum) : '—'}
-        </DetailProp>
-        <DetailProp label="Projektleitung">
-          <div className="space-y-1">
+        </MockProp>
+        <MockProp label="Projektleitung">
+          {team.length ? (
             <select
               className="input max-w-full"
               value={betreuerId}
               onChange={(e) => onBetreuerChange(e.target.value)}
               disabled={pending}
+              aria-label="Projektleitung"
             >
               <option value="">— Keine Zuweisung —</option>
               {team.map((m) => (
@@ -74,15 +68,14 @@ export function AuftragDetailTopCards({
                 </option>
               ))}
             </select>
-            <p className="prop-form-hint">
-              Ansprechpartner im Kundenportal (Name, E-Mail, Telefon aus Team-Profil).
-            </p>
-          </div>
-        </DetailProp>
-        <DetailProp label="Auftragswert">
-          <span className="font-semibold tabular-nums text-bw-text">{wert}</span>
-        </DetailProp>
+          ) : (
+            betreuerName || '—'
+          )}
+        </MockProp>
+        <MockProp label="Auftragswert">
+          <span style={{ color: 'var(--green)', fontWeight: 600 }}>{wert}</span>
+        </MockProp>
       </div>
-    </Card>
+    </MockCard>
   )
 }

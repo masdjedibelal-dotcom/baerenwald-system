@@ -8,11 +8,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { MapPin } from 'lucide-react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
+import { runDuplicateAuftrag } from '@/lib/list-actions'
+import { AuftragDetailsTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
 import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
@@ -28,7 +31,6 @@ import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
-import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
@@ -40,7 +42,6 @@ import {
   updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
-import { KundenStammdatenCard } from '@/components/kunden/KundenStammdatenCard'
 import {
   ensureKundenTokenAction,
   sendKundenProjektLinkEmail,
@@ -61,6 +62,7 @@ import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { Modal } from '@/components/ui/Modal'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
@@ -87,17 +89,12 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
-import type { AngebotHandwerkerRow, LeadDetail } from '@/lib/types'
+import type { LeadDetail } from '@/lib/types'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
-  { ssr: false }
-)
-
-const KundeModal = dynamic(
-  () => import('@/components/kunden/KundeModal').then((mod) => ({ default: mod.KundeModal })),
   { ssr: false }
 )
 
@@ -114,12 +111,20 @@ type AuftragLeadSnapshot = Pick<
   | 'kanal'
   | 'auftraggeber_kunde_id'
   | 'anlass'
+  | 'situation'
+  | 'kontakt_nachricht'
+  | 'notizen'
+  | 'budget_ca'
+  | 'preis_min'
+  | 'preis_max'
+  | 'created_at'
 >
 
 type AuftragDetailTab =
   | 'stammdaten'
   | 'leistung'
   | 'baustelle'
+  | 'abnahme'
   | 'aktivitaet'
   | 'dokumente'
   | 'finanzen'
@@ -129,6 +134,7 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'stammdaten',
   'leistung',
   'baustelle',
+  'abnahme',
   'aktivitaet',
   'dokumente',
   'finanzen',
@@ -143,6 +149,7 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
   if (tab === 'positionen' || tab === 'details') return 'leistung'
   if (tab === 'zahlplan') return 'finanzen'
   if (tab === 'bautagebuch') return 'baustelle'
+  if (tab === 'abnahmeprotokoll' || tab === 'abnahmeprotokolle') return 'abnahme'
   if (tab === 'verlauf') return 'aktivitaet'
   if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
   if (tab === 'kommunikation') return 'notizen'
@@ -186,7 +193,6 @@ export function AuftragDetailClient({
   const { refresh, generation } = useCrmRefresh()
   const isMobile = useIsMobile()
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
-  const [stammdatenModalOpen, setStammdatenModalOpen] = useState(false)
   const [detail, setDetail] = useState(initial)
   const [err, setErr] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -277,7 +283,8 @@ export function AuftragDetailClient({
   }, [])
 
   const openAbnahme = useCallback(() => {
-    router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+    setMainTab('abnahme')
+    router.replace(`/auftraege/${detail.id}?tab=abnahme`, { scroll: false })
   }, [detail.id, router])
 
   const openAbschluss = useCallback(() => {
@@ -353,6 +360,7 @@ export function AuftragDetailClient({
     const hash = window.location.hash
     if (hash === '#dokumentation') setMainTab('dokumente')
     if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('dokumente')
+    if (hash === '#auftrag-abnahmeprotokoll' || hash === '#abnahme') setMainTab('abnahme')
   }, [])
 
   useEffect(() => {
@@ -447,109 +455,37 @@ export function AuftragDetailClient({
     setProjektModal(true)
   }, [detail.ist_bauprojekt, istBauprojekt])
 
-  /** Mock-Reihenfolge + CRM-Extras mit Funktion; Admin Login nur für CRM-Admins. */
-  const aktionenMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
+  /** Mock entityMenu(auftrag) + CRM-Extras */
+  const aktionenMenuItems = useMemo(() => {
+    const extras: EntityMenuItem[] = [
       {
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil'),
-        onClick: openProjektBearbeiten,
-      },
-      'sep',
-      {
-        label: 'Kundenportal-Link versenden',
-        icon: mockMenuIcon('send'),
-        hint: detail.kunden?.email?.trim() ? undefined : 'Keine Kunden-E-Mail',
-        onClick: () => {
-          startTransition(async () => {
-            const r = await sendKundenProjektLinkEmail(detail.id)
-            if (!r.ok) toast.error(r.message)
-            else toast.success('E-Mail gesendet')
-          })
-        },
-      },
-    ]
-
-    if (isCrmAdmin && detail.kunde_id) {
-      items.push({
-        label: 'Admin Login',
-        icon: mockMenuIcon('external-link'),
-        hint: impersonating
-          ? 'Öffne…'
-          : `HV-Portal als ${detail.kunden?.name ?? 'Kunde'}`,
-        onClick: () => {
-          if (impersonating || !detail.kunde_id) return
-          setImpersonating(true)
-          void openPortalAsKunde(detail.kunde_id).then((r) => {
-            setImpersonating(false)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            window.open(r.url, '_blank', 'noopener,noreferrer')
-          })
-        },
-      })
-    }
-
-    items.push('sep')
-
-    if (detail.angebot_id) {
-      items.push({
-        label: 'Angebot korrigieren',
-        icon: mockMenuIcon('file-pencil'),
-        hint: 'Leistungen ergänzen, Korrektur an Kunden senden',
-        onClick: openAngebotKorrektur,
-      })
-      items.push({
-        label: 'Zum Angebot',
-        icon: mockMenuIcon('file-invoice'),
-        onClick: () => router.push(`/angebote/${detail.angebot_id}`),
-      })
-    }
-
-    if (!istAbgeschlossen) {
-      items.push({
-        label: 'Auftrag abschließen',
-        icon: mockMenuIcon('checks'),
-        onClick: openAbschluss,
-      })
-    }
-
-    items.push(
-      {
+        icon: 'clipboard-list',
         label: 'Abnahmeprotokoll',
-        icon: mockMenuIcon('clipboard-list'),
         onClick: openAbnahme,
       },
       ...(istBauprojekt
-        ? [
+        ? ([
             {
+              icon: 'file-pencil',
               label: 'Nachunternehmervertrag',
-              icon: mockMenuIcon('file-pencil'),
               onClick: () => openNachunternehmervertrag(),
-            } as ActionsMenuItem,
+            },
             ...(hauptvertraegeFuerNachtrag.length
               ? [
                   {
+                    icon: 'file-pencil',
                     label: 'Nachtrag erstellen',
-                    icon: mockMenuIcon('file-pencil'),
                     onClick: () => openNachtragErstellen(),
-                  } as ActionsMenuItem,
+                  },
                 ]
               : []),
-          ]
+          ] as EntityMenuItem[])
         : []),
-      {
-        label: 'Rechnung erstellen',
-        icon: mockMenuIcon('file-invoice'),
-        onClick: () => openRechnungErstellen(),
-      },
       ...(String(detail.kostentraeger ?? '').trim() === 'versicherung'
-        ? [
+        ? ([
             {
+              icon: 'shield-check',
               label: 'Versicherungsakte erzeugen',
-              icon: mockMenuIcon('shield-check'),
               onClick: () => {
                 startTransition(async () => {
                   const r = await erzeugeVersicherungsaktePdf(detail.id)
@@ -560,56 +496,115 @@ export function AuftragDetailClient({
                   }
                 })
               },
-            } as ActionsMenuItem,
-          ]
+            },
+          ] as EntityMenuItem[])
         : []),
-    )
+      ...(detail.angebot_id
+        ? ([
+            {
+              icon: 'file-invoice',
+              label: 'Zum Angebot',
+              onClick: () => router.push(`/angebote/${detail.angebot_id}`),
+            },
+          ] as EntityMenuItem[])
+        : []),
+    ]
 
-    if (kundeTelefon || detail.kunden?.email?.trim()) {
-      items.push('sep')
-      if (kundeTelefon) {
-        items.push({
-          label: 'Anrufen',
-          icon: mockMenuIcon('phone'),
-          onClick: () => {
-            window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'auftrag',
+        {
+          name: projektName,
+          status: detail.status,
+          customer: {
+            name: detail.kunden?.name ?? undefined,
+            tel: kundeTelefon || undefined,
+            mail: detail.kunden?.email?.trim() || undefined,
           },
-        })
-      }
-      if (detail.kunden?.email?.trim()) {
-        items.push({
-          label: 'Mail schreiben',
-          icon: mockMenuIcon('mail'),
-          onClick: () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id)),
-        })
-      }
-    }
-
-    return items
+        },
+        {
+          onEdit: openProjektBearbeiten,
+          onCopy: () => runDuplicateAuftrag(detail.id, router),
+          onPortal: () => {
+            if (!isCrmAdmin || !detail.kunde_id) {
+              toast.error('Admin Login nur für CRM-Admins mit Kundenkonto')
+              return
+            }
+            if (impersonating) return
+            setImpersonating(true)
+            void openPortalAsKunde(detail.kunde_id).then((r) => {
+              setImpersonating(false)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              window.open(r.url, '_blank', 'noopener,noreferrer')
+            })
+          },
+          onPortalLink: () => {
+            startTransition(async () => {
+              const r = await sendKundenProjektLinkEmail(detail.id)
+              if (!r.ok) toast.error(r.message)
+              else toast.success('E-Mail gesendet')
+            })
+          },
+          onEditAngebot: detail.angebot_id ? openAngebotKorrektur : undefined,
+          onComplete: !istAbgeschlossen ? openAbschluss : undefined,
+          onInvoice: () => openRechnungErstellen(),
+          tel: kundeTelefon || null,
+          mail: detail.kunden?.email?.trim() || null,
+          onCall: kundeTelefon
+            ? () => {
+                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+              }
+            : undefined,
+          onMail: detail.kunden?.email?.trim()
+            ? () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))
+            : undefined,
+          onDelete: detail.lead_id
+            ? () => {
+                void deleteVorgang(detail.lead_id!).then((r) => {
+                  if (!r.ok) toast.error(r.message)
+                  else {
+                    toast.success('Vorgang gelöscht')
+                    router.push('/vorgaenge?tab=auftrag')
+                  }
+                })
+              }
+            : undefined,
+          deleteLabel: projektName,
+          extra: extras,
+        }
+      ),
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
   }, [
     detail.angebot_id,
     detail.id,
     detail.kunde_id,
     detail.kunden?.name,
-    openAngebotKorrektur,
     detail.kunden?.email,
+    detail.status,
+    detail.kostentraeger,
+    detail.lead_id,
     kundeTelefon,
     mailCompose,
     hauptvertraegeFuerNachtrag.length,
     openAbnahme,
     openAbschluss,
+    openAngebotKorrektur,
     openNachtragErstellen,
     openNachunternehmervertrag,
     openRechnungErstellen,
     openProjektBearbeiten,
     router,
-    detail.kostentraeger,
     refresh,
     startTransition,
     istBauprojekt,
     istAbgeschlossen,
     isCrmAdmin,
     impersonating,
+    projektName,
   ])
 
   const submitFormular = () => {
@@ -646,120 +641,25 @@ export function AuftragDetailClient({
     [detail, rechnungenListe, vertraegeListe]
   )
 
-  const handwerkerKontext = useMemo(
-    () => ({
-      kundeName: name,
-      adresse: detail.kunden?.adresse ?? null,
-      plz: detail.kunden?.plz ?? null,
-      ort: detail.kunden?.ort ?? null,
-      startDatum: detail.start_datum,
-      endDatum: detail.end_datum,
-      notizen: detail.notizen,
-    }),
-    [name, detail.kunden, detail.start_datum, detail.end_datum, detail.notizen]
-  )
-
-  const angebotHandwerker = useMemo((): AngebotHandwerkerRow[] => {
-    const raw = detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null | undefined
-    return raw?.angebot_handwerker ?? []
-  }, [detail.angebote])
-
-  const angebotPositionen = useMemo(() => {
-    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
-    return normalizeAngebotPositionen((ang as { positionen?: unknown } | null)?.positionen)
-  }, [detail.angebote])
-
-  const angebotTitel = useMemo(() => {
-    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
-    return (ang as { titel?: string } | null)?.titel?.trim() || detail.titel?.trim() || 'Projekt'
-  }, [detail.angebote, detail.titel])
-
-  const stammdatenInhalt = (
-    <>
-      <AuftragDetailTopCards detail={detail} team={team} />
-      <KundenStammdatenCard
-        kunde={kunde}
-        collapsible={false}
-        fallback={
-          lead
-            ? {
-                plz: lead.plz,
-                kontakt_name: lead.kontakt_name,
-                kontakt_email: lead.kontakt_email,
-                kontakt_telefon: lead.kontakt_telefon,
-                funnel_daten: lead.funnel_daten,
-              }
-            : null
-        }
-        action={
-          kunde ? (
-            <button
-              type="button"
-              onClick={() => setStammdatenModalOpen(true)}
-              className="btn ghost sm"
-              aria-label="Stammdaten bearbeiten"
-            >
-              <MockIcon ctx="btn" n="pencil" size={15} />
-            </button>
-          ) : null
-        }
-      />
-    </>
-  )
+  const stammdatenInhalt = <AuftragStammdatenCard detail={detail} lead={lead} />
 
   const leistungInhalt = (
-    <>
-      <Card
-        id="auftrag-positionen"
-        title="Positionen"
-        collapsible={false}
-        bodyClassName="p-4"
-        action={
-          posCount > 0 ? (
-            <span className="text-[12px] font-medium tabular-nums text-bw-text-muted">
-              {posCount} {posCount === 1 ? 'Leistung' : 'Leistungen'}
-            </span>
-          ) : null
-        }
-      >
-        <AuftragPositionenSteuerungTab
-          auftragId={detail.id}
-          positionen={detail.auftrag_positionen ?? []}
-          gewerke={gewerke}
-          angebotId={detail.angebot_id}
-          angebotTitel={angebotTitel}
-          angebotHandwerker={angebotHandwerker}
-          angebotPositionen={angebotPositionen}
-          auftragStatus={detail.status}
-          handwerkerKontext={handwerkerKontext}
-          handwerkerRows={detail.auftrag_handwerker ?? []}
-          eigenregie={istBauprojekt}
-          onChanged={() => refresh()}
-        />
-      </Card>
-      <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
-    </>
+    <AuftragDetailsTab
+      detail={detail}
+      lead={lead}
+      team={team}
+      gewerke={gewerke}
+      editable={detail.status !== 'storniert'}
+      onSaved={() => refresh()}
+    />
   )
 
-  const baustelleInhalt = istBauprojekt ? (
-    <AuftragBaustelleTab
-      auftragId={detail.id}
-      team={
-        detail.auftrag_baustelle_team ?? {
-          bau_mannschaft: [],
-        }
-      }
-      bautagesberichte={detail.auftrag_bautagesberichte ?? []}
-      regiearbeiten={detail.auftrag_regiearbeiten ?? []}
-      wochenberichte={detail.auftrag_wochenberichte ?? []}
-      baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
-      kundeName={name}
-      kundeAdresse={kundeAdresse}
-      handwerker={detail.auftrag_handwerker ?? []}
-      onChanged={() => refresh()}
-    />
-  ) : (
-    <Card id="auftrag-bautagebuch" title="Bautagebuch" collapsible={false} bodyClassName="p-4">
+  const abnahmeInhalt = (
+    <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
+  )
+
+  const baustelleInhalt = (
+    <div className="space-y-4">
       <AuftragBautagebuchCard
         auftragId={detail.id}
         eintraege={detail.auftrag_bautagebuch ?? []}
@@ -768,7 +668,25 @@ export function AuftragDetailClient({
         gewerke={gewerke}
         onChanged={() => refresh()}
       />
-    </Card>
+      {istBauprojekt ? (
+        <AuftragBaustelleTab
+          auftragId={detail.id}
+          team={
+            detail.auftrag_baustelle_team ?? {
+              bau_mannschaft: [],
+            }
+          }
+          bautagesberichte={detail.auftrag_bautagesberichte ?? []}
+          regiearbeiten={detail.auftrag_regiearbeiten ?? []}
+          wochenberichte={detail.auftrag_wochenberichte ?? []}
+          baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
+          kundeName={name}
+          kundeAdresse={kundeAdresse}
+          handwerker={detail.auftrag_handwerker ?? []}
+          onChanged={() => refresh()}
+        />
+      ) : null}
+    </div>
   )
 
   const auftragNettoSumme = useMemo(() => {
@@ -824,7 +742,7 @@ export function AuftragDetailClient({
     {
       id: 'leistung',
       label: 'Details',
-      icon: 'list-numbers',
+      icon: 'list-details',
       count: posCount || undefined,
       render: () => leistungInhalt,
     },
@@ -839,6 +757,12 @@ export function AuftragDetailClient({
       label: 'Bautagebuch',
       icon: 'clipboard-list',
       render: () => baustelleInhalt,
+    },
+    {
+      id: 'abnahme',
+      label: 'Abnahmeprotokoll',
+      icon: 'checklist',
+      render: () => abnahmeInhalt,
     },
     {
       id: 'aktivitaet',
@@ -885,12 +809,15 @@ export function AuftragDetailClient({
   ]
 
   return (
-    <div className="space-y-4 pb-0">
-      <DetailHead
-        backHref="/vorgaenge?tab=auftrag"
-        backLabel="Zurück zu den Vorgängen"
-        title={projektName}
-        badges={
+    <EntityDetailLayout
+      phase="auftrag"
+      breadcrumbTitle={projektName}
+      crumbBackHref="/vorgaenge?tab=auftrag"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      className="space-y-4 pb-0"
+      head={{
+        title: projektName,
+        badges: (
           <span className="inline-flex flex-wrap items-center gap-2">
             <MockBadge kind={variantToMockBadgeKind(auftragStatus.variant)}>{auftragStatus.label}</MockBadge>
             {lead ? (
@@ -903,9 +830,9 @@ export function AuftragDetailClient({
               />
             ) : null}
           </span>
-        }
-        meta={headMeta}
-        actions={
+        ),
+        meta: headMeta,
+        actions: (
           <div className="flex w-full flex-wrap items-center gap-2">
             {istAbgeschlossen ? (
               <button
@@ -928,23 +855,17 @@ export function AuftragDetailClient({
             )}
             <ActionsMenu
               trigger={
-                <button
-                  type="button"
-                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn ghost max-md:px-2"
-                  aria-label="Weitere Aktionen"
-                  title="Aktionen"
-                >
+                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
                   <MockIcon ctx="btn" n="dots" size={18} />
-                  <span className="sr-only">Mehr</span>
                 </button>
               }
               items={aktionenMenuItems}
               sheetTitle="Auftrag"
             />
           </div>
-        }
-      />
-
+        ),
+      }}
+    >
       {err ? (
         <p className="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
           {err}
@@ -1171,22 +1092,6 @@ export function AuftragDetailClient({
         onSaved={() => refresh()}
       />
 
-      {kunde ? (
-        <KundeModal
-          open={stammdatenModalOpen}
-          onClose={() => setStammdatenModalOpen(false)}
-          editKunde={kunde}
-          leadFunnelDaten={lead?.funnel_daten}
-          stayOnPage
-          revalidateAnfrageId={lead?.id}
-          onSaved={() => {
-            toast.success('Stammdaten gespeichert')
-            setStammdatenModalOpen(false)
-            refresh()
-          }}
-        />
-      ) : null}
-
       {mailCompose.modal}
 
       {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
@@ -1211,6 +1116,6 @@ export function AuftragDetailClient({
           onSaved={() => refresh()}
         />
       ) : null}
-    </div>
+    </EntityDetailLayout>
   )
 }

@@ -362,7 +362,7 @@ export function summenKostenaufstellungAusPositionen(
 }
 
 export function summenAusPositionen(
-  positionen: AngebotPosition[],
+  positionen: AngebotPosition[] | null | undefined,
   mwstSatz = 19
 ): AngebotSummen {
   let lohnZeileMin = 0
@@ -372,11 +372,12 @@ export function summenAusPositionen(
   let einkaufZeileMin = 0
   let einkaufZeileMax = 0
 
-  for (const p of positionen) {
+  const list = Array.isArray(positionen) ? positionen : []
+  for (const p of list) {
     if (!istPreisPosition(p)) continue
     const m = p.menge || 1
-    const l = p.lohn_netto * m
-    const mat = p.material_netto * m
+    const l = (Number(p.lohn_netto) || 0) * m
+    const mat = (Number(p.material_netto) || 0) * m
     lohnZeileMin += l
     lohnZeileMax += l
     materialZeileMin += mat

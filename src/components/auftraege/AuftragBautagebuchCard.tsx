@@ -1,20 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { ChevronDown, Eye, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
-import { RichTextContent } from '@/components/ui/RichTextContent'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
-import {
-  gewerkOptionenAusPositionen,
-  gewerkSelectionFromEintrag,
-  type GewerkOpt,
-} from '@/lib/auftraege/auftrag-position-blocks'
 import { BautagebuchKundeSendModal } from '@/components/auftraege/BautagebuchKundeSendModal'
+import {
+  BautagebuchEintragModal,
+  type BautagebuchEditorDraft,
+} from '@/components/auftraege/BautagebuchEintragModal'
 import {
   anfrageHandwerkerBautagebuchEintrag,
   createAuftragBautagebuchEintrag,
@@ -28,14 +25,42 @@ import {
   mergeBautagebuchFotoUrls,
 } from '@/lib/auftraege/bautagebuch-fotos'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
+import type { GewerkOpt } from '@/lib/auftraege/auftrag-position-blocks'
+import { richTextToPlain } from '@/lib/rich-text'
 
 const BAUTAGEBUCH_POLL_MS = 20_000
 
 function eintragFotosAnzeige(e: AuftragBautagebuchEintrag): string[] {
   if (e.foto_display_urls?.length) return e.foto_display_urls
   return e.foto_urls ?? []
+}
+
+function beschreibungPlain(html: string | null | undefined): string {
+  if (!html?.trim()) return ''
+  return richTextToPlain(html).trim()
+}
+
+function draftFromEintrag(e: AuftragBautagebuchEintrag): BautagebuchEditorDraft {
+  return {
+    id: e.id,
+    titel: e.titel || '',
+    beschreibung: e.beschreibung || '',
+    datum: e.datum?.slice(0, 10) || heuteYmd(),
+    foto_urls: [...(e.foto_urls ?? [])],
+    foto_display_urls: [...eintragFotosAnzeige(e)],
+  }
+}
+
+function emptyDraft(): BautagebuchEditorDraft {
+  return {
+    titel: '',
+    beschreibung: '',
+    datum: heuteYmd(),
+    foto_urls: [],
+    foto_display_urls: [],
+  }
 }
 
 function istPartnerEntwurf(e: AuftragBautagebuchEintrag): boolean {
@@ -47,7 +72,6 @@ export function AuftragBautagebuchCard({
   eintraege,
   kundeName,
   positionen = [],
-  gewerke = [],
   onChanged,
 }: {
   auftragId: string
@@ -58,28 +82,11 @@ export function AuftragBautagebuchCard({
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
-  const [sendEintrag, setSendEintrag] = useState<AuftragBautagebuchEintrag | null>(null)
-
-  const [neuTitel, setNeuTitel] = useState('')
-  const [neuDatum, setNeuDatum] = useState(heuteYmd())
-  const [neuGewerk, setNeuGewerk] = useState('')
-  const [neuBeschreibung, setNeuBeschreibung] = useState('')
-  const [neuFotos, setNeuFotos] = useState<string[]>([])
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const editFileRef = useRef<HTMLInputElement>(null)
-
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editTitel, setEditTitel] = useState('')
-  const [editDatum, setEditDatum] = useState('')
-  const [editGewerk, setEditGewerk] = useState('')
-  const [editBeschreibung, setEditBeschreibung] = useState('')
-  const [editFotos, setEditFotos] = useState<string[]>([])
-  const [editFotoDisplay, setEditFotoDisplay] = useState<string[]>([])
-  const [filterPartner, setFilterPartner] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
   const [rows, setRows] = useState(eintraege)
+  const [sel, setSel] = useState<Record<string, boolean>>({})
+  const [draft, setDraft] = useState<BautagebuchEditorDraft | null>(null)
+  const [sendEintrag, setSendEintrag] = useState<AuftragBautagebuchEintrag | null>(null)
+  const fotoImportRef = useRef<HTMLInputElement>(null)
   const seenPartnerIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -93,14 +100,7 @@ export function AuftragBautagebuchCard({
         if (cancelled) return
         setRows(list)
         const neu = list.filter((e) => istPartnerEntwurf(e) && !seenPartnerIds.current.has(e.id))
-        if (neu.length) {
-          setOpenIds((prev) => {
-            const next = new Set(prev)
-            for (const e of neu) next.add(e.id)
-            return next
-          })
-          for (const e of neu) seenPartnerIds.current.add(e.id)
-        }
+        for (const e of neu) seenPartnerIds.current.add(e.id)
       })
     }
     poll()
@@ -111,51 +111,17 @@ export function AuftragBautagebuchCard({
     }
   }, [auftragId])
 
-  const gewerkOptionen = useMemo(
-    () => gewerkOptionenAusPositionen(positionen, gewerke),
-    [positionen, gewerke]
-  )
-
-  const gewerkSelectOptions = useMemo(() => {
-    if (gewerkOptionen.length === 1) {
-      return [{ value: gewerkOptionen[0]!.id, label: gewerkOptionen[0]!.name }]
-    }
-    return [
-      { value: '', label: 'Keine Angabe (automatisch)' },
-      ...gewerkOptionen.map((g) => ({ value: g.id, label: g.name })),
-    ]
-  }, [gewerkOptionen])
-
-  function gewerkLabel(e: AuftragBautagebuchEintrag): string | null {
-    const sel = gewerkSelectionFromEintrag(e)
-    if (!sel) return null
-    return gewerkOptionen.find((g) => g.id === sel)?.name ?? null
-  }
-
-  const sorted = useMemo(() => {
-    let list = rows
-    if (filterPartner) {
-      list = list.filter((e) => Boolean(e.handwerker_id))
-    }
-    return [...list].sort((a, b) => {
-      const d = new Date(b.datum).getTime() - new Date(a.datum).getTime()
-      if (d !== 0) return d
-      return (b.sort_order ?? 0) - (a.sort_order ?? 0)
-    })
-  }, [rows, filterPartner])
-
-  const pendingPartner = useMemo(
+  const sorted = useMemo(
     () =>
-      [...rows]
-        .filter(istPartnerEntwurf)
-        .sort((a, b) => new Date(b.created_at ?? b.datum).getTime() - new Date(a.created_at ?? a.datum).getTime()),
+      [...rows].sort((a, b) => {
+        const d = new Date(b.datum).getTime() - new Date(a.datum).getTime()
+        if (d !== 0) return d
+        return (b.sort_order ?? 0) - (a.sort_order ?? 0)
+      }),
     [rows]
   )
 
-  const partnerCount = useMemo(
-    () => rows.filter((e) => Boolean(e.handwerker_id)).length,
-    [rows]
-  )
+  const selIds = useMemo(() => Object.keys(sel).filter((k) => sel[k]), [sel])
 
   const zugewiesenePartner = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
@@ -169,6 +135,14 @@ export function AuftragBautagebuchCard({
     return Array.from(map.values())
   }, [positionen])
 
+  function toggleSel(id: string) {
+    setSel((s) => ({ ...s, [id]: !s[id] }))
+  }
+
+  function clearSel() {
+    setSel({})
+  }
+
   function requestPartnerBautagebuch(handwerkerId: string, name: string) {
     startTransition(async () => {
       const res = await anfrageHandwerkerBautagebuchEintrag({ auftragId, handwerkerId })
@@ -181,107 +155,92 @@ export function AuftragBautagebuchCard({
     })
   }
 
-  function toggleOpen(id: string) {
-    setOpenIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function openNew() {
+    setDraft(emptyDraft())
   }
 
-  async function uploadFiles(files: FileList | File[], target: 'neu' | 'edit') {
-    const current = target === 'neu' ? neuFotos : editFotos
-    const slots = BAUTAGEBUCH_MAX_FOTOS - current.length
-    if (slots <= 0) {
-      toast.error(`Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos pro Eintrag.`)
-      return
-    }
-
-    const list = Array.from(files).slice(0, slots)
-    if (!list.length) return
-    setUploading(true)
-    try {
-      const urls: string[] = []
-      for (const file of list) {
-        const fd = new FormData()
-        fd.set('file', file)
-        fd.set('filename', file.name)
-        const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
-          method: 'POST',
-          body: fd,
-        })
-        const json = (await res.json()) as { url?: string; error?: string }
-        if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
-        urls.push(json.url)
-      }
-      if (target === 'neu') {
-        setNeuFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
-      } else {
-        setEditFotos((prev) => mergeBautagebuchFotoUrls(prev, urls))
-        setEditFotoDisplay((prev) => mergeBautagebuchFotoUrls(prev, urls))
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
-    } finally {
-      setUploading(false)
-    }
+  function openEdit(e: AuftragBautagebuchEintrag) {
+    setDraft(draftFromEintrag(e))
   }
 
-  function resetAddForm() {
-    setNeuTitel('')
-    setNeuBeschreibung('')
-    setNeuFotos([])
-    setNeuGewerk(gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')
-    setNeuDatum(heuteYmd())
+  function patchDraft(patch: Partial<BautagebuchEditorDraft>) {
+    setDraft((d) => (d ? { ...d, ...patch } : d))
   }
 
-  function openAdd() {
-    resetAddForm()
-    setAddOpen(true)
-  }
-
-  function closeAdd() {
-    setAddOpen(false)
-  }
-
-  function createEintrag() {
-    if (!neuTitel.trim()) {
+  async function saveDraft() {
+    if (!draft?.titel.trim()) {
       toast.error('Bitte einen Titel eingeben.')
       return
     }
-    const gewerkPhase =
-      neuGewerk.trim() || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : null) || null
+    const payload = {
+      titel: draft.titel.trim(),
+      beschreibung: draft.beschreibung.trim() || null,
+      datum: draft.datum || heuteYmd(),
+      foto_urls: draft.foto_urls,
+    }
     startTransition(async () => {
-      const r = await createAuftragBautagebuchEintrag({
-        auftragId,
-        titel: neuTitel,
-        beschreibung: neuBeschreibung,
-        datum: neuDatum,
-        gewerk_phase: gewerkPhase,
-        foto_urls: neuFotos,
-      })
+      if (draft.id) {
+        const r = await updateAuftragBautagebuchEintrag({
+          auftragId,
+          eintragId: draft.id,
+          ...payload,
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+      } else {
+        const r = await createAuftragBautagebuchEintrag({
+          auftragId,
+          ...payload,
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+      }
+      setDraft(null)
+      toast.success('Gespeichert')
+      onChanged()
+    })
+  }
+
+  function removeEintrag(id: string) {
+    startTransition(async () => {
+      const r = await deleteAuftragBautagebuchEintrag({ auftragId, eintragId: id })
       if (!r.ok) toast.error(r.message)
       else {
-        resetAddForm()
-        setAddOpen(false)
-        toast.success('Eintrag gespeichert')
+        setSel((s) => {
+          const n = { ...s }
+          delete n[id]
+          return n
+        })
+        if (draft?.id === id) setDraft(null)
         onChanged()
       }
     })
   }
 
-  function startEdit(e: AuftragBautagebuchEintrag) {
-    setEditId(e.id)
-    setEditTitel(e.titel)
-    setEditDatum(e.datum.slice(0, 10))
-    setEditGewerk(
-      gewerkSelectionFromEintrag(e) || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')
-    )
-    setEditBeschreibung(e.beschreibung ?? '')
-    setEditFotos([...(e.foto_urls ?? [])])
-    setEditFotoDisplay(eintragFotosAnzeige(e))
-    setOpenIds((prev) => new Set(prev).add(e.id))
+  function confirmRemove(e: AuftragBautagebuchEintrag) {
+    if (!confirm(`„${e.titel || 'Eintrag'}“ wirklich löschen?`)) return
+    removeEintrag(e.id)
+  }
+
+  function dupEintrag(e: AuftragBautagebuchEintrag) {
+    startTransition(async () => {
+      const r = await createAuftragBautagebuchEintrag({
+        auftragId,
+        titel: `${e.titel || 'Eintrag'} (Kopie)`,
+        beschreibung: e.beschreibung ?? null,
+        datum: heuteYmd(),
+        foto_urls: e.foto_urls ?? [],
+      })
+      if (!r.ok) toast.error(r.message)
+      else {
+        toast.success('Kopie erstellt')
+        onChanged()
+      }
+    })
   }
 
   function freigebenLive(e: AuftragBautagebuchEintrag) {
@@ -295,418 +254,364 @@ export function AuftragBautagebuchCard({
     })
   }
 
-  function saveEdit() {
-    if (!editId || !editTitel.trim()) return
-    const gewerkPhase =
-      editGewerk.trim() || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : null) || null
+  async function importFotoEntries(files: FileList | null) {
+    if (!files?.length) return
+    const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    if (!list.length) return
     startTransition(async () => {
-      const r = await updateAuftragBautagebuchEintrag({
-        auftragId,
-        eintragId: editId,
-        titel: editTitel,
-        beschreibung: editBeschreibung,
-        datum: editDatum,
-        gewerk_phase: gewerkPhase,
-        foto_urls: editFotos,
-      })
-      if (!r.ok) toast.error(r.message)
-      else {
-        setEditId(null)
-        toast.success('Gespeichert')
-        onChanged()
+      for (const file of list) {
+        try {
+          const fd = new FormData()
+          fd.set('file', file)
+          fd.set('filename', file.name)
+          const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+            method: 'POST',
+            body: fd,
+          })
+          const json = (await res.json()) as { url?: string; error?: string }
+          if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
+          const titel = file.name.replace(/\.[^.]+$/, '') || 'Foto'
+          const r = await createAuftragBautagebuchEintrag({
+            auftragId,
+            titel,
+            beschreibung: null,
+            datum: heuteYmd(),
+            foto_urls: mergeBautagebuchFotoUrls([], [json.url]).slice(0, BAUTAGEBUCH_MAX_FOTOS),
+          })
+          if (!r.ok) throw new Error(r.message)
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Foto-Import fehlgeschlagen')
+          return
+        }
       }
+      toast.success(list.length === 1 ? 'Foto-Eintrag erstellt' : `${list.length} Foto-Einträge erstellt`)
+      onChanged()
     })
   }
 
-  function removeEintrag(e: AuftragBautagebuchEintrag) {
-    if (!confirm(`„${e.titel}" wirklich löschen?`)) return
+  function bulkDelete() {
+    if (!selIds.length) return
+    if (!confirm(`${selIds.length} Eintrag(e) wirklich löschen?`)) return
     startTransition(async () => {
-      const r = await deleteAuftragBautagebuchEintrag({ auftragId, eintragId: e.id })
-      if (!r.ok) toast.error(r.message)
-      else onChanged()
+      for (const id of selIds) {
+        const r = await deleteAuftragBautagebuchEintrag({ auftragId, eintragId: id })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+      }
+      clearSel()
+      onChanged()
     })
   }
 
-  const addTrigger = (
-    <button
-      type="button"
-      className="bt-add-trigger"
-      aria-label="Eintrag hinzufügen"
-      onClick={openAdd}
-    >
-      <Plus className="h-4 w-4" aria-hidden />
-    </button>
-  )
+  function bulkCopy() {
+    startTransition(async () => {
+      for (const id of selIds) {
+        const e = rows.find((x) => x.id === id)
+        if (!e) continue
+        const r = await createAuftragBautagebuchEintrag({
+          auftragId,
+          titel: `${e.titel || 'Eintrag'} (Kopie)`,
+          beschreibung: e.beschreibung ?? null,
+          datum: heuteYmd(),
+          foto_urls: e.foto_urls ?? [],
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+      }
+      clearSel()
+      toast.success('Kopien erstellt')
+      onChanged()
+    })
+  }
 
-  const addFormFields = (
-    <>
-      <div className="bt-add-fields">
-        <Input label="Titel" value={neuTitel} onChange={(e) => setNeuTitel(e.target.value)} placeholder="z. B. Rohbau abgeschlossen" />
-        <Input label="Datum" type="date" value={neuDatum} onChange={(e) => setNeuDatum(e.target.value)} />
-        {gewerkOptionen.length > 0 ? (
-          <Select
-            label="Gewerk (optional, Phase in der Mail)"
-            value={neuGewerk || (gewerkOptionen.length === 1 ? gewerkOptionen[0]!.id : '')}
-            onChange={(e) => setNeuGewerk(e.target.value)}
-            options={gewerkSelectOptions}
-            hint={
-              gewerkOptionen.length > 1
-                ? 'Optional — ohne Auswahl wird in der Kunden-Mail die aktuelle Bauphase automatisch hervorgehoben.'
-                : undefined
-            }
-          />
-        ) : null}
-        <div className="field-full">
-          <Textarea
-            label="Beschreibung"
-            value={neuBeschreibung}
-            onChange={(e) => setNeuBeschreibung(e.target.value)}
-            placeholder="Was ist passiert? Was ist als Nächstes geplant?"
-            rows={4}
-          />
-        </div>
-      </div>
+  function itemActions(e: AuftragBautagebuchEintrag): ActionsMenuItem[] {
+    const items: ActionsMenuItem[] = [
+      {
+        label: 'Bearbeiten',
+        icon: <MockIcon ctx="row" n="pencil" size={16} />,
+        onClick: () => openEdit(e),
+      },
+      {
+        label: 'Kopieren',
+        icon: <MockIcon ctx="row" n="copy" size={16} />,
+        onClick: () => dupEintrag(e),
+      },
+      {
+        label: 'An Kunde versenden',
+        icon: <MockIcon ctx="row" n="mail-forward" size={16} />,
+        onClick: () => setSendEintrag(e),
+      },
+    ]
+    if (istPartnerEntwurf(e)) {
+      items.push({
+        label: 'Live stellen',
+        icon: <MockIcon ctx="row" n="eye" size={16} />,
+        onClick: () => freigebenLive(e),
+      })
+    }
+    items.push('sep', {
+      label: 'Löschen',
+      icon: <MockIcon ctx="row" n="trash" size={16} />,
+      danger: true,
+      onClick: () => confirmRemove(e),
+    })
+    return items
+  }
 
-      {neuFotos.length > 0 ? (
-        <div className="bt-foto-grid">
-          {neuFotos.map((url) => (
-            <div key={url} className="bt-foto-thumb">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" />
-              <button type="button" className="bt-foto-remove" onClick={() => setNeuFotos((p) => p.filter((u) => u !== url))}>
-                <X className="h-3 w-3" aria-hidden />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={uploading || neuFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload className="mr-1 h-3 w-3" aria-hidden />
-          Fotos
-        </Button>
-        <span className="text-[11px] text-bw-text-muted">
-          Bis zu {BAUTAGEBUCH_MAX_FOTOS} Fotos · {neuFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
-        </span>
-        <Button type="button" variant="primary" size="sm" loading={pending} onClick={createEintrag}>
-          Eintrag speichern
-        </Button>
-      </div>
-    </>
-  )
+  function statusBadge(e: AuftragBautagebuchEintrag) {
+    if (e.an_kunde_gesendet_at || e.fuer_kunde_freigegeben) {
+      return (
+        <MockBadge kind="aktiv">
+          <MockIcon ctx="row" n="check" size={10} /> Aktiv
+        </MockBadge>
+      )
+    }
+    return (
+      <MockBadge kind="fertig">
+        <MockIcon ctx="row" n="file-pencil" size={10} /> Entwurf
+      </MockBadge>
+    )
+  }
 
   return (
-    <div className="auftrag-bautagebuch auftrag-pos-compact">
-      {zugewiesenePartner.length > 0 ? (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {zugewiesenePartner.map((hw) => (
-            <Button
-              key={hw.id}
-              type="button"
-              variant="secondary"
-              size="sm"
-              loading={pending}
-              onClick={() => requestPartnerBautagebuch(hw.id, hw.name)}
+    <>
+      <MockCard
+        id="auftrag-bautagebuch"
+        title={`Bautagebuch · ${sorted.length}`}
+        icon="clipboard-list"
+        actions={
+          <>
+            <input
+              ref={fotoImportRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(ev) => {
+                void importFotoEntries(ev.target.files)
+                ev.target.value = ''
+              }}
+            />
+            <MockBtn
+              sm
+              kind="ghost"
+              icon="photo-plus"
+              disabled={pending}
+              onClick={() => fotoImportRef.current?.click()}
             >
-              Tagebuch einfordern · {hw.name}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-      <input
-        ref={fileRef}
-        type="file"
-        className="hidden"
-        accept=".jpg,.jpeg,.png,.webp"
-        multiple
-        onChange={(e) => {
-          if (e.target.files?.length) void uploadFiles(e.target.files, 'neu')
-          e.target.value = ''
-        }}
-      />
-      <input
-        ref={editFileRef}
-        type="file"
-        className="hidden"
-        accept=".jpg,.jpeg,.png,.webp"
-        multiple
-        onChange={(e) => {
-          if (e.target.files?.length) void uploadFiles(e.target.files, 'edit')
-          e.target.value = ''
-        }}
-      />
-
-      {pendingPartner.length > 0 ? (
-        <div className="mb-4 space-y-3">
-          {pendingPartner.map((e) => {
-            const fotos = eintragFotosAnzeige(e)
-            return (
-              <div
-                key={`pending-${e.id}`}
-                className="rounded-lg border border-violet-300 bg-violet-50/80 p-4 shadow-sm"
+              Foto
+            </MockBtn>
+            <MockBtn sm kind="primary" icon="plus" disabled={pending} onClick={openNew}>
+              Eintrag
+            </MockBtn>
+          </>
+        }
+      >
+        {zugewiesenePartner.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {zugewiesenePartner.map((hw) => (
+              <MockBtn
+                key={hw.id}
+                sm
+                kind="ghost"
+                disabled={pending}
+                onClick={() => requestPartnerBautagebuch(hw.id, hw.name)}
               >
-                <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">
-                      Neu vom Partner — zur Prüfung
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-bw-text">{e.titel}</p>
-                    <p className="text-xs text-bw-text-muted">
-                      {formatDatum(e.datum)}
-                      {e.handwerker?.name ? ` · ${e.handwerker.name}` : ''}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-950">
-                    Entwurf
-                  </span>
-                </div>
+                Tagebuch einfordern · {hw.name}
+              </MockBtn>
+            ))}
+          </div>
+        ) : null}
 
-                {e.beschreibung?.trim() ? (
-                  <RichTextContent html={e.beschreibung} className="text-[13px] text-bw-text" />
-                ) : (
-                  <p className="text-sm text-bw-text-muted">Keine Beschreibung.</p>
-                )}
-
-                {fotos.length > 0 ? (
-                  <div className="bt-foto-grid mt-3">
-                    {fotos.map((url) => (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="bt-foto-thumb">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" />
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" variant="primary" size="sm" onClick={() => setSendEintrag(e)}>
-                    <Send className="mr-1 h-3 w-3" aria-hidden />
-                    An Kunden senden
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(e)}>
-                    <Pencil className="mr-1 h-3 w-3" aria-hidden />
-                    Bearbeiten
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" loading={pending} onClick={() => freigebenLive(e)}>
-                    Live stellen
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setSendEintrag(e)}>
-                    <Eye className="mr-1 h-3 w-3" aria-hidden />
-                    Vorschau
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {(partnerCount > 0 || sorted.length > 0) ? (
-        <div className="bt-list-toolbar">
-          {partnerCount > 0 ? (
+        {selIds.length > 0 ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 14px',
+              marginBottom: 12,
+              background: 'var(--green-dark)',
+              color: '#fff',
+              borderRadius: 10,
+            }}
+          >
+            <MockIcon ctx="row" n="checks" size={16} />
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{selIds.length} ausgewählt</span>
+            <div style={{ flex: 1 }} />
+            {[
+              {
+                icon: 'mail-forward',
+                label: 'An Kunde versenden',
+                onClick: () => {
+                  const first = rows.find((x) => x.id === selIds[0])
+                  if (first) setSendEintrag(first)
+                },
+              },
+              { icon: 'copy', label: 'Kopieren', onClick: bulkCopy },
+              { icon: 'trash', label: 'Löschen', onClick: bulkDelete },
+            ].map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                onClick={a.onClick}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'rgba(255,255,255,0.16)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <MockIcon ctx="btn" n={a.icon} size={15} />
+                {a.label}
+              </button>
+            ))}
             <button
               type="button"
-              className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                filterPartner
-                  ? 'bg-bw-primary text-white'
-                  : 'bg-bw-bg-soft text-bw-text-muted hover:text-bw-text'
-              )}
-              onClick={() => setFilterPartner((v) => !v)}
+              onClick={clearSel}
+              title="Auswahl aufheben"
+              style={{
+                display: 'inline-flex',
+                padding: 6,
+                borderRadius: 8,
+                border: 'none',
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.8)',
+                cursor: 'pointer',
+              }}
             >
-              Nur Partner ({partnerCount})
+              <MockIcon ctx="row" n="x" size={16} />
             </button>
-          ) : (
-            <span />
-          )}
-          {addTrigger}
-        </div>
-      ) : null}
-
-      {sorted.length === 0 ? (
-        rows.length === 0 ? (
-          <div className="bt-empty-row">
-            <p className="text-sm text-bw-text-muted">Noch keine Einträge</p>
-            {addTrigger}
           </div>
+        ) : null}
+
+        {sorted.length === 0 ? (
+          <MockEmpty
+            icon="clipboard-list"
+            title="Noch keine Einträge"
+            hint="Dokumentiere den Baufortschritt mit Titel, Beschreibung und Fotos."
+          />
         ) : (
-          <p className="py-4 text-center text-sm text-bw-text-muted">Keine Einträge für diesen Filter.</p>
-        )
-      ) : (
-        <div className="bt-list divide-y divide-bw-border rounded-md border border-bw-border bg-bw-card">
-          {sorted.map((e) => {
-            const open = openIds.has(e.id)
-            const editing = editId === e.id
-            const phaseName = gewerkLabel(e)
-            return (
-              <div key={e.id} className={cn('bt-entry', open && 'open')}>
-                <button type="button" className="bt-entry-head" onClick={() => toggleOpen(e.id)}>
-                  <ChevronDown
-                    className={cn('h-3.5 w-3.5 shrink-0 text-bw-text-muted transition-transform', open && 'rotate-180')}
-                    aria-hidden
-                  />
-                  <div className="bt-entry-head-main min-w-0">
-                    <p className="bt-entry-title">{e.titel}</p>
-                    <p className="bt-entry-meta">
+          <div className="bt-list">
+            {sorted.map((e) => {
+              const fotos = eintragFotosAnzeige(e)
+              const desc = beschreibungPlain(e.beschreibung)
+              const selected = Boolean(sel[e.id])
+              return (
+                <div key={e.id} className={`bt-entry${selected ? ' sel' : ''}`}>
+                  <span
+                    role="checkbox"
+                    aria-checked={selected}
+                    tabIndex={0}
+                    onClick={() => toggleSel(e.id)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault()
+                        toggleSel(e.id)
+                      }
+                    }}
+                  >
+                    <span className={`bt-check${selected ? ' on' : ''}`}>
+                      {selected ? <MockIcon ctx="row" n="check" size={11} /> : null}
+                    </span>
+                  </span>
+                  <div className="bt-thumb">
+                    {fotos[0] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={fotos[0]} alt="" />
+                    ) : (
+                      <MockIcon ctx="empty" n="photo" size={22} style={{ color: 'var(--text-4)' }} />
+                    )}
+                    {fotos.length > 1 ? <span className="count">+{fotos.length - 1}</span> : null}
+                  </div>
+                  <div
+                    className="bt-main"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(e)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault()
+                        openEdit(e)
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="bt-title">
+                      {e.titel || '(ohne Titel)'} {statusBadge(e)}
+                      {e.handwerker_id ? (
+                        <MockBadge kind="plain">
+                          Partner{e.handwerker?.name ? ` · ${e.handwerker.name}` : ''}
+                        </MockBadge>
+                      ) : null}
+                    </div>
+                    {desc ? <div className="bt-desc">{desc}</div> : null}
+                    <div className="bt-meta">
                       {formatDatum(e.datum)}
-                      {phaseName ? ` · ${phaseName}` : ''}
-                    </p>
+                      {fotos.length
+                        ? ` · ${fotos.length} Foto${fotos.length === 1 ? '' : 's'}`
+                        : ''}
+                    </div>
                   </div>
-                  <div className="bt-entry-badges" onClick={(ev) => ev.stopPropagation()}>
-                    {e.handwerker_id ? (
-                      <span className="bt-badge bg-violet-100 text-violet-900" title="Vom Partner-Portal">
-                        Partner
-                        {e.handwerker?.name ? ` · ${e.handwerker.name}` : ''}
-                      </span>
-                    ) : null}
-                    {e.fuer_kunde_freigegeben ? (
-                      <span className="bt-badge bt-badge-live">Live</span>
-                    ) : (
-                      <span className="bt-badge bt-badge-draft">Entwurf</span>
-                    )}
-                    {e.an_kunde_gesendet_at ? <span className="bt-badge bt-badge-sent">Gesendet</span> : null}
+                  <div className="bt-act">
+                    <ActionsMenu
+                      align="right"
+                      trigger={
+                        <button type="button" className="qa-btn" title="Aktionen">
+                          <MockIcon ctx="row" n="dots" size={16} />
+                        </button>
+                      }
+                      items={itemActions(e)}
+                    />
                   </div>
-                </button>
-
-                {open ? (
-                  <div className="bt-entry-body">
-                    {editing ? (
-                      <div className="space-y-3">
-                        <Input label="Titel" value={editTitel} onChange={(ev) => setEditTitel(ev.target.value)} />
-                        <Input label="Datum" type="date" value={editDatum} onChange={(ev) => setEditDatum(ev.target.value)} />
-                        {gewerkOptionen.length > 0 ? (
-                          <Select
-                            label="Gewerk (optional, Phase in der Mail)"
-                            value={editGewerk}
-                            onChange={(ev) => setEditGewerk(ev.target.value)}
-                            options={gewerkSelectOptions}
-                          />
-                        ) : null}
-                        <Textarea label="Beschreibung" value={editBeschreibung} onChange={(ev) => setEditBeschreibung(ev.target.value)} rows={5} />
-                        {(e.foto_urls ?? []).length > 0 ? (
-                          <div className="bt-foto-grid">
-                            {editFotoDisplay.map((url, i) => (
-                              <div key={`${url}-${i}`} className="bt-foto-thumb">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={url} alt="" />
-                                <button
-                                  type="button"
-                                  className="bt-foto-remove"
-                                  onClick={() => {
-                                    setEditFotos((p) => p.filter((_, idx) => idx !== i))
-                                    setEditFotoDisplay((p) => p.filter((_, idx) => idx !== i))
-                                  }}
-                                >
-                                  <X className="h-3 w-3" aria-hidden />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            disabled={uploading || editFotos.length >= BAUTAGEBUCH_MAX_FOTOS}
-                            onClick={() => editFileRef.current?.click()}
-                          >
-                            <Upload className="mr-1 h-3 w-3" aria-hidden />
-                            Fotos hinzufügen
-                          </Button>
-                          <span className="text-[11px] text-bw-text-muted">
-                            {editFotos.length}/{BAUTAGEBUCH_MAX_FOTOS}
-                          </span>
-                          <Button type="button" variant="primary" size="sm" loading={pending} onClick={saveEdit}>
-                            Speichern
-                          </Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setEditId(null)}>
-                            Abbrechen
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {e.beschreibung?.trim() ? (
-                          <RichTextContent html={e.beschreibung} className="text-[13px] text-bw-text" />
-                        ) : (
-                          <p className="text-sm text-bw-text-muted">Keine Beschreibung.</p>
-                        )}
-                        {eintragFotosAnzeige(e).length > 0 ? (
-                          <div className="bt-foto-grid">
-                            {eintragFotosAnzeige(e).map((url) => (
-                              <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="bt-foto-thumb">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={url} alt="" />
-                              </a>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        <div className="bt-entry-actions">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setSendEintrag(e)}
-                          >
-                            <Eye className="mr-1 h-3 w-3" aria-hidden />
-                            Kunden-Vorschau
-                          </Button>
-                          <Button type="button" variant="primary" size="sm" onClick={() => setSendEintrag(e)}>
-                            <Send className="mr-1 h-3 w-3" aria-hidden />
-                            An Kunden senden
-                          </Button>
-                          <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(e)}>
-                            <Pencil className="mr-1 h-3 w-3" aria-hidden />
-                            Bearbeiten
-                          </Button>
-                          <Button type="button" variant="ghost" size="sm" className="text-status-cancel-text" onClick={() => removeEintrag(e)}>
-                            <Trash2 className="mr-1 h-3 w-3" aria-hidden />
-                            Löschen
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {addOpen ? (
-        <div className="bt-add-card hidden md:block">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="bt-add-title mb-0">Neuer Eintrag</p>
-            <button type="button" className="bt-add-close" aria-label="Schließen" onClick={closeAdd}>
-              <X className="h-4 w-4" aria-hidden />
-            </button>
+                </div>
+              )
+            })}
           </div>
-          {addFormFields}
-        </div>
-      ) : null}
+        )}
+      </MockCard>
 
-      <MobileListFilterSheet open={addOpen} onClose={closeAdd} title="Neuer Eintrag">
-        {addFormFields}
-      </MobileListFilterSheet>
+      <BautagebuchEintragModal
+        open={Boolean(draft)}
+        onClose={() => setDraft(null)}
+        draft={draft}
+        auftragId={auftragId}
+        saving={pending}
+        onChange={patchDraft}
+        onSave={saveDraft}
+        onRemove={
+          draft?.id
+            ? () => {
+                const row = rows.find((x) => x.id === draft.id)
+                if (row) confirmRemove(row)
+              }
+            : undefined
+        }
+      />
 
       <BautagebuchKundeSendModal
-        open={!!sendEintrag}
+        open={Boolean(sendEintrag)}
         onClose={() => setSendEintrag(null)}
         auftragId={auftragId}
         eintrag={sendEintrag}
         kundeName={kundeName}
-        onSent={onChanged}
+        onSent={() => {
+          setSendEintrag(null)
+          clearSel()
+          onChanged()
+        }}
       />
-    </div>
+    </>
   )
 }

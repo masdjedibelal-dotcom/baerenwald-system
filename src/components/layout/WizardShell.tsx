@@ -42,7 +42,7 @@ export function WizardShell({
     : `Schritt ${currentStep}`
 
   return (
-    <div className={cn('wizard', className)} role="dialog" aria-modal="true">
+    <div className={cn('wizard wizard-flow', className)} role="dialog" aria-modal="true">
       <div className="wizard-inner-shell">
         <div className="wizard-top">
           <WizardMobileToolbar

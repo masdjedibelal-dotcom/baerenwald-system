@@ -1,7 +1,9 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { cn } from '@/lib/utils'
 
 interface SidePanelProps {
   open: boolean
@@ -14,6 +16,9 @@ interface SidePanelProps {
   width?: 'sm' | 'md' | 'lg'
 }
 
+/**
+ * Früher rechtes Sidepanel — laut Mock Erstellen/Bearbeiten/Preview als zentriertes Sheet-Modal.
+ */
 export function SidePanel({
   open,
   onClose,
@@ -24,6 +29,8 @@ export function SidePanel({
   children,
   width = 'md',
 }: SidePanelProps) {
+  const [mounted, setMounted] = useState(false)
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -32,65 +39,61 @@ export function SidePanel({
   )
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     if (!open) return
     document.addEventListener('keydown', handleKey)
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      document.body.style.overflow = 'hidden'
-    }
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', handleKey)
-      document.body.style.overflow = ''
+      document.body.style.overflow = prev
     }
   }, [open, handleKey])
 
-  const widthClass = {
-    sm: 'w-full md:w-96',
-    md: 'w-full md:w-[480px]',
-    lg: 'w-full md:w-[600px]',
-  }[width]
+  if (!open || !mounted) return null
 
-  if (!open) return null
-
-  return (
-    <>
+  return createPortal(
+    <div
+      className="sheet-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      role="presentation"
+    >
       <div
-        className="z-sidepanel fixed inset-0 bg-black/50 md:bg-black/20"
-        onClick={onClose}
-        role="presentation"
-        aria-hidden
-      />
-
-      <div
-        className={`z-sidepanel-pop fixed flex max-h-[90vh] flex-col rounded-t-2xl bg-bw-card shadow-lg animate-slide-up md:inset-y-0 md:right-0 md:max-h-none md:rounded-none md:rounded-l-xl md:animate-slide-right ${widthClass} bottom-0 left-0 right-0 md:bottom-0 md:left-auto md:top-0`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={cn('sheet', (width === 'lg' || width === 'md') && width === 'lg' && 'wide')}
+        style={
+          width === 'sm'
+            ? { width: 'min(420px, 100%)' }
+            : width === 'md'
+              ? { width: 'min(640px, 100%)' }
+              : undefined
+        }
       >
-        <div className="flex justify-center pb-1 pt-3 md:hidden">
-          <div className="h-1 w-10 rounded-full bg-bw-border" />
-        </div>
-
-        <div className="flex flex-shrink-0 items-start justify-between border-b border-bw-border px-5 py-4">
-          <div className="min-w-0 flex-1 pr-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-md truncate font-semibold text-bw-text">{title}</h2>
-              {badge}
-            </div>
-            {subtitle ? <p className="mt-0.5 text-sm text-bw-text-muted">{subtitle}</p> : null}
+        <div className="sheet-h">
+          <div className="title flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <span className="min-w-0 truncate">{title}</span>
+            {badge}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-shrink-0 rounded-md p-1.5 text-bw-text-muted transition-colors hover:bg-bw-hover hover:text-bw-text"
-            aria-label="Schließen"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <MockBtn sm kind="ghost" icon="x" onClick={onClose} title="Schließen" />
         </div>
-
-        {actions ? (
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-bw-border bg-bw-bg px-5 py-3">{actions}</div>
+        {subtitle ? (
+          <div className="border-b border-bw-border px-5 py-2 text-[13px] text-bw-text-muted">{subtitle}</div>
         ) : null}
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-bw-border bg-bw-bg-soft px-5 py-3">
+            {actions}
+          </div>
+        ) : null}
+        <div className="sheet-b">{children}</div>
       </div>
-    </>
+    </div>,
+    document.body
   )
 }

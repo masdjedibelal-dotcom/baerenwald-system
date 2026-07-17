@@ -2,23 +2,18 @@
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailResponsiveTabs } from '@/components/layout/app'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
-import { DetailAccordion } from '@/components/ui/DetailAccordion'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { Timeline } from '@/components/ui/timeline'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
-import { Card } from '@/components/ui/Card'
-import {
-  CrmDokumenteTabelle,
-  type CrmDokumentZeile,
-} from '@/components/dokumente/CrmDokumenteTabelle'
 import { Button } from '@/components/ui/Button'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
@@ -33,51 +28,80 @@ import {
   type RechnungMahnMailZeile,
 } from '@/components/rechnungen/RechnungMahnverlaufCard'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
-import { loadRechnungWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import type { Gewerk, Preisliste, Rechnung, RechnungBelegTyp, RechnungStatus } from '@/lib/types'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import {
+  loadRechnungWizardBootstrap,
+  loadRechnungWizardBootstrapStandalone,
+  deleteRechnungEntwurf,
+} from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
+import { RechnungDetailsTab } from '@/components/rechnungen/RechnungDetailsTab'
+import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
+import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateRechnung } from '@/lib/list-actions'
+import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
+import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import {
-  berechneRechnung,
-  formatHinweis35aRechnung,
-  rechnungZeigtHinweis35a,
-} from '@/lib/rechnung-berechnung'
-import { formatDatum, formatPreis } from '@/lib/utils'
-import {
-  HINWEIS_KLEINUNTERNEHMER,
-  HINWEIS_REVERSE_CHARGE_13B,
-  RECHNUNG_BELEG_TYP_LABELS,
-  RECHNUNG_STATUS_LABELS,
-} from '@/lib/rechnung-config'
+import { berechneRechnung } from '@/lib/rechnung-berechnung'
+import { formatDatum, formatTimelineStamp } from '@/lib/utils'
+import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
   rechnungDarfImWizardBearbeitetWerden,
   type RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
-import { toast } from '@/components/ui/app-toast'
 import {
   mahnstufeListenLabel,
   rechnungHatMahnverlauf,
 } from '@/lib/rechnungen/mahnverlauf'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { toast } from '@/components/ui/app-toast'
+import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
+import type {
+  Gewerk,
+  LeadDetail,
+  LeadNotizRow,
+  LeadTimelineRow,
+  Preisliste,
+  Rechnung,
+  RechnungBelegTyp,
+  RechnungStatus,
+} from '@/lib/types'
 
-function DetailProp({
-  label,
-  children,
-  link,
-}: {
-  label: string
-  children: ReactNode
-  link?: boolean
-}) {
-  return (
-    <div className="prop">
-      <div className="prop-l">{label}</div>
-      <div className={link ? 'prop-v link' : 'prop-v'}>{children}</div>
-    </div>
-  )
+type RechnungDetailTab =
+  | 'stammdaten'
+  | 'details'
+  | 'mahnverlauf'
+  | 'verlauf'
+  | 'dokumente'
+  | 'notizen'
+
+const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
+  'stammdaten',
+  'details',
+  'mahnverlauf',
+  'verlauf',
+  'dokumente',
+  'notizen',
+])
+
+function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTab | null {
+  const tab = (raw ?? '').trim().toLowerCase()
+  if (!tab) return null
+  if (tab === 'uebersicht' || tab === 'stammdaten') return 'stammdaten'
+  if (tab === 'positionen' || tab === 'leistung' || tab === 'details') return 'details'
+  if (tab === 'mahnung' || tab === 'mahnungen' || tab === 'mahnverlauf') return 'mahnverlauf'
+  if (tab === 'aktivitaet' || tab === 'verlauf') return 'verlauf'
+  if (tab === 'kommunikation' || tab === 'notizen') return 'notizen'
+  if (tab === 'dokumente') return 'dokumente'
+  if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
+  return null
 }
 
 function tageSeitFaelligkeit(faelligAm: string | null): number {
@@ -85,7 +109,7 @@ function tageSeitFaelligkeit(faelligAm: string | null): number {
   const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
   const [y, m, d] = parts
-  const due = new Date(y, m - 1, d)
+  const due = new Date(y!, m! - 1, d!)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   due.setHours(0, 0, 0, 0)
@@ -100,10 +124,13 @@ function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
   return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Entwurf</MockBadge>
 }
 
-type RechnungDetailTab = 'stammdaten' | 'leistung' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
-
-const DESKTOP_RECHNUNG_TABS: RechnungDetailTab[] = ['uebersicht', 'positionen', 'aktivitaet', 'dokumente']
-const MOBILE_RECHNUNG_TABS: RechnungDetailTab[] = ['stammdaten', 'leistung', 'aktivitaet', 'dokumente']
+function rechnungTitelMeta(detail: Rechnung, belegTyp: RechnungBelegTyp): string {
+  const auftrag = detail.auftraege?.titel?.trim()
+  if (auftrag) return auftrag
+  const nr = detail.rechnungsnummer?.trim()
+  if (nr) return `${RECHNUNG_BELEG_TYP_LABELS[belegTyp]} ${nr}`
+  return RECHNUNG_BELEG_TYP_LABELS[belegTyp]
+}
 
 export function RechnungDetailClient({
   detail: initial,
@@ -114,6 +141,8 @@ export function RechnungDetailClient({
   mahnMails = [],
   projektKontext,
   pipelineLead = null,
+  lead = null,
+  timeline: timelineInitial = [],
 }: {
   detail: Rechnung
   kleinunternehmerFirma: boolean
@@ -123,19 +152,32 @@ export function RechnungDetailClient({
   mahnMails?: RechnungMahnMailZeile[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
   pipelineLead?: PipelineKontextLead | null
+  lead?: LeadDetail | null
+  timeline?: LeadTimelineRow[]
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
+  const isCrmAdmin = useIsCrmAdmin()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
-  const [err, setErr] = useState<string | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [tab, setTab] = useState<RechnungDetailTab>('uebersicht')
+  const [mainTab, setMainTab] = useState<RechnungDetailTab>('stammdaten')
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
+  const [impersonating, setImpersonating] = useState(false)
+
+  useEffect(() => {
+    setDetail(initial)
+  }, [initial])
+
+  useEffect(() => {
+    const tab = resolveRechnungDetailTabFromQuery(searchParams.get('tab'))
+    if (tab) setMainTab(tab)
+  }, [searchParams])
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
   const berechnung = useMemo(
@@ -149,7 +191,10 @@ export function RechnungDetailClient({
 
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
-  const titel = detail.kunden?.name?.trim() || 'Rechnung'
+  const kundeName = detail.kunden?.name?.trim() || 'Rechnung'
+  const kundeTelefon = detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+  const kundeEmail = detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
+  const kundeId = detail.kunden?.id ?? detail.kunde_id
 
   const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
   const ueberfaellig =
@@ -158,31 +203,98 @@ export function RechnungDetailClient({
     detail.status !== 'storniert' &&
     belegTyp === 'rechnung'
 
-  const hinweis35a =
-    belegTyp === 'rechnung' &&
-    rechnungZeigtHinweis35a(detail.kunden?.typ, berechnung.lohn_netto, kleinunternehmerFirma)
-
-  const mahnLabel = mahnstufeListenLabel(detail)
   const zeigtMahnverlauf =
     belegTyp === 'rechnung' &&
     (detail.status === 'gesendet' ||
       detail.status === 'bezahlt' ||
       rechnungHatMahnverlauf(detail))
 
-  const zahlungszielTage = Math.max(
+  const zahlungszielFallback = Math.max(
     1,
-    parseInt(firm?.zahlungsziel_tage ?? '', 10) ||
-      defaultZahlungszielTage(detail.kunden?.typ)
+    parseInt(firm?.zahlungsziel_tage ?? '', 10) || defaultZahlungszielTage(detail.kunden?.typ)
   )
 
   const pdfHref = detail.pdf_url?.trim() || `/api/rechnungen/${detail.id}/pdf`
 
+  const positionenCount = useMemo(
+    () => pos.filter((p) => !istGewerkBeschreibungPosition(p)).length,
+    [pos]
+  )
+
+  const leadId = lead?.id ?? projektKontext?.lead?.id ?? null
+  const notizenRows: LeadNotizRow[] = lead?.lead_notizen ?? []
+  const dokumenteRows = lead?.lead_dokumente ?? []
+
+  const timelineSorted = useMemo(
+    () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
+    [timelineInitial]
+  )
+
+  const timelineItems = useMemo(() => {
+    type Row = {
+      id: string
+      text: string
+      time: string
+      state: 'done' | 'open' | 'active'
+      ts: number
+      linkLabel?: string
+      onLinkClick?: () => void
+    }
+
+    const fromEvents: Row[] = timelineSorted.map((ev) => ({
+      id: ev.id,
+      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
+      time: formatTimelineStamp(ev.created_at),
+      state: 'done' as const,
+      ts: new Date(ev.created_at).getTime(),
+      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
+      onLinkClick: ev.email_log_id ? () => setEmailPreviewId(ev.email_log_id!) : undefined,
+    }))
+
+    let basis: Row[] = fromEvents
+    if (basis.length === 0 && detail.created_at) {
+      basis = [
+        {
+          id: `rechnung-created-${detail.id}`,
+          text: `Rechnung angelegt${detail.rechnungsnummer?.trim() ? ` — ${detail.rechnungsnummer.trim()}` : ''}`,
+          time: formatTimelineStamp(detail.created_at),
+          state: 'done',
+          ts: new Date(detail.created_at).getTime(),
+        },
+      ]
+    }
+
+    if (!projektKontext) return basis
+
+    const enriched = ergaenzeTimelineMitProjektKontext(
+      basis.map((b) => ({
+        id: b.id,
+        ts: b.ts,
+        text: b.text,
+        time: b.time,
+        state: b.state === 'active' ? 'active' : 'done',
+        linkLabel: b.linkLabel,
+      })),
+      projektKontext
+    )
+
+    return enriched.map((item) => ({
+      id: item.id,
+      text: item.text,
+      time: item.time,
+      state: item.state,
+      linkLabel: item.linkLabel,
+      onLinkClick: item.href
+        ? () => router.push(item.href!)
+        : basis.find((b) => b.id === item.id)?.onLinkClick,
+    }))
+  }, [timelineSorted, detail.created_at, detail.id, detail.rechnungsnummer, projektKontext, router])
+
   async function setStatus(s: RechnungStatus) {
-    setErr(null)
     startTransition(async () => {
       const r = await updateRechnungStatus(detail.id, s)
       if (!r.ok) {
-        setErr(r.message)
+        toast.error(r.message)
         return
       }
       if (s === 'bezahlt') {
@@ -198,18 +310,11 @@ export function RechnungDetailClient({
   }
 
   function handleGutschrift() {
-    if (
-      !window.confirm(
-        'Gutschrift anlegen und Originalrechnung als storniert markieren?'
-      )
-    ) {
-      return
-    }
-    setErr(null)
+    if (!window.confirm('Gutschrift anlegen und Originalrechnung als storniert markieren?')) return
     startTransition(async () => {
       const r = await createGutschriftFromRechnung(detail.id)
       if (!r.ok) {
-        setErr(r.message)
+        toast.error(r.message)
         return
       }
       toast.success('Gutschrift erstellt')
@@ -219,11 +324,10 @@ export function RechnungDetailClient({
   }
 
   function handleSenden() {
-    setErr(null)
     startTransition(async () => {
       const r = await sendRechnung(detail.id)
       if (!r.ok) {
-        setErr(r.message)
+        toast.error(r.message)
         return
       }
       toast.success('Rechnung gesendet')
@@ -247,102 +351,139 @@ export function RechnungDetailClient({
     })
   }
 
-  const aktionenMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'E-Mail schreiben',
-        icon: mockMenuIcon('mail'),
-        hint: detail.kunden?.email?.trim() ? undefined : 'Keine E-Mail-Adresse',
-        onClick: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
-      },
-      {
-        label: 'PDF öffnen',
-        icon: mockMenuIcon('download'),
-        onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
-      },
-    ]
+  const menuStatusKey = ueberfaellig
+    ? 'ueberfaellig'
+    : detail.status === 'gesendet'
+      ? 'gesendet'
+      : detail.status
 
-    if (rechnungDarfImWizardBearbeitetWerden(detail.status)) {
-      items.push({
-        label: 'Im Wizard bearbeiten',
-        icon: mockMenuIcon('pencil'),
-        onClick: openWizard,
-      })
-    }
-
-    if (detail.status === 'entwurf') {
-      items.push({
-        label: 'Als gesendet markieren',
-        icon: mockMenuIcon('send'),
-        onClick: () => void setStatus('gesendet'),
-      })
-    }
-
-    if (detail.status === 'gesendet') {
-      items.push(
-        {
-          label: 'Als bezahlt markieren',
-          icon: mockMenuIcon('receipt'),
-          onClick: () => void setStatus('bezahlt'),
-        },
-        {
-          label: 'Zahlungserinnerung senden',
-          icon: mockMenuIcon('alert-triangle'),
-          onClick: () => setErinnerungModalOpen(true),
-        }
-      )
-    }
-
-    if (
-      belegTyp === 'rechnung' &&
-      detail.status !== 'storniert' &&
-      detail.status !== 'bezahlt'
-    ) {
-      items.push('sep', {
+  const detailHeadMenuItems = useMemo(() => {
+    const extras = []
+    if (belegTyp === 'rechnung' && detail.status !== 'storniert' && detail.status !== 'bezahlt') {
+      extras.push({
+        icon: 'file-off',
         label: 'Gutschrift erstellen',
-        icon: mockMenuIcon('file-off'),
         onClick: handleGutschrift,
       })
-      items.push({
-        label: 'Nur stornieren',
-        icon: mockMenuIcon('alert-triangle'),
-        danger: true,
-        onClick: () => void setStatus('storniert'),
+    }
+    if (detail.status === 'gesendet' && belegTyp === 'rechnung') {
+      extras.push({
+        icon: 'alert-triangle',
+        label: 'Zahlungserinnerung senden',
+        onClick: () => setErinnerungModalOpen(true),
       })
     }
 
-    if (detail.kunden?.id || detail.kunde_id) {
-      items.push('sep', {
-        label: 'Zum Kunden',
-        icon: mockMenuIcon('user'),
-        onClick: () =>
-          router.push(`/kunden/${detail.kunden?.id ?? detail.kunde_id}`),
-      })
-    }
-
-    if (detail.auftrag_id) {
-      items.push({
-        label: 'Zum Auftrag',
-        icon: mockMenuIcon('briefcase'),
-        onClick: () => router.push(`/auftraege/${detail.auftrag_id}`),
-      })
-    }
-
-    return items
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'rechnung',
+        {
+          name: kundeName,
+          status: detail.status,
+          statusKey: menuStatusKey,
+          customer: {
+            name: kundeName,
+            tel: kundeTelefon || undefined,
+            mail: kundeEmail || undefined,
+          },
+        },
+        {
+          onCopy: () => runDuplicateRechnung(detail.id, router),
+          onPortal: () => {
+            if (!isCrmAdmin || !kundeId) {
+              toast.error('Admin Login nur für CRM-Admins mit Kundenkonto')
+              return
+            }
+            if (impersonating) return
+            setImpersonating(true)
+            void openPortalAsKunde(kundeId).then((r) => {
+              setImpersonating(false)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              window.open(r.url, '_blank', 'noopener,noreferrer')
+            })
+          },
+          onPortalLink: () => {
+            toast.message('Kundenportal-Link', {
+              description: 'Versand über Kundenakte oder Auftrag.',
+            })
+          },
+          onEdit2: rechnungDarfImWizardBearbeitetWerden(detail.status) ? openWizard : undefined,
+          onMarkPaid:
+            detail.status === 'gesendet' || ueberfaellig
+              ? () => void setStatus('bezahlt')
+              : undefined,
+          onPdf: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+          onSend:
+            detail.status === 'storniert' || detail.status === 'bezahlt'
+              ? undefined
+              : handleSenden,
+          onToAuftrag: detail.auftrag_id
+            ? () => router.push(`/auftraege/${detail.auftrag_id}`)
+            : undefined,
+          tel: kundeTelefon || null,
+          mail: kundeEmail || null,
+          onCall: kundeTelefon
+            ? () => {
+                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
+              }
+            : undefined,
+          onMail: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
+          onDelete:
+            detail.status === 'entwurf'
+              ? () => {
+                  startTransition(async () => {
+                    const r = await deleteRechnungEntwurf(detail.id)
+                    if (!r.ok) {
+                      toast.error(r.message)
+                      return
+                    }
+                    toast.success('Entwurf gelöscht')
+                    router.push('/vorgaenge?tab=rechnung')
+                  })
+                }
+              : detail.status !== 'bezahlt'
+                ? () => void setStatus('storniert')
+                : undefined,
+          deleteMenuLabel: detail.status === 'entwurf' ? 'Löschen' : 'Stornieren',
+          deleteLabel: kundeName,
+          extra: extras,
+        }
+      ),
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail, belegTyp, pdfHref, router])
+  }, [
+    belegTyp,
+    detail.status,
+    detail.id,
+    detail.auftrag_id,
+    kundeName,
+    kundeTelefon,
+    kundeEmail,
+    kundeId,
+    menuStatusKey,
+    pdfHref,
+    ueberfaellig,
+    mailCompose,
+    router,
+    isCrmAdmin,
+    impersonating,
+  ])
 
-  const headSub = [
-    RECHNUNG_BELEG_TYP_LABELS[belegTyp],
-    detail.rechnungsdatum ? formatDatum(detail.rechnungsdatum) : null,
+  const headMeta = [
+    rechnungTitelMeta(detail, belegTyp),
+    formatEurBetrag(berechnung.brutto),
     detail.faellig_am && belegTyp === 'rechnung'
-      ? `Fällig ${formatDatum(detail.faellig_am)}`
+      ? `fällig ${formatDatum(detail.faellig_am)}`
       : null,
   ]
     .filter(Boolean)
-    .join(' · ')
+    .join('  ·  ')
 
-  const primaryAction = useMemo(() => {
+  const primaryAction = (() => {
     if (detail.status === 'entwurf') {
       return (
         <Button type="button" variant="primary" size="sm" loading={pending} onClick={handleSenden}>
@@ -351,23 +492,18 @@ export function RechnungDetailClient({
         </Button>
       )
     }
-    if (detail.status === 'gesendet') {
+    if (detail.status === 'gesendet' || ueberfaellig) {
       return (
         <div className="flex flex-wrap items-center gap-2">
           {ueberfaellig && belegTyp === 'rechnung' ? (
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => setErinnerungModalOpen(true)}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={() => setErinnerungModalOpen(true)}>
               <MockIcon ctx="btn" n="alert-triangle" size={14} />
-              Zahlungserinnerung
+              Erinnerung
             </Button>
           ) : null}
           <Button
             type="button"
-            variant={ueberfaellig ? 'secondary' : 'primary'}
+            variant="primary"
             size="sm"
             loading={pending}
             onClick={() => void setStatus('bezahlt')}
@@ -377,300 +513,178 @@ export function RechnungDetailClient({
         </div>
       )
     }
-    return (
-      <a
-        href={pdfHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn primary sm inline-flex gap-1.5"
-      >
-        <MockIcon ctx="btn" n="download" size={14} />
-        PDF öffnen
-      </a>
-    )
-  }, [detail.status, pending, pdfHref, ueberfaellig, belegTyp])
+    return null
+  })()
 
-  const summenFooter = (
-    <div className="border-t border-bw-border px-4 py-3 text-sm">
-      <div className="flex justify-between py-1">
-        <span className="text-bw-text-muted">Lohn netto</span>
-        <span className="tabular-nums">{formatEurBetrag(berechnung.lohn_netto)}</span>
-      </div>
-      <div className="flex justify-between py-1">
-        <span className="text-bw-text-muted">Material netto</span>
-        <span className="tabular-nums">{formatEurBetrag(berechnung.material_netto)}</span>
-      </div>
-      <div className="flex justify-between py-1">
-        <span className="text-bw-text-muted">Netto</span>
-        <span className="tabular-nums">{formatEurBetrag(berechnung.netto)}</span>
-      </div>
-      {kleinunternehmerFirma ? (
-        <p className="py-1 text-xs text-bw-text-muted">{HINWEIS_KLEINUNTERNEHMER}</p>
-      ) : detail.reverse_charge_13b ? (
-        <p className="py-1 text-xs text-bw-text-muted">{HINWEIS_REVERSE_CHARGE_13B}</p>
-      ) : (
-        berechnung.mwst_aufschluesselung.map((z) => (
-          <div key={z.satz} className="flex justify-between py-1">
-            <span className="text-bw-text-muted">
-              USt {z.satz} % (auf {formatEurBetrag(z.netto)})
-            </span>
-            <span className="tabular-nums">{formatEurBetrag(z.mwst)}</span>
-          </div>
-        ))
-      )}
-      <div className="flex justify-between border-t border-bw-border pt-2 font-semibold text-bw-primary">
-        <span>Brutto</span>
-        <span className="tabular-nums">{formatEurBetrag(berechnung.brutto)}</span>
-      </div>
-      {hinweis35a ? (
-        <p className="mt-2 border-t border-bw-border pt-2 text-xs text-bw-text-muted">
-          {formatHinweis35aRechnung(berechnung.lohn_netto)}
+  const mahnLabel = mahnstufeListenLabel(detail)
+
+  const stammdatenInhalt = <RechnungStammdatenCard detail={detail} lead={lead} />
+
+  const detailsInhalt = (
+    <>
+      <RechnungDetailsTab detail={detail} lead={lead} zahlungszielFallback={zahlungszielFallback} />
+      {ueberfaellig && !zeigtMahnverlauf ? (
+        <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--danger, #c0392b)' }}>
+          Seit {tageUeberfaellig} Tag{tageUeberfaellig === 1 ? '' : 'en'} überfällig
+          {mahnLabel ? ` · ${mahnLabel}` : ''}.
         </p>
       ) : null}
-    </div>
+    </>
   )
 
-  const rechnungsdetailsCard = (
-    <Card collapsible title="Rechnungsdaten">
-      <div className="props">
-        {detail.rechnungsnummer?.trim() ? (
-          <DetailProp label="Rechnungsnr.">{detail.rechnungsnummer.trim()}</DetailProp>
-        ) : null}
-        <DetailProp label="Belegart">{RECHNUNG_BELEG_TYP_LABELS[belegTyp]}</DetailProp>
-        <DetailProp label="Status">{RECHNUNG_STATUS_LABELS[detail.status]}</DetailProp>
-        <DetailProp label="Kunde" link={Boolean(detail.kunden?.id ?? detail.kunde_id)}>
-          {detail.kunden?.id ?? detail.kunde_id ? (
-            <Link
-              href={`/kunden/${detail.kunden?.id ?? detail.kunde_id}`}
-              className="font-medium text-bw-link hover:underline"
-            >
-              {detail.kunden?.name ?? '—'}
-            </Link>
-          ) : (
-            detail.kunden?.name ?? '—'
-          )}
-        </DetailProp>
-        {detail.kunden?.ust_id ? (
-          <DetailProp label="Kunden-USt-ID">{detail.kunden.ust_id}</DetailProp>
-        ) : null}
-        <DetailProp label="Rechnungsdatum">{formatDatum(detail.rechnungsdatum)}</DetailProp>
-        {detail.leistungszeitraum_von && detail.leistungszeitraum_bis ? (
-          <DetailProp label="Leistungszeitraum">
-            {formatDatum(detail.leistungszeitraum_von)} – {formatDatum(detail.leistungszeitraum_bis)}
-          </DetailProp>
-        ) : null}
-        {detail.faellig_am && belegTyp === 'rechnung' ? (
-          <DetailProp label="Fällig">{formatDatum(detail.faellig_am)}</DetailProp>
-        ) : null}
-        {mahnLabel ? <DetailProp label="Mahnstufe">{mahnLabel}</DetailProp> : null}
-        {detail.bezahlt_at ? (
-          <DetailProp label="Bezahlt am">{formatDatum(detail.bezahlt_at)}</DetailProp>
-        ) : null}
-        {detail.gesendet_at ? (
-          <DetailProp label="Gesendet am">{formatDatum(detail.gesendet_at)}</DetailProp>
-        ) : null}
-        {detail.reverse_charge_13b ? <DetailProp label="§ 13b">Reverse Charge</DetailProp> : null}
-        {detail.auftrag_id ? (
-          <DetailProp label="Zum Auftrag">
-            <Link href={`/auftraege/${detail.auftrag_id}`} className="text-bw-link hover:underline">
-              Auftrag öffnen
-            </Link>
-          </DetailProp>
-        ) : null}
-        {detail.angebot_id ? (
-          <DetailProp label="Zum Angebot">
-            <Link href={`/angebote/${detail.angebot_id}`} className="text-bw-link hover:underline">
-              Angebot öffnen
-            </Link>
-          </DetailProp>
-        ) : null}
-      </div>
-    </Card>
+  const mahnverlaufInhalt = (
+    <RechnungMahnverlaufCard
+      rechnung={detail}
+      mahnMails={mahnMails}
+      empty={
+        belegTyp !== 'rechnung' ||
+        (detail.status === 'entwurf' && !rechnungHatMahnverlauf(detail))
+      }
+      onSendErinnerung={
+        detail.status === 'gesendet' || ueberfaellig || zeigtMahnverlauf
+          ? () => setErinnerungModalOpen(true)
+          : undefined
+      }
+      onMailAnsehen={(id) => setEmailPreviewId(id)}
+    />
   )
 
-  const positionenTab = (
-    <div className="overflow-hidden rounded-lg border border-bw-border bg-bw-card shadow-card">
-      {pos.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-bw-text-muted">Keine Positionen.</p>
-      ) : (
-        <ul className="divide-y divide-bw-border">
-          {pos.map((p, i) => (
-            <li key={p.id ?? i} className="px-4 py-3">
-              <p className="text-sm font-medium text-bw-text">
-                {i + 1}. {(p.beschreibung || p.leistung_name || p.leistung || 'Leistung').trim()}
-              </p>
-              <p className="mt-1 text-xs text-bw-text-muted">
-                Lohn {formatEurBetrag(p.lohn_netto * (p.menge || 1))} · Material{' '}
-                {formatEurBetrag(p.material_netto * (p.menge || 1))}
-                {p.gewerk_name ? ` · ${p.gewerk_name}` : ''}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-      {summenFooter}
-    </div>
+  const verlaufInhalt = (
+    <MockVerlaufCard empty={timelineItems.length === 0}>
+      <Timeline items={timelineItems} />
+    </MockVerlaufCard>
   )
-
-  const fixedOverview = (
-    <div className="space-y-3">
-      {rechnungsdetailsCard}
-      {zeigtMahnverlauf ? (
-        <RechnungMahnverlaufCard
-          rechnung={detail}
-          mahnMails={mahnMails}
-          onSendErinnerung={() => setErinnerungModalOpen(true)}
-          onMailAnsehen={(id) => setEmailPreviewId(id)}
-        />
-      ) : null}
-      {ueberfaellig ? (
-        <div
-          className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
-          role="status"
-        >
-          Diese Rechnung ist seit {tageUeberfaellig} Tag
-          {tageUeberfaellig === 1 ? '' : 'en'} überfällig.
-        </div>
-      ) : null}
-    </div>
-  )
-
-  const aktivitaetInhalt = <DetailAccordion mobileOnly sections={[]} />
 
   const dokumenteInhalt = (
-    <div className="space-y-6">
-      <CrmDokumenteTabelle
-        zeilen={
-          [
-            {
-              id: 'rechnung-pdf',
-              datum: detail.rechnungsdatum,
-              name: detail.rechnungsnummer?.trim()
-                ? `Rechnung ${detail.rechnungsnummer.trim()}`
-                : 'Rechnung PDF',
-              href: pdfHref,
-            },
-          ] satisfies CrmDokumentZeile[]
-        }
-        emptyTitle="Noch kein PDF"
-        emptyDescription="PDF wird nach Freigabe der Rechnung erzeugt."
-      />
-      <p className="text-xs text-bw-text-muted">
-        Vor dem PDF werden Pflichtangaben (Adressen, Leistungszeitraum, Steuer-ID) geprüft.
-      </p>
-    </div>
+    <RechnungDokumenteTab
+      detail={detail}
+      leadId={leadId}
+      dokumente={dokumenteRows}
+      onReload={() => refresh()}
+    />
   )
 
-  const desktopDetailTabs = [
-    { id: 'uebersicht', label: 'Stammdaten', iconName: 'layout-dashboard' },
-    { id: 'positionen', label: 'Details', iconName: 'list-numbers', count: pos.length || undefined },
-    { id: 'aktivitaet', label: 'Verlauf', iconName: 'history' },
-    { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
+  const notizenInhalt = leadId ? (
+    <AnfrageNotizenTab leadId={leadId} notizen={notizenRows} onReload={() => refresh()} />
+  ) : (
+    <MockCard title="Notizen · 0" icon="messages">
+      <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+        Noch keine Notizen — diese Rechnung ist keiner Anfrage zugeordnet.
+      </div>
+    </MockCard>
+  )
+
+  const detailShellGroups: DetailShellGroup[] = [
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'details',
+      label: 'Details',
+      icon: 'list-details',
+      count: positionenCount || undefined,
+      render: () => detailsInhalt,
+    },
+    {
+      id: 'mahnverlauf',
+      label: 'Mahnverlauf',
+      icon: 'mail-forward',
+      render: () => mahnverlaufInhalt,
+    },
+    {
+      id: 'verlauf',
+      label: ACTIVITY_SECTIONS.verlauf,
+      icon: 'history',
+      count: timelineItems.length || undefined,
+      render: () => verlaufInhalt,
+    },
+    {
+      id: 'dokumente',
+      label: ACTIVITY_SECTIONS.dokumente,
+      icon: 'files',
+      count: (dokumenteRows.length || 0) + 1 || undefined,
+      render: () => dokumenteInhalt,
+    },
+    {
+      id: 'notizen',
+      label: ACTIVITY_SECTIONS.notizen,
+      icon: 'messages',
+      count: notizenRows.length || undefined,
+      render: () => notizenInhalt,
+    },
   ]
 
-  const mobileDetailTabs = [
-    { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
-    { id: 'leistung', label: 'Details', iconName: 'list-numbers', count: pos.length || undefined },
-    { id: 'aktivitaet', label: 'Verlauf', iconName: 'history' },
-    { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
-  ]
-
-  const desktopTabContent = (
-    <>
-      {tab === 'uebersicht' ? fixedOverview : null}
-      {tab === 'positionen' ? positionenTab : null}
-      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
-      {tab === 'dokumente' ? dokumenteInhalt : null}
-    </>
-  )
-
-  const mobileTabContent = (
-    <>
-      {tab === 'stammdaten' ? fixedOverview : null}
-      {tab === 'leistung' ? positionenTab : null}
-      {tab === 'aktivitaet' ? aktivitaetInhalt : null}
-      {tab === 'dokumente' ? dokumenteInhalt : null}
-    </>
-  )
+  const crumbTitle = rechnungTitelMeta(detail, belegTyp)
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        backHref="/vorgaenge?tab=rechnung"
-        backLabel="Zurück zu den Vorgängen"
-        title={
-          <div className="detail-head-title-row">
-            <span>{titel}</span>
+    <EntityDetailLayout
+      phase="rechnung"
+      breadcrumbTitle={crumbTitle}
+      crumbBackHref="/vorgaenge?tab=rechnung"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbSectionLabel="Rechnungen"
+      className="space-y-4 pb-0"
+      head={{
+        title: kundeName,
+        badges: (
+          <span className="inline-flex flex-wrap items-center gap-2">
             {rechnungStatusBadge(detail.status, ueberfaellig)}
-            {mahnLabel ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
-                {mahnLabel}
-              </span>
-            ) : null}
-            {pipelineLead ? <PipelineKontextBadge lead={pipelineLead} /> : null}
-          </div>
-        }
-        sub={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {headSub}
-            {detail.brutto != null ? (
-              <span className="font-semibold tabular-nums text-bw-primary">
-                · {formatPreis(detail.brutto)}
-              </span>
+            {pipelineLead || lead ? (
+              <PipelineKontextBadge
+                lead={{
+                  kanal: pipelineLead?.kanal ?? lead?.kanal,
+                  auftraggeber_kunde_id:
+                    pipelineLead?.auftraggeber_kunde_id ?? lead?.auftraggeber_kunde_id,
+                  anlass: pipelineLead?.anlass ?? lead?.anlass,
+                }}
+              />
             ) : null}
           </span>
-        }
-        actions={
-          <>
+        ),
+        meta: headMeta,
+        actions: (
+          <div className="flex w-full flex-wrap items-center gap-2">
             {primaryAction}
             <ActionsMenu
+              align="right"
+              sheetTitle="Aktionen"
               trigger={
-                <button
-                  type="button"
-                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
-                  aria-label="Weitere Aktionen"
-                >
+                <button type="button" className="btn ghost sm icon" aria-label="Aktionen">
                   <MockIcon ctx="btn" n="dots" size={16} />
-                  <span className="sr-only">Mehr</span>
                 </button>
               }
-              items={aktionenMenuItems}
-              sheetTitle="Rechnung"
+              items={detailHeadMenuItems}
             />
-          </>
-        }
+          </div>
+        ),
+      }}
+    >
+      <DetailShell
+        groups={detailShellGroups}
+        value={mainTab}
+        onChange={(id) => setMainTab(id as RechnungDetailTab)}
       />
 
-      {err ? (
-        <p className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
-          {err}
-        </p>
-      ) : null}
+      <EmailLogPreviewModal
+        emailLogId={emailPreviewId}
+        open={Boolean(emailPreviewId)}
+        onClose={() => setEmailPreviewId(null)}
+      />
 
-      <DetailResponsiveTabs
-        tab={tab}
-        onTabChange={setTab}
-        desktopOverview={fixedOverview}
-        desktopTabs={
-          <DetailTabBar
-            tabs={desktopDetailTabs}
-            value={tab}
-            onChange={(id) => setTab(id as RechnungDetailTab)}
-          />
-        }
-        mobileTabs={
-          <DetailTabBar
-            tabs={mobileDetailTabs}
-            value={tab}
-            onChange={(id) => setTab(id as RechnungDetailTab)}
-          />
-        }
-        desktopTabContent={desktopTabContent}
-        mobileTabContent={mobileTabContent}
-        mobileDefaultTab="stammdaten"
-        desktopDefaultTab="uebersicht"
-        mobileTabIds={MOBILE_RECHNUNG_TABS}
-        desktopTabIds={DESKTOP_RECHNUNG_TABS}
+      <ZahlungserinnerungMailModal
+        open={erinnerungModalOpen}
+        onClose={() => setErinnerungModalOpen(false)}
+        rechnungId={detail.id}
+        rechnungsnummer={detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)}
+        erinnerung7SentAt={detail.erinnerung_7_sent_at}
+        erinnerung21SentAt={detail.erinnerung_21_sent_at}
+        onSent={() => {
+          setErinnerungModalOpen(false)
+          refresh()
+        }}
       />
 
       {wizardOpen && wizardBootstrap && firm ? (
@@ -681,7 +695,7 @@ export function RechnungDetailClient({
             gewerke={gewerke}
             preislisten={preislisten}
             firm={firm}
-            zahlungszielTage={zahlungszielTage}
+            zahlungszielTage={zahlungszielFallback}
             onClose={() => {
               setWizardOpen(false)
               setWizardBootstrap(null)
@@ -695,25 +709,7 @@ export function RechnungDetailClient({
         </ClientOnly>
       ) : null}
 
-      <ZahlungserinnerungMailModal
-        open={erinnerungModalOpen}
-        onClose={() => setErinnerungModalOpen(false)}
-        rechnungId={detail.id}
-        rechnungsnummer={detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)}
-        erinnerung7SentAt={detail.erinnerung_7_sent_at}
-        erinnerung21SentAt={detail.erinnerung_21_sent_at}
-        onSent={() => {
-          refresh()
-        }}
-      />
-
-      <EmailLogPreviewModal
-        emailLogId={emailPreviewId}
-        open={Boolean(emailPreviewId)}
-        onClose={() => setEmailPreviewId(null)}
-      />
-
       {mailCompose.modal}
-    </div>
+    </EntityDetailLayout>
   )
 }
