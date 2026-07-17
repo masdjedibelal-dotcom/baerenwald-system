@@ -302,7 +302,7 @@ export function LexofficeDokumentEditor({
       <div className="lex-doc-actions mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="btn btn-secondary btn-sm gap-1.5 border-bw-primary/40 text-bw-primary"
+          className="btn ghost sm gap-1.5 border-bw-primary/40 text-bw-primary"
           onClick={() => onChange([...zeilen, neueArtikelZeile()])}
         >
           <Plus className="h-3.5 w-3.5" />
@@ -310,7 +310,7 @@ export function LexofficeDokumentEditor({
         </button>
         <button
           type="button"
-          className="btn btn-ghost btn-sm gap-1.5"
+          className="btn ghost sm gap-1.5"
           onClick={() => onChange([...zeilen, neueFreitextZeile()])}
         >
           <GripVertical className="h-3.5 w-3.5" />

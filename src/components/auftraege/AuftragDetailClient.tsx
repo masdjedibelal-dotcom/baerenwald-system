@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -11,13 +13,10 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
-import { AuftragFinanzenClient } from '@/components/auftraege/AuftragFinanzenClient'
 import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
-import type { AuftragFinanzenClientPayload } from '@/app/(dashboard)/auftraege/load-auftrag-finanzen-client-props'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -162,7 +161,6 @@ export function AuftragDetailClient({
   rechnungenListe = [],
   vertraegeListe = [],
   firm,
-  finanzenPayload,
   complianceTypen = [],
   partnerDokumente = [],
   rahmenVertraegeByHandwerker = {},
@@ -178,7 +176,6 @@ export function AuftragDetailClient({
   rechnungenListe?: RechnungAuswahlZeile[]
   vertraegeListe?: HandwerkerVertragRow[]
   firm?: FirmenEinstellungen
-  finanzenPayload: AuftragFinanzenClientPayload | null
   complianceTypen?: import('@/lib/types').ComplianceDokumentTyp[]
   partnerDokumente?: import('@/lib/types').PartnerDokument[]
   rahmenVertraegeByHandwerker?: Record<string, HandwerkerVertragRow>
@@ -699,7 +696,7 @@ export function AuftragDetailClient({
             <button
               type="button"
               onClick={() => setStammdatenModalOpen(true)}
-              className="btn btn-ghost btn-sm"
+              className="btn ghost sm"
               aria-label="Stammdaten bearbeiten"
             >
               <MockIcon ctx="btn" n="pencil" size={15} />
@@ -801,25 +798,14 @@ export function AuftragDetailClient({
   }, [detail.auftrag_positionen, detail.angebote])
 
   const finanzenInhalt = (
-    <>
-      <AuftragZahlungsplanSection
-        auftragId={detail.id}
-        zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
-        gesamtNetto={auftragNettoSumme}
-        rechnungen={rechnungenListe}
-      />
-      {finanzenPayload ? (
-        <AuftragFinanzenClient
-          embedded
-          auftragId={detail.id}
-          projektTitel={detail.titel}
-          kundeName={detail.kunden?.name ?? null}
-          {...finanzenPayload}
-        />
-      ) : (
-        <p className="text-sm text-bw-text-muted">Finanzdaten konnten nicht geladen werden.</p>
-      )}
-    </>
+    <AuftragZahlungsplanSection
+      auftragId={detail.id}
+      zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
+      gesamtNetto={auftragNettoSumme}
+      rechnungen={rechnungenListe}
+      onCreateInvoice={openRechnungErstellen}
+      onRefresh={() => refresh()}
+    />
   )
 
   const notizenInhalt = detail.notizen?.trim() ? (
@@ -906,7 +892,7 @@ export function AuftragDetailClient({
         title={projektName}
         badges={
           <span className="inline-flex flex-wrap items-center gap-2">
-            <StatusBadge variant={auftragStatus.variant} label={auftragStatus.label} />
+            <MockBadge kind={variantToMockBadgeKind(auftragStatus.variant)}>{auftragStatus.label}</MockBadge>
             {lead ? (
               <PipelineKontextBadge
                 lead={{
@@ -924,7 +910,7 @@ export function AuftragDetailClient({
             {istAbgeschlossen ? (
               <button
                 type="button"
-                className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
+                className="btn primary sm inline-flex flex-1 gap-1.5 sm:flex-none"
                 onClick={() => openRechnungErstellen()}
               >
                 <MockIcon ctx="btn" n="file-invoice" size={15} />
@@ -933,7 +919,7 @@ export function AuftragDetailClient({
             ) : (
               <button
                 type="button"
-                className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
+                className="btn primary sm inline-flex flex-1 gap-1.5 sm:flex-none"
                 onClick={openAbschluss}
               >
                 <MockIcon ctx="btn" n="checks" size={15} />
@@ -944,7 +930,7 @@ export function AuftragDetailClient({
               trigger={
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
+                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn ghost max-md:px-2"
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >

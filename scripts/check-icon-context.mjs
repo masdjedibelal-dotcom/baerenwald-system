@@ -141,11 +141,12 @@ function checkMockIconRoot() {
       }
     }
   }
-  const css = fs.readFileSync(path.join(srcDir, 'app/globals.css'), 'utf8')
+  // Komponenten-CSS liegt nur in mock-design-system.css (siehe docs/DESIGN-CSS.md)
+  const css = fs.readFileSync(path.join(srcDir, 'styles/mock-design-system.css'), 'utf8')
   const iconBlock = css.includes('.mock-icon svg') && css.includes('fill: none')
   if (!iconBlock) {
     violations.push({
-      rel: 'src/app/globals.css',
+      rel: 'src/styles/mock-design-system.css',
       line: 1,
       snippet: '.mock-icon svg braucht fill: none als Absicherung',
     })

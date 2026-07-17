@@ -196,7 +196,7 @@ export function BaustelleWochenberichteCard({
                         href={`/api/auftraege/${auftragId}/wochenbericht/${w.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-secondary btn-sm inline-flex gap-1"
+                        className="btn ghost sm inline-flex gap-1"
                       >
                         Vorschau
                       </a>
@@ -205,7 +205,7 @@ export function BaustelleWochenberichteCard({
                           href={w.pdf_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-ghost btn-sm"
+                          className="btn ghost sm"
                         >
                           Gespeichertes PDF
                         </a>

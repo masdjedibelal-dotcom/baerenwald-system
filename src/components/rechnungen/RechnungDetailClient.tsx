@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
@@ -19,7 +21,6 @@ import {
 } from '@/components/dokumente/CrmDokumenteTabelle'
 import { Button } from '@/components/ui/Button'
 import { ClientOnly } from '@/components/ui/ClientOnly'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
   createGutschriftFromRechnung,
@@ -92,11 +93,11 @@ function tageSeitFaelligkeit(faelligAm: string | null): number {
 }
 
 function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
-  if (ueberfaellig) return <StatusBadge status="cancel" label="Überfällig" />
-  if (status === 'bezahlt') return <StatusBadge status="order" label="Bezahlt" />
-  if (status === 'gesendet') return <StatusBadge status="offer" label="Gesendet" />
-  if (status === 'storniert') return <StatusBadge status="cancel" label="Storniert" />
-  return <StatusBadge status="done" label="Entwurf" />
+  if (ueberfaellig) return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Überfällig</MockBadge>
+  if (status === 'bezahlt') return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Bezahlt</MockBadge>
+  if (status === 'gesendet') return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>Gesendet</MockBadge>
+  if (status === 'storniert') return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Storniert</MockBadge>
+  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Entwurf</MockBadge>
 }
 
 type RechnungDetailTab = 'stammdaten' | 'leistung' | 'uebersicht' | 'positionen' | 'aktivitaet' | 'dokumente'
@@ -381,7 +382,7 @@ export function RechnungDetailClient({
         href={pdfHref}
         target="_blank"
         rel="noopener noreferrer"
-        className="btn btn-primary btn-sm inline-flex gap-1.5"
+        className="btn primary sm inline-flex gap-1.5"
       >
         <MockIcon ctx="btn" n="download" size={14} />
         PDF öffnen
@@ -626,7 +627,7 @@ export function RechnungDetailClient({
               trigger={
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
                   aria-label="Weitere Aktionen"
                 >
                   <MockIcon ctx="btn" n="dots" size={16} />

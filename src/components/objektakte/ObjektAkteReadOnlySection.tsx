@@ -1,8 +1,9 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { ExternalLink, FileText, StickyNote } from 'lucide-react'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
   FREMD_VORGANG_KATEGORIE_LABELS,
   OBJEKT_DOKUMENT_KATEGORIE_LABELS,
@@ -59,9 +60,11 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
                           {n.bezug_typ === 'vorgang' ? 'Vorgang' : 'Objekt'}
                         </span>
                         {n.wiedervorlage_am && !n.erledigt_am ? (
-                          <StatusBadge status="offer" label={`Wiedervorlage ${formatDatum(n.wiedervorlage_am)}`} />
+                          <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>
+                            {`Wiedervorlage ${formatDatum(n.wiedervorlage_am)}`}
+                          </MockBadge>
                         ) : null}
-                        {n.erledigt_am ? <StatusBadge status="done" label="Erledigt" /> : null}
+                        {n.erledigt_am ? <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Erledigt</MockBadge> : null}
                       </div>
                       <p className="mt-1 whitespace-pre-wrap text-[13px] text-bw-text">{n.text}</p>
                       <p className="mt-1 text-[11px] text-bw-text-muted">{formatDatum(n.created_at)}</p>
@@ -113,7 +116,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
                     <li key={f.id} className="px-3 py-2.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[13px] font-medium text-bw-text">{f.titel}</span>
-                        <StatusBadge status="order" label="extern" />
+                        <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>extern</MockBadge>
                       </div>
                       <p className="mt-0.5 text-[12px] text-bw-text-muted">
                         {formatDatum(f.datum)}

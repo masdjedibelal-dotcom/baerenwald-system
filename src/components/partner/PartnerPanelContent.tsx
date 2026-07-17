@@ -123,7 +123,7 @@ export function PartnerPanelContent({
       </dl>
 
       <div className="border-t border-bw-border pt-4">
-        <button type="button" onClick={onBearbeiten} className="btn btn-secondary btn-sm w-full">
+        <button type="button" onClick={onBearbeiten} className="btn ghost sm w-full">
           Bearbeiten…
         </button>
       </div>

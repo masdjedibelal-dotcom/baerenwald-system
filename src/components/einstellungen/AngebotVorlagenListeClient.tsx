@@ -47,7 +47,7 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
     <Card
       title="Angebot-Vorlagen"
       action={
-        <Link href="/einstellungen/vorlagen/neu" className="btn btn-primary btn-sm">
+        <Link href="/einstellungen/vorlagen/neu" className="btn primary sm">
           + Neue Vorlage
         </Link>
       }
@@ -64,7 +64,7 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
             <div className="flex flex-wrap gap-1">
               <Link
                 href={`/einstellungen/vorlagen/${v.id}`}
-                className="btn btn-secondary btn-sm inline-flex items-center gap-1"
+                className="btn ghost sm inline-flex items-center gap-1"
               >
                 <Pencil className="h-4 w-4" aria-hidden />
                 Bearbeiten
@@ -75,7 +75,7 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
               </Button>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm text-status-cancel-text"
+                className="btn ghost sm text-status-cancel-text"
                 aria-label="Löschen"
                 onClick={() => void loeschen(v.id, v.name)}
               >

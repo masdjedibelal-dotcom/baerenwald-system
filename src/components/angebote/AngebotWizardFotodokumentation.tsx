@@ -172,7 +172,7 @@ function WizardFotoRow({
           {onVisualisieren ? (
             <button
               type="button"
-              className="btn btn-secondary btn-sm gap-1 px-2 py-1 text-xs"
+              className="btn ghost sm gap-1 px-2 py-1 text-xs"
               title="KI-Visualisierung für dieses Foto"
               disabled={disabled || visualisierenLoading}
               onClick={onVisualisieren}
@@ -183,7 +183,7 @@ function WizardFotoRow({
           ) : null}
           <button
             type="button"
-            className="btn btn-ghost btn-sm p-1.5"
+            className="btn ghost sm p-1.5"
             title="Bild entfernen"
             disabled={disabled}
             onClick={onRemove}

@@ -5,14 +5,15 @@ import { Mail, Phone } from 'lucide-react'
 import { IconText } from '@/components/ui/IconText'
 import { LinkChevron } from '@/components/ui/LinkChevron'
 import { SidePanel } from '@/components/ui/SidePanel'
-import { formatRelativeDate, cn } from '@/lib/utils'
+import { formatRelativeDate } from '@/lib/utils'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { kundeNeueAnfrageHref } from '@/lib/kunden/kunde-pipeline-nav'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 
-function typBadgeClass(typ: string) {
-  if (typ === 'gewerbe') return 'badge badge-order badge-no-dot'
-  if (typ === 'hausverwaltung') return 'badge badge-offer badge-no-dot'
-  return 'badge badge-new badge-no-dot'
+function typBadgeKind(typ: string) {
+  if (typ === 'gewerbe') return 'aktiv'
+  if (typ === 'hausverwaltung') return 'warten'
+  return 'neu'
 }
 
 function typBadgeLabel(typ: string) {
@@ -45,7 +46,7 @@ export function KundeSidePanel({
       title={summary.name}
       subtitle={summary.kundennummer ?? undefined}
       width="md"
-      badge={<span className={cn(typBadgeClass(summary.typ))}>{typBadgeLabel(summary.typ)}</span>}
+      badge={<MockBadge kind={typBadgeKind(summary.typ)}>{typBadgeLabel(summary.typ)}</MockBadge>}
       actions={null}
     >
       <div className="p-5 space-y-4">
@@ -86,19 +87,19 @@ export function KundeSidePanel({
         <p className="text-xs text-bw-text-muted">Letzte Aktivität: {formatRelativeDate(aktiv)}</p>
 
         <div className="space-y-2 border-t border-bw-border pt-2">
-          <Link href={kundeNeueAnfrageHref(summary.id)} className="btn btn-primary btn-sm inline-flex w-full justify-center">
+          <Link href={kundeNeueAnfrageHref(summary.id)} className="btn primary sm inline-flex w-full justify-center">
             + Neue Anfrage
           </Link>
           <Link
             href={`/anfragen?neu=1&kunde_id=${summary.id}&ziel=angebot`}
-            className="btn btn-secondary btn-sm inline-flex w-full justify-center"
+            className="btn ghost sm inline-flex w-full justify-center"
           >
             + Neues Angebot
           </Link>
-          <Link href={`/kunden/${kundeId}`} className="btn btn-secondary btn-sm inline-flex w-full justify-center">
+          <Link href={`/kunden/${kundeId}`} className="btn ghost sm inline-flex w-full justify-center">
             <LinkChevron>Zur Kundenakte</LinkChevron>
           </Link>
-          <button type="button" className="btn btn-secondary btn-sm w-full" onClick={onBearbeiten}>
+          <button type="button" className="btn ghost sm w-full" onClick={onBearbeiten}>
             Bearbeiten
           </button>
         </div>

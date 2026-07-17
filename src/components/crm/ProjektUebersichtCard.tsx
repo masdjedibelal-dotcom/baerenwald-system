@@ -1,9 +1,10 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ANGEBOT_STATUS_LABELS, formatDatum, formatPreis } from '@/lib/utils'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
@@ -92,10 +93,7 @@ export function ProjektUebersichtCard({ kontext }: Props) {
                     {r.rechnungsnummer}
                   </Link>
                   <span className="flex items-center gap-2">
-                    <StatusBadge
-                      status="done"
-                      label={RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status}
-                    />
+                    <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>{RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status}</MockBadge>
                     <span className="text-bw-text-muted">{formatDatum(r.rechnungsdatum)}</span>
                     {r.brutto != null && (
                       <span className="tabular-nums">{formatPreis(r.brutto, null, null)}</span>

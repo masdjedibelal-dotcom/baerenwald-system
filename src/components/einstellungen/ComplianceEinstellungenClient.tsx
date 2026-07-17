@@ -68,7 +68,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
       <Card
         title="Compliance-Dokumenttypen"
         action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={() => setModal(true)}>
+          <Button type="button" variant="primary" className="sm" onClick={() => setModal(true)}>
             + Neuer Typ
           </Button>
         }

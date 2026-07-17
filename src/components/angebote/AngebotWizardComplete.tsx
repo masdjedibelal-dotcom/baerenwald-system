@@ -37,7 +37,7 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
         {versendet ? (
           <Link
             href={`/angebote/${angebotId}`}
-            className="btn btn-primary btn-sm inline-flex gap-1.5"
+            className="btn primary sm inline-flex gap-1.5"
             onClick={onClose}
           >
             Zum Angebot
@@ -46,7 +46,7 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
         ) : (
           <Link
             href={`/angebote/${angebotId}#angebot-versand-handwerker`}
-            className="btn btn-primary btn-sm inline-flex gap-1.5"
+            className="btn primary sm inline-flex gap-1.5"
             onClick={onClose}
           >
             <Send className="h-4 w-4" aria-hidden />
@@ -56,7 +56,7 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
         {!versendet ? (
           <Link
             href={`/angebote/${angebotId}`}
-            className="btn btn-secondary btn-sm inline-flex gap-1.5"
+            className="btn ghost sm inline-flex gap-1.5"
             onClick={onClose}
           >
             Zum Angebot

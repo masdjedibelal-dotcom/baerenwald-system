@@ -129,7 +129,7 @@ export function AuftragDetailKopf({
                 href={projektUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-secondary btn-sm inline-flex w-full justify-center gap-1.5"
+                className="btn ghost sm inline-flex w-full justify-center gap-1.5"
               >
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 Kunden-Link öffnen

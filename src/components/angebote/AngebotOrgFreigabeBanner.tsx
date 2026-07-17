@@ -1,8 +1,9 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { ShieldAlert } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import type { OrgFreigabeLogRow, OrgFreigabeStatus } from '@/lib/types'
 import { formatDatumZeit } from '@/lib/utils'
@@ -35,7 +36,7 @@ export function AngebotOrgFreigabeBanner({
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={badgeStatus} label={ORG_FREIGABE_LABELS[status]} />
+        <MockBadge kind={hubSpotStatusToMockBadgeKind(badgeStatus)}>{ORG_FREIGABE_LABELS[status]}</MockBadge>
         {status === 'ausstehend' ? (
           <span className="text-[12px] text-bw-text-muted">
             Partner- und Handwerker-Anfragen sind bis zur Freigabe blockiert.

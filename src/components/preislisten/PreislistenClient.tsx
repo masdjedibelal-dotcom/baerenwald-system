@@ -429,7 +429,7 @@ export function PreislistenClient({
             <div className="text-sm font-medium text-bw-text">Gewerke verwalten</div>
             <div className="mt-0.5 text-xs text-bw-text-muted">Gewerke anlegen, bearbeiten und deaktivieren</div>
           </div>
-          <Link href="/einstellungen/preise" className="btn btn-secondary btn-sm shrink-0">
+          <Link href="/einstellungen/preise" className="btn ghost sm shrink-0">
             Einstellungen
           </Link>
         </div>
@@ -492,10 +492,10 @@ export function PreislistenClient({
         size="md"
         footer={
           <div className="flex gap-2">
-            <button type="button" onClick={closeModal} className="btn btn-secondary">
+            <button type="button" onClick={closeModal} className="btn ghost">
               Abbrechen
             </button>
-            <button type="button" onClick={handleSave} disabled={pending} className="btn btn-primary">
+            <button type="button" onClick={handleSave} disabled={pending} className="btn primary">
               Speichern
             </button>
           </div>

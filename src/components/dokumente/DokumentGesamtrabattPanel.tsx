@@ -51,7 +51,7 @@ export function DokumentGesamtrabattPanel({
         <div className={cn('mt-3 border-t border-bw-border pt-3', className)}>
           <button
             type="button"
-            className="btn btn-ghost btn-sm gap-1.5 text-bw-primary"
+            className="btn ghost sm gap-1.5 text-bw-primary"
             onClick={addRabatt}
           >
             <Percent className="h-3.5 w-3.5" />
@@ -138,7 +138,7 @@ export function DokumentGesamtrabattPanel({
           Rabatt auf Gesamtsumme
         </p>
         {!rabatt ? (
-          <Button type="button" variant="secondary" className="btn-sm gap-1" onClick={addRabatt}>
+          <Button type="button" variant="secondary" className="sm gap-1" onClick={addRabatt}>
             <Plus className="h-3.5 w-3.5" />
             Rabatt hinzufügen
           </Button>

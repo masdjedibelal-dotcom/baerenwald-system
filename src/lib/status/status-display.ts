@@ -6,14 +6,14 @@ import {
 } from '@/lib/angebot-einfach'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
 import { AUFTRAG_STATUS_LABELS, STATUS_LABELS } from '@/lib/utils'
-import type { StatusBadgeVariant } from '@/components/ui/StatusBadge'
+import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
 
 export type StatusDisplay = {
   label: string
-  variant: StatusBadgeVariant
+  variant: StatusDisplayVariant
 }
 
-const ANGEBOT_VARIANT: Record<AngebotStatusEinfach, StatusBadgeVariant> = {
+const ANGEBOT_VARIANT: Record<AngebotStatusEinfach, StatusDisplayVariant> = {
   entwurf: 'neutral',
   gesendet: 'active',
   angenommen: 'success',
@@ -22,7 +22,7 @@ const ANGEBOT_VARIANT: Record<AngebotStatusEinfach, StatusBadgeVariant> = {
   ersetzt: 'neutral',
 }
 
-const ANFRAGE_VARIANT: Record<LeadStatus, StatusBadgeVariant> = {
+const ANFRAGE_VARIANT: Record<LeadStatus, StatusDisplayVariant> = {
   neu: 'active',
   kontaktiert: 'warning',
   termin: 'warning',
@@ -32,7 +32,7 @@ const ANFRAGE_VARIANT: Record<LeadStatus, StatusBadgeVariant> = {
   abgebrochen: 'danger',
 }
 
-const AUFTRAG_VARIANT: Record<AuftragStatus, StatusBadgeVariant> = {
+const AUFTRAG_VARIANT: Record<AuftragStatus, StatusDisplayVariant> = {
   offen: 'neutral',
   in_arbeit: 'active',
   abnahme: 'warning',

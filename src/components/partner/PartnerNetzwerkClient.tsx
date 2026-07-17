@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import {
@@ -12,7 +14,6 @@ import {
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
@@ -66,9 +67,9 @@ function partnerExportRow(p: PartnerRow): Record<string, unknown> {
 
 function partnerAktivBadge(p: PartnerRow) {
   return p.aktiv ? (
-    <StatusBadge status="order" label="Aktiv" />
+    <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
   ) : (
-    <StatusBadge status="cancel" label="Inaktiv" />
+    <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Inaktiv</MockBadge>
   )
 }
 

@@ -67,7 +67,7 @@ function RechnungListenZeile({
       </span>
       <div className="flex shrink-0 items-center">
         {loading ? (
-          <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+          <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             Bitte warten…
           </span>
@@ -75,7 +75,7 @@ function RechnungListenZeile({
           <ActionsMenu
             align="right"
             trigger={
-              <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
+              <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
                 <MoreHorizontal className="h-4 w-4" aria-hidden />
                 Aktionen
               </button>
@@ -190,17 +190,17 @@ export function RechnungAuswahlPanel({
   const footer = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {variant === 'modal' && onClose ? (
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={pending}>
+        <button type="button" className="btn ghost sm" onClick={onClose} disabled={pending}>
           Schließen
         </button>
       ) : (
-        <Link href={`/auftraege/${auftragId}`} className="btn btn-ghost btn-sm">
+        <Link href={`/auftraege/${auftragId}`} className="btn ghost sm">
           Zum Auftrag
         </Link>
       )}
       <button
         type="button"
-        className="btn btn-primary btn-sm inline-flex gap-1.5"
+        className="btn primary sm inline-flex gap-1.5"
         onClick={onNeueRechnung}
         disabled={pending}
       >
@@ -250,7 +250,7 @@ export function RechnungAuswahlPanel({
                 />
                 <div className="flex justify-end px-1">
                   {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+                    <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                       Bitte warten…
                     </span>
@@ -258,7 +258,7 @@ export function RechnungAuswahlPanel({
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
+                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
                           <MoreHorizontal className="h-4 w-4" aria-hidden />
                           Aktionen
                         </button>

@@ -344,7 +344,7 @@ export function ProjektComplianceCheckliste({
                           <>
                             <button
                               type="button"
-                              className="btn-primary py-1 text-xs"
+                              className="btn primary py-1 text-xs"
                               disabled={busy}
                               onClick={() => freigeben(doc.id)}
                             >
@@ -352,7 +352,7 @@ export function ProjektComplianceCheckliste({
                             </button>
                             <button
                               type="button"
-                              className="btn-secondary py-1 text-xs"
+                              className="btn ghost py-1 text-xs"
                               disabled={busy}
                               onClick={() => ablehnen(doc.id, typ.bezeichnung)}
                             >
@@ -406,7 +406,7 @@ export function ProjektComplianceCheckliste({
                     />
                     <button
                       type="button"
-                      className="btn btn-sm btn-secondary inline-flex items-center gap-1"
+                      className="btn ghost sm inline-flex items-center gap-1"
                       disabled={busy}
                       onClick={() => typRefs.current[typ.slug]?.click()}
                     >
@@ -462,7 +462,7 @@ export function ProjektComplianceCheckliste({
             />
             <button
               type="button"
-              className="btn btn-sm btn-secondary"
+              className="btn ghost sm"
               disabled={busy}
               onClick={() => individuellRef.current?.click()}
             >
@@ -536,7 +536,7 @@ export function ProjektComplianceCheckliste({
           />
           <button
             type="button"
-            className="btn btn-sm btn-secondary"
+            className="btn ghost sm"
             disabled={busy || !freierTyp}
             onClick={() => freiRef.current?.click()}
           >

@@ -203,7 +203,7 @@ export function AuftragDokumenteTab({
         action={
           <button
             type="button"
-            className="btn btn-primary btn-sm inline-flex gap-1.5"
+            className="btn primary sm inline-flex gap-1.5"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
           >

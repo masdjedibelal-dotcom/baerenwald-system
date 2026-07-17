@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
@@ -17,7 +19,6 @@ import { FormSheet } from '@/components/ui/FormSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { createClient } from '@/lib/supabase'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
 
@@ -154,7 +155,7 @@ export function PartnerDetailClient({
       collapsible
       title="Stammdaten"
       action={
-        <button type="button" onClick={() => setEditOpen(true)} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
+        <button type="button" onClick={() => setEditOpen(true)} className="btn ghost sm" aria-label="Bearbeiten">
           <MockIcon ctx="btn" n="pencil" size={14} />
         </button>
       }
@@ -164,9 +165,9 @@ export function PartnerDetailClient({
         <DetailProp label="Subkategorie">{partner.subkategorie?.trim() || '—'}</DetailProp>
         <DetailProp label="Status">
           {partner.aktiv ? (
-            <StatusBadge status="order" label="Aktiv" />
+            <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
           ) : (
-            <StatusBadge status="cancel" label="Inaktiv" />
+            <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Inaktiv</MockBadge>
           )}
         </DetailProp>
         <DetailProp label="Webseite">
@@ -212,9 +213,9 @@ export function PartnerDetailClient({
           <div className="detail-head-title-row">
             <span>{partner.name}</span>
             {partner.aktiv ? (
-              <StatusBadge status="order" label="Aktiv" />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
             ) : (
-              <StatusBadge status="cancel" label="Inaktiv" />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Inaktiv</MockBadge>
             )}
             {partner.partner_kategorien?.name ? (
               <span className="pill-tag">{partner.partner_kategorien.name}</span>
@@ -232,7 +233,7 @@ export function PartnerDetailClient({
             trigger={
               <button
                 type="button"
-                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
                 aria-label="Weitere Aktionen"
               >
                 <MockIcon ctx="btn" n="dots" size={16} />

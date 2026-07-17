@@ -1,12 +1,13 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useState, useTransition } from 'react'
 import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { toast } from '@/components/ui/app-toast'
 import {
   EinstellungenListBody,
@@ -90,7 +91,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       <Card
         title="Team"
         action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={() => setInviteOpen(true)}>
+          <Button type="button" variant="primary" className="sm" onClick={() => setInviteOpen(true)}>
             + Einladen
           </Button>
         }
@@ -108,15 +109,11 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                 </EinstellungenListMeta>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge
-                  status={u.aktiv ? 'done' : 'cancel'}
-                  label={u.aktiv ? 'Aktiv' : 'Deaktiviert'}
-                />
+                <MockBadge kind={hubSpotStatusToMockBadgeKind(u.aktiv ? 'done' : 'cancel')}>{u.aktiv ? 'Aktiv' : 'Deaktiviert'}</MockBadge>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="btn-sm"
                   onClick={() => {
                     setEdit(u)
                     setEditName(u.name)

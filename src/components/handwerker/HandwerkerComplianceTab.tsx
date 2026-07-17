@@ -400,7 +400,7 @@ export function HandwerkerComplianceTab({
                       />
                       <button
                         type="button"
-                        className="btn btn-sm btn-secondary inline-flex items-center gap-1.5"
+                        className="btn ghost sm inline-flex items-center gap-1.5"
                         disabled={busy}
                         onClick={() => typRefs.current[typ.slug]?.click()}
                       >

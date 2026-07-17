@@ -136,12 +136,12 @@ export function AuftragAbnahmeprotokollCard({
                       href={p.pdf_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-secondary btn-sm"
+                      className="btn ghost sm"
                     >
                       <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
                       PDF öffnen
                     </a>
-                    <a href={p.pdf_url} download className="btn btn-secondary btn-sm">
+                    <a href={p.pdf_url} download className="btn ghost sm">
                       <Download className="mr-1.5 h-4 w-4" aria-hidden />
                       Download
                     </a>

@@ -361,7 +361,7 @@ export function FormularBearbeitenPanel({
               <button
                 type="button"
                 onClick={() => setAddFeldOpen((o) => !o)}
-                className="btn btn-secondary btn-sm w-full"
+                className="btn ghost sm w-full"
               >
                 + Feld hinzufügen
               </button>
@@ -382,11 +382,11 @@ export function FormularBearbeitenPanel({
               ) : null}
             </div>
 
-            <button type="button" onClick={() => setVorschauOpen(true)} className="btn btn-ghost btn-sm w-full">
+            <button type="button" onClick={() => setVorschauOpen(true)} className="btn ghost sm w-full">
               Vorschau ansehen
             </button>
 
-            <button type="button" onClick={handleSave} disabled={pending} className="btn btn-primary btn-sm w-full">
+            <button type="button" onClick={handleSave} disabled={pending} className="btn primary sm w-full">
               Speichern
             </button>
           </div>
@@ -419,10 +419,10 @@ export function FormularBearbeitenPanel({
               onChange={(v) => setForm((s) => ({ ...s, aktiv: v }))}
             />
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
+              <button type="button" onClick={onClose} className="btn ghost flex-1">
                 Abbrechen
               </button>
-              <button type="button" onClick={handleSave} disabled={pending} className="btn btn-primary flex-1">
+              <button type="button" onClick={handleSave} disabled={pending} className="btn primary flex-1">
                 Speichern
               </button>
             </div>
@@ -461,10 +461,10 @@ export function FormularBearbeitenPanel({
               />
             ) : null}
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setEditFeld(null)} className="btn btn-secondary flex-1">
+              <button type="button" onClick={() => setEditFeld(null)} className="btn ghost flex-1">
                 Abbrechen
               </button>
-              <button type="button" onClick={saveEditFeld} className="btn btn-primary flex-1">
+              <button type="button" onClick={saveEditFeld} className="btn primary flex-1">
                 Übernehmen
               </button>
             </div>

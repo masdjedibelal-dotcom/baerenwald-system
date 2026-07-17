@@ -625,7 +625,7 @@ function PositionAccordionItem({
         )}
       </div>
       <div className="pos-edit-foot">
-        <button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={onRemove}>
+        <button type="button" className="btn ghost sm gap-1.5" onClick={onRemove}>
           <Trash2 className="h-3.5 w-3.5" />
           Entfernen
         </button>
@@ -636,7 +636,7 @@ function PositionAccordionItem({
           </span>
         ) : null}
         {display !== 'editor' ? (
-          <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={onClose}>
+          <button type="button" className="btn primary sm gap-1.5" onClick={onClose}>
             <Check className="h-3.5 w-3.5" />
             Fertig
           </button>
@@ -715,7 +715,7 @@ function PositionAccordionItem({
             <div className="pos-reorder" aria-label="Reihenfolge">
               <button
                 type="button"
-                className="btn btn-ghost btn-sm pos-reorder-btn"
+                className="btn ghost sm pos-reorder-btn"
                 title="Nach oben"
                 aria-label="Position nach oben verschieben"
                 disabled={!canMoveUp}
@@ -728,7 +728,7 @@ function PositionAccordionItem({
               </button>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm pos-reorder-btn"
+                className="btn ghost sm pos-reorder-btn"
                 title="Nach unten"
                 aria-label="Position nach unten verschieben"
                 disabled={!canMoveDown}
@@ -743,7 +743,7 @@ function PositionAccordionItem({
           ) : null}
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn ghost sm"
             title={browseMode ? 'Bearbeiten' : inlineOpen ? 'Schließen' : 'Bearbeiten'}
             onClick={(e) => {
               e.stopPropagation()
@@ -759,7 +759,7 @@ function PositionAccordionItem({
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn ghost sm"
             title="Entfernen"
             onClick={(e) => {
               e.stopPropagation()

@@ -1,17 +1,16 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/lib/utils'
-import { DetailCollapsibleCard } from '@/components/ui/DetailCollapsibleCard'
+import { MockCard } from '@/components/mock-ui/MockCard'
 
 interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
   action?: ReactNode
   children: ReactNode
-  /** Detail-Ansicht: hellgrüner Kopf, Klick auf Kopfzeile klappt ein/aus. Standard: an, wenn `title` gesetzt ist. */
+  /** Nur bei explizit `true`: Klick auf Kopfzeile klappt ein/aus. */
   collapsible?: boolean
   defaultOpen?: boolean
-  /** Zusätzliche Klassen für `card-body` (z. B. `p-0` für volle Breite). */
+  /** Zusätzliche Klassen für `card-b` (z. B. `p-0` für volle Breite). */
   bodyClassName?: string
-  /** Ohne inneres Padding (nur Rahmen), z. B. für Tabellen/List-Shells. */
+  /** Ohne inneres Padding (nur Rahmen), z. B. für Tabellen/List-Shells. */
   flush?: boolean
 }
 
@@ -20,46 +19,24 @@ export function Card({
   action,
   children,
   className = '',
-  collapsible: collapsibleProp,
+  collapsible = false,
   defaultOpen = true,
   bodyClassName,
   flush = false,
   ...props
 }: CardProps) {
-  const collapsible =
-    collapsibleProp ?? (title != null && title !== '')
-
-  if (collapsible && title != null && title !== '') {
-    return (
-      <DetailCollapsibleCard
-        title={title}
-        action={action}
-        defaultOpen={defaultOpen}
-        className={className}
-        flush={flush}
-        bodyClassName={bodyClassName}
-        {...props}
-      >
-        {children}
-      </DetailCollapsibleCard>
-    )
-  }
-
-  if (title != null && title !== '') {
-    return (
-      <div className={cn('card', className)} {...props}>
-        <div className="card-header">
-          <span className="card-title">{title}</span>
-          {action ? <div>{action}</div> : null}
-        </div>
-        <div className={cn('card-body', bodyClassName)}>{children}</div>
-      </div>
-    )
-  }
-
   return (
-    <div className={cn('card', className)} {...props}>
-      {flush ? <>{children}</> : <div className={cn('p-5', bodyClassName)}>{children}</div>}
-    </div>
+    <MockCard
+      title={title}
+      actions={action}
+      collapsible={collapsible}
+      defaultOpen={defaultOpen}
+      bodyClassName={bodyClassName}
+      flush={flush}
+      className={className}
+      {...props}
+    >
+      {children}
+    </MockCard>
   )
 }

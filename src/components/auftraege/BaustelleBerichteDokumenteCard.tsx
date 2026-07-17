@@ -134,7 +134,7 @@ export function BaustelleBerichteDokumenteCard({
                 href={d.datei_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-ghost btn-sm"
+                className="btn ghost sm"
                 aria-label="PDF öffnen"
               >
                 <Download className="h-3.5 w-3.5" />

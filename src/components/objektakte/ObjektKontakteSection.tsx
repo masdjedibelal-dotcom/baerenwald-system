@@ -143,7 +143,7 @@ export function ObjektKontakteSection({
           </>
         }
         actions={
-          <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={openNeu}>
+          <button type="button" className="btn ghost sm gap-1" onClick={openNeu}>
             <Plus className="h-3.5 w-3.5" aria-hidden />
             Hinzufügen
           </button>
@@ -184,7 +184,7 @@ export function ObjektKontakteSection({
                 <div className="flex shrink-0 gap-1">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn ghost sm"
                     aria-label="Bearbeiten"
                     onClick={() => openBearbeiten(k)}
                   >
@@ -192,7 +192,7 @@ export function ObjektKontakteSection({
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-danger"
+                    className="btn ghost sm text-danger"
                     aria-label="Löschen"
                     disabled={pending}
                     onClick={() => entfernen(k)}

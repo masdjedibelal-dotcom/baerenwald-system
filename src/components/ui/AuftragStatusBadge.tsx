@@ -1,13 +1,13 @@
-import { cn } from '@/lib/utils'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { AUFTRAG_STATUS_LABELS } from '@/lib/utils'
 import type { AuftragStatus } from '@/lib/types'
 
-const auftragStatusClass: Record<AuftragStatus, string> = {
-  offen: 'badge badge-new',
-  in_arbeit: 'badge badge-contacted',
-  abnahme: 'badge badge-offer',
-  abgeschlossen: 'badge badge-done',
-  storniert: 'badge badge-cancel',
+const auftragStatusKind: Record<AuftragStatus, string> = {
+  offen: 'neu',
+  in_arbeit: 'aktiv',
+  abnahme: 'warten',
+  abgeschlossen: 'fertig',
+  storniert: 'storniert',
 }
 
 export function AuftragStatusBadge({ status }: { status: AuftragStatus | string }) {
@@ -15,9 +15,7 @@ export function AuftragStatusBadge({ status }: { status: AuftragStatus | string 
     status in AUFTRAG_STATUS_LABELS
       ? AUFTRAG_STATUS_LABELS[status as AuftragStatus]
       : String(status)
-  const cls =
-    status in auftragStatusClass
-      ? auftragStatusClass[status as AuftragStatus]
-      : 'badge badge-plain badge-no-dot'
-  return <span className={cn(cls)}>{label}</span>
+  const kind =
+    status in auftragStatusKind ? auftragStatusKind[status as AuftragStatus] : 'plain'
+  return <MockBadge kind={kind}>{label}</MockBadge>
 }

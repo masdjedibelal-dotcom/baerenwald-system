@@ -1,22 +1,22 @@
-import { cn } from '@/lib/utils'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import {
   ANGEBOT_EINFACH_LABELS,
   type AngebotStatusEinfach,
 } from '@/lib/angebot-einfach'
 
-const cls: Record<AngebotStatusEinfach, string> = {
-  entwurf: 'badge badge-plain badge-no-dot',
-  gesendet: 'badge badge-offer',
-  angenommen: 'badge badge-done',
-  abgelehnt: 'badge badge-cancel',
-  abgelaufen: 'badge badge-contacted',
-  ersetzt: 'badge badge-plain badge-no-dot',
+const kindByStatus: Record<AngebotStatusEinfach, string> = {
+  entwurf: 'plain',
+  gesendet: 'warten',
+  angenommen: 'fertig',
+  abgelehnt: 'storniert',
+  abgelaufen: 'warten',
+  ersetzt: 'plain',
 }
 
 export function AngebotEinfachStatusBadge({ status }: { status: AngebotStatusEinfach }) {
   return (
-    <span className={cn(cls[status] ?? 'badge badge-plain badge-no-dot')}>
+    <MockBadge kind={kindByStatus[status] ?? 'plain'}>
       {ANGEBOT_EINFACH_LABELS[status] ?? status}
-    </span>
+    </MockBadge>
   )
 }

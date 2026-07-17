@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
-import { BrandLogo } from '@/components/brand/BrandLogo'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 
 interface TopBarProps {
@@ -37,6 +36,7 @@ function pathToBreadcrumbs(pathname: string): {
     return {
       title: meta?.cta?.label ?? `${sectionLabel} – Neu`,
       parents: [{ label: sectionLabel, href: sectionHref }],
+      cta: undefined,
     }
   }
 
@@ -69,7 +69,13 @@ function pathToBreadcrumbs(pathname: string): {
   }
 }
 
-export function TopBar({ user, onSearchOpen }: TopBarProps) {
+/**
+ * Eine einzige Kopfzeile (Mock).
+ * Früher: Mobile- + Desktop-`<header className="topbar">` parallel —
+ * unlayered `.topbar { display:flex }` in mock-design-system.css hat Tailwind
+ * `hidden` / `md:hidden` überschrieben → doppelte Suche/Glocke.
+ */
+export function TopBar({ user: _user, onSearchOpen }: TopBarProps) {
   const pathname = usePathname() ?? '/'
   const router = useRouter()
   const { title, parents, cta } = pathToBreadcrumbs(pathname)
@@ -77,115 +83,60 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
   const isListRoot = parents.length === 0
 
   return (
-    <>
-      {/* Mobile */}
-      <header
-        className="topbar z-header md:hidden"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        {parentHref ? (
-          <Link
-            href={parentHref}
-            aria-label="Zurück"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-2)]"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        ) : (
-          <Link href="/" aria-label="Bärenwald CRM" className="flex shrink-0 items-center">
-            <BrandLogo variant="green" height={28} priority />
-          </Link>
-        )}
+    <header className="topbar">
+      {parentHref ? (
+        <Link
+          href={parentHref}
+          aria-label="Zurück"
+          className="topbar-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+      ) : null}
 
-        <div className="topbar-title min-w-0 flex-1 truncate">{title}</div>
-
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-3)]"
-            aria-label="Suchen"
-            onClick={() => onSearchOpen?.()}
-          >
-            <MockIcon ctx="default" n="search" size={18} />
-          </button>
-          {cta ? (
-            <button
-              type="button"
-              onClick={() => router.push(cta.href)}
-              aria-label={cta.label}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--green)] text-white"
-            >
-              <MockIcon ctx="default" n="plus" size={18} />
-            </button>
-          ) : (
-            <Link
-              href="/einstellungen/profil"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--green)] text-xs font-semibold text-white"
-              title={user.email ? `${user.email} — Profil` : 'Profil'}
-              aria-label="Profil öffnen"
-            >
-              {user.email?.[0]?.toUpperCase() ?? 'B'}
+      <div className="topbar-title">
+        {parents.map((p) =>
+          p.href ? (
+            <Link key={p.label} href={p.href} className="topbar-crumb-link">
+              {p.label}
+              <span className="topbar-crumb-sep">›</span>
             </Link>
-          )}
-        </div>
-      </header>
-
-      {/* Desktop */}
-      <header className="topbar hidden md:flex">
-        <div className="topbar-title">
-          {parents.map((p) =>
-            p.href ? (
-              <Link key={p.label} href={p.href} className="font-medium text-[var(--text-3)] hover:text-[var(--text)]">
-                {p.label}
-                <span className="mx-2 text-[var(--text-4)]">›</span>
-              </Link>
-            ) : (
-              <span key={p.label} className="font-medium text-[var(--text-3)]">
-                {p.label}
-                <span className="mx-2 text-[var(--text-4)]">›</span>
-              </span>
-            )
-          )}
-          <span id="breadcrumb-portal" className="contents" />
-          <span className="truncate">{title}</span>
-        </div>
-
-        {isListRoot ? (
-          <button type="button" className="topbar-search-trigger" onClick={() => onSearchOpen?.()}>
-            <MockIcon ctx="default" n="search" size={16} />
-            <span>Suchen…</span>
-          </button>
-        ) : (
-          <div className="flex-1" />
+          ) : (
+            <span key={p.label} className="topbar-crumb-link">
+              {p.label}
+              <span className="topbar-crumb-sep">›</span>
+            </span>
+          )
         )}
+        <span className="truncate">{title}</span>
+      </div>
 
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            title="Benachrichtigungen"
-            aria-label="Benachrichtigungen"
-          >
-            <MockIcon ctx="default" n="bell" size={16} />
+      {isListRoot ? (
+        <button type="button" className="topbar-search-trigger" onClick={() => onSearchOpen?.()}>
+          <MockIcon ctx="default" n="search" size={16} />
+          <span>Suchen…</span>
+        </button>
+      ) : (
+        <div className="topbar-spacer" />
+      )}
+
+      <div className="topbar-actions">
+        <button
+          type="button"
+          className="topbar-icon-btn"
+          title="Benachrichtigungen"
+          aria-label="Benachrichtigungen"
+        >
+          <MockIcon ctx="default" n="bell" size={16} />
+        </button>
+
+        {cta ? (
+          <button type="button" onClick={() => router.push(cta.href)} className="btn primary sm topbar-cta">
+            <MockIcon ctx="btn" n="plus" size={14} />
+            <span className="topbar-cta-label">{cta.label}</span>
           </button>
-
-          {cta ? (
-            <button type="button" onClick={() => router.push(cta.href)} className="btn btn-primary btn-sm">
-              <MockIcon ctx="default" n="plus" size={14} />
-              {cta.label}
-            </button>
-          ) : null}
-
-          <Link
-            href="/einstellungen/profil"
-            className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--green)] text-xs font-semibold text-white"
-            title={user.email ? `${user.email} — Profil` : 'Profil'}
-            aria-label="Profil öffnen"
-          >
-            {user.email?.[0]?.toUpperCase() ?? 'B'}
-          </Link>
-        </div>
-      </header>
-    </>
+        ) : null}
+      </div>
+    </header>
   )
 }

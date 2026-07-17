@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -21,7 +23,6 @@ import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -354,7 +355,7 @@ export function AnfrageDetailClient({
           <button
             type="button"
             onClick={() => setStammdatenModalOpen(true)}
-            className="btn btn-ghost btn-sm"
+            className="btn ghost sm"
             aria-label="Stammdaten bearbeiten"
           >
             <MockIcon ctx="btn" n="pencil" size={15} />
@@ -732,9 +733,9 @@ export function AnfrageDetailClient({
             {(() => {
               const s = anfrageStatusDisplay(lead.status)
               if (lead.status === 'angebot') {
-                return <StatusBadge status="offer" label={s.label} />
+                return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{s.label}</MockBadge>
               }
-              return <StatusBadge label={s.label} variant={s.variant} />
+              return <MockBadge kind={variantToMockBadgeKind(s.variant)}>{s.label}</MockBadge>
             })()}
             <PipelineKontextBadge
               lead={{
@@ -750,7 +751,7 @@ export function AnfrageDetailClient({
           <div className="flex w-full flex-wrap items-center gap-2">
             <button
               type="button"
-              className="btn btn-primary btn-sm inline-flex flex-1 gap-1.5 sm:flex-none"
+              className="btn primary sm inline-flex flex-1 gap-1.5 sm:flex-none"
               onClick={primaryCtaAction}
             >
               {primaryCtaLabel}
@@ -760,7 +761,7 @@ export function AnfrageDetailClient({
               trigger={
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
+                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn ghost max-md:px-2"
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >

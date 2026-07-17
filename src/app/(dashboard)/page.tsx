@@ -1,19 +1,27 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
-import { StatCard } from '@/components/dashboard/StatCard'
-import { Begruessing } from '@/components/dashboard/Begruessing'
-import { DashboardTodayBar } from '@/components/dashboard/DashboardTodayBar'
-import { DashboardDetailsSection } from '@/components/dashboard/DashboardDetailsSection'
-import { buildDashboardAktivitaet } from '@/lib/dashboard-aktivitaet'
-import { deltaVsPrevious } from '@/lib/dashboard-delta'
-import { dashboardLeadPeriodBoundaries } from '@/lib/dashboard-periods'
-import { loadOrgDashboardKpis } from '@/lib/dashboard-org-kpis'
-import { DASHBOARD_FILTER_LINKS } from '@/lib/dashboard-filters'
+import { MockDashboardClient } from '@/components/dashboard/MockDashboardClient'
+import type { MockDashboardKpi, MockDashboardPhase } from '@/components/dashboard/MockDashboardClient'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import type { AngebotListeEintrag, AngebotPosition, KalenderTermin, LeadWithAngebote } from '@/lib/types'
+import type { AngebotListeEintrag, AngebotPosition, LeadWithAngebote } from '@/lib/types'
 import type { AuftragListeEintrag } from '@/lib/types'
+import type { RechnungListeZeile } from '@/lib/types'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
-import { Inbox } from 'lucide-react'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
+import { formatDatum } from '@/lib/utils'
+import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { angebotKundenName, angebotSubline } from '@/components/dashboard/dashboard-list-utils'
+import {
+  angebotDashboardBadge,
+  auftragDashboardBadge,
+  isAktiverAuftragStatus,
+  isNeueAnfrageStatus,
+  isOffeneRechnungStatus,
+  isOffenesAngebotStatus,
+  leadDashboardBadge,
+  rechnungDashboardBadge,
+} from '@/lib/dashboard-mock-mapping'
+import { RECHNUNGEN_LISTE_SELECT } from '@/lib/rechnungen/rechnungen-liste-data'
 
 export const revalidate = 60
 
@@ -33,19 +41,6 @@ function parseAngebote(rows: unknown[]): AngebotListeEintrag[] {
 }
 
 type SupabaseErr = { message: string } | null
-
-async function safeCount(
-  run: () => PromiseLike<{ count: number | null; error: SupabaseErr }>
-): Promise<number> {
-  try {
-    const { count, error } = await run()
-    if (error) throw error
-    return count ?? 0
-  } catch (e) {
-    console.error(e)
-    return 0
-  }
-}
 
 async function safeRows<T>(
   run: () => PromiseLike<{ data: T[] | null; error: SupabaseErr }>
@@ -73,9 +68,18 @@ async function safeMaybeSingle<T>(
   }
 }
 
+function rechnungTitel(r: RechnungListeZeile): string {
+  const nr = r.rechnungsnummer?.trim()
+  const auftrag = Array.isArray(r.auftraege) ? r.auftraege[0] : r.auftraege
+  const projekt = auftrag?.titel?.trim()
+  if (nr && projekt) return `${nr} — ${projekt}`
+  if (projekt) return projekt
+  if (nr) return nr
+  return 'Rechnung'
+}
+
 export default async function DashboardPage() {
   const supabase = createClient()
-  const leadPeriods = dashboardLeadPeriodBoundaries()
 
   let user: { id: string } | null = null
   try {
@@ -92,77 +96,7 @@ export default async function DashboardPage() {
       )
     : null
 
-  const [
-    neueAnfragenWocheCount,
-    neueAnfragenVorwocheCount,
-    offeneAngeboteCount,
-    aktiveAuftraegeCount,
-    abgeschlossenMonatCount,
-    abgeschlossenVormonatCount,
-    offeneTodos,
-    letzteAnfragen,
-    letzteAngebote,
-    letzteAuftraege,
-    orgKpis,
-  ] = await Promise.all([
-    safeCount(() =>
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', leadPeriods.weekStartIso)
-    ),
-    safeCount(() =>
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', leadPeriods.prevWeekStartIso)
-        .lt('created_at', leadPeriods.weekStartIso)
-    ),
-    safeCount(() =>
-      supabase
-        .from('angebote')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['gesendet_kunde', 'gesendet_handwerker', 'handwerker_akzeptiert'])
-    ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['offen', 'in_arbeit', 'abnahme'])
-    ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'abgeschlossen')
-        .gte('updated_at', leadPeriods.monthStartIso)
-    ),
-    safeCount(() =>
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'abgeschlossen')
-        .gte('updated_at', leadPeriods.prevMonthStartIso)
-        .lt('updated_at', leadPeriods.monthStartIso)
-    ),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
-          .from('kalender_termine')
-          .select(
-            `
-        *,
-        leads(kontakt_name),
-        auftraege(titel, kunden(name))
-      `
-          )
-          .eq('erledigt', false)
-          .in('typ', ['besichtigung', 'beginn', 'abnahme'])
-          .order('datum', { ascending: true })
-          .order('uhrzeit_von', { ascending: true })
-          .limit(128)
-      )
-    ),
+  const [letzteAnfragen, letzteAngebote, letzteAuftraege, letzteRechnungen] = await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
@@ -187,8 +121,8 @@ export default async function DashboardPage() {
           .select(
             `
         *,
-        kunden(id, name, email),
-        leads(id, situation, bereiche),
+        kunden(id, name, email, plz),
+        leads(id, situation, bereiche, plz),
         angebot_handwerker(id, status, handwerker_id, gewerk_id, handwerker(name))
       `
           )
@@ -213,120 +147,134 @@ export default async function DashboardPage() {
           .limit(64)
       )
     ),
-    loadOrgDashboardKpis(supabase, leadPeriods.weekStartIso),
+    safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db
+          .from('rechnungen')
+          .select(RECHNUNGEN_LISTE_SELECT)
+          .order('created_at', { ascending: false })
+          .limit(64)
+      )
+    ),
   ])
 
   const anfragenListe = filterOutLegacyDemoLeads(letzteAnfragen as unknown as LeadWithAngebote[])
   const angeboteListe = parseAngebote(letzteAngebote)
   const auftraegeListe = letzteAuftraege as AuftragListeEintrag[]
-  const offeneTodosListe = (offeneTodos as KalenderTermin[]).filter(
-    (t) => t?.datum != null && String(t.datum).length > 0
-  )
-  const aktivitaet = buildDashboardAktivitaet(anfragenListe, angeboteListe, auftraegeListe)
+  const rechnungenListe = letzteRechnungen as RechnungListeZeile[]
 
-  const heuteIso = new Date().toISOString().slice(0, 10)
-  const offeneAnfragenCount = anfragenListe.filter((l) => l.status === 'neu').length
-  const anfragenUeber48h = anfragenListe.filter((l) => {
-    if (l.status !== 'neu') return false
-    const h = (Date.now() - new Date(l.created_at).getTime()) / 3_600_000
-    return h >= 48
-  }).length
-  const termineHeute = offeneTodosListe.filter((t) => String(t.datum).slice(0, 10) === heuteIso).length
+  const neueAnfragenCount = anfragenListe.filter((l) => isNeueAnfrageStatus(l.status)).length
+  const offeneAngeboteCount = angeboteListe.filter((a) =>
+    isOffenesAngebotStatus(a.status, a.status_einfach)
+  ).length
+  const aktiveAuftraegeCount = auftraegeListe.filter((a) => isAktiverAuftragStatus(a.status)).length
+  const offeneRechnungenCount = rechnungenListe.filter((r) => isOffeneRechnungStatus(r.status)).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
-  const deltaNeueAnfragenWoche = deltaVsPrevious(
-    neueAnfragenWocheCount,
-    neueAnfragenVorwocheCount,
-    'vs. Vorwoche'
-  )
-  const deltaAbgeschlossenMonat = deltaVsPrevious(
-    abgeschlossenMonatCount,
-    abgeschlossenVormonatCount,
-    'vs. Vormonat'
-  )
+  const kpis: MockDashboardKpi[] = [
+    {
+      icon: 'inbox',
+      label: 'Neue Anfragen',
+      value: neueAnfragenCount,
+      href: '/vorgaenge?tab=anfrage',
+    },
+    {
+      icon: 'file-invoice',
+      label: 'Offene Angebote',
+      value: offeneAngeboteCount,
+      href: '/vorgaenge?tab=angebot',
+    },
+    {
+      icon: 'tool',
+      label: 'Aktive Aufträge',
+      value: aktiveAuftraegeCount,
+      href: '/vorgaenge?tab=auftrag',
+    },
+    {
+      icon: 'receipt',
+      label: 'Offene Rechnungen',
+      value: offeneRechnungenCount,
+      href: '/vorgaenge?tab=rechnung',
+    },
+  ]
 
-  return (
-    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 md:px-6">
-      <Begruessing name={vorname} />
+  const phasen: MockDashboardPhase[] = [
+    {
+      key: 'anfragen',
+      title: 'Anfragen',
+      icon: 'inbox',
+      href: '/vorgaenge?tab=anfrage',
+      rows: anfragenListe.slice(0, 4).map((l) => {
+        const badge = leadDashboardBadge(l.status)
+        const name = leadKontaktAnzeigeName(l, 'Ohne Name')
+        const sub = [l.situation?.trim(), l.plz?.trim()].filter(Boolean).join(' · ') || '—'
+        return {
+          id: l.id,
+          title: name,
+          sub,
+          badgeKind: badge.kind,
+          badgeLabel: badge.label,
+          href: `/anfragen/${l.id}`,
+        }
+      }),
+    },
+    {
+      key: 'angebote',
+      title: 'Angebote',
+      icon: 'file-invoice',
+      href: '/vorgaenge?tab=angebot',
+      rows: angeboteListe.slice(0, 4).map((a) => {
+        const badge = angebotDashboardBadge(a.status, a.status_einfach)
+        const kunde = angebotKundenName(a)
+        const projekt = a.leads?.situation?.trim() || angebotSubline(a)
+        const title = projekt.includes(kunde) ? projekt : `${projekt} — ${kunde}`
+        return {
+          id: a.id,
+          title,
+          sub: `AN-${a.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+          badgeKind: badge.kind,
+          badgeLabel: badge.label,
+          href: `/angebote/${a.id}`,
+        }
+      }),
+    },
+    {
+      key: 'auftraege',
+      title: 'Aufträge',
+      icon: 'tool',
+      href: '/vorgaenge?tab=auftrag',
+      rows: auftraegeListe.slice(0, 4).map((o) => {
+        const badge = auftragDashboardBadge(o.status)
+        const ende = o.end_datum ? formatDatum(o.end_datum) : null
+        return {
+          id: o.id,
+          title: o.titel?.trim() || 'Auftrag',
+          sub: ende ? `bis ${ende}` : '—',
+          badgeKind: badge.kind,
+          badgeLabel: badge.label,
+          href: `/auftraege/${o.id}`,
+        }
+      }),
+    },
+    {
+      key: 'rechnungen',
+      title: 'Rechnungen',
+      icon: 'receipt',
+      href: '/vorgaenge?tab=rechnung',
+      rows: rechnungenListe.slice(0, 4).map((r) => {
+        const badge = rechnungDashboardBadge({ status: r.status, faellig_am: r.faellig_am })
+        return {
+          id: r.id,
+          title: rechnungTitel(r),
+          sub: formatEurBetrag(Number(r.brutto) || 0),
+          badgeKind: badge.kind,
+          badgeLabel: badge.label,
+          href: `/rechnungen/${r.id}`,
+        }
+      }),
+    },
+  ]
 
-      <DashboardTodayBar
-        offeneAnfragen={offeneAnfragenCount}
-        anfragenUeber48h={anfragenUeber48h}
-        termineHeute={termineHeute}
-        offeneTodos={offeneTodosListe.length}
-      />
-
-      <section className="space-y-2" aria-label="Kennzahlen">
-        <h2 className="text-sm font-semibold text-bw-text">Kennzahlen</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard
-          zahl={neueAnfragenWocheCount}
-          label="Neue Anfragen diese Woche"
-          icon={Inbox}
-          href={DASHBOARD_FILTER_LINKS.neueAnfragen}
-          farbe="blau"
-          delta={deltaNeueAnfragenWoche}
-          layout="compact"
-        />
-        <StatCard
-          zahl={offeneAngeboteCount}
-          label="Offene Angebote"
-          href={DASHBOARD_FILTER_LINKS.offeneAngebote}
-          farbe="orange"
-          layout="minimal"
-        />
-        <StatCard
-          zahl={aktiveAuftraegeCount}
-          label="Aktive Aufträge"
-          href={DASHBOARD_FILTER_LINKS.aktiveAuftraege}
-          farbe="gruen"
-          layout="minimal"
-        />
-        <StatCard
-          zahl={abgeschlossenMonatCount}
-          label="Abgeschlossene Aufträge diesen Monat"
-          href={DASHBOARD_FILTER_LINKS.abgeschlosseneAuftraege}
-          farbe="lila"
-          delta={deltaAbgeschlossenMonat}
-          layout="compact"
-        />
-        </div>
-      </section>
-
-      <section className="space-y-2" aria-label="Auftraggeber-Portal">
-        <h2 className="text-sm font-semibold text-bw-text">Auftraggeber-Portal</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          <StatCard
-            zahl={orgKpis.meldungenWoche}
-            label="Meldungen diese Woche"
-            href="/anfragen"
-            farbe="blau"
-            layout="minimal"
-          />
-          <StatCard
-            zahl={orgKpis.wartetFreigabe}
-            label="Wartet auf Org-Freigabe"
-            href="/anfragen"
-            farbe="orange"
-            layout="minimal"
-          />
-          <StatCard
-            zahl={orgKpis.orgPortalLeads}
-            label="Org-Portal-Leads (Woche)"
-            href="/anfragen"
-            farbe="gruen"
-            layout="minimal"
-          />
-        </div>
-      </section>
-
-      <DashboardDetailsSection
-        anfragen={anfragenListe}
-        angebote={angeboteListe}
-        auftraege={auftraegeListe}
-        aktivitaet={aktivitaet}
-      />
-    </div>
-  )
+  return <MockDashboardClient vorname={vorname} kpis={kpis} phasen={phasen} />
 }

@@ -80,7 +80,7 @@ export function DashboardHWZeile({ row: h }: { row: HandwerkerZeile }) {
           <p>{h.telefon ?? '—'}</p>
           <Link
             href={`/handwerker/${h.id}`}
-            className="btn btn-primary w-full justify-center"
+            className="btn primary w-full justify-center"
             onClick={() => setOpen(false)}
           >
             Profil öffnen

@@ -559,7 +559,7 @@ export function AngebotWizardPositionenByGewerk({
                       <div className="pos-reorder shrink-0" aria-label="Reihenfolge Gewerk">
                         <button
                           type="button"
-                          className="btn btn-ghost btn-sm pos-reorder-btn"
+                          className="btn ghost sm pos-reorder-btn"
                           title="Gewerk nach oben"
                           aria-label="Gewerk nach oben verschieben"
                           disabled={blockIndex === 0}
@@ -572,7 +572,7 @@ export function AngebotWizardPositionenByGewerk({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-ghost btn-sm pos-reorder-btn"
+                          className="btn ghost sm pos-reorder-btn"
                           title="Gewerk nach unten"
                           aria-label="Gewerk nach unten verschieben"
                           disabled={blockIndex === displayBlocks.length - 1}
@@ -618,7 +618,7 @@ export function AngebotWizardPositionenByGewerk({
                   {canRemoveEmpty ? (
                     <button
                       type="button"
-                      className="btn btn-ghost shrink-0 rounded-none border-l border-bw-border px-3"
+                      className="btn ghost shrink-0 rounded-none border-l border-bw-border px-3"
                       title="Leeren Gewerk-Abschnitt entfernen"
                       onClick={() => removeEmptySection(block)}
                     >
@@ -725,7 +725,7 @@ export function AngebotWizardPositionenByGewerk({
           </select>
           <button
             type="button"
-            className="btn btn-secondary btn-sm gap-1"
+            className="btn ghost sm gap-1"
             disabled={!addGewerkId}
             onClick={handleAddGewerkSection}
           >

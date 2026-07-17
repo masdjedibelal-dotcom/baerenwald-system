@@ -31,7 +31,7 @@ export default async function EinstellungenPreisePage() {
         <p className="mt-1 text-sm text-bw-text-muted">
           Leistungen und Preise je Gewerk pflegen Sie in der dedizierten Preislisten-Ansicht.
         </p>
-        <Link href="/preislisten" className="btn btn-primary btn-sm mt-4 inline-flex">
+        <Link href="/preislisten" className="btn primary sm mt-4 inline-flex">
           Zur Preisliste →
         </Link>
       </Card>

@@ -165,7 +165,7 @@ export function KommunikationCard({
                         <button
                           type="button"
                           onClick={() => setPreviewId(row.id)}
-                          className="btn btn-ghost btn-sm inline-flex gap-1 px-2"
+                          className="btn ghost sm inline-flex gap-1 px-2"
                           aria-label="E-Mail ansehen"
                         >
                           <Eye className="h-3.5 w-3.5" aria-hidden />

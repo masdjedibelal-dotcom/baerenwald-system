@@ -461,7 +461,7 @@ export function FormularTemplateForm({
 
   const pageActionBar = !embedded ? (
     <div className="flex flex-wrap gap-2">
-      <Link href="/formulare" className="btn btn-secondary inline-flex items-center justify-center">
+      <Link href="/formulare" className="btn ghost inline-flex items-center justify-center">
         Abbrechen
       </Link>
       <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>

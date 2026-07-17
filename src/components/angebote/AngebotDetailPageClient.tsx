@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
@@ -39,7 +41,6 @@ import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { KundeModal } from '@/components/kunden/KundeModal'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import {
   angebotSummenBrutto,
@@ -473,7 +474,7 @@ export function AngebotDetailPageClient({
   ])
 
   const detailPrimaryBtnClass =
-    'btn btn-primary btn-sm inline-flex flex-1 justify-center gap-1.5 sm:flex-none md:flex-none'
+    'btn primary sm inline-flex flex-1 justify-center gap-1.5 sm:flex-none md:flex-none'
 
   const primaryAction = (() => {
     const hwRows = detail.angebot_handwerker ?? []
@@ -558,7 +559,7 @@ export function AngebotDetailPageClient({
           <button
             type="button"
             onClick={() => setStammdatenModalOpen(true)}
-            className="btn btn-ghost btn-sm"
+            className="btn ghost sm"
             aria-label="Stammdaten bearbeiten"
           >
             <MockIcon ctx="btn" n="pencil" size={15} />
@@ -814,7 +815,7 @@ export function AngebotDetailPageClient({
         title={kundeName}
         badges={
           <span className="inline-flex flex-wrap items-center gap-2">
-            <StatusBadge variant={angebotStatus.variant} label={angebotStatus.label} />
+            <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
             {lead ? (
               <PipelineKontextBadge
                 lead={{
@@ -834,7 +835,7 @@ export function AngebotDetailPageClient({
               trigger={
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn-ghost max-md:px-2"
+                  className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5 max-md:btn ghost max-md:px-2"
                   aria-label="Weitere Aktionen"
                   title="Aktionen"
                 >

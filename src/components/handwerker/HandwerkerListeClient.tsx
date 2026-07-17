@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -13,7 +15,6 @@ import {
   MockSortHead,
 } from '@/components/mock-ui'
 import type { EntityMenuItem } from '@/lib/entity-menu'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -83,8 +84,8 @@ function isComplianceNichtOk(h: HandwerkerZeile): boolean {
 }
 
 function handwerkerStatusBadge(h: HandwerkerZeile) {
-  if (h.aktiver_einsatz) return <StatusBadge status="order" label="Aktiv" />
-  return <StatusBadge status="done" label="Verfügbar" />
+  if (h.aktiver_einsatz) return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
+  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Verfügbar</MockBadge>
 }
 
 function resolveGewerkChipValue(name: string, gewerkeOptionen: GewerkOption[]): string {

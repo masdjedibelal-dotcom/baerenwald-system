@@ -468,7 +468,7 @@ function ProjektLeistungAccordion({
             <div className="lead-leistung-panel-foot">
               <button
                 type="button"
-                className="btn btn-ghost btn-sm gap-1.5"
+                className="btn ghost sm gap-1.5"
                 disabled={pending}
                 onClick={onRemove}
               >
@@ -478,7 +478,7 @@ function ProjektLeistungAccordion({
               <div className="flex-1" />
               <button
                 type="button"
-                className="btn btn-primary btn-sm gap-1.5"
+                className="btn primary sm gap-1.5"
                 disabled={pending}
                 onClick={onClose}
               >

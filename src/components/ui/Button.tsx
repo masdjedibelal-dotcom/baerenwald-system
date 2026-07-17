@@ -28,25 +28,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref
 ) {
-  const variantClass = {
-    primary: 'btn-primary',
-    secondary: 'btn-secondary',
-    ghost: 'btn-ghost',
-    danger: 'btn-danger',
-  }[variant]
-
-  const sizeClass = {
-    sm: 'btn-sm',
-    md: '',
-    lg: 'btn-lg',
-  }[size]
+  const kindClass =
+    variant === 'primary'
+      ? 'primary'
+      : variant === 'danger'
+        ? 'danger'
+        : variant === 'ghost' || variant === 'secondary'
+          ? 'ghost'
+          : ''
 
   return (
     <button
       ref={ref}
       type={type}
       disabled={disabled || loading}
-      className={cn(variantClass, sizeClass, fullWidth && 'w-full', className)}
+      className={cn('btn', kindClass, size === 'sm' && 'sm', fullWidth && 'w-full', className)}
       {...props}
     >
       {loading ? (

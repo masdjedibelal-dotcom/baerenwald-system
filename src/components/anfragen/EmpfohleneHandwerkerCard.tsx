@@ -55,7 +55,7 @@ export function EmpfohleneHandwerkerCard({ handwerker }: { handwerker: Empfohlen
             )}
             <Link
               href={`/handwerker/${h.id}`}
-              className="btn btn-ghost btn-sm !h-7 !min-h-0 !w-7 !p-0"
+              className="btn ghost sm !h-7 !min-h-0 !w-7 !p-0"
               aria-label={`${h.name} öffnen`}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -63,7 +63,7 @@ export function EmpfohleneHandwerkerCard({ handwerker }: { handwerker: Empfohlen
             {h.telefon ? (
               <a
                 href={`tel:${h.telefon.replace(/\s/g, '')}`}
-                className="btn btn-ghost btn-sm !h-7 !min-h-0 !w-7 !p-0"
+                className="btn ghost sm !h-7 !min-h-0 !w-7 !p-0"
                 aria-label={`${h.name} anrufen`}
               >
                 <Phone className="h-3.5 w-3.5" aria-hidden />

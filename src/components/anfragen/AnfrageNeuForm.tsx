@@ -1077,13 +1077,13 @@ export function AnfrageNeuForm({
             isModal ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined
           }
         >
-          <button type="button" onClick={handleCancel} className="btn btn-secondary btn-sm">
+          <button type="button" onClick={handleCancel} className="btn ghost sm">
             Abbrechen
           </button>
           <button
             type="submit"
             disabled={loading || !isValid}
-            className="btn btn-primary btn-sm inline-flex items-center justify-center gap-2"
+            className="btn primary sm inline-flex items-center justify-center gap-2"
           >
             {loading ? (
               <span

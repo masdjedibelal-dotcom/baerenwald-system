@@ -157,13 +157,13 @@ export function ZahlungsplanEditor({
     <div className="space-y-3">
       {!compact && showVorlagen ? (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(zahlungsplanVorlage50_50())}>
+          <button type="button" className="btn ghost sm" onClick={() => onChange(zahlungsplanVorlage50_50())}>
             50 / 50
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(zahlungsplanVorlage30_70())}>
+          <button type="button" className="btn ghost sm" onClick={() => onChange(zahlungsplanVorlage30_70())}>
             30 / 70
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(zahlungsplanVorlage3x())}>
+          <button type="button" className="btn ghost sm" onClick={() => onChange(zahlungsplanVorlage3x())}>
             3 Abschläge
           </button>
         </div>
@@ -216,7 +216,7 @@ export function ZahlungsplanEditor({
                   {plan.zeilen.length > 1 && z.typ !== 'rest' ? (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm shrink-0 text-bw-danger"
+                      className="btn ghost sm shrink-0 text-bw-danger"
                       onClick={() => removeZeile(z.id)}
                       aria-label="Zeile entfernen"
                     >
@@ -279,7 +279,7 @@ export function ZahlungsplanEditor({
       </ul>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" onClick={addZeile}>
+        <button type="button" className="btn ghost sm inline-flex gap-1.5" onClick={addZeile}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Abschlag hinzufügen
         </button>

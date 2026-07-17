@@ -131,7 +131,7 @@ export function AbnahmeprotokollCreateWizard({
         actions={mobileActions}
       />
       <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Schließen">
+        <button type="button" className="btn ghost sm" onClick={onClose} aria-label="Schließen">
           <X className="h-4 w-4" />
         </button>
         <div className="h-6 w-px bg-bw-border" aria-hidden />

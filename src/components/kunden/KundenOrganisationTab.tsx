@@ -180,7 +180,7 @@ export function KundenOrganisationTab({
                   </a>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn ghost sm"
                     aria-label="Link kopieren"
                     onClick={() => void kopieren(meldeBasisLink, 'Melde-Link')}
                   >
@@ -190,7 +190,7 @@ export function KundenOrganisationTab({
                     href={meldeBasisLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-ghost btn-sm"
+                    className="btn ghost sm"
                     aria-label="Link öffnen"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />

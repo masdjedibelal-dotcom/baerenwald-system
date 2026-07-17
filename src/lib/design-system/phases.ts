@@ -51,7 +51,7 @@ export const UI_PHASES: UiPhase[] = [
     title: 'Fundament — Status & Tokens',
     status: 'done',
     todos: [
-      'StatusBadge + status-display.ts (semantische Varianten)',
+      'MockBadge + status-display.ts (semantische Varianten)',
       'Design Tokens in globals.css (Spacing-Referenz)',
       'Detail-Pattern: ein Badge im Header (Anfrage, Angebot, Auftrag)',
       'Breakpoint 900px dokumentieren',

@@ -142,7 +142,7 @@ export function ObjektBewohnerSection({
         actions={
           <button
             type="button"
-            className="btn btn-ghost btn-sm gap-1"
+            className="btn ghost sm gap-1"
             onClick={openNeu}
             disabled={einheiten.length === 0}
           >
@@ -189,7 +189,7 @@ export function ObjektBewohnerSection({
                 <div className="flex shrink-0 gap-1">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn ghost sm"
                     aria-label="Bearbeiten"
                     onClick={() => openBearbeiten(b)}
                   >
@@ -197,7 +197,7 @@ export function ObjektBewohnerSection({
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-danger"
+                    className="btn ghost sm text-danger"
                     aria-label="Löschen"
                     disabled={pending}
                     onClick={() => entfernen(b)}

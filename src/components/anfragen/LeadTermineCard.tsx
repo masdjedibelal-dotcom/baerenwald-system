@@ -311,7 +311,7 @@ function TerminNotizFormModal({
             type="button"
             disabled={pending || !canAddFotos}
             onClick={() => fileGalleryRef.current?.click()}
-            className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+            className="btn ghost sm inline-flex items-center justify-center gap-1.5"
           >
             <ImagePlus className="h-4 w-4" aria-hidden />
             {mode === 'add' ? 'Fotos' : 'Fotos hinzufügen'}
@@ -320,7 +320,7 @@ function TerminNotizFormModal({
             type="button"
             disabled={pending || !canAddFotos}
             onClick={() => fileCameraRef.current?.click()}
-            className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+            className="btn ghost sm inline-flex items-center justify-center gap-1.5"
           >
             <Camera className="h-4 w-4" aria-hidden />
             Aufnehmen
@@ -466,7 +466,7 @@ function TerminNotizenBlock({
         </p>
         <button
           type="button"
-          className="btn btn-secondary btn-sm inline-flex items-center gap-1"
+          className="btn ghost sm inline-flex items-center gap-1"
           onClick={() => setAddOpen(true)}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />

@@ -162,7 +162,7 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
         action={
           <Link
             href="/formulare/neu"
-            className="btn btn-primary btn-sm inline-flex items-center justify-center md:hidden"
+            className="btn primary sm inline-flex items-center justify-center md:hidden"
           >
             + Neues Template
           </Link>
@@ -181,7 +181,7 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
             }
             action={
               formulare.length === 0 ? (
-                <Link href="/formulare/neu" className="btn btn-primary btn-sm">
+                <Link href="/formulare/neu" className="btn primary sm">
                   + Erstes Template anlegen
                 </Link>
               ) : null

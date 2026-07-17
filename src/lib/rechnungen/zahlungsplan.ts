@@ -18,12 +18,20 @@ export type ZahlungsplanZeile = {
   typ: ZahlungsplanAbschlagTyp
   /** Prozent (0–100) oder Festbetrag netto; bei rest ignoriert */
   wert: number
+  /**
+   * Geplantes Fälligkeitsdatum der Rate (ISO `YYYY-MM-DD`).
+   * Optional — ältere Pläne ohne Feld bleiben gültig; Anzeige dann „—“ bzw. Rechnungs-Fälligkeit.
+   */
+  faellig_am?: string | null
   /** Auftragspositionen, die dieser Abschlagsrechnung zugeordnet sind (Schluss = Rest automatisch) */
   position_ids?: string[]
   pdf_einleitung_vorlage?: string | null
   mail_einleitung_vorlage?: string | null
   mail_betreff_vorlage?: string | null
 }
+
+/** Mock-Zahlplan-Rate: Geplant / Gestellt / Bezahlt */
+export type ZahlplanRateStatus = 'geplant' | 'gestellt' | 'bezahlt'
 
 export type Zahlungsplan = {
   modus: 'standard' | 'abschlagsplan'
@@ -52,6 +60,7 @@ export type RechnungAbschlagLink = {
   zahlungsplan_abschlag_id?: string | null
   status?: string | null
   brutto?: number | null
+  faellig_am?: string | null
 }
 
 export function emptyZahlungsplan(): Zahlungsplan {
@@ -60,15 +69,23 @@ export function emptyZahlungsplan(): Zahlungsplan {
 
 export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): ZahlungsplanZeile {
   return {
-    id: neueZahlungsplanId(),
+    id: partial?.id?.trim() || neueZahlungsplanId(),
     titel: partial?.titel?.trim() || 'Abschlag',
     typ: partial?.typ ?? 'prozent',
     wert: partial?.wert ?? 50,
+    faellig_am: partial?.faellig_am?.trim() || null,
     position_ids: partial?.position_ids?.length ? [...partial.position_ids] : [],
     pdf_einleitung_vorlage: partial?.pdf_einleitung_vorlage ?? null,
     mail_einleitung_vorlage: partial?.mail_einleitung_vorlage ?? null,
     mail_betreff_vorlage: partial?.mail_betreff_vorlage ?? null,
   }
+}
+
+function plusDaysIso(days: number): string {
+  const d = new Date()
+  d.setHours(12, 0, 0, 0)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
@@ -84,6 +101,10 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
         ? z.typ
         : 'prozent') as ZahlungsplanAbschlagTyp,
       wert: Number(z.wert) || 0,
+      faellig_am:
+        typeof z.faellig_am === 'string' && /^\d{4}-\d{2}-\d{2}/.test(z.faellig_am.trim())
+          ? z.faellig_am.trim().slice(0, 10)
+          : null,
       position_ids: Array.isArray(z.position_ids)
         ? z.position_ids.map((id) => String(id)).filter(Boolean)
         : [],
@@ -116,31 +137,74 @@ export function zahlungsplanVorlage50_50(): Zahlungsplan {
   return {
     modus: 'abschlagsplan',
     zeilen: [
-      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 50 }),
-      neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0 }),
+      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 50, faellig_am: plusDaysIso(14) }),
+      neueZahlungsplanZeile({
+        titel: 'Schlussrechnung',
+        typ: 'prozent',
+        wert: 50,
+        faellig_am: plusDaysIso(60),
+      }),
     ],
   }
 }
 
+/** Mock-Label „Anzahlung 30% + Rest“ */
 export function zahlungsplanVorlage30_70(): Zahlungsplan {
   return {
     modus: 'abschlagsplan',
     zeilen: [
-      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 30 }),
-      neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0 }),
+      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 30, faellig_am: plusDaysIso(7) }),
+      neueZahlungsplanZeile({
+        titel: 'Schlussrechnung',
+        typ: 'prozent',
+        wert: 70,
+        faellig_am: plusDaysIso(60),
+      }),
     ],
   }
 }
 
-export function zahlungsplanVorlage3x(): Zahlungsplan {
+/** Mock-Vorlage „30 / 40 / 30“ */
+export function zahlungsplanVorlage30_40_30(): Zahlungsplan {
   return {
     modus: 'abschlagsplan',
     zeilen: [
-      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 30 }),
-      neueZahlungsplanZeile({ titel: 'Zwischenzahlung', typ: 'prozent', wert: 40 }),
-      neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0 }),
+      neueZahlungsplanZeile({ titel: '1. Abschlag', typ: 'prozent', wert: 30, faellig_am: plusDaysIso(14) }),
+      neueZahlungsplanZeile({ titel: '2. Abschlag', typ: 'prozent', wert: 40, faellig_am: plusDaysIso(45) }),
+      neueZahlungsplanZeile({
+        titel: 'Schlussrechnung',
+        typ: 'prozent',
+        wert: 30,
+        faellig_am: plusDaysIso(75),
+      }),
     ],
   }
+}
+
+/** @deprecated Alias — nutze zahlungsplanVorlage30_40_30 */
+export function zahlungsplanVorlage3x(): Zahlungsplan {
+  return zahlungsplanVorlage30_40_30()
+}
+
+export function rechnungFuerAbschlagZeile(
+  zeileId: string,
+  rechnungen: RechnungAbschlagLink[]
+): RechnungAbschlagLink | null {
+  return (
+    rechnungen.find(
+      (r) => r.zahlungsplan_abschlag_id === zeileId && r.status !== 'storniert'
+    ) ?? null
+  )
+}
+
+export function zahlplanRateStatus(
+  zeileId: string,
+  rechnungen: RechnungAbschlagLink[]
+): ZahlplanRateStatus {
+  const r = rechnungFuerAbschlagZeile(zeileId, rechnungen)
+  if (!r) return 'geplant'
+  if (r.status === 'bezahlt') return 'bezahlt'
+  return 'gestellt'
 }
 
 export function auftragSummenAusPositionen(

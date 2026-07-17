@@ -24,7 +24,7 @@ export function WizardMobileToolbar({
     <div className="wizard-mobile-toolbar md:hidden">
       <button
         type="button"
-        className="btn btn-ghost btn-sm wizard-mobile-toolbar__close shrink-0"
+        className="btn ghost sm wizard-mobile-toolbar__close shrink-0"
         onClick={onClose}
         aria-label="Schließen"
       >

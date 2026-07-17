@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { AUFTRAG_PHASEN, auftragPhasenStates, type AuftragPhaseState } from '@/lib/auftrag-phasen'
 import type { AuftragStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -43,7 +44,7 @@ export function AuftragPhasenSteps({
               {p.label}
             </span>
             {state === 'aktuell' ? (
-              <span className="badge badge-contacted text-[10px]">aktiv</span>
+              <MockBadge kind="aktiv">aktiv</MockBadge>
             ) : null}
           </li>
         )

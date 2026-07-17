@@ -43,7 +43,7 @@ export function AuftragRechnungenSection({
           Rechnungen {rechnungen.length > 0 ? `· ${rechnungen.length}` : ''}
         </h2>
         {neuHref ? (
-          <Link href={neuHref} className="btn btn-primary btn-sm inline-flex gap-1.5">
+          <Link href={neuHref} className="btn primary sm inline-flex gap-1.5">
             <Plus className="h-3.5 w-3.5" aria-hidden />
             Rechnung erstellen
           </Link>

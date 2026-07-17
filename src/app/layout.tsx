@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+/* Mock-Listen/Shell-Klassen (.vg-row, .listbar, …) — Tokens liegen in globals.css */
+import '../styles/mock-design-system.css'
 
 export const metadata: Metadata = {
   title: 'Bärenwald CRM',

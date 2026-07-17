@@ -139,7 +139,7 @@ export function LeadFunnelProjektAnzeige({
         <button
           type="button"
           onClick={() => wasBlockRef.current?.addLeistung()}
-          className="btn btn-ghost btn-sm"
+          className="btn ghost sm"
           aria-label="Leistung hinzufügen"
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden />

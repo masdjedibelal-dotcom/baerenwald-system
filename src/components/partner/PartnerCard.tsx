@@ -81,7 +81,7 @@ export function PartnerCard({
         {partner.telefon ? (
           <a
             href={`tel:${partner.telefon.replace(/\s/g, '')}`}
-            className="btn-secondary btn-sm inline-flex w-full justify-center gap-1.5 sm:w-auto sm:flex-1 sm:min-w-[7rem]"
+            className="btn ghost sm inline-flex w-full justify-center gap-1.5 sm:w-auto sm:flex-1 sm:min-w-[7rem]"
             onClick={(e) => e.stopPropagation()}
           >
             <Phone className="h-3.5 w-3.5" aria-hidden />
@@ -91,7 +91,7 @@ export function PartnerCard({
         {partner.email ? (
           <a
             href={`mailto:${partner.email}`}
-            className="btn-secondary btn-sm inline-flex w-full justify-center gap-1.5 sm:w-auto sm:flex-1 sm:min-w-[7rem]"
+            className="btn ghost sm inline-flex w-full justify-center gap-1.5 sm:w-auto sm:flex-1 sm:min-w-[7rem]"
             onClick={(e) => e.stopPropagation()}
           >
             <Mail className="h-3.5 w-3.5" aria-hidden />
@@ -100,7 +100,7 @@ export function PartnerCard({
         ) : null}
         <button
           type="button"
-          className="btn-ghost btn-sm w-full justify-center text-bw-link sm:ml-auto sm:w-auto sm:justify-start"
+          className="btn ghost sm w-full justify-center text-bw-link sm:ml-auto sm:w-auto sm:justify-start"
           onClick={(e) => {
             e.stopPropagation()
             onEdit()

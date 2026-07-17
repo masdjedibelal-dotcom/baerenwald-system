@@ -392,7 +392,7 @@ export function ListFilterBar({
           </button>
         }
         footer={
-          <button type="button" className="btn btn-primary w-full" onClick={() => setSheetOpen(false)}>
+          <button type="button" className="btn primary w-full" onClick={() => setSheetOpen(false)}>
             {resultLabel}
           </button>
         }

@@ -19,10 +19,10 @@ export function PdfViewer({ open, onClose, url, title }: PdfViewerProps) {
       size="lg"
       footer={
         <div className="flex w-full justify-between gap-2">
-          <button type="button" onClick={onClose} className="btn btn-secondary">
+          <button type="button" onClick={onClose} className="btn ghost">
             Schließen
           </button>
-          <a href={url} download className="btn btn-primary inline-flex items-center gap-2">
+          <a href={url} download className="btn primary inline-flex items-center gap-2">
             <Download className="h-4 w-4" aria-hidden />
             Herunterladen
           </a>

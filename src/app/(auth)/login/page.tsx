@@ -206,7 +206,7 @@ function LoginPageContent() {
               type="button"
               onClick={() => void (mode === 'login' ? handleLogin() : handleForgot())}
               disabled={loading || !email.trim() || (mode === 'login' && !password)}
-              className="btn btn-primary btn-lg w-full"
+              className="btn primary w-full"
             >
               {loading
                 ? 'Bitte warten…'

@@ -392,7 +392,7 @@ export function HandwerkerDetailClient({
       <Card
         title="Kontakt"
         action={
-          <button type="button" onClick={() => setModalOpen(true)} className="btn btn-ghost btn-sm">
+          <button type="button" onClick={() => setModalOpen(true)} className="btn ghost sm">
             <MockIcon ctx="btn" n="pencil" size={14} />
             Bearbeiten
           </button>
@@ -529,7 +529,7 @@ export function HandwerkerDetailClient({
                         <AuftragStatusBadge status={a.auftrag_status} />
                       </div>
                     </div>
-                    <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
+                    <Link href={`/auftraege/${a.id}`} className="btn ghost sm shrink-0">
                       Zum Auftrag
                     </Link>
                   </div>
@@ -556,7 +556,7 @@ export function HandwerkerDetailClient({
                         <AuftragStatusBadge status={a.auftrag_status} />
                       </div>
                     </div>
-                    <Link href={`/auftraege/${a.id}`} className="btn btn-secondary btn-sm shrink-0">
+                    <Link href={`/auftraege/${a.id}`} className="btn ghost sm shrink-0">
                       Zum Auftrag
                     </Link>
                   </div>
@@ -620,7 +620,7 @@ export function HandwerkerDetailClient({
             trigger={
               <button
                 type="button"
-                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
                 aria-label="Weitere Aktionen"
               >
                 <MockIcon ctx="btn" n="dots" size={16} />

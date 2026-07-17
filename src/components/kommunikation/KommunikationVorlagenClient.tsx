@@ -105,7 +105,7 @@ export function KommunikationVorlagenClient({
       <Card
         title="Vorlagen"
         action={
-          <Button type="button" variant="primary" className="btn-sm" onClick={openNew}>
+          <Button type="button" variant="primary" size="sm" onClick={openNew}>
             <Plus className="h-3.5 w-3.5" aria-hidden />
             Neu
           </Button>
@@ -128,7 +128,7 @@ export function KommunikationVorlagenClient({
                 <div className="flex gap-1">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn ghost sm"
                     onClick={() => openRow(r)}
                     aria-label="Bearbeiten"
                   >
@@ -136,7 +136,7 @@ export function KommunikationVorlagenClient({
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-red-700"
+                    className="btn ghost sm text-red-700"
                     onClick={() => remove(r.id)}
                     aria-label="Löschen"
                   >

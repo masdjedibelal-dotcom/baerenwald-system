@@ -1,12 +1,13 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
 import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { LeadStatusBadge } from '@/components/ui/Badge'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { buildKundeProjektBaeume, type KundeProjektAst } from '@/lib/crm/build-kunde-projekt-baum'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
@@ -107,10 +108,7 @@ function AstKnoten({
                       {r.nummer}
                     </Link>
                     <span className="flex items-center gap-2">
-                      <StatusBadge
-                        status="done"
-                        label={RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status}
-                      />
+                      <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>{RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status}</MockBadge>
                       <span className="tabular-nums text-bw-text-muted">{r.betrag}</span>
                     </span>
                   </li>

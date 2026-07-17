@@ -178,17 +178,17 @@ export function AngebotAuswahlPanel({
   const footer = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {variant === 'modal' && onClose ? (
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={pending}>
+        <button type="button" className="btn ghost sm" onClick={onClose} disabled={pending}>
           Schließen
         </button>
       ) : (
-        <Link href={`/anfragen/${leadId}`} className="btn btn-ghost btn-sm">
+        <Link href={`/anfragen/${leadId}`} className="btn ghost sm">
           Zur Anfrage
         </Link>
       )}
       <button
         type="button"
-        className="btn btn-secondary btn-sm inline-flex gap-1.5"
+        className="btn ghost sm inline-flex gap-1.5"
         onClick={handleNeuesAngebotClick}
         disabled={pending}
       >
@@ -228,7 +228,7 @@ export function AngebotAuswahlPanel({
           </p>
           <button
             type="button"
-            className="btn btn-primary btn-sm mt-3 inline-flex gap-1.5"
+            className="btn primary sm mt-3 inline-flex gap-1.5"
             disabled={pending}
             onClick={handleEntwurfFortsetzen}
           >
@@ -262,7 +262,7 @@ export function AngebotAuswahlPanel({
                 />
                 <div className="flex justify-end px-1">
                   {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+                    <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                       Bitte warten…
                     </span>
@@ -270,7 +270,7 @@ export function AngebotAuswahlPanel({
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
+                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
                           <MoreHorizontal className="h-4 w-4" aria-hidden />
                           Aktionen
                         </button>
@@ -308,7 +308,7 @@ export function AngebotAuswahlPanel({
                 </span>
                 <div className="flex shrink-0 items-center">
                   {loading ? (
-                    <span className="btn btn-secondary btn-sm inline-flex gap-1.5" aria-busy="true">
+                    <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                       Bitte warten…
                     </span>
@@ -316,7 +316,7 @@ export function AngebotAuswahlPanel({
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button type="button" className="btn btn-secondary btn-sm inline-flex gap-1.5" disabled={pending}>
+                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
                           <MoreHorizontal className="h-4 w-4" aria-hidden />
                           Aktionen
                         </button>

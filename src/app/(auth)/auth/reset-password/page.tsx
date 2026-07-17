@@ -96,7 +96,7 @@ function ResetPasswordContent() {
           ) : !ready ? (
             <div className="space-y-3">
               <p className="text-sm text-bw-text-muted">{error}</p>
-              <a href="/login" className="btn btn-primary btn-lg w-full text-center">
+              <a href="/login" className="btn primary w-full text-center">
                 Zum CRM-Login
               </a>
             </div>
@@ -129,7 +129,7 @@ function ResetPasswordContent() {
               ) : null}
               <button
                 type="button"
-                className="btn btn-primary btn-lg w-full"
+                className="btn primary w-full"
                 disabled={loading}
                 onClick={() => void handleSave()}
               >

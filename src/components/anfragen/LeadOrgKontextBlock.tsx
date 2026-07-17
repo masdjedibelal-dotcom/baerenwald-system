@@ -1,12 +1,13 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Building2, Copy, Download, ImageIcon, Shield, User } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import {
   exportMelderAuskunft,
   loescheMelderDaten,
@@ -126,37 +127,28 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
         <Card title="Auftraggeber-Kontext">
           <div className="flex flex-wrap gap-2">
             {anlass ? (
-              <StatusBadge status="order" label={ANLASS_LABELS[anlass] ?? anlass} />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>{ANLASS_LABELS[anlass] ?? anlass}</MockBadge>
             ) : null}
             {lead.erfassung_von ? (
-              <StatusBadge
-                status="done"
-                label={`Erfasst: ${ERFASSUNG_VON_LABELS[lead.erfassung_von] ?? lead.erfassung_von}`}
-              />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>
+                {`Erfasst: ${ERFASSUNG_VON_LABELS[lead.erfassung_von] ?? lead.erfassung_von}`}
+              </MockBadge>
             ) : null}
             {lead.org_freigabe_status && lead.org_freigabe_status !== 'nicht_noetig' ? (
-              <StatusBadge
-                status={orgFreigabeBadgeStatus(lead.org_freigabe_status)}
-                label={ORG_FREIGABE_LABELS[lead.org_freigabe_status]}
-              />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind(orgFreigabeBadgeStatus(lead.org_freigabe_status))}>{ORG_FREIGABE_LABELS[lead.org_freigabe_status]}</MockBadge>
             ) : null}
             {(lead as { hv_meldung_status?: string }).hv_meldung_status ? (
-              <StatusBadge
-                status="offer"
-                label={`HV-Status: ${HV_MELDUNG_STATUS_LABELS[(lead as { hv_meldung_status: string }).hv_meldung_status] ?? (lead as { hv_meldung_status: string }).hv_meldung_status}`}
-              />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>
+                {`HV-Status: ${HV_MELDUNG_STATUS_LABELS[(lead as { hv_meldung_status: string }).hv_meldung_status] ?? (lead as { hv_meldung_status: string }).hv_meldung_status}`}
+              </MockBadge>
             ) : null}
             {(lead as { kostentraeger?: string }).kostentraeger ? (
-              <StatusBadge
-                status="done"
-                label={`Kostenträger: ${KOSTENTRAEGER_LABELS[(lead as { kostentraeger: string }).kostentraeger] ?? (lead as { kostentraeger: string }).kostentraeger}`}
-              />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>
+                {`Kostenträger: ${KOSTENTRAEGER_LABELS[(lead as { kostentraeger: string }).kostentraeger] ?? (lead as { kostentraeger: string }).kostentraeger}`}
+              </MockBadge>
             ) : null}
             {lead.einladung_status ? (
-              <StatusBadge
-                status={lead.einladung_status === 'offen' ? 'offer' : 'done'}
-                label={EINLADUNG_STATUS_LABELS[lead.einladung_status] ?? lead.einladung_status}
-              />
+              <MockBadge kind={hubSpotStatusToMockBadgeKind(lead.einladung_status === 'offen' ? 'offer' : 'done')}>{EINLADUNG_STATUS_LABELS[lead.einladung_status] ?? lead.einladung_status}</MockBadge>
             ) : null}
           </div>
         </Card>

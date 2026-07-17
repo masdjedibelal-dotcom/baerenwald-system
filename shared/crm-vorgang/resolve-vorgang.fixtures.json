@@ -1,0 +1,179 @@
+{
+  "$schema": "./resolve-vorgang.fixtures.schema.json",
+  "version": "1.0.0",
+  "description": "Kanonische resolveVorgang()-Testfälle (Input → erwarteter Output). In Portal- und CRM-Repo identisch halten — bei Regeländerung in beiden Repos aktualisieren.",
+  "fixtures": [
+    {
+      "id": "1-notfall-anfrage",
+      "input": {
+        "lead": {
+          "id": "L-N1",
+          "status": "neu",
+          "situation": "Rohrbruch",
+          "hv_meldung_status": "notmassnahme",
+          "kanal": "hv_melder_link",
+          "created_at": "2026-07-10T08:00:00Z"
+        }
+      },
+      "expect": {
+        "phase": "anfrage",
+        "unterstatus": "neu",
+        "needsAction": true,
+        "actor": "bw",
+        "notfall": true
+      }
+    },
+    {
+      "id": "2-freigabe-ausstehend",
+      "input": {
+        "lead": {
+          "id": "L-F1",
+          "status": "kontaktiert",
+          "org_freigabe_status": "ausstehend",
+          "kanal": "hv_melder_link",
+          "created_at": "2026-07-09T10:00:00Z"
+        },
+        "angebote": [
+          {
+            "id": "AN-F1",
+            "status_einfach": "entwurf",
+            "created_at": "2026-07-09T11:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "angebot",
+        "unterstatus": "entwurf",
+        "needsAction": true,
+        "actor": "freigabe",
+        "wartet_freigabe": true
+      }
+    },
+    {
+      "id": "3-hw-anfrage-offen",
+      "input": {
+        "lead": {
+          "id": "L-H1",
+          "status": "auftrag",
+          "kanal": "website",
+          "created_at": "2026-06-01T10:00:00Z"
+        },
+        "angebote": [
+          {
+            "id": "AN-H1",
+            "status_einfach": "angenommen",
+            "created_at": "2026-06-02T10:00:00Z"
+          }
+        ],
+        "auftraege": [
+          {
+            "id": "AU-H1",
+            "status": "in_arbeit",
+            "handwerkerAktionOffen": true,
+            "created_at": "2026-06-03T10:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "auftrag",
+        "unterstatus": "in_arbeit",
+        "needsAction": true,
+        "actor": "handwerker"
+      }
+    },
+    {
+      "id": "4-angebot-gesendet-kunde",
+      "input": {
+        "lead": {
+          "id": "L-K1",
+          "status": "angebot",
+          "kanal": "website",
+          "created_at": "2026-06-10T10:00:00Z"
+        },
+        "angebote": [
+          {
+            "id": "AN-K1",
+            "status_einfach": "gesendet",
+            "gesendet_am": "2026-06-11T10:00:00Z",
+            "created_at": "2026-06-10T12:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "angebot",
+        "unterstatus": "gesendet",
+        "needsAction": true,
+        "actor": "kunde"
+      }
+    },
+    {
+      "id": "5-rechnung-ueberfaellig",
+      "input": {
+        "lead": {
+          "id": "L-R1",
+          "status": "abgeschlossen",
+          "kanal": "telefon",
+          "created_at": "2026-05-01T10:00:00Z"
+        },
+        "angebote": [
+          {
+            "id": "AN-R1",
+            "status_einfach": "angenommen",
+            "created_at": "2026-05-02T10:00:00Z"
+          }
+        ],
+        "auftraege": [
+          {
+            "id": "AU-R1",
+            "status": "abgeschlossen",
+            "created_at": "2026-05-03T10:00:00Z"
+          }
+        ],
+        "rechnungen": [
+          {
+            "id": "RE-R1",
+            "status": "gesendet",
+            "faellig": "2026-05-01",
+            "created_at": "2026-05-10T10:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "rechnung",
+        "unterstatus": "gesendet",
+        "needsAction": false,
+        "actor": null,
+        "ueberfaellig": true
+      }
+    },
+    {
+      "id": "6-alle-angebote-storniert",
+      "input": {
+        "lead": {
+          "id": "L-S1",
+          "status": "kontaktiert",
+          "kanal": "website",
+          "created_at": "2026-04-01T10:00:00Z"
+        },
+        "angebote": [
+          {
+            "id": "AN-S1",
+            "status_einfach": "abgelehnt",
+            "created_at": "2026-04-05T10:00:00Z"
+          },
+          {
+            "id": "AN-S2",
+            "status_einfach": "ersetzt",
+            "created_at": "2026-04-08T10:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "anfrage",
+        "unterstatus": "storniert",
+        "needsAction": false,
+        "actor": null
+      }
+    }
+  ]
+}

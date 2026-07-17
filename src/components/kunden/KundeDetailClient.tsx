@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -45,7 +47,6 @@ import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
@@ -163,13 +164,13 @@ function isRechnungUeberfaellig(r: { status: string; faellig_am?: string | null 
 
 function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) {
   if (isRechnungUeberfaellig(r)) {
-    return <StatusBadge status="cancel" label="Überfällig" />
+    return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Überfällig</MockBadge>
   }
   const st = r.status as RechnungStatus
-  if (st === 'bezahlt') return <StatusBadge status="order" label={RECHNUNG_STATUS_LABELS.bezahlt} />
-  if (st === 'gesendet') return <StatusBadge status="offer" label={RECHNUNG_STATUS_LABELS.gesendet} />
-  if (st === 'storniert') return <StatusBadge status="cancel" label={RECHNUNG_STATUS_LABELS.storniert} />
-  return <StatusBadge status="done" label={RECHNUNG_STATUS_LABELS.entwurf} />
+  if (st === 'bezahlt') return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>{RECHNUNG_STATUS_LABELS.bezahlt}</MockBadge>
+  if (st === 'gesendet') return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{RECHNUNG_STATUS_LABELS.gesendet}</MockBadge>
+  if (st === 'storniert') return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>{RECHNUNG_STATUS_LABELS.storniert}</MockBadge>
+  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>{RECHNUNG_STATUS_LABELS.entwurf}</MockBadge>
 }
 
 type KundeDetailTab = 'uebersicht' | 'objekte' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
@@ -622,7 +623,7 @@ export function KundeDetailClient({
       collapsible
       title="Stammdaten"
       action={
-        <button type="button" onClick={openEditModal} className="btn btn-ghost btn-sm" aria-label="Bearbeiten">
+        <button type="button" onClick={openEditModal} className="btn ghost sm" aria-label="Bearbeiten">
           <MockIcon ctx="btn" n="pencil" size={14} />
         </button>
       }
@@ -1229,7 +1230,7 @@ export function KundeDetailClient({
             trigger={
               <button
                 type="button"
-                className="btn btn-secondary btn-sm inline-flex shrink-0 gap-1.5 px-2.5"
+                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
                 aria-label="Weitere Aktionen"
               >
                 <MockIcon ctx="btn" n="dots" size={16} />

@@ -69,7 +69,7 @@ function LeadNotizFotoToolbar({
           type="button"
           disabled={pending}
           onClick={onGalleryClick}
-          className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+          className="btn ghost sm inline-flex items-center justify-center gap-1.5"
         >
           <ImagePlus className="h-4 w-4 shrink-0" aria-hidden />
           {galleryLabel}
@@ -78,7 +78,7 @@ function LeadNotizFotoToolbar({
           type="button"
           disabled={pending}
           onClick={onCameraClick}
-          className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+          className="btn ghost sm inline-flex items-center justify-center gap-1.5"
         >
           <Camera className="h-4 w-4 shrink-0" aria-hidden />
           {cameraLabel}
@@ -88,7 +88,7 @@ function LeadNotizFotoToolbar({
         type="button"
         disabled={!canSave}
         onClick={onSave}
-        className="btn btn-primary btn-sm lead-notiz-compose__save"
+        className="btn primary sm lead-notiz-compose__save"
       >
         {saveLabel}
       </button>
@@ -386,12 +386,12 @@ export function AngeboteListeTab({
         </div>
         <div className="border-t border-bw-border px-4 py-3">
           {onAngebotErstellen ? (
-            <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+            <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>
               <Plus className="h-3.5 w-3.5" />
               Neues Angebot
             </button>
           ) : (
-            <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+            <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn primary sm">
               <Plus className="h-3.5 w-3.5" />
               Neues Angebot
             </Link>
@@ -406,11 +406,11 @@ export function AngeboteListeTab({
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-medium text-bw-text">Angebote</h3>
         {onAngebotErstellen ? (
-          <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+          <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>
             + Angebot erstellen
           </button>
         ) : (
-          <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+          <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn primary sm">
             + Angebot erstellen
           </Link>
         )}
@@ -423,11 +423,11 @@ export function AngeboteListeTab({
           description="Erstelle ein Angebot basierend auf den Projektdetails."
           action={
             onAngebotErstellen ? (
-              <button type="button" className="btn btn-primary btn-sm" onClick={onAngebotErstellen}>
+              <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>
                 + Angebot erstellen
               </button>
             ) : (
-              <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn btn-primary btn-sm">
+              <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn primary sm">
                 + Angebot erstellen
               </Link>
             )

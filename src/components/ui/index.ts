@@ -1,5 +1,4 @@
 export { Button, type ButtonProps } from './Button'
-export { StatusBadge, type HubSpotStatusType } from './StatusBadge'
 export { Card } from './Card'
 export { Accordion } from './Accordion'
 export { Tabs, type TabItem } from './Tabs'

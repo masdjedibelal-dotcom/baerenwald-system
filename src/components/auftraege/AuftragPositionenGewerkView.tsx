@@ -195,7 +195,7 @@ export function AuftragPositionenGewerkView({
         title="Keine Leistungen"
         description="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
         action={
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => onAddLeistung('')}>
+          <button type="button" className="btn primary sm" onClick={() => onAddLeistung('')}>
             + Leistung
           </button>
         }
@@ -408,7 +408,7 @@ export function AuftragPositionenGewerkView({
                   <div className="flex flex-wrap items-center gap-2 border-t border-bw-border px-3 py-2.5">
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm gap-1"
+                      className="btn ghost sm gap-1"
                       onClick={() => onAddLeistung(slugForAdd)}
                     >
                       <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -416,7 +416,7 @@ export function AuftragPositionenGewerkView({
                     </button>
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm gap-1"
+                      className="btn ghost sm gap-1"
                       disabled={!block.gewerkId || pending}
                       onClick={() => openGewerkModal(block)}
                     >
@@ -432,7 +432,7 @@ export function AuftragPositionenGewerkView({
       </div>
 
       <div className="mt-4 flex justify-end">
-        <button type="button" className="btn btn-primary btn-sm gap-1" onClick={() => onAddLeistung('')}>
+        <button type="button" className="btn primary sm gap-1" onClick={() => onAddLeistung('')}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Leistung hinzufügen
         </button>
