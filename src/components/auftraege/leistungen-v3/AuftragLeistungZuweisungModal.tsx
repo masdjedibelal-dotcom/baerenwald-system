@@ -123,7 +123,7 @@ export function AuftragLeistungZuweisungModal({
     if (!sample) return
     setTitel(sample.leistung_name?.trim() || '')
     setBeschreibung(richTextToPlain(sample.beschreibung ?? '') || '')
-    setVk(numInput(sample.preis_vk))
+    setVk(numInput(sample.preis_fix))
     setPartnerNetto(numInput(sample.preis_partner))
     const start = sample.start_datum?.slice(0, 10) || ''
     const end = sample.end_datum?.slice(0, 10) || ''
@@ -176,7 +176,7 @@ export function AuftragLeistungZuweisungModal({
         const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
           leistung_name: titel.trim() || sample.leistung_name,
           beschreibung: beschreibung.trim() || null,
-          preis_vk: vkNum,
+          preis_fix: vkNum,
           preis_partner: ekNum,
           start_datum: vonYmd,
           end_datum: bisYmd,

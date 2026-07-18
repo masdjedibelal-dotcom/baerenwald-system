@@ -37,9 +37,8 @@ function nav(
 }
 
 /**
- * Sidebar = Mock-Positivliste NAV:
- * Arbeit: Dashboard, Vorgänge · Stammdaten: Kunden, Handwerker, Partner · Planung: Kalender
- * Phasen-Listen (/anfragen …) bleiben erreichbar über Dashboard/Vorgänge, nicht als Sidebar-Einträge.
+ * Sidebar: eine Sektion „Arbeit“ (Dashboard, Vorgänge, Kunden, Handwerker) + Planung (Kalender).
+ * Partner nicht in der Nav — Route bleibt erreichbar.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -53,15 +52,8 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
         '/auftraege',
         '/rechnungen',
       ]),
-    ],
-  },
-  {
-    id: 'stammdaten',
-    label: 'Stammdaten',
-    items: [
       nav('/kunden', 'users', 'Kunden'),
       nav('/handwerker', 'tool', 'Handwerker'),
-      nav('/partner', 'building', 'Partner'),
     ],
   },
   {
@@ -89,7 +81,7 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/kalender', 'calendar', 'Kalender'),
 ]
 
-/** Mobile Mehr-Screen (Kachel-Grid) — Mock MEHR_ITEMS. */
+/** Mobile Mehr-Screen (Kachel-Grid) — ohne Partner. */
 export const MEHR_TILE_NAV: Array<{
   href: string
   icon: LucideIcon
@@ -98,7 +90,6 @@ export const MEHR_TILE_NAV: Array<{
 }> = [
   { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
   { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
-  { href: '/partner', icon: Building2, label: 'Partner', desc: 'Netzwerk' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
