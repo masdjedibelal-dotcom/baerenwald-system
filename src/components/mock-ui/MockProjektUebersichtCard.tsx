@@ -12,6 +12,7 @@ export type ProjektUebersichtExtraRow = {
 }
 
 export function MockProjektUebersichtCard({
+  title = 'Projekt-Übersicht',
   projekt,
   beschreibung,
   region,
@@ -27,6 +28,7 @@ export function MockProjektUebersichtCard({
   /** Zusätzliche Zeilen nach Quelle (z. B. Eingegangen) */
   footerRows,
 }: {
+  title?: string
   projekt: string
   beschreibung?: string | null
   region?: string | null
@@ -52,7 +54,7 @@ export function MockProjektUebersichtCard({
         : null
 
   return (
-    <MockCard title="Projekt-Übersicht" icon="clipboard-list">
+    <MockCard title={title} icon="clipboard-list">
       <div className="props">
         <MockProp label="Projekt">{projekt}</MockProp>
         {beschreibung?.trim() ? (

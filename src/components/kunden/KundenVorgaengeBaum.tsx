@@ -129,7 +129,7 @@ export function KundenVorgaengeBaum({ kunde }: Props) {
     return (
       <p className="py-4 text-center text-sm text-bw-text-muted">
         Noch keine Vorgänge.{' '}
-        <Link href={`/anfragen?neu=1&kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+        <Link href={`/anfragen/neu?kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
           Anfrage anlegen
         </Link>
       </p>

@@ -126,6 +126,26 @@ export async function updateLeadNotizen(
   return { ok: true }
 }
 
+/** Inline-Edit: Kundenbeschreibung / Nachricht auf der Anfrage. */
+export async function updateLeadBeschreibung(
+  leadId: string,
+  kontakt_nachricht: string | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('leads')
+    .update({
+      kontakt_nachricht: kontakt_nachricht?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', leadId)
+
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/anfragen/${leadId}`)
+  revalidatePath('/anfragen')
+  return { ok: true }
+}
+
 export async function loadCrmTeamFuerTermin(): Promise<
   { id: string; name: string; telefon: string }[]
 > {

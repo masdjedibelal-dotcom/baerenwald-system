@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
-import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import { Timeline } from '@/components/ui/timeline'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
@@ -44,14 +43,15 @@ import { AngebotDetailsTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import {
   betragAnzeige,
   addDaysYmd,
   heuteYmd,
   kundeNameAusAngebot,
-  leistungAnzeige,
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { angebotStatusDisplay } from '@/lib/status/status-display'
 import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -64,7 +64,7 @@ import type {
   LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum, formatTimelineStamp, SITUATION_LABELS } from '@/lib/utils'
+import { formatDatum, formatTimelineStamp } from '@/lib/utils'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
@@ -127,7 +127,6 @@ export function AngebotDetailPageClient({
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
   const [mainTab, setMainTab] = useState<AngebotDetailTab>('stammdaten')
-  const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -142,6 +141,7 @@ export function AngebotDetailPageClient({
   const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
+  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
   const isCrmAdmin = useIsCrmAdmin()
 
   useEffect(() => {
@@ -271,8 +271,6 @@ export function AngebotDetailPageClient({
       time: string
       state: 'done' | 'open' | 'active'
       ts: number
-      linkLabel?: string
-      onLinkClick?: () => void
     }
 
     const fromEvents: Row[] = timelineSorted.map((ev) => ({
@@ -281,10 +279,6 @@ export function AngebotDetailPageClient({
       time: formatTimelineStamp(ev.created_at),
       state: 'done' as const,
       ts: new Date(ev.created_at).getTime(),
-      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
-      onLinkClick: ev.email_log_id
-        ? () => setEmailPreviewId(ev.email_log_id!)
-        : undefined,
     }))
 
     let basis: Row[] = fromEvents
@@ -309,7 +303,6 @@ export function AngebotDetailPageClient({
           text: b.text,
           time: b.time,
           state: b.state === 'active' ? 'active' : 'done',
-          linkLabel: b.linkLabel,
         })),
         projektKontext
       )
@@ -319,10 +312,6 @@ export function AngebotDetailPageClient({
         time: item.time,
         state: item.state,
         ts: item.ts,
-        linkLabel: item.linkLabel,
-        onLinkClick: item.href
-          ? () => router.push(item.href!)
-          : basis.find((b) => b.id === item.id)?.onLinkClick,
       }))
     }
 
@@ -350,7 +339,6 @@ export function AngebotDetailPageClient({
   }, [
     timelineSorted,
     projektKontext,
-    router,
     detail.created_at,
     detail.angebotsnr,
     auftragId,
@@ -365,17 +353,20 @@ export function AngebotDetailPageClient({
   }, [detail, dokumenteRows, lead?.id])
 
   const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
-  const projektTitel = useMemo(() => {
-    const leistung = leistungAnzeige(detail)
-    if (leistung && leistung !== '—') return leistung
-    const sit = lead?.situation?.trim()
-    if (sit) return SITUATION_LABELS[sit] ?? sit
-    return detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
-  }, [detail, lead?.situation])
+  const projektTitel = useMemo(
+    () =>
+      angebotTitelOderSituationBereich({
+        angebot: detail,
+        situation: lead?.situation,
+        bereiche: lead?.bereiche ?? detail.leads?.bereiche,
+        fallback: detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`,
+      }),
+    [detail, lead?.situation, lead?.bereiche]
+  )
   const headMeta = (
     <span className="text-sm text-bw-text-muted">
       {[
-        projektTitel,
+        kundeName !== projektTitel ? kundeName : null,
         betragLabel || null,
         detail.gueltig_bis ? `gültig bis ${formatDatum(detail.gueltig_bis)}` : null,
       ]
@@ -468,9 +459,11 @@ export function AngebotDetailPageClient({
             })
           },
           onPortalLink: () => {
-            toast.message('Kundenportal-Link', {
-              description: 'Versand über Kundenakte oder Auftrag.',
-            })
+            if (!detail.kunde_id) {
+              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+              return
+            }
+            setPortalLinkModalOpen(true)
           },
           onAccept: versendet && !auftragId ? openAcceptModal : undefined,
           onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
@@ -580,7 +573,9 @@ export function AngebotDetailPageClient({
     return null
   })()
 
-  const stammdatenInhalt = <AngebotStammdatenCard detail={detail} lead={lead} />
+  const stammdatenInhalt = (
+    <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+  )
 
   const detailsInhalt = (
     <AngebotDetailsTab
@@ -597,10 +592,11 @@ export function AngebotDetailPageClient({
       <MockVerlaufCard empty={timelineItems.length === 0}>
         <Timeline items={timelineItems} />
       </MockVerlaufCard>
-      <EmailLogPreviewModal
-        emailLogId={emailPreviewId}
-        open={Boolean(emailPreviewId)}
-        onClose={() => setEmailPreviewId(null)}
+      <KundenportalLinkVersendenModal
+        open={portalLinkModalOpen}
+        onClose={() => setPortalLinkModalOpen(false)}
+        kundeId={detail.kunde_id}
+        fallbackEmail={kundeEmail}
       />
     </>
   )
@@ -669,17 +665,13 @@ export function AngebotDetailPageClient({
   return (
     <EntityDetailLayout
       phase="angebot"
-      breadcrumbTitle={
-        projektTitel && projektTitel !== '—'
-          ? `${projektTitel} — ${kundeName}`
-          : kundeName
-      }
+      breadcrumbTitle={projektTitel && projektTitel !== '—' ? projektTitel : kundeName}
       crumbBackHref="/vorgaenge?tab=angebot"
       crumbBackLabel="Zurück zu den Vorgängen"
       crumbSectionLabel="Angebote"
       className="space-y-4 pb-0"
       head={{
-        title: kundeName,
+        title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
         badges: (
           <span className="inline-flex flex-wrap items-center gap-2">
             <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>

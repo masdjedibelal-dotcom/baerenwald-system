@@ -147,15 +147,15 @@ export function buildEntityMenu(
   }
 
   if (type === 'auftrag') {
-    const laufend = st === 'aktiv' || st === 'auftrag' || st === 'in_bearbeitung'
-    const abschluss = st === 'fertig' || st === 'abnahme' || st === 'abgeschlossen'
+    const laufend = st === 'offen' || st === 'in_arbeit' || st === 'aktiv' || st === 'in_bearbeitung'
+    const abschluss = st === 'abnahme' || st === 'abgeschlossen' || st === 'fertig'
     const before = A.length
     A.push('sep')
     if (h.onEditAngebot && !abschluss) {
       A.push({ icon: 'file-pencil', label: 'Angebot korrigieren', onClick: h.onEditAngebot })
     }
     if (h.onComplete && laufend) {
-      A.push({ icon: 'checks', label: 'Auftrag abschließen', onClick: h.onComplete })
+      A.push({ icon: 'checks', label: 'Abschlussdokumentation', onClick: h.onComplete })
     }
     if (h.onInvoice && (abschluss || laufend)) {
       A.push({ icon: 'file-invoice', label: 'Rechnung erstellen', onClick: h.onInvoice })

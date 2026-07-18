@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
+import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
 import { WizardShell } from '@/components/layout/WizardShell'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
+import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { PosTotals } from '@/components/posboard/PosTotals'
 import { toast } from '@/components/ui/app-toast'
+import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import {
   saveAngebotWizardDraft,
   sendAngebotWizard,
@@ -224,7 +227,9 @@ export function AngebotWizard({
   const [mailTo, setMailTo] = useState<string[]>(() =>
     email && isValidEmail(email) ? [email] : []
   )
-  const [mailCc] = useState<string[]>([])
+  const [mailCc, setMailCc] = useState<string[]>([])
+  const [mailBetreff, setMailBetreff] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const zahlfristInit = zahlfristSegFromAngebotMeta(meta)
   const [zahlfristSeg, setZahlfristSeg] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -234,6 +239,15 @@ export function AngebotWizard({
     if (mailTo.length) return
     if (email && isValidEmail(email)) setMailTo([email])
   }, [email, mailTo.length])
+
+  const defaultMailBetreff = `Ihr Angebot — ${meta.titel.trim() || projekt}`
+  useEffect(() => {
+    setMailBetreff((prev) => {
+      if (!prev.trim()) return defaultMailBetreff
+      if (prev.startsWith('Ihr Angebot — ')) return defaultMailBetreff
+      return prev
+    })
+  }, [defaultMailBetreff])
 
   const draftSnapshot = useMemo(
     () =>
@@ -446,6 +460,25 @@ export function AngebotWizard({
     ]
   )
 
+  async function ensureDraftForPreview(): Promise<string | null> {
+    if (angebotId && !draftDirty) return angebotId
+    setPreviewLoading(true)
+    try {
+      return await persistDraft({ notify: false })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  /** Mock: Weiter — vor Vorschau Entwurf speichern für PDF */
+  async function handleWeiter() {
+    if (step === 3) {
+      const id = await ensureDraftForPreview()
+      if (!id) return
+    }
+    setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
+  }
+
   function handleRequestClose() {
     if (draftDirty && !saving) {
       const verwerfen = window.confirm(
@@ -454,11 +487,6 @@ export function AngebotWizard({
       if (!verwerfen) return
     }
     onClose()
-  }
-
-  /** Mock: Weiter ohne Pflicht-Validierung */
-  function handleWeiter() {
-    setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
   }
 
   async function handleFinishVersenden() {
@@ -483,6 +511,7 @@ export function AngebotWizard({
       lead_id: lead.id,
       mailTo: recipients,
       mailCc,
+      betreff: mailBetreff.trim() || undefined,
       auftragKorrektur: istAuftragKorrektur,
     })
     setSaving(false)
@@ -539,7 +568,12 @@ export function AngebotWizard({
         </MockBtn>
       ) : null}
       {step < WIZARD_TOTAL_STEPS ? (
-        <MockBtn kind="primary" icon="chevron-right" onClick={handleWeiter}>
+        <MockBtn
+          kind="primary"
+          icon="chevron-right"
+          disabled={saving || previewLoading}
+          onClick={() => void handleWeiter()}
+        >
           Weiter
         </MockBtn>
       ) : (
@@ -556,7 +590,12 @@ export function AngebotWizard({
         {step > 1 ? (
           <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
         ) : null}
-        <MockBtn sm kind="primary" onClick={handleWeiter}>
+        <MockBtn
+          sm
+          kind="primary"
+          disabled={saving || previewLoading}
+          onClick={() => void handleWeiter()}
+        >
           Weiter
         </MockBtn>
       </>
@@ -847,27 +886,82 @@ export function AngebotWizard({
       ) : null}
 
       {step === 4 ? (
-        <>
+        <AngebotWizardPdfPreview
+          angebotId={angebotId}
+          loading={previewLoading || saving || !angebotId}
+          kundeName={name}
+        />
+      ) : null}
+
+      {step === 5 ? (
+        <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              Empfänger und Betreff prüfen — E-Mail-Vorschau wie beim Kunden
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <EmailPillsField
+                label="An"
+                required
+                emails={mailTo}
+                onChange={setMailTo}
+                placeholder="kunde@beispiel.de"
+                hint="Mindestens eine Empfänger-Adresse"
+                disabled={saving}
+              />
+              <EmailPillsField
+                label="CC"
+                emails={mailCc}
+                onChange={setMailCc}
+                placeholder="weitere@beispiel.de"
+                hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
+                disabled={saving}
+              />
+              <MockField label="Betreff" full required>
+                <input
+                  className="txt"
+                  value={mailBetreff}
+                  onChange={(e) => setMailBetreff(e.target.value)}
+                  disabled={saving}
+                  placeholder={defaultMailBetreff}
+                />
+              </MockField>
+            </div>
+            <div className="wz-overview" style={{ marginTop: 14 }}>
+              <div>
+                <span className="k">Gültig bis</span>
+                <b>{meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}</b>
+              </div>
+              <div>
+                <span className="k">Zahlfrist</span>
+                <b>{zahlfristText}</b>
+              </div>
+              <div>
+                <span className="k">Gesamt</span>
+                <b>{formatEurBetrag(mailSummen.bruttoMin)} brutto</b>
+              </div>
+            </div>
+          </div>
+
           <div
             className="section-h"
             style={{
-              marginBottom: 12,
-              display: 'flex',
-              justifyContent: 'space-between',
+              marginBottom: 0,
               textTransform: 'none',
               letterSpacing: 0,
               fontSize: 14,
               fontWeight: 600,
             }}
           >
-            <span>Angebots-Vorschau</span>
-            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12 }}>
-              So erhält {name} das Angebot
-            </span>
+            E-Mail-Vorschau
           </div>
           <AngebotWizardMailPreview
             brand={brand}
-            titel={meta.titel.trim() || `Angebot ${projekt}`}
+            titel={mailBetreff.trim() || meta.titel.trim() || `Angebot ${projekt}`}
             gueltigBis={meta.gueltig_bis}
             einleitung={meta.einleitung}
             schluss={meta.schluss}
@@ -882,46 +976,9 @@ export function AngebotWizard({
             fotos={projektFotos}
             zahlfristText={zahlfristText}
           />
-        </>
-      ) : null}
 
-      {step === 5 ? (
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-              Empfänger prüfen und Angebot versenden
-            </div>
-          </div>
-          <div className="wz-overview">
-            <div>
-              <span className="k">Empfänger</span>
-              <b>{name}</b>
-            </div>
-            <div>
-              <span className="k">E-Mail</span>
-              <b>{mailTo[0] || email || 'kunde@beispiel.de'}</b>
-            </div>
-            <div>
-              <span className="k">Betreff</span>
-              <b>Ihr Angebot — {meta.titel.trim() || projekt}</b>
-            </div>
-            <div>
-              <span className="k">Gültig bis</span>
-              <b>{meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}</b>
-            </div>
-            <div>
-              <span className="k">Zahlfrist</span>
-              <b>{zahlfristText}</b>
-            </div>
-            <div>
-              <span className="k">Gesamt</span>
-              <b>{formatEurBetrag(mailSummen.bruttoMin)} brutto</b>
-            </div>
-          </div>
           <div
             style={{
-              marginTop: 12,
               fontSize: 12.5,
               color: 'var(--text-3)',
               display: 'flex',
@@ -929,8 +986,8 @@ export function AngebotWizard({
               gap: 6,
             }}
           >
-            <MockIcon ctx="default" n="info-circle" size={14} />{' '}
-            {`Mit „Angebot versenden" wird das Angebot als PDF per E-Mail zugestellt.`}
+            <MockIcon ctx="default" n="info-circle" size={14} />
+            Mit „Angebot versenden“ wird das Angebot als PDF per E-Mail zugestellt.
           </div>
         </div>
       ) : null}

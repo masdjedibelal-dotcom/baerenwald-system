@@ -1,24 +1,37 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { AnfrageWizard } from '@/components/anfragen/AnfrageWizard'
 
-function RedirectNeueAnfrage() {
+function NeueAnfrageWizardHost() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [open, setOpen] = useState(true)
+  const kundeId = searchParams.get('kunde_id')
 
   useEffect(() => {
-    const params = new URLSearchParams()
-    const kundeId = searchParams.get('kunde_id')
-    if (kundeId) params.set('kunde_id', kundeId)
-    params.set('neu', '1')
-    router.replace(`/anfragen?${params.toString()}`)
-  }, [router, searchParams])
+    setOpen(true)
+  }, [])
+
+  function close() {
+    setOpen(false)
+    router.replace('/vorgaenge?tab=anfrage')
+  }
 
   return (
-    <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
-      Formular wird geöffnet…
-    </div>
+    <>
+      <div className="py-8 text-center text-sm text-bw-text-muted">Anfrage wird geöffnet…</div>
+      <AnfrageWizard
+        open={open}
+        onClose={close}
+        defaultKundeId={kundeId}
+        onSuccess={(id) => {
+          setOpen(false)
+          router.replace(`/anfragen/${id}`)
+        }}
+      />
+    </>
   )
 }
 
@@ -31,7 +44,7 @@ export default function NeueAnfragePage() {
         </div>
       }
     >
-      <RedirectNeueAnfrage />
+      <NeueAnfrageWizardHost />
     </Suspense>
   )
 }

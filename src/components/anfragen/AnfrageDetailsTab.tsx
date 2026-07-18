@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
-  MockProjektUebersichtCard,
+  EntityProjektUebersichtCard,
   type ProjektUebersichtExtraRow,
-} from '@/components/mock-ui/MockProjektUebersichtCard'
+} from '@/components/crm/EntityProjektUebersichtCard'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
-import { saveLeadProjektWasZeilen } from '@/app/(dashboard)/anfragen/actions'
+import {
+  saveLeadProjektWasZeilen,
+  updateLeadBeschreibung,
+} from '@/app/(dashboard)/anfragen/actions'
 import {
   isEchterFreitext,
   kundentypLabel,
@@ -334,10 +337,22 @@ export function AnfrageDetailsTab({
   const funnelUi = useMemo(() => buildFunnelExtraRows(lead), [lead])
 
   return (
-    <div className="space-y-4">
-      <MockProjektUebersichtCard
-        projekt={projektTitel(lead)}
-        beschreibung={beschreibungFromLead(lead)}
+    <>
+      <EntityProjektUebersichtCard
+        title="Anfragedetails"
+        initial={{
+          titel: projektTitel(lead),
+          beschreibung: beschreibungFromLead(lead) ?? '',
+          startDatum: lead.zeitraum_von?.slice(0, 10) ?? '',
+          endDatum: lead.zeitraum_bis?.slice(0, 10) ?? '',
+          istBauprojekt: false,
+        }}
+        editableFields={['beschreibung']}
+        onSave={async (draft) => {
+          const r = await updateLeadBeschreibung(lead.id, draft.beschreibung)
+          if (r.ok) onSaved?.()
+          return r
+        }}
         region={regionLabel(lead)}
         preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
         quelle={funnelUi.quelle}
@@ -361,6 +376,6 @@ export function AnfrageDetailsTab({
           })
         }
       />
-    </div>
+    </>
   )
 }

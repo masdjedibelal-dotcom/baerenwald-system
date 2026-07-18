@@ -245,12 +245,14 @@ export async function sendAngebotWizard(input: {
   lead_id: string
   mailTo: string[]
   mailCc?: string[]
+  betreff?: string
   /** Angenommenes Angebot: Korrektur senden ohne Status-Rücksetzung */
   auftragKorrektur?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const sent = await sendAngebotToKunde(input.angebotId, {
     to: input.mailTo,
     cc: input.mailCc,
+    betreff: input.betreff?.trim() || undefined,
     statusBeibehalten: input.auftragKorrektur,
     skipHandwerkerGate: input.auftragKorrektur,
   })

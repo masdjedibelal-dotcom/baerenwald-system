@@ -26,8 +26,6 @@ export function ergaenzeTimelineMitProjektKontext(
       text: `Angebot ${a.angebotsnr?.trim() || a.id.slice(0, 8).toUpperCase()} — ${ANGEBOT_STATUS_LABELS[a.status as keyof typeof ANGEBOT_STATUS_LABELS] ?? a.status}`,
       time: formatDatum(a.created_at),
       state: 'done',
-      linkLabel: 'Zum Angebot',
-      href: `/angebote/${a.id}`,
     })
   }
 
@@ -38,8 +36,6 @@ export function ergaenzeTimelineMitProjektKontext(
       text: `Auftrag: ${kontext.auftrag.titel?.trim() || 'Auftrag'} — ${AUFTRAG_STATUS_LABELS[kontext.auftrag.status as keyof typeof AUFTRAG_STATUS_LABELS] ?? kontext.auftrag.status}`,
       time: '—',
       state: 'active',
-      linkLabel: 'Zum Auftrag',
-      href: `/auftraege/${kontext.auftrag.id}`,
     })
   }
 
@@ -50,8 +46,6 @@ export function ergaenzeTimelineMitProjektKontext(
       text: `Rechnung ${r.rechnungsnummer} — ${RECHNUNG_STATUS_LABELS[r.status as keyof typeof RECHNUNG_STATUS_LABELS] ?? r.status}`,
       time: formatDatum(r.rechnungsdatum),
       state: 'done',
-      linkLabel: 'Zur Rechnung',
-      href: `/rechnungen/${r.id}`,
     })
   }
 

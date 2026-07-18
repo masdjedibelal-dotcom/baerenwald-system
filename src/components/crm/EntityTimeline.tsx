@@ -1,8 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Timeline, type TimelineItem } from '@/components/ui/timeline'
-import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import type { AuftragDetail, LeadTimelineRow } from '@/lib/types'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { formatDatumZeit, formatRelativeDate } from '@/lib/utils'
@@ -10,12 +9,11 @@ import { formatDatumZeit, formatRelativeDate } from '@/lib/utils'
 type LeadTimelineOptions = {
   fallbackCreatedAt?: string
   fallbackCreatedLabel?: string
-  onEmailPreview?: (emailLogId: string) => void
 }
 
 export function buildLeadTimelineItems(
   events: LeadTimelineRow[],
-  { fallbackCreatedAt, fallbackCreatedLabel, onEmailPreview }: LeadTimelineOptions = {}
+  { fallbackCreatedAt, fallbackCreatedLabel }: LeadTimelineOptions = {}
 ): TimelineItem[] {
   const sorted = sortTimelineByCreatedAtAsc(events)
   if (sorted.length) {
@@ -24,9 +22,6 @@ export function buildLeadTimelineItems(
       text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
       time: formatRelativeDate(ev.created_at),
       state: 'done' as const,
-      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
-      onLinkClick:
-        ev.email_log_id && onEmailPreview ? () => onEmailPreview(ev.email_log_id!) : undefined,
     }))
   }
   if (fallbackCreatedAt && fallbackCreatedLabel) {
@@ -75,27 +70,9 @@ export function buildAuftragTimelineItems(
   ]
 }
 
-type EntityTimelineProps = {
-  items: TimelineItem[]
-  withEmailPreview?: boolean
-}
-
-/** Einheitliche Timeline-Darstellung mit optionalem E-Mail-Vorschau-Modal. */
-export function EntityTimeline({ items, withEmailPreview = false }: EntityTimelineProps) {
-  const [previewId, setPreviewId] = useState<string | null>(null)
-
-  return (
-    <>
-      <Timeline items={items} />
-      {withEmailPreview ? (
-        <EmailLogPreviewModal
-          emailLogId={previewId}
-          open={Boolean(previewId)}
-          onClose={() => setPreviewId(null)}
-        />
-      ) : null}
-    </>
-  )
+/** Einheitliche Timeline-Darstellung (nur informativ, nicht klickbar). */
+export function EntityTimeline({ items }: { items: TimelineItem[] }) {
+  return <Timeline items={items} />
 }
 
 export function LeadEntityTimeline({
@@ -107,28 +84,16 @@ export function LeadEntityTimeline({
   fallbackCreatedAt?: string
   fallbackCreatedLabel?: string
 }) {
-  const [previewId, setPreviewId] = useState<string | null>(null)
-
   const items = useMemo(
     () =>
       buildLeadTimelineItems(events, {
         fallbackCreatedAt,
         fallbackCreatedLabel,
-        onEmailPreview: (id) => setPreviewId(id),
       }),
     [events, fallbackCreatedAt, fallbackCreatedLabel]
   )
 
-  return (
-    <>
-      <EntityTimeline items={items} />
-      <EmailLogPreviewModal
-        emailLogId={previewId}
-        open={Boolean(previewId)}
-        onClose={() => setPreviewId(null)}
-      />
-    </>
-  )
+  return <EntityTimeline items={items} />
 }
 
 export function AuftragEntityTimeline({

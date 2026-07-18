@@ -17,6 +17,7 @@ import {
   type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
 import type { EntityMenuItem } from '@/lib/entity-menu'
+import { richTextToPlain } from '@/lib/rich-text'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -210,17 +211,18 @@ export function PosBoard({
     return Array.from(map.entries()).map(([gewerk, arr], gi) => ({
       id: `g${gi}`,
       gewerk,
-      items: arr.map((p: PosBoardLine) => ({
-        id: p.id,
-        name:
-          p.name != null && p.name !== ''
-            ? p.name
-            : p.beschreibung || '(ohne Bezeichnung)',
-        beschreibung: p.name != null && p.name !== '' ? p.beschreibung : '',
-        mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
-        preisLabel: preisLabelOf ? preisLabelOf(p) : formatEurBetrag(_line(p)),
-        badge: badgeOf ? badgeOf(p) : null,
-      })),
+      items: arr.map((p: PosBoardLine) => {
+        const namePlain = richTextToPlain(p.name)
+        const beschPlain = richTextToPlain(p.beschreibung)
+        return {
+          id: p.id,
+          name: namePlain || beschPlain || '(ohne Bezeichnung)',
+          beschreibung: namePlain ? beschPlain : '',
+          mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
+          preisLabel: preisLabelOf ? preisLabelOf(p) : formatEurBetrag(_line(p)),
+          badge: badgeOf ? badgeOf(p) : null,
+        }
+      }),
     }))
   }, [positionen, mengeLabelOf, preisLabelOf, badgeOf, _line])
 

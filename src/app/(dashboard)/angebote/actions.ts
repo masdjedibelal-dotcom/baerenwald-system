@@ -430,6 +430,35 @@ export async function createAngebot(
   return { ok: true, id }
 }
 
+/** Leichtes Inline-Update für Projektfelder (ohne Positionen). */
+export async function updateAngebotProjektFelder(
+  angebotId: string,
+  patch: { projektbeschreibung?: string | null }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: current, error: loadErr } = await supabase
+    .from('angebote')
+    .select('id, status')
+    .eq('id', angebotId)
+    .maybeSingle()
+
+  if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
+  if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
+    return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
+  }
+
+  const db: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (patch.projektbeschreibung !== undefined) {
+    db.projektbeschreibung = patch.projektbeschreibung?.trim() || null
+  }
+
+  const { error } = await supabase.from('angebote').update(db).eq('id', angebotId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/angebote/${angebotId}`)
+  revalidatePath('/angebote')
+  return { ok: true }
+}
+
 export async function updateAngebot(
   angebotId: string,
   input: Omit<CreateAngebotInput, 'lead_id'> & { lead_id: string | null },

@@ -1132,7 +1132,10 @@ export type Rechnung = {
   created_at: string
   updated_at: string
   kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ' | 'ust_id'> | null
-  angebote?: Pick<Angebot, 'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max'> | null
+  angebote?: Pick<
+    Angebot,
+    'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max' | 'leistungsumfang' | 'notizen'
+  > | null
   auftraege?: Pick<Auftrag, 'id' | 'titel'> | null
 }
 

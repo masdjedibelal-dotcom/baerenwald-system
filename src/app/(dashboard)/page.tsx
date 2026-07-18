@@ -1,44 +1,28 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
-import { MockDashboardClient } from '@/components/dashboard/MockDashboardClient'
-import type { MockDashboardKpi, MockDashboardPhase } from '@/components/dashboard/MockDashboardClient'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import type { AngebotListeEintrag, AngebotPosition, LeadWithAngebote } from '@/lib/types'
-import type { AuftragListeEintrag } from '@/lib/types'
-import type { RechnungListeZeile } from '@/lib/types'
+import { DashboardClient } from '@/components/dashboard/DashboardClient'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
-import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
-import { formatDatum } from '@/lib/utils'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { angebotKundenName, angebotSubline } from '@/components/dashboard/dashboard-list-utils'
+import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
-  angebotDashboardBadge,
-  auftragDashboardBadge,
   isAktiverAuftragStatus,
-  isNeueAnfrageStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
-  leadDashboardBadge,
-  rechnungDashboardBadge,
 } from '@/lib/dashboard-mock-mapping'
-import { RECHNUNGEN_LISTE_SELECT } from '@/lib/rechnungen/rechnungen-liste-data'
+import {
+  buildGewerkUmsatz,
+  buildHandwerkerRanking,
+  buildKundenRanking,
+  buildUmsatzverlauf12m,
+  buildVertriebsFunnel,
+  inZeitraum,
+  parseDashboardZeitraum,
+  auftragNetto,
+  zeitraumStartIso,
+  type DashboardZeitraum,
+} from '@/lib/dashboard/dashboard-analytics'
+import type { LeadWithAngebote } from '@/lib/types'
 
 export const revalidate = 60
-
-function parseAngebote(rows: unknown[]): AngebotListeEintrag[] {
-  try {
-    return (rows ?? []).map((row) => {
-      const r = row as AngebotListeEintrag & { positionen: unknown }
-      return {
-        ...r,
-        positionen: normalizeAngebotPositionen(r.positionen) as AngebotPosition[],
-      }
-    })
-  } catch (e) {
-    console.error('parseAngebote', e)
-    return []
-  }
-}
 
 type SupabaseErr = { message: string } | null
 
@@ -68,18 +52,9 @@ async function safeMaybeSingle<T>(
   }
 }
 
-function rechnungTitel(r: RechnungListeZeile): string {
-  const nr = r.rechnungsnummer?.trim()
-  const auftrag = Array.isArray(r.auftraege) ? r.auftraege[0] : r.auftraege
-  const projekt = auftrag?.titel?.trim()
-  if (nr && projekt) return `${nr} — ${projekt}`
-  if (projekt) return projekt
-  if (nr) return nr
-  return 'Rechnung'
-}
-
-export default async function DashboardPage() {
+async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
   const supabase = createClient()
+  const startIso = zeitraumStartIso(zeitraum)
 
   let user: { id: string } | null = null
   try {
@@ -96,22 +71,14 @@ export default async function DashboardPage() {
       )
     : null
 
-  const [letzteAnfragen, letzteAngebote, letzteAuftraege, letzteRechnungen] = await Promise.all([
+  const [leadsRaw, angeboteRaw, auftraegeRaw, rechnungenRaw, zuweisungenRaw] = await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
           .from('leads')
-          .select(
-            `
-        id, status, kanal, situation,
-        bereiche, preis_min, preis_max,
-        kontakt_name, kontakt_email, kontakt_telefon,
-        plz, created_at,
-        kunden!kunde_id(id, name, email, telefon)
-      `
-          )
+          .select('id, status, kunde_id, created_at')
           .order('created_at', { ascending: false })
-          .limit(64)
+          .limit(2000)
       )
     ),
     safeRows(() =>
@@ -120,14 +87,14 @@ export default async function DashboardPage() {
           .from('angebote')
           .select(
             `
-        *,
-        kunden(id, name, email, plz),
-        leads(id, situation, bereiche, plz),
-        angebot_handwerker(id, status, handwerker_id, gewerk_id, handwerker(name))
-      `
+            id, status, status_einfach, kunde_id, lead_id, created_at,
+            gesamt_fix, gesamt_min, gesamt_max, positionen,
+            leads(id, status),
+            auftraege(id, status)
+          `
           )
           .order('created_at', { ascending: false })
-          .limit(64)
+          .limit(2000)
       )
     ),
     safeRows(() =>
@@ -136,43 +103,75 @@ export default async function DashboardPage() {
           .from('auftraege')
           .select(
             `
-        *,
-        kunden(id, name, email, telefon),
-        angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
-        auftrag_handwerker(*, handwerker(name), gewerke(name))
-      `
+            id, status, kunde_id, lead_id, angebot_id, created_at, titel,
+            angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
+            kunden(id, name, vorname, nachname)
+          `
           )
-          .in('status', ['offen', 'in_arbeit', 'abnahme'])
           .order('created_at', { ascending: false })
-          .limit(64)
+          .limit(2000)
       )
     ),
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select(RECHNUNGEN_LISTE_SELECT)
+          .select('id, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(64)
+          .limit(2000)
+      )
+    ),
+    safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db
+          .from('auftrag_handwerker')
+          .select(
+            `
+            id, auftrag_id, handwerker_id, vereinbarter_preis,
+            handwerker(id, name, firma),
+            gewerke(name),
+            auftraege(id, status, lead_id, angebot_id, kunde_id, created_at,
+              angebote(gesamt_fix, gesamt_min, gesamt_max, positionen))
+          `
+          )
+          .limit(3000)
       )
     ),
   ])
 
-  const anfragenListe = filterOutLegacyDemoLeads(letzteAnfragen as unknown as LeadWithAngebote[])
-  const angeboteListe = parseAngebote(letzteAngebote)
-  const auftraegeListe = letzteAuftraege as AuftragListeEintrag[]
-  const rechnungenListe = letzteRechnungen as RechnungListeZeile[]
+  const leads = filterOutLegacyDemoLeads(
+    (leadsRaw as unknown as LeadWithAngebote[]).map((l) => ({
+      ...l,
+      kontakt_email: null,
+      kontakt_name: null,
+      kontakt_telefon: null,
+      notizen: null,
+      funnel_daten: null,
+    }))
+  )
+  const angebote = angeboteRaw as Array<Record<string, unknown>>
+  const auftraege = auftraegeRaw as Array<Record<string, unknown>>
+  const rechnungen = rechnungenRaw as Array<{ id: string; status: string; created_at: string }>
 
-  const neueAnfragenCount = anfragenListe.filter((l) => isNeueAnfrageStatus(l.status)).length
-  const offeneAngeboteCount = angeboteListe.filter((a) =>
-    isOffenesAngebotStatus(a.status, a.status_einfach)
+  const leadsZ = leads.filter((l) => inZeitraum(l.created_at, startIso))
+  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
+  const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
+  const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, startIso))
+
+  const neueAnfragenCount = leadsZ.filter(
+    (l) => String(l.status ?? '').toLowerCase() === 'neu'
   ).length
-  const aktiveAuftraegeCount = auftraegeListe.filter((a) => isAktiverAuftragStatus(a.status)).length
-  const offeneRechnungenCount = rechnungenListe.filter((r) => isOffeneRechnungStatus(r.status)).length
+  const offeneAngeboteCount = angeboteZ.filter((a) =>
+    isOffenesAngebotStatus(a.status as string, a.status_einfach as string | null)
+  ).length
+  const aktiveAuftraegeCount = auftraegeZ.filter((a) =>
+    isAktiverAuftragStatus(a.status as string)
+  ).length
+  const offeneRechnungenCount = rechnungenZ.filter((r) => isOffeneRechnungStatus(r.status)).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
-  const kpis: MockDashboardKpi[] = [
+  const kpis = [
     {
       icon: 'inbox',
       label: 'Neue Anfragen',
@@ -199,82 +198,169 @@ export default async function DashboardPage() {
     },
   ]
 
-  const phasen: MockDashboardPhase[] = [
-    {
-      key: 'anfragen',
-      title: 'Anfragen',
-      icon: 'inbox',
-      href: '/vorgaenge?tab=anfrage',
-      rows: anfragenListe.slice(0, 4).map((l) => {
-        const badge = leadDashboardBadge(l.status)
-        const name = leadKontaktAnzeigeName(l, 'Ohne Name')
-        const sub = [l.situation?.trim(), l.plz?.trim()].filter(Boolean).join(' · ') || '—'
-        return {
-          id: l.id,
-          title: name,
-          sub,
-          badgeKind: badge.kind,
-          badgeLabel: badge.label,
-          href: `/anfragen/${l.id}`,
-        }
-      }),
-    },
-    {
-      key: 'angebote',
-      title: 'Angebote',
-      icon: 'file-invoice',
-      href: '/vorgaenge?tab=angebot',
-      rows: angeboteListe.slice(0, 4).map((a) => {
-        const badge = angebotDashboardBadge(a.status, a.status_einfach)
-        const kunde = angebotKundenName(a)
-        const projekt = a.leads?.situation?.trim() || angebotSubline(a)
-        const title = projekt.includes(kunde) ? projekt : `${projekt} — ${kunde}`
-        return {
-          id: a.id,
-          title,
-          sub: `AN-${a.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
-          badgeKind: badge.kind,
-          badgeLabel: badge.label,
-          href: `/angebote/${a.id}`,
-        }
-      }),
-    },
-    {
-      key: 'auftraege',
-      title: 'Aufträge',
-      icon: 'tool',
-      href: '/vorgaenge?tab=auftrag',
-      rows: auftraegeListe.slice(0, 4).map((o) => {
-        const badge = auftragDashboardBadge(o.status)
-        const ende = o.end_datum ? formatDatum(o.end_datum) : null
-        return {
-          id: o.id,
-          title: o.titel?.trim() || 'Auftrag',
-          sub: ende ? `bis ${ende}` : '—',
-          badgeKind: badge.kind,
-          badgeLabel: badge.label,
-          href: `/auftraege/${o.id}`,
-        }
-      }),
-    },
-    {
-      key: 'rechnungen',
-      title: 'Rechnungen',
-      icon: 'receipt',
-      href: '/vorgaenge?tab=rechnung',
-      rows: rechnungenListe.slice(0, 4).map((r) => {
-        const badge = rechnungDashboardBadge({ status: r.status, faellig_am: r.faellig_am })
-        return {
-          id: r.id,
-          title: rechnungTitel(r),
-          sub: formatEurBetrag(Number(r.brutto) || 0),
-          badgeKind: badge.kind,
-          badgeLabel: badge.label,
-          href: `/rechnungen/${r.id}`,
-        }
-      }),
-    },
-  ]
+  // Umsatzverlauf: immer letzte 12 Monate (unabhängig vom KPI-Filter), Auftragssummen
+  const umsatzMonate = buildUmsatzverlauf12m(
+    auftraege.map((a) => ({
+      status: String(a.status ?? ''),
+      created_at: String(a.created_at ?? ''),
+      angebote: a.angebote as never,
+    }))
+  )
 
-  return <MockDashboardClient vorname={vorname} kpis={kpis} phasen={phasen} />
+  const funnel = buildVertriebsFunnel({
+    anfragen: leadsZ.length,
+    angebote: angeboteZ.length,
+    auftraege: auftraegeZ.length,
+  })
+
+  const gewerk = buildGewerkUmsatz(
+    angeboteZ.map((a) => ({
+      positionen: a.positionen,
+      leads: a.leads as never,
+      auftraege: a.auftraege as never,
+    }))
+  )
+
+  // Handwerker-Ranking aus Zuweisungen (Zeitraum über Auftrag.created_at)
+  const hwRows: Parameters<typeof buildHandwerkerRanking>[0] = []
+  for (const z of zuweisungenRaw as Array<Record<string, unknown>>) {
+    const auftrag = Array.isArray(z.auftraege) ? z.auftraege[0] : z.auftraege
+    const auf = auftrag as Record<string, unknown> | null
+    if (!auf?.id) continue
+    if (!inZeitraum(String(auf.created_at ?? ''), startIso)) continue
+    if (String(auf.status ?? '') === 'storniert') continue
+    const hw = Array.isArray(z.handwerker) ? z.handwerker[0] : z.handwerker
+    const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
+    const hwId = String(z.handwerker_id ?? h?.id ?? '')
+    if (!hwId) continue
+    const gewerkRow = Array.isArray(z.gewerke) ? z.gewerke[0] : z.gewerke
+    const gName = (gewerkRow as { name?: string } | null)?.name?.trim() || ''
+    hwRows.push({
+      handwerker_id: hwId,
+      handwerker_name: (h?.firma || h?.name || 'Handwerker').trim(),
+      gewerk: gName,
+      vereinbarter_preis: Number(z.vereinbarter_preis) || 0,
+      auftrag_id: String(auf.id),
+      auftrag_netto: auftragNetto({ angebote: auf.angebote as never }),
+      lead_id: (auf.lead_id as string | null) ?? null,
+      angebot_id: (auf.angebot_id as string | null) ?? null,
+    })
+  }
+
+  // Auch Anfragen/Angebote ohne Auftrag: über angebot_handwerker für Vorgänge-Zählung
+  const angebotHw = await safeRows(() =>
+    withCrmReadFallback(async (db) =>
+      db
+        .from('angebot_handwerker')
+        .select(
+          `
+          angebot_id, handwerker_id,
+          handwerker(id, name, firma),
+          gewerke(name),
+          angebote(id, lead_id, kunde_id, created_at, status)
+        `
+        )
+        .limit(3000)
+    )
+  )
+
+  for (const row of angebotHw as Array<Record<string, unknown>>) {
+    const ang = Array.isArray(row.angebote) ? row.angebote[0] : row.angebote
+    const a = ang as Record<string, unknown> | null
+    if (!a?.id) continue
+    if (!inZeitraum(String(a.created_at ?? ''), startIso)) continue
+    const hw = Array.isArray(row.handwerker) ? row.handwerker[0] : row.handwerker
+    const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
+    const hwId = String(row.handwerker_id ?? h?.id ?? '')
+    if (!hwId) continue
+    const gewerkRow = Array.isArray(row.gewerke) ? row.gewerke[0] : row.gewerke
+    const gName = (gewerkRow as { name?: string } | null)?.name?.trim() || ''
+    // Nur für Vorgänge-Zählung (kein EK/Umsatz ohne Auftrag) — EK bleibt 0, Umsatz 0
+    hwRows.push({
+      handwerker_id: hwId,
+      handwerker_name: (h?.firma || h?.name || 'Handwerker').trim(),
+      gewerk: gName,
+      vereinbarter_preis: 0,
+      auftrag_id: '',
+      auftrag_netto: 0,
+      lead_id: (a.lead_id as string | null) ?? null,
+      angebot_id: String(a.id),
+    })
+  }
+
+  const rankingHandwerker = buildHandwerkerRanking(hwRows.filter((r) => r.auftrag_id || r.angebot_id || r.lead_id))
+
+  const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
+  for (const l of leadsZ) {
+    const kid = (l as { kunde_id?: string | null }).kunde_id
+    if (!kid) continue
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: 'Kunde',
+      lead_id: l.id,
+      angebot_id: null,
+      auftrag_id: null,
+      auftrag_netto: 0,
+    })
+  }
+  for (const a of angeboteZ) {
+    const kid = a.kunde_id as string | null
+    if (!kid) continue
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: 'Kunde',
+      lead_id: (a.lead_id as string | null) ?? null,
+      angebot_id: String(a.id),
+      auftrag_id: null,
+      auftrag_netto: 0,
+    })
+  }
+  for (const a of auftraegeZ) {
+    const kid = a.kunde_id as string | null
+    if (!kid) continue
+    const k = Array.isArray(a.kunden) ? a.kunden[0] : a.kunden
+    const name = k ? kundeDisplayName(k as never) : 'Kunde'
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: name,
+      lead_id: (a.lead_id as string | null) ?? null,
+      angebot_id: (a.angebot_id as string | null) ?? null,
+      auftrag_id: String(a.id),
+      auftrag_netto: auftragNetto({ angebote: a.angebote as never }),
+    })
+  }
+
+  // Namen für Kunden nachziehen aus Aufträgen
+  const nameByKunde = new Map<string, string>()
+  for (const r of kundenRows) {
+    if (r.kunde_name !== 'Kunde') nameByKunde.set(r.kunde_id, r.kunde_name)
+  }
+  const rankingKunden = buildKundenRanking(
+    kundenRows.map((r) => ({
+      ...r,
+      kunde_name: nameByKunde.get(r.kunde_id) ?? r.kunde_name,
+    }))
+  )
+
+  return (
+    <DashboardClient
+      vorname={vorname}
+      zeitraum={zeitraum}
+      kpis={kpis}
+      umsatzMonate={umsatzMonate}
+      funnel={funnel}
+      gewerk={gewerk}
+      rankingHandwerker={rankingHandwerker}
+      rankingKunden={rankingKunden}
+    />
+  )
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { zeitraum?: string }
+}) {
+  const zeitraum = parseDashboardZeitraum(searchParams?.zeitraum)
+  return <DashboardData zeitraum={zeitraum} />
 }

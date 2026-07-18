@@ -54,7 +54,7 @@ export function AuftragDetailTopCards({
         <MockProp label="Projektleitung">
           {team.length ? (
             <select
-              className="input max-w-full"
+              className="sel"
               value={betreuerId}
               onChange={(e) => onBetreuerChange(e.target.value)}
               disabled={pending}

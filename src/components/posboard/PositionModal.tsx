@@ -6,6 +6,7 @@ import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
+import { richTextToPlain } from '@/lib/rich-text'
 
 function Field({
   label,
@@ -108,7 +109,7 @@ export function PositionModal({
         <Field label="Beschreibung" full hint="Erscheint beim Kunden">
           <textarea
             className="ta"
-            value={p.beschreibung ?? ''}
+            value={richTextToPlain(p.beschreibung)}
             onChange={(e) => onChange({ beschreibung: e.target.value })}
             rows={2}
             placeholder="Details zur Leistung…"

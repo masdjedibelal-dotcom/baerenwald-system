@@ -1,23 +1,8 @@
 'use client'
 
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockProp } from '@/components/mock-ui/MockProp'
+import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import type { LeadDetail, Rechnung } from '@/lib/types'
 import { formatLeadListDatum, kanalLabel } from '@/lib/utils'
-
-function telHref(tel: string) {
-  return `tel:${tel.replace(/\s/g, '')}`
-}
-
-function regionLabel(detail: Rechnung, lead?: LeadDetail | null): string {
-  const kunde = detail.kunden
-  const ort = (kunde?.ort ?? '').trim()
-  const plz = (kunde?.plz ?? lead?.plz ?? '').trim()
-  if (ort && plz) return `${ort} · ${plz}`
-  if (ort) return ort
-  if (plz) return plz
-  return '—'
-}
 
 function eingegangenLabel(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -28,43 +13,36 @@ function eingegangenLabel(iso: string | null | undefined): string {
   return `${day} · ${time}`
 }
 
-/**
- * Mock Stammdaten Rechnung — flache Prop-Liste wie Anfrage/Angebot
- * (Name · Telefon · E-Mail · Region · Quelle · Eingegangen).
- */
 export function RechnungStammdatenCard({
   detail,
   lead,
+  onSaved,
 }: {
   detail: Rechnung
   lead?: LeadDetail | null
+  onSaved?: () => void
 }) {
-  const name = detail.kunden?.name?.trim() || '—'
-  const tel =
-    detail.kunden?.telefon?.trim() ||
-    lead?.kontakt_telefon?.trim() ||
-    ''
-  const email =
-    detail.kunden?.email?.trim() ||
-    lead?.kontakt_email?.trim() ||
-    ''
-  const quelle = lead ? kanalLabel(lead.kanal) : null
-  const eingegangen = eingegangenLabel(detail.created_at || detail.rechnungsdatum || lead?.created_at)
+  const name = detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || ''
 
   return (
-    <MockCard title="Stammdaten">
-      <div className="props">
-        <MockProp label="Name">{name}</MockProp>
-        <MockProp label="Telefon" link={Boolean(tel)}>
-          {tel ? <a href={telHref(tel)}>{tel}</a> : '—'}
-        </MockProp>
-        <MockProp label="E-Mail" link={Boolean(email)}>
-          {email ? <a href={`mailto:${email}`}>{email}</a> : '—'}
-        </MockProp>
-        <MockProp label="Region">{regionLabel(detail, lead)}</MockProp>
-        {quelle ? <MockProp label="Quelle">{quelle}</MockProp> : null}
-        <MockProp label="Eingegangen">{eingegangen}</MockProp>
-      </div>
-    </MockCard>
+    <EntityKundenStammdatenCard
+      kundeId={detail.kunde_id ?? detail.kunden?.id}
+      leadId={lead?.id}
+      initial={{
+        name,
+        telefon:
+          detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || '',
+        email: detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || '',
+        plz: detail.kunden?.plz?.trim() || lead?.plz?.trim() || '',
+        ort: detail.kunden?.ort?.trim() || '',
+        strasse: detail.kunden?.adresse?.trim() || '',
+      }}
+      kundeTyp={detail.kunden?.typ}
+      quelle={lead ? kanalLabel(lead.kanal) : null}
+      eingegangen={eingegangenLabel(
+        detail.created_at || detail.rechnungsdatum || lead?.created_at
+      )}
+      onSaved={onSaved}
+    />
   )
 }

@@ -194,7 +194,7 @@ export function KiHubClient({ initialAnalysen }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="sticky top-0 z-20 -mx-4 border-b border-bw-border bg-bw-card/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6">
+      <div className="sticky top-0 z-20 -mx-4 border-b border-bw-border bg-white px-4 py-4 md:-mx-6 md:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#2E7D52]">

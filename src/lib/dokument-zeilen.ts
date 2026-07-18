@@ -416,5 +416,6 @@ export function dokumentArtikelToWizardPosition(z: DokumentArtikelZeile): Wizard
 }
 
 export function formatEurBetrag(n: number): string {
-  return `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  const v = Number.isFinite(n) ? n : 0
+  return `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }

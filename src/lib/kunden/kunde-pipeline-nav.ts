@@ -18,7 +18,7 @@ export function findeAngebotFuerAuftrag(kunde: KundeDetailPayload): string | nul
 }
 
 export function kundeNeueAnfrageHref(kundeId: string): string {
-  return `/anfragen?neu=1&kunde_id=${encodeURIComponent(kundeId)}`
+  return `/anfragen/neu?kunde_id=${encodeURIComponent(kundeId)}`
 }
 
 export function kundeNeuesAngebotHref(kunde: KundeDetailPayload): string {
@@ -26,7 +26,7 @@ export function kundeNeuesAngebotHref(kunde: KundeDetailPayload): string {
   if (leadId) {
     return `/anfragen/${leadId}?angebot_wizard=1`
   }
-  return `/anfragen?neu=1&kunde_id=${encodeURIComponent(kunde.id)}&ziel=angebot`
+  return `/anfragen/neu?kunde_id=${encodeURIComponent(kunde.id)}&ziel=angebot`
 }
 
 export function kundeNeuerAuftragHref(kunde: KundeDetailPayload): string {
@@ -34,5 +34,5 @@ export function kundeNeuerAuftragHref(kunde: KundeDetailPayload): string {
   if (angebotId) return `/angebote/${angebotId}`
   const leadId = neuesteLeadId(kunde)
   if (leadId) return `/anfragen/${leadId}?angebot_wizard=1`
-  return `/anfragen?neu=1&kunde_id=${encodeURIComponent(kunde.id)}&ziel=angebot`
+  return `/anfragen/neu?kunde_id=${encodeURIComponent(kunde.id)}&ziel=angebot`
 }

@@ -91,7 +91,7 @@ export function KundeSidePanel({
             + Neue Anfrage
           </Link>
           <Link
-            href={`/anfragen?neu=1&kunde_id=${summary.id}&ziel=angebot`}
+            href={`/anfragen/neu?kunde_id=${summary.id}&ziel=angebot`}
             className="btn ghost sm inline-flex w-full justify-center"
           >
             + Neues Angebot

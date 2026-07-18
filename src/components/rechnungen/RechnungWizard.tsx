@@ -9,6 +9,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { PosBoard } from '@/components/posboard/PosBoard'
+import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAllAbschlagRechnungenFromWizard,
@@ -32,6 +33,7 @@ import {
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
+import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
@@ -45,26 +47,26 @@ import type {
   RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
+  berechneZahlungsplan,
+  emptyZahlungsplan,
   neueZahlungsplanZeile,
+  zahlungsplanVorlage30_40_30,
+  zahlungsplanVorlage30_70,
+  zahlungsplanVorlage50_50,
   type Zahlungsplan,
+  type ZahlungsplanAbschlagTyp,
+  type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
 import type { Gewerk, Preisliste } from '@/lib/types'
 import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
-  plusDaysIso,
   type ZahlfristSeg,
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
+import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 
-type Rate = {
-  id: string
-  label: string
-  prozent: number
-  faellig: string
-}
-
-type Versandweg = 'portal' | 'email' | 'post'
+type Rechnungsart = 'abschlag' | 'schluss'
 type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos'
 
 const ANLAGEN_DEF: Array<{
@@ -90,72 +92,38 @@ const ANLAGEN_DEF: Array<{
 
 const WIZARD_STEPS = [
   { id: 1, label: 'Positionen' },
-  { id: 2, label: 'Zahlplan' },
-  { id: 3, label: 'Paket & Versand' },
+  { id: 2, label: 'Individualisieren' },
+  { id: 3, label: 'Paket' },
+  { id: 4, label: 'Versand' },
+]
+
+const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
+  { name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
+  { name: '50 / 50', build: zahlungsplanVorlage50_50 },
+  { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
 ]
 
 function formatDateDe(ymd: string): string {
   return formatDateDeYmd(ymd)
 }
 
-function mkRate(label: string, prozent: number, tage: number): Rate {
-  return {
-    id: `rate-${Math.random().toString(36).slice(2, 9)}`,
-    label,
-    prozent,
-    faellig: plusDaysIso(tage),
-  }
+function planProzentSumme(plan: Zahlungsplan): number {
+  return plan.zeilen
+    .filter((z) => z.typ === 'prozent')
+    .reduce((s, z) => s + (Number(z.wert) || 0), 0)
 }
 
-const PRESETS: Record<string, Array<[string, number, number]>> = {
-  '30 / 40 / 30': [
-    ['1. Abschlag', 30, 14],
-    ['2. Abschlag', 40, 45],
-    ['Schlussrechnung', 30, 75],
-  ],
-  '50 / 50': [
-    ['Anzahlung', 50, 14],
-    ['Schlussrechnung', 50, 60],
-  ],
-  'Anzahlung 30% + Rest': [
-    ['Anzahlung', 30, 7],
-    ['Schlussrechnung', 70, 60],
-  ],
-}
-
-function ratesToZahlungsplan(raten: Rate[]): Zahlungsplan {
-  return {
-    modus: 'abschlagsplan',
-    zeilen: raten.map((r) =>
-      neueZahlungsplanZeile({
-        id: r.id,
-        titel: r.label,
-        typ: 'prozent',
-        wert: r.prozent,
-      })
-    ),
-  }
-}
-
-function planToRates(plan: Zahlungsplan | null | undefined): Rate[] {
-  if (!plan?.zeilen.length) {
-    return [
-      mkRate('1. Abschlag', 30, 14),
-      mkRate('2. Abschlag', 40, 45),
-      mkRate('Schlussrechnung', 30, 75),
-    ]
-  }
-  return plan.zeilen.map((z, i) => ({
-    id: z.id,
-    label: z.titel,
-    prozent: z.typ === 'rest' ? 0 : Number(z.wert) || 0,
-    faellig: plusDaysIso(14 + i * 30),
-  }))
+function planIstOk(plan: Zahlungsplan): boolean {
+  if (!plan.zeilen.length) return true
+  const hasRest = plan.zeilen.some((z) => z.typ === 'rest')
+  const hasBetrag = plan.zeilen.some((z) => z.typ === 'betrag')
+  if (hasRest || hasBetrag) return plan.zeilen.length >= 1
+  return Math.round(planProzentSumme(plan)) === 100
 }
 
 /**
- * Rechnungs-Wizard 1:1 Mock:
- * Positionen (PosBoard) → Zahlplan → Paket & Versand
+ * Rechnungs-Wizard:
+ * Positionen → Individualisieren → Paket → Versand
  */
 export function RechnungWizard({
   bootstrap,
@@ -202,14 +170,21 @@ export function RechnungWizard({
   const [step, setStep] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
-  const [mode, setMode] = useState<'einzel' | 'plan'>(() =>
-    bootstrap.meta.zahlungsart === 'abschlaege' || bootstrap.modus === 'abschlag'
-      ? 'plan'
-      : 'einzel'
+  const [rechnungsart, setRechnungsart] = useState<Rechnungsart>(() =>
+    bootstrap.modus === 'abschlag' || bootstrap.abschlag?.rechnungArt === 'abschlag'
+      ? 'abschlag'
+      : bootstrap.abschlag?.istSchluss
+        ? 'schluss'
+        : 'schluss'
   )
-  const [raten, setRaten] = useState<Rate[]>(() => planToRates(bootstrap.zahlungsplan))
-  const [aktivRate, setAktivRate] = useState<string | null>(null)
-  const [versandweg, setVersandweg] = useState<Versandweg>('portal')
+  const [plan, setPlan] = useState<Zahlungsplan>(() =>
+    bootstrap.zahlungsplan?.zeilen?.length
+      ? bootstrap.zahlungsplan
+      : emptyZahlungsplan()
+  )
+  const [aktivRate, setAktivRate] = useState<string | null>(
+    () => bootstrap.abschlag?.zeileId ?? bootstrap.meta.abschlag_zeile_id ?? null
+  )
   const [anlagen, setAnlagen] = useState<Record<AnlagenKey, boolean>>({
     rechnung: true,
     leistungsnachweis: true,
@@ -222,6 +197,16 @@ export function RechnungWizard({
       bootstrap.meta.einleitung?.trim() ||
       `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
   )
+  const [mailBetreff, setMailBetreff] = useState(
+    () => bootstrap.meta.mail_betreff?.trim() || ''
+  )
+  const [mailTo, setMailTo] = useState<string[]>(() =>
+    kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
+  )
+  const [mailCc, setMailCc] = useState<string[]>([])
+  const [docPreviewTab, setDocPreviewTab] = useState<AnlagenKey>('rechnung')
+  const [docAccordionOpen, setDocAccordionOpen] = useState(true)
+
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
@@ -236,7 +221,8 @@ export function RechnungWizard({
   const savedSnapshotRef = useRef<string | null>(null)
 
   const kundeId = bootstrap.kundeId
-  const istPlan = mode === 'plan'
+  const hasPlan = plan.zeilen.length > 0
+  const planOk = planIstOk(plan)
 
   useEffect(() => {
     setMounted(true)
@@ -247,8 +233,17 @@ export function RechnungWizard({
   }, [])
 
   useEffect(() => {
-    if (mode === 'plan' && !aktivRate && raten[0]) setAktivRate(raten[0].id)
-  }, [mode, aktivRate, raten])
+    if (!hasPlan) {
+      setAktivRate(null)
+      return
+    }
+    if (aktivRate && plan.zeilen.some((z) => z.id === aktivRate)) return
+    if (rechnungsart === 'schluss') {
+      setAktivRate(plan.zeilen[plan.zeilen.length - 1]?.id ?? null)
+    } else {
+      setAktivRate(plan.zeilen[0]?.id ?? null)
+    }
+  }, [hasPlan, plan.zeilen, aktivRate, rechnungsart])
 
   const positionenBerechnet = useMemo(
     () => dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
@@ -266,25 +261,35 @@ export function RechnungWizard({
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
   )
 
+  const netto = berechnung.netto
   const brutto = berechnung.brutto
   const lohnAnteil = berechnung.lohn_netto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
+  const planKontext = useMemo(
+    () => berechneZahlungsplan(plan, netto, defaultMwst),
+    [plan, netto, defaultMwst]
+  )
 
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
-  const prozentSumme = raten.reduce((s, r) => s + (Number(r.prozent) || 0), 0)
-  const planOk = !istPlan || prozentSumme === 100
-  const selRate = raten.find((r) => r.id === aktivRate) ?? null
-  const rateBrutto = (r: Rate) => Math.round((brutto * (Number(r.prozent) || 0)) / 100)
+  const selRate = plan.zeilen.find((z) => z.id === aktivRate) ?? null
+  const selBerechnet = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
   const rTitel =
-    istPlan && selRate
-      ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.label}`
-      : `${bootstrap.projektTitel || auftragLabel} — Schlussrechnung`
-  const rBrutto = istPlan && selRate ? rateBrutto(selRate) : brutto
-  const rFaellig = istPlan && selRate ? selRate.faellig : einzelFaellig
+    hasPlan && selRate
+      ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.titel}`
+      : `${bootstrap.projektTitel || auftragLabel} — ${
+          rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
+        }`
+  const rBrutto = hasPlan && selBerechnet ? selBerechnet.brutto : brutto
+  const rFaellig =
+    hasPlan && selRate?.faellig_am?.trim()
+      ? selRate.faellig_am.trim().slice(0, 10)
+      : einzelFaellig
   const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
+  const selectedAnlagen = ANLAGEN_DEF.filter((a) => anlagen[a.key])
   const previewNr = rechnungsnummer.trim() || 'RE-Entwurf'
   const activeVersandId = versandRechnungId ?? rechnungId
+  const defaultBetreff = `${previewNr} · ${rTitel}`
 
   function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
     setZahlfrist(seg)
@@ -295,8 +300,17 @@ export function RechnungWizard({
   }
 
   const draftSnapshot = useMemo(
-    () => JSON.stringify({ zeilen, meta, mode, raten, einleitung }),
-    [zeilen, meta, mode, raten, einleitung]
+    () =>
+      JSON.stringify({
+        zeilen,
+        meta,
+        rechnungsart,
+        plan,
+        einleitung,
+        mailBetreff,
+        anlagen,
+      }),
+    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, anlagen]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -310,24 +324,45 @@ export function RechnungWizard({
     setZeilen(posBoardLinesToDokumentZeilen(next, zeilen))
   }
 
-  function applyPreset(name: string) {
-    const rows = PRESETS[name]
-    if (!rows) return
-    setRaten(rows.map(([l, p, t]) => mkRate(l, p, t)))
-    setAktivRate(null)
+  function patchPlanZeile(id: string, patch: Partial<ZahlungsplanZeile>) {
+    setPlan((p) => ({
+      ...p,
+      modus: 'abschlagsplan',
+      zeilen: p.zeilen.map((z) => (z.id === id ? { ...z, ...patch } : z)),
+    }))
   }
 
-  function updRate(id: string, patch: Partial<Rate>) {
-    setRaten((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  function addPlanZeile() {
+    setPlan((p) => ({
+      ...p,
+      modus: 'abschlagsplan',
+      zeilen: [
+        ...p.zeilen,
+        neueZahlungsplanZeile({
+          titel: `${p.zeilen.length + 1}. Abschlag`,
+          typ: 'prozent',
+          wert: 0,
+        }),
+      ],
+    }))
   }
 
-  function rmRate(id: string) {
-    setRaten((prev) => prev.filter((r) => r.id !== id))
+  function removePlanZeile(id: string) {
+    setPlan((p) => ({
+      ...p,
+      modus: 'abschlagsplan',
+      zeilen: p.zeilen.filter((z) => z.id !== id),
+    }))
     setAktivRate((cur) => (cur === id ? null : cur))
   }
 
-  function addRate() {
-    setRaten((prev) => [...prev, mkRate(`${prev.length + 1}. Abschlag`, 0, 30)])
+  function enablePlan() {
+    setPlan(zahlungsplanVorlage30_40_30())
+  }
+
+  function clearPlan() {
+    setPlan(emptyZahlungsplan())
+    setAktivRate(null)
   }
 
   function toggleAnlage(k: AnlagenKey) {
@@ -339,8 +374,9 @@ export function RechnungWizard({
       ...meta,
       einleitung,
       mail_einleitung: einleitung,
-      zahlungsart: istPlan ? 'abschlaege' : 'standard',
-      abschlag_zeile_id: istPlan ? aktivRate : null,
+      mail_betreff: mailBetreff.trim() || defaultBetreff,
+      zahlungsart: hasPlan ? 'abschlaege' : 'standard',
+      abschlag_zeile_id: hasPlan ? aktivRate : null,
       faellig_am: rFaellig,
     }
   }
@@ -369,7 +405,7 @@ export function RechnungWizard({
         kunde_id: kundeId,
         positionen: positionenBerechnet,
         meta: nextMeta,
-        modus: bootstrap.modus ?? 'voll',
+        modus: rechnungsart === 'abschlag' ? 'abschlag' : bootstrap.modus ?? 'voll',
         zahlungsplan: null,
         zahlungsplanSpeichern: false,
       })
@@ -398,9 +434,12 @@ export function RechnungWizard({
       draftSnapshot,
       meta,
       einleitung,
-      istPlan,
+      mailBetreff,
+      hasPlan,
       aktivRate,
       rFaellig,
+      rechnungsart,
+      defaultBetreff,
     ]
   )
 
@@ -414,10 +453,9 @@ export function RechnungWizard({
       return null
     }
     if (!planOk) {
-      toast.error('Zahlplan-Summe muss 100% sein.')
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return null
     }
-    const plan = ratesToZahlungsplan(raten)
     const nextMeta = buildMetaForSave()
     setSaving(true)
     const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
@@ -454,88 +492,65 @@ export function RechnungWizard({
     bootstrap.angebotId,
     kundeId,
     planOk,
-    raten,
+    plan,
     positionenBerechnet,
     aktivRate,
     draftSnapshot,
     meta,
     einleitung,
-    istPlan,
+    mailBetreff,
+    hasPlan,
     rFaellig,
+    defaultBetreff,
   ])
 
-  async function handleFinish() {
-    if (!planOk) {
-      toast.error('Zahlplan-Summe muss 100% sein.')
+  async function persistDraft(): Promise<string | null> {
+    return hasPlan ? persistPlan() : persistEinzel()
+  }
+
+  async function handleFinish(sendMail: boolean) {
+    if (hasPlan && !planOk) {
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
-    const id = istPlan ? await persistPlan() : await persistEinzel()
+    const id = await persistDraft()
     if (!id) return
 
-    const mailTo =
-      kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
     const nextMeta = buildMetaForSave()
     const nrLabel = () =>
       abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
       (id === activeVersandId ? rechnungsnummer.trim() : '') ||
       previewNr
 
-    // Post: ohne E-Mail finalisieren
-    if (versandweg === 'post') {
-      setSaving(true)
-      await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
-      const res = await finalizeRechnungWizardWithoutMail(id)
-      setSaving(false)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(
-        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt & drucken · ${formatEurBetrag(rBrutto)} brutto`
-      )
-      onDone?.(id)
-      onClose()
-      router.refresh()
-      return
-    }
-
-    // Portal ohne E-Mail: bereitstellen
-    if (versandweg === 'portal' && !mailTo.length) {
-      setSaving(true)
-      await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
-      const res = await finalizeRechnungWizardWithoutMail(id)
-      setSaving(false)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(
-        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
-      )
-      onDone?.(id)
-      onClose()
-      router.refresh()
-      return
-    }
-
-    if (!mailTo.length) {
-      toast.error('Keine Kunden-E-Mail hinterlegt — Versand nicht möglich.')
-      return
-    }
     setSaving(true)
-    const sync = await syncRechnungWizardMetaToEntwurf(id, {
-      kunde_id: kundeId,
-      meta: nextMeta,
-    })
-    if (!sync.ok) {
+    await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
+
+    if (!sendMail) {
+      const res = await finalizeRechnungWizardWithoutMail(id)
       setSaving(false)
-      toast.error(sync.message)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
+      return
+    }
+
+    const to = mailTo.filter((e) => isValidEmail(e))
+    if (!to.length) {
+      setSaving(false)
+      toast.error('Mindestens eine gültige Empfänger-E-Mail erforderlich.')
       return
     }
     const res = await sendRechnungWizard({
       rechnungId: id,
-      mailTo,
-      mailCc: [],
+      mailTo: to,
+      mailCc: mailCc.filter((e) => isValidEmail(e)),
     })
     setSaving(false)
     if (!res.ok) {
@@ -560,17 +575,29 @@ export function RechnungWizard({
     onClose()
   }
 
-  function handleWeiter() {
-    if (step === 2 && istPlan && !planOk) {
-      toast.error('Zahlplan-Summe muss 100% sein.')
+  async function handleWeiter() {
+    if (step === 1) {
+      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      if (!artikel.length) {
+        toast.error('Mindestens eine Position erforderlich.')
+        return
+      }
+    }
+    if (step === 2 && hasPlan && !planOk) {
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
-    setStep((s) => Math.min(3, s + 1))
+    if (step === 3) {
+      const id = await persistDraft()
+      if (!id) return
+      if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
+      const firstDoc = selectedAnlagen[0]?.key ?? 'rechnung'
+      setDocPreviewTab(firstDoc)
+    }
+    setStep((s) => Math.min(4, s + 1))
   }
 
   if (!mounted) return null
-
-  const finishLabel = `Rechnung erstellen & ${versandweg === 'post' ? 'drucken' : 'senden'}`
 
   const desktopActions = (
     <div className="wizard-nav-actions">
@@ -579,30 +606,39 @@ export function RechnungWizard({
           Zurück
         </MockBtn>
       ) : null}
-      {step < 3 ? (
-        <MockBtn kind="primary" icon="chevron-right" onClick={handleWeiter}>
+      {step < 4 ? (
+        <MockBtn kind="primary" icon="chevron-right" onClick={() => void handleWeiter()}>
           Weiter
         </MockBtn>
       ) : (
-        <MockBtn
-          kind="primary"
-          icon="send"
-          disabled={saving || !planOk}
-          onClick={() => void handleFinish()}
-        >
-          {finishLabel}
-        </MockBtn>
+        <>
+          <MockBtn
+            kind="ghost"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(false)}
+          >
+            Erstellen
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="send"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(true)}
+          >
+            Erstellen und versenden
+          </MockBtn>
+        </>
       )}
     </div>
   )
 
   const mobileActions =
-    step < 3 ? (
+    step < 4 ? (
       <>
         {step > 1 ? (
           <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
         ) : null}
-        <MockBtn sm kind="primary" onClick={handleWeiter}>
+        <MockBtn sm kind="primary" onClick={() => void handleWeiter()}>
           Weiter
         </MockBtn>
       </>
@@ -613,24 +649,87 @@ export function RechnungWizard({
           sm
           kind="primary"
           icon="send"
-          disabled={saving || !planOk}
-          onClick={() => void handleFinish()}
+          disabled={saving || (hasPlan && !planOk)}
+          onClick={() => void handleFinish(true)}
         >
-          {versandweg === 'post' ? 'Drucken' : 'Senden'}
+          Versenden
         </MockBtn>
       </>
     )
 
-  const wege: Array<{ key: Versandweg; label: string; icon: string; sub: string }> = [
-    {
-      key: 'portal',
-      label: 'Kundenportal',
-      icon: 'layout-dashboard',
-      sub: 'Freigabe & Download im Portal',
-    },
-    { key: 'email', label: 'E-Mail', icon: 'mail', sub: `PDF-Anhang an ${kundeName}` },
-    { key: 'post', label: 'Post', icon: 'building', sub: 'Ausdruck & Briefversand' },
-  ]
+  const steuernBlock = (
+    <>
+      <div
+        className="section-h"
+        style={{
+          marginBottom: 10,
+          marginTop: 18,
+          textTransform: 'none',
+          letterSpacing: 0,
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--text)',
+        }}
+      >
+        Steuerliche Hinweise
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {(
+          [
+            {
+              on: meta.hinweis_35a,
+              set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
+              label: '§35a EStG-Hinweis ausweisen',
+              sub: 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
+            },
+            {
+              on: meta.reverse_charge_13b,
+              set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
+              label: 'Reverse-Charge (§13b UStG)',
+              sub: 'Steuerschuldnerschaft des Leistungsempfängers',
+            },
+          ] as const
+        ).map((c) => (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => c.set(!c.on)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 11,
+              padding: '10px 12px',
+              border: `1px solid ${c.on ? 'var(--green)' : 'var(--border)'}`,
+              background: c.on ? 'var(--green-50)' : 'var(--card)',
+              borderRadius: 9,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 5,
+                border: `1.5px solid ${c.on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                background: c.on ? 'var(--green)' : 'transparent',
+                display: 'grid',
+                placeItems: 'center',
+                flex: '0 0 auto',
+                color: '#fff',
+              }}
+            >
+              {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{c.sub}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
+  )
 
   const wizard = (
     <WizardShell
@@ -645,21 +744,35 @@ export function RechnungWizard({
       {step === 1 ? (
         <>
           <div
-            className="section-h"
             style={{
-              marginBottom: 12,
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--text)',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <span>Leistungen · Gesamtumfang</span>
-            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+            <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
+              Rechnungsart
+            </div>
+            <div className="seg" role="group" aria-label="Rechnungsart">
+              <button
+                type="button"
+                className={rechnungsart === 'abschlag' ? 'on' : undefined}
+                onClick={() => setRechnungsart('abschlag')}
+              >
+                Abschlag
+              </button>
+              <button
+                type="button"
+                className={rechnungsart === 'schluss' ? 'on' : undefined}
+                onClick={() => setRechnungsart('schluss')}
+              >
+                Schlussrechnung
+              </button>
+            </div>
+            <div style={{ flex: 1 }} />
+            <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>
               Auftrag {auftragLabel} · {kundeName}
             </span>
           </div>
@@ -677,306 +790,336 @@ export function RechnungWizard({
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
               gap: 12,
-              marginBottom: 16,
+              marginBottom: 14,
               flexWrap: 'wrap',
             }}
           >
-            <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
-              Zahlungsweise
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Individualisieren
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+                Zahlungsziel, optionaler Zahlplan und steuerliche Hinweise
+              </div>
             </div>
-            <div className="seg" role="group" aria-label="Zahlungsweise">
-              <button
-                type="button"
-                className={mode === 'einzel' ? 'on' : undefined}
-                onClick={() => setMode('einzel')}
-              >
-                Einzelrechnung
-              </button>
-              <button
-                type="button"
-                className={mode === 'plan' ? 'on' : undefined}
-                onClick={() => setMode('plan')}
-              >
-                Zahlplan (Abschläge)
-              </button>
-            </div>
-            <div style={{ flex: 1 }} />
             <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-              Gesamt{' '}
-              <b style={{ color: 'var(--green)' }}>{formatEurBetrag(brutto)}</b> brutto
+              Gesamt <b style={{ color: 'var(--green)' }}>{formatEurBetrag(brutto)}</b> brutto
             </div>
           </div>
 
-          {istPlan ? (
-            <>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--text-3)',
-                    alignSelf: 'center',
-                    marginRight: 2,
-                  }}
-                >
-                  Vorlage:
-                </span>
-                {Object.keys(PRESETS).map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => applyPreset(name)}
-                    style={{
-                      padding: '5px 11px',
-                      borderRadius: 8,
-                      border: '0.5px solid var(--border)',
-                      background: 'var(--card)',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-              <div
-                style={{
-                  border: '0.5px solid var(--border)',
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  background: 'var(--card)',
-                  boxShadow: 'var(--shadow)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 84px 120px 150px 34px',
-                    gap: 10,
-                    padding: '9px 14px',
-                    background: 'var(--bg-soft)',
-                    borderBottom: '0.5px solid var(--border)',
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    color: 'var(--text-2)',
-                  }}
-                >
-                  <div>Bezeichnung</div>
-                  <div style={{ textAlign: 'right' }}>Anteil</div>
-                  <div style={{ textAlign: 'right' }}>Betrag brutto</div>
-                  <div>Fällig</div>
-                  <div />
+          <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung">
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <MockZahlfristSeg
+                value={zahlfrist}
+                onChange={(v) => applyZahlfrist(v)}
+                aria-label="Zahlungsziel / Zahlfrist"
+              />
+              {zahlfrist === 'datum' ? (
+                <div style={{ width: 180 }}>
+                  <input
+                    type="date"
+                    className="input"
+                    value={zahlfristDatum}
+                    onChange={(e) => applyZahlfrist('datum', e.target.value)}
+                  />
                 </div>
-                {raten.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 84px 120px 150px 34px',
-                      gap: 10,
-                      padding: '8px 14px',
-                      borderBottom: '0.5px solid var(--border)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <input
-                      className="input"
-                      value={r.label}
-                      onChange={(e) => updRate(r.id, { label: e.target.value })}
-                      style={{ height: 32 }}
-                    />
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        className="input"
-                        type="number"
-                        value={r.prozent}
-                        onChange={(e) =>
-                          updRate(r.id, { prozent: Number(e.target.value) || 0 })
-                        }
-                        style={{ textAlign: 'right', paddingRight: 22, height: 32 }}
-                      />
-                      <span
-                        style={{
-                          position: 'absolute',
-                          right: 8,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          fontSize: 12,
-                          color: 'var(--text-3)',
-                        }}
-                      >
-                        %
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        textAlign: 'right',
-                        fontWeight: 600,
-                        fontVariantNumeric: 'tabular-nums',
-                        fontSize: 13,
-                      }}
-                    >
-                      {formatEurBetrag(rateBrutto(r))}
-                    </div>
-                    <input
-                      className="input"
-                      type="date"
-                      value={r.faellig}
-                      onChange={(e) => updRate(r.id, { faellig: e.target.value })}
-                      style={{ height: 32, fontSize: 12 }}
-                    />
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="trash"
-                      title="Entfernen"
-                      onClick={() => rmRate(r.id)}
-                    />
+              ) : null}
+            </div>
+          </MockField>
+
+          <div style={{ marginTop: 18 }}>
+            {!hasPlan ? (
+              <div className="card" style={{ padding: 20 }}>
+                <div className="zahlplan-empty">
+                  <MockIcon ctx="empty" n="calculator" size={26} />
+                  <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
+                  <div className="zahlplan-empty__text">
+                    Optional: Teile die Auftragssumme von{' '}
+                    <b>{formatEurBetrag(netto)}</b> netto in Abschläge auf — z. B. 30 % bei Beginn,
+                    40 % nach Rohbau, 30 % zur Schlussrechnung.
                   </div>
-                ))}
+                  <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
+                    Zahlplan hinzufügen
+                  </MockBtn>
+                </div>
+              </div>
+            ) : (
+              <>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '8px 14px',
-                    gap: 10,
+                    gap: 8,
+                    marginBottom: 10,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <button
-                    type="button"
-                    className="pt-add"
-                    style={{ border: 'none', padding: 0, width: 'auto' }}
-                    onClick={addRate}
+                  <div
+                    className="section-h"
+                    style={{ marginBottom: 0, textTransform: 'none', flex: 1 }}
                   >
-                    <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
-                  </button>
-                  <div style={{ flex: 1 }} />
-                  <span
+                    Zahlplan
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
+                    Vorlage:
+                  </span>
+                  {PLAN_PRESETS.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      className="zahlplan-preset-chip"
+                      onClick={() => setPlan(p.build())}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                  <MockBtn sm kind="ghost" onClick={clearPlan}>
+                    Entfernen
+                  </MockBtn>
+                </div>
+
+                <div
+                  style={{
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'var(--card)',
+                    boxShadow: 'var(--shadow)',
+                  }}
+                >
+                  <div
                     style={{
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      color:
-                        prozentSumme === 100
-                          ? 'var(--green)'
-                          : 'var(--danger, #c0392b)',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
+                      gap: 10,
+                      padding: '9px 14px',
+                      background: 'var(--bg-soft)',
+                      borderBottom: '0.5px solid var(--border)',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: 'var(--text-2)',
                     }}
                   >
-                    Summe {prozentSumme}%
-                    {prozentSumme !== 100 ? ' · muss 100% sein' : ''}
-                  </span>
+                    <div>Bezeichnung</div>
+                    <div>Art</div>
+                    <div style={{ textAlign: 'right' }}>Anteil</div>
+                    <div style={{ textAlign: 'right' }}>Betrag brutto</div>
+                    <div>Fällig</div>
+                    <div />
+                  </div>
+                  {plan.zeilen.map((z) => {
+                    const berech = planKontext.zeilen.find((x) => x.id === z.id)
+                    return (
+                      <div
+                        key={z.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
+                          gap: 10,
+                          padding: '8px 14px',
+                          borderBottom: '0.5px solid var(--border)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <input
+                          className="input"
+                          value={z.titel}
+                          onChange={(e) => patchPlanZeile(z.id, { titel: e.target.value })}
+                          style={{ height: 32 }}
+                        />
+                        <select
+                          className="input"
+                          value={z.typ}
+                          onChange={(e) =>
+                            patchPlanZeile(z.id, {
+                              typ: e.target.value as ZahlungsplanAbschlagTyp,
+                            })
+                          }
+                          style={{ height: 32, fontSize: 12 }}
+                        >
+                          <option value="prozent">Prozent</option>
+                          <option value="betrag">Euro netto</option>
+                          <option value="rest">Rest</option>
+                        </select>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            className="input"
+                            type="number"
+                            disabled={z.typ === 'rest'}
+                            value={z.typ === 'rest' ? '' : z.wert}
+                            placeholder={z.typ === 'rest' ? 'auto' : undefined}
+                            onChange={(e) =>
+                              patchPlanZeile(z.id, { wert: Number(e.target.value) || 0 })
+                            }
+                            style={{ textAlign: 'right', paddingRight: 28, height: 32 }}
+                          />
+                          <span
+                            style={{
+                              position: 'absolute',
+                              right: 8,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              fontSize: 12,
+                              color: 'var(--text-3)',
+                            }}
+                          >
+                            {z.typ === 'prozent' ? '%' : z.typ === 'betrag' ? '€' : ''}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            textAlign: 'right',
+                            fontWeight: 600,
+                            fontVariantNumeric: 'tabular-nums',
+                            fontSize: 13,
+                          }}
+                        >
+                          {formatEurBetrag(berech?.brutto ?? 0)}
+                        </div>
+                        <input
+                          className="input"
+                          type="date"
+                          value={z.faellig_am?.slice(0, 10) ?? ''}
+                          onChange={(e) =>
+                            patchPlanZeile(z.id, { faellig_am: e.target.value || null })
+                          }
+                          style={{ height: 32, fontSize: 12 }}
+                        />
+                        <MockBtn
+                          sm
+                          kind="ghost"
+                          icon="trash"
+                          title="Entfernen"
+                          onClick={() => removePlanZeile(z.id)}
+                        />
+                      </div>
+                    )
+                  })}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '8px 14px',
+                      gap: 10,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="pt-add"
+                      style={{ border: 'none', padding: 0, width: 'auto' }}
+                      onClick={addPlanZeile}
+                    >
+                      <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
+                      }}
+                    >
+                      {plan.zeilen.every((z) => z.typ === 'prozent')
+                        ? `Summe ${planProzentSumme(plan)}%${planOk ? '' : ' · muss 100% sein'}`
+                        : planOk
+                          ? 'Plan ok'
+                          : 'Plan prüfen'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div
-                style={{
-                  padding: 16,
-                  border: '0.5px solid var(--border)',
-                  borderRadius: 10,
-                  background: 'var(--bg-soft)',
-                  fontSize: 13,
-                  color: 'var(--text-2)',
-                }}
-              >
-                Der Gesamtbetrag von <b>{formatEurBetrag(brutto)}</b> brutto wird als eine Rechnung
-                gestellt.
-              </div>
-              <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung">
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <MockZahlfristSeg
-                    value={zahlfrist}
-                    onChange={(v) => applyZahlfrist(v)}
-                    aria-label="Zahlungsziel / Zahlfrist"
-                  />
-                  {zahlfrist === 'datum' ? (
-                    <div style={{ width: 180 }}>
-                      <input
-                        type="date"
-                        className="input"
-                        value={zahlfristDatum}
-                        onChange={(e) => applyZahlfrist('datum', e.target.value)}
-                      />
+
+                {hasPlan && bootstrap.auftragId ? (
+                  <div style={{ marginTop: 14 }}>
+                    <div
+                      className="section-h"
+                      style={{
+                        marginBottom: 8,
+                        textTransform: 'none',
+                        letterSpacing: 0,
+                        fontSize: 14,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Welche Rechnung jetzt erstellen?
                     </div>
-                  ) : null}
-                </div>
-              </MockField>
-            </div>
-          )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {planKontext.zeilen.map((z) => {
+                        const on = aktivRate === z.id
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => setAktivRate(z.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '10px 12px',
+                              border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                              background: on ? 'var(--green-50)' : 'var(--card)',
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 17,
+                                height: 17,
+                                borderRadius: 20,
+                                border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                                background: on ? 'var(--green)' : 'transparent',
+                                display: 'grid',
+                                placeItems: 'center',
+                                color: '#fff',
+                              }}
+                            >
+                              {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
+                            </span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{z.titel}</div>
+                              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                                {z.typ === 'prozent'
+                                  ? `${z.wert}%`
+                                  : z.typ === 'betrag'
+                                    ? formatEurBetrag(z.wert)
+                                    : 'Rest'}
+                                {z.faellig_am
+                                  ? ` · fällig ${formatDateDe(z.faellig_am.slice(0, 10))}`
+                                  : ''}
+                              </div>
+                            </div>
+                            <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {formatEurBetrag(z.brutto)}
+                            </b>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          {steuernBlock}
         </>
       ) : null}
 
       {step === 3 ? (
         <>
-          {istPlan ? (
-            <>
-              <div
-                className="section-h"
-                style={{
-                  marginBottom: 8,
-                  textTransform: 'none',
-                  letterSpacing: 0,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: 'var(--text)',
-                }}
-              >
-                Welche Rechnung jetzt erstellen?
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-                {raten.map((r) => {
-                  const on = aktivRate === r.id
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setAktivRate(r.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '10px 12px',
-                        border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                        background: on ? 'var(--green-50)' : 'var(--card)',
-                        borderRadius: 8,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 17,
-                          height: 17,
-                          borderRadius: 20,
-                          border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                          background: on ? 'var(--green)' : 'transparent',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: '#fff',
-                        }}
-                      >
-                        {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{r.label}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
-                          {r.prozent}% · fällig {formatDateDe(r.faellig)}
-                        </div>
-                      </div>
-                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {formatEurBetrag(rateBrutto(r))}
-                      </b>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          ) : null}
-
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Paket</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              Welche Dokumente sollen mit erstellt werden? Portal und Einstellungen aktualisieren
+              sich automatisch — nur die E-Mail wird separat versendet.
+            </div>
+          </div>
           <div
             className="section-h"
             style={{
@@ -993,7 +1136,7 @@ export function RechnungWizard({
               · {anlagenCount} Anlage{anlagenCount === 1 ? '' : 'n'}
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {ANLAGEN_DEF.map((a) => {
               const on = !!anlagen[a.key]
               return (
@@ -1052,232 +1195,129 @@ export function RechnungWizard({
               )
             })}
           </div>
+        </>
+      ) : null}
+
+      {step === 4 ? (
+        <div style={{ display: 'grid', gap: 18, maxWidth: 760, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              E-Mail prüfen — Erstellen legt die Rechnung an (Portal), Erstellen und versenden
+              schickt zusätzlich die Mail
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <MockField label="Rechnungstitel" full>
+                <input className="input" value={rTitel} readOnly />
+              </MockField>
+              <EmailPillsField
+                label="An"
+                required
+                emails={mailTo}
+                onChange={setMailTo}
+                placeholder="kunde@beispiel.de"
+                hint="Mindestens eine Empfänger-Adresse"
+                disabled={saving}
+              />
+              <EmailPillsField
+                label="CC"
+                emails={mailCc}
+                onChange={setMailCc}
+                placeholder="weitere@beispiel.de"
+                hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
+                disabled={saving}
+              />
+              <MockField label="Betreff" full required>
+                <input
+                  className="input"
+                  value={mailBetreff}
+                  onChange={(e) => setMailBetreff(e.target.value)}
+                  disabled={saving}
+                  placeholder={defaultBetreff}
+                />
+              </MockField>
+              <MockField label="Beschreibung / Einleitung" full>
+                <textarea
+                  className="input ta"
+                  rows={4}
+                  value={einleitung}
+                  onChange={(e) => setEinleitung(e.target.value)}
+                  disabled={saving}
+                />
+              </MockField>
+            </div>
+            <div className="wz-overview" style={{ marginTop: 14 }}>
+              <div>
+                <span className="k">Kunde</span>
+                <b>{kundeName}</b>
+              </div>
+              <div>
+                <span className="k">Fällig am</span>
+                <b>{formatDateDe(rFaellig)}</b>
+              </div>
+              <div>
+                <span className="k">Betrag</span>
+                <b>{formatEurBetrag(rBrutto)} brutto</b>
+              </div>
+              <div>
+                <span className="k">Art</span>
+                <b>{rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'}</b>
+              </div>
+            </div>
+          </div>
 
           <div
             className="section-h"
             style={{
-              marginBottom: 10,
+              marginBottom: 0,
               textTransform: 'none',
               letterSpacing: 0,
               fontSize: 14,
               fontWeight: 600,
-              color: 'var(--text)',
             }}
           >
-            Versandweg
+            E-Mail-Vorschau
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 8,
-              marginBottom: 18,
-            }}
-          >
-            {wege.map((w) => {
-              const on = versandweg === w.key
-              return (
-                <button
-                  key={w.key}
-                  type="button"
-                  onClick={() => setVersandweg(w.key)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 5,
-                    padding: '12px',
-                    border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                    background: on ? 'var(--green-50)' : 'var(--card)',
-                    borderRadius: 10,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <MockIcon
-                    ctx="default"
-                    n={w.icon}
-                    size={18}
-                    style={{ color: on ? 'var(--green)' : 'var(--text-2)' }}
-                  />
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{w.label}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.35 }}>
-                    {w.sub}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          <div
-            className="section-h"
-            style={{
-              marginBottom: 10,
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--text)',
-            }}
-          >
-            Steuerliche Hinweise
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-            {(
-              [
-                {
-                  on: meta.hinweis_35a,
-                  set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
-                  label: '§35a EStG-Hinweis ausweisen',
-                  sub: 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
-                },
-                {
-                  on: meta.reverse_charge_13b,
-                  set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
-                  label: 'Reverse-Charge (§13b UStG)',
-                  sub: 'Steuerschuldnerschaft des Leistungsempfängers',
-                },
-              ] as const
-            ).map((c) => (
-              <button
-                key={c.label}
-                type="button"
-                onClick={() => c.set(!c.on)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 11,
-                  padding: '10px 12px',
-                  border: `1px solid ${c.on ? 'var(--green)' : 'var(--border)'}`,
-                  background: c.on ? 'var(--green-50)' : 'var(--card)',
-                  borderRadius: 9,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <span
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 5,
-                    border: `1.5px solid ${c.on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                    background: c.on ? 'var(--green)' : 'transparent',
-                    display: 'grid',
-                    placeItems: 'center',
-                    flex: '0 0 auto',
-                    color: '#fff',
-                  }}
-                >
-                  {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{c.sub}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="form-grid form-grid--sheet" style={{ marginBottom: 16 }}>
-            <MockField label="Rechnungstitel" full>
-              <input className="input" value={rTitel} readOnly />
-            </MockField>
-            <MockField label="Empfänger">
-              <input className="input" value={kundeName} readOnly />
-            </MockField>
-            <MockField label="Fällig am">
-              <input
-                className="input"
-                type="date"
-                value={rFaellig}
-                readOnly={istPlan}
-                onChange={
-                  istPlan
-                    ? undefined
-                    : (e) => applyZahlfrist('datum', e.target.value)
-                }
-              />
-            </MockField>
-            <MockField label="Einleitung" full>
-              <textarea
-                className="input ta"
-                rows={3}
-                value={einleitung}
-                onChange={(e) => setEinleitung(e.target.value)}
-              />
-            </MockField>
-          </div>
-
-          <div className="mail-preview" style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div className="mail-preview" style={{ maxWidth: 720, margin: '0 auto', width: '100%' }}>
             <div className="mail-h" style={{ padding: '14px 18px' }}>
               <div className="brand">{brand}</div>
               <div className="subj">
-                {previewNr} · {rTitel}
+                {(mailBetreff.trim() || defaultBetreff)} · {kundeName}
               </div>
             </div>
             <div className="mail-body">
               <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{einleitung}</p>
-              {istPlan ? (
-                <div
-                  style={{
-                    margin: '14px 0',
-                    border: '0.5px solid var(--border)',
-                    borderRadius: 6,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {raten.map((r) => (
-                    <div
-                      key={r.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderBottom: '0.5px solid var(--border)',
-                        fontSize: 12,
-                        background: r.id === aktivRate ? 'var(--green-50)' : 'transparent',
-                      }}
-                    >
-                      <span>
-                        {r.label}
-                        {r.id === aktivRate ? ' · diese Rechnung' : ''} · fällig{' '}
-                        {formatDateDe(r.faellig)}
-                      </span>
-                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {formatEurBetrag(rateBrutto(r))}
-                      </b>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    margin: '14px 0',
-                    border: '0.5px solid var(--border)',
-                    borderRadius: 6,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {posBoardLines.map((p) => (
-                    <div
-                      key={p.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderBottom: '0.5px solid var(--border)',
-                        fontSize: 12,
-                      }}
-                    >
-                      <span>
-                        {p.name || '—'} · {p.menge} {p.einheit}
-                      </span>
-                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {formatEurBetrag(posBoardLineNetto(p))}
-                      </b>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div
+                style={{
+                  margin: '14px 0',
+                  border: '0.5px solid var(--border)',
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                }}
+              >
+                {posBoardLines.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderBottom: '0.5px solid var(--border)',
+                      fontSize: 12,
+                    }}
+                  >
+                    <span>
+                      {p.name || '—'} · {p.menge} {p.einheit}
+                    </span>
+                    <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {formatEurBetrag(posBoardLineNetto(p))}
+                    </b>
+                  </div>
+                ))}
+              </div>
               <div
                 style={{
                   display: 'flex',
@@ -1287,14 +1327,10 @@ export function RechnungWizard({
                   padding: '6px 2px',
                 }}
               >
-                <span>{istPlan ? 'Dieser Rechnungsbetrag' : 'Rechnungsbetrag'}</span>
+                <span>Rechnungsbetrag</span>
                 <span style={{ color: 'var(--green)', fontVariantNumeric: 'tabular-nums' }}>
                   {formatEurBetrag(rBrutto)}
                 </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-                Fällig am {formatDateDe(rFaellig)}
-                {istPlan ? ` · Teil eines Zahlplans über ${formatEurBetrag(brutto)}` : ''}
               </div>
               {meta.hinweis_35a ? (
                 <div
@@ -1308,26 +1344,7 @@ export function RechnungWizard({
                     color: 'var(--text-2)',
                   }}
                 >
-                  <b>Hinweis nach §35a EStG:</b> Im Rechnungsbetrag sind Lohn-/Arbeitskosten in Höhe
-                  von {formatEurBetrag(lohnAnteil)} enthalten. Diese sind für haushaltsnahe
-                  Handwerkerleistungen steuerlich begünstigt.
-                </div>
-              ) : null}
-              {meta.reverse_charge_13b ? (
-                <div
-                  style={{
-                    marginTop: 8,
-                    padding: '10px 12px',
-                    background: 'var(--bg-soft)',
-                    border: '0.5px solid var(--border)',
-                    borderRadius: 6,
-                    fontSize: 11.5,
-                    color: 'var(--text-2)',
-                  }}
-                >
-                  <b>Steuerschuldnerschaft des Leistungsempfängers (§13b UStG):</b> Die Umsatzsteuer
-                  wird nicht gesondert ausgewiesen; die Steuer schuldet der Leistungsempfänger
-                  (Reverse-Charge).
+                  <b>Hinweis nach §35a EStG:</b> Lohn-/Arbeitskosten {formatEurBetrag(lohnAnteil)}.
                 </div>
               ) : null}
               {anlagenCount > 0 ? (
@@ -1351,7 +1368,7 @@ export function RechnungWizard({
                   >
                     Anlagen:
                   </span>
-                  {ANLAGEN_DEF.filter((a) => anlagen[a.key]).map((a) => (
+                  {selectedAnlagen.map((a) => (
                     <span
                       key={a.key}
                       style={{
@@ -1373,10 +1390,112 @@ export function RechnungWizard({
               ) : null}
             </div>
             <div className="mail-foot">
-              {brand} · an {kundeName}
+              {brand} · an {mailTo[0] || kundeName}
             </div>
           </div>
-        </>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setDocAccordionOpen((o) => !o)}
+              style={{
+                display: 'flex',
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              <span
+                className="section-h"
+                style={{
+                  marginBottom: 0,
+                  textTransform: 'none',
+                  letterSpacing: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                Dokument-Vorschauen
+              </span>
+              <MockIcon
+                ctx="default"
+                n={docAccordionOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+              />
+            </button>
+
+            {docAccordionOpen ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginBottom: 12,
+                  }}
+                >
+                  {selectedAnlagen.map((a) => {
+                    const on = docPreviewTab === a.key
+                    return (
+                      <button
+                        key={a.key}
+                        type="button"
+                        onClick={() => setDocPreviewTab(a.key)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                          background: on ? 'var(--green-50)' : 'var(--card)',
+                          fontSize: 12.5,
+                          fontWeight: on ? 600 : 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {docPreviewTab === 'rechnung' ? (
+                  <RechnungWizardPdfPreview
+                    rechnungId={activeVersandId}
+                    loading={saving && !activeVersandId}
+                    kundeName={kundeName}
+                  />
+                ) : (
+                  <div className="card" style={{ padding: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <MockIcon ctx="default" n="file-text" size={22} />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            color: 'var(--text-3)',
+                            marginTop: 4,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.sub}. Wird mit dem
+                          Rechnungsversand als Anlage vorbereitet — Live-PDF-Vorschau folgt, sobald
+                          das Dokument erzeugt ist.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
       ) : null}
     </WizardShell>
   )

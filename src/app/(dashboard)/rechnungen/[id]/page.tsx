@@ -24,7 +24,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       db
         .from('rechnungen')
         .select(
-          '*, kunden(id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, ust_id), auftraege(id, titel), angebote(id)'
+          '*, kunden(id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, ust_id), auftraege(id, titel), angebote(id, leistungsumfang, notizen)'
         )
         .eq('id', params.id)
         .maybeSingle()

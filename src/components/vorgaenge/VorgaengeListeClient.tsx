@@ -345,17 +345,11 @@ export function VorgaengeListeClient({
           else if (isAuftrag) runDuplicateAuftrag(v.entityId, router)
           else if (isRechnung) runDuplicateRechnung(v.entityId, router)
         },
-        onAngebot: isAnfrage ? () => router.push(`/anfragen/${v.leadId}`) : undefined,
-        onAccept: isAngebot ? () => router.push(v.detailHref) : undefined,
-        onComplete: isAuftrag ? () => router.push(v.detailHref) : undefined,
-        onMarkPaid: isRechnung ? () => router.push(v.detailHref) : undefined,
         onPdf: isAngebot
           ? () => window.open(`/api/angebote/${v.entityId}/pdf`, '_blank')
           : isRechnung
             ? () => window.open(`/api/rechnungen/${v.entityId}/pdf`, '_blank')
             : undefined,
-        onSend: isAngebot || isRechnung ? () => router.push(v.detailHref) : undefined,
-        onInvoice: isAuftrag ? () => router.push(`/rechnungen/neu?auftrag=${v.entityId}`) : undefined,
         onDelete: () => runDeleteVorgang(v.leadId, router),
         deleteLabel: v.titel,
       })

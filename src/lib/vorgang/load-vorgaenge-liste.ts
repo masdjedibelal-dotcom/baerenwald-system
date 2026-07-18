@@ -45,7 +45,7 @@ export async function loadVorgaengeListe(): Promise<{
     withCrmReadFallback(async (db) =>
       db
         .from('angebote')
-        .select('id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, created_at, updated_at')
+        .select('id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, created_at, updated_at')
         .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(500)
@@ -115,6 +115,8 @@ export async function loadVorgaengeListe(): Promise<{
     status_einfach: string | null
     gesendet_am: string | null
     gesendet_kunde_at: string | null
+    leistungsumfang: string | null
+    notizen: string | null
     created_at: string
     updated_at: string | null
   }>
@@ -211,6 +213,8 @@ export async function loadVorgaengeListe(): Promise<{
         gesendet_kunde_at: a.gesendet_kunde_at,
         created_at: a.created_at,
         updated_at: a.updated_at,
+        leistungsumfang: a.leistungsumfang,
+        notizen: a.notizen,
       })),
       auftraege: (auftraegeByLead.get(lead.id) ?? []).map((a) => ({
         id: a.id,

@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
-import { MockProjektUebersichtCard } from '@/components/mock-ui/MockProjektUebersichtCard'
+import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import {
+  updateAuftragNotizen,
+  updateAuftragProjektFelder,
+} from '@/app/(dashboard)/auftraege/actions'
 import { replaceAuftragPositionenFromPosBoard } from '@/app/(dashboard)/auftraege/auftrag-posboard-actions'
 import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -16,7 +20,8 @@ import {
 } from '@/lib/posboard/pos-board-line'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AuftragDetail, AuftragPosition, Lead } from '@/lib/types'
-import { kanalLabel, SITUATION_LABELS } from '@/lib/utils'
+import { kanalLabel } from '@/lib/utils'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
   Lead,
@@ -34,6 +39,7 @@ type AuftragLeadSnap = Pick<
     Pick<
       Lead,
       | 'situation'
+      | 'bereiche'
       | 'kontakt_nachricht'
       | 'notizen'
       | 'budget_ca'
@@ -44,14 +50,13 @@ type AuftragLeadSnap = Pick<
   >
 
 function projektTitel(detail: AuftragDetail, lead?: AuftragLeadSnap | null): string {
-  const t = detail.titel?.trim()
-  if (t) return t
-  const sit = lead?.situation?.trim()
-  if (sit) return SITUATION_LABELS[sit] ?? sit
   const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
-  const angTitel = (ang as { titel?: string } | null)?.titel?.trim()
-  if (angTitel) return angTitel
-  return 'Projekt'
+  return angebotTitelOderSituationBereich({
+    angebot: ang,
+    situation: lead?.situation,
+    bereiche: lead?.bereiche,
+    fallback: detail.titel?.trim() || 'Auftrag',
+  })
 }
 
 function regionLabel(detail: AuftragDetail, lead?: AuftragLeadSnap | null): string | null {
@@ -149,14 +154,40 @@ export function AuftragDetailsTab({
     <>
       <AuftragDetailTopCards detail={detail} team={team} />
 
-      <MockProjektUebersichtCard
-        projekt={projektTitel(detail, lead)}
-        beschreibung={beschreibungFrom(detail, lead)}
+      <EntityProjektUebersichtCard
+        title="Auftragsdetails"
+        initial={{
+          titel: detail.titel?.trim() || projektTitel(detail, lead),
+          beschreibung: beschreibungFrom(detail, lead) ?? '',
+          startDatum: detail.start_datum?.slice(0, 10) ?? '',
+          endDatum: detail.end_datum?.slice(0, 10) ?? '',
+          istBauprojekt: detail.ist_bauprojekt === true,
+        }}
+        editableFields={
+          editable
+            ? ['titel', 'beschreibung', 'startDatum', 'endDatum', 'istBauprojekt']
+            : []
+        }
+        onSave={
+          editable
+            ? async (draft) => {
+                const r1 = await updateAuftragProjektFelder(detail.id, {
+                  titel: draft.titel,
+                  start_datum: draft.startDatum || null,
+                  end_datum: draft.endDatum || null,
+                  ist_bauprojekt: draft.istBauprojekt,
+                })
+                if (!r1.ok) return r1
+                const r2 = await updateAuftragNotizen(detail.id, draft.beschreibung)
+                if (r2.ok) onSaved?.()
+                return r2
+              }
+            : undefined
+        }
+        disabled={!editable}
         region={regionLabel(detail, lead)}
         preisrahmenLabel={preisrahmen}
         quelle={lead?.kanal ? kanalLabel(lead.kanal) : null}
-        startDatum={detail.start_datum}
-        endDatum={detail.end_datum}
         fortschritt={fortschritt}
       />
 

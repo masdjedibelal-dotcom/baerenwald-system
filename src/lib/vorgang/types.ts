@@ -10,6 +10,10 @@ export type VorgangAngebotInput = {
   updated_at?: string | null
   gesendet_am?: string | null
   gesendet_kunde_at?: string | null
+  /** Projekt-/Leistungstitel (Spalte oder Wizard) */
+  leistungsumfang?: string | null
+  notizen?: string | null
+  titel?: string | null
 }
 
 export type VorgangAuftragInput = {

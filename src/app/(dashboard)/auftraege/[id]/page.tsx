@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase-server'
 import { AuftragDetailClient } from '@/components/auftraege/AuftragDetailClient'
 import {
   loadAuftragDetail,
-  listFormularTemplates,
 } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { loadRechnungenForAuftrag } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { listVertraegeFuerAuftrag, loadRahmenVertraegeForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
@@ -15,14 +14,13 @@ import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at'
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, bereiche, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
     const [
       detail,
-      templates,
       gwRes,
       plRes,
       rechnungenListe,
@@ -33,7 +31,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       partnerDokumente,
     ] = await Promise.all([
       loadAuftragDetail(params.id),
-      listFormularTemplates(),
       supabase.from('gewerke').select('id, name, slug').eq('aktiv', true).order('name'),
       supabase.from('preislisten').select('*').order('gewerk_id'),
       loadRechnungenForAuftrag(params.id),
@@ -104,7 +101,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       <AuftragDetailClient
         detail={detail}
         lead={lead}
-        templates={templates}
         gewerke={(gwRes.data ?? []) as { id: string; name: string; slug: string }[]}
         preislisten={(plRes.data ?? []) as Preisliste[]}
         leadTimeline={leadTimeline}

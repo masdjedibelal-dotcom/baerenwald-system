@@ -60,6 +60,7 @@ import {
 } from '@/lib/rechnungen/mahnverlauf'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
+import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
@@ -124,12 +125,25 @@ function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
   return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Entwurf</MockBadge>
 }
 
-function rechnungTitelMeta(detail: Rechnung, belegTyp: RechnungBelegTyp): string {
-  const auftrag = detail.auftraege?.titel?.trim()
-  if (auftrag) return auftrag
-  const nr = detail.rechnungsnummer?.trim()
-  if (nr) return `${RECHNUNG_BELEG_TYP_LABELS[belegTyp]} ${nr}`
-  return RECHNUNG_BELEG_TYP_LABELS[belegTyp]
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+
+function rechnungTitelMeta(
+  detail: Rechnung,
+  belegTyp: RechnungBelegTyp,
+  lead?: LeadDetail | null
+): string {
+  const angRaw = detail.angebote
+  const ang = Array.isArray(angRaw) ? angRaw[0] : angRaw
+  return angebotTitelOderSituationBereich({
+    angebot: ang,
+    situation: lead?.situation,
+    bereiche: lead?.bereiche,
+    fallback:
+      detail.auftraege?.titel?.trim() ||
+      (detail.rechnungsnummer?.trim()
+        ? `${RECHNUNG_BELEG_TYP_LABELS[belegTyp]} ${detail.rechnungsnummer.trim()}`
+        : RECHNUNG_BELEG_TYP_LABELS[belegTyp]),
+  })
 }
 
 export function RechnungDetailClient({
@@ -168,6 +182,7 @@ export function RechnungDetailClient({
   const [mainTab, setMainTab] = useState<RechnungDetailTab>('stammdaten')
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
+  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
 
   useEffect(() => {
@@ -237,8 +252,6 @@ export function RechnungDetailClient({
       time: string
       state: 'done' | 'open' | 'active'
       ts: number
-      linkLabel?: string
-      onLinkClick?: () => void
     }
 
     const fromEvents: Row[] = timelineSorted.map((ev) => ({
@@ -247,8 +260,6 @@ export function RechnungDetailClient({
       time: formatTimelineStamp(ev.created_at),
       state: 'done' as const,
       ts: new Date(ev.created_at).getTime(),
-      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
-      onLinkClick: ev.email_log_id ? () => setEmailPreviewId(ev.email_log_id!) : undefined,
     }))
 
     let basis: Row[] = fromEvents
@@ -273,7 +284,6 @@ export function RechnungDetailClient({
         text: b.text,
         time: b.time,
         state: b.state === 'active' ? 'active' : 'done',
-        linkLabel: b.linkLabel,
       })),
       projektKontext
     )
@@ -283,12 +293,9 @@ export function RechnungDetailClient({
       text: item.text,
       time: item.time,
       state: item.state,
-      linkLabel: item.linkLabel,
-      onLinkClick: item.href
-        ? () => router.push(item.href!)
-        : basis.find((b) => b.id === item.id)?.onLinkClick,
+      ts: item.ts,
     }))
-  }, [timelineSorted, detail.created_at, detail.id, detail.rechnungsnummer, projektKontext, router])
+  }, [timelineSorted, detail.created_at, detail.id, detail.rechnungsnummer, projektKontext])
 
   async function setStatus(s: RechnungStatus) {
     startTransition(async () => {
@@ -406,9 +413,11 @@ export function RechnungDetailClient({
             })
           },
           onPortalLink: () => {
-            toast.message('Kundenportal-Link', {
-              description: 'Versand über Kundenakte oder Auftrag.',
-            })
+            if (!kundeId) {
+              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+              return
+            }
+            setPortalLinkModalOpen(true)
           },
           onEdit2: rechnungDarfImWizardBearbeitetWerden(detail.status) ? openWizard : undefined,
           onMarkPaid:
@@ -473,8 +482,11 @@ export function RechnungDetailClient({
     impersonating,
   ])
 
+  const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
+
   const headMeta = [
-    rechnungTitelMeta(detail, belegTyp),
+    kundeName !== projektTitelAnzeige ? kundeName : null,
+    detail.rechnungsnummer?.trim() || null,
     formatEurBetrag(berechnung.brutto),
     detail.faellig_am && belegTyp === 'rechnung'
       ? `fällig ${formatDatum(detail.faellig_am)}`
@@ -518,7 +530,9 @@ export function RechnungDetailClient({
 
   const mahnLabel = mahnstufeListenLabel(detail)
 
-  const stammdatenInhalt = <RechnungStammdatenCard detail={detail} lead={lead} />
+  const stammdatenInhalt = (
+    <RechnungStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+  )
 
   const detailsInhalt = (
     <>
@@ -617,7 +631,7 @@ export function RechnungDetailClient({
     },
   ]
 
-  const crumbTitle = rechnungTitelMeta(detail, belegTyp)
+  const crumbTitle = projektTitelAnzeige
 
   return (
     <EntityDetailLayout
@@ -628,7 +642,7 @@ export function RechnungDetailClient({
       crumbSectionLabel="Rechnungen"
       className="space-y-4 pb-0"
       head={{
-        title: kundeName,
+        title: crumbTitle && crumbTitle !== '—' ? crumbTitle : kundeName,
         badges: (
           <span className="inline-flex flex-wrap items-center gap-2">
             {rechnungStatusBadge(detail.status, ueberfaellig)}
@@ -710,6 +724,13 @@ export function RechnungDetailClient({
       ) : null}
 
       {mailCompose.modal}
+
+      <KundenportalLinkVersendenModal
+        open={portalLinkModalOpen}
+        onClose={() => setPortalLinkModalOpen(false)}
+        kundeId={kundeId}
+        fallbackEmail={kundeEmail}
+      />
     </EntityDetailLayout>
   )
 }

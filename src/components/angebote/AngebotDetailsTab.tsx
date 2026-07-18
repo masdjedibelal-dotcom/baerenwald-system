@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { MockProjektUebersichtCard } from '@/components/mock-ui/MockProjektUebersichtCard'
+import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { replaceAngebotPositionen } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import {
@@ -15,16 +16,18 @@ import {
   POS_BOARD_DEFAULT_GEWERK,
   type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
-import { betragAnzeige, leistungAnzeige } from '@/lib/angebot-einfach'
+import { betragAnzeige } from '@/lib/angebot-einfach'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { AngebotDetail, Gewerk, LeadDetail } from '@/lib/types'
-import { formatDatum, formatDatumZeit, kanalLabel, SITUATION_LABELS } from '@/lib/utils'
+import { formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
 
 function projektTitel(detail: AngebotDetail, lead?: LeadDetail | null): string {
-  const leistung = leistungAnzeige(detail)
-  if (leistung && leistung !== '—') return leistung
-  const sit = lead?.situation?.trim()
-  if (sit) return SITUATION_LABELS[sit] ?? sit
-  return detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
+  return angebotTitelOderSituationBereich({
+    angebot: detail,
+    situation: lead?.situation,
+    bereiche: lead?.bereiche ?? detail.leads?.bereiche,
+    fallback: detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`,
+  })
 }
 
 function regionLabel(detail: AngebotDetail, lead?: LeadDetail | null): string | null {
@@ -156,9 +159,28 @@ export function AngebotDetailsTab({
 
   return (
     <>
-      <MockProjektUebersichtCard
-        projekt={projektTitel(detail, lead)}
-        beschreibung={beschreibungFrom(detail, lead)}
+      <EntityProjektUebersichtCard
+        title="Angebotsdetails"
+        initial={{
+          titel: projektTitel(detail, lead),
+          beschreibung: beschreibungFrom(detail, lead) ?? '',
+          startDatum: '',
+          endDatum: '',
+          istBauprojekt: false,
+        }}
+        editableFields={editable ? ['beschreibung'] : []}
+        onSave={
+          editable
+            ? async (draft) => {
+                const r = await updateAngebotProjektFelder(detail.id, {
+                  projektbeschreibung: draft.beschreibung,
+                })
+                if (r.ok) onSaved?.()
+                return r
+              }
+            : undefined
+        }
+        disabled={!editable}
         region={regionLabel(detail, lead)}
         preisrahmenLabel={preisrahmen}
         quelle={lead ? kanalLabel(lead.kanal) : null}

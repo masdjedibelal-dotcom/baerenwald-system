@@ -631,7 +631,7 @@ export function AngebotNeuForm({
       ) : null}
 
       {!modusVorlage ? (
-        <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-bw-card/95 px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
+        <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-white px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>

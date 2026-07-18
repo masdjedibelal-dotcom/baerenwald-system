@@ -441,6 +441,37 @@
 .card-b { padding: 16px 18px; }
 .card-b.tight { padding: 6px 8px; }
 
+/* Inline-Edit: Bereich markieren + Felder hervorheben */
+.inline-edit-section--active {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green-50), var(--shadow);
+}
+.inline-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.inline-edit-body .inline-edit-field {
+  background: var(--green-50);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 -4px;
+}
+.inline-edit-body .inline-edit-field .input,
+.inline-edit-body .inline-edit-field input.input {
+  width: 100%;
+  min-height: 36px;
+}
+.inline-edit-hint {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Listing layout helpers */
 .listbar {
   display: flex;
@@ -2565,22 +2596,65 @@
 .dshell-cards { display: flex; flex-direction: column; gap: 22px; }
 /* Cards immer untereinander, nie nebeneinander */
 .dshell-cards .grid-2, .dshell-cards .grid-3 { grid-template-columns: 1fr !important; }
-/* Info-Cards im Detail flach: Titel + Trenner statt Box (Apple-Settings-Stil).
-   Direkte Card-Kinder der Sektion werden flach; verschachtelte Cards (Objekte) bleiben. */
-.dshell-cards > .card {
-  border: none;
-  box-shadow: none;
-  border-radius: 0;
-  background: transparent;
+/* Info-Cards im Detail flach (Desktop): Titel + Trenner statt Box (Apple-Settings-Stil).
+   Direkte Card-Kinder der Sektion werden flach; verschachtelte Cards (Objekte) bleiben.
+   Mobil: echte weiße Cards (sonst scheinen sie durch den grauen Page-Background). */
+@media (min-width: 761px) {
+  .dshell-cards > .card {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .dshell-cards > .card > .card-h {
+    padding: 0 0 8px;
+    min-height: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .dshell-cards > .card > .card-h .title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .dshell-cards > .card > .card-b {
+    padding: 4px 0 0;
+  }
+  /* Objekt-Container (Tabellen/Listen mit padding:0) behalten ihren Rahmen */
+  .dshell-cards > .card[style*='padding: 0'],
+  .dshell-cards > .card[style*='padding:0'] {
+    border: 0.5px solid var(--border);
+    box-shadow: var(--shadow);
+    border-radius: var(--r);
+    background: var(--card);
+  }
+  .dshell-cards > .card[style*='padding: 0'] > .card-h,
+  .dshell-cards > .card[style*='padding:0'] > .card-h {
+    padding: 15px 18px;
+    min-height: 48px;
+    margin-bottom: 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .dshell-cards > .card[style*='padding: 0'] > .card-h .title,
+  .dshell-cards > .card[style*='padding:0'] > .card-h .title {
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: -0.015em;
+    color: var(--text);
+  }
 }
-.dshell-cards > .card > .card-h {
-  padding: 0 0 8px;
-  min-height: 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
+
+@media (max-width: 760px) {
+  .dshell-cards > .card:not(.dshell-framed) {
+    background: #ffffff;
+    border: 0.5px solid var(--border);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+  }
 }
-.dshell-cards > .card > .card-h .title { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
-.dshell-cards > .card > .card-b { padding: 4px 0 0; }
+
 /* Objekt-Container (Tabellen/Listen mit padding:0) behalten ihren Rahmen */
 .dshell-cards > .card[style*="padding: 0"],
 .dshell-cards > .card[style*="padding:0"] {
@@ -4255,6 +4329,34 @@
     @apply min-h-[34px] py-1.5 text-[13px];
     font-size: 13px !important;
   }
+
+/* Selects in Prop-Zeilen: optisch wie .prop-v-Text (nicht Formularfeld) */
+.props .prop-v .sel {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0 18px 0 0;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: inherit !important;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.props .prop-v .sel:focus {
+  border: none;
+  box-shadow: none;
+  outline: 1px solid var(--green);
+  outline-offset: 2px;
+}
+.prop:has(.sel) {
+  align-items: baseline;
+}
 
 .prop-form .prop-v .input,
   .prop-form .prop-v select.input,
@@ -6342,13 +6444,7 @@ textarea.input {
     grid-template-columns: 1fr !important;
   }
 
-.dshell-cards > .card:not(.dshell-framed) {
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    background: transparent;
-  }
-
+/* Desktop flach; Mobil weiß — siehe Media-Queries weiter oben bei .dshell-cards */
 .dshell-cards > .card.dshell-framed {
     border: 0.5px solid var(--border);
     box-shadow: var(--shadow);
@@ -7000,7 +7096,7 @@ textarea.input {
   }
 
 .pos-v3-send-bar {
-    @apply sticky bottom-0 z-30 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bw-border bg-bw-card/95 px-4 py-3 backdrop-blur;
+    @apply sticky bottom-0 z-30 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bw-border bg-white px-4 py-3;
   }
 
 .pos-v3-status-pill {
@@ -8322,6 +8418,7 @@ textarea.input {
 
 .mobile-filter-sheet__panel {
   @apply absolute inset-x-0 bottom-0 top-[6vh] flex flex-col rounded-t-2xl bg-white shadow-2xl;
+  background: #ffffff;
 }
 
 .mobile-filter-sheet__header {
@@ -8350,6 +8447,7 @@ textarea.input {
 
 .mobile-filter-sheet__footer {
   @apply border-t border-[var(--app-separator)] bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))];
+  background: #ffffff;
 }
 
 .mobile-filter-section + .mobile-filter-section {

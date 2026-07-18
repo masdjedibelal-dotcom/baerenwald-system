@@ -14,7 +14,6 @@ import {
   leadKontaktAnzeigeName,
 } from '@/lib/lead-display-helpers'
 import { Timeline } from '@/components/ui/timeline'
-import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
@@ -32,6 +31,7 @@ import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
@@ -49,8 +49,7 @@ import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openMieterStatusPreview } from '@/app/(dashboard)/impersonation/actions'
 import { MockVerlaufCard } from '@/components/mock-ui'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
-import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
-import { findeNeuestenEntwurf, hatNurEntwuerfe } from '@/lib/angebote/angebot-lebenszyklus'
+import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -176,6 +175,7 @@ export function AnfrageDetailClient({
   const [tab, setTab] = useState<AnfrageDetailTab>('stammdaten')
   const isCrmAdmin = useIsCrmAdmin()
   const [impersonating, setImpersonating] = useState(false)
+  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   useEffect(() => {
     const fromQuery = resolveAnfrageDetailTabFromQuery(searchParams.get('tab'))
@@ -192,8 +192,6 @@ export function AnfrageDetailClient({
   useEffect(() => {
     setLead(initial)
   }, [initial.id])
-
-  const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
 
   const history = sortTimelineByCreatedAtAsc(lead.leads_status_history ?? [])
 
@@ -236,9 +234,6 @@ export function AnfrageDetailClient({
       time: string
       state: 'done' | 'open' | 'active'
       ts: number
-      linkLabel?: string
-      onLinkClick?: () => void
-      href?: string
     }
 
     const fromEvents: Row[] = timelineSorted.map((ev) => ({
@@ -247,8 +242,6 @@ export function AnfrageDetailClient({
       time: formatTimelineStamp(ev.created_at),
       state: 'done',
       ts: new Date(ev.created_at).getTime(),
-      linkLabel: ev.email_log_id ? 'E-Mail ansehen' : undefined,
-      onLinkClick: ev.email_log_id ? () => setEmailPreviewId(ev.email_log_id!) : undefined,
     }))
     const fromHistory: Row[] = history.map((h) => ({
       id: h.id,
@@ -283,7 +276,6 @@ export function AnfrageDetailClient({
           text: b.text,
           time: b.time,
           state: b.state === 'active' ? 'active' : 'done',
-          linkLabel: b.linkLabel,
         })),
         projektKontext
       )
@@ -293,8 +285,6 @@ export function AnfrageDetailClient({
         time: item.time,
         state: item.state,
         ts: item.ts,
-        linkLabel: item.linkLabel,
-        onLinkClick: item.href ? () => router.push(item.href!) : undefined,
       }))
     }
 
@@ -326,7 +316,6 @@ export function AnfrageDetailClient({
     timelineSorted,
     history,
     projektKontext,
-    router,
     lead.created_at,
     lead.kanal,
     angeboteListe.length,
@@ -347,6 +336,7 @@ export function AnfrageDetailClient({
 
   const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
   const leadTelefon = (lead.kunden?.telefon ?? lead.kontakt_telefon ?? '').trim()
+  const kundeId = lead.kunde_id ?? lead.kunden?.id ?? null
   const auftragId = leadStatusData.auftrag_id as string | undefined
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
 
@@ -402,21 +392,8 @@ export function AnfrageDetailClient({
       openAngebotWizard(null)
       return
     }
-    const entwurf = findeNeuestenEntwurf(angeboteListe)
-    if (entwurf && hatNurEntwuerfe(angeboteListe)) {
-      startTransition(async () => {
-        const res = await loadAngebotWizardBootstrap(entwurf.id, lead.id)
-        if (res.ok) {
-          openAngebotWizard(res.bootstrap)
-          return
-        }
-        toast.error(res.message)
-        setAngebotAuswahlOpen(true)
-      })
-      return
-    }
     setAngebotAuswahlOpen(true)
-  }, [angeboteListe, lead.id, openAngebotWizard, startTransition])
+  }, [angeboteListe.length, openAngebotWizard])
 
   const openAngebotErstellen = openAngebotAuswahl
 
@@ -498,9 +475,11 @@ export function AnfrageDetailClient({
             })
           },
           onPortalLink: () => {
-            toast.message('Kundenportal-Link', {
-              description: 'Versand über Kundenakte oder Auftrag.',
-            })
+            if (!kundeId) {
+              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+              return
+            }
+            setPortalLinkModalOpen(true)
           },
           onStatus: (k) => setStatusModalKind(k),
           onAngebot: () => {
@@ -544,6 +523,7 @@ export function AnfrageDetailClient({
     isCrmAdmin,
     impersonating,
     refresh,
+    kundeId,
   ])
 
   const projektMetaLabel = useMemo(() => leadProjektMetaLabel(lead), [lead])
@@ -563,22 +543,15 @@ export function AnfrageDetailClient({
   )
 
   const timelineTab = (
-    <>
-      <MockVerlaufCard empty={timelineItems.length === 0}>
-        <Timeline items={timelineItems} />
-      </MockVerlaufCard>
-      <EmailLogPreviewModal
-        emailLogId={emailPreviewId}
-        open={Boolean(emailPreviewId)}
-        onClose={() => setEmailPreviewId(null)}
-      />
-    </>
+    <MockVerlaufCard empty={timelineItems.length === 0}>
+      <Timeline items={timelineItems} />
+    </MockVerlaufCard>
   )
 
   const stammdatenInhalt = (
     <>
       <HvMeldungKontextCards lead={lead} />
-      <AnfrageStammdatenCard lead={lead} />
+      <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
     </>
   )
 
@@ -737,6 +710,13 @@ export function AnfrageDetailClient({
           setBearbeitenOpen(false)
           refresh()
         }}
+      />
+
+      <KundenportalLinkVersendenModal
+        open={portalLinkModalOpen}
+        onClose={() => setPortalLinkModalOpen(false)}
+        kundeId={kundeId}
+        fallbackEmail={leadEmail}
       />
 
       <StatusModal

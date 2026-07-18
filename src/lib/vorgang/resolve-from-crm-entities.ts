@@ -24,6 +24,9 @@ export type CrmAngebotResolveSlice = {
   gesendet_kunde_at?: string | null
   created_at: string
   updated_at?: string | null
+  leistungsumfang?: string | null
+  notizen?: string | null
+  titel?: string | null
 }
 
 export type CrmAuftragResolveSlice = {
@@ -72,6 +75,9 @@ export function resolveVorgangFromCrmEntities(args: {
       gesendet_kunde_at: a.gesendet_kunde_at,
       created_at: a.created_at,
       updated_at: a.updated_at,
+      leistungsumfang: a.leistungsumfang,
+      notizen: a.notizen,
+      titel: a.titel,
     })),
     auftraege: (args.auftraege ?? []).map((a) => ({
       id: a.id,

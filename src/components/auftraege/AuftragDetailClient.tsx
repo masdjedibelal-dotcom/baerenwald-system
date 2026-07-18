@@ -20,39 +20,28 @@ import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlun
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { DetailMetaChip, DetailMetaRow } from '@/components/ui/DetailMetaChip'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
+import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschlussSection'
 import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
 import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
-import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
-import {
-  createFormularEintragUndEmail,
-  updateAuftragProjektFelder,
-} from '@/app/(dashboard)/auftraege/actions'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
-import {
-  ensureKundenTokenAction,
-  sendKundenProjektLinkEmail,
-} from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
-import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
-import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
+import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
   AuftragDetail,
-  FormularTemplate,
   Gewerk,
   Lead,
   LeadTimelineRow,
@@ -63,7 +52,6 @@ import { toast } from '@/components/ui/app-toast'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
-import { Modal } from '@/components/ui/Modal'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
@@ -112,6 +100,7 @@ type AuftragLeadSnapshot = Pick<
   | 'auftraggeber_kunde_id'
   | 'anlass'
   | 'situation'
+  | 'bereiche'
   | 'kontakt_nachricht'
   | 'notizen'
   | 'budget_ca'
@@ -125,6 +114,7 @@ type AuftragDetailTab =
   | 'leistung'
   | 'baustelle'
   | 'abnahme'
+  | 'abschluss'
   | 'aktivitaet'
   | 'dokumente'
   | 'finanzen'
@@ -135,6 +125,7 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'leistung',
   'baustelle',
   'abnahme',
+  'abschluss',
   'aktivitaet',
   'dokumente',
   'finanzen',
@@ -150,6 +141,7 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
   if (tab === 'zahlplan') return 'finanzen'
   if (tab === 'bautagebuch') return 'baustelle'
   if (tab === 'abnahmeprotokoll' || tab === 'abnahmeprotokolle') return 'abnahme'
+  if (tab === 'abschlussdokumentation' || tab === 'abschlussdoku') return 'abschluss'
   if (tab === 'verlauf') return 'aktivitaet'
   if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
   if (tab === 'kommunikation') return 'notizen'
@@ -160,7 +152,6 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
 export function AuftragDetailClient({
   detail: initial,
   lead = null,
-  templates,
   gewerke = [],
   preislisten = [],
   leadTimeline = [],
@@ -175,7 +166,6 @@ export function AuftragDetailClient({
 }: {
   detail: AuftragDetail
   lead?: AuftragLeadSnapshot | null
-  templates: FormularTemplate[]
   gewerke?: GewerkOpt[]
   preislisten?: Preisliste[]
   leadTimeline?: LeadTimelineRow[]
@@ -194,16 +184,8 @@ export function AuftragDetailClient({
   const isMobile = useIsMobile()
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const [detail, setDetail] = useState(initial)
-  const [err, setErr] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
 
-  const [formModal, setFormModal] = useState<{
-    gewerkId: string
-    handwerkerId: string
-    email: string
-    templateId: string
-    phase: 'vorab' | 'update' | 'abnahme'
-  } | null>(null)
   const [mainTab, setMainTab] = useState<AuftragDetailTab>('stammdaten')
 
   useEffect(() => {
@@ -214,11 +196,6 @@ export function AuftragDetailClient({
     }
     if (tab) setMainTab(tab)
   }, [searchParams, initial.notizen])
-  const [projektModal, setProjektModal] = useState(false)
-  const [projektTitel, setProjektTitel] = useState('')
-  const [projektStart, setProjektStart] = useState('')
-  const [projektEnde, setProjektEnde] = useState('')
-  const [projektIstBauprojekt, setProjektIstBauprojekt] = useState(false)
   const [abschlussModal, setAbschlussModal] = useState(false)
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
@@ -230,7 +207,6 @@ export function AuftragDetailClient({
     useState<ProjektVertragWizardBootstrap | null>(null)
   const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
-  const [hwBewertungZiele, setHwBewertungZiele] = useState<HandwerkerBewertungZiel[] | null>(null)
   const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
   const [angebotKorrekturBootstrap, setAngebotKorrekturBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
@@ -238,6 +214,7 @@ export function AuftragDetailClient({
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
   const isCrmAdmin = useIsCrmAdmin()
   const [impersonating, setImpersonating] = useState(false)
+  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   const openAngebotKorrektur = useCallback(() => {
     if (!detail.angebot_id) {
@@ -288,6 +265,11 @@ export function AuftragDetailClient({
   }, [detail.id, router])
 
   const openAbschluss = useCallback(() => {
+    setMainTab('abschluss')
+    router.replace(`/auftraege/${detail.id}?tab=abschluss`, { scroll: false })
+  }, [detail.id, router])
+
+  const openAbschlussErstellen = useCallback(() => {
     if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
     else setAbschlussModal(true)
   }, [detail.id, isMobile, router])
@@ -340,19 +322,36 @@ export function AuftragDetailClient({
   }, [hauptvertraegeFuerNachtrag, startNachtragWizard])
 
   const openRechnungErstellen = useCallback(() => {
+    if (rechnungenListe.length === 0) {
+      if (isMobile) {
+        router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
+        return
+      }
+      startTransition(async () => {
+        const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        openRechnungWizard(res.bootstrap)
+      })
+      return
+    }
     if (isMobile) {
       router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
       return
     }
     setRechnungAuswahlOpen(true)
-  }, [detail.id, isMobile, router])
+  }, [
+    detail.id,
+    isMobile,
+    openRechnungWizard,
+    rechnungenListe.length,
+    router,
+  ])
 
   useEffect(() => {
     setDetail(initial)
-    setProjektTitel(initial.titel ?? '')
-    setProjektStart(initial.start_datum?.slice(0, 10) ?? '')
-    setProjektEnde(initial.end_datum?.slice(0, 10) ?? '')
-    setProjektIstBauprojekt(initial.ist_bauprojekt === true)
   }, [initial])
 
   useEffect(() => {
@@ -375,15 +374,6 @@ export function AuftragDetailClient({
     window.addEventListener('pageshow', onPageShow)
     return () => window.removeEventListener('pageshow', onPageShow)
   }, [])
-
-  const run = (fn: () => Promise<{ ok: boolean; message?: string }>) => {
-    setErr(null)
-    startTransition(async () => {
-      const r = await fn()
-      if (!r.ok) setErr('message' in r ? (r.message ?? 'Fehler') : 'Fehler')
-      else refresh()
-    })
-  }
 
   const kunde = detail.kunden
   const name = kunde?.name ?? 'Auftrag'
@@ -408,7 +398,13 @@ export function AuftragDetailClient({
 
   const auftragStatus = useMemo(() => auftragStatusDisplay(detail.status), [detail.status])
 
-  const projektName = auftragTitel(detail)
+  const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+  const projektName = angebotTitelOderSituationBereich({
+    angebot: ang,
+    situation: lead?.situation,
+    bereiche: lead?.bereiche,
+    fallback: detail.titel?.trim() || formatAuftragsNr(detail),
+  })
   const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
   const headMeta = useMemo(() => {
     const ort = detail.kunden?.ort?.trim() || ''
@@ -425,39 +421,21 @@ export function AuftragDetailClient({
     )
   }, [detail])
 
-  const filteredTemplates = formModal
-    ? templates.filter(
-        (t) => !t.gewerk_id || t.gewerk_id === formModal.gewerkId
-      )
-    : []
-
-  const openFormModal = (gewerkId: string, handwerkerId: string, email: string) => {
-    const first = templates.find((t) => !t.gewerk_id || t.gewerk_id === gewerkId)
-    setFormModal({
-      gewerkId,
-      handwerkerId,
-      email: email ?? '',
-      templateId: first?.id ?? '',
-      phase: 'vorab',
-    })
-  }
-
   const istAbgeschlossen = detail.status === 'abgeschlossen'
 
   const openProjektBearbeiten = useCallback(() => {
-    setProjektIstBauprojekt(
-      detail.ist_bauprojekt === true
-        ? true
-        : detail.ist_bauprojekt === false
-          ? false
-          : istBauprojekt
-    )
-    setProjektModal(true)
-  }, [detail.ist_bauprojekt, istBauprojekt])
+    setMainTab('leistung')
+    router.replace(`/auftraege/${detail.id}?tab=details`, { scroll: false })
+  }, [detail.id, router])
 
   /** Mock entityMenu(auftrag) + CRM-Extras */
   const aktionenMenuItems = useMemo(() => {
     const extras: EntityMenuItem[] = [
+      {
+        icon: 'checks',
+        label: 'Abschlussdokumentation',
+        onClick: openAbschluss,
+      },
       {
         icon: 'clipboard-list',
         label: 'Abnahmeprotokoll',
@@ -542,11 +520,11 @@ export function AuftragDetailClient({
             })
           },
           onPortalLink: () => {
-            startTransition(async () => {
-              const r = await sendKundenProjektLinkEmail(detail.id)
-              if (!r.ok) toast.error(r.message)
-              else toast.success('E-Mail gesendet')
-            })
+            if (!detail.kunde_id) {
+              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+              return
+            }
+            setPortalLinkModalOpen(true)
           },
           onEditAngebot: detail.angebot_id ? openAngebotKorrektur : undefined,
           onComplete: !istAbgeschlossen ? openAbschluss : undefined,
@@ -607,29 +585,6 @@ export function AuftragDetailClient({
     projektName,
   ])
 
-  const submitFormular = () => {
-    if (!formModal || !formModal.templateId || !formModal.email.trim()) {
-      setErr('Template und E-Mail ausfüllen.')
-      return
-    }
-    setErr(null)
-    startTransition(async () => {
-      const r = await createFormularEintragUndEmail({
-        auftragId: detail.id,
-        handwerkerId: formModal.handwerkerId,
-        gewerkId: formModal.gewerkId,
-        templateId: formModal.templateId,
-        phase: formModal.phase,
-        handwerkerEmail: formModal.email.trim(),
-      })
-      if (!r.ok) setErr(r.message ?? 'Fehler')
-      else {
-        setFormModal(null)
-        refresh()
-      }
-    })
-  }
-
   const timelineCount = useMemo(() => {
     const lead = leadTimeline.length
     const auftrag = detail.auftrag_timeline?.length ?? 0
@@ -641,7 +596,9 @@ export function AuftragDetailClient({
     [detail, rechnungenListe, vertraegeListe]
   )
 
-  const stammdatenInhalt = <AuftragStammdatenCard detail={detail} lead={lead} />
+  const stammdatenInhalt = (
+    <AuftragStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+  )
 
   const leistungInhalt = (
     <AuftragDetailsTab
@@ -656,6 +613,17 @@ export function AuftragDetailClient({
 
   const abnahmeInhalt = (
     <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
+  )
+
+  const abschlussInhalt = (
+    <AuftragAbschlussSection
+      auftragId={detail.id}
+      istAbgeschlossen={istAbgeschlossen}
+      abschlussUrl={detail.abschlussdokumentation_url}
+      abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
+      onCreate={openAbschlussErstellen}
+      onRefresh={() => refresh()}
+    />
   )
 
   const baustelleInhalt = (
@@ -765,6 +733,12 @@ export function AuftragDetailClient({
       render: () => abnahmeInhalt,
     },
     {
+      id: 'abschluss',
+      label: 'Abschlussdokumentation',
+      icon: 'checks',
+      render: () => abschlussInhalt,
+    },
+    {
       id: 'aktivitaet',
       label: ACTIVITY_SECTIONS.verlauf,
       icon: 'history',
@@ -850,7 +824,7 @@ export function AuftragDetailClient({
                 onClick={openAbschluss}
               >
                 <MockIcon ctx="btn" n="checks" size={15} />
-                Auftrag abschließen
+                Abschlussdokumentation
               </button>
             )}
             <ActionsMenu
@@ -866,149 +840,11 @@ export function AuftragDetailClient({
         ),
       }}
     >
-      {err ? (
-        <p className="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
-          {err}
-        </p>
-      ) : null}
-
       <DetailShell
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as AuftragDetailTab)}
       />
-
-      <Modal
-        open={projektModal}
-        onClose={() => setProjektModal(false)}
-        title="Projekt bearbeiten"
-        size="md"
-      >
-        <div className="space-y-3">
-          <Input label="Titel" value={projektTitel} onChange={(e) => setProjektTitel(e.target.value)} />
-          <Input
-            label="Start (Datum)"
-            type="date"
-            value={projektStart}
-            onChange={(e) => setProjektStart(e.target.value)}
-          />
-          <Input
-            label="Ende (Datum)"
-            type="date"
-            value={projektEnde}
-            onChange={(e) => setProjektEnde(e.target.value)}
-          />
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-bw-text">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-bw-border"
-              checked={projektIstBauprojekt}
-              onChange={(e) => setProjektIstBauprojekt(e.target.checked)}
-            />
-            <span>
-              <span className="font-medium">Bauprojekt / Bauauftrag</span>
-              <span className="mt-0.5 block text-xs text-bw-text-muted">
-                Aktiviert Bautagebuch, Baustellen-Tab und Compliance-Checkliste (wie im
-                Partner-Portal).
-              </span>
-            </span>
-          </label>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setProjektModal(false)}>
-            Abbrechen
-          </Button>
-          <Button
-            variant="primary"
-            loading={pending}
-            onClick={() =>
-              run(async () => {
-                const r = await updateAuftragProjektFelder(detail.id, {
-                  titel: projektTitel,
-                  start_datum: projektStart || null,
-                  end_datum: projektEnde || null,
-                  ist_bauprojekt: projektIstBauprojekt,
-                })
-                if (r.ok) setProjektModal(false)
-                return r
-              })
-            }
-          >
-            Speichern
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={!!formModal}
-        onClose={() => setFormModal(null)}
-        title="Formular-Link senden"
-        size="md"
-      >
-        {formModal ? (
-          <>
-            <div className="space-y-3">
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Template</span>
-                <select
-                  value={formModal.templateId}
-                  onChange={(e) =>
-                    setFormModal((m) => (m ? { ...m, templateId: e.target.value } : m))
-                  }
-                  className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3"
-                >
-                  <option value="">Bitte wählen</option>
-                  {filteredTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Phase</span>
-                <select
-                  value={formModal.phase}
-                  onChange={(e) =>
-                    setFormModal((m) =>
-                      m
-                        ? {
-                            ...m,
-                            phase: e.target.value as 'vorab' | 'update' | 'abnahme',
-                          }
-                        : m
-                    )
-                  }
-                  className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3"
-                >
-                  <option value="vorab">Vorab</option>
-                  <option value="update">Update</option>
-                  <option value="abnahme">Abnahme</option>
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Handwerker-E-Mail</span>
-                <input
-                  type="email"
-                  value={formModal.email}
-                  onChange={(e) =>
-                    setFormModal((m) => (m ? { ...m, email: e.target.value } : m))
-                  }
-                  className="mt-1 w-full min-h-[44px] rounded-lg border border-border bg-surface px-3"
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => setFormModal(null)}>
-                Abbrechen
-              </Button>
-              <Button variant="primary" loading={pending} onClick={submitFormular}>
-                Formular-Link senden
-              </Button>
-            </div>
-          </>
-        ) : null}
-      </Modal>
 
       <AbschlussdokumentationModal
         open={abschlussModal}
@@ -1084,15 +920,14 @@ export function AuftragDetailClient({
         onSelect={startNachtragWizard}
       />
 
-      <HandwerkerBewertungModal
-        open={hwBewertungZiele != null && hwBewertungZiele.length > 0}
-        onClose={() => setHwBewertungZiele(null)}
-        auftragId={detail.id}
-        ziele={hwBewertungZiele ?? []}
-        onSaved={() => refresh()}
-      />
-
       {mailCompose.modal}
+
+      <KundenportalLinkVersendenModal
+        open={portalLinkModalOpen}
+        onClose={() => setPortalLinkModalOpen(false)}
+        kundeId={detail.kunde_id}
+        fallbackEmail={detail.kunden?.email}
+      />
 
       {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
         <AngebotWizard

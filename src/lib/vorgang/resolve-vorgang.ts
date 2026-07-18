@@ -1,4 +1,5 @@
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
   ResolveVorgangInput,
   ResolvedVorgang,
@@ -248,15 +249,23 @@ function resolvePhase(input: ResolveVorgangInput): PhasePick {
   }
 }
 
-function buildTitel(input: ResolveVorgangInput): string {
-  if (input.titel?.trim()) return input.titel.trim()
-  const lead = input.lead
-  const bereich = lead.bereiche?.[0]?.trim()
-  const situation = lead.situation?.trim()
-  const ort = lead.plz?.trim()
-  const parts = [situation, bereich, ort].filter(Boolean)
-  if (parts.length) return parts.join(' — ')
-  return lead.kontakt_name?.trim() || 'Vorgang'
+function buildTitel(
+  input: ResolveVorgangInput,
+  angebotAktiv: VorgangAngebotInput | null | undefined
+): string {
+  const angebote = input.angebote ?? []
+  const angebot =
+    angebotAktiv ??
+    angebote.find((a) => Boolean(a.leistungsumfang?.trim() || a.notizen?.trim() || a.titel?.trim())) ??
+    angebote[0] ??
+    null
+
+  return angebotTitelOderSituationBereich({
+    angebot,
+    situation: input.lead.situation,
+    bereiche: input.lead.bereiche,
+    fallback: input.titel?.trim() || input.lead.kontakt_name?.trim() || 'Vorgang',
+  })
 }
 
 /** Kanonische Ableitung — nie aus vorgang_phase lesen. Output: `ResolvedVorgang`. */
@@ -320,7 +329,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
     badges,
     ueberfaellig,
     kanalMeta: kanalMetaFromLead(lead.kanal),
-    titel: buildTitel(input),
+    titel: buildTitel(input, angebotAktiv),
     entityId: pick.entityId,
     entityType: pick.phase,
     updatedAt: pick.updatedAt,
