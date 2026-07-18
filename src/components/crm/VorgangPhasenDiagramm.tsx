@@ -69,7 +69,7 @@ export function VorgangPhasenDiagramm({
     <nav
       aria-label="Vorgangsphasen"
       className={cn('vorgang-phasen-diagramm', className)}
-      style={{ marginTop: 14, marginBottom: 4 }}
+      style={{ marginTop: 14, marginBottom: 24 }}
     >
       <ol
         style={{

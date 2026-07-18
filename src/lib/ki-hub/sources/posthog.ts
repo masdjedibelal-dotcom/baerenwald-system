@@ -13,7 +13,16 @@ function extractPageviews(raw: unknown): number | null {
   return null
 }
 
-export async function fetchPostHogSummary(): Promise<KiHubQuelleResult<Record<string, unknown>>> {
+export type MarketingDateRange = {
+  /** YYYY-MM-DD */
+  from: string
+  /** YYYY-MM-DD */
+  to: string
+}
+
+export async function fetchPostHogSummary(
+  range?: MarketingDateRange
+): Promise<KiHubQuelleResult<Record<string, unknown>>> {
   const apiKey = process.env.POSTHOG_API_KEY?.trim()
   const projectId = process.env.POSTHOG_PROJECT_ID?.trim()
   if (!apiKey || !projectId) {
@@ -25,6 +34,8 @@ export async function fetchPostHogSummary(): Promise<KiHubQuelleResult<Record<st
     const end = new Date()
     const start = new Date(end)
     start.setDate(start.getDate() - 7)
+    const dateFrom = range?.from ?? start.toISOString().slice(0, 10)
+    const dateTo = range?.to ?? end.toISOString().slice(0, 10)
 
     const res = await fetch(`${host}/api/projects/${projectId}/query/`, {
       method: 'POST',
@@ -37,8 +48,8 @@ export async function fetchPostHogSummary(): Promise<KiHubQuelleResult<Record<st
           kind: 'TrendsQuery',
           series: [{ event: '$pageview', kind: 'EventsNode' }],
           dateRange: {
-            date_from: start.toISOString().slice(0, 10),
-            date_to: end.toISOString().slice(0, 10),
+            date_from: dateFrom,
+            date_to: dateTo,
           },
         },
       }),
@@ -71,7 +82,9 @@ export async function fetchPostHogSummary(): Promise<KiHubQuelleResult<Record<st
       status: 'ok',
       data: {
         pageviews_7d: pageviews,
-        zeitraum_tage: 7,
+        pageviews: pageviews,
+        date_from: dateFrom,
+        date_to: dateTo,
         host,
         project_id: projectId,
       },

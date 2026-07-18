@@ -1,12 +1,10 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Plus, Trash2, UserPlus, X, ClipboardList } from 'lucide-react'
+import { UserPlus, X, ClipboardList } from 'lucide-react'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { Button } from '@/components/ui/Button'
-import { toast } from '@/components/ui/app-toast'
-import { bulkDeleteAuftragPositionenV3 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
 import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks'
 import { summenPositionen } from '@/lib/auftraege/auftrag-leistung-phasen'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -17,16 +15,12 @@ import type { HandwerkerZuweisenKontext } from '@/components/auftraege/Handwerke
 import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { AuftragLeistungDetailModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungDetailModal'
-import { AuftragLeistungEditModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungEditModal'
-import { AuftragGewerkAddRow } from '@/components/auftraege/leistungen-v3/AuftragGewerkAddRow'
-import { AuftragLeistungNewModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungNewModal'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/PartnerVorgangChip'
 import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
 import { istPartnerEntfernungAusstehend } from '@/lib/auftraege/partner-vorgang-display'
 import {
   blockVkSumme,
-  createLeeresGewerkBlock,
   groupPositionenByGewerkSlug,
 } from '@/components/auftraege/leistungen-v3/utils'
 
@@ -55,25 +49,17 @@ export function AuftragLeistungenV3Tab({
   auftragAbgeschlossen?: boolean
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [detailPos, setDetailPos] = useState<AuftragPosition | null>(null)
-  const [editPos, setEditPos] = useState<AuftragPosition | null>(null)
-  const [newBlock, setNewBlock] = useState<AuftragGewerkBlock | null>(null)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
-  const [extraBlocks, setExtraBlocks] = useState<AuftragGewerkBlock[]>([])
 
-  const disabled = auftragAbgeschlossen || pending
+  const disabled = auftragAbgeschlossen
   const sorted = useMemo(
     () => [...positionen].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [positionen]
   )
   const blocks = useMemo(() => groupPositionenByGewerkSlug(sorted, gewerke), [sorted, gewerke])
-  const allBlocks = useMemo(() => {
-    const keys = new Set(blocks.map((b) => b.key))
-    const pendingBlocks = extraBlocks.filter((b) => !keys.has(b.key))
-    return [...blocks, ...pendingBlocks]
-  }, [blocks, extraBlocks])
   const totals = useMemo(() => summenPositionen(sorted), [sorted])
   const abgelehntZuweisungen = useMemo(
     () => handwerkerRows.filter((z) => (z.status ?? '').toLowerCase() === 'abgelehnt'),
@@ -110,102 +96,15 @@ export function AuftragLeistungenV3Tab({
     setSelectedIds(new Set())
   }
 
-  function addGewerk(g: GewerkOpt) {
-    const block = createLeeresGewerkBlock(g)
-    setExtraBlocks((prev) => [...prev, block])
-    setNewBlock(block)
-  }
-
-  function removeEmptyBlock(block: AuftragGewerkBlock) {
-    if (block.positionen.length > 0) return
-    setExtraBlocks((prev) => prev.filter((b) => b.key !== block.key))
-    if (newBlock?.key === block.key) setNewBlock(null)
-  }
-
-  function onLeistungSaved() {
-    if (newBlock) {
-      setExtraBlocks((prev) => prev.filter((b) => b.key !== newBlock.key))
-    }
-    refresh()
-  }
-
-  function bulkDelete() {
-    const ids = Array.from(selectedIds)
-    if (!ids.length) return
-    if (
-      !window.confirm(
-        ids.length === 1
-          ? 'Diese Leistung wirklich entfernen?'
-          : `${ids.length} Leistungen wirklich entfernen?`
-      )
-    ) {
-      return
-    }
-    startTransition(async () => {
-      const r = await bulkDeleteAuftragPositionenV3(auftragId, ids, { projektName: angebotTitel })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      const msg =
-        r.markiert > 0
-          ? r.markiert === 1
-            ? 'Leistung als entfernt markiert — Partner wird informiert.'
-            : `${r.markiert} Leistungen als entfernt markiert — Partner wird informiert.`
-          : r.deleted === 1
-            ? 'Leistung entfernt.'
-            : `${r.deleted} Leistungen entfernt.`
-      toast.success(msg)
-      clearSelection()
-      setDetailPos(null)
-      refresh()
-    })
-  }
-
-  function deleteOne(pos: AuftragPosition) {
-    if (!window.confirm(`„${pos.leistung_name}" wirklich entfernen?`)) return
-    startTransition(async () => {
-      const r = await bulkDeleteAuftragPositionenV3(auftragId, [pos.id], { projektName: angebotTitel })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success(
-        r.markiert > 0
-          ? 'Leistung als entfernt markiert — Partner wird informiert.'
-          : 'Leistung entfernt.'
-      )
-      setDetailPos(null)
-      setSelectedIds((prev) => {
-        const next = new Set(prev)
-        next.delete(pos.id)
-        return next
-      })
-      refresh()
-    })
-  }
-
   function rowMenu(pos: AuftragPosition): EntityMenuItem[] {
     const rowLocked = istPartnerEntfernungAusstehend(pos)
     if (disabled || rowLocked) return []
     const hasHw = Boolean(pos.handwerker_id)
     return [
       {
-        icon: 'pencil',
-        label: 'Bearbeiten',
-        onClick: () => setEditPos(pos),
-      },
-      {
         icon: 'user',
         label: hasHw ? 'Handwerker ändern' : 'Handwerker anfragen',
         onClick: () => setZuweisungIds([pos.id]),
-      },
-      'sep',
-      {
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () => deleteOne(pos),
       },
     ]
   }
@@ -213,58 +112,25 @@ export function AuftragLeistungenV3Tab({
   function gewerkMenu(block: AuftragGewerkBlock): EntityMenuItem[] {
     if (disabled) return []
     const ids = block.positionen.map((p) => p.id)
-    const items: EntityMenuItem[] = [
+    if (ids.length === 0) return []
+    return [
       {
-        icon: 'plus',
-        label: 'Position hinzufügen',
-        onClick: () => setNewBlock(block),
-      },
-    ]
-    if (ids.length > 0) {
-      items.push({
         icon: 'user',
         label: 'Handwerker fürs Gewerk',
         onClick: () => setZuweisungIds(ids),
-      })
-    }
-    if (block.positionen.length === 0) {
-      items.push('sep', {
-        icon: 'trash',
-        label: 'Gewerk entfernen',
-        danger: true,
-        onClick: () => removeEmptyBlock(block),
-      })
-    }
-    return items
+      },
+    ]
   }
 
   const selectedCount = selectedIds.size
 
-  if (!sorted.length && extraBlocks.length === 0) {
+  if (!sorted.length) {
     return (
       <div className="pos-v3">
         <EmptyState
           icon={ClipboardList}
-          title="Noch keine Gewerke"
-          description="Legen Sie zuerst ein Gewerk an und fügen Sie danach Leistungen hinzu."
-          action={
-            <AuftragGewerkAddRow
-              gewerke={gewerke}
-              disabled={disabled}
-              className="pos-gewerk-add-row justify-center"
-              onAdd={addGewerk}
-            />
-          }
-        />
-        <AuftragLeistungNewModal
-          open={newBlock !== null}
-          onClose={() => setNewBlock(null)}
-          auftragId={auftragId}
-          angebotId={angebotId}
-          projektName={angebotTitel}
-          block={newBlock}
-          gewerke={gewerke}
-          onSaved={onLeistungSaved}
+          title="Noch keine Leistungen"
+          description="Leistungen und Gewerke stammen aus dem Angebot. Hier können Sie Handwerker anfragen."
         />
       </div>
     )
@@ -272,6 +138,20 @@ export function AuftragLeistungenV3Tab({
 
   return (
     <div className="pos-v3">
+      <div
+        className="section-h"
+        style={{
+          margin: '2px 2px 10px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+        }}
+      >
+        <span>Leistungen</span>
+        <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+          {sorted.length} {sorted.length === 1 ? 'Position' : 'Positionen'}
+        </span>
+      </div>
       {abgelehntZuweisungen.length > 0 && handwerkerKontext ? (
         <div className="mb-4 space-y-2">
           {abgelehntZuweisungen.map((z) => (
@@ -290,7 +170,7 @@ export function AuftragLeistungenV3Tab({
         </div>
       ) : null}
       <div className="postable2">
-        {allBlocks.map((block) => {
+        {blocks.map((block) => {
           const blockIds = block.positionen.map((p) => p.id)
           const blockAllSelected =
             blockIds.length > 0 && blockIds.every((id) => selectedIds.has(id))
@@ -407,23 +287,9 @@ export function AuftragLeistungenV3Tab({
                   </div>
                 )
               })}
-
-              <button
-                type="button"
-                className="pt-add"
-                disabled={disabled}
-                onClick={() => setNewBlock(block)}
-                style={{ borderBottom: '0.5px solid var(--border)' }}
-              >
-                <Plus className="h-3.5 w-3.5" /> Position hinzufügen
-              </button>
             </div>
           )
         })}
-
-        <div style={{ padding: '8px 12px', borderBottom: '0.5px solid var(--border)' }}>
-          <AuftragGewerkAddRow gewerke={gewerke} disabled={disabled} onAdd={addGewerk} />
-        </div>
 
         <div className="pt2-foot">
           <div className="r">
@@ -446,9 +312,7 @@ export function AuftragLeistungenV3Tab({
 
       {selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
-          <span className="text-sm font-medium text-bw-text">
-            {selectedCount} ausgewählt
-          </span>
+          <span className="text-sm font-medium text-bw-text">{selectedCount} ausgewählt</span>
           <Button
             type="button"
             variant="secondary"
@@ -458,10 +322,6 @@ export function AuftragLeistungenV3Tab({
           >
             <UserPlus className="h-4 w-4" />
             Handwerker anfragen
-          </Button>
-          <Button type="button" variant="danger" size="sm" disabled={disabled} onClick={bulkDelete}>
-            <Trash2 className="h-4 w-4" />
-            Entfernen
           </Button>
           <button
             type="button"
@@ -480,35 +340,13 @@ export function AuftragLeistungenV3Tab({
         pos={detailPos}
         gewerkName={detailPos?.gewerk_name ?? ''}
         disabled={disabled}
-        onRemove={() => detailPos && deleteOne(detailPos)}
+        onRemove={() => undefined}
         onEdit={() => {
-          if (detailPos) {
-            setEditPos(detailPos)
-            setDetailPos(null)
-          }
+          if (!detailPos || disabled) return
+          setZuweisungIds([detailPos.id])
+          setDetailPos(null)
         }}
-      />
-
-      <AuftragLeistungEditModal
-        open={!!editPos}
-        onClose={() => setEditPos(null)}
-        pos={editPos}
-        auftragId={auftragId}
-        angebotId={angebotId}
-        projektName={angebotTitel}
-        gewerke={gewerke}
-        onSaved={refresh}
-      />
-
-      <AuftragLeistungNewModal
-        open={newBlock !== null}
-        onClose={() => setNewBlock(null)}
-        auftragId={auftragId}
-        angebotId={angebotId}
-        projektName={angebotTitel}
-        block={newBlock}
-        gewerke={gewerke}
-        onSaved={onLeistungSaved}
+        handwerkerOnly
       />
 
       <AuftragLeistungZuweisungModal
@@ -522,7 +360,7 @@ export function AuftragLeistungenV3Tab({
         gewerke={gewerke}
         onDone={() => {
           clearSelection()
-          refresh()
+          startTransition(() => refresh())
         }}
       />
     </div>

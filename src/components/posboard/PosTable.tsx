@@ -78,8 +78,8 @@ export function PosTable({
   groups: PosTableGroup[]
   /** @deprecated Prefer onAddKind — kept for per-group fallback */
   onAddItem?: (group: PosTableGroup) => void
-  /** 4 Mock-Optionen: Freie Position · Preisliste · Freitext · Nachlass */
-  onAddKind?: (kind: PosAddKind) => void
+  /** 4 Optionen; optional mit Ziel-Gewerk (bei Plus pro Gruppe) */
+  onAddKind?: (kind: PosAddKind, gewerk?: string) => void
   onAddGroup?: () => void
   groupActions?: (group: PosTableGroup) => EntityMenuItem[]
   itemActions?: (group: PosTableGroup, item: PosTableItem) => EntityMenuItem[]
@@ -99,13 +99,16 @@ export function PosTable({
   const sel = selected ?? {}
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [addOpenFor, setAddOpenFor] = useState<string | null>(null)
   const dragRef = useRef<string | null>(null)
+  const hasGroups = (groups ?? []).length > 0
 
   return (
     <div className="postable2">
       {(groups ?? []).map((g) => {
         const items = g.items ?? []
         const allSel = Boolean(selectable && items.length > 0 && items.every((it) => sel[it.id]))
+        const addOpen = Boolean(onAddKind && addOpenFor === g.id)
         return (
           <div key={g.id}>
             <div
@@ -141,9 +144,25 @@ export function PosTable({
               <span className="g">{g.gewerk || 'Ohne Gewerk'}</span>
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
+              {onAddKind ? (
+                <button
+                  type="button"
+                  className={`pt2-gewerk-add${addOpen ? ' is-open' : ''}`}
+                  title={addOpen ? 'Schließen' : 'Position zu diesem Gewerk hinzufügen'}
+                  aria-expanded={addOpen}
+                  aria-label={
+                    addOpen
+                      ? 'Hinzufügen schließen'
+                      : `Position zu ${g.gewerk || 'Gewerk'} hinzufügen`
+                  }
+                  onClick={() => setAddOpenFor(addOpen ? null : g.id)}
+                >
+                  <MockIcon ctx="default" n={addOpen ? 'x' : 'plus'} size={14} />
+                </button>
+              ) : null}
               {groupActions ? <PosTableMenu items={groupActions(g)} /> : null}
             </div>
-            {items.length === 0 ? (
+            {items.length === 0 && !addOpen ? (
               <div
                 style={{
                   padding: '12px 14px',
@@ -252,6 +271,17 @@ export function PosTable({
                 </div>
               )
             })}
+            {addOpen ? (
+              <div className="pt2-gewerk-add-panel">
+                <PosAddRow
+                  onAdd={(kind) => {
+                    onAddKind?.(kind, g.gewerk)
+                    setAddOpenFor(null)
+                  }}
+                  disabledKinds={disabledAddKinds}
+                />
+              </div>
+            ) : null}
             {!onAddKind && onAddItem ? (
               <button
                 type="button"
@@ -265,9 +295,9 @@ export function PosTable({
           </div>
         )
       })}
-      {onAddKind ? (
+      {onAddKind && !hasGroups ? (
         <div style={{ padding: '12px 0 4px' }}>
-          <PosAddRow onAdd={onAddKind} disabledKinds={disabledAddKinds} />
+          <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
         </div>
       ) : null}
       {onAddGroup ? (

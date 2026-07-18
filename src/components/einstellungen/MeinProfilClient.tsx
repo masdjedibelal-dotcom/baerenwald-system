@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { toast } from '@/components/ui/app-toast'
+import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
 import type { MeinProfilDaten } from '@/app/(dashboard)/einstellungen/profil/actions'
 import { saveMeinProfil } from '@/app/(dashboard)/einstellungen/profil/actions'
@@ -32,6 +33,13 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Card title="Mein Profil">
+        <div className="mb-4 flex items-center gap-3">
+          <BrandAvatar size={48} />
+          <div>
+            <div className="text-[14px] font-semibold text-bw-text">{name || 'Profil'}</div>
+            <div className="text-[12.5px] text-bw-text-muted">{initial.email || '—'}</div>
+          </div>
+        </div>
         <EinstellungenMeta className="mb-4">
           Name und Handynummer erscheinen im Kundenportal als Ansprechpartner, wenn du Betreuer eines
           Auftrags bist.

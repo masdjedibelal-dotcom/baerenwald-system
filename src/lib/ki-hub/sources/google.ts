@@ -11,7 +11,10 @@ type GscRow = {
   position?: number
 }
 
-export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string, unknown>>> {
+export async function fetchGscSummary(range?: {
+  from: string
+  to: string
+}): Promise<KiHubQuelleResult<Record<string, unknown>>> {
   const siteUrl = process.env.GSC_SITE_URL?.trim()
 
   if (!siteUrl) {
@@ -25,6 +28,8 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
     start.setDate(start.getDate() - 28)
 
     const fmt = (d: Date) => d.toISOString().slice(0, 10)
+    const startDate = range?.from ?? fmt(start)
+    const endDate = range?.to ?? fmt(end)
     const encodedSite = encodeURIComponent(siteUrl)
 
     const res = await fetch(
@@ -36,8 +41,8 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          startDate: fmt(start),
-          endDate: fmt(end),
+          startDate,
+          endDate,
           dimensions: ['query'],
           rowLimit: 10,
         }),
@@ -83,7 +88,8 @@ export async function fetchGscSummary(): Promise<KiHubQuelleResult<Record<string
       data: {
         site_url: siteUrl,
         auth_mode: mode,
-        zeitraum_tage: 28,
+        date_from: startDate,
+        date_to: endDate,
         clicks: totals.clicks,
         impressions: totals.impressions,
         top_queries: topQueries,

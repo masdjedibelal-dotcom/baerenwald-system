@@ -19,6 +19,7 @@ export function AuftragLeistungDetailModal({
   onRemove,
   onEdit,
   disabled,
+  handwerkerOnly = false,
 }: {
   open: boolean
   onClose: () => void
@@ -27,6 +28,8 @@ export function AuftragLeistungDetailModal({
   onRemove: () => void
   onEdit: () => void
   disabled?: boolean
+  /** Details: nur Handwerker anfragen, kein Bearbeiten/Entfernen */
+  handwerkerOnly?: boolean
 }) {
   if (!pos) return null
 
@@ -36,6 +39,7 @@ export function AuftragLeistungDetailModal({
   const hwName = pos.handwerker?.name
   const entferntPending = istPartnerEntfernungAusstehend(pos)
   const rowLocked = entferntPending
+  const hasHw = Boolean(pos.handwerker_id)
 
   return (
     <Modal
@@ -44,24 +48,39 @@ export function AuftragLeistungDetailModal({
       title={pos.leistung_name}
       size="lg"
       footer={
-        <>
-          {!rowLocked ? (
-            <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
-              Entfernen
+        handwerkerOnly ? (
+          <>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Schließen
             </Button>
-          ) : null}
-          <div className="ml-auto flex flex-wrap gap-2">
+            <div className="ml-auto flex flex-wrap gap-2">
+              {!rowLocked ? (
+                <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
+                  {hasHw ? 'Handwerker ändern' : 'Handwerker anfragen'}
+                </Button>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <>
             {!rowLocked ? (
-              <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
-                Bearbeiten
+              <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
+                Entfernen
               </Button>
-            ) : (
-              <Button type="button" variant="secondary" onClick={onClose}>
-                Schließen
-              </Button>
-            )}
-          </div>
-        </>
+            ) : null}
+            <div className="ml-auto flex flex-wrap gap-2">
+              {!rowLocked ? (
+                <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
+                  Bearbeiten
+                </Button>
+              ) : (
+                <Button type="button" variant="secondary" onClick={onClose}>
+                  Schließen
+                </Button>
+              )}
+            </div>
+          </>
+        )
       }
     >
       {rowLocked ? (

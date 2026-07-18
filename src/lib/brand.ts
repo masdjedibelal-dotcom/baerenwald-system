@@ -13,6 +13,9 @@ export const BRAND_LOGO_GREEN = '/brand/logo-mark-green.png'
 /** Weiß auf dunklem Hintergrund (Sidebar, E-Mail-Kopf, Status-Seiten) */
 export const BRAND_LOGO_WHITE = '/brand/logo-mark-white.png'
 
+/** Logo auf grünem Badge — für Avatare / Profilbild */
+export const BRAND_LOGO_BADGE = '/brand/logo-badge-green-bg.png'
+
 export type BrandLogoVariant = 'green' | 'white'
 
 export function brandLogoPath(variant: BrandLogoVariant): string {

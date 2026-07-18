@@ -70,20 +70,8 @@ export default async function DashboardLayout({
 
     const showDemoBanner = isDemoTestUserEmail(user.email)
 
-    let datenschutzHintDismissed = false
-    const { data: profile, error: profileErr } = await supabase
-      .from('user_profiles')
-      .select('datenschutz_hint_bestaetigt_am')
-      .eq('id', user.id)
-      .maybeSingle()
-    if (!profileErr) {
-      datenschutzHintDismissed = Boolean(
-        (profile as { datenschutz_hint_bestaetigt_am?: string | null } | null)?.datenschutz_hint_bestaetigt_am
-      )
-    }
-
     return (
-      <DashboardProviders datenschutzHintDismissed={datenschutzHintDismissed}>
+      <DashboardProviders>
         <DashboardShell user={user} showDemoBanner={showDemoBanner}>
           {children}
         </DashboardShell>

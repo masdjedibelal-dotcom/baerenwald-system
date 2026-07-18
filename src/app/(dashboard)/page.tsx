@@ -139,7 +139,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
           .limit(3000)
       )
     ),
-    loadDashboardMarketing(),
+    loadDashboardMarketing(zeitraum),
   ])
 
   const leads = filterOutLegacyDemoLeads(

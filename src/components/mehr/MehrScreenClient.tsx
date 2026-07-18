@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createClient } from '@/lib/supabase'
@@ -18,10 +19,10 @@ const ICON_MAP: Record<string, string> = {
 export function MehrScreenClient({
   userName = 'Beran Bärenwald',
   userRole = 'Inhaber · Bärenwald München',
-  initials = 'BB',
 }: {
   userName?: string
   userRole?: string
+  /** @deprecated Immer Brand-Logo als Avatar */
   initials?: string
 }) {
   const router = useRouter()
@@ -51,21 +52,7 @@ export function MehrScreenClient({
           borderRadius: 'var(--r)',
         }}
       >
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            background: 'var(--green)',
-            color: 'white',
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 15,
-            fontWeight: 600,
-          }}
-        >
-          {initials}
-        </div>
+        <BrandAvatar size={44} aria-hidden />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{userName}</div>
           <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{userRole}</div>
@@ -89,7 +76,6 @@ export function MehrScreenClient({
         ))}
       </div>
 
-      {/* Abmelden: Funktionsschutz (Sidebar/MoreSheet) — nicht in Mock-Mehr-Tiles */}
       <div style={{ marginTop: 16, padding: '0 4px' }}>
         <MockBtn
           kind="danger"

@@ -1,16 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo } from 'react'
 import {
   EntityProjektUebersichtCard,
   type ProjektUebersichtExtraRow,
 } from '@/components/crm/EntityProjektUebersichtCard'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { toast } from '@/components/ui/app-toast'
-import {
-  saveLeadProjektWasZeilen,
-  updateLeadBeschreibung,
-} from '@/app/(dashboard)/anfragen/actions'
+import { updateLeadBeschreibung } from '@/app/(dashboard)/anfragen/actions'
 import {
   isEchterFreitext,
   kundentypLabel,
@@ -35,7 +31,6 @@ import {
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
 import {
-  neuePosBoardLine,
   POS_BOARD_DEFAULT_GEWERK,
   type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
@@ -216,25 +211,6 @@ function wasZeilenToPosBoard(zeilen: ProjektWasZeile[], gewerke: Gewerk[]): PosB
   }))
 }
 
-function posBoardToWasZeilen(lines: PosBoardLine[], prev: ProjektWasZeile[]): ProjektWasZeile[] {
-  const prevById = new Map(prev.map((z) => [z.id, z]))
-  return lines.map((line) => {
-    const old = prevById.get(line.id)
-    return {
-      id: line.id || neueWasZeilenId(),
-      titel: line.name.trim() || 'Leistung',
-      beschreibung: line.beschreibung?.trim() || undefined,
-      menge: Number(line.menge) > 0 ? Number(line.menge) : 1,
-      einheit: line.einheit?.trim() || 'pauschal',
-      bereich_key: old?.bereich_key,
-      gewerk_id: old?.gewerk_id,
-      preisliste_id: old?.preisliste_id,
-      relevant_fuer_rechnung: old?.relevant_fuer_rechnung ?? true,
-      ergaenzungen: old?.ergaenzungen ?? [],
-    }
-  })
-}
-
 function initialWasZeilen(lead: LeadDetail, gewerke: Gewerk[]): ProjektWasZeile[] {
   const fromWas = parseProjektWasZeilen(lead.funnel_daten, {
     bereiche: lead.bereiche,
@@ -257,7 +233,7 @@ function initialWasZeilen(lead: LeadDetail, gewerke: Gewerk[]): ProjektWasZeile[
   }))
 }
 
-/** Anfrage: nur Bedarf (Funnel) + ungepreiste Wunschliste. */
+/** Anfrage: Bedarf (Funnel) + Wunschliste nur Anzeige (keine Positionen/Gewerke in Details). */
 export function AnfrageDetailsTab({
   lead,
   gewerke = [],
@@ -267,45 +243,9 @@ export function AnfrageDetailsTab({
   gewerke?: Gewerk[]
   onSaved?: () => void
 }) {
-  const [zeilen, setZeilen] = useState(() => initialWasZeilen(lead, gewerke))
-  const zeilenRef = useRef(zeilen)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [, startTransition] = useTransition()
-
-  useEffect(() => {
-    setZeilen(initialWasZeilen(lead, gewerke))
-  }, [lead.id, lead.funnel_daten, gewerke])
-
-  useEffect(() => {
-    zeilenRef.current = zeilen
-  }, [zeilen])
-
-  const positionen = useMemo(() => wasZeilenToPosBoard(zeilen, gewerke), [zeilen, gewerke])
-
-  const persist = useCallback(
-    (next: ProjektWasZeile[]) => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => {
-        startTransition(async () => {
-          const res = await saveLeadProjektWasZeilen(lead.id, next)
-          if (!res.ok) {
-            toast.error(res.message)
-            return
-          }
-          onSaved?.()
-        })
-      }, 450)
-    },
-    [lead.id, onSaved]
-  )
-
-  const onPosBoardChange = useCallback(
-    (next: PosBoardLine[]) => {
-      const mapped = posBoardToWasZeilen(next, zeilenRef.current)
-      setZeilen(mapped)
-      persist(mapped)
-    },
-    [persist]
+  const positionen = useMemo(
+    () => wasZeilenToPosBoard(initialWasZeilen(lead, gewerke), gewerke),
+    [lead, gewerke]
   )
 
   const preisrahmen = resolveLeadPreisAnzeige(
@@ -341,22 +281,7 @@ export function AnfrageDetailsTab({
         footerRows={bedarfUi.footerRows}
       />
 
-      <PosBoard
-        title="Wunschliste"
-        positionen={positionen}
-        onChange={onPosBoardChange}
-        showUst={false}
-        makeNew={(gewerk) =>
-          neuePosBoardLine({
-            gewerk: gewerk || POS_BOARD_DEFAULT_GEWERK,
-            name: '',
-            menge: 1,
-            einheit: 'pauschal',
-            preis: 0,
-            ust: 19,
-          })
-        }
-      />
+      <PosBoard title="Wunschliste" positionen={positionen} showUst={false} />
     </>
   )
 }

@@ -65,9 +65,14 @@
   color: white;
   display: grid;
   place-items: center;
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: -0.02em;
+  overflow: hidden;
+  padding: 3px;
+  box-sizing: border-box;
+}
+.sidebar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .sidebar-icon {
   position: relative;
@@ -259,6 +264,53 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.topbar-avatar {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.topbar-avatar:hover .brand-avatar,
+.topbar-avatar.is-open .brand-avatar {
+  box-shadow: 0 0 0 2px var(--green-50), 0 0 0 3.5px var(--green);
+}
+.topbar-avatar:hover .avatar,
+.topbar-avatar.is-open .avatar {
+  box-shadow: 0 0 0 2px var(--green-50), 0 0 0 3.5px var(--green);
+}
+.topbar-user-pop__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px 10px;
+}
+.topbar-user-pop__meta {
+  min-width: 0;
+  flex: 1;
+}
+.topbar-user-pop__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-user-pop__email {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Page */
@@ -975,6 +1027,24 @@ div.input input::placeholder { color: var(--text-4); }
   background: var(--card);
   box-shadow: var(--shadow);
 }
+.page-loading {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: calc(100vh - var(--topbar-h, 44px) - 80px);
+  padding: 24px;
+}
+.page-loading__spinner {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  border: 5px solid transparent;
+  border-top-color: var(--green);
+  animation: page-loading-spin 0.8s linear infinite;
+}
+@keyframes page-loading-spin {
+  to { transform: rotate(360deg); }
+}
 .phase-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1465,19 +1535,26 @@ div.input input::placeholder { color: var(--text-4); }
   flex-shrink: 0;
 }
 .modal-h .title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  line-height: 1.3;
 }
 .modal-h .sub {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-3);
-  margin-top: 1px;
+  margin-top: 2px;
+  line-height: 1.3;
 }
 .modal-b {
   padding: 16px 18px;
   overflow-y: auto;
   flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  background: #ffffff;
 }
 .modal-f {
   padding: 12px 18px;
@@ -1485,6 +1562,62 @@ div.input input::placeholder { color: var(--text-4); }
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.modal-f.modal-footer--spread {
+  justify-content: space-between;
+}
+
+/* Legacy-Aliase (ältere Modal-Markup-Klassen → gleiches Design) */
+.modal-header {
+  padding: 16px 18px 12px;
+  border-bottom: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+}
+.modal-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.modal-header-leading {
+  flex-shrink: 0;
+}
+.modal-title {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  line-height: 1.3;
+}
+.modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.3;
+}
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  background: #ffffff;
+}
+.modal-footer {
+  padding: 12px 18px;
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modal-footer--spread {
+  justify-content: space-between;
 }
 
 /* ============ Stepper ============ */
@@ -2499,6 +2632,34 @@ div.input input::placeholder { color: var(--text-4); }
 .pt2-sub { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--bg-soft); border-bottom: 0.5px solid var(--border); }
 .pt2-sub .g { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
 .pt2-sub .gt { font-size: 12px; color: var(--text-3); }
+.pt2-gewerk-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.pt2-gewerk-add:hover,
+.pt2-gewerk-add.is-open {
+  background: var(--green-50);
+  border-color: var(--green);
+  color: var(--green);
+}
+.pt2-gewerk-add-panel {
+  padding: 10px 12px 12px;
+  border-bottom: 0.5px solid var(--border);
+  background: color-mix(in srgb, var(--green-50) 45%, #fff);
+}
+.pt2-gewerk-add-panel .pos-add-row {
+  margin-top: 0;
+}
 .pt2-row { display: grid; grid-template-columns: auto 1fr auto 120px 34px; gap: 10px; align-items: center; padding: 9px 14px; border-bottom: 0.5px solid var(--border); }
 .pt2-row.sel { background: var(--green-50); }
 .pt2-main { min-width: 0; }
@@ -3791,9 +3952,9 @@ div.input input::placeholder { color: var(--text-4); }
     color: white;
     display: grid;
     place-items: center;
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: -0.02em;
+    overflow: hidden;
+    padding: 3px;
+    box-sizing: border-box;
   }
 
 .sidebar-icon.active .mock-icon,
@@ -4669,47 +4830,7 @@ textarea.input:focus {
     z-index: 320;
   }
 
-.modal-header {
-    @apply flex min-h-[44px] items-center justify-between border-b border-bw-border px-4 py-3;
-  }
-
-.modal-header-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
-}
-
-.modal-header-leading {
-  flex-shrink: 0;
-}
-
-.modal-title {
-    @apply text-[15px] font-semibold tracking-tight text-bw-text;
-  }
-
-.modal-subtitle {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--text-3);
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.modal-body {
-    @apply space-y-3 overflow-y-auto px-4 py-3 text-[13px] leading-snug text-bw-text;
-    background: #ffffff;
-  }
-
-.modal-footer {
-    @apply flex min-h-[44px] items-center justify-end gap-2 border-t border-bw-border px-4 py-3;
-  }
-
-.modal-footer--spread {
-  justify-content: space-between;
-}
+/* modal-header/title/body/footer: kanonische Regeln weiter oben bei .modal-h — hier nur Legacy-Hooks */
 
 /* —— Handwerker anfragen Modal (Mock) —— */
 
@@ -4725,9 +4846,9 @@ textarea.input:focus {
 
 .hw-anfrage-modal .modal-h .title,
 .hw-anfrage-modal .modal-title {
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 650;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 .hw-anfrage-modal-icon {
@@ -5071,7 +5192,7 @@ textarea.input:focus {
   }
 
 .modal-compact-h {
-    @apply flex min-h-[44px] items-center gap-2.5 border-b border-hairline border-bw-border px-4 py-3;
+    @apply flex items-center gap-2.5 border-b border-hairline border-bw-border px-[18px] py-3;
   }
 
 .modal-compact-icon {
@@ -5083,19 +5204,25 @@ textarea.input:focus {
   }
 
 .modal-compact-title {
-    @apply text-[15px] font-semibold tracking-tight text-bw-text;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--text);
   }
 
 .modal-compact-sub {
-    @apply mt-0.5 text-xs text-bw-text-muted;
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--text-3);
+    line-height: 1.3;
   }
 
 .modal-compact-b {
-    @apply flex-1 space-y-3 overflow-y-auto px-4 py-3 text-[13px] leading-snug text-bw-text;
+    @apply flex-1 space-y-3 overflow-y-auto px-[18px] py-4 text-[13px] leading-snug text-bw-text;
   }
 
 .modal-compact-f {
-    @apply flex min-h-[44px] items-center gap-2 border-t border-hairline border-bw-border px-4 py-3;
+    @apply flex items-center gap-2 border-t border-hairline border-bw-border px-[18px] py-3;
   }
 
 .modal .input,
@@ -5106,10 +5233,17 @@ textarea.input:focus {
   .modal-compact textarea.input,
   .form-sheet .input,
   .form-sheet select.input,
-  .form-sheet textarea.input {
+  .form-sheet textarea.input,
+  .modal .txt,
+  .modal .ta,
+  .modal .sel,
+  .modal-compact .txt,
+  .modal-compact .ta,
+  .modal-compact .sel {
     @apply min-h-[34px] py-1.5 text-[13px] leading-snug;
     font-size: 13px !important;
     border-color: var(--border);
+    border-radius: 6px;
   }
 
 .modal .input::placeholder,
@@ -5120,12 +5254,17 @@ textarea.input:focus {
   .form-sheet textarea.input::placeholder {
     @apply text-[13px] leading-snug;
     font-size: 13px !important;
+    color: var(--text-4);
   }
 
 .modal textarea.input,
   .modal-compact textarea.input,
-  .form-sheet textarea.input {
-    @apply min-h-[56px] resize-y;
+  .form-sheet textarea.input,
+  .modal .ta,
+  .modal-compact .ta {
+    @apply min-h-[72px] resize-y;
+    padding: 8px 10px;
+    line-height: 1.5;
   }
 
 .modal .input-label,
@@ -5133,14 +5272,29 @@ textarea.input:focus {
   .form-sheet .input-label,
   .modal .form-field-label,
   .modal-compact .form-field-label,
-  .form-sheet .form-field-label {
-    @apply mb-0.5 text-[11px] font-medium text-bw-text-muted;
+  .form-sheet .form-field-label,
+  .modal .field-label,
+  .modal-compact .field-label,
+  .modal .field-l,
+  .modal-compact .field-l {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px !important;
+    font-weight: 500;
+    color: var(--text-2);
+    letter-spacing: 0;
+    text-transform: none;
   }
 
 .modal .form-field,
   .modal-compact .form-field,
-  .form-sheet .form-field {
-    @apply space-y-1;
+  .form-sheet .form-field,
+  .modal .field,
+  .modal-compact .field {
+    @apply space-y-0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
 
 .modal .form-field-hint,
@@ -5148,28 +5302,58 @@ textarea.input:focus {
   .form-sheet .form-field-hint,
   .modal .input-error-msg,
   .modal-compact .input-error-msg,
-  .form-sheet .input-error-msg {
-    @apply text-[11px];
+  .form-sheet .input-error-msg,
+  .modal .field-hint {
+    @apply text-[11.5px];
+    color: var(--text-3);
   }
 
-.modal-body .text-sm,
+/* Tailwind-Utilities in Modal-Bodies → Design-Token-Größen (wie Details/Props) */
+.modal-b .text-xs,
+  .modal-body .text-xs,
+  .modal-compact-b .text-xs,
+  .modal-b .text-\[11px\],
+  .modal-body .text-\[11px\] {
+    font-size: 11.5px !important;
+    line-height: 1.4;
+  }
+
+.modal-b .text-sm,
   .modal-compact-b .text-sm,
   .form-sheet .text-sm,
-  .modal-body .text-base,
+  .modal-body .text-sm,
+  .modal-b .text-base,
   .modal-compact-b .text-base,
-  .form-sheet .text-base {
-    @apply text-[13px] leading-snug;
+  .form-sheet .text-base,
+  .modal-body .text-base,
+  .modal-b .text-\[13px\],
+  .modal-body .text-\[13px\] {
+    font-size: 13px !important;
+    line-height: 1.45;
   }
 
-.modal-body .space-y-4 > :not([hidden]) ~ :not([hidden]),
+.modal-b .text-muted,
+  .modal-body .text-muted,
+  .modal-b .text-bw-text-muted,
+  .modal-body .text-bw-text-muted,
+  .modal-b .text-bw-light,
+  .modal-body .text-bw-light,
+  .modal-b .text-bw-mid,
+  .modal-body .text-bw-mid {
+    color: var(--text-3) !important;
+  }
+
+.modal-b .space-y-4 > :not([hidden]) ~ :not([hidden]),
   .modal-compact-b .space-y-4 > :not([hidden]) ~ :not([hidden]),
-  .form-sheet .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  .form-sheet .space-y-4 > :not([hidden]) ~ :not([hidden]),
+  .modal-body .space-y-4 > :not([hidden]) ~ :not([hidden]) {
     --tw-space-y-reverse: 0;
     margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
     margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
   }
 
-.modal .modal-footer .btn,
+.modal .modal-f .btn,
+  .modal .modal-footer .btn,
   .modal-compact .modal-compact-f .btn,
   .form-sheet footer .btn,
   .modal-form-footer .btn {
@@ -5178,6 +5362,30 @@ textarea.input:focus {
 
 .modal .rich-text-toolbar-btn {
     @apply h-7 w-7;
+  }
+
+/* Prop-Zeilen in Modals wie in Detail-Cards */
+.modal-b .prop,
+  .modal-body .prop {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 16px;
+    padding: 8px 0;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 13px;
+  }
+.modal-b .prop:last-child,
+  .modal-body .prop:last-child {
+    border-bottom: none;
+  }
+.modal-b .prop-l,
+  .modal-body .prop-l {
+    color: var(--text-3);
+  }
+.modal-b .prop-v,
+  .modal-body .prop-v {
+    color: var(--text);
+    font-weight: 500;
   }
 
 .status-hint {
@@ -9188,6 +9396,226 @@ textarea.input:focus {
     grid-column: 1;
   }
 }
+
+/* Abnahmeprotokoll — Inline-Tab (Mock) */
+.abnahme-inline {
+  position: relative;
+  padding-bottom: 88px;
+}
+.abnahme-inline__head {
+  margin-bottom: 22px;
+}
+.abnahme-inline__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.abnahme-inline__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.abnahme-inline__lead {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-3);
+  max-width: 560px;
+}
+.abnahme-inline__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--yel-bg, #fff8eb);
+  color: var(--yel-tx, #8a6a00);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.abnahme-inline__section-label {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.abnahme-inline__gewerk {
+  margin-bottom: 22px;
+}
+.abnahme-inline__gewerk-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.abnahme-inline__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.abnahme-inline__item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.abnahme-inline__check {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong, #c8d0c9);
+  background: var(--card);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.abnahme-inline__check:hover {
+  border-color: var(--green);
+}
+.abnahme-inline__check.is-ok {
+  background: var(--green);
+  border-color: var(--green);
+}
+.abnahme-inline__check.is-mangel {
+  border-color: #d97706;
+  background: #fff8eb;
+}
+.abnahme-inline__item-body {
+  min-width: 0;
+  flex: 1;
+}
+.abnahme-inline__item-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.abnahme-inline__item-sub {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.abnahme-inline__notiz {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+.abnahme-inline__add-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.abnahme-inline__add-note:hover {
+  text-decoration: underline;
+}
+.abnahme-inline__sign {
+  margin-top: 28px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--border);
+}
+.abnahme-inline__maengel-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text);
+  cursor: pointer;
+}
+.abnahme-inline__sign-label {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.abnahme-inline__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin-bottom: 18px;
+}
+.abnahme-inline__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.abnahme-inline__hint {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.abnahme-inline__edit-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.abnahme-inline__fab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.abnahme-inline__fab-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #f0a020;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -4px rgba(180, 100, 0, 0.45);
+}
+.abnahme-inline__fab-edit.is-active {
+  background: var(--green-dark, #1a3d2b);
+}
+@media (max-width: 760px) {
+  .abnahme-inline__fab.fab-desktop {
+    display: flex;
+  }
+}
+
 .zahlplan-editor-presets {
   display: flex;
   gap: 6px;
@@ -9261,3 +9689,126 @@ textarea.input:focus {
 .zahlplan-editor-summe.is-ok { color: var(--green); }
 .zahlplan-editor-summe.is-bad { color: var(--red-tx); }
 .zahlplan-row .badge { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Brand Avatar — immer Bärenwald-Logo */
+.brand-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--green);
+}
+.brand-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Login — Mock-Parität */
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--bg);
+}
+.login-screen__inner {
+  width: min(380px, 100%);
+}
+.login-screen__brand {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.login-screen__logo {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 10px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 0.5px solid var(--border);
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  box-sizing: border-box;
+  box-shadow: var(--shadow);
+}
+.login-screen__title {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.login-screen__sub {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.login-screen__card {
+  padding: 20px;
+}
+.login-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login-screen__forgot {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--green);
+  cursor: pointer;
+  font-family: inherit;
+}
+.login-screen__forgot:hover {
+  text-decoration: underline;
+}
+.login-screen__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.login-screen__alert {
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.login-screen__alert--error {
+  background: var(--red-bg, #fef2f2);
+  color: var(--red-tx, #991b1b);
+}
+.login-screen__alert--ok {
+  background: var(--green-50);
+  color: var(--green-dark, #14532d);
+}
+.login-screen__demo {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.login-screen__demo .link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--green);
+  cursor: pointer;
+}
+.login-screen__demo .link:hover {
+  text-decoration: underline;
+}
+.login-screen__footer {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-4);
+  margin-top: 12px;
+}
+.login-screen__loading {
+  font-size: 13px;
+  color: var(--text-3);
+}

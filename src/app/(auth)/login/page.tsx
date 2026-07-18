@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card } from '@/components/ui/Card'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import {
   requestCrmPasswordReset,
@@ -100,23 +99,26 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bw-bg px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-bw-bg p-2">
+    <div className="login-screen">
+      <div className="login-screen__inner">
+        <div className="login-screen__brand">
+          <div className="login-screen__logo">
             <BrandLogo variant="green" height={40} priority />
           </div>
-          <h1 className="text-xl font-semibold text-bw-text">Bärenwald CRM</h1>
-          <p className="mt-1 text-sm text-bw-light">München — nur für Team-Zugänge</p>
+          <div className="login-screen__title">Bärenwald CRM</div>
+          <div className="login-screen__sub">München</div>
         </div>
 
-        <Card>
-          <div className="space-y-4">
+        <div className="card login-screen__card">
+          <div className="login-screen__form">
             {mode === 'login' ? (
               <>
                 <div>
-                  <label className="input-label">E-Mail</label>
+                  <label className="input-label" htmlFor="crm-login-email">
+                    E-Mail
+                  </label>
                   <input
+                    id="crm-login-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -128,8 +130,11 @@ function LoginPageContent() {
                 </div>
 
                 <div>
-                  <label className="input-label">Passwort</label>
+                  <label className="input-label" htmlFor="crm-login-password">
+                    Passwort
+                  </label>
                   <input
+                    id="crm-login-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -142,7 +147,7 @@ function LoginPageContent() {
 
                 <button
                   type="button"
-                  className="text-left text-sm text-bw-link underline-offset-2 hover:underline"
+                  className="login-screen__forgot"
                   onClick={() => {
                     setMode('forgot')
                     setError(null)
@@ -154,13 +159,16 @@ function LoginPageContent() {
               </>
             ) : (
               <>
-                <p className="text-sm text-bw-text-muted">
+                <p className="login-screen__hint">
                   CRM-Passwort zurücksetzen — der Link führt zur CRM-URL, nicht zur Website
                   MeinBärenwald.
                 </p>
                 <div>
-                  <label className="input-label">CRM-E-Mail</label>
+                  <label className="input-label" htmlFor="crm-forgot-email">
+                    CRM-E-Mail
+                  </label>
                   <input
+                    id="crm-forgot-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -171,7 +179,7 @@ function LoginPageContent() {
                 </div>
                 <button
                   type="button"
-                  className="text-sm text-bw-link underline-offset-2 hover:underline"
+                  className="login-screen__forgot"
                   onClick={() => {
                     setMode('login')
                     setError(null)
@@ -184,22 +192,20 @@ function LoginPageContent() {
             )}
 
             {devError ? (
-              <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
+              <div className="login-screen__alert login-screen__alert--error">
                 Dev-Auto-Login fehlgeschlagen: {decodeURIComponent(devError)}
               </div>
             ) : null}
-            {urlError ? (
-              <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
+            {urlError && urlError !== 'portal_only' ? (
+              <div className="login-screen__alert login-screen__alert--error">
                 Anmeldung fehlgeschlagen: {decodeURIComponent(urlError)}
               </div>
             ) : null}
             {error ? (
-              <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
-                {error}
-              </div>
+              <div className="login-screen__alert login-screen__alert--error">{error}</div>
             ) : null}
             {info ? (
-              <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{info}</div>
+              <div className="login-screen__alert login-screen__alert--ok">{info}</div>
             ) : null}
 
             <button
@@ -214,19 +220,25 @@ function LoginPageContent() {
                   ? 'Anmelden'
                   : 'Reset-Link senden'}
             </button>
-          </div>
-        </Card>
 
-        <p className="mt-4 text-center text-xs text-bw-text-muted">
-          MeinBärenwald / Partner-Portal:{' '}
-          <a
-            href="https://baerenwaldmuenchen.de/portal/login"
-            className="text-bw-link underline-offset-2 hover:underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            baerenwaldmuenchen.de
-          </a>
+            {mode === 'login' ? (
+              <div className="login-screen__demo">
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    document.getElementById('crm-login-email')?.focus()
+                  }}
+                >
+                  Direkt zur Demo →
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <p className="login-screen__footer">
+          🇩🇪 Server in Deutschland · DSGVO-konform · verschlüsselt
         </p>
       </div>
     </div>
@@ -237,8 +249,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-bw-bg px-4">
-          <p className="text-sm text-bw-light">Laden…</p>
+        <div className="login-screen">
+          <p className="login-screen__loading">Laden…</p>
         </div>
       }
     >

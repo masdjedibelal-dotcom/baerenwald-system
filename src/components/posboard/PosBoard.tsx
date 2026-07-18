@@ -119,6 +119,7 @@ export function PosBoard({
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [preislisteOpen, setPreislisteOpen] = useState(false)
   const [preislistePick, setPreislistePick] = useState('')
+  const [preislisteTargetGewerk, setPreislisteTargetGewerk] = useState<string | null>(null)
 
   const _line = lineOf ?? posBoardLineNetto
 
@@ -169,12 +170,12 @@ export function PosBoard({
     setEditId(id)
   }
 
-  const addFreitext = () => {
+  const addFreitext = (gewerk?: string) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
-      gewerk: defaultGewerk(),
+      gewerk: gewerk?.trim() || defaultGewerk(),
       name: '',
       beschreibung: '',
       menge: 0,
@@ -213,7 +214,8 @@ export function PosBoard({
   const addFromPreisliste = (pl: Preisliste) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
-    const gewerkName = pl.gewerke?.name?.trim() || defaultGewerk()
+    const gewerkName =
+      preislisteTargetGewerk?.trim() || pl.gewerke?.name?.trim() || defaultGewerk()
     const np = neuePosBoardLine({
       id,
       gewerk: gewerkName,
@@ -229,15 +231,18 @@ export function PosBoard({
     onChange([...positionen, np])
     setPreislisteOpen(false)
     setPreislistePick('')
+    setPreislisteTargetGewerk(null)
     setEditId(id)
   }
 
-  const onAddKind = (kind: PosAddKind) => {
-    if (kind === 'position') addPosition(defaultGewerk())
-    else if (kind === 'freitext') addFreitext()
+  const onAddKind = (kind: PosAddKind, gewerk?: string) => {
+    const target = gewerk?.trim() || defaultGewerk()
+    if (kind === 'position') addPosition(target)
+    else if (kind === 'freitext') addFreitext(target)
     else if (kind === 'nachlass') addNachlass()
     else if (kind === 'preisliste') {
       if (preislisten.filter((p) => p.aktiv !== false).length === 0) return
+      setPreislisteTargetGewerk(target)
       setPreislisteOpen(true)
     }
   }
@@ -362,11 +367,6 @@ export function PosBoard({
   const groupActions = editable
     ? (g: PosTableGroup) => {
         const items: EntityMenuItem[] = [
-          {
-            label: 'Position hinzufügen',
-            icon: 'plus',
-            onClick: () => addPosition(g.gewerk),
-          },
           {
             label: 'Gewerk bearbeiten',
             icon: 'pencil',
@@ -589,6 +589,7 @@ export function PosBoard({
           onClose={() => {
             setPreislisteOpen(false)
             setPreislistePick('')
+            setPreislisteTargetGewerk(null)
           }}
           icon="list-filter"
           title="Aus Preisliste"

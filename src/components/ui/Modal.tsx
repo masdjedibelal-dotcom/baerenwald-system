@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { cn } from '@/lib/utils'
 
 interface ModalProps {
@@ -20,6 +20,13 @@ interface ModalProps {
   className?: string
   /** Footer: Abbrechen links, Primäraktion rechts */
   footerSpread?: boolean
+}
+
+const SIZE_WIDTH: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'min(24rem, 100%)',
+  md: 'min(32rem, 100%)',
+  lg: 'min(42rem, 100%)',
+  xl: 'min(96vw, 56rem)',
 }
 
 /** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. */
@@ -57,13 +64,6 @@ export function Modal({
 
   if (!open || !mounted) return null
 
-  const sizeClass = {
-    sm: 'max-w-sm',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-[min(96vw,56rem)]',
-  }[size]
-
   return createPortal(
     <div
       className="modal-overlay"
@@ -73,31 +73,22 @@ export function Modal({
       }}
     >
       <div
-        className={cn('modal bg-white', sizeClass, className)}
+        className={cn('modal', className)}
         role="dialog"
         aria-modal="true"
-        style={{ borderColor: 'var(--border)' }}
+        style={{ width: SIZE_WIDTH[size] }}
       >
-        <div className="modal-header">
-          <div className="modal-header-main min-w-0 flex-1">
-            {leading ? <div className="modal-header-leading">{leading}</div> : null}
-            <div className="min-w-0">
-              <h2 className="modal-title">{title}</h2>
-              {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
-            </div>
+        <div className="modal-h">
+          {leading ? <div className="icon">{leading}</div> : null}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="title">{title}</div>
+            {subtitle ? <div className="sub">{subtitle}</div> : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-bw-light transition-colors hover:text-bw-text"
-            aria-label="Schließen"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <MockBtn icon="x" kind="ghost" sm onClick={onClose} title="Schließen" />
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-b">{children}</div>
         {footer ? (
-          <div className={cn('modal-footer', footerSpread && 'modal-footer--spread')}>{footer}</div>
+          <div className={cn('modal-f', footerSpread && 'modal-footer--spread')}>{footer}</div>
         ) : null}
       </div>
     </div>,

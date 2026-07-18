@@ -42,7 +42,6 @@ import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCa
 import { AngebotDetailsTab } from '@/components/angebote/AngebotDetailsTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
-import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import {
@@ -764,15 +763,6 @@ export function AngebotDetailPageClient({
         kundeModalOpen={kundeVersandOpen}
         onKundeModalOpenChange={setKundeVersandOpen}
         onKundeSent={() => refresh()}
-      />
-
-      <AngebotHandwerkerPartnerSection
-        detail={detail}
-        auftragId={auftragId}
-        bruttoMin={summenMail.bruttoMin}
-        bruttoMax={summenMail.bruttoMax}
-        positionen={detail.positionen ?? []}
-        gueltigBis={gueltigBisYmd}
       />
 
       {wizardOpen && lead ? (

@@ -25,7 +25,7 @@ import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschluss
 import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
 import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
+import { AuftragAbnahmeprotokollInline } from '@/components/auftraege/AuftragAbnahmeprotokollInline'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
@@ -646,8 +646,23 @@ export function AuftragDetailClient({
     />
   )
 
+  const angPos = useMemo(() => {
+    const raw =
+      (Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote)?.positionen ??
+      angebotDetail?.positionen ??
+      null
+    return raw ? normalizeAngebotPositionen(raw) : null
+  }, [detail.angebote, angebotDetail?.positionen])
+
   const abnahmeInhalt = (
-    <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => refresh()} />
+    <AuftragAbnahmeprotokollInline
+      auftragId={detail.id}
+      positionen={detail.auftrag_positionen ?? []}
+      angebotPositionen={angPos}
+      gewerke={gewerke}
+      kundeName={name}
+      onChanged={() => refresh()}
+    />
   )
 
   const abschlussInhalt = (
@@ -745,7 +760,7 @@ export function AuftragDetailClient({
     },
     {
       id: 'leistung',
-      label: 'Details',
+      label: 'Leistungen',
       icon: 'list-details',
       count: posCount || undefined,
       render: () => leistungInhalt,
