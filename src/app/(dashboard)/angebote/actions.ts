@@ -1655,6 +1655,10 @@ export type HandwerkerGewerkListeEintrag = {
   telefon: string | null
   letzter_einsatz: string | null
   verfuegbar: boolean
+  /** Gewerk-Slugs aus Stammdaten */
+  gewerke?: string[] | null
+  /** Optional Gesamtbewertung 1–5 */
+  bewertung?: number | null
 }
 
 export async function listHandwerkerFuerGewerk(

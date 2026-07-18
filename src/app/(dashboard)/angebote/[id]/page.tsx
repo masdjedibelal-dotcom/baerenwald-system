@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase-server'
 import { AngebotDetailPageClient } from '@/components/angebote/AngebotDetailPageClient'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
-import type { AngebotDetail, LeadDetail, LeadTimelineRow } from '@/lib/types'
+import type { AngebotDetail, Handwerker, LeadDetail, LeadTimelineRow } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { loadKiVisualisierungenForAngebot } from '@/lib/visualize/queries'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
@@ -67,7 +67,7 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     timeline = (tlByLead ?? []) as LeadTimelineRow[]
   }
 
-  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext] =
+  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext, { data: hwRows }] =
     await Promise.all([
       loadWizardContext(supabase),
       detail.lead_id ? loadAnfrageDetail(supabase, detail.lead_id) : Promise.resolve(null),
@@ -80,6 +80,7 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
         kundeId: detail.kunde_id,
         auftragId: (auftrag as { id: string } | null)?.id ?? null,
       }),
+      supabase.from('handwerker').select('*').eq('aktiv', true).order('name'),
     ])
 
   return (
@@ -90,6 +91,7 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
       gewerke={gewerke}
       wizardPreislisten={wizardPreislisten}
       wizardFirm={firm}
+      wizardHandwerker={(hwRows ?? []) as Handwerker[]}
       kiVisualisierungen={kiVisualisierungen}
       lead={leadDetail as LeadDetail | null}
       projektKontext={projektKontext}

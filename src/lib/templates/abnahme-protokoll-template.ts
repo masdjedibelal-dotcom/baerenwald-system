@@ -3,6 +3,7 @@
  */
 
 import type { AbnahmeGewerkBlock, AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import { notizenFuerLeistung } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   angebotLogoKopfHtml,
@@ -89,14 +90,25 @@ function checklistCircleHtml(): string {
 }
 
 function checklistBulletHtml(p: AbnahmePunkt): string {
-  const notiz = p.notiz?.trim()
   return `<li style="display:flex;align-items:flex-start;gap:8px;margin:0 0 8px;padding:0;font-size:9pt;line-height:1.45;color:${TEXT};list-style:none;">
     ${checklistCircleHtml()}
     <span style="flex:1;min-width:0;">
       ${esc(p.beschreibung?.trim() || '—')}
-      ${notiz ? `<span style="display:block;margin-top:2px;font-size:8pt;color:${MUTED};">Notiz: ${esc(notiz)}</span>` : ''}
     </span>
   </li>`
+}
+
+function leistungNotizenHtml(notizen: string[]): string {
+  const clean = notizen.map((n) => n.trim()).filter(Boolean)
+  if (!clean.length) return ''
+  return `<ul style="margin:6px 0 0;padding:0 0 0 14px;">
+    ${clean
+      .map(
+        (n) =>
+          `<li style="margin:0 0 3px;font-size:8pt;line-height:1.4;color:${MUTED};">${esc(n)}</li>`
+      )
+      .join('')}
+  </ul>`
 }
 
 function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
@@ -108,9 +120,11 @@ function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
       const leistungen = g.leistungen
         .map((l) => {
           const bullets = l.punkte.map((p) => checklistBulletHtml(p)).join('')
+          const notizen = leistungNotizenHtml(notizenFuerLeistung(l.punkte))
           return `<div style="margin:0 0 14px;padding:10px 0 0;border-top:1px solid ${BORDER};page-break-inside:avoid;">
             <p style="margin:0 0 8px;font-size:9.5pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>
             <ul style="margin:0;padding:0;">${bullets}</ul>
+            ${notizen}
           </div>`
         })
         .join('')

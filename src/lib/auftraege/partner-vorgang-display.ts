@@ -58,11 +58,14 @@ export function handwerkerAntwortAnzeige(
   if (st === 'zugewiesen' || st === '') {
     return { label: 'Nicht gesendet', variant: 'nicht_gesendet' }
   }
+  if (st === 'angefragt') {
+    return { label: 'Angefragt', variant: 'offen' }
+  }
   if (PENDING.has(st)) {
-    return { label: 'Offen', variant: 'offen' }
+    return { label: 'Angefragt', variant: 'offen' }
   }
 
-  return { label: 'Offen', variant: 'offen' }
+  return { label: 'Angefragt', variant: 'offen' }
 }
 
 export function istPartnerEntfernungAusstehend(

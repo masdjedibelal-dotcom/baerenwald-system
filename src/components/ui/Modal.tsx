@@ -9,14 +9,32 @@ import { cn } from '@/lib/utils'
 interface ModalProps {
   open: boolean
   onClose: () => void
-  title: string
+  title: ReactNode
+  /** Optionaler Untertitel unter dem Titel (Mock-Header) */
+  subtitle?: ReactNode
+  /** Optional links neben dem Titel (z. B. Icon-Kreis) */
+  leading?: ReactNode
   children: ReactNode
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  className?: string
+  /** Footer: Abbrechen links, Primäraktion rechts */
+  footerSpread?: boolean
 }
 
 /** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. */
-export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  leading,
+  children,
+  footer,
+  size = 'md',
+  className,
+  footerSpread = false,
+}: ModalProps) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -54,9 +72,20 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className={cn('modal', sizeClass)} role="dialog" aria-modal="true">
+      <div
+        className={cn('modal bg-white', sizeClass, className)}
+        role="dialog"
+        aria-modal="true"
+        style={{ borderColor: 'var(--border)' }}
+      >
         <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
+          <div className="modal-header-main min-w-0 flex-1">
+            {leading ? <div className="modal-header-leading">{leading}</div> : null}
+            <div className="min-w-0">
+              <h2 className="modal-title">{title}</h2>
+              {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -67,7 +96,9 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
           </button>
         </div>
         <div className="modal-body">{children}</div>
-        {footer ? <div className="modal-footer">{footer}</div> : null}
+        {footer ? (
+          <div className={cn('modal-footer', footerSpread && 'modal-footer--spread')}>{footer}</div>
+        ) : null}
       </div>
     </div>,
     document.body

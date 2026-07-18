@@ -1,26 +1,30 @@
 'use client'
 
-import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { Accordion } from '@/components/ui/Accordion'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { Textarea } from '@/components/ui/Textarea'
-import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
-import { standardDokumente } from '@/lib/handwerker/compliance-katalog'
+import {
+  complianceDokumentStatus,
+  dokumentFuerTyp,
+  filterStandardComplianceTypen,
+  standardDokumente,
+} from '@/lib/handwerker/compliance-katalog'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { AppDetailScreen } from '@/components/layout/app'
+import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
+import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -33,6 +37,7 @@ import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actio
 import {
   formatHandwerkerBewertung,
   HANDWERKER_BEWERTUNG_KATEGORIEN,
+  type HandwerkerBewertungKategorieKey,
 } from '@/lib/handwerker/bewertung-kategorien'
 import {
   updateHandwerker,
@@ -54,12 +59,21 @@ import {
   sendPartnerPortalLinkMail,
 } from '@/app/actions/mails'
 import { parseEmailTokens } from '@/lib/email-recipients'
-import {
-  buildPartnerDashboardLink,
-} from '@/lib/portal-utils'
+import { buildPartnerDashboardLink } from '@/lib/portal-utils'
 import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateHandwerker } from '@/lib/list-actions'
+import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import type { VorgangListeRow } from '@/lib/vorgang/types'
+import { cn, formatRelativeDate } from '@/lib/utils'
+
+type HandwerkerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
+
+function formatEurCompact(n: number): string {
+  return `${Math.round(n).toLocaleString('de-DE')} €`
+}
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -70,8 +84,7 @@ function gewerkSlugsFromField(gewerke: unknown): string[] {
   }
   if (typeof gewerke === 'string') {
     try {
-      const p = JSON.parse(gewerke) as unknown
-      return gewerkSlugsFromField(p)
+      return gewerkSlugsFromField(JSON.parse(gewerke) as unknown)
     } catch {
       return gewerke.trim() ? [gewerke.trim().toLowerCase()] : []
     }
@@ -79,15 +92,58 @@ function gewerkSlugsFromField(gewerke: unknown): string[] {
   return []
 }
 
-function gewerkTagsFromSlugs(
-  gewerke: unknown,
-  slugToName: Map<string, string>
-): string[] {
+function gewerkTagsFromSlugs(gewerke: unknown, slugToName: Map<string, string>): string[] {
   return gewerkSlugsFromField(gewerke).map((slug) => slugToName.get(slug) ?? slug)
 }
 
-function isAuftragAbgeschlossen(auftragStatus: string): boolean {
-  return auftragStatus === 'abgeschlossen' || auftragStatus === 'storniert'
+function RatingStars({ value, size = 14 }: { value: number | null | undefined; size?: number }) {
+  const n = typeof value === 'number' && Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0
+  const full = Math.floor(n)
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`${formatHandwerkerBewertung(n)} von 5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <MockIcon
+          key={i}
+          ctx="default"
+          n={i < full ? 'star-filled' : 'star'}
+          size={size}
+          className={i < full ? 'text-[var(--yel-tx,#c9a227)]' : 'text-[var(--text-4)]'}
+        />
+      ))}
+    </span>
+  )
+}
+
+function bewertungKategorieWert(
+  hw: Handwerker,
+  key: HandwerkerBewertungKategorieKey
+): number | null {
+  const map: Record<HandwerkerBewertungKategorieKey, number | null | undefined> = {
+    qualitaet: hw.bewertung_qualitaet,
+    termintreue: hw.bewertung_termintreue,
+    sauberkeit: hw.bewertung_sauberkeit,
+    kommunikation: hw.bewertung_kommunikation,
+    preis_leistung: hw.bewertung_preis_leistung,
+  }
+  const v = map[key]
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
+function complianceRowMeta(status: ReturnType<typeof complianceDokumentStatus>): {
+  label: string
+  tone: 'ok' | 'warn' | 'bad'
+  icon: 'check' | 'alert-triangle' | 'circle-x'
+} {
+  if (status === 'ok') {
+    return { label: 'geprüft', tone: 'ok', icon: 'check' }
+  }
+  if (status === 'warnung') {
+    return { label: 'läuft ab', tone: 'warn', icon: 'alert-triangle' }
+  }
+  if (status === 'abgelaufen') {
+    return { label: 'abgelaufen', tone: 'bad', icon: 'circle-x' }
+  }
+  return { label: 'fehlt', tone: 'bad', icon: 'alert-triangle' }
 }
 
 export function HandwerkerDetailClient({
@@ -97,6 +153,7 @@ export function HandwerkerDetailClient({
   complianceTypen,
   rahmenVertrag = null,
   verwandteStammdaten = [],
+  vorgaengeRows = [],
 }: {
   payload: HandwerkerDetailPayload
   gewerkeSlugs: { slug: string; name: string }[]
@@ -104,6 +161,7 @@ export function HandwerkerDetailClient({
   complianceTypen: ComplianceDokumentTyp[]
   rahmenVertrag?: HandwerkerVertragRow | null
   verwandteStammdaten?: StammdatenKontaktTreffer[]
+  vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -119,8 +177,9 @@ export function HandwerkerDetailClient({
     [payload.dokumente]
   )
 
-  const [tab, setTab] = useState<'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'>('uebersicht')
+  const [tab, setTab] = useState<HandwerkerDetailTab>('uebersicht')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
+  const [notizDraft, setNotizDraft] = useState('')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -150,6 +209,9 @@ export function HandwerkerDetailClient({
   const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
   const [formEmail, setFormEmail] = useState(hw.email ?? '')
   const [formAdresse, setFormAdresse] = useState(hw.adresse ?? '')
+  const [formIban, setFormIban] = useState(hw.iban ?? '')
+  const [formUstid, setFormUstid] = useState(hw.ustid ?? '')
+  const [formSteuernummer, setFormSteuernummer] = useState(hw.steuernummer ?? '')
 
   useEffect(() => {
     setNotizen(hw.notizen ?? '')
@@ -164,6 +226,9 @@ export function HandwerkerDetailClient({
       setFormTelefon(hw.telefon ?? '')
       setFormEmail(hw.email ?? '')
       setFormAdresse(hw.adresse ?? '')
+      setFormIban(hw.iban ?? '')
+      setFormUstid(hw.ustid ?? '')
+      setFormSteuernummer(hw.steuernummer ?? '')
       setErr(null)
     }
   }, [modalOpen, hw])
@@ -196,16 +261,14 @@ export function HandwerkerDetailClient({
     }
   }, [notizen, hw.id, hw.notizen, router])
 
-  const { aktiv: aktivAuftraege, fertig: fertigeAuftraege } = useMemo(() => {
-    type AuftragZeile = HandwerkerDetailPayload['auftraege'][number]
-    const aktiv: AuftragZeile[] = []
-    const fertig: AuftragZeile[] = []
-    for (const a of payload.auftraege) {
-      if (isAuftragAbgeschlossen(a.auftrag_status)) fertig.push(a)
-      else aktiv.push(a)
-    }
-    return { aktiv, fertig }
-  }, [payload.auftraege])
+  const complianceTypenStandard = useMemo(
+    () => filterStandardComplianceTypen(complianceTypen, hwGewerkSlugs, gewerke),
+    [complianceTypen, hwGewerkSlugs, gewerke]
+  )
+
+  const bewertungGesamt = hw.bewertung_gesamt ?? null
+  const bewertungAnzahl = hw.bewertung_anzahl ?? 0
+  const kategorie = hw.subkategorie?.trim() || gewerkNamen[0] || 'Handwerker'
 
   const openRahmenvertrag = useCallback(() => {
     startTransition(async () => {
@@ -243,9 +306,9 @@ export function HandwerkerDetailClient({
       subkategorie: hw.subkategorie,
       ist_fachbetrieb: hw.ist_fachbetrieb,
       partner_kategorie_id: hw.partner_kategorie_id,
-      steuernummer: hw.steuernummer?.trim() || null,
-      ustid: hw.ustid?.trim() || null,
-      iban: hw.iban?.replace(/\s+/g, '') || null,
+      steuernummer: formSteuernummer.trim() || null,
+      ustid: formUstid.trim() || null,
+      iban: formIban.replace(/\s+/g, '') || null,
       aktiv: hw.aktiv,
       notizen: hw.notizen?.trim() || null,
     }
@@ -266,6 +329,9 @@ export function HandwerkerDetailClient({
     formEmail,
     formTelefon,
     formAdresse,
+    formIban,
+    formUstid,
+    formSteuernummer,
     hw,
     router,
   ])
@@ -303,7 +369,7 @@ export function HandwerkerDetailClient({
       toast.error(res.message)
       return
     }
-    toast.success('Partner-Portal-Einladung gesendet')
+    toast.success('Handwerker-Link versendet')
     setPortalModalOpen(false)
   }
 
@@ -322,87 +388,190 @@ export function HandwerkerDetailClient({
     return () => clearTimeout(timer)
   }, [portalModalOpen, portalText, hw.id])
 
-  const handwerkerMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil', 16),
-        onClick: () => setModalOpen(true),
-      },
-      {
-        label: 'Rahmenvertrag',
-        icon: mockMenuIcon('file-pencil', 16),
-        onClick: () => void openRahmenvertrag(),
-      },
-      {
-        label: 'Partner-Portal-Einladung',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !hw.email ? 'Keine E-Mail' : undefined,
+  const handwerkerMenuItems = useMemo(() => {
+    const extra: import('@/lib/entity-menu').EntityMenuItem[] = []
+    if (!isCrmAdmin) {
+      extra.push({
+        icon: 'send',
+        label: 'Handwerker-Link versenden',
         onClick: () => void openPortalModal(),
-      },
-    ]
-    if (isCrmAdmin) {
-      items.push('sep', {
-        label: 'Admin Login',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !hasPortalAccount
-          ? 'Kein Portal-Account'
-          : impersonating
-            ? 'Öffne…'
-            : `Partner-Portal als ${handwerkerDisplayName(hw)}`,
-        onClick: () => {
-          if (!hasPortalAccount || impersonating) return
-          setImpersonating(true)
-          void openPortalAsHandwerker(hw.id).then((r) => {
-            setImpersonating(false)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            window.open(r.url, '_blank', 'noopener,noreferrer')
-          })
-        },
       })
     }
-    return items
-  }, [hw, isCrmAdmin, hasPortalAccount, impersonating])
+    extra.push('sep', {
+      icon: 'file-pencil',
+      label: 'Rahmenvertrag',
+      onClick: () => void openRahmenvertrag(),
+    })
 
-  const tabUebersicht = (
-    <div className="space-y-3">
-      <Card title="Kontakt">
-        <div className="space-y-1">
-          <PropertyRow label="Firmenname" value={handwerkerDisplayName(hw)} editable={false} />
-          <PropertyRow label="Telefon" value={hw.telefon || '—'} editable={false} />
-          <PropertyRow label="E-Mail" value={hw.email || '—'} editable={false} />
+    const items = buildEntityMenu(
+      'handwerker',
+      {
+        name: handwerkerDisplayName(hw),
+        tel: hw.telefon,
+        mail: hw.email,
+      },
+      {
+        onEdit: () => setModalOpen(true),
+        onCopy: () => runDuplicateHandwerker(hw.id, router),
+        onPortal: isCrmAdmin
+          ? () => {
+              if (!hasPortalAccount) {
+                toast.error('Kein Portal-Account')
+                return
+              }
+              if (impersonating) {
+                toast.error('Anmeldung läuft bereits…')
+                return
+              }
+              setImpersonating(true)
+              void openPortalAsHandwerker(hw.id).then((r) => {
+                setImpersonating(false)
+                if (!r.ok) {
+                  toast.error(r.message)
+                  return
+                }
+                window.open(r.url, '_blank', 'noopener,noreferrer')
+              })
+            }
+          : undefined,
+        onPortalLink: () => void openPortalModal(),
+        tel: hw.telefon,
+        mail: hw.email,
+        extra,
+      }
+    )
+    return entityMenuToActionItems(items, (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size))
+  }, [hw, isCrmAdmin, hasPortalAccount, impersonating, router, openRahmenvertrag])
+
+  const uebersichtInhalt = (
+    <div className="space-y-5">
+      <MockUebersichtCard
+        stats={[
+          {
+            icon: 'inbox',
+            label: 'Angefragt',
+            value: payload.stats.angefragt,
+          },
+          {
+            icon: 'file-invoice',
+            label: 'Angebote',
+            value: payload.stats.angebote,
+          },
+          {
+            icon: 'tool',
+            label: 'Aufträge',
+            value: payload.stats.auftraegeAktiv,
+          },
+          {
+            icon: 'calculator',
+            label: 'Volumen',
+            value: formatEurCompact(payload.stats.volumen),
+          },
+          {
+            icon: 'trending-up',
+            label: 'Ø Auftrag',
+            value: formatEurCompact(payload.stats.avgAuftrag),
+          },
+          {
+            icon: 'clock',
+            label: 'Offen',
+            value: formatEurCompact(payload.stats.offen),
+          },
+        ]}
+      />
+
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="star" size={16} />
+            Bewertungen von Kunden
+          </div>
         </div>
-      </Card>
-      <Card title="Compliance">
-        <div className="space-y-2">
-          <ComplianceBadge status={hw.compliance_status} />
-          <p className="text-sm text-bw-text-muted">
-            Nachweise und Dokumente unter Tab „Dokumente“.
-          </p>
+        <div className="card-b">
+          <div className="mb-4 flex flex-wrap items-baseline gap-3">
+            <div
+              className="text-[36px] font-semibold leading-none tabular-nums"
+              style={{ color: '#D9A800' }}
+            >
+              {bewertungGesamt != null && bewertungGesamt > 0
+                ? formatHandwerkerBewertung(bewertungGesamt)
+                : '—'}
+            </div>
+            <div>
+              <RatingStars value={bewertungGesamt} size={14} />
+              <div className="mt-0.5 text-[12px] text-[var(--text-3)]">
+                {bewertungAnzahl > 0
+                  ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
+                  : 'Noch keine Bewertungen'}
+              </div>
+            </div>
+          </div>
+
+          {payload.bewertungen.length > 0 ? (
+            <ul>
+              {payload.bewertungen.map((b) => (
+                <li
+                  key={b.id}
+                  className="border-b border-[var(--border)] py-2.5 last:border-0"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <div className="text-[13px] font-medium text-[var(--text)]">
+                      {b.kundeName || 'Kunde'}
+                    </div>
+                    <div className="text-[12px] text-[var(--text-3)]">
+                      {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
+                    </div>
+                  </div>
+                  <div className="mb-1">
+                    <RatingStars value={b.note} />
+                  </div>
+                  {b.notiz?.trim() ? (
+                    <p className="text-[13px] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="space-y-2">
+              {HANDWERKER_BEWERTUNG_KATEGORIEN.map((k) => {
+                const val = bewertungKategorieWert(hw, k.key)
+                return (
+                  <li
+                    key={k.key}
+                    className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium text-[var(--text)]">{k.label}</div>
+                      <div className="text-[11.5px] text-[var(--text-3)]">{k.hint}</div>
+                    </div>
+                    <RatingStars value={val} />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
-      </Card>
+      </div>
     </div>
   )
 
-  const sidebar = (
+  const stammdatenInhalt = (
     <>
-      <Card
-        title="Kontakt"
-        action={
-          <button type="button" onClick={() => setModalOpen(true)} className="btn ghost sm">
-            <MockIcon ctx="btn" n="pencil" size={14} />
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="users" size={16} />
+            Kontakt
+          </div>
+          <MockBtn sm kind="ghost" icon="pencil" onClick={() => setModalOpen(true)}>
             Bearbeiten
-          </button>
-        }
-      >
-        <div className="space-y-1">
-          <PropertyRow label="Firmenname" value={handwerkerDisplayName(hw)} editable={false} />
+          </MockBtn>
+        </div>
+        <div className="card-b space-y-1">
+          <PropertyRow label="Betrieb" value={handwerkerDisplayName(hw)} editable={false} />
           <PropertyRow
-            label="Geschäftsführer"
-            value={handwerkerGfName(hw) || '—'}
+            label="Gewerk"
+            value={gewerkNamen.join(', ') || kategorie || '—'}
             editable={false}
           />
           <PropertyRow
@@ -431,165 +600,143 @@ export function HandwerkerDetailClient({
             }
             editable={false}
           />
-          <PropertyRow label="Adresse" value={hw.adresse || '—'} editable={false} />
+          <PropertyRow label="Einsatzgebiet" value={hw.adresse || '—'} editable={false} />
+          {handwerkerGfName(hw) ? (
+            <PropertyRow label="Geschäftsführer" value={handwerkerGfName(hw)} editable={false} />
+          ) : null}
         </div>
-      </Card>
+      </div>
+
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="shield-check" size={16} />
+            Compliance
+          </div>
+          <ComplianceBadge status={hw.compliance_status} />
+        </div>
+        <div className="card-b">
+          {complianceTypenStandard.length === 0 ? (
+            <p className="text-[13px] text-[var(--text-3)]">Keine Compliance-Typen konfiguriert.</p>
+          ) : (
+            complianceTypenStandard.map((typ) => {
+              const doc = dokumentFuerTyp(payload.dokumente, typ.slug, {
+                handwerkerId: hw.id,
+                auftragId: null,
+              })
+              const st = complianceDokumentStatus(typ, doc)
+              const row = complianceRowMeta(st)
+              const sub =
+                doc?.gueltig_bis != null
+                  ? `gültig bis ${String(doc.gueltig_bis).slice(0, 10).split('-').reverse().join('.')}`
+                  : row.label === 'geprüft'
+                    ? 'geprüft'
+                    : row.label
+              return (
+                <div key={typ.id} className="setting-row">
+                  <div>
+                    <div className="lbl">{typ.bezeichnung}</div>
+                    <div className="sub">{sub}</div>
+                  </div>
+                  <MockIcon
+                    ctx="default"
+                    n={row.icon}
+                    size={20}
+                    className={cn(
+                      row.tone === 'ok' && 'text-[var(--green)]',
+                      row.tone === 'warn' && 'text-[var(--yel-tx,#c0622b)]',
+                      row.tone === 'bad' && 'text-[var(--red-tx)]'
+                    )}
+                  />
+                </div>
+              )
+            })
+          )}
+          <button
+            type="button"
+            className="mt-2 text-[12.5px] font-medium text-[var(--green)] hover:underline"
+            onClick={() => setTab('dokumente')}
+          >
+            Alle Nachweise verwalten →
+          </button>
+        </div>
+      </div>
 
       <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
 
-      <Card title="Gewerke">
-        <div className="flex flex-wrap gap-2">
-          {gewerkNamen.length === 0 ? (
-            <p className="text-sm text-bw-text-muted">Keine Gewerke hinterlegt.</p>
-          ) : (
-            gewerkNamen.map((n) => (
-              <span key={n} className="rounded-full bg-bw-hover px-2.5 py-1 text-xs font-medium text-bw-text">
-                {n}
-              </span>
-            ))
-          )}
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">Bank &amp; Steuer</div>
+          <MockBtn sm kind="ghost" icon="pencil" onClick={() => setModalOpen(true)}>
+            Bearbeiten
+          </MockBtn>
         </div>
-      </Card>
+        <div className="card-b space-y-1">
+          <PropertyRow label="IBAN" value={hw.iban || '—'} editable={false} />
+          <PropertyRow label="USt-ID" value={hw.ustid || '—'} editable={false} />
+          <PropertyRow label="Steuernummer" value={hw.steuernummer || '—'} editable={false} />
+        </div>
+      </div>
 
-      <Card title="Dokumente">
-        <p className="text-sm text-bw-text">
-          <span className="font-medium tabular-nums">{dokumenteAnzahl}</span>
-          {' '}
-          {dokumenteAnzahl === 1 ? 'Dokument' : 'Dokumente'} hochgeladen
-        </p>
-        {rahmenVertrag?.pdf_url ? (
-          <p className="mt-2 text-sm">
+      {rahmenVertrag?.pdf_url ? (
+        <div className="card">
+          <div className="card-h">
+            <div className="card-title title">Rahmenvertrag</div>
+          </div>
+          <div className="card-b">
             <a
               href={rahmenVertrag.pdf_url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-bw-link hover:underline"
             >
-              Rahmenvertrag {rahmenVertrag.vertrags_nr}
+              {rahmenVertrag.vertrags_nr || 'Rahmenvertrag öffnen'}
             </a>
-          </p>
-        ) : null}
-        <p className="mt-2 text-sm text-bw-text-muted">
-          Unter Tab „Compliance“ Dateien hochladen, ansehen und löschen.
-        </p>
-      </Card>
-
-      <Card title="Bank & Steuer">
-        <div className="space-y-1">
-          <PropertyRow label="IBAN" value={hw.iban || '—'} editable={false} />
-          <PropertyRow label="USt-ID" value={hw.ustid || '—'} editable={false} />
+          </div>
         </div>
-      </Card>
-
+      ) : null}
     </>
   )
 
-  const detailTabs = useMemo(
-    () => [
-      { id: 'uebersicht', label: 'Übersicht', iconName: 'layout-dashboard' },
-      { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
-      {
-        id: 'vorgaenge',
-        label: 'Vorgänge',
-        iconName: 'folders',
-        count: aktivAuftraege.length + fertigeAuftraege.length || undefined,
-      },
-      {
-        id: 'dokumente',
-        label: 'Dokumente',
-        iconName: 'files',
-        count: dokumenteAnzahl || undefined,
-      },
-      {
-        id: 'notizen',
-        label: 'Notizen',
-        iconName: 'messages',
-        count: hw.notizen?.trim() ? 1 : undefined,
-      },
-    ],
-    [aktivAuftraege.length, fertigeAuftraege.length, hw.notizen, dokumenteAnzahl]
+  const vorgaengeInhalt = (
+    <Suspense
+      fallback={
+        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Vorgänge werden geladen…
+        </p>
+      }
+    >
+      <VorgaengeListeClient rows={vorgaengeRows} embedded restrictHandwerkerId={hw.id} />
+    </Suspense>
   )
 
-  const tabAuftraege = (
-    <div className="space-y-6">
-      <section>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Aktive Aufträge</h3>
-        {aktivAuftraege.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Keine laufenden Aufträge.</p>
-        ) : (
-          <ul className="space-y-3">
-            {aktivAuftraege.map((a) => (
-              <li key={a.id}>
-                <Card className="p-4 space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
-                      <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
-                      <div className="mt-2">
-                        <AuftragStatusBadge status={a.auftrag_status} />
-                      </div>
-                    </div>
-                    <Link href={`/auftraege/${a.id}`} className="btn ghost sm shrink-0">
-                      Zum Auftrag
-                    </Link>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+  const appendNotiz = useCallback(() => {
+    const text = notizDraft.trim()
+    if (!text) return
+    const next = notizen.trim() ? `${notizen.trim()}\n\n${text}` : text
+    setNotizen(next)
+    setNotizDraft('')
+  }, [notizDraft, notizen])
 
-      <Accordion title={`Abgeschlossene Aufträge (${fertigeAuftraege.length})`} defaultOpen={false}>
-        {fertigeAuftraege.length === 0 ? (
-          <p className="pt-1 text-sm text-bw-text-muted">Keine abgeschlossenen Aufträge.</p>
-        ) : (
-          <ul className="space-y-3 pt-1">
-            {fertigeAuftraege.map((a) => (
-              <li key={a.id}>
-                <Card className="p-4 space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-bw-text">{a.kunde_name ?? '—'}</p>
-                      <p className="mt-0.5 text-sm text-bw-text-muted">{a.titel ?? 'Ohne Titel'}</p>
-                      <div className="mt-2">
-                        <AuftragStatusBadge status={a.auftrag_status} />
-                      </div>
-                    </div>
-                    <Link href={`/auftraege/${a.id}`} className="btn ghost sm shrink-0">
-                      Zum Auftrag
-                    </Link>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Accordion>
-    </div>
-  )
-
-  const tabNotizen = (
-    <Card>
-      <div className="space-y-2">
-        <label className="input-label" htmlFor="hw-notizen">
-          Notizen
-        </label>
-        <Textarea
-          id="hw-notizen"
-          rows={12}
-          value={notizen}
-          onChange={(e) => setNotizen(e.target.value)}
-          placeholder="Notizen zum Handwerker…"
-          className="min-h-[200px]"
+  const notizenInhalt = (
+    <MockNotizenCard
+      notes={
+        notizen.trim()
+          ? [{ autor: 'Notiz', text: notizen.trim() }]
+          : []
+      }
+      composer={
+        <MockNotizComposer
+          value={notizDraft}
+          onChange={setNotizDraft}
+          onSubmit={appendNotiz}
+          placeholder="Notiz schreiben… (Enter senden · Shift+Enter neue Zeile)"
         />
-        <p className="text-xs text-bw-text-muted">Wird automatisch gespeichert.</p>
-        {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
-      </div>
-    </Card>
+      }
+    />
   )
 
-  const tabCompliance = (
+  const dokumenteInhalt = (
     <HandwerkerComplianceTab
       handwerkerId={hw.id}
       handwerkerGewerke={hwGewerkSlugs}
@@ -600,21 +747,88 @@ export function HandwerkerDetailClient({
     />
   )
 
+  const vorgaengeCount = useMemo(
+    () => vorgaengeRows.filter((r) => (r.handwerkerIds ?? []).includes(hw.id)).length,
+    [vorgaengeRows, hw.id]
+  )
+
+  const detailShellGroups: DetailShellGroup[] = [
+    {
+      id: 'uebersicht',
+      label: 'Übersicht',
+      icon: 'layout-dashboard',
+      render: () => uebersichtInhalt,
+    },
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      count: vorgaengeCount || undefined,
+      render: () => vorgaengeInhalt,
+    },
+    {
+      id: 'dokumente',
+      label: 'Dokumente',
+      icon: 'files',
+      count: dokumenteAnzahl || undefined,
+      render: () => dokumenteInhalt,
+    },
+    {
+      id: 'notizen',
+      label: 'Notizen',
+      icon: 'messages',
+      count: hw.notizen?.trim() ? 1 : undefined,
+      render: () => notizenInhalt,
+    },
+  ]
+
   return (
     <>
+      <MockDetailBackLink href="/handwerker" label="Zurück zu Handwerker" />
       <DetailHead
-        backHref="/handwerker"
-        backLabel="Zurück zu Handwerker"
         title={handwerkerDisplayName(hw)}
-        sub={
-          <span>
-            {handwerkerGfName(hw) ? `${handwerkerGfName(hw)} · ` : null}
-            {hw.subkategorie ?? 'Handwerker'}
-            {gewerkNamen.length ? ` · ${gewerkNamen.slice(0, 3).join(', ')}` : null}
-            {hw.adresse ? ` · ${hw.adresse}` : null}
-          </span>
+        badges={
+          <>
+            <ComplianceBadge status={hw.compliance_status} />
+            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
+              <span className="inline-flex items-center gap-1">
+                <MockIcon
+                  ctx="default"
+                  n={hasPortalAccount ? 'plug' : 'circle-x'}
+                  size={10}
+                />
+                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
+              </span>
+            </MockBadge>
+          </>
         }
-        badges={<ComplianceBadge status={hw.compliance_status} />}
+        meta={
+          <>
+            <span>{kategorie}</span>
+            {bewertungGesamt != null && bewertungGesamt > 0 ? (
+              <>
+                <span className="sep" aria-hidden>
+                  ·
+                </span>
+                <span className="rating inline-flex items-center gap-1">
+                  <MockIcon
+                    ctx="default"
+                    n="star-filled"
+                    size={12}
+                    className="text-[var(--yel-tx,#c9a227)]"
+                  />
+                  {formatHandwerkerBewertung(bewertungGesamt)}
+                </span>
+              </>
+            ) : null}
+          </>
+        }
         actions={
           <ActionsMenu
             trigger={
@@ -633,17 +847,11 @@ export function HandwerkerDetailClient({
         }
       />
 
-      <AppDetailScreen
-        tabs={<DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as typeof tab)} />}
-      >
-        <div className="min-w-0 space-y-3">
-          {tab === 'uebersicht' ? tabUebersicht : null}
-          {tab === 'stammdaten' ? sidebar : null}
-          {tab === 'vorgaenge' ? tabAuftraege : null}
-          {tab === 'notizen' ? tabNotizen : null}
-          {tab === 'dokumente' ? tabCompliance : null}
-        </div>
-      </AppDetailScreen>
+      <DetailShell
+        groups={detailShellGroups}
+        value={tab}
+        onChange={(id) => setTab(id as HandwerkerDetailTab)}
+      />
 
       {(() => {
         const editForm = (
@@ -665,6 +873,15 @@ export function HandwerkerDetailClient({
             <Input label="Telefon" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} />
             <Input label="E-Mail" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
             <Input label="Adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} />
+            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+              <Input label="IBAN" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
+              <Input label="USt-ID" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
+            </div>
+            <Input
+              label="Steuernummer"
+              value={formSteuernummer}
+              onChange={(e) => setFormSteuernummer(e.target.value)}
+            />
           </div>
         )
         const editFooter = (
@@ -701,7 +918,7 @@ export function HandwerkerDetailClient({
       <Modal
         open={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
-        title="Partner-Portal-Einladung senden"
+        title="Handwerker-Link versenden"
         size="lg"
         footer={
           <div className="flex w-full justify-end gap-2">
@@ -738,16 +955,7 @@ export function HandwerkerDetailClient({
               srcDoc={portalHtml}
             />
           </div>
-          <Input
-            label="Partner-Portal Login"
-            value={portalLink}
-            readOnly
-            className="bg-bw-bg-soft"
-          />
-          <p className="text-xs text-bw-text-muted">
-            Der Button in der Mail führt zu <strong>/partner</strong>. Mehrere Adressen in „An“/„CC“ mit Semikolon
-            trennen.
-          </p>
+          <Input label="Partner-Portal Login" value={portalLink} readOnly className="bg-bw-bg-soft" />
         </div>
       </Modal>
 

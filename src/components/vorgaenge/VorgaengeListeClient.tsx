@@ -104,10 +104,13 @@ export function VorgaengeListeClient({
   rows,
   embedded = false,
   restrictPartnerName,
+  restrictHandwerkerId,
 }: {
   rows: VorgangListeRow[]
   embedded?: boolean
   restrictPartnerName?: string
+  /** Nur Vorgänge, in denen dieser Handwerker vorkommt (Mock `restrictHandwerker`). */
+  restrictHandwerkerId?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -187,9 +190,16 @@ export function VorgaengeListeClient({
     (fDatumBis ? 1 : 0)
 
   const baseRows = useMemo(() => {
-    if (!restrictPartnerName?.trim()) return rows
-    return filterVorgaengeByPartnerName(rows, restrictPartnerName)
-  }, [rows, restrictPartnerName])
+    let next = rows
+    if (restrictPartnerName?.trim()) {
+      next = filterVorgaengeByPartnerName(next, restrictPartnerName)
+    }
+    const hwId = restrictHandwerkerId?.trim()
+    if (hwId) {
+      next = next.filter((r) => (r.handwerkerIds ?? []).includes(hwId))
+    }
+    return next
+  }, [rows, restrictPartnerName, restrictHandwerkerId])
 
   const statusOptions = useMemo(() => {
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)

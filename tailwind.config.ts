@@ -159,7 +159,8 @@ const config: Config = {
     },
   },
   plugins: [
-    forms,
+    /** Nur Klassen-Strategie: sonst setzt forms `gray.500`-Rahmen auf alle Inputs (wirkt schwarz). */
+    forms({ strategy: 'class' }),
     /** @apply border-hairline in globals.css — explizit, damit Netlify/Linux-Build nicht scheitert */
     plugin(({ addUtilities, theme }) => {
       addUtilities({

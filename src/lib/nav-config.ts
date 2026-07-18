@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Building2, Settings, Users, Wrench } from 'lucide-react'
+import { Settings, Users, Wrench } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 
 export type NavItemDef = {

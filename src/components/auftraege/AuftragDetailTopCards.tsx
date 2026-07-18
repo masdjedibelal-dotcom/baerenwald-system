@@ -7,13 +7,12 @@ import { updateAuftragBetreuer } from '@/app/(dashboard)/auftraege/actions'
 import { formatAuftragsNr, auftragWertAnzeige } from '@/lib/auftraege/auftrag-liste-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AuftragDetail } from '@/lib/types'
-import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 
 /**
- * Mock Auftragsdaten — Auftrag · Beginn · Ende · Projektleitung · Auftragswert
- * (ohne Kunde/Region — die gehören in Projekt-Übersicht / Stammdaten).
+ * Auftragsdaten — Nr · Projektleitung · Auftragswert
+ * (Termine / Titel / Bauprojekt in der Auftrag-Karte darunter.)
  */
 export function AuftragDetailTopCards({
   detail,
@@ -45,12 +44,6 @@ export function AuftragDetailTopCards({
     <MockCard title="Auftragsdaten">
       <div className="props">
         <MockProp label="Auftrag">{nr}</MockProp>
-        <MockProp label="Beginn">
-          {detail.start_datum ? formatDatum(detail.start_datum) : '—'}
-        </MockProp>
-        <MockProp label="Ende geplant">
-          {detail.end_datum ? formatDatum(detail.end_datum) : '—'}
-        </MockProp>
         <MockProp label="Projektleitung">
           {team.length ? (
             <select

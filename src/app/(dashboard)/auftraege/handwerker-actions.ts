@@ -25,6 +25,7 @@ type HandwerkerRow = {
   telefon: string | null
   email: string | null
   gewerke: string[] | null
+  bewertung_gesamt?: number | null
 }
 
 function mapHandwerkerMitEinsatz(
@@ -39,6 +40,11 @@ function mapHandwerkerMitEinsatz(
     telefon: h.telefon,
     letzter_einsatz: lastByHw.get(h.id) ?? null,
     verfuegbar: !busyIds.has(h.id),
+    gewerke: h.gewerke ?? null,
+    bewertung:
+      h.bewertung_gesamt != null && Number.isFinite(h.bewertung_gesamt)
+        ? Number(h.bewertung_gesamt)
+        : null,
   }))
 }
 
@@ -102,11 +108,34 @@ export async function listHandwerkerAuswahlFuerGewerk(input: {
 
   const { data: allHw, error: hErr } = await supabase
     .from('handwerker')
-    .select('id, name, firma, telefon, email, gewerke, aktiv')
+    .select('id, name, firma, telefon, email, gewerke, aktiv, bewertung_gesamt')
     .eq('aktiv', true)
     .order('name')
 
-  if (hErr) return { ok: false, message: hErr.message }
+  if (hErr) {
+    // Fallback ohne Bewertungs-Spalte (ältere DBs)
+    if (hErr.message.includes('bewertung')) {
+      const retry = await supabase
+        .from('handwerker')
+        .select('id, name, firma, telefon, email, gewerke, aktiv')
+        .eq('aktiv', true)
+        .order('name')
+      if (retry.error) return { ok: false, message: retry.error.message }
+      const rows = (retry.data ?? []) as HandwerkerRow[]
+      const ids = rows.map((h) => h.id)
+      const { lastByHw, busyIds } = await loadEinsatzMeta(supabase, ids)
+      const empfohlenRaw = slug ? filterHandwerkerFuerGewerkSlug(rows, slug) : []
+      const empfohlenIds = new Set(empfohlenRaw.map((h) => h.id))
+      const alleRaw = rows.filter((h) => !empfohlenIds.has(h.id))
+      return {
+        ok: true,
+        gewerkSlug: slug,
+        empfohlen: mapHandwerkerMitEinsatz(empfohlenRaw, lastByHw, busyIds),
+        alle: mapHandwerkerMitEinsatz(alleRaw, lastByHw, busyIds),
+      }
+    }
+    return { ok: false, message: hErr.message }
+  }
 
   const rows = (allHw ?? []) as HandwerkerRow[]
   const ids = rows.map((h) => h.id)

@@ -781,6 +781,7 @@ export function RechnungWizard({
             onChange={onPosBoardChange}
             showUst
             gewerke={gewerkNamen}
+            preislisten={preislisten}
           />
         </>
       ) : null}

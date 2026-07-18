@@ -6,13 +6,12 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  ListFilter,
   Pencil,
   Percent,
-  Plus,
   Trash2,
 } from 'lucide-react'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
+import { PosAddRow } from '@/components/posboard/PosAddRow'
 import { Button } from '@/components/ui/Button'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
@@ -24,8 +23,11 @@ import {
   artikelZeilenNetto,
   formatEurBetrag,
   gesamtrabattBetrag,
+  getGesamtrabattZeile,
   neueArtikelZeile,
   neueFreitextZeile,
+  neueGesamtrabattZeile,
+  setGesamtrabattInZeilen,
   summeArtikelNetto,
   zeilenOhneGesamtrabatt,
   type DokumentArtikelZeile,
@@ -1074,49 +1076,27 @@ export function AngebotWizardPositionen({
       ) : null}
 
       {!hideAddRow ? (
-      <div className="pos-add-row">
-        <button
-          type="button"
-          className="pos-add-btn"
-          onClick={() =>
-            addZeile(neueArtikelZeile({ bezeichnung: 'Neue Position', ...artikelPartial() }))
-          }
-        >
-          <span className="icon-wrap">
-            <Plus className="h-4 w-4" />
-          </span>
-          <span className="lbl-block">
-            <span>Freie Position</span>
-            <span className="sub">leer anlegen</span>
-          </span>
-        </button>
-        <button
-          type="button"
-          className="pos-add-btn"
-          onClick={() => addZeile(neueArtikelZeile(artikelPartial()), { preisliste: true })}
-        >
-          <span className="icon-wrap">
-            <ListFilter className="h-4 w-4" />
-          </span>
-          <span className="lbl-block">
-            <span>Aus Preisliste</span>
-            <span className="sub">Vorlage wählen</span>
-          </span>
-        </button>
-        <button
-          type="button"
-          className="pos-add-btn"
-          onClick={() => addZeile({ ...neueFreitextZeile(), ...blockKeyPartial() })}
-        >
-          <span className="icon-wrap">
-            <AlignLeft className="h-4 w-4" />
-          </span>
-          <span className="lbl-block">
-            <span>Freitext</span>
-            <span className="sub">Hinweis ohne Preis</span>
-          </span>
-        </button>
-      </div>
+        <PosAddRow
+          onAdd={(kind) => {
+            if (kind === 'position') {
+              addZeile(neueArtikelZeile({ bezeichnung: 'Neue Position', ...artikelPartial() }))
+              return
+            }
+            if (kind === 'preisliste') {
+              addZeile(neueArtikelZeile(artikelPartial()), { preisliste: true })
+              return
+            }
+            if (kind === 'freitext') {
+              addZeile({ ...neueFreitextZeile(), ...blockKeyPartial() })
+              return
+            }
+            const existing = getGesamtrabattZeile(zeilen)
+            if (existing) return
+            onChange(
+              setGesamtrabattInZeilen(zeilen, neueGesamtrabattZeile({ bezeichnung: 'Nachlass' }))
+            )
+          }}
+        />
       ) : null}
     </>
   )

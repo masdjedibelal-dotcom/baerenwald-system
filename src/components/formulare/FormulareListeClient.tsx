@@ -6,7 +6,7 @@ import { FileText } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { ListFilterSection } from '@/components/layout/ListPageParts'
-import { AppListScreen, AppEntityListRow } from '@/components/layout/app'
+import { AppListScreen } from '@/components/layout/app'
 import { ListFilterBar } from '@/components/ui/ListFilterBar'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -160,11 +160,8 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
     >
       <PageHeader
         action={
-          <Link
-            href="/formulare/neu"
-            className="btn primary sm inline-flex items-center justify-center md:hidden"
-          >
-            + Neues Template
+          <Link href="/formulare/neu" className="btn primary sm inline-flex items-center justify-center">
+            + Formular
           </Link>
         }
       />
@@ -190,21 +187,45 @@ export function FormulareListeClient({ templates }: { templates: FormularTemplat
         ) : (
           <ul className="m-0 list-none space-y-3 p-0">
             {sorted.map((formular) => (
-              <li key={formular.id}>
-                <AppEntityListRow
-                  href={`/formulare/${formular.id}/bearbeiten`}
-                  avatar={<ListAvatar name={formular.name} tone="soft" />}
-                  title={formular.name}
-                  line2={`${formular.felder?.length || 0} Felder · ${subtypLabel(formular.subtyp)}`}
-                  line3={formatRelativeDate(formular.updated_at || formular.created_at || '')}
-                  badge={
-                    !formular.aktiv ? (
-                      <span className="rounded-md bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-                        Inaktiv
-                      </span>
-                    ) : undefined
-                  }
-                />
+              <li key={formular.id} className="list-none">
+                <div className="app-entity-card app-entity-list-row">
+                  <Link
+                    href={`/formulare/${formular.id}/bearbeiten`}
+                    className="app-entity-list-row__main block min-w-0 text-inherit no-underline"
+                  >
+                    <div className="flex gap-3">
+                      <div className="app-entity-list-row__avatar shrink-0">
+                        <ListAvatar name={formular.name} tone="soft" />
+                      </div>
+                      <div className="app-entity-list-row__body min-w-0 flex-1">
+                        <p className="app-entity-list-row__title">{formular.name}</p>
+                        <p className="app-entity-list-row__line">
+                          {formular.felder?.length || 0} Felder · {subtypLabel(formular.subtyp)}
+                        </p>
+                        <p className="app-entity-list-row__line">
+                          {formatRelativeDate(formular.updated_at || formular.created_at || '')}
+                        </p>
+                      </div>
+                      {!formular.aktiv ? (
+                        <span className="rounded-md bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
+                          Inaktiv
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+                  <div className="app-entity-list-row__footer mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() => setModal(formular)}
+                    >
+                      Vorschau
+                    </button>
+                    <Link href={`/formulare/${formular.id}/bearbeiten`} className="btn ghost sm">
+                      Bearbeiten
+                    </Link>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

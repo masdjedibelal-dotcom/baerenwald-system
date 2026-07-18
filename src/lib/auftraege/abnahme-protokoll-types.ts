@@ -19,7 +19,10 @@ export type AbnahmePunkt = {
   /** Text der Checkliste (Bullet) */
   beschreibung: string
   status: AbnahmePunktStatus
+  /** @deprecated — bitte `notizen` nutzen; wird beim Laden migriert */
   notiz?: string | null
+  /** Beliebig viele Notizen zur Leistung (am ersten Punkt der Gruppe gespeichert) */
+  notizen?: string[]
   foto_urls?: string[]
 }
 
@@ -75,6 +78,43 @@ function leistungKey(p: AbnahmePunkt): string {
 
 function leistungName(p: AbnahmePunkt): string {
   return p.leistung_name?.trim() || p.beschreibung?.trim() || 'Leistung'
+}
+
+/** Notizen einer Leistungsgruppe (Plural + Legacy `notiz`). */
+export function notizenFuerLeistung(punkte: AbnahmePunkt[]): string[] {
+  if (!punkte.length) return []
+  const primary = punkte[0]
+  if (primary.notizen && primary.notizen.length > 0) {
+    return primary.notizen.map((n) => String(n ?? ''))
+  }
+  const legacy = punkte
+    .map((p) => p.notiz?.trim())
+    .filter((n): n is string => Boolean(n))
+  return legacy
+}
+
+/** Schreibt Notizen auf den ersten Punkt der Leistung, räumt Legacy auf den Geschwistern. */
+export function setNotizenFuerLeistung(
+  alle: AbnahmePunkt[],
+  leistungId: string,
+  notizen: string[]
+): AbnahmePunkt[] {
+  let first = true
+  return alle.map((p) => {
+    if (leistungKey(p) !== leistungId) return p
+    if (first) {
+      first = false
+      return { ...p, notizen: [...notizen], notiz: null }
+    }
+    return { ...p, notizen: undefined, notiz: null }
+  })
+}
+
+/** Alle Notiztexte eines Punkts (für PDF). */
+export function notizenEinesPunkts(p: AbnahmePunkt): string[] {
+  if (p.notizen?.length) return p.notizen.map((n) => String(n ?? '')).filter((n) => n.trim())
+  const legacy = p.notiz?.trim()
+  return legacy ? [legacy] : []
 }
 
 function abnahmeCheckpunkt(

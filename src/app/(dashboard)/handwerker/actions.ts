@@ -153,6 +153,14 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
   return (data ?? []) as unknown as Handwerker[]
 }
 
+export type HandwerkerDetailBewertung = {
+  id: string
+  note: number
+  notiz: string | null
+  updatedAt: string | null
+  kundeName: string | null
+}
+
 export type HandwerkerDetailPayload = {
   handwerker: Handwerker | null
   dokumente: PartnerDokument[]
@@ -167,7 +175,20 @@ export type HandwerkerDetailPayload = {
     gewerk_name: string | null
     kunde_name: string | null
   }[]
-  stats: { gesamt: number; angenommen: number; abgelehnt: number; quote: number | null }
+  stats: {
+    gesamt: number
+    angenommen: number
+    abgelehnt: number
+    quote: number | null
+    /** Mock-Übersicht KPIs */
+    angefragt: number
+    angebote: number
+    auftraegeAktiv: number
+    volumen: number
+    avgAuftrag: number
+    offen: number
+  }
+  bewertungen: HandwerkerDetailBewertung[]
 }
 
 const HANDWERKER_DETAIL_SELECT_BASE = `
@@ -231,13 +252,13 @@ async function fetchHandwerkerDetailRow(
 export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetailPayload> {
   const supabase = createClient()
 
-  const [{ data: h }, { data: ahRaw }] = await Promise.all([
+  const [{ data: h }, { data: ahRaw }, angeboteCountRes, bewertungenRes] = await Promise.all([
     fetchHandwerkerDetailRow(supabase, id),
     supabase
       .from('auftrag_handwerker')
       .select(
         `
-        id, status, created_at,
+        id, status, created_at, vereinbarter_preis,
         gewerke ( name ),
         auftraege ( id, titel, status, created_at, kunden ( name ) )
       `
@@ -245,6 +266,21 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .eq('handwerker_id', id)
       .order('created_at', { ascending: false })
       .limit(120),
+    supabase
+      .from('angebot_handwerker')
+      .select('id', { count: 'exact', head: true })
+      .eq('handwerker_id', id),
+    supabase
+      .from('handwerker_bewertungen')
+      .select(
+        `
+        id, qualitaet, termintreue, sauberkeit, kommunikation, preis_leistung, notiz, updated_at,
+        auftraege ( kunden ( name ) )
+      `
+      )
+      .eq('handwerker_id', id)
+      .order('updated_at', { ascending: false })
+      .limit(12),
   ])
 
   const hw = (h as Handwerker | null) ?? null
@@ -276,9 +312,10 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         created_at: a.created_at,
         gewerk_name: g?.name ?? null,
         kunde_name: k?.name ?? null,
+        vereinbarter_preis: Number((r as { vereinbarter_preis?: number | null }).vereinbarter_preis) || 0,
       }
     })
-    .filter(Boolean) as HandwerkerDetailPayload['auftraege']
+    .filter(Boolean) as (HandwerkerDetailPayload['auftraege'][number] & { vereinbarter_preis: number })[]
 
   const gesamt = auftraege.length
   const angenommen = auftraege.filter((x) => /akzept|angenom|zugew|in_arbeit/i.test(x.status)).length
@@ -286,12 +323,63 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   const entschieden = angenommen + abgelehnt
   const quote = entschieden > 0 ? Math.round((angenommen / entschieden) * 100) : null
 
+  const aktiv = auftraege.filter((a) => !isAuftragAbgeschlossenStatus(a.auftrag_status))
+  const volumen = auftraege.reduce((s, a) => s + (a.vereinbarter_preis || 0), 0)
+  const offen = aktiv.reduce((s, a) => s + (a.vereinbarter_preis || 0), 0)
+  const avgAuftrag = gesamt > 0 ? Math.round(volumen / gesamt) : 0
+  const angebote = angeboteCountRes.error ? 0 : (angeboteCountRes.count ?? 0)
+  const angefragt = gesamt + angebote
+
+  const bewertungen: HandwerkerDetailBewertung[] = bewertungenRes.error
+    ? []
+    : (bewertungenRes.data ?? []).map((row) => {
+        const r = row as Record<string, unknown>
+        const vals = [
+          Number(r.qualitaet) || 0,
+          Number(r.termintreue) || 0,
+          Number(r.sauberkeit) || 0,
+          Number(r.kommunikation) || 0,
+          Number(r.preis_leistung) || 0,
+        ].filter((n) => n >= 1)
+        const note = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0
+        const aRaw = r.auftraege as unknown
+        const a = (Array.isArray(aRaw) ? aRaw[0] : aRaw) as
+          | { kunden?: { name?: string } | { name?: string }[] | null }
+          | null
+          | undefined
+        const kRaw = a?.kunden
+        const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { name?: string } | null | undefined
+        return {
+          id: String(r.id),
+          note,
+          notiz: (r.notiz as string | null) ?? null,
+          updatedAt: (r.updated_at as string | null) ?? null,
+          kundeName: k?.name?.trim() || null,
+        }
+      })
+
   return {
     handwerker: hw ? { ...hw, partner_dokumente: dokumente } : null,
     dokumente,
-    auftraege,
-    stats: { gesamt, angenommen, abgelehnt, quote },
+    auftraege: auftraege.map(({ vereinbarter_preis: _p, ...rest }) => rest),
+    stats: {
+      gesamt,
+      angenommen,
+      abgelehnt,
+      quote,
+      angefragt,
+      angebote,
+      auftraegeAktiv: aktiv.length,
+      volumen,
+      avgAuftrag,
+      offen,
+    },
+    bewertungen,
   }
+}
+
+function isAuftragAbgeschlossenStatus(auftragStatus: string): boolean {
+  return auftragStatus === 'abgeschlossen' || auftragStatus === 'storniert'
 }
 
 function revalidatePartnerDokumentPfade(handwerkerId: string, auftragId?: string | null) {

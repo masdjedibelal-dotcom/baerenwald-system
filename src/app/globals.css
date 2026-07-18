@@ -17,8 +17,10 @@
     --bg: #ffffff;
     --bg-soft: #f6f7f6;
     --card: #ffffff;
-    --border: rgba(0, 0, 0, 0.08);
-    --border-strong: rgba(0, 0, 0, 0.16);
+    /* Grau-Rahmen (kein Schwarz/rgba-Schwarz) */
+    --border: #e5e3df;
+    --border-strong: #d6d3ce;
+    --border-2: #e5e3df;
     --text: #16201b;
     --text-2: #404a45;
     --text-3: #6a746f;
@@ -39,8 +41,8 @@
     --r: 13px;
     --r-lg: 18px;
     --r-pill: 999px;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
-    --shadow-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.18), 0 4px 10px -4px rgba(0, 0, 0, 0.07);
+    --shadow: 0 1px 3px rgba(22, 32, 27, 0.05);
+    --shadow-pop: 0 16px 40px -12px rgba(22, 32, 27, 0.12), 0 4px 10px -4px rgba(22, 32, 27, 0.06);
 
     --sidebar-w: 44px;
     --topbar-h: 44px;
@@ -148,6 +150,35 @@
   textarea,
   select {
     font-size: 16px !important;
+  }
+
+  /*
+   * Form-Rahmen = Mock-Grau (--border / #e5e3df), nicht Browser-Schwarz
+   * und nicht das frühere @tailwindcss/forms gray.500.
+   */
+  input:where(
+      [type='text'],
+      [type='email'],
+      [type='url'],
+      [type='password'],
+      [type='number'],
+      [type='date'],
+      [type='datetime-local'],
+      [type='month'],
+      [type='search'],
+      [type='tel'],
+      [type='time'],
+      [type='week']
+    ),
+  input:where(:not([type])),
+  textarea,
+  select {
+    border-color: var(--border);
+  }
+
+  input:where([type='checkbox']),
+  input:where([type='radio']) {
+    border-color: var(--border-strong);
   }
 
   ::-webkit-scrollbar {

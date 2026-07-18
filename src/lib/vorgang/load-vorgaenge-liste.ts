@@ -239,12 +239,23 @@ export async function loadVorgaengeListe(): Promise<{
         ? `${Math.round(Number(rechnung.brutto)).toLocaleString('de-DE')} €`
         : null
 
+    const handwerkerIds = Array.from(
+      new Set(
+        (auftraegeByLead.get(lead.id) ?? []).flatMap((a) =>
+          (positionenByAuftrag.get(a.id) ?? [])
+            .map((p) => p.handwerker_id)
+            .filter((id): id is string => Boolean(id?.trim()))
+        )
+      )
+    )
+
     return {
       ...resolved,
       leadId: lead.id,
       kundeName,
       wertLabel,
       detailHref: detailHrefForPhase(resolved.phase, resolved.entityId, lead.id),
+      handwerkerIds,
     }
   })
 

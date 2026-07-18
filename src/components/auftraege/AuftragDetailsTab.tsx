@@ -1,26 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo } from 'react'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
+import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
-import { PosBoard } from '@/components/posboard/PosBoard'
-import { toast } from '@/components/ui/app-toast'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
-import { replaceAuftragPositionenFromPosBoard } from '@/app/(dashboard)/auftraege/auftrag-posboard-actions'
-import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
+import type { HandwerkerZuweisenKontext } from '@/components/auftraege/HandwerkerZuweisenModal'
 import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
-import { auftragPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
-import {
-  neuePosBoardLine,
-  POS_BOARD_DEFAULT_GEWERK,
-  type PosBoardLine,
-} from '@/lib/posboard/pos-board-line'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AuftragDetail, AuftragPosition, Lead } from '@/lib/types'
-import { kanalLabel } from '@/lib/utils'
+import type {
+  AngebotDetail,
+  AngebotHandwerkerRow,
+  AuftragDetail,
+  Lead,
+} from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -59,30 +55,13 @@ function projektTitel(detail: AuftragDetail, lead?: AuftragLeadSnap | null): str
   })
 }
 
-function regionLabel(detail: AuftragDetail, lead?: AuftragLeadSnap | null): string | null {
-  const ort = (detail.kunden?.ort ?? '').trim()
-  const plz = (detail.kunden?.plz ?? lead?.plz ?? '').trim()
-  if (ort && plz) return `${ort} · ${plz}`
-  if (ort) return ort
-  if (plz) return plz
-  return null
-}
-
-function beschreibungFrom(detail: AuftragDetail, lead?: AuftragLeadSnap | null): string | null {
-  const t =
-    lead?.kontakt_nachricht?.trim() ||
-    lead?.notizen?.trim() ||
-    detail.notizen?.trim() ||
-    ''
-  return t || null
-}
-
-/** Mock Details: Auftragsdaten + Projekt-Übersicht + PosBoard Leistungen. */
+/** Auftrag: Steuerung + Ausführung + Leistungen mit Handwerker-Zuweisung/Status. */
 export function AuftragDetailsTab({
   detail,
   lead,
   team = [],
   gewerke = [],
+  angebotDetail = null,
   editable = true,
   onSaved,
 }: {
@@ -90,75 +69,43 @@ export function AuftragDetailsTab({
   lead?: AuftragLeadSnap | null
   team?: CrmTeamMitglied[]
   gewerke?: { id: string; name: string; slug: string }[]
+  angebotDetail?: AngebotDetail | null
   editable?: boolean
   onSaved?: () => void
 }) {
-  const positionen = detail.auftrag_positionen ?? []
-  const [lines, setLines] = useState(() => auftragPositionenToPosBoardLines(positionen))
-  const baseRef = useRef<AuftragPosition[]>(positionen)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [, startTransition] = useTransition()
-
-  useEffect(() => {
-    const next = detail.auftrag_positionen ?? []
-    baseRef.current = next
-    setLines(auftragPositionenToPosBoardLines(next))
-  }, [detail.id, detail.auftrag_positionen])
-
-  const persist = useCallback(
-    (next: PosBoardLine[]) => {
-      if (!editable) return
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => {
-        startTransition(async () => {
-          const res = await replaceAuftragPositionenFromPosBoard(detail.id, next)
-          if (!res.ok) {
-            toast.error(res.message)
-            return
-          }
-          onSaved?.()
-        })
-      }, 450)
-    },
-    [detail.id, editable, onSaved]
-  )
-
-  const onPosBoardChange = useCallback(
-    (next: PosBoardLine[]) => {
-      setLines(next)
-      persist(next)
-    },
-    [persist]
-  )
-
-  const preisrahmen = useMemo(() => {
-    if (!lead) return null
-    const raw = resolveLeadPreisAnzeige(
-      lead.kanal,
-      lead.budget_ca,
-      lead.preis_min,
-      lead.preis_max,
-      lead.funnel_daten
-    )
-    return raw !== '—' ? raw : null
-  }, [lead])
-
-  const gewerkNames = useMemo(
-    () => gewerke.map((g) => g.name.trim()).filter(Boolean),
-    [gewerke]
-  )
-
   const fortschritt = auftragFortschritt(detail)
+  const auftragNotiz = detail.notizen?.trim() || ''
+  const angebotTitel = projektTitel(detail, lead)
+  const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
+
+  const handwerkerKontext = useMemo((): HandwerkerZuweisenKontext => {
+    const k = detail.kunden
+    return {
+      kundeName: k?.name?.trim() || lead?.kontakt_name?.trim() || 'Kunde',
+      adresse: k?.adresse?.trim() || k?.strasse?.trim() || null,
+      plz: k?.plz?.trim() || lead?.plz?.trim() || null,
+      ort: k?.ort?.trim() || null,
+      startDatum: detail.start_datum,
+      endDatum: detail.end_datum,
+      notizen: detail.notizen,
+    }
+  }, [detail, lead])
+
+  const angebotHandwerker = useMemo(
+    (): AngebotHandwerkerRow[] => angebotDetail?.angebot_handwerker ?? [],
+    [angebotDetail]
+  )
 
   return (
     <>
       <AuftragDetailTopCards detail={detail} team={team} />
 
       <EntityProjektUebersichtCard
-        title="Auftragsdetails"
+        title="Auftrag"
+        icon="tool"
         initial={{
-          titel: detail.titel?.trim() || projektTitel(detail, lead),
-          beschreibung: beschreibungFrom(detail, lead) ?? '',
+          titel: detail.titel?.trim() || angebotTitel,
+          beschreibung: auftragNotiz,
           startDatum: detail.start_datum?.slice(0, 10) ?? '',
           endDatum: detail.end_datum?.slice(0, 10) ?? '',
           istBauprojekt: detail.ist_bauprojekt === true,
@@ -185,28 +132,20 @@ export function AuftragDetailsTab({
             : undefined
         }
         disabled={!editable}
-        region={regionLabel(detail, lead)}
-        preisrahmenLabel={preisrahmen}
-        quelle={lead?.kanal ? kanalLabel(lead.kanal) : null}
         fortschritt={fortschritt}
       />
 
-      <PosBoard
-        title="Leistungen"
-        positionen={lines}
-        onChange={editable ? onPosBoardChange : undefined}
-        showUst
-        gewerke={gewerkNames.length ? gewerkNames : undefined}
-        makeNew={(gewerk) =>
-          neuePosBoardLine({
-            gewerk: gewerk || POS_BOARD_DEFAULT_GEWERK,
-            name: '',
-            menge: 1,
-            einheit: 'Stück',
-            preis: 0,
-            ust: 19,
-          })
-        }
+      <AuftragPositionenSteuerungTab
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        gewerke={gewerke}
+        angebotId={detail.angebot_id}
+        angebotTitel={angebotTitel}
+        angebotHandwerker={angebotHandwerker}
+        handwerkerRows={detail.auftrag_handwerker ?? []}
+        handwerkerKontext={handwerkerKontext}
+        auftragAbgeschlossen={istAbgeschlossen || !editable}
+        onChanged={() => onSaved?.()}
       />
     </>
   )

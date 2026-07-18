@@ -12,6 +12,7 @@ export function MockModal({
   sub,
   children,
   footer,
+  className,
 }: {
   open: boolean
   onClose: () => void
@@ -20,6 +21,7 @@ export function MockModal({
   sub?: string
   children: ReactNode
   footer?: ReactNode
+  className?: string
 }) {
   useEffect(() => {
     if (!open) return
@@ -40,7 +42,7 @@ export function MockModal({
       }}
       role="presentation"
     >
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className={className ? `modal ${className}` : 'modal'} role="dialog" aria-modal="true">
         <div className="modal-h">
           {icon ? (
             <div className="icon">

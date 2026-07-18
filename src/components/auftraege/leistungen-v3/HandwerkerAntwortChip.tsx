@@ -1,3 +1,4 @@
+import { Check, RefreshCw } from 'lucide-react'
 import type { AuftragPosition } from '@/lib/types'
 import {
   handwerkerAntwortAnzeige,
@@ -22,11 +23,15 @@ export function HandwerkerAntwortChip({
   const info = handwerkerAntwortAnzeige(pos)
   if (!info) return null
 
+  const Icon =
+    info.variant === 'angenommen' ? Check : info.variant === 'offen' ? RefreshCw : null
+
   return (
     <span
       className={cn('pos-v3-hw-antwort-chip', VARIANT_CLASS[info.variant], className)}
       title="Antwort des Handwerkers auf die Anfrage"
     >
+      {Icon ? <Icon className="h-3 w-3 shrink-0" aria-hidden strokeWidth={2.5} /> : null}
       {info.label}
     </span>
   )

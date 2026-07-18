@@ -35,9 +35,9 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungDetailsTab } from '@/components/rechnungen/RechnungDetailsTab'
+import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
@@ -45,8 +45,6 @@ import { runDuplicateRechnung } from '@/lib/list-actions'
 import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { berechneRechnung } from '@/lib/rechnung-berechnung'
 import { formatDatum, formatTimelineStamp } from '@/lib/utils'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
@@ -65,6 +63,8 @@ import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
 import type {
+  AngebotDetail,
+  AuftragDetail,
   Gewerk,
   LeadDetail,
   LeadNotizRow,
@@ -78,7 +78,6 @@ import type {
 type RechnungDetailTab =
   | 'stammdaten'
   | 'details'
-  | 'mahnverlauf'
   | 'verlauf'
   | 'dokumente'
   | 'notizen'
@@ -86,7 +85,6 @@ type RechnungDetailTab =
 const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
   'stammdaten',
   'details',
-  'mahnverlauf',
   'verlauf',
   'dokumente',
   'notizen',
@@ -96,11 +94,32 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
   const tab = (raw ?? '').trim().toLowerCase()
   if (!tab) return null
   if (tab === 'uebersicht' || tab === 'stammdaten') return 'stammdaten'
-  if (tab === 'positionen' || tab === 'leistung' || tab === 'details') return 'details'
-  if (tab === 'mahnung' || tab === 'mahnungen' || tab === 'mahnverlauf') return 'mahnverlauf'
+  if (
+    tab === 'positionen' ||
+    tab === 'leistung' ||
+    tab === 'rechnung-details' ||
+    tab === 'anfrage' ||
+    tab === 'anfrage-details' ||
+    tab === 'angebot' ||
+    tab === 'angebot-details' ||
+    tab === 'auftrag' ||
+    tab === 'auftrag-details'
+  ) {
+    return 'details'
+  }
+  if (tab === 'mahnung' || tab === 'mahnungen' || tab === 'mahnverlauf') return 'verlauf'
   if (tab === 'aktivitaet' || tab === 'verlauf') return 'verlauf'
   if (tab === 'kommunikation' || tab === 'notizen') return 'notizen'
   if (tab === 'dokumente') return 'dokumente'
+  const cumulative = resolveCumulativeDetailTabAlias(tab)
+  if (
+    cumulative === 'anfrage-details' ||
+    cumulative === 'angebot-details' ||
+    cumulative === 'auftrag-details' ||
+    cumulative === 'rechnung-details'
+  ) {
+    return 'details'
+  }
   if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
   return null
 }
@@ -156,6 +175,8 @@ export function RechnungDetailClient({
   projektKontext,
   pipelineLead = null,
   lead = null,
+  angebotDetail = null,
+  auftragDetail = null,
   timeline: timelineInitial = [],
 }: {
   detail: Rechnung
@@ -167,6 +188,8 @@ export function RechnungDetailClient({
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
   pipelineLead?: PipelineKontextLead | null
   lead?: LeadDetail | null
+  angebotDetail?: AngebotDetail | null
+  auftragDetail?: AuftragDetail | null
   timeline?: LeadTimelineRow[]
 }) {
   const router = useRouter()
@@ -195,14 +218,6 @@ export function RechnungDetailClient({
   }, [searchParams])
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
-  const berechnung = useMemo(
-    () =>
-      berechneRechnung(pos, {
-        kleinunternehmer: kleinunternehmerFirma,
-        reverseCharge13b: Boolean(detail.reverse_charge_13b),
-      }),
-    [pos, kleinunternehmerFirma, detail.reverse_charge_13b]
-  )
 
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
@@ -484,16 +499,7 @@ export function RechnungDetailClient({
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
 
-  const headMeta = [
-    kundeName !== projektTitelAnzeige ? kundeName : null,
-    detail.rechnungsnummer?.trim() || null,
-    formatEurBetrag(berechnung.brutto),
-    detail.faellig_am && belegTyp === 'rechnung'
-      ? `fällig ${formatDatum(detail.faellig_am)}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join('  ·  ')
+  const headMeta = kundeName
 
   const primaryAction = (() => {
     if (detail.status === 'entwurf') {
@@ -546,27 +552,25 @@ export function RechnungDetailClient({
     </>
   )
 
-  const mahnverlaufInhalt = (
-    <RechnungMahnverlaufCard
-      rechnung={detail}
-      mahnMails={mahnMails}
-      empty={
-        belegTyp !== 'rechnung' ||
-        (detail.status === 'entwurf' && !rechnungHatMahnverlauf(detail))
-      }
-      onSendErinnerung={
-        detail.status === 'gesendet' || ueberfaellig || zeigtMahnverlauf
-          ? () => setErinnerungModalOpen(true)
-          : undefined
-      }
-      onMailAnsehen={(id) => setEmailPreviewId(id)}
-    />
-  )
-
   const verlaufInhalt = (
-    <MockVerlaufCard empty={timelineItems.length === 0}>
-      <Timeline items={timelineItems} />
-    </MockVerlaufCard>
+    <>
+      <MockVerlaufCard empty={timelineItems.length === 0}>
+        <Timeline items={timelineItems} />
+      </MockVerlaufCard>
+      {belegTyp === 'rechnung' ? (
+        <RechnungMahnverlaufCard
+          rechnung={detail}
+          mahnMails={mahnMails}
+          empty={detail.status === 'entwurf' && !rechnungHatMahnverlauf(detail)}
+          onSendErinnerung={
+            detail.status === 'gesendet' || ueberfaellig || zeigtMahnverlauf
+              ? () => setErinnerungModalOpen(true)
+              : undefined
+          }
+          onMailAnsehen={(id) => setEmailPreviewId(id)}
+        />
+      ) : null}
+    </>
   )
 
   const dokumenteInhalt = (
@@ -603,12 +607,6 @@ export function RechnungDetailClient({
       render: () => detailsInhalt,
     },
     {
-      id: 'mahnverlauf',
-      label: 'Mahnverlauf',
-      icon: 'mail-forward',
-      render: () => mahnverlaufInhalt,
-    },
-    {
       id: 'verlauf',
       label: ACTIVITY_SECTIONS.verlauf,
       icon: 'history',
@@ -636,31 +634,16 @@ export function RechnungDetailClient({
   return (
     <EntityDetailLayout
       phase="rechnung"
-      breadcrumbTitle={crumbTitle}
+      projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=rechnung"
-      crumbBackLabel="Zurück zu den Vorgängen"
-      crumbSectionLabel="Rechnungen"
+      crumbBackLabel="Zurück zu den Suchergebnissen"
       className="space-y-4 pb-0"
       head={{
         title: crumbTitle && crumbTitle !== '—' ? crumbTitle : kundeName,
-        badges: (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {rechnungStatusBadge(detail.status, ueberfaellig)}
-            {pipelineLead || lead ? (
-              <PipelineKontextBadge
-                lead={{
-                  kanal: pipelineLead?.kanal ?? lead?.kanal,
-                  auftraggeber_kunde_id:
-                    pipelineLead?.auftraggeber_kunde_id ?? lead?.auftraggeber_kunde_id,
-                  anlass: pipelineLead?.anlass ?? lead?.anlass,
-                }}
-              />
-            ) : null}
-          </span>
-        ),
+        badges: rechnungStatusBadge(detail.status, ueberfaellig),
         meta: headMeta,
         actions: (
-          <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {primaryAction}
             <ActionsMenu
               align="right"

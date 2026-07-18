@@ -12,6 +12,8 @@ import {
   type RankingZeile,
   type UmsatzMonat,
 } from '@/lib/dashboard/dashboard-analytics'
+import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
+import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { cn } from '@/lib/utils'
 
 export type DashboardKpi = {
@@ -226,6 +228,8 @@ function GewerkUmsatzCard({
   )
 }
 
+const TOP_RANKING_LIMIT = 8
+
 function TopRankingCard({
   handwerker,
   kunden,
@@ -234,7 +238,10 @@ function TopRankingCard({
   kunden: RankingZeile[]
 }) {
   const [mode, setMode] = useState<'handwerker' | 'kunden'>('handwerker')
-  const rows = mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])
+  const rows = (mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])).slice(
+    0,
+    TOP_RANKING_LIMIT
+  )
   const maxUmsatz = rows.length ? Math.max(1, ...rows.map((r) => Number(r.umsatz) || 0)) : 1
 
   return (
@@ -338,6 +345,7 @@ export function DashboardClient({
   vorname,
   zeitraum,
   kpis,
+  marketing,
   umsatzMonate,
   funnel,
   gewerk,
@@ -347,6 +355,7 @@ export function DashboardClient({
   vorname: string
   zeitraum: DashboardZeitraum
   kpis: DashboardKpi[]
+  marketing: DashboardMarketingSnapshot
   umsatzMonate: UmsatzMonat[]
   funnel: {
     stufen: FunnelStufe[]
@@ -428,6 +437,10 @@ export function DashboardClient({
             </div>
           </button>
         ))}
+      </div>
+
+      <div className="mb-[22px]">
+        <DashboardMarketingCard data={marketing} />
       </div>
 
       <div

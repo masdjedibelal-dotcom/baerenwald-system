@@ -6,7 +6,6 @@ import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { replaceAngebotPositionen } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
-import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import {
   angebotPositionenToPosBoardLines,
   posBoardLinesToAngebotPositionenWithBase,
@@ -19,7 +18,7 @@ import {
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { AngebotDetail, Gewerk, LeadDetail } from '@/lib/types'
-import { formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
+import { formatDatum, formatDatumZeit } from '@/lib/utils'
 
 function projektTitel(detail: AngebotDetail, lead?: LeadDetail | null): string {
   return angebotTitelOderSituationBereich({
@@ -30,22 +29,8 @@ function projektTitel(detail: AngebotDetail, lead?: LeadDetail | null): string {
   })
 }
 
-function regionLabel(detail: AngebotDetail, lead?: LeadDetail | null): string | null {
-  const ort = (detail.kunden?.ort ?? '').trim()
-  const plz = (detail.kunden?.plz ?? lead?.plz ?? '').trim()
-  if (ort && plz) return `${ort} · ${plz}`
-  if (ort) return ort
-  if (plz) return plz
-  return null
-}
-
-function beschreibungFrom(detail: AngebotDetail, lead?: LeadDetail | null): string | null {
-  const t =
-    lead?.kontakt_nachricht?.trim() ||
-    detail.projektbeschreibung?.trim() ||
-    lead?.notizen?.trim() ||
-    ''
-  return t || null
+function beschreibungFromAngebot(detail: AngebotDetail): string | null {
+  return detail.projektbeschreibung?.trim() || null
 }
 
 function enrichGewerke(
@@ -79,7 +64,7 @@ function enrichGewerke(
   })
 }
 
-/** Mock Details: Projekt-Übersicht + PosBoard Leistungen (mit Netto/MwSt/Brutto). */
+/** Angebot: nur Verkauf (Beschreibung, Summe, Gültigkeit) + gepreiste Positionen. */
 export function AngebotDetailsTab({
   detail,
   lead,
@@ -136,18 +121,6 @@ export function AngebotDetailsTab({
     [persist]
   )
 
-  const preisrahmen = useMemo(() => {
-    if (!lead) return null
-    const raw = resolveLeadPreisAnzeige(
-      lead.kanal,
-      lead.budget_ca,
-      lead.preis_min,
-      lead.preis_max,
-      lead.funnel_daten
-    )
-    return raw !== '—' ? raw : null
-  }, [lead])
-
   const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
   const angebotNr =
     detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
@@ -160,10 +133,11 @@ export function AngebotDetailsTab({
   return (
     <>
       <EntityProjektUebersichtCard
-        title="Angebotsdetails"
+        title="Angebot"
+        icon="file-invoice"
         initial={{
           titel: projektTitel(detail, lead),
-          beschreibung: beschreibungFrom(detail, lead) ?? '',
+          beschreibung: beschreibungFromAngebot(detail) ?? '',
           startDatum: '',
           endDatum: '',
           istBauprojekt: false,
@@ -181,13 +155,10 @@ export function AngebotDetailsTab({
             : undefined
         }
         disabled={!editable}
-        region={regionLabel(detail, lead)}
-        preisrahmenLabel={preisrahmen}
-        quelle={lead ? kanalLabel(lead.kanal) : null}
         footerRows={[
-          { label: 'Angebot', children: angebotNr },
+          { label: 'Angebotsnr.', children: angebotNr },
           {
-            label: 'Gesamt (DB)',
+            label: 'Angebotssumme',
             children: (
               <span style={{ color: 'var(--green)', fontWeight: 600 }}>{betragLabel || '—'}</span>
             ),

@@ -121,15 +121,6 @@ export function TopBar({ user: _user, onSearchOpen }: TopBarProps) {
       )}
 
       <div className="topbar-actions">
-        <button
-          type="button"
-          className="topbar-icon-btn"
-          title="Benachrichtigungen"
-          aria-label="Benachrichtigungen"
-        >
-          <MockIcon ctx="default" n="bell" size={16} />
-        </button>
-
         {cta ? (
           <button type="button" onClick={() => router.push(cta.href)} className="btn primary sm topbar-cta">
             <MockIcon ctx="btn" n="plus" size={14} />

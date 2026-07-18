@@ -269,9 +269,8 @@ export function AuftragLeistungNewModal({
             ) : null}
           </select>
           <p className="mt-1 text-xs text-bw-text-muted">
-            Handwerker für diese Leistung wählen. Mit „Speichern & senden“ geht die Anfrage direkt
-            ins Partner-Portal (Tab Offen/Anfragen). Ohne Handwerker nur speichern — Versand später
-            über „An Handwerker senden“.
+            Optional: Handwerker hier wählen und mit „Speichern & senden“ direkt anfragen. Sonst
+            später über ⋯ → „Handwerker anfragen“.
           </p>
         </div>
         <div className="sm:col-span-2">

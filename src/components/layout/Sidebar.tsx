@@ -120,7 +120,12 @@ export function Sidebar({
         <span className="sidebar-label">Einstellungen</span>
       </Link>
 
-      <div className="sidebar-icon" data-label={name} aria-label={name}>
+      <Link
+        href="/einstellungen/profil"
+        data-label={name}
+        aria-label={`Profil · ${name}`}
+        className={cn('sidebar-icon', pathname.startsWith('/einstellungen/profil') && 'active')}
+      >
         <div
           style={{
             width: 24,
@@ -138,7 +143,7 @@ export function Sidebar({
           {initials}
         </div>
         <span className="sidebar-label">{name}</span>
-      </div>
+      </Link>
     </nav>
   )
 }

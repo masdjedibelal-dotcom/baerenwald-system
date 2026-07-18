@@ -1,21 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Plus, Send, Trash2, UserPlus, X, ClipboardList } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { Plus, Trash2, UserPlus, X, ClipboardList } from 'lucide-react'
 import { EmptyState } from '@/components/layout/EmptyState'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
-import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
-import {
-  bulkDeleteAuftragPositionenV3,
-  countUnsentZugewieseneLeistungenV3,
-  sendAuftragLeistungenAnHandwerkerV3,
-} from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
+import { bulkDeleteAuftragPositionenV3 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
 import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks'
 import { summenPositionen } from '@/lib/auftraege/auftrag-leistung-phasen'
-import type { AuftragLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import type { EntityMenuItem } from '@/lib/entity-menu'
+import { richTextToPlain } from '@/lib/rich-text'
 import { PartnerAbgelehntBanner } from '@/components/auftraege/PartnerAbgelehntBanner'
 import type { HandwerkerZuweisenKontext } from '@/components/auftraege/HandwerkerZuweisenModal'
 import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
@@ -25,16 +21,13 @@ import { AuftragLeistungEditModal } from '@/components/auftraege/leistungen-v3/A
 import { AuftragGewerkAddRow } from '@/components/auftraege/leistungen-v3/AuftragGewerkAddRow'
 import { AuftragLeistungNewModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungNewModal'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
-import { LeistungStatusPill } from '@/components/auftraege/leistungen-v3/LeistungStatusPill'
 import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/PartnerVorgangChip'
 import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
 import { istPartnerEntfernungAusstehend } from '@/lib/auftraege/partner-vorgang-display'
 import {
   blockVkSumme,
   createLeeresGewerkBlock,
-  formatZeitraumKurz,
   groupPositionenByGewerkSlug,
-  rowMarge,
 } from '@/components/auftraege/leistungen-v3/utils'
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -68,9 +61,7 @@ export function AuftragLeistungenV3Tab({
   const [editPos, setEditPos] = useState<AuftragPosition | null>(null)
   const [newBlock, setNewBlock] = useState<AuftragGewerkBlock | null>(null)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
-  const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
   const [extraBlocks, setExtraBlocks] = useState<AuftragGewerkBlock[]>([])
-  const [unsentCount, setUnsentCount] = useState(0)
 
   const disabled = auftragAbgeschlossen || pending
   const sorted = useMemo(
@@ -80,8 +71,8 @@ export function AuftragLeistungenV3Tab({
   const blocks = useMemo(() => groupPositionenByGewerkSlug(sorted, gewerke), [sorted, gewerke])
   const allBlocks = useMemo(() => {
     const keys = new Set(blocks.map((b) => b.key))
-    const pending = extraBlocks.filter((b) => !keys.has(b.key))
-    return [...blocks, ...pending]
+    const pendingBlocks = extraBlocks.filter((b) => !keys.has(b.key))
+    return [...blocks, ...pendingBlocks]
   }, [blocks, extraBlocks])
   const totals = useMemo(() => summenPositionen(sorted), [sorted])
   const abgelehntZuweisungen = useMemo(
@@ -91,17 +82,8 @@ export function AuftragLeistungenV3Tab({
   const margePct =
     totals.verkauf > 0 ? Math.round((totals.marge / totals.verkauf) * 1000) / 10 : null
 
-  useEffect(() => {
-    void countUnsentZugewieseneLeistungenV3(auftragId).then((r) => {
-      if (r.ok) setUnsentCount(r.count)
-    })
-  }, [auftragId, positionen])
-
   function refresh() {
     onChanged()
-    void countUnsentZugewieseneLeistungenV3(auftragId).then((r) => {
-      if (r.ok) setUnsentCount(r.count)
-    })
   }
 
   function toggleOne(id: string) {
@@ -203,36 +185,57 @@ export function AuftragLeistungenV3Tab({
     })
   }
 
-  function updateStatus(pos: AuftragPosition, status: AuftragLeistungStatus) {
-    startTransition(async () => {
-      const r = await updateAuftragPositionLeistungStatus({
-        auftragId,
-        positionId: pos.id,
-        status,
-      })
-      if (!r.ok) toast.error(r.message)
-      else refresh()
-    })
+  function rowMenu(pos: AuftragPosition): EntityMenuItem[] {
+    const rowLocked = istPartnerEntfernungAusstehend(pos)
+    if (disabled || rowLocked) return []
+    const hasHw = Boolean(pos.handwerker_id)
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => setEditPos(pos),
+      },
+      {
+        icon: 'user',
+        label: hasHw ? 'Handwerker ändern' : 'Handwerker anfragen',
+        onClick: () => setZuweisungIds([pos.id]),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => deleteOne(pos),
+      },
+    ]
   }
 
-  function sendAnHandwerker() {
-    startTransition(async () => {
-      const r = await sendAuftragLeistungenAnHandwerkerV3({
-        auftragId,
-        angebotId,
-        projektName: angebotTitel,
-        gewerke,
+  function gewerkMenu(block: AuftragGewerkBlock): EntityMenuItem[] {
+    if (disabled) return []
+    const ids = block.positionen.map((p) => p.id)
+    const items: EntityMenuItem[] = [
+      {
+        icon: 'plus',
+        label: 'Position hinzufügen',
+        onClick: () => setNewBlock(block),
+      },
+    ]
+    if (ids.length > 0) {
+      items.push({
+        icon: 'user',
+        label: 'Handwerker fürs Gewerk',
+        onClick: () => setZuweisungIds(ids),
       })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success(
-        `${r.gesendet} Leistung${r.gesendet === 1 ? '' : 'en'} an ${r.handwerker} Handwerker gesendet.`
-      )
-      setSendConfirmOpen(false)
-      refresh()
-    })
+    }
+    if (block.positionen.length === 0) {
+      items.push('sep', {
+        icon: 'trash',
+        label: 'Gewerk entfernen',
+        danger: true,
+        onClick: () => removeEmptyBlock(block),
+      })
+    }
+    return items
   }
 
   const selectedCount = selectedIds.size
@@ -286,95 +289,85 @@ export function AuftragLeistungenV3Tab({
           ))}
         </div>
       ) : null}
-      <div className="pos-v3-totals">
-        <div>
-          <span className="pos-v3-totals-label">VK gesamt</span>
-          <span className="pos-v3-totals-value">{formatEurBetrag(totals.verkauf)}</span>
-        </div>
-        <div>
-          <span className="pos-v3-totals-label">EK gesamt</span>
-          <span className="pos-v3-totals-value">
-            {formatEurBetrag(totals.partner + totals.eigen)}
-          </span>
-        </div>
-        <div>
-          <span className="pos-v3-totals-label">Marge gesamt</span>
-          <span className="pos-v3-totals-value">
-            {formatEurBetrag(totals.marge)}
-            {margePct != null ? ` (${margePct} %)` : ''}
-          </span>
-        </div>
-      </div>
+      <div className="postable2">
+        {allBlocks.map((block) => {
+          const blockIds = block.positionen.map((p) => p.id)
+          const blockAllSelected =
+            blockIds.length > 0 && blockIds.every((id) => selectedIds.has(id))
+          const blockSomeSelected = blockIds.some((id) => selectedIds.has(id))
+          const isEmpty = block.positionen.length === 0
+          const gMenu = gewerkMenu(block)
 
-      {allBlocks.map((block) => {
-        const blockIds = block.positionen.map((p) => p.id)
-        const blockAllSelected =
-          blockIds.length > 0 && blockIds.every((id) => selectedIds.has(id))
-        const blockSomeSelected = blockIds.some((id) => selectedIds.has(id))
-        const isEmpty = block.positionen.length === 0
+          return (
+            <div key={block.key}>
+              <div className="pt2-sub">
+                {blockIds.length > 0 ? (
+                  <label className="pos-v3-check" style={{ display: 'inline-flex' }}>
+                    <input
+                      type="checkbox"
+                      checked={blockAllSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = blockSomeSelected && !blockAllSelected
+                      }}
+                      disabled={disabled}
+                      onChange={() => toggleBlock(block)}
+                    />
+                  </label>
+                ) : null}
+                <span className="g">{block.gewerkName || 'Ohne Gewerk'}</span>
+                {!isEmpty ? (
+                  <span className="gt">· {formatEurBetrag(blockVkSumme(block))}</span>
+                ) : (
+                  <span className="gt">· Noch keine Leistungen</span>
+                )}
+                <div style={{ flex: 1 }} />
+                {gMenu.length > 0 ? <MockEntityRowMenu items={gMenu} title="Gewerk" /> : null}
+              </div>
 
-        return (
-          <section key={block.key} className="pos-v3-gewerk">
-            <header className="pos-v3-gewerk-head">
-              {blockIds.length > 0 ? (
-                <label className="pos-v3-check">
-                  <input
-                    type="checkbox"
-                    checked={blockAllSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = blockSomeSelected && !blockAllSelected
-                    }}
-                    disabled={disabled}
-                    onChange={() => toggleBlock(block)}
-                  />
-                </label>
-              ) : (
-                <span className="pos-v3-check w-4 shrink-0" aria-hidden />
-              )}
-              <span className="pos-v3-gewerk-name">Gewerk: {block.gewerkName}</span>
-              <span className="pos-v3-gewerk-vk">
-                {isEmpty ? 'Noch keine Leistungen' : `VK gesamt: ${formatEurBetrag(blockVkSumme(block))}`}
-              </span>
               {isEmpty ? (
-                <button
-                  type="button"
-                  className="pos-v3-row-delete"
-                  disabled={disabled}
-                  aria-label="Leeren Gewerk-Abschnitt entfernen"
-                  onClick={() => removeEmptyBlock(block)}
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    fontSize: 12.5,
+                    color: 'var(--text-4)',
+                    borderBottom: '0.5px solid var(--border)',
+                  }}
                 >
-                  <X className="h-4 w-4" />
-                </button>
+                  Keine Positionen
+                </div>
               ) : null}
-            </header>
 
-            <ul className="pos-v3-rows">
               {block.positionen.map((pos) => {
-                const { ek, pct } = rowMarge(pos)
                 const vk = Math.max(0, pos.preis_fix ?? 0)
-                const zeitraum = formatZeitraumKurz(pos)
-                const hwName = pos.handwerker?.name
+                const hwName = pos.handwerker?.name?.trim()
                 const entferntPending = istPartnerEntfernungAusstehend(pos)
                 const rowLocked = entferntPending
+                const mengeLabel =
+                  pos.einheit?.trim()?.toLowerCase() === 'pauschal' || (pos.menge ?? 1) === 1
+                    ? pos.einheit?.trim() || 'pauschal'
+                    : `${pos.menge ?? 1} ${pos.einheit?.trim() || ''}`.trim()
+                const desc = richTextToPlain(pos.beschreibung)
+                const menu = rowMenu(pos)
 
                 return (
-                  <li key={pos.id}>
-                    <div
-                      className={cn(
-                        'pos-v3-row',
-                        selectedIds.has(pos.id) && 'pos-v3-row--selected',
-                        entferntPending && 'pos-v3-row--entfernt'
-                      )}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setDetailPos(pos)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          setDetailPos(pos)
-                        }
-                      }}
-                    >
+                  <div
+                    key={pos.id}
+                    className={cn(
+                      'pt2-row',
+                      selectedIds.has(pos.id) && 'sel',
+                      entferntPending && 'pos-v3-row--entfernt'
+                    )}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetailPos(pos)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setDetailPos(pos)
+                      }
+                    }}
+                  >
+                    <div className="pt2-ctrl">
                       <label className="pos-v3-check" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -383,78 +376,73 @@ export function AuftragLeistungenV3Tab({
                           onChange={() => toggleOne(pos.id)}
                         />
                       </label>
-
-                      <div className="pos-v3-row-main">
-                        <span className="pos-v3-row-name">{pos.leistung_name}</span>
-                        <PartnerVorgangChip pos={pos} />
-                        <HandwerkerAntwortChip pos={pos} />
-                        {hwName ? (
-                          <span className="pos-v3-hw-chip">{hwName}</span>
-                        ) : !rowLocked ? (
-                          <button
-                            type="button"
-                            className="pos-v3-hw-chip pos-v3-hw-chip--action"
-                            disabled={disabled}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setZuweisungIds([pos.id])
-                            }}
-                          >
-                            <UserPlus className="h-3 w-3" />
-                            Zuweisen
-                          </button>
-                        ) : null}
-                        {zeitraum ? <span className="pos-v3-row-zeitraum">{zeitraum}</span> : null}
-                      </div>
-
-                      <div className="pos-v3-row-pricing">
-                        <span className="pos-v3-row-vk">{formatEurBetrag(vk)}</span>
-                        <span className="pos-v3-row-ek">
-                          EK {formatEurBetrag(ek)}
-                          {pct != null ? ` · ${pct} %` : ''}
-                        </span>
-                      </div>
-
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <LeistungStatusPill
-                          status={pos.leistung_status}
-                          disabled={disabled || rowLocked}
-                          onChange={(s) => updateStatus(pos, s)}
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="pos-v3-row-delete"
-                        disabled={disabled || rowLocked}
-                        aria-label={rowLocked ? 'Entfernung wartet auf Partner' : 'Leistung entfernen'}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteOne(pos)
+                    </div>
+                    <div className="pt2-main">
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexWrap: 'wrap',
                         }}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <span className="pt-name">{pos.leistung_name}</span>
+                        <HandwerkerAntwortChip pos={pos} />
+                        <PartnerVorgangChip pos={pos} />
+                      </div>
+                      {desc ? <div className="pt-desc">{desc}</div> : null}
+                      {hwName ? (
+                        <div className="pt-desc" style={{ marginTop: 2 }}>
+                          {hwName}
+                        </div>
+                      ) : null}
                     </div>
-                  </li>
+                    <div className="pt2-menge">{mengeLabel}</div>
+                    <div className="pt2-preis">{formatEurBetrag(vk)}</div>
+                    <div className="pt2-act" onClick={(e) => e.stopPropagation()}>
+                      {menu.length > 0 ? (
+                        <MockEntityRowMenu items={menu} title="Leistung" />
+                      ) : null}
+                    </div>
+                  </div>
                 )
               })}
-            </ul>
 
-            <button
-              type="button"
-              className="pos-v3-add-btn"
-              disabled={disabled}
-              onClick={() => setNewBlock(block)}
-            >
-              <Plus className="h-4 w-4" />
-              Leistung hinzufügen
-            </button>
-          </section>
-        )
-      })}
+              <button
+                type="button"
+                className="pt-add"
+                disabled={disabled}
+                onClick={() => setNewBlock(block)}
+                style={{ borderBottom: '0.5px solid var(--border)' }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Position hinzufügen
+              </button>
+            </div>
+          )
+        })}
 
-      <AuftragGewerkAddRow gewerke={gewerke} disabled={disabled} onAdd={addGewerk} />
+        <div style={{ padding: '8px 12px', borderBottom: '0.5px solid var(--border)' }}>
+          <AuftragGewerkAddRow gewerke={gewerke} disabled={disabled} onAdd={addGewerk} />
+        </div>
+
+        <div className="pt2-foot">
+          <div className="r">
+            <span>VK gesamt</span>
+            <b>{formatEurBetrag(totals.verkauf)}</b>
+          </div>
+          <div className="r">
+            <span>EK gesamt</span>
+            <b>{formatEurBetrag(totals.partner + totals.eigen)}</b>
+          </div>
+          <div className="r grand">
+            <span>
+              Marge
+              {margePct != null ? ` (${margePct} %)` : ''}
+            </span>
+            <b>{formatEurBetrag(totals.marge)}</b>
+          </div>
+        </div>
+      </div>
 
       {selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
@@ -469,7 +457,7 @@ export function AuftragLeistungenV3Tab({
             onClick={() => setZuweisungIds(Array.from(selectedIds))}
           >
             <UserPlus className="h-4 w-4" />
-            Handwerker zuweisen
+            Handwerker anfragen
           </Button>
           <Button type="button" variant="danger" size="sm" disabled={disabled} onClick={bulkDelete}>
             <Trash2 className="h-4 w-4" />
@@ -486,23 +474,6 @@ export function AuftragLeistungenV3Tab({
         </div>
       ) : null}
 
-      <div className="pos-v3-send-bar">
-        <p className="text-sm text-bw-text-muted">
-          {unsentCount > 0
-            ? `${unsentCount} Leistung${unsentCount === 1 ? '' : 'en'} zugewiesen, noch nicht gesendet`
-            : 'Keine offenen Zuweisungen zum Senden'}
-        </p>
-        <Button
-          type="button"
-          variant="primary"
-          disabled={disabled || unsentCount === 0}
-          onClick={() => setSendConfirmOpen(true)}
-        >
-          <Send className="h-4 w-4" />
-          An Handwerker senden
-        </Button>
-      </div>
-
       <AuftragLeistungDetailModal
         open={!!detailPos}
         onClose={() => setDetailPos(null)}
@@ -510,12 +481,6 @@ export function AuftragLeistungenV3Tab({
         gewerkName={detailPos?.gewerk_name ?? ''}
         disabled={disabled}
         onRemove={() => detailPos && deleteOne(detailPos)}
-        onZuweisen={() => {
-          if (detailPos) {
-            setZuweisungIds([detailPos.id])
-            setDetailPos(null)
-          }
-        }}
         onEdit={() => {
           if (detailPos) {
             setEditPos(detailPos)
@@ -550,35 +515,16 @@ export function AuftragLeistungenV3Tab({
         open={!!zuweisungIds?.length}
         onClose={() => setZuweisungIds(null)}
         auftragId={auftragId}
+        angebotId={angebotId}
+        projektName={angebotTitel}
         positionIds={zuweisungIds ?? []}
         positionen={sorted}
+        gewerke={gewerke}
         onDone={() => {
           clearSelection()
           refresh()
         }}
       />
-
-      <Modal
-        open={sendConfirmOpen}
-        onClose={() => setSendConfirmOpen(false)}
-        title="An Handwerker senden"
-        size="md"
-        footer={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setSendConfirmOpen(false)} disabled={pending}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={sendAnHandwerker} disabled={pending}>
-              Senden
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-bw-text">
-          Alle zugewiesenen Leistungen werden jetzt an die Handwerker gesendet. Sie erhalten eine
-          E-Mail und können den Auftrag bestätigen.
-        </p>
-      </Modal>
     </div>
   )
 }

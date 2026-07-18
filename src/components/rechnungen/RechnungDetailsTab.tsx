@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockProp } from '@/components/mock-ui/MockProp'
@@ -105,19 +104,10 @@ export function RechnungDetailsTab({
 
   return (
     <>
-      <MockCard title="Rechnungsdaten" icon="file-invoice">
+      <MockCard title="Rechnung" icon="file-invoice">
         <div className="props">
           <MockProp label="Nummer">{detail.rechnungsnummer?.trim() || '—'}</MockProp>
           <MockProp label="Art">{artLabel(detail, belegTyp)}</MockProp>
-          <MockProp label="Auftrag" link={Boolean(detail.auftrag_id)}>
-            {detail.auftrag_id ? (
-              <Link href={`/auftraege/${detail.auftrag_id}`}>
-                {detail.auftraege?.titel?.trim() || detail.auftrag_id.slice(0, 8).toUpperCase()}
-              </Link>
-            ) : (
-              '—'
-            )}
-          </MockProp>
           <MockProp label="Erstellt">
             {detail.rechnungsdatum
               ? formatDatum(detail.rechnungsdatum)

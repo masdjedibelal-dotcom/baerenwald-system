@@ -20,7 +20,7 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
   if (k === 'ok') {
     return (
       <MockBadge kind="aktiv">
-        <IconText icon={Check}>OK</IconText>
+        <IconText icon={Check}>Compliance OK</IconText>
       </MockBadge>
     )
   }
@@ -28,7 +28,7 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
     return (
       <span title="Dokument läuft bald ab">
         <MockBadge kind="warten">
-          <IconText icon={AlertTriangle}>Läuft ab</IconText>
+          <IconText icon={AlertTriangle}>läuft ab</IconText>
         </MockBadge>
       </span>
     )
@@ -36,13 +36,13 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
   if (k === 'unvollstaendig') {
     return (
       <MockBadge kind="warten">
-        <IconText icon={AlertTriangle}>Unvollständig</IconText>
+        <IconText icon={AlertTriangle}>Nachweis fehlt</IconText>
       </MockBadge>
     )
   }
   return (
     <MockBadge kind="storniert">
-      <IconText icon={X}>Fehlt</IconText>
+      <IconText icon={X}>Nachweis fehlt</IconText>
     </MockBadge>
   )
 }

@@ -315,7 +315,8 @@ export async function loadAngebotWizardBootstrap(
       varianten,
       kunde_objekt_id,
       gesendet_kunde_at,
-      leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ))
+      leads(plz, bereiche, situation, kundentyp,       kunden!kunde_id(typ)),
+      angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
     )
     .eq('id', angebotId)
@@ -352,6 +353,12 @@ export async function loadAngebotWizardBootstrap(
       kundentyp?: string | null
       kunden?: { typ?: string | null } | null
     } | null
+    angebot_handwerker?: {
+      gewerk_id: string
+      handwerker_id: string
+      status?: string
+      aufgabe_notiz?: string | null
+    }[] | null
   }
 
   if (ang.lead_id !== leadId) {
@@ -399,12 +406,19 @@ export async function loadAngebotWizardBootstrap(
   const variantenPersist =
     dokumentTyp === 'projekt' ? normalizeVariantenFromDb(ang.varianten) : null
 
+  const posNorm = repairAngebotPositionen(
+    rebindLooseAnfahrtPositionen(normalizeAngebotPositionen(ang.positionen))
+  )
+  const hwK = (ang.angebot_handwerker ?? []).map((z) => ({
+    gewerk_id: z.gewerk_id as string,
+    handwerker_id: z.handwerker_id as string,
+  }))
+  const positionen = mergeHandwerkerQueuesIntoPositionen(posNorm, hwK)
+
   const bootstrap: AngebotWizardBootstrap = {
     angebotId: ang.id,
     angebotsnr: ang.angebotsnr?.trim() || null,
-    positionen: repairAngebotPositionen(
-      rebindLooseAnfahrtPositionen(normalizeAngebotPositionen(ang.positionen))
-    ),
+    positionen,
     meta,
     dokumentTyp,
     projektbeschreibung: ang.projektbeschreibung?.trim() || null,

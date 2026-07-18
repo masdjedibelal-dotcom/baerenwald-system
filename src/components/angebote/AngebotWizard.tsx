@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
+import {
+  AngebotWizardHandwerkerStep,
+  buildGewerkHandwerkerZuweisungen,
+  gewerkHandwerkerZuweisungenToMaps,
+  type GewerkHandwerkerZuweisung,
+} from '@/components/angebote/AngebotWizardHandwerkerStep'
 import { WizardShell } from '@/components/layout/WizardShell'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -70,7 +76,7 @@ import {
   isDefaultAngebotEinleitung,
 } from '@/lib/templates/angebot-mail'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
-import type { Gewerk, Handwerker, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
+import type { AngebotPosition, Gewerk, Handwerker, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
 import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
 import type { ZahlfristSeg } from '@/lib/zahlfrist'
 
@@ -81,11 +87,34 @@ function kundenName(lead: LeadDetail) {
 const WIZARD_STEP_LABELS = [
   'Typ & Projekt',
   'Positionen',
+  'Handwerker',
   'Finalisieren',
   'Vorschau',
   'Versenden',
 ] as const
 const WIZARD_TOTAL_STEPS = WIZARD_STEP_LABELS.length
+
+/** Bestehende HW-Zuweisung aus Bootstrap-Positionen (handwerker_id pro Gewerk). */
+function zuweisungenFromBootstrapPositionen(
+  positionen: AngebotPosition[] | null | undefined
+): GewerkHandwerkerZuweisung[] {
+  if (!positionen?.length) return []
+  const seen = new Set<string>()
+  const out: GewerkHandwerkerZuweisung[] = []
+  for (const p of positionen) {
+    const gid = p.gewerk_id?.trim()
+    const hid = p.handwerker_id?.trim()
+    if (!gid || !hid || seen.has(gid)) continue
+    seen.add(gid)
+    out.push({
+      gewerk_id: gid,
+      gewerk_name: p.gewerk_name?.trim() || 'Gewerk',
+      handwerker_id: hid,
+      aufgabe_notiz: '',
+    })
+  }
+  return out
+}
 
 function projektLabel(lead: LeadDetail) {
   const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
@@ -106,13 +135,14 @@ function regionLabel(lead: LeadDetail): string {
 }
 
 /**
- * Angebots-Wizard 1:1 Mock v7:
- * Typ & Projekt → Positionen → Finalisieren → Vorschau → Versenden
+ * Angebots-Wizard:
+ * Typ & Projekt → Positionen → Handwerker → Finalisieren → Vorschau → Versenden
  */
 export function AngebotWizard({
   lead,
   gewerke,
   preislisten,
+  handwerker = [],
   firm: firmProp,
   bootstrap = null,
   onClose,
@@ -122,7 +152,6 @@ export function AngebotWizard({
   lead: LeadDetail
   gewerke: Gewerk[]
   preislisten: Preisliste[]
-  /** API-Kompatibilität — im Mock-Wizard ungenutzt */
   handwerker?: Handwerker[]
   firm?: FirmenEinstellungen
   kundenObjekte?: KundenObjekt[]
@@ -187,6 +216,12 @@ export function AngebotWizard({
       .map(dokumentArtikelToWizardPosition)
   )
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(() => initialZeilen)
+  const [hwZuweisungen, setHwZuweisungen] = useState<GewerkHandwerkerZuweisung[]>(() =>
+    buildGewerkHandwerkerZuweisungen(
+      initialZeilen,
+      zuweisungenFromBootstrapPositionen(bootstrap?.positionen)
+    )
+  )
   const [mitAnfahrt, setMitAnfahrt] = useState(() => findAnfahrtZeilen(initialZeilen).length > 0)
   const [meta, setMeta] = useState<AngebotWizardMeta>(() => {
     const base = bootstrap?.meta ?? defaultMeta
@@ -261,6 +296,7 @@ export function AngebotWizard({
         zahlungsplan,
         zahlfristSeg,
         zahlfristDatum,
+        hwZuweisungen,
       }),
     [
       zeilen,
@@ -272,6 +308,7 @@ export function AngebotWizard({
       zahlungsplan,
       zahlfristSeg,
       zahlfristDatum,
+      hwZuweisungen,
     ]
   )
   draftSnapshotRef.current = draftSnapshot
@@ -293,6 +330,10 @@ export function AngebotWizard({
     const hat = findAnfahrtZeilen(zeilen).length > 0
     setMitAnfahrt((prev) => (prev === hat ? prev : hat))
     setMeta((m) => (m.mit_anfahrt === hat ? m : { ...m, mit_anfahrt: hat }))
+  }, [zeilen])
+
+  useEffect(() => {
+    setHwZuweisungen((prev) => buildGewerkHandwerkerZuweisungen(zeilen, prev))
   }, [zeilen])
 
   function syncZeilenToPositions(next: DokumentZeile[]) {
@@ -395,6 +436,7 @@ export function AngebotWizard({
       }
 
       setSaving(true)
+      const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
       const res = await saveAngebotWizardDraft({
         angebotId,
         lead_id: lead.id,
@@ -408,8 +450,8 @@ export function AngebotWizard({
         wichtige_hinweise:
           dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
         varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
-        handwerker_zuweisungen: [],
-        handwerker_aufgabe_notizen: {},
+        handwerker_zuweisungen: positionQueues,
+        handwerker_aufgabe_notizen: notizenByGewerk,
         zahlungsplan:
           metaPersist.zahlungsbedingungen === 'abschlagsplan' ||
           metaPersist.zahlungsbedingungen === 'anzahlung_50'
@@ -457,6 +499,7 @@ export function AngebotWizard({
       gewerke,
       zahlfristSeg,
       zahlfristDatum,
+      hwZuweisungen,
     ]
   )
 
@@ -470,9 +513,9 @@ export function AngebotWizard({
     }
   }
 
-  /** Mock: Weiter — vor Vorschau Entwurf speichern für PDF */
+  /** Weiter — vor Vorschau Entwurf speichern für PDF */
   async function handleWeiter() {
-    if (step === 3) {
+    if (step === 4) {
       const id = await ensureDraftForPreview()
       if (!id) return
     }
@@ -822,11 +865,23 @@ export function AngebotWizard({
             onChange={onPosBoardChange}
             showUst
             gewerke={gewerkNamen}
+            preislisten={preislisten}
           />
         </>
       ) : null}
 
       {step === 3 ? (
+        <AngebotWizardHandwerkerStep
+          zeilen={zeilen}
+          gewerke={gewerke}
+          handwerker={handwerker}
+          zuweisungen={hwZuweisungen}
+          onChange={setHwZuweisungen}
+          disabled={saving}
+        />
+      ) : null}
+
+      {step === 4 ? (
         <div className="form-grid form-grid--sheet">
           <MockField label="Angebotstitel" full>
             <input
@@ -885,7 +940,7 @@ export function AngebotWizard({
         </div>
       ) : null}
 
-      {step === 4 ? (
+      {step === 5 ? (
         <AngebotWizardPdfPreview
           angebotId={angebotId}
           loading={previewLoading || saving || !angebotId}
@@ -893,7 +948,7 @@ export function AngebotWizard({
         />
       ) : null}
 
-      {step === 5 ? (
+      {step === 6 ? (
         <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>

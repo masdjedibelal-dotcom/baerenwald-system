@@ -17,7 +17,6 @@ export function AuftragLeistungDetailModal({
   pos,
   gewerkName,
   onRemove,
-  onZuweisen,
   onEdit,
   disabled,
 }: {
@@ -26,7 +25,6 @@ export function AuftragLeistungDetailModal({
   pos: AuftragPosition | null
   gewerkName: string
   onRemove: () => void
-  onZuweisen: () => void
   onEdit: () => void
   disabled?: boolean
 }) {
@@ -54,14 +52,9 @@ export function AuftragLeistungDetailModal({
           ) : null}
           <div className="ml-auto flex flex-wrap gap-2">
             {!rowLocked ? (
-              <>
-                <Button type="button" variant="secondary" onClick={onZuweisen} disabled={disabled}>
-                  Handwerker zuweisen
-                </Button>
-                <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
-                  Bearbeiten
-                </Button>
-              </>
+              <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
+                Bearbeiten
+              </Button>
             ) : (
               <Button type="button" variant="secondary" onClick={onClose}>
                 Schließen
@@ -81,8 +74,7 @@ export function AuftragLeistungDetailModal({
       <HandwerkerAntwortChip pos={pos} className="mb-3" />
       {!pos.handwerker_id ? (
         <p className="mb-3 rounded-lg border border-bw-border bg-bw-green-bg/40 px-3 py-2 text-xs text-bw-text-muted">
-          Tipp: Beim Anlegen einer neuen Leistung direkt einen Handwerker wählen — schneller als
-          nachträglich zuweisen.
+          Handwerker über das ⋯-Menü der Zeile anfragen.
         </p>
       ) : null}
       <dl className="pos-v3-detail-grid">

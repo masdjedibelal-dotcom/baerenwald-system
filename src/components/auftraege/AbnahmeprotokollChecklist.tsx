@@ -7,6 +7,8 @@ import {
   gruppiereAbnahmePunkte,
   neuerAbnahmePunktFreitext,
   neuerBulletUnterLeistung,
+  notizenFuerLeistung,
+  setNotizenFuerLeistung,
   type AbnahmeGewerkBlock,
   type AbnahmePunkt,
   type AbnahmePunktStatus,
@@ -49,6 +51,66 @@ function StatusToggle({
   )
 }
 
+function LeistungNotizen({
+  notizen,
+  onChange,
+  readOnly,
+}: {
+  notizen: string[]
+  onChange: (next: string[]) => void
+  readOnly?: boolean
+}) {
+  if (readOnly) {
+    if (!notizen.some((n) => n.trim())) return null
+    return (
+      <ul className="mt-2 space-y-1.5">
+        {notizen
+          .filter((n) => n.trim())
+          .map((n, i) => (
+            <li key={i} className="rounded-md bg-bw-bg-soft px-2.5 py-1.5 text-[12.5px] text-bw-text-mid">
+              {n}
+            </li>
+          ))}
+      </ul>
+    )
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {notizen.map((n, i) => (
+        <div key={i} className="flex items-start gap-1.5">
+          <Input
+            placeholder="Notiz zur Leistung…"
+            value={n}
+            onChange={(e) => {
+              const next = [...notizen]
+              next[i] = e.target.value
+              onChange(next)
+            }}
+            className="flex-1"
+          />
+          <button
+            type="button"
+            className="shrink-0 rounded-md p-1.5 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
+            title="Notiz löschen"
+            onClick={() => onChange(notizen.filter((_, j) => j !== i))}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-[13px] font-medium text-bw-primary hover:underline"
+        onClick={() => onChange([...notizen, ''])}
+      >
+        <Plus className="h-3.5 w-3.5" aria-hidden />
+        Notiz hinzufügen
+      </button>
+    </div>
+  )
+}
+
 export function AbnahmeprotokollChecklist({
   punkte,
   onChange,
@@ -76,6 +138,10 @@ export function AbnahmeprotokollChecklist({
     onChange([...punkte, neuerBulletUnterLeistung(block.gewerk, leistung.leistung_id, leistung.leistung_name)])
   }
 
+  function patchLeistungNotizen(leistungId: string, next: string[]) {
+    onChange(setNotizenFuerLeistung(punkte, leistungId, next))
+  }
+
   const isVorort = mode === 'vorort'
 
   return (
@@ -86,103 +152,103 @@ export function AbnahmeprotokollChecklist({
             <p className="text-[13px] font-semibold text-bw-primary">{block.gewerk}</p>
           </div>
           <div className="divide-y divide-bw-border">
-            {block.leistungen.map((leistung) => (
-              <div key={`${block.gewerk}-${leistung.leistung_id}`} className="px-3 py-3">
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-bw-text-muted">
-                  {leistung.leistung_name}
-                </p>
-                <ul className="space-y-2">
-                  {leistung.punkte.map((p) => (
-                    <li
-                      key={p.id}
-                      className={cn(
-                        'abnahme-punkt-card',
-                        isVorort && 'flex flex-wrap items-start gap-3 p-3',
-                        p.status === 'mangel' && isVorort && 'border-red-200 bg-red-50/50'
-                      )}
-                    >
-                      <div className={cn('flex gap-2', isVorort && 'w-full', !isVorort && 'w-full items-start')}>
-                        {isVorort ? (
-                          <StatusToggle
-                            value={p.status}
-                            onChange={(s) => patchPunkt(p.id, { status: s })}
-                            compact={isVorort}
-                          />
-                        ) : null}
-                        <div className="min-w-0 flex-1">
+            {block.leistungen.map((leistung) => {
+              const leistungNotizen = notizenFuerLeistung(leistung.punkte)
+              return (
+                <div key={`${block.gewerk}-${leistung.leistung_id}`} className="px-3 py-3">
+                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-bw-text-muted">
+                    {leistung.leistung_name}
+                  </p>
+                  <ul className="space-y-2">
+                    {leistung.punkte.map((p) => (
+                      <li
+                        key={p.id}
+                        className={cn(
+                          'abnahme-punkt-card',
+                          isVorort && 'flex flex-wrap items-start gap-3 p-3',
+                          p.status === 'mangel' && isVorort && 'border-red-200 bg-red-50/50'
+                        )}
+                      >
+                        <div className={cn('flex gap-2', isVorort && 'w-full', !isVorort && 'w-full items-start')}>
                           {isVorort ? (
-                            <p className="text-[14px] font-medium leading-snug text-bw-text">
-                              {p.beschreibung?.trim() || '—'}
-                            </p>
-                          ) : (
-                            <Input
-                              placeholder="Checkpunkt beschreiben…"
-                              value={p.beschreibung}
-                              onChange={(e) => patchPunkt(p.id, { beschreibung: e.target.value })}
+                            <StatusToggle
+                              value={p.status}
+                              onChange={(s) => patchPunkt(p.id, { status: s })}
+                              compact={isVorort}
                             />
-                          )}
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            {isVorort ? (
+                              <p className="text-[14px] font-medium leading-snug text-bw-text">
+                                {p.beschreibung?.trim() || '—'}
+                              </p>
+                            ) : (
+                              <Input
+                                placeholder="Checkpunkt beschreiben…"
+                                value={p.beschreibung}
+                                onChange={(e) => patchPunkt(p.id, { beschreibung: e.target.value })}
+                              />
+                            )}
+                          </div>
                           {!isVorort ? (
-                            <Input
-                              placeholder="Notiz (optional)"
-                              value={p.notiz ?? ''}
-                              onChange={(e) => patchPunkt(p.id, { notiz: e.target.value })}
-                              className="mt-2"
-                            />
-                          ) : p.notiz?.trim() ? (
-                            <p className="mt-1 text-[12px] text-bw-text-muted">{p.notiz}</p>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-md p-1.5 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
+                              title="Punkt entfernen"
+                              onClick={() => removePunkt(p.id)}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                            </button>
                           ) : null}
                         </div>
-                        {!isVorort ? (
-                          <button
-                            type="button"
-                            className="shrink-0 rounded-md p-1.5 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
-                            title="Punkt entfernen"
-                            onClick={() => removePunkt(p.id)}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden />
-                          </button>
+                        {(p.foto_urls ?? []).length > 0 ? (
+                          <div className="bt-foto-grid mt-2 w-full">
+                            {(p.foto_urls ?? []).map((url) => (
+                              <div key={url} className="bt-foto-thumb">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt="" />
+                              </div>
+                            ))}
+                          </div>
                         ) : null}
-                      </div>
-                      {(p.foto_urls ?? []).length > 0 ? (
-                        <div className="bt-foto-grid mt-2 w-full">
-                          {(p.foto_urls ?? []).map((url) => (
-                            <div key={url} className="bt-foto-thumb">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt="" />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                      {onFotoClick ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="mt-2"
-                          disabled={uploading}
-                          onClick={() => onFotoClick(p.id)}
-                        >
-                          <Camera className="mr-1 h-3 w-3" aria-hidden />
-                          Foto
-                        </Button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-                {!isVorort ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => addBullet(block, leistung)}
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
-                    Checkpunkt
-                  </Button>
-                ) : null}
-              </div>
-            ))}
+                        {onFotoClick ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="mt-2"
+                            disabled={uploading}
+                            onClick={() => onFotoClick(p.id)}
+                          >
+                            <Camera className="mr-1 h-3 w-3" aria-hidden />
+                            Foto
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <LeistungNotizen
+                    notizen={leistungNotizen}
+                    onChange={(next) => patchLeistungNotizen(leistung.leistung_id, next)}
+                    readOnly={false}
+                  />
+
+                  {!isVorort ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => addBullet(block, leistung)}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+                      Checkpunkt
+                    </Button>
+                  ) : null}
+                </div>
+              )
+            })}
           </div>
         </div>
       ))}

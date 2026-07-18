@@ -20,6 +20,7 @@ import {
   zeitraumStartIso,
   type DashboardZeitraum,
 } from '@/lib/dashboard/dashboard-analytics'
+import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
 
 export const revalidate = 60
@@ -71,7 +72,8 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
       )
     : null
 
-  const [leadsRaw, angeboteRaw, auftraegeRaw, rechnungenRaw, zuweisungenRaw] = await Promise.all([
+  const [leadsRaw, angeboteRaw, auftraegeRaw, rechnungenRaw, zuweisungenRaw, marketing] =
+    await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
@@ -137,6 +139,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
           .limit(3000)
       )
     ),
+    loadDashboardMarketing(),
   ])
 
   const leads = filterOutLegacyDemoLeads(
@@ -347,6 +350,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
       vorname={vorname}
       zeitraum={zeitraum}
       kpis={kpis}
+      marketing={marketing}
       umsatzMonate={umsatzMonate}
       funnel={funnel}
       gewerk={gewerk}

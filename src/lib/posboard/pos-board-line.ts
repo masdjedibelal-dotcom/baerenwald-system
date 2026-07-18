@@ -2,11 +2,17 @@ import { positionVkNettoStueck } from '@/lib/angebot-positionen'
 import {
   GEWERK_NAME_ALLGEMEIN,
   neueArtikelZeile,
+  neueFreitextZeile,
+  neueGesamtrabattZeile,
   type DokumentArtikelZeile,
+  type DokumentFreitextZeile,
+  type DokumentGesamtrabattZeile,
   type DokumentZeile,
   type MwstSatzOption,
 } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
+
+export type PosBoardLineKind = 'position' | 'freitext' | 'nachlass'
 
 export type PosBoardLine = {
   id: string
@@ -15,9 +21,14 @@ export type PosBoardLine = {
   beschreibung?: string
   menge: number
   einheit: string
-  /** Einzelpreis netto */
+  /** Einzelpreis netto (bei Nachlass: Wert; Modus über nachlassModus) */
   preis: number
   ust?: number
+  /** Zeilentyp — Standard Position */
+  kind?: PosBoardLineKind
+  /** Nur kind=nachlass */
+  nachlassModus?: 'prozent' | 'betrag'
+  preisliste_id?: string | null
 }
 
 export const POS_BOARD_DEFAULT_GEWERK = 'Allgemein'
@@ -41,6 +52,11 @@ export function neuePosBoardLine(partial?: Partial<PosBoardLine>): PosBoardLine 
 }
 
 export function posBoardLineNetto(line: PosBoardLine): number {
+  if (line.kind === 'freitext') return 0
+  if (line.kind === 'nachlass') {
+    // Anzeigezeile — Abzug wird dokumentweit berechnet; hier 0 für Positions-Summe
+    return 0
+  }
   return (Number(line.menge) || 0) * (Number(line.preis) || 0)
 }
 
@@ -137,7 +153,7 @@ export function posBoardLineToDokumentArtikel(
       gewerk_id: base?.gewerk_id,
       gewerk_slug: base?.gewerk_slug,
       gewerk_block_key: base?.gewerk_block_key,
-      preisliste_id: base?.preisliste_id,
+      preisliste_id: line.preisliste_id ?? base?.preisliste_id,
       kostenart: base?.kostenart,
       kostenverteilung: base?.kostenverteilung,
       rabattProzent: base?.rabattProzent ?? 0,
@@ -148,23 +164,88 @@ export function posBoardLineToDokumentArtikel(
 }
 
 export function dokumentZeilenToPosBoardLines(zeilen: DokumentZeile[]): PosBoardLine[] {
-  return zeilen
-    .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-    .map(posBoardLineFromDokumentArtikel)
+  const out: PosBoardLine[] = []
+  for (const z of zeilen) {
+    if (z.typ === 'artikel') {
+      out.push(posBoardLineFromDokumentArtikel(z))
+      continue
+    }
+    if (z.typ === 'freitext') {
+      out.push({
+        id: z.id,
+        gewerk: GEWERK_NAME_ALLGEMEIN,
+        name: z.titel?.trim() || 'Freitext',
+        beschreibung: z.text ?? '',
+        menge: 0,
+        einheit: '',
+        preis: 0,
+        ust: 0,
+        kind: 'freitext',
+      })
+      continue
+    }
+    if (z.typ === 'gesamtrabatt') {
+      out.push({
+        id: z.id,
+        gewerk: GEWERK_NAME_ALLGEMEIN,
+        name: z.bezeichnung?.trim() || 'Nachlass',
+        beschreibung: '',
+        menge: 1,
+        einheit: z.modus === 'prozent' ? '%' : '€',
+        preis: z.wert,
+        ust: 0,
+        kind: 'nachlass',
+        nachlassModus: z.modus,
+      })
+    }
+  }
+  return out
 }
 
-/** Ersetzt Artikel-Zeilen, behält Freitext/Gesamtrabatt. */
+/** Ersetzt alle PosBoard-Zeilen inkl. Freitext/Nachlass. */
 export function posBoardLinesToDokumentZeilen(
   lines: PosBoardLine[],
   existing: DokumentZeile[]
 ): DokumentZeile[] {
   const baseById = new Map<string, DokumentArtikelZeile>()
+  const freitextById = new Map<string, DokumentFreitextZeile>()
+  const rabattById = new Map<string, DokumentGesamtrabattZeile>()
   for (const z of existing) {
     if (z.typ === 'artikel') baseById.set(z.id, z)
+    if (z.typ === 'freitext') freitextById.set(z.id, z)
+    if (z.typ === 'gesamtrabatt') rabattById.set(z.id, z)
   }
-  const preserved = existing.filter((z) => z.typ !== 'artikel')
-  const artikel = lines.map((line) => posBoardLineToDokumentArtikel(line, baseById.get(line.id)))
-  const rabatt = preserved.find((z) => z.typ === 'gesamtrabatt')
-  const ohneRabatt = preserved.filter((z) => z.typ !== 'gesamtrabatt')
-  return rabatt ? [...ohneRabatt, ...artikel, rabatt] : [...ohneRabatt, ...artikel]
+
+  const out: DokumentZeile[] = []
+  let nachlass: DokumentGesamtrabattZeile | null = null
+
+  for (const line of lines) {
+    const kind = line.kind ?? 'position'
+    if (kind === 'freitext') {
+      const prev = freitextById.get(line.id)
+      out.push({
+        ...(prev ?? neueFreitextZeile()),
+        id: line.id,
+        typ: 'freitext',
+        titel: line.name?.trim() || prev?.titel || '',
+        text: line.beschreibung?.trim() || prev?.text || '',
+      })
+      continue
+    }
+    if (kind === 'nachlass') {
+      const prev = rabattById.get(line.id)
+      nachlass = {
+        ...(prev ?? neueGesamtrabattZeile()),
+        id: line.id,
+        typ: 'gesamtrabatt',
+        bezeichnung: line.name?.trim() || prev?.bezeichnung || 'Nachlass',
+        modus: line.nachlassModus ?? prev?.modus ?? 'prozent',
+        wert: Math.max(0, Number(line.preis) || 0),
+      }
+      continue
+    }
+    out.push(posBoardLineToDokumentArtikel(line, baseById.get(line.id)))
+  }
+
+  return nachlass ? [...out, nachlass] : out
 }

@@ -28,6 +28,7 @@ export function KundeAuswahlFeld({
 }: Props) {
   const [suche, setSuche] = useState('')
   const [treffer, setTreffer] = useState<Kunde[]>([])
+  const [suchen, setSuchen] = useState(false)
   const [ausgewaehlt, setAusgewaehlt] = useState<Kunde | null>(bekannterKunde ?? null)
 
   useEffect(() => {
@@ -50,10 +51,14 @@ export function KundeAuswahlFeld({
     const q = suche.trim()
     if (disabled || q.length < 2) {
       setTreffer([])
+      setSuchen(false)
       return
     }
+    setSuchen(true)
     const t = setTimeout(() => {
-      void searchKunden(q).then((r) => setTreffer(r.kunden))
+      void searchKunden(q)
+        .then((r) => setTreffer(r.kunden))
+        .finally(() => setSuchen(false))
     }, 280)
     return () => clearTimeout(t)
   }, [suche, disabled])
@@ -73,11 +78,14 @@ export function KundeAuswahlFeld({
     setTreffer([])
   }
 
+  const qLen = suche.trim().length
+  const showResults = !ausgewaehlt && qLen >= 2
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-bw-text-muted">{hint}</p>
       {ausgewaehlt ? (
-        <div className="flex items-start justify-between gap-2 rounded-lg border border-bw-primary/30 bg-bw-green-bg/40 px-3 py-2">
+        <div className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2">
           <div className="min-w-0 text-sm">
             <p className="font-medium text-bw-text">{kundeDisplayName(ausgewaehlt)}</p>
             <p className="truncate text-xs text-bw-text-muted">
@@ -98,7 +106,7 @@ export function KundeAuswahlFeld({
           ) : null}
         </div>
       ) : (
-        <div className="relative">
+        <div className="space-y-2">
           <Input
             label={label}
             name="kunde_suche"
@@ -108,13 +116,24 @@ export function KundeAuswahlFeld({
             autoComplete="off"
             disabled={disabled}
           />
-          {treffer.length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-bw-border bg-bw-card py-1 shadow-lg">
+          {/* In-flow (kein absolute) — bleibt im Modal, deckendes Weiß */}
+          {showResults ? (
+            <ul
+              className="m-0 max-h-56 list-none overflow-y-auto rounded-lg border border-[var(--border)] bg-white py-1"
+              role="listbox"
+              aria-label="Kundenvorschläge"
+            >
+              {suchen && treffer.length === 0 ? (
+                <li className="px-3 py-2.5 text-sm text-bw-text-muted">Suche…</li>
+              ) : null}
+              {!suchen && treffer.length === 0 ? (
+                <li className="px-3 py-2.5 text-sm text-bw-text-muted">Keine Kunden gefunden</li>
+              ) : null}
               {treffer.map((k) => (
-                <li key={k.id}>
+                <li key={k.id} role="option">
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-bw-hover"
+                    className="w-full border-0 bg-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--bg-soft)]"
                     onClick={() => waehle(k)}
                   >
                     <span className="font-medium text-bw-text">{kundeDisplayName(k)}</span>

@@ -23,10 +23,10 @@ import { runDuplicateAnfrage } from '@/lib/list-actions'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { AnfrageDetailsTab } from '@/components/anfragen/AnfrageDetailsTab'
+import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
@@ -87,8 +87,10 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
   if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
     return 'stammdaten'
   }
-  if (tab === 'projekt') return 'details'
+  if (tab === 'projekt' || tab === 'anfrage-details' || tab === 'anfragedetails') return 'details'
   if (tab === 'timeline') return 'verlauf'
+  const cumulative = resolveCumulativeDetailTabAlias(tab)
+  if (cumulative === 'anfrage-details') return 'details'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
   return null
 }
@@ -528,19 +530,7 @@ export function AnfrageDetailClient({
 
   const projektMetaLabel = useMemo(() => leadProjektMetaLabel(lead), [lead])
 
-  const headMeta = (
-    <>
-      <span>{projektMetaLabel}</span>
-      {lead.created_at ? (
-        <>
-          <span className="sep" aria-hidden>
-            ·
-          </span>
-          <span>Eingang {formatDatum(lead.created_at)}</span>
-        </>
-      ) : null}
-    </>
-  )
+  const headMeta = kundenName(lead)
 
   const timelineTab = (
     <MockVerlaufCard empty={timelineItems.length === 0}>
@@ -609,35 +599,24 @@ export function AnfrageDetailClient({
   return (
     <EntityDetailLayout
       phase="anfrage"
-      breadcrumbTitle={kundenName(lead)}
+      projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=anfrage"
-      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbBackLabel="Zurück zu den Suchergebnissen"
       head={{
-        title: kundenName(lead),
-        badges: (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {(() => {
-              const s = anfrageStatusDisplay(lead.status)
-              if (lead.status === 'angebot') {
-                return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{s.label}</MockBadge>
-              }
-              return <MockBadge kind={variantToMockBadgeKind(s.variant)}>{s.label}</MockBadge>
-            })()}
-            <PipelineKontextBadge
-              lead={{
-                kanal: lead.kanal,
-                auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
-                anlass: lead.anlass,
-              }}
-            />
-          </span>
-        ),
+        title: projektMetaLabel,
+        badges: (() => {
+          const s = anfrageStatusDisplay(lead.status)
+          if (lead.status === 'angebot') {
+            return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{s.label}</MockBadge>
+          }
+          return <MockBadge kind={variantToMockBadgeKind(s.variant)}>{s.label}</MockBadge>
+        })(),
         meta: headMeta,
         actions: (
-          <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              className="btn primary sm inline-flex flex-1 gap-1.5 sm:flex-none"
+              className="btn primary sm inline-flex shrink-0 gap-1.5"
               onClick={primaryCtaAction}
               disabled={pending}
             >

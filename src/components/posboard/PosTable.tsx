@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { PosAddRow, type PosAddKind } from '@/components/posboard/PosAddRow'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 
@@ -57,6 +58,7 @@ function SelectBox({ on }: { on: boolean }) {
 export function PosTable({
   groups,
   onAddItem,
+  onAddKind,
   onAddGroup,
   groupActions,
   itemActions,
@@ -71,9 +73,13 @@ export function PosTable({
   netto,
   ust,
   brutto,
+  disabledAddKinds,
 }: {
   groups: PosTableGroup[]
+  /** @deprecated Prefer onAddKind — kept for per-group fallback */
   onAddItem?: (group: PosTableGroup) => void
+  /** 4 Mock-Optionen: Freie Position · Preisliste · Freitext · Nachlass */
+  onAddKind?: (kind: PosAddKind) => void
   onAddGroup?: () => void
   groupActions?: (group: PosTableGroup) => EntityMenuItem[]
   itemActions?: (group: PosTableGroup, item: PosTableItem) => EntityMenuItem[]
@@ -88,6 +94,7 @@ export function PosTable({
   netto?: number
   ust?: number
   brutto?: number
+  disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
 }) {
   const sel = selected ?? {}
   const [dragId, setDragId] = useState<string | null>(null)
@@ -245,7 +252,7 @@ export function PosTable({
                 </div>
               )
             })}
-            {onAddItem ? (
+            {!onAddKind && onAddItem ? (
               <button
                 type="button"
                 className="pt-add"
@@ -258,6 +265,11 @@ export function PosTable({
           </div>
         )
       })}
+      {onAddKind ? (
+        <div style={{ padding: '12px 0 4px' }}>
+          <PosAddRow onAdd={onAddKind} disabledKinds={disabledAddKinds} />
+        </div>
+      ) : null}
       {onAddGroup ? (
         <button
           type="button"

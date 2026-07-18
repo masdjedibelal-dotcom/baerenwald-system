@@ -171,7 +171,7 @@ export function AngebotWizardHandwerkerStep({
     return (
       <Card title="Handwerker">
         <p className="text-sm text-bw-text-muted">
-          Bitte in Schritt 1 mindestens eine Leistung mit Gewerk erfassen.
+          Bitte zuerst Positionen mit Gewerk erfassen.
         </p>
       </Card>
     )

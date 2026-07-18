@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
-import { Check } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { AuftragBaustelleScreen } from '@/components/auftraege/AuftragBaustelleScreen'
 import { Button } from '@/components/ui/Button'
@@ -12,20 +11,26 @@ import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import {
-  downloadAbschlussdokumentationPdf,
   finalizeAbschlussdokumentationOhneMail,
   getAbschlussdokumentationMailDefaults,
   getAbschlussdokuVorschau,
   previewAbschlussdokumentationMail,
   sendAbschlussdokumentationAnKunde,
+  type AbschlussVersandAuswahl,
   type AbschlussdokuOptionen,
 } from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
-import { downloadPdfFromBase64 } from '@/lib/download-pdf-base64'
-import { ABSCHLUSS_PROTOKOLL_TITEL } from '@/lib/auftraege/abschlussdokumentation-labels'
 import { defaultAbschlussdokumentationNachricht } from '@/lib/mail/abschlussdokumentation-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { cn } from '@/lib/utils'
 
+type VersandDoc = {
+  key: keyof AbschlussVersandAuswahl
+  label: string
+  ready: boolean
+  hint: string
+}
+
+/** Modal „Auftrag abschließen“ mit Auswahl An Kunde versenden. */
 export function AbschlussdokumentationModal({
   open,
   onClose,
@@ -48,14 +53,21 @@ export function AbschlussdokumentationModal({
     bautagebuchCount: 0,
     fotoCount: 0,
     hasAbnahme: false,
+    hasAbschlussbericht: false,
     hasRechnung: false,
     rechnungsnummer: null as string | null,
     hasKundeEmail: false,
+    abschlussUrl: null as string | null,
   })
-  const [optionen, setOptionen] = useState<AbschlussdokuOptionen>({
-    mitBautagebuch: false,
-    mitFotos: false,
-    mitPreisen: false,
+  const [optionen] = useState<AbschlussdokuOptionen>({
+    mitBautagebuch: true,
+    mitFotos: true,
+    mitPreisen: true,
+  })
+  const [versand, setVersand] = useState<AbschlussVersandAuswahl>({
+    abnahmeprotokoll: false,
+    abschlussbericht: false,
+    rechnung: false,
   })
   const [anrede, setAnrede] = useState<AngebotMailAnrede>('sie')
   const [projektTitel, setProjektTitel] = useState(kundeName)
@@ -72,11 +84,11 @@ export function AbschlussdokumentationModal({
     setMailReady(false)
     void getAbschlussdokuVorschau(auftragId).then((v) => {
       setVorschau(v)
-      setOptionen((o) => ({
-        ...o,
-        mitBautagebuch: v.bautagebuchCount > 0,
-        mitFotos: v.fotoCount > 0,
-      }))
+      setVersand({
+        abnahmeprotokoll: v.hasAbnahme,
+        abschlussbericht: v.hasAbschlussbericht,
+        rechnung: v.hasRechnung,
+      })
     })
     void getAbschlussdokumentationMailDefaults(auftragId).then((r) => {
       if (!r.ok) return
@@ -127,256 +139,190 @@ export function AbschlussdokumentationModal({
     )
   }
 
-  function downloadPdf() {
-    startTransition(async () => {
-      const r = await downloadAbschlussdokumentationPdf(auftragId, optionen)
-      if (!r.ok) toast.error(r.message)
-      else {
-        downloadPdfFromBase64(r.pdfBase64, r.filename)
-        toast.success('PDF erstellt')
-      }
-    })
-  }
+  const docs: VersandDoc[] = [
+    {
+      key: 'abnahmeprotokoll',
+      label: 'Abnahmeprotokoll',
+      ready: vorschau.hasAbnahme,
+      hint: 'Noch nicht signiert — wird nicht mitgesendet',
+    },
+    {
+      key: 'abschlussbericht',
+      label: 'Abschlussbericht',
+      ready: vorschau.hasAbschlussbericht,
+      hint: 'Noch nicht erstellt — wird nicht mitgesendet',
+    },
+    {
+      key: 'rechnung',
+      label: vorschau.rechnungsnummer
+        ? `Rechnung (${vorschau.rechnungsnummer})`
+        : 'Rechnung',
+      ready: vorschau.hasRechnung,
+      hint: 'Noch nicht erstellt — wird nicht mitgesendet',
+    },
+  ]
 
-  function abschlussBereit(): boolean {
-    return true
-  }
+  const selectedReady = docs.filter((d) => d.ready && versand[d.key])
+  const willSendMail = selectedReady.length > 0 && mailReady && mailTo.length > 0
 
-  function senden() {
-    if (!betreff.trim() || !nachricht.trim()) {
+  function abschliessenUndVersenden() {
+    if (willSendMail && (!betreff.trim() || !nachricht.trim())) {
       toast.error('Bitte Betreff und Nachricht ausfüllen.')
       return
     }
-    if (!mailTo.length) {
+    if (willSendMail && !mailTo.length) {
       toast.error('Bitte mindestens eine Empfänger-Adresse in An angeben.')
       return
     }
+
     startTransition(async () => {
-      const r = await sendAbschlussdokumentationAnKunde(auftragId, optionen, {
-        betreff,
-        nachricht,
-        anrede,
-        to: mailTo,
-        cc: mailCc.length ? mailCc : undefined,
-      })
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Gesendet — Auftrag abgeschlossen')
+      if (!willSendMail) {
+        const r = await finalizeAbschlussdokumentationOhneMail(auftragId)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        const skipped = docs.filter((d) => !d.ready).map((d) => d.label)
+        toast.success(
+          skipped.length
+            ? `Auftrag abgeschlossen (ohne Versand — fehlt: ${skipped.join(', ')})`
+            : 'Auftrag abgeschlossen'
+        )
         onDone()
         onClose()
+        return
       }
+
+      const r = await sendAbschlussdokumentationAnKunde(
+        auftragId,
+        optionen,
+        {
+          betreff,
+          nachricht,
+          anrede,
+          to: mailTo,
+          cc: mailCc.length ? mailCc : undefined,
+        },
+        {
+          abnahmeprotokoll: versand.abnahmeprotokoll && vorschau.hasAbnahme,
+          abschlussbericht: versand.abschlussbericht && vorschau.hasAbschlussbericht,
+          rechnung: versand.rechnung && vorschau.hasRechnung,
+        }
+      )
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      if (r.closedWithoutMail || r.sentLabels.length === 0) {
+        toast.success('Auftrag abgeschlossen (keine Unterlagen versendet)')
+      } else {
+        toast.success(`Abgeschlossen & versendet: ${r.sentLabels.join(', ')}`)
+      }
+      onDone()
+      onClose()
     })
   }
-
-  function abschliessenOhneMail() {
-    startTransition(async () => {
-      const r = await finalizeAbschlussdokumentationOhneMail(auftragId)
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Auftrag abgeschlossen')
-        onDone()
-        onClose()
-      }
-    })
-  }
-
-  const pdfOptionen = (
-    [
-      vorschau.bautagebuchCount > 0
-        ? (['mitBautagebuch', `${ABSCHLUSS_PROTOKOLL_TITEL} einschließen`] as const)
-        : null,
-      vorschau.fotoCount > 0 ? (['mitFotos', 'Fotos einschließen'] as const) : null,
-      ['mitPreisen', 'Preise anzeigen (intern)'] as const,
-    ] as const
-  ).filter(Boolean) as ReadonlyArray<readonly [keyof AbschlussdokuOptionen, string]>
-
-  const checklist = [
-    {
-      ok: true,
-      label: '1. Auftrag abschließen',
-      hint: 'Optional: Abschluss-PDF erstellen oder an den Kunden senden',
-    },
-    {
-      ok: vorschau.hasAbnahme,
-      label: 'Abnahmeprotokoll (optional)',
-      hint: vorschau.hasAbnahme ? undefined : 'Nur bei Bedarf — z. B. über Karte „Abnahmeprotokoll“',
-      muted: !vorschau.hasAbnahme,
-    },
-    {
-      ok: vorschau.hasRechnung,
-      label: vorschau.rechnungsnummer
-        ? `Rechnung (${vorschau.rechnungsnummer}) — nach Abschluss`
-        : 'Rechnung erstellen — nach Abschluss',
-      hint: vorschau.hasRechnung
-        ? 'Wird bei Kundenversand mitgeschickt, falls vorhanden'
-        : 'Als nächster Schritt im Auftrag anlegen',
-      muted: !vorschau.hasRechnung,
-    },
-    ...(vorschau.hasKundeEmail
-      ? [
-          {
-            ok: abschlussBereit(),
-            label: 'Abschlussdokumentation per E-Mail (optional)',
-            hint: vorschau.hasRechnung
-              ? vorschau.hasAbnahme
-                ? 'E-Mail mit PDFs: Abnahme → Rechnung → Abschluss'
-                : 'E-Mail mit PDFs: Rechnung → Abschluss'
-              : vorschau.hasAbnahme
-                ? 'E-Mail mit PDFs: Abnahme → Abschluss (Rechnung folgt danach)'
-                : 'E-Mail mit Abschluss-PDF (Rechnung folgt danach)',
-          },
-        ]
-      : []),
-    { ok: true, label: 'Projektübersicht im Abschluss-PDF' },
-    ...(vorschau.bautagebuchCount > 0
-      ? [
-          {
-            ok: optionen.mitBautagebuch,
-            label: `${ABSCHLUSS_PROTOKOLL_TITEL} (${vorschau.bautagebuchCount} Einträge)`,
-            muted: !optionen.mitBautagebuch,
-          },
-        ]
-      : []),
-    {
-      ok: vorschau.positionenCount > 0,
-      label: `Alle Positionen (${vorschau.positionenCount})`,
-    },
-    ...(vorschau.fotoCount > 0
-      ? [
-          {
-            ok: optionen.mitFotos,
-            label: `Fotos (${vorschau.fotoCount})`,
-            muted: !optionen.mitFotos,
-          },
-        ]
-      : []),
-  ]
 
   const flowFooter = (
     <ModalFormFooter
       onCancel={onClose}
-      onSubmit={senden}
-      submitLabel="Senden & abschließen"
+      onSubmit={abschliessenUndVersenden}
+      submitLabel="Abschließen & versenden"
       loading={pending}
-      submitDisabled={!abschlussBereit() || !mailReady}
+      submitDisabled={false}
       extra={
-        <>
-          <Button
-            type="button"
-            variant="primary"
-            className="w-full md:w-auto"
-            loading={pending}
-            onClick={abschliessenOhneMail}
-          >
-            Abschließen
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full md:w-auto"
-            loading={pending}
-            disabled={!abschlussBereit()}
-            onClick={downloadPdf}
-          >
-            PDF herunterladen
-          </Button>
-        </>
+        willSendMail ? null : (
+          <p className="w-full text-[11px] text-bw-text-muted md:w-auto">
+            Ohne fertige Unterlagen / E-Mail wird nur abgeschlossen.
+          </p>
+        )
       }
     />
   )
 
   const body = (
     <>
-      <p className="mb-3 text-sm text-bw-text-muted">
-        Abschluss für <strong>{kundeName}</strong>. Bautagebuch, Abnahme, Abschluss-PDF und E-Mail sind optional —
-        du kannst den Auftrag auch direkt abschließen. Die Rechnung legst du danach als nächsten Schritt im Auftrag
-        an.
+      <p className="mb-4 text-sm text-bw-text-muted">
+        Auftrag für <strong>{kundeName}</strong> abschließen. Wähle, welche fertigen Unterlagen
+        an den Kunden gehen — fehlende bleiben deaktiviert.
       </p>
 
-      <p className="mb-3 text-sm font-semibold text-bw-text">Ablauf & Inhalt</p>
-      <ul className="mb-4 space-y-1.5">
-        {checklist.map((c) => (
-          <li
-            key={c.label}
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+        An Kunde versenden
+      </p>
+      <div className="mb-5 space-y-2 rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
+        {docs.map((d) => (
+          <label
+            key={d.key}
             className={cn(
-              'flex flex-col gap-0.5 text-[13px]',
-              'muted' in c && c.muted ? 'text-bw-text-muted' : 'text-bw-text'
+              'flex flex-col gap-0.5 rounded-md px-2 py-2 text-sm',
+              d.ready ? 'text-bw-text' : 'text-bw-text-muted opacity-80'
             )}
           >
             <span className="flex items-center gap-2">
-              <Check
-                className={cn(
-                  'h-4 w-4 shrink-0',
-                  c.ok ? 'text-emerald-600' : 'text-bw-border'
-                )}
-                aria-hidden
+              <input
+                type="checkbox"
+                disabled={!d.ready || pending}
+                checked={d.ready && versand[d.key]}
+                onChange={(e) =>
+                  setVersand((v) => ({ ...v, [d.key]: e.target.checked }))
+                }
               />
-              {c.label}
+              <span className="font-medium">{d.label}</span>
             </span>
-            {'hint' in c && c.hint && !c.ok ? (
-              <span className="pl-6 text-[11px] text-bw-text-muted">{c.hint}</span>
+            {!d.ready ? (
+              <span className="pl-6 text-[11px] text-bw-text-muted">{d.hint}</span>
             ) : null}
-          </li>
-        ))}
-      </ul>
-
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">PDF-Optionen</p>
-      <div className="mb-5 space-y-2">
-        {pdfOptionen.map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={optionen[key]}
-              onChange={(e) => setOptionen((o) => ({ ...o, [key]: e.target.checked }))}
-            />
-            {label}
           </label>
         ))}
       </div>
 
       {mailReady ? (
         <div className="border-t border-bw-border pt-4 space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kunden (optional)</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+            E-Mail an Kunden
+          </p>
 
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-1.5">
-            <input type="radio" checked={anrede === 'sie'} onChange={() => onAnredeChange('sie')} />
-            Sie
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" checked={anrede === 'du'} onChange={() => onAnredeChange('du')} />
-            Du
-          </label>
-        </div>
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-1.5">
+              <input type="radio" checked={anrede === 'sie'} onChange={() => onAnredeChange('sie')} />
+              Sie
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="radio" checked={anrede === 'du'} onChange={() => onAnredeChange('du')} />
+              Du
+            </label>
+          </div>
 
-        <AngebotWizardVersandEmpfaengerCard
-          mailTo={mailTo}
-          onMailToChange={setMailTo}
-          mailCc={mailCc}
-          onMailCcChange={setMailCc}
-          disabled={pending}
-          dokumentLabel="Abschlussdokumentation"
-        />
+          <AngebotWizardVersandEmpfaengerCard
+            mailTo={mailTo}
+            onMailToChange={setMailTo}
+            mailCc={mailCc}
+            onMailCcChange={setMailCc}
+            disabled={pending}
+            dokumentLabel="Abschluss"
+          />
 
-        <Input label="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
-        <Textarea
-          label="Nachricht"
-          plain
-          rows={7}
-          value={nachricht}
-          onChange={(e) => setNachricht(e.target.value)}
-          hint="Begrüßung und Google-Bewertung werden automatisch ergänzt — hier den Haupttext anpassen."
-        />
+          <Input label="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+          <Textarea
+            label="Nachricht"
+            plain
+            rows={6}
+            value={nachricht}
+            onChange={(e) => setNachricht(e.target.value)}
+            hint="Begrüßung und Google-Bewertung werden automatisch ergänzt."
+          />
 
-        {previewHtml ? (
-          <CollapsibleMailPreview previewHtml={previewHtml} />
-        ) : mailReady ? (
-          <p className="text-center text-[13px] text-bw-text-muted py-4">Vorschau wird geladen…</p>
-        ) : null}
+          {previewHtml ? (
+            <CollapsibleMailPreview previewHtml={previewHtml} />
+          ) : (
+            <p className="py-3 text-center text-[13px] text-bw-text-muted">Vorschau wird geladen…</p>
+          )}
         </div>
       ) : (
         <p className="border-t border-bw-border pt-4 text-sm text-bw-text-muted">
-          Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Du kannst den Auftrag trotzdem abschließen.
+          Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Du kannst den Auftrag trotzdem
+          abschließen.
         </p>
       )}
     </>
@@ -384,14 +330,14 @@ export function AbschlussdokumentationModal({
 
   if (presentation === 'flow') {
     return (
-      <AuftragBaustelleScreen auftragId={auftragId} title="Abschlussdokumentation" footer={flowFooter}>
+      <AuftragBaustelleScreen auftragId={auftragId} title="Auftrag abschließen" footer={flowFooter}>
         {body}
       </AuftragBaustelleScreen>
     )
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Abschlussdokumentation" size="lg" footer={flowFooter}>
+    <Modal open={open} onClose={onClose} title="Auftrag abschließen" size="lg" footer={flowFooter}>
       {body}
     </Modal>
   )

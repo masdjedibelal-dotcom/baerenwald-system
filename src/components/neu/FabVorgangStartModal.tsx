@@ -154,7 +154,7 @@ export function FabVorgangStartModal({
       open={open}
       onClose={() => !pending && onClose()}
       title={TITEL[art]}
-      size="md"
+      size="lg"
     >
       {step === 1 ? (
         <div className="space-y-4">

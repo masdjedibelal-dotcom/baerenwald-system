@@ -83,6 +83,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   kundeName: string | null
   wertLabel: string | null
   detailHref: string
+  /** Handwerker an Auftragspositionen dieses Vorgangs (für Detail-`restrictHandwerker`). */
+  handwerkerIds?: string[]
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

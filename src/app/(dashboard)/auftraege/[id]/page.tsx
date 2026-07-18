@@ -11,7 +11,9 @@ import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/act
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
-import type { Lead, Preisliste, LeadTimelineRow } from '@/lib/types'
+import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
+import { loadAngebotDetail } from '@/lib/angebote/load-angebot-detail'
+import type { Lead, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
   'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, bereiche, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at'
@@ -72,7 +74,7 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       | 'created_at'
     > | null = null
 
-    const [leadTimeline, projektKontext] = await Promise.all([
+    const [leadTimeline, projektKontext, leadDetail, angebotDetail] = await Promise.all([
       detail.lead_id
         ? (async () => {
             const [{ data: tlByLead }, { data: leadRow }] = await Promise.all([
@@ -95,12 +97,20 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         kundeId: detail.kunde_id,
         angebotId: detail.angebot_id,
       }),
+      detail.lead_id
+        ? loadAnfrageDetail(supabase, detail.lead_id).then((d) => d as LeadDetail | null)
+        : Promise.resolve(null),
+      detail.angebot_id
+        ? loadAngebotDetail(supabase, detail.angebot_id)
+        : Promise.resolve(null),
     ])
 
     return (
       <AuftragDetailClient
         detail={detail}
         lead={lead}
+        leadDetail={leadDetail}
+        angebotDetail={angebotDetail}
         gewerke={(gwRes.data ?? []) as { id: string; name: string; slug: string }[]}
         preislisten={(plRes.data ?? []) as Preisliste[]}
         leadTimeline={leadTimeline}

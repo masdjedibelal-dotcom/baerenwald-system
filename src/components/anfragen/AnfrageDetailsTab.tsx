@@ -14,7 +14,6 @@ import {
 import {
   isEchterFreitext,
   kundentypLabel,
-  resolveLeadKunde,
   resolveLeadPreisAnzeige,
   zeitraumLabel,
 } from '@/lib/lead-display-helpers'
@@ -41,7 +40,7 @@ import {
   type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
 import type { Gewerk, LeadDetail } from '@/lib/types'
-import { BEREICH_LABELS, formatDatum, formatDatumZeit, KANAL_LABELS, kanalLabel } from '@/lib/utils'
+import { BEREICH_LABELS, formatDatum, formatDatumZeit } from '@/lib/utils'
 
 function projektTitel(lead: LeadDetail): string {
   const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
@@ -51,16 +50,6 @@ function projektTitel(lead: LeadDetail): string {
   const sit = leadSituationDisplay(lead.situation)
   if (sit) return sit
   return 'Anfrage'
-}
-
-function regionLabel(lead: LeadDetail): string {
-  const kunde = resolveLeadKunde(lead.kunden)
-  const ort = (kunde?.ort ?? '').trim()
-  const plz = (kunde?.plz ?? lead.plz ?? '').trim()
-  if (ort && plz) return `${ort} · ${plz}`
-  if (ort) return ort
-  if (plz) return plz
-  return '—'
 }
 
 function beschreibungFromLead(lead: LeadDetail): string | null {
@@ -92,11 +81,10 @@ function resolveZeitraumAnzeige(
   return fromLead || null
 }
 
-/** Live-Funnel-Props für Projekt-Übersicht (zusätzlich zum Mock-Kern). */
-function buildFunnelExtraRows(lead: LeadDetail): {
+/** Bedarf aus Funnel — ohne Region/Quelle (Stammdaten) und ohne Verkaufspreise. */
+function buildBedarfExtraRows(lead: LeadDetail): {
   extraRows: ProjektUebersichtExtraRow[]
   footerRows: ProjektUebersichtExtraRow[]
-  quelle: string | null
 } {
   let norm
   try {
@@ -108,7 +96,6 @@ function buildFunnelExtraRows(lead: LeadDetail): {
       footerRows: lead.created_at
         ? [{ label: 'Eingegangen', children: formatDatumZeit(lead.created_at) }]
         : [],
-      quelle: kanalLabel(lead.kanal) || null,
     }
   }
 
@@ -199,17 +186,12 @@ function buildFunnelExtraRows(lead: LeadDetail): {
     extraRows.push({ label: 'Zustand', children: norm.labels.zustand })
   }
 
-  const quelle =
-    lead.kanal === 'website' && norm.labels.funnel_quelle
-      ? `${KANAL_LABELS[lead.kanal] ?? lead.kanal} · ${norm.labels.funnel_quelle}`
-      : kanalLabel(lead.kanal) || null
-
   const footerRows: ProjektUebersichtExtraRow[] = []
   if (lead.created_at) {
     footerRows.push({ label: 'Eingegangen', children: formatDatumZeit(lead.created_at) })
   }
 
-  return { extraRows, footerRows, quelle }
+  return { extraRows, footerRows }
 }
 
 function gewerkLabel(zeile: ProjektWasZeile, gewerke: Gewerk[]): string {
@@ -275,7 +257,7 @@ function initialWasZeilen(lead: LeadDetail, gewerke: Gewerk[]): ProjektWasZeile[
   }))
 }
 
-/** Anfrage Details: Mock-Kern + Live-Funnel-Props + PosBoard Leistungen. */
+/** Anfrage: nur Bedarf (Funnel) + ungepreiste Wunschliste. */
 export function AnfrageDetailsTab({
   lead,
   gewerke = [],
@@ -334,17 +316,18 @@ export function AnfrageDetailsTab({
     lead.funnel_daten
   )
 
-  const funnelUi = useMemo(() => buildFunnelExtraRows(lead), [lead])
+  const bedarfUi = useMemo(() => buildBedarfExtraRows(lead), [lead])
 
   return (
     <>
       <EntityProjektUebersichtCard
-        title="Anfragedetails"
+        title="Anfrage"
+        icon="inbox"
         initial={{
           titel: projektTitel(lead),
           beschreibung: beschreibungFromLead(lead) ?? '',
-          startDatum: lead.zeitraum_von?.slice(0, 10) ?? '',
-          endDatum: lead.zeitraum_bis?.slice(0, 10) ?? '',
+          startDatum: '',
+          endDatum: '',
           istBauprojekt: false,
         }}
         editableFields={['beschreibung']}
@@ -353,15 +336,13 @@ export function AnfrageDetailsTab({
           if (r.ok) onSaved?.()
           return r
         }}
-        region={regionLabel(lead)}
         preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
-        quelle={funnelUi.quelle}
-        extraRows={funnelUi.extraRows}
-        footerRows={funnelUi.footerRows}
+        extraRows={bedarfUi.extraRows}
+        footerRows={bedarfUi.footerRows}
       />
 
       <PosBoard
-        title="Leistungen"
+        title="Wunschliste"
         positionen={positionen}
         onChange={onPosBoardChange}
         showUst={false}

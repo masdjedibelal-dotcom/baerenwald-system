@@ -1,5 +1,10 @@
 /** Spec §3 — einheitliche Detail-Tabs (Anzeige-Labels). */
 
+import {
+  CUMULATIVE_DETAIL_LABEL,
+  CUMULATIVE_DETAIL_TAB,
+} from '@/lib/entity-detail/cumulative-detail-tabs'
+
 export const ENTITY_DETAIL_TAB_LABELS = {
   stammdaten: 'Stammdaten',
   details: 'Details',
@@ -13,6 +18,10 @@ export const ENTITY_DETAIL_TAB_LABELS = {
   leistung: 'Leistungen',
   positionen: 'Positionen',
   aktivitaet: 'Aktivität',
+  [CUMULATIVE_DETAIL_TAB.anfrage]: CUMULATIVE_DETAIL_LABEL.anfrage,
+  [CUMULATIVE_DETAIL_TAB.angebot]: CUMULATIVE_DETAIL_LABEL.angebot,
+  [CUMULATIVE_DETAIL_TAB.auftrag]: CUMULATIVE_DETAIL_LABEL.auftrag,
+  [CUMULATIVE_DETAIL_TAB.rechnung]: CUMULATIVE_DETAIL_LABEL.rechnung,
 } as const
 
 /** Legacy-Tab-ID → Spec-Label (Wave 1: nur Label-Mapping, keine ID-Umbenennung). */
@@ -32,6 +41,10 @@ export function entityDetailTabLabel(tabId: string): string {
     uebersicht: ENTITY_DETAIL_TAB_LABELS.uebersicht,
     zahlplan: ENTITY_DETAIL_TAB_LABELS.zahlplan,
     bautagebuch: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
+    [CUMULATIVE_DETAIL_TAB.anfrage]: CUMULATIVE_DETAIL_LABEL.anfrage,
+    [CUMULATIVE_DETAIL_TAB.angebot]: CUMULATIVE_DETAIL_LABEL.angebot,
+    [CUMULATIVE_DETAIL_TAB.auftrag]: CUMULATIVE_DETAIL_LABEL.auftrag,
+    [CUMULATIVE_DETAIL_TAB.rechnung]: CUMULATIVE_DETAIL_LABEL.rechnung,
   }
   return map[tabId] ?? tabId
 }

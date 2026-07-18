@@ -101,7 +101,7 @@ export function buildEntityMenu(
       label: linkLabel,
       onClick: () => {
         if (h.onPortalLink) h.onPortalLink()
-        else toast.success(linkLabel.replace(' versenden', ' versendet'))
+        else toast.error(`${linkLabel} ist hier nicht verfügbar`)
       },
     })
   }
@@ -155,7 +155,7 @@ export function buildEntityMenu(
       A.push({ icon: 'file-pencil', label: 'Angebot korrigieren', onClick: h.onEditAngebot })
     }
     if (h.onComplete && laufend) {
-      A.push({ icon: 'checks', label: 'Abschlussdokumentation', onClick: h.onComplete })
+      A.push({ icon: 'checks', label: 'Auftrag abschließen', onClick: h.onComplete })
     }
     if (h.onInvoice && (abschluss || laufend)) {
       A.push({ icon: 'file-invoice', label: 'Rechnung erstellen', onClick: h.onInvoice })

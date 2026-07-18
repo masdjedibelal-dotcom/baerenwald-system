@@ -6,6 +6,8 @@ import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
+import { loadAngebotDetail } from '@/lib/angebote/load-angebot-detail'
+import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
 import type { Gewerk, LeadDetail, LeadTimelineRow, Preisliste, Rechnung } from '@/lib/types'
 
 export default async function RechnungDetailPage({ params }: { params: { id: string } }) {
@@ -49,6 +51,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
   })
 
   const leadId = projektKontext.lead?.id ?? null
+  const angebotId = rec.angebot_id ?? projektKontext.angebote[0]?.id ?? null
+  const auftragId = rec.auftrag_id ?? projektKontext.auftrag?.id ?? null
 
   let pipelineLead: {
     kanal?: string | null
@@ -58,24 +62,41 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
   let lead: LeadDetail | null = null
   let timeline: LeadTimelineRow[] = []
 
-  if (leadId) {
-    const [leadDetail, tlRes, leadPipe] = await Promise.all([
-      loadAnfrageDetail(supabase, leadId),
-      supabase
-        .from('lead_timeline')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('leads')
-        .select('kanal, auftraggeber_kunde_id, anlass')
-        .eq('id', leadId)
-        .maybeSingle(),
-    ])
-    lead = leadDetail as LeadDetail | null
-    timeline = (tlRes.data ?? []) as LeadTimelineRow[]
-    if (leadPipe.data) pipelineLead = leadPipe.data
-  }
+  const [leadBundle, angebotDetail, auftragDetail] = await Promise.all([
+    leadId
+      ? Promise.all([
+          loadAnfrageDetail(supabase, leadId),
+          supabase
+            .from('lead_timeline')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('leads')
+            .select('kanal, auftraggeber_kunde_id, anlass')
+            .eq('id', leadId)
+            .maybeSingle(),
+        ]).then(([leadDetail, tlRes, leadPipe]) => ({
+          lead: leadDetail as LeadDetail | null,
+          timeline: (tlRes.data ?? []) as LeadTimelineRow[],
+          pipelineLead: leadPipe.data ?? null,
+        }))
+      : Promise.resolve({
+          lead: null as LeadDetail | null,
+          timeline: [] as LeadTimelineRow[],
+          pipelineLead: null as {
+            kanal?: string | null
+            auftraggeber_kunde_id?: string | null
+            anlass?: string | null
+          } | null,
+        }),
+    angebotId ? loadAngebotDetail(supabase, angebotId) : Promise.resolve(null),
+    auftragId ? loadAuftragDetail(auftragId) : Promise.resolve(null),
+  ])
+
+  lead = leadBundle.lead
+  timeline = leadBundle.timeline
+  pipelineLead = leadBundle.pipelineLead
 
   return (
     <RechnungDetailClient
@@ -88,6 +109,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       projektKontext={projektKontext}
       pipelineLead={pipelineLead}
       lead={lead}
+      angebotDetail={angebotDetail}
+      auftragDetail={auftragDetail}
       timeline={timeline}
     />
   )

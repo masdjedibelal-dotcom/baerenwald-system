@@ -40,12 +40,12 @@ import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
 import { AngebotDetailsTab } from '@/components/angebote/AngebotDetailsTab'
+import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
+import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import {
-  betragAnzeige,
   addDaysYmd,
   heuteYmd,
   kundeNameAusAngebot,
@@ -58,6 +58,7 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
   AngebotDetail,
   Gewerk,
+  Handwerker,
   LeadDetail,
   LeadDokumentRow,
   LeadNotizRow,
@@ -67,6 +68,8 @@ import type {
 import { formatDatum, formatTimelineStamp } from '@/lib/utils'
 import {
   darfAngebotAnKundeSenden,
+  hatAngebotHandwerker,
+  handwerkerAnfrageErledigt,
   handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
@@ -94,9 +97,19 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
   if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
     return 'stammdaten'
   }
-  if (tab === 'positionen' || tab === 'leistung') return 'details'
+  if (
+    tab === 'positionen' ||
+    tab === 'leistung' ||
+    tab === 'angebot-details' ||
+    tab === 'anfrage' ||
+    tab === 'anfrage-details'
+  ) {
+    return 'details'
+  }
   if (tab === 'aktivitaet') return 'verlauf'
   if (tab === 'kommunikation') return 'notizen'
+  const cumulative = resolveCumulativeDetailTabAlias(tab)
+  if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'details'
   if (ANGEBOT_DETAIL_TAB_IDS.has(tab as AngebotDetailTab)) return tab as AngebotDetailTab
   return null
 }
@@ -108,6 +121,7 @@ export function AngebotDetailPageClient({
   gewerke,
   wizardPreislisten,
   wizardFirm,
+  wizardHandwerker = [],
   lead,
   kiVisualisierungen: _kiVisualisierungen = [],
   projektKontext,
@@ -118,6 +132,7 @@ export function AngebotDetailPageClient({
   gewerke: Gewerk[]
   wizardPreislisten: Preisliste[]
   wizardFirm: FirmenEinstellungen
+  wizardHandwerker?: Handwerker[]
   lead: LeadDetail | null
   kiVisualisierungen?: import('@/lib/visualize/types').KiVisualisierung[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
@@ -153,6 +168,15 @@ export function AngebotDetailPageClient({
     const tab = resolveAngebotDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
   }, [searchParams, detail.id, router])
+
+  useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : ''
+    if (hash !== 'angebot-versand-handwerker' && hash !== 'handwerker-partner') return
+    const t = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [detail.id, detail.angebot_handwerker])
 
   const orgFreigabeStatus = lead?.org_freigabe_status ?? null
 
@@ -352,7 +376,6 @@ export function AngebotDetailPageClient({
     })
   }, [detail, dokumenteRows, lead?.id])
 
-  const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
   const projektTitel = useMemo(
     () =>
       angebotTitelOderSituationBereich({
@@ -363,17 +386,7 @@ export function AngebotDetailPageClient({
       }),
     [detail, lead?.situation, lead?.bereiche]
   )
-  const headMeta = (
-    <span className="text-sm text-bw-text-muted">
-      {[
-        kundeName !== projektTitel ? kundeName : null,
-        betragLabel || null,
-        detail.gueltig_bis ? `gültig bis ${formatDatum(detail.gueltig_bis)}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')}
-    </span>
-  )
+  const headMeta = kundeName
 
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail = kunde?.email?.trim() ?? ''
@@ -393,6 +406,23 @@ export function AngebotDetailPageClient({
       handwerkerSendenBlockierHinweis(detail.angebot_handwerker ?? [], orgFreigabeStatus) ||
         'Angebot kann derzeit nicht an den Kunden gesendet werden.'
     )
+  }
+
+  function openHandwerkerAnfragen() {
+    const rows = detail.angebot_handwerker ?? []
+    if (!hatAngebotHandwerker(rows)) {
+      if (kannBearbeiten && detail.lead_id && lead) {
+        toast.info('Bitte zuerst Handwerker im Angebots-Wizard zuweisen.')
+        openWizardBearbeiten()
+        return
+      }
+      toast.error('Keine Handwerker zugewiesen — Angebot im Wizard bearbeiten.')
+      return
+    }
+    const el =
+      document.getElementById('angebot-versand-handwerker') ??
+      document.getElementById('handwerker-partner')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   function openAcceptModal() {
@@ -426,7 +456,7 @@ export function AngebotDetailPageClient({
       Boolean(auftragId)
     const versendet = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
-    return entityMenuToActionItems(
+    const baseItems = entityMenuToActionItems(
       buildEntityMenu(
         'angebot',
         {
@@ -499,6 +529,21 @@ export function AngebotDetailPageClient({
       ),
       (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
     )
+
+    if (erledigt || statusEinfach !== 'entwurf') return baseItems
+
+    const out: typeof baseItems = []
+    for (const item of baseItems) {
+      out.push(item)
+      if (item !== 'sep' && item.label === 'Bearbeiten') {
+        out.push({
+          label: 'Handwerker anfragen',
+          icon: mockMenuIcon('send', 15),
+          onClick: openHandwerkerAnfragen,
+        })
+      }
+    }
+    return out
   }, [
     kannBearbeiten,
     kannVersenden,
@@ -519,20 +564,23 @@ export function AngebotDetailPageClient({
   ])
 
   const detailPrimaryBtnClass =
-    'btn primary sm inline-flex flex-1 justify-center gap-1.5 sm:flex-none md:flex-none'
+    'btn primary sm inline-flex shrink-0 justify-center gap-1.5'
 
   const primaryAction = (() => {
     const hwRows = detail.angebot_handwerker ?? []
     if (statusEinfach === 'entwurf') {
-      if (!darfAngebotAnKundeSenden(hwRows, detail.status)) {
+      if (hatAngebotHandwerker(hwRows) && !darfAngebotAnKundeSenden(hwRows, detail.status)) {
+        const label = handwerkerAnfrageErledigt(hwRows)
+          ? 'Partner-Einreichung prüfen'
+          : 'Handwerker anfragen'
         return (
           <button
             type="button"
             className={detailPrimaryBtnClass}
             disabled={pending}
-            onClick={openAngebotVersandModal}
+            onClick={openHandwerkerAnfragen}
           >
-            Angebot versenden
+            {label}
             <MockIcon ctx="btn" n="send" size={14} />
           </button>
         )
@@ -665,30 +713,18 @@ export function AngebotDetailPageClient({
   return (
     <EntityDetailLayout
       phase="angebot"
-      breadcrumbTitle={projektTitel && projektTitel !== '—' ? projektTitel : kundeName}
+      projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=angebot"
-      crumbBackLabel="Zurück zu den Vorgängen"
-      crumbSectionLabel="Angebote"
+      crumbBackLabel="Zurück zu den Suchergebnissen"
       className="space-y-4 pb-0"
       head={{
         title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
         badges: (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
-            {lead ? (
-              <PipelineKontextBadge
-                lead={{
-                  kanal: lead.kanal,
-                  auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
-                  anlass: lead.anlass,
-                }}
-              />
-            ) : null}
-          </span>
+          <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
         ),
         meta: headMeta,
         actions: (
-          <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {primaryAction}
             <ActionsMenu
               trigger={
@@ -730,12 +766,22 @@ export function AngebotDetailPageClient({
         onKundeSent={() => refresh()}
       />
 
+      <AngebotHandwerkerPartnerSection
+        detail={detail}
+        auftragId={auftragId}
+        bruttoMin={summenMail.bruttoMin}
+        bruttoMax={summenMail.bruttoMax}
+        positionen={detail.positionen ?? []}
+        gueltigBis={gueltigBisYmd}
+      />
+
       {wizardOpen && lead ? (
         <AngebotWizard
           key={wizardSessionKey}
           lead={lead}
           gewerke={gewerke}
           preislisten={wizardPreislisten}
+          handwerker={wizardHandwerker}
           firm={wizardFirm}
           bootstrap={wizardBootstrap}
           onClose={closeWizard}
