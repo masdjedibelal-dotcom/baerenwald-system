@@ -47,16 +47,17 @@ export default async function RechnungNeuPage({
     bootstrap = loaded.bootstrap
   } else if (kundeId) {
     const k = await loadRechnungWizardKunde(kundeId)
-    if (k.ok) {
-      bootstrap = {
-        ...buildStandaloneRechnungWizardBootstrap(firm),
-        kundeId: k.kunde.id,
-        kunde: k.kunde,
-        meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
-          kundeTyp: k.kunde.typ,
-          firm,
-        }),
-      }
+    if (!k.ok) {
+      redirect(`/rechnungen?err=${encodeURIComponent(k.message)}`)
+    }
+    bootstrap = {
+      ...buildStandaloneRechnungWizardBootstrap(firm),
+      kundeId: k.kunde.id,
+      kunde: k.kunde,
+      meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
+        kundeTyp: k.kunde.typ,
+        firm,
+      }),
     }
   }
 

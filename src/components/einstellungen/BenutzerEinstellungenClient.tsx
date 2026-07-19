@@ -206,7 +206,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                         },
                         {
                           icon: 'mail',
-                          label: 'E-Mail schreiben',
+                          label: 'Mail schreiben',
                           onClick: () => {
                             if (u.email) window.open(`mailto:${u.email}`)
                           },

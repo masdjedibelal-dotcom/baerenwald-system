@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { confirmDelete } from '@/components/ui/confirm-delete'
-import { toast } from '@/components/ui/app-toast'
 
 export type EntityMenuType =
   | 'anfrage'
@@ -24,10 +23,17 @@ export type EntityMenuItem =
 export type EntityMenuHandlers = {
   onEdit?: () => void
   onCopy?: () => void
+  /** Admin-Impersonation / Admin Login */
   onPortal?: () => void
+  /** Portal-Einladungsmail (Kunden-/Handwerker-/Partner-Link versenden) */
   onPortalLink?: () => void
   onStatus?: (kind: 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren') => void
   onAngebot?: () => void
+  /** Kunde / Handwerker: Pipeline anlegen */
+  onCreateAnfrage?: () => void
+  onCreateAngebot?: () => void
+  onCreateAuftrag?: () => void
+  onCreateRechnung?: () => void
   onAccept?: () => void
   onPdf?: () => void
   onSend?: () => void
@@ -47,6 +53,13 @@ export type EntityMenuHandlers = {
   onCall?: () => void
   onMail?: () => void
   extra?: EntityMenuItem[]
+}
+
+/** Kanonische Portal-Link-Labels — überall gleich. */
+export function portalLinkMenuLabel(type: EntityMenuType): string {
+  if (type === 'handwerker') return 'Handwerker-Link versenden'
+  if (type === 'partner') return 'Partner-Link versenden'
+  return 'Kundenportal-Link versenden'
 }
 
 type EntityLike = {
@@ -87,23 +100,35 @@ export function buildEntityMenu(
   if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
   if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
 
-  /* Portal-Aktionen ohne Sep davor — wie Mock-Screenshot (Gruppe mit Bearbeiten/Kopieren) */
+  /* Portal-Aktionen ohne Sep davor — Gruppe mit Bearbeiten/Kopieren */
   if (h.onPortal) {
     A.push({ icon: 'external-link', label: 'Admin Login', onClick: h.onPortal })
-    const linkLabel =
-      type === 'handwerker'
-        ? 'Handwerker-Link versenden'
-        : type === 'partner'
-          ? 'Partner-Link versenden'
-          : 'Kundenportal-Link versenden'
+  }
+  if (h.onPortalLink) {
+    const linkLabel = portalLinkMenuLabel(type)
     A.push({
       icon: 'send',
       label: linkLabel,
-      onClick: () => {
-        if (h.onPortalLink) h.onPortalLink()
-        else toast.error(`${linkLabel} ist hier nicht verfügbar`)
-      },
+      onClick: h.onPortalLink,
     })
+  }
+
+  if (type === 'kunde' || type === 'handwerker') {
+    const before = A.length
+    A.push('sep')
+    if (h.onCreateAnfrage) {
+      A.push({ icon: 'inbox', label: 'Neue Anfrage', onClick: h.onCreateAnfrage })
+    }
+    if (h.onCreateAngebot) {
+      A.push({ icon: 'file-invoice', label: 'Neues Angebot', onClick: h.onCreateAngebot })
+    }
+    if (h.onCreateAuftrag) {
+      A.push({ icon: 'briefcase', label: 'Neuer Auftrag', onClick: h.onCreateAuftrag })
+    }
+    if (h.onCreateRechnung) {
+      A.push({ icon: 'receipt', label: 'Neue Rechnung', onClick: h.onCreateRechnung })
+    }
+    if (A.length === before + 1) A.pop()
   }
 
   if (type === 'anfrage' && h.onStatus) {

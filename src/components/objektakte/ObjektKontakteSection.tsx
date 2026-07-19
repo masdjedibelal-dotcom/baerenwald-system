@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { Mail, Pencil, Phone, Plus, Trash2, UserRound } from 'lucide-react'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -17,6 +19,7 @@ import {
   OBJEKT_KONTAKT_ROLLE_LABELS,
   OBJEKT_KONTAKT_ROLLEN,
 } from '@/lib/objektakte/labels'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { ObjektKontakt, ObjektKontaktInput, ObjektKontaktRolle } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
@@ -24,6 +27,8 @@ const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.map((r) => ({
   value: r,
   label: OBJEKT_KONTAKT_ROLLE_LABELS[r],
 }))
+
+const COLS = 'minmax(0, 1.3fr) 120px minmax(0, 1.2fr) 44px'
 
 export function ObjektKontakteSection({
   kundeId,
@@ -133,76 +138,97 @@ export function ObjektKontakteSection({
     })
   }
 
+  function rowMenuItems(k: ObjektKontakt): EntityMenuItem[] {
+    return [
+      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openBearbeiten(k) },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => {
+          if (pending) return
+          entfernen(k)
+        },
+      },
+    ]
+  }
+
   return (
     <>
       <MockCard
         collapsible
-        title={
-          <>
-            <UserRound className="inline h-4 w-4 text-bw-primary" aria-hidden /> Kontakte vor Ort
-          </>
-        }
+        title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
+        icon="user"
         actions={
-          <button type="button" className="btn ghost sm gap-1" onClick={openNeu}>
-            <Plus className="h-3.5 w-3.5" aria-hidden />
+          <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
             Hinzufügen
-          </button>
+          </MockBtn>
         }
       >
-        <p className="mb-3 text-[12px] text-bw-text-muted">
+        <p className="mb-3 text-[12px]" style={{ color: 'var(--text-3)' }}>
           Hausmeister, Beirat, Notfallkontakte — für die Disposition.
         </p>
         {liste.length === 0 ? (
-          <p className="text-[13px] text-bw-text-muted">Noch keine Kontakte hinterlegt.</p>
+          <MockEmpty icon="user" title="Noch keine Kontakte" hint="Kontakt hinzufügen" />
         ) : (
-          <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
-            {liste.map((k) => (
-              <li key={k.id} className="flex gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-bw-text">{k.name}</span>
-                    <span className="rounded bg-bw-muted px-1.5 py-0.5 text-[10px] font-medium text-bw-text-muted">
+          <div className="listcard">
+            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
+              <div>Name</div>
+              <div>Rolle</div>
+              <div>Kontakt</div>
+              <div />
+            </div>
+            {liste.map((k) => {
+              const kontaktZeile = [k.telefon?.trim(), k.email?.trim()].filter(Boolean).join(' · ') || '—'
+              return (
+                <div key={k.id} className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
+                  <div className="lc-title" style={{ fontWeight: 600 }}>
+                    {k.name}
+                    {k.notiz ? (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 400,
+                          color: 'var(--text-3)',
+                          marginTop: 2,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={k.notiz}
+                      >
+                        {k.notiz}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="lc-pills">
+                    <span className="pill-tag" style={{ cursor: 'default' }}>
                       {OBJEKT_KONTAKT_ROLLE_LABELS[k.rolle]}
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
-                    {k.telefon ? (
-                      <a href={`tel:${k.telefon}`} className="inline-flex items-center gap-1 text-bw-link">
-                        <Phone className="h-3 w-3" aria-hidden />
-                        {k.telefon}
-                      </a>
-                    ) : null}
-                    {k.email ? (
-                      <a href={`mailto:${k.email}`} className="inline-flex items-center gap-1 text-bw-link">
-                        <Mail className="h-3 w-3" aria-hidden />
-                        {k.email}
-                      </a>
-                    ) : null}
+                  <div
+                    style={{
+                      color: 'var(--text-2)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={kontaktZeile}
+                  >
+                    {kontaktZeile}
                   </div>
-                  {k.notiz ? <p className="mt-1 text-[12px] text-bw-text-muted">{k.notiz}</p> : null}
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    aria-label="Bearbeiten"
-                    onClick={() => openBearbeiten(k)}
+                  <div
+                    className="row-actions always"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ justifyContent: 'flex-end' }}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost sm text-danger"
-                    aria-label="Löschen"
-                    disabled={pending}
-                    onClick={() => entfernen(k)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                    <MockEntityRowMenu items={rowMenuItems(k)} title="Kontakt" />
+                  </div>
                 </div>
-              </li>
-            ))}
-          </ul>
+              )
+            })}
+          </div>
         )}
       </MockCard>
 

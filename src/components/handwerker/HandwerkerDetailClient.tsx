@@ -39,6 +39,7 @@ import {
   updateHandwerker,
   updateHandwerkerNotizen,
   getPartnerPortalLoginHint,
+  setHandwerkerPortalGesperrt,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
@@ -59,6 +60,10 @@ import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateHandwerker } from '@/lib/list-actions'
+import {
+  FabVorgangStartModal,
+  type FabVorgangArt,
+} from '@/components/neu/FabVorgangStartModal'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
@@ -172,6 +177,32 @@ export function HandwerkerDetailClient({
   const [hasPortalAccount, setHasPortalAccount] = useState(false)
   const isCrmAdmin = useIsCrmAdmin()
   const [impersonating, setImpersonating] = useState(false)
+  const [vorgangArt, setVorgangArt] = useState<FabVorgangArt | null>(null)
+  const [portalGesperrtPending, setPortalGesperrtPending] = useState(false)
+  const [istPortalGesperrt, setIstPortalGesperrt] = useState(Boolean(hw.ist_portal_gesperrt))
+
+  useEffect(() => {
+    setIstPortalGesperrt(Boolean(hw.ist_portal_gesperrt))
+  }, [hw.id, hw.ist_portal_gesperrt])
+
+  function togglePortalGesperrt() {
+    const next = !istPortalGesperrt
+    const label = next
+      ? 'Partner vom Portal ausschließen? Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
+      : 'Portal-Ausschluss aufheben? Login und Registrierung sind danach wieder möglich.'
+    if (!confirm(label)) return
+    setPortalGesperrtPending(true)
+    void setHandwerkerPortalGesperrt(hw.id, next).then((r) => {
+      setPortalGesperrtPending(false)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setIstPortalGesperrt(next)
+      toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
+      router.refresh()
+    })
+  }
 
   const legacyKontakt = normalizeHandwerkerNamen(hw)
   const [formFirma, setFormFirma] = useState(legacyKontakt.firma)
@@ -394,19 +425,25 @@ export function HandwerkerDetailClient({
   }, [portalModalOpen, portalText, hw.id])
 
   const handwerkerMenuItems = useMemo(() => {
-    const extra: import('@/lib/entity-menu').EntityMenuItem[] = []
-    if (!isCrmAdmin) {
-      extra.push({
-        icon: 'send',
-        label: 'Handwerker-Link versenden',
-        onClick: () => void openPortalModal(),
-      })
-    }
-    extra.push('sep', {
-      icon: 'file-pencil',
-      label: 'Rahmenvertrag',
-      onClick: () => void openRahmenvertrag(),
-    })
+    const extra: import('@/lib/entity-menu').EntityMenuItem[] = [
+      'sep',
+      {
+        icon: 'file-pencil',
+        label: 'Rahmenvertrag',
+        onClick: () => void openRahmenvertrag(),
+      },
+      'sep',
+      {
+        icon: istPortalGesperrt ? 'check' : 'shield-x',
+        label: istPortalGesperrt ? 'Portal-Ausschluss aufheben' : 'Vom Portal ausschließen',
+        danger: !istPortalGesperrt,
+        hint: portalGesperrtPending ? 'Speichere…' : undefined,
+        onClick: () => {
+          if (portalGesperrtPending) return
+          togglePortalGesperrt()
+        },
+      },
+    ]
 
     const items = buildEntityMenu(
       'handwerker',
@@ -427,29 +464,59 @@ export function HandwerkerDetailClient({
                 toast.error('Kein Portal-Account')
                 return
               }
+              if (istPortalGesperrt) {
+                toast.error('Partner ist vom Portal ausgeschlossen — Zugang gesperrt.')
+                return
+              }
               if (impersonating) {
                 toast.error('Anmeldung läuft bereits…')
                 return
               }
               setImpersonating(true)
+              // Popup sofort im User-Gesture öffnen — sonst blockiert der Browser ab dem 2. Partner.
+              const popup = window.open('about:blank', '_blank')
               void openPortalAsHandwerker(hw.id).then((r) => {
                 setImpersonating(false)
                 if (!r.ok) {
+                  popup?.close()
                   toast.error(r.message)
                   return
                 }
-                window.open(r.url, '_blank', 'noopener,noreferrer')
+                if (popup) {
+                  popup.location.href = r.url
+                } else {
+                  window.location.assign(r.url)
+                }
               })
             }
           : undefined,
-        onPortalLink: () => void openPortalModal(),
+        onPortalLink: () => {
+          if (istPortalGesperrt) {
+            toast.error('Partner ist vom Portal ausgeschlossen — Zugang gesperrt.')
+            return
+          }
+          void openPortalModal()
+        },
+        onCreateAnfrage: () => setVorgangArt('anfrage'),
+        onCreateAngebot: () => setVorgangArt('angebot'),
+        onCreateAuftrag: () => setVorgangArt('auftrag'),
+        onCreateRechnung: () => setVorgangArt('rechnung'),
         tel: hw.telefon,
         mail: hw.email,
         extra,
       }
     )
     return entityMenuToActionItems(items, (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size))
-  }, [hw, isCrmAdmin, hasPortalAccount, impersonating, router, openRahmenvertrag])
+  }, [
+    hw,
+    isCrmAdmin,
+    hasPortalAccount,
+    impersonating,
+    router,
+    openRahmenvertrag,
+    istPortalGesperrt,
+    portalGesperrtPending,
+  ])
 
   const uebersichtInhalt = (
     <div className="space-y-5">
@@ -799,6 +866,14 @@ export function HandwerkerDetailClient({
         badges={
           <>
             <ComplianceBadge status={hw.compliance_status} />
+            {istPortalGesperrt ? (
+              <MockBadge kind="storniert">
+                <span className="inline-flex items-center gap-1">
+                  <MockIcon ctx="default" n="shield-x" size={10} />
+                  Portal gesperrt
+                </span>
+              </MockBadge>
+            ) : null}
             <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
               <span className="inline-flex items-center gap-1">
                 <MockIcon
@@ -905,6 +980,12 @@ export function HandwerkerDetailClient({
           />
         </ClientOnly>
       ) : null}
+
+      <FabVorgangStartModal
+        open={vorgangArt != null}
+        art={vorgangArt}
+        onClose={() => setVorgangArt(null)}
+      />
     </>
   )
 }

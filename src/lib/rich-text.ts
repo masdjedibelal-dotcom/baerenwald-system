@@ -127,6 +127,18 @@ export function richTextToSafePdfHtml(text: string | null | undefined): string {
   return safe
 }
 
+/** Plain-Text — Leerzeichen/Zwischenstand für Editoren erhalten (kein trim). */
+export function richTextToEditablePlain(html: string | null | undefined): string {
+  const raw = html ?? ''
+  if (!raw) return ''
+  if (!looksLikeHtml(raw)) return raw
+  if (typeof document === 'undefined') {
+    return raw.replace(/<[^>]+>/g, ' ')
+  }
+  const doc = new DOMParser().parseFromString(raw, 'text/html')
+  return doc.body.textContent ?? ''
+}
+
 /** Plain-Text für Vorschau / Suche. */
 export function richTextToPlain(html: string | null | undefined): string {
   const raw = (html ?? '').trim()

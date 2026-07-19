@@ -212,7 +212,7 @@ export function FormulareListeClient({
                         },
                         {
                           icon: 'copy',
-                          label: 'Duplizieren',
+                          label: 'Kopieren',
                           onClick: () => onDuplizieren(f),
                         },
                         'sep',

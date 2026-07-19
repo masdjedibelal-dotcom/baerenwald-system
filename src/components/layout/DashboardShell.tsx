@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { TopBar } from '@/components/layout/TopBar'
 import { MockNeuPopover } from '@/components/layout/MockNeuPopover'
-import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { DemoModeBanner } from '@/components/dashboard/DemoModeBanner'
 import { ToastProvider } from '@/components/ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -24,16 +23,12 @@ export function DashboardShell({
   const [neuOpen, setNeuOpen] = useState(false)
   const [sbCollapsed, setSbCollapsed] = useState(false)
 
-  function openSearch() {
-    document.dispatchEvent(new Event('open-search'))
-  }
-
   return (
     <div className={cn('app', sbCollapsed && 'sb-collapsed')}>
       <Sidebar collapsed={sbCollapsed} onCollapsedChange={setSbCollapsed} user={user} />
 
       <div className="main">
-        <TopBar user={user} onSearchOpen={openSearch} />
+        <TopBar user={user} />
 
         <main className="page">
           <div className="page-inner">
@@ -58,7 +53,6 @@ export function DashboardShell({
       </div>
 
       <MockNeuPopover open={neuOpen} onClose={() => setNeuOpen(false)} />
-      <GlobalSearch />
       <ToastProvider />
     </div>
   )

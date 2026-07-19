@@ -32,6 +32,7 @@ export default async function KundeDetailPage({ params }: { params: Promise<{ id
   return (
     <div>
       <KundeDetailClient
+        key={id}
         kunde={kunde}
         customFieldDefs={customFieldDefs}
         customValues={customValues}

@@ -1079,7 +1079,7 @@ export function AngebotWizardPositionen({
         <PosAddRow
           onAdd={(kind) => {
             if (kind === 'position') {
-              addZeile(neueArtikelZeile({ bezeichnung: 'Neue Position', ...artikelPartial() }))
+              addZeile(neueArtikelZeile({ bezeichnung: '', ...artikelPartial() }))
               return
             }
             if (kind === 'preisliste') {

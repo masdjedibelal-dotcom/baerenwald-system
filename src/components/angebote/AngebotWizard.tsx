@@ -21,6 +21,7 @@ import { PosTotals } from '@/components/posboard/PosTotals'
 import { toast } from '@/components/ui/app-toast'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import {
+  finalizeAngebotWizardWithoutMail,
   saveAngebotWizardDraft,
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
@@ -436,47 +437,53 @@ export function AngebotWizard({
       }
 
       setSaving(true)
-      const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
-      const res = await saveAngebotWizardDraft({
-        angebotId,
-        lead_id: lead.id,
-        kunde_id: kundeId,
-        positionen: dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
-        artikelFuerPreislisteSync: artikelA,
-        meta: metaPersist,
-        dokument_typ: dokumentTyp,
-        projektbeschreibung: projektbeschreibung.trim() || null,
-        fotos_urls: projektFotos,
-        wichtige_hinweise:
-          dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
-        varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
-        handwerker_zuweisungen: positionQueues,
-        handwerker_aufgabe_notizen: notizenByGewerk,
-        zahlungsplan:
-          metaPersist.zahlungsbedingungen === 'abschlagsplan' ||
-          metaPersist.zahlungsbedingungen === 'anzahlung_50'
-            ? zahlungsplan
-            : null,
-        auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
-      })
-      setSaving(false)
-      if (!res.ok) {
-        toast.error(res.message)
+      try {
+        const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
+        const res = await saveAngebotWizardDraft({
+          angebotId,
+          lead_id: lead.id,
+          kunde_id: kundeId,
+          positionen: dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
+          artikelFuerPreislisteSync: artikelA,
+          meta: metaPersist,
+          dokument_typ: dokumentTyp,
+          projektbeschreibung: projektbeschreibung.trim() || null,
+          fotos_urls: projektFotos,
+          wichtige_hinweise:
+            dokumentTyp === 'projekt' ? wichtigeHinweisePersist.trim() || null : undefined,
+          varianten: dokumentTyp === 'projekt' ? variantenPersist : null,
+          handwerker_zuweisungen: positionQueues,
+          handwerker_aufgabe_notizen: notizenByGewerk,
+          zahlungsplan:
+            metaPersist.zahlungsbedingungen === 'abschlagsplan' ||
+            metaPersist.zahlungsbedingungen === 'anzahlung_50'
+              ? zahlungsplan
+              : null,
+          auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          return null
+        }
+        setAngebotId(res.angebotId)
+        setMeta(metaPersist)
+        savedSnapshotRef.current = draftSnapshotRef.current
+        setDraftDirty(false)
+        onSaved?.(res.angebotId)
+        if (opts?.notify) {
+          toast.success(
+            res.angebotsnr?.trim()
+              ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+              : 'Entwurf gespeichert'
+          )
+        }
+        return res.angebotId
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
+      } finally {
+        setSaving(false)
       }
-      setAngebotId(res.angebotId)
-      setMeta(metaPersist)
-      savedSnapshotRef.current = draftSnapshotRef.current
-      setDraftDirty(false)
-      onSaved?.(res.angebotId)
-      if (opts?.notify) {
-        toast.success(
-          res.angebotsnr?.trim()
-            ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-            : 'Entwurf gespeichert'
-        )
-      }
-      return res.angebotId
     },
     [
       angebotId,
@@ -515,11 +522,16 @@ export function AngebotWizard({
 
   /** Weiter — vor Vorschau Entwurf speichern für PDF */
   async function handleWeiter() {
-    if (step === 3) {
-      const id = await ensureDraftForPreview()
-      if (!id) return
+    if (saving || previewLoading) return
+    try {
+      if (step === 3) {
+        const id = await ensureDraftForPreview()
+        if (!id) return
+      }
+      setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
     }
-    setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
   }
 
   function handleRequestClose() {
@@ -532,6 +544,31 @@ export function AngebotWizard({
     onClose()
   }
 
+  async function handleFinishErstellen() {
+    setSaving(true)
+    try {
+      const id = await persistDraft({ notify: false })
+      if (!id) return
+      const res = await finalizeAngebotWizardWithoutMail(id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        res.angebotsnr?.trim()
+          ? `Angebot ${res.angebotsnr.trim()} erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+          : `Angebot erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleFinishVersenden() {
     const recipients =
       mailTo.length > 0
@@ -540,36 +577,38 @@ export function AngebotWizard({
           ? [email]
           : []
     if (!recipients.length) {
-      toast.error('Keine Kunden-E-Mail hinterlegt — Versand nicht möglich.')
+      toast.error('Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Nutze „Erstellen“ ohne Mail.')
       return
     }
     setSaving(true)
-    const id = await persistDraft({ notify: false })
-    if (!id) {
+    try {
+      const id = await persistDraft({ notify: false })
+      if (!id) return
+      const res = await sendAngebotWizard({
+        angebotId: id,
+        lead_id: lead.id,
+        mailTo: recipients,
+        mailCc,
+        betreff: mailBetreff.trim() || undefined,
+        auftragKorrektur: istAuftragKorrektur,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        istAuftragKorrektur
+          ? 'Korrektur gespeichert und an den Kunden versendet'
+          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
+    } finally {
       setSaving(false)
-      return
     }
-    const res = await sendAngebotWizard({
-      angebotId: id,
-      lead_id: lead.id,
-      mailTo: recipients,
-      mailCc,
-      betreff: mailBetreff.trim() || undefined,
-      auftragKorrektur: istAuftragKorrektur,
-    })
-    setSaving(false)
-    if (!res.ok) {
-      toast.error(res.message)
-      return
-    }
-    toast.success(
-      istAuftragKorrektur
-        ? 'Korrektur gespeichert und an den Kunden versendet'
-        : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
-    )
-    onDone?.(id)
-    onClose()
-    router.refresh()
   }
 
   function patchTitel(v: string) {
@@ -605,7 +644,7 @@ export function AngebotWizard({
   const wizardDesktopActions = (
     <div className="wizard-nav-actions">
       {step > 1 ? (
-        <MockBtn kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)}>
+        <MockBtn kind="ghost" icon="chevron-left" disabled={saving} onClick={() => setStep((s) => s - 1)}>
           Zurück
         </MockBtn>
       ) : null}
@@ -616,12 +655,19 @@ export function AngebotWizard({
           disabled={saving || previewLoading}
           onClick={() => void handleWeiter()}
         >
-          Weiter
+          {saving || previewLoading ? 'Speichern…' : 'Weiter'}
         </MockBtn>
       ) : (
-        <MockBtn kind="primary" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
-          {finishLabel}
-        </MockBtn>
+        <>
+          {!istAuftragKorrektur ? (
+            <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+              {saving ? 'Erstellen…' : 'Erstellen'}
+            </MockBtn>
+          ) : null}
+          <MockBtn kind="primary" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
+            {finishLabel}
+          </MockBtn>
+        </>
       )}
     </div>
   )
@@ -630,7 +676,14 @@ export function AngebotWizard({
     step < WIZARD_TOTAL_STEPS ? (
       <>
         {step > 1 ? (
-          <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="chevron-left"
+            disabled={saving}
+            onClick={() => setStep((s) => s - 1)}
+            title="Zurück"
+          />
         ) : null}
         <MockBtn
           sm
@@ -638,12 +691,24 @@ export function AngebotWizard({
           disabled={saving || previewLoading}
           onClick={() => void handleWeiter()}
         >
-          Weiter
+          {saving || previewLoading ? '…' : 'Weiter'}
         </MockBtn>
       </>
     ) : (
       <>
-        <MockBtn sm kind="ghost" icon="chevron-left" onClick={() => setStep((s) => s - 1)} title="Zurück" />
+        <MockBtn
+          sm
+          kind="ghost"
+          icon="chevron-left"
+          disabled={saving}
+          onClick={() => setStep((s) => s - 1)}
+          title="Zurück"
+        />
+        {!istAuftragKorrektur ? (
+          <MockBtn sm kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+            Erstellen
+          </MockBtn>
+        ) : null}
         <MockBtn
           sm
           kind="primary"

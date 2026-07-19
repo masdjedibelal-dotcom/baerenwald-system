@@ -16,7 +16,7 @@ import { parseEmailTokens } from '@/lib/email-recipients'
 
 /**
  * Modal „Kundenportal-Link versenden“:
- * Vorschau + An/CC/Betreff/Text + Versenden (MeinBärenwald-Einladung).
+ * Vorschau + An/CC/Betreff/Text + Versenden (Kundenportal-Link).
  */
 export function KundenportalLinkVersendenModal({
   open,
@@ -119,7 +119,7 @@ export function KundenportalLinkVersendenModal({
       onClose={onClose}
       icon="send"
       title="Kundenportal-Link versenden"
-      sub="MeinBärenwald-Einladung mit Vorschau"
+      sub="Einladung mit Login-Link und Vorschau"
       footer={
         <>
           <MockBtn sm kind="ghost" onClick={onClose} disabled={sending}>

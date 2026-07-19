@@ -3,6 +3,7 @@
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailTabBar } from '@/components/ui/detail-tab-bar'
 import { AppDetailScreen } from '@/components/layout/app'
@@ -10,7 +11,7 @@ import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockEmpty } from '@/components/mock-ui'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailProp } from '@/components/ui/detail-prop'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -20,6 +21,8 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicatePartner } from '@/lib/list-actions'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
 
 type PartnerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
@@ -39,6 +42,7 @@ export function PartnerDetailClient({
   kategorien: PartnerKategorie[]
 }) {
   const { refresh } = useCrmRefresh()
+  const router = useRouter()
   const isMobile = useIsMobile()
   const [partner, setPartner] = useState(initial)
   const [editOpen, setEditOpen] = useState(false)
@@ -65,25 +69,25 @@ export function PartnerDetailClient({
     .filter(Boolean)
     .join(' · ')
 
-  const partnerMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil', 16),
-        onClick: () => setEditOpen(true),
-      },
-    ]
-    if (partner.email?.trim()) {
-      items.push({
-        label: 'Mail schreiben',
-        icon: mockMenuIcon('mail', 16),
-        onClick: () => {
-          window.location.href = `mailto:${partner.email}`
+  const partnerMenuItems = useMemo(() => {
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'partner',
+        {
+          name: partner.name,
+          tel: partner.telefon,
+          mail: partner.email,
         },
-      })
-    }
-    return items
-  }, [partner.email])
+        {
+          onEdit: () => setEditOpen(true),
+          onCopy: () => runDuplicatePartner(partner.id, router),
+          tel: partner.telefon,
+          mail: partner.email?.trim() || null,
+        }
+      ),
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
+  }, [partner, router])
 
   async function savePartner() {
     if (!edit) return

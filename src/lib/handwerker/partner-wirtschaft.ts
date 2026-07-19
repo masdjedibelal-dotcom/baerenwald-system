@@ -28,9 +28,6 @@ export type PartnerWirtschaftSnapshot = {
   offenesVolumen: number
   aktiveEinsaetze: number
   anfragenGesamt: number
-  neueAnfragen: number
-  angebote: number
-  auftraege: number
   monate: PartnerUmsatzMonat[]
   gewerke: PartnerGewerkVolumen[]
 }
@@ -124,7 +121,6 @@ export function buildPartnerWirtschaft(
 ): PartnerWirtschaftSnapshot {
   const { start, end, months } = kundeWirtschaftBounds(zeitraum, now)
   const auftraege = payload.auftraege ?? []
-  const angeboteAll = payload.angebotZuweisungen ?? []
 
   const events = auftraege
     .filter((a) => a.auftrag_status !== 'storniert')
@@ -152,19 +148,6 @@ export function buildPartnerWirtschaft(
   const aktiv = auftraege.filter((a) => isAktiv(a.auftrag_status))
   const offenesVolumen = aktiv.reduce((s, a) => s + (Number(a.vereinbarter_preis) || 0), 0)
 
-  const neueAnfragen =
-    zeitraum === 'all'
-      ? auftraege.length
-      : auftraege.filter((a) => inBounds(a.created_at, start, end)).length
-  const angebote =
-    zeitraum === 'all'
-      ? angeboteAll.length
-      : angeboteAll.filter((a) => inBounds(a.created_at, start, end)).length
-  const auftraegeCount =
-    zeitraum === 'all'
-      ? aktiv.length
-      : aktiv.filter((a) => inBounds(a.created_at, start, end)).length
-
   const gewerkMap = new Map<string, number>()
   for (const a of auftraege) {
     if (a.auftrag_status === 'storniert') continue
@@ -191,10 +174,7 @@ export function buildPartnerWirtschaft(
     umsatzDeltaPct: zeitraum === 'all' ? null : umsatzDeltaPct,
     offenesVolumen,
     aktiveEinsaetze: aktiv.length,
-    anfragenGesamt: payload.stats.angefragt,
-    neueAnfragen,
-    angebote,
-    auftraege: auftraegeCount,
+    anfragenGesamt: payload.stats?.angefragt ?? 0,
     monate: buildMonate(events, zeitraum, now),
     gewerke,
   }

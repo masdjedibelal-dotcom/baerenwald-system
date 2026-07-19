@@ -76,13 +76,18 @@ export function FabVorgangStartModal({
       return
     }
     startTransition(async () => {
-      const r = await createAnfrageFuerKunde(kundeId)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+      try {
+        const r = await createAnfrageFuerKunde(kundeId)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        onClose()
+        toast.success('Anfrage angelegt — Angebot-Wizard öffnet sich…')
+        router.push(`/anfragen/${r.leadId}?angebot_wizard=1`)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Angebot konnte nicht gestartet werden.')
       }
-      onClose()
-      router.push(`/anfragen/${r.leadId}?angebot_wizard=1`)
     })
   }
 

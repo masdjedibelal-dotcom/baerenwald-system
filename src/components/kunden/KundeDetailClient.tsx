@@ -31,16 +31,17 @@ import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import type { KundenObjekt } from '@/lib/types'
 import {
   kundeNeueAnfrageHref,
-  kundeNeuerAuftragHref,
   kundeNeuesAngebotHref,
+  kundeNeuerAuftragHref,
+  kundeNeueRechnungHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { ActionsMenu } from '@/components/ui/actions-menu'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
+import { saveKunde, saveKundeCustomFieldValue, setKundeSpam } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
 import {
@@ -48,6 +49,8 @@ import {
   defaultPortalInviteBetreff,
   defaultPortalInviteText,
 } from '@/lib/portal-utils'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateKunde } from '@/lib/list-actions'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
@@ -113,7 +116,14 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-type KundeDetailTab = 'uebersicht' | 'objekte' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
+type KundeDetailTab =
+  | 'uebersicht'
+  | 'objekte'
+  | 'organisation'
+  | 'stammdaten'
+  | 'vorgaenge'
+  | 'dokumente'
+  | 'notizen'
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -152,6 +162,8 @@ export function KundeDetailClient({
   const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
   const isCrmAdmin = useIsCrmAdmin()
   const [impersonating, setImpersonating] = useState(false)
+  const [spamPending, setSpamPending] = useState(false)
+  const istSpam = Boolean(kunde.ist_spam)
 
   useEffect(() => {
     void (async () => {
@@ -169,6 +181,29 @@ export function KundeDetailClient({
     setKunde(initialKunde)
     setEditForm(buildEditFormFromKunde(initialKunde))
   }, [initialKunde])
+
+  function toggleSpam() {
+    const next = !istSpam
+    const label = next
+      ? 'Als Spam markieren? Der Kunde kann dann keine Anfragen mehr über den Rechner stellen und sich nicht mehr mit dieser E-Mail anmelden oder registrieren.'
+      : 'Spam-Markierung aufheben? Rechner und Portal-Zugang sind danach wieder möglich.'
+    if (!confirm(label)) return
+    setSpamPending(true)
+    void setKundeSpam(kunde.id, next).then((r) => {
+      setSpamPending(false)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setKunde((k) => ({
+        ...k,
+        ist_spam: next,
+        spam_markiert_am: next ? new Date().toISOString() : null,
+      }))
+      toast.success(next ? 'Als Spam markiert' : 'Spam-Markierung aufgehoben')
+      refresh()
+    })
+  }
 
   const rechnungen = useMemo(() => kunde.rechnungen ?? [], [kunde.rechnungen])
 
@@ -621,74 +656,99 @@ export function KundeDetailClient({
     </Suspense>
   )
 
-  const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil', 16),
-        onClick: beginEditKontakt,
-      },
-      {
-        label: 'Mail schreiben',
-        icon: mockMenuIcon('mail', 16),
-        onClick: () => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id)),
-      },
-      {
-        label: 'Neue Anfrage',
-        icon: mockMenuIcon('inbox', 16),
-        onClick: () => router.push(kundeNeueAnfrageHref(kunde.id)),
-      },
-      {
-        label: 'Neues Angebot',
-        icon: mockMenuIcon('file-invoice', 16),
-        onClick: () => router.push(kundeNeuesAngebotHref(kunde)),
-      },
-      {
-        label: 'Neuer Auftrag',
-        icon: mockMenuIcon('briefcase', 16),
-        onClick: () => router.push(kundeNeuerAuftragHref(kunde)),
-      },
-      'sep',
-      {
-        label: 'MeinBärenwald-Einladung',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !kunde.email ? 'Keine E-Mail' : undefined,
-        onClick: () => void openPortalModal(),
-      },
-    ]
+  const kundeMenuItems = useMemo(() => {
+    const extra: import('@/lib/entity-menu').EntityMenuItem[] = []
     if (zeigtOrganisationTab) {
-      items.push({
-        label: 'Organisation',
-        icon: mockMenuIcon('building', 16),
-        onClick: () => setTab('stammdaten'),
+      extra.push({
+        icon: 'plug',
+        label: 'Organisation & Portal',
+        onClick: () => setTab('organisation'),
       })
     }
-    if (isCrmAdmin) {
-      const label = kundeDisplayName(kunde) || kunde.name || 'Kunde'
-      items.push('sep', {
-        label: 'Admin Login',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !hasPortalAccount
-          ? 'Kein Portal-Account'
-          : impersonating
-            ? 'Öffne…'
-            : `HV-Portal als ${label}`,
-        onClick: () => {
-          if (!hasPortalAccount || impersonating) return
-          setImpersonating(true)
-          void openPortalAsKunde(kunde.id).then((r) => {
-            setImpersonating(false)
-            if (!r.ok) {
-              toast.error(r.message)
+    extra.push('sep', {
+      icon: istSpam ? 'check' : 'shield-x',
+      label: istSpam ? 'Spam-Markierung aufheben' : 'Als Spam markieren',
+      danger: !istSpam,
+      hint: spamPending ? 'Speichere…' : undefined,
+      onClick: () => {
+        if (spamPending) return
+        toggleSpam()
+      },
+    })
+
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'kunde',
+        {
+          name: kundeDisplayName(kunde),
+          tel: kunde.telefon,
+          mail: kunde.email,
+        },
+        {
+          onEdit: beginEditKontakt,
+          onCopy: () => runDuplicateKunde(kunde.id, router),
+          onPortal: isCrmAdmin
+            ? () => {
+                if (!hasPortalAccount) {
+                  toast.error('Kein Portal-Account')
+                  return
+                }
+                if (istSpam) {
+                  toast.error('Kunde ist als Spam markiert — Portal-Zugang gesperrt.')
+                  return
+                }
+                if (impersonating) return
+                setImpersonating(true)
+                const popup = window.open('about:blank', '_blank')
+                void openPortalAsKunde(kunde.id).then((r) => {
+                  setImpersonating(false)
+                  if (!r.ok) {
+                    popup?.close()
+                    toast.error(r.message)
+                    return
+                  }
+                  if (popup) {
+                    popup.location.href = r.url
+                  } else {
+                    window.location.assign(r.url)
+                  }
+                })
+              }
+            : undefined,
+          onPortalLink: () => {
+            if (!kunde.email?.trim()) {
+              toast.error('Keine E-Mail')
               return
             }
-            window.open(r.url, '_blank', 'noopener,noreferrer')
-          })
-        },
-      })
-    }
-    return items
-  }, [kunde, router, isCrmAdmin, impersonating, hasPortalAccount, zeigtOrganisationTab, mailCompose])
+            if (istSpam) {
+              toast.error('Kunde ist als Spam markiert — Portal-Zugang gesperrt.')
+              return
+            }
+            void openPortalModal()
+          },
+          onCreateAnfrage: () => router.push(kundeNeueAnfrageHref(kunde.id)),
+          onCreateAngebot: () => router.push(kundeNeuesAngebotHref(kunde)),
+          onCreateAuftrag: () => router.push(kundeNeuerAuftragHref(kunde)),
+          onCreateRechnung: () => router.push(kundeNeueRechnungHref(kunde.id)),
+          tel: kunde.telefon,
+          mail: kunde.email,
+          onMail: () => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id)),
+          extra,
+        }
+      ),
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
+  }, [
+    kunde,
+    router,
+    isCrmAdmin,
+    impersonating,
+    hasPortalAccount,
+    zeigtOrganisationTab,
+    mailCompose,
+    istSpam,
+    spamPending,
+  ])
 
   const tabOrganisation = zeigtOrganisationTab ? (
     <KundenOrganisationTab
@@ -698,13 +758,6 @@ export function KundeDetailClient({
       onSaved={() => refresh()}
     />
   ) : null
-
-  const stammdatenInhalt = (
-    <>
-      {tabStammdaten}
-      {zeigtOrganisationTab ? tabOrganisation : null}
-    </>
-  )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -724,11 +777,21 @@ export function KundeDetailClient({
           },
         ]
       : []),
+    ...(zeigtOrganisationTab
+      ? [
+          {
+            id: 'organisation' as const,
+            label: 'Organisation & Portal',
+            icon: 'plug',
+            render: () => tabOrganisation,
+          },
+        ]
+      : []),
     {
       id: 'stammdaten',
       label: 'Stammdaten',
       icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
+      render: () => tabStammdaten,
     },
     {
       id: 'vorgaenge',
@@ -762,6 +825,14 @@ export function KundeDetailClient({
         badges={
           <>
             <TypBadge typ={kunde.typ} />
+            {istSpam ? (
+              <MockBadge kind="storniert">
+                <span className="inline-flex items-center gap-1">
+                  <MockIcon ctx="default" n="shield-x" size={10} />
+                  Spam
+                </span>
+              </MockBadge>
+            ) : null}
             <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
               <span className="inline-flex items-center gap-1">
                 <MockIcon
@@ -801,7 +872,7 @@ export function KundeDetailClient({
       <Modal
         open={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
-        title="MeinBärenwald-Einladung senden"
+        title="Kundenportal-Link versenden"
         size="lg"
         footer={
           <div className="flex w-full justify-end gap-2">
@@ -860,7 +931,7 @@ export function KundeDetailClient({
             />
           </div>
           <Input
-            label="MeinBärenwald Login"
+            label="Portal-Login"
             value={portalLink}
             readOnly
             className="bg-bw-bg-soft"

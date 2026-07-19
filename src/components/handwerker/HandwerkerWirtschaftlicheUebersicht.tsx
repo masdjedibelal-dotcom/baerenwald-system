@@ -167,57 +167,40 @@ export function HandwerkerWirtschaftlicheUebersicht({
         </div>
       </div>
 
-      <div className="pw-bottom">
-        <div className="pw-counts">
-          <div className="card kw-count">
-            <div className="kw-count-label">Neue Anfragen</div>
-            <div className="kw-count-val">{snap.neueAnfragen}</div>
-          </div>
-          <div className="card kw-count">
-            <div className="kw-count-label">Angebote</div>
-            <div className="kw-count-val">{snap.angebote}</div>
-          </div>
-          <div className="card kw-count">
-            <div className="kw-count-label">Aufträge</div>
-            <div className="kw-count-val">{snap.auftraege}</div>
+      <div className="card pw-gewerk">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="activity" size={16} />
+            Volumen nach Gewerk
           </div>
         </div>
-
-        <div className="card pw-gewerk">
-          <div className="card-h">
-            <div className="card-title title">
-              <MockIcon ctx="emphasis" n="activity" size={16} />
-              Volumen nach Gewerk
-            </div>
-          </div>
-          <div className="card-b">
-            {snap.gewerke.length === 0 ? (
-              <p className="kw-chart-empty" style={{ padding: '12px 0' }}>
-                Noch kein Volumen nach Gewerk.
-              </p>
-            ) : (
-              <ul className="pw-gewerk-list">
-                {snap.gewerke.map((g) => (
-                  <li key={g.name} className="pw-gewerk-row">
-                    <div className="pw-gewerk-top">
-                      <span className="pw-gewerk-name" title={g.name}>
-                        {g.name}
-                      </span>
-                      <span className="pw-gewerk-val">{formatEurGanz(g.betrag)}</span>
-                    </div>
-                    <div className="pw-gewerk-track">
-                      <div
-                        className="pw-gewerk-bar"
-                        style={{
-                          width: `${Math.max(6, Math.round((g.betrag / gewerkMax) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        <div className="card-b">
+          {snap.gewerke.length === 0 ? (
+            <p className="kw-chart-empty" style={{ padding: '12px 0' }}>
+              Noch kein Volumen nach Gewerk.
+            </p>
+          ) : (
+            <ul className="pw-gewerk-list">
+              {snap.gewerke.map((g) => (
+                <li key={g.name} className="pw-gewerk-row">
+                  <div className="pw-gewerk-top">
+                    <span className="pw-gewerk-name" title={g.name}>
+                      {g.name}
+                    </span>
+                    <span className="pw-gewerk-val">{formatEurGanz(g.betrag)}</span>
+                  </div>
+                  <div className="pw-gewerk-track">
+                    <div
+                      className="pw-gewerk-bar"
+                      style={{
+                        width: `${Math.max(6, Math.round((g.betrag / gewerkMax) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

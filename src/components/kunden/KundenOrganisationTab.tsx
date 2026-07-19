@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { Building2, Copy, ExternalLink, Mail } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Button } from '@/components/ui/Button'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { suggestOrgKennungFromName } from '@/lib/org/slug'
@@ -31,16 +30,6 @@ type Props = {
   onInvitePortal?: () => void
   onSaved?: () => void
 }
-
-const PORTAL_MODUS_OPTS = [
-  { value: 'privat', label: 'Privat (MeinBärenwald)' },
-  { value: 'organisation', label: 'Organisation (Auftraggeber-Portal)' },
-]
-
-const FREIGABE_MODUS_OPTS = [
-  { value: 'direkt', label: 'Direkt — ohne Org-Freigabe' },
-  { value: 'freigabe', label: 'Freigabe — Organisation muss freigeben' },
-]
 
 export function KundenOrganisationTab({
   kunde,
@@ -111,152 +100,206 @@ export function KundenOrganisationTab({
   }
 
   return (
-    <Card
-      title={
-        <>
-          <Building2 className="inline h-4 w-4 text-bw-primary" aria-hidden /> Organisation & Portal
-        </>
-      }
-    >
-      <p className="mb-4 text-[12px] leading-relaxed text-bw-text-muted">
-        Auftraggeber-Modus für Hausverwaltungen und Gewerbe: Melde-Links, Freigabe-Workflow und
-        Zugang zum Auftraggeber-Portal unter <code className="text-[11px]">/portal</code>.
-      </p>
+    <div className="space-y-4">
+      <MockCard
+        title="Organisation & Portal"
+        icon="plug"
+        actions={
+          <MockBtn kind="primary" sm disabled={pending} onClick={speichern}>
+            {pending ? 'Speichern…' : 'Speichern'}
+          </MockBtn>
+        }
+      >
+        <p className="mb-4 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+          Auftraggeber-Modus für Hausverwaltungen und Gewerbe: Melde-Links, Freigabe-Workflow und
+          Zugang zum Auftraggeber-Portal.
+        </p>
 
-      <div className="space-y-3">
-        <Select
-          label="Portal-Modus"
-          name="portal_modus"
-          value={portalModus}
-          onChange={(e) => setPortalModus(e.target.value as PortalModus)}
-          options={PORTAL_MODUS_OPTS}
-        />
+        <MockFormSection title="Portal-Modus" icon="plug">
+          <MockField label="Modus" full>
+            <div className="chiprow">
+              <MockChip
+                active={portalModus === 'privat'}
+                onClick={() => setPortalModus('privat')}
+              >
+                Privat (MeinBärenwald)
+              </MockChip>
+              <MockChip
+                active={portalModus === 'organisation'}
+                onClick={() => setPortalModus('organisation')}
+              >
+                Organisation (Auftraggeber-Portal)
+              </MockChip>
+            </div>
+          </MockField>
+        </MockFormSection>
 
         {istOrganisation ? (
           <>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <Input
-                  label="Org-Kennung (URL-Slug)"
-                  placeholder="z. B. musterverwaltung"
-                  value={orgKennung}
-                  onChange={(e) => setOrgKennung(e.target.value)}
-                  hint="Pflicht — wird in Melde-Links verwendet: /melden/{org_kennung}"
-                  required
+            <MockFormSection title="Organisation" icon="building" className="mt-4">
+              <MockField
+                label="Org-Kennung (URL-Slug)"
+                required
+                hint="Pflicht — wird in Melde-Links verwendet: /melden/{org_kennung}"
+                full
+              >
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    className="txt"
+                    style={{ flex: 1 }}
+                    placeholder="z. B. musterverwaltung"
+                    value={orgKennung}
+                    onChange={(e) => setOrgKennung(e.target.value)}
+                  />
+                  <MockBtn sm kind="ghost" onClick={vorschlagKennung}>
+                    Vorschlag
+                  </MockBtn>
+                </div>
+              </MockField>
+              <MockField label="Anzeigename" full>
+                <input
+                  className="txt"
+                  placeholder="z. B. Muster Hausverwaltung GmbH"
+                  value={orgAnzeigename}
+                  onChange={(e) => setOrgAnzeigename(e.target.value)}
                 />
-              </div>
-              <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={vorschlagKennung}>
-                Vorschlag
-              </Button>
-            </div>
-
-            <Input
-              label="Anzeigename"
-              placeholder="z. B. Muster Hausverwaltung GmbH"
-              value={orgAnzeigename}
-              onChange={(e) => setOrgAnzeigename(e.target.value)}
-            />
-
-            <Input
-              label="Logo-URL"
-              placeholder="https://…"
-              value={orgLogoUrl}
-              onChange={(e) => setOrgLogoUrl(e.target.value)}
-            />
+              </MockField>
+              <MockField label="Logo-URL" full>
+                <input
+                  className="txt"
+                  placeholder="https://…"
+                  value={orgLogoUrl}
+                  onChange={(e) => setOrgLogoUrl(e.target.value)}
+                />
+              </MockField>
+            </MockFormSection>
 
             {meldeBasisLink ? (
-              <div className="rounded-lg border border-bw-border bg-bw-muted/30 px-3 py-2.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-bw-text-muted">
+              <div className="listcard mt-3" style={{ padding: '12px 14px' }}>
+                <div
+                  className="text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-3)', marginBottom: 6 }}
+                >
                   Melde-Link (Organisation)
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                   <a
                     href={meldeBasisLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="min-w-0 flex-1 truncate text-[13px] text-bw-primary underline-offset-2 hover:underline"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      color: 'var(--green)',
+                    }}
                   >
                     {meldeBasisLink}
                   </a>
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    aria-label="Link kopieren"
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="copy"
+                    title="Link kopieren"
                     onClick={() => void kopieren(meldeBasisLink, 'Melde-Link')}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
+                  />
                   <a
                     href={meldeBasisLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn ghost sm"
+                    className="btn ghost sm icon"
                     aria-label="Link öffnen"
+                    title="Link öffnen"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    <MockIcon ctx="btn" n="external-link" size={14} />
                   </a>
                 </div>
               </div>
             ) : null}
 
-            <div className="border-t border-bw-border pt-3">
-              <p className="mb-2 text-[12px] font-medium text-bw-text">Freigabe-Workflow</p>
-              <Select
-                label="Freigabe-Modus"
-                name="freigabe_modus"
-                value={freigabeModus}
-                onChange={(e) => setFreigabeModus(e.target.value as FreigabeModus)}
-                options={FREIGABE_MODUS_OPTS}
-              />
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="Schwelle (€)"
+            <MockFormSection title="Freigabe-Workflow" icon="shield-check" className="mt-4">
+              <MockField label="Freigabe-Modus" full>
+                <div className="chiprow">
+                  <MockChip
+                    active={freigabeModus === 'direkt'}
+                    onClick={() => setFreigabeModus('direkt')}
+                  >
+                    Direkt — ohne Org-Freigabe
+                  </MockChip>
+                  <MockChip
+                    active={freigabeModus === 'freigabe'}
+                    onClick={() => setFreigabeModus('freigabe')}
+                  >
+                    Freigabe — Organisation muss freigeben
+                  </MockChip>
+                </div>
+              </MockField>
+              <MockField label="Schwelle (€)" hint="Leer = nur nach Modus">
+                <input
+                  className="txt"
                   type="number"
                   min={0}
                   step={0.01}
-                  placeholder="Leer = nur nach Modus"
+                  placeholder="z. B. 500"
                   value={schwelle}
                   onChange={(e) => setSchwelle(e.target.value)}
                 />
-                <label className="flex items-center gap-2 self-end pb-2 text-[13px] text-bw-text">
+              </MockField>
+              <MockField label="Notfall">
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    minHeight: 36,
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={notfallDirekt}
                     onChange={(e) => setNotfallDirekt(e.target.checked)}
-                    className="rounded border-bw-border"
                   />
                   Notfall umgeht Freigabe
                 </label>
-              </div>
-            </div>
+              </MockField>
+            </MockFormSection>
           </>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-bw-border pt-3">
+        {err ? (
+          <p className="mt-3 text-sm" style={{ color: 'var(--red-tx, #b91c1c)' }}>
+            {err}
+          </p>
+        ) : null}
+      </MockCard>
+
+      <MockCard title="Portal-Zugang" icon="mail">
+        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+          Einladung und Login für das Kunden- bzw. Auftraggeber-Portal.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {onInvitePortal ? (
-            <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={onInvitePortal}>
-              <Mail className="h-3.5 w-3.5" aria-hidden />
-              {hasPortalAccount ? 'Portal-Einladung erneut senden' : 'MeinBärenwald-Einladung senden'}
-            </Button>
+            <MockBtn sm kind="ghost" icon="mail" onClick={onInvitePortal}>
+              {hasPortalAccount
+                ? 'Kundenportal-Link erneut versenden'
+                : 'Kundenportal-Link versenden'}
+            </MockBtn>
           ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="copy"
             onClick={() => void kopieren(buildPortalLoginLink(), 'Portal-Login')}
           >
             Portal-Login kopieren
-          </Button>
+          </MockBtn>
         </div>
-
-        {err ? <p className="text-sm text-danger">{err}</p> : null}
-
-        <div className="flex justify-end pt-1">
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </Button>
-        </div>
-      </div>
-    </Card>
+      </MockCard>
+    </div>
   )
 }

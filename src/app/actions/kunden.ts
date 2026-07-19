@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { saveCustomValue as persistCustomFieldValue } from '@/lib/custom-fields'
 import {
   buildKundeStammDbPayload,
@@ -10,6 +11,9 @@ import {
   type SaveKundeStammInput,
 } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
+
+/** Lange Auth-Sperre (gleiche Dauer wie bei deaktivierten CRM-Mitarbeitern). */
+const AUTH_BAN_DURATION = '876600h'
 
 export type SaveKundeInput = SaveKundeStammInput & {
   telefon?: string | null
@@ -198,6 +202,71 @@ export async function findKundenDuplikate(
   }))
 }
 
+/**
+ * Kunde als Spam markieren / zurücknehmen.
+ * Spam → kein Rechner, kein Portal-Login/-Register; bestehendes Auth-Konto wird gesperrt.
+ */
+export async function setKundeSpam(
+  kundeId: string,
+  istSpam: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = kundeId?.trim()
+  if (!id) return { ok: false, message: 'Kunde fehlt.' }
+
+  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle()
+  )
+  if (loadErr || !row) {
+    return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
+  }
+
+  const { error: upErr } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .update({
+        ist_spam: istSpam,
+        spam_markiert_am: istSpam ? new Date().toISOString() : null,
+      })
+      .eq('id', id)
+  )
+  if (upErr) {
+    const msg = upErr.message ?? ''
+    if (msg.includes('ist_spam') || msg.includes('does not exist') || msg.includes('schema cache')) {
+      return {
+        ok: false,
+        message: 'Spam-Spalte fehlt in der Datenbank — bitte Migration kunden_ist_spam ausführen.',
+      }
+    }
+    return { ok: false, message: upErr.message }
+  }
+
+  const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
+  if (authUserId) {
+    const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+      ban_duration: istSpam ? AUTH_BAN_DURATION : 'none',
+    })
+    if (banErr) {
+      console.error('[setKundeSpam] Auth-Ban fehlgeschlagen:', banErr.message)
+    }
+    if (istSpam) {
+      try {
+        const admin = supabaseAdmin.auth.admin as {
+          signOut?: (uid: string, scope?: string) => Promise<unknown>
+        }
+        if (typeof admin.signOut === 'function') {
+          await admin.signOut(authUserId, 'global')
+        }
+      } catch (e) {
+        console.error('[setKundeSpam] Sign-out fehlgeschlagen:', e)
+      }
+    }
+  }
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true }
+}
+
 /** Portal-Zugang: Kunde registriert sich mit derselben E-Mail unter /portal/login */
 export async function getPortalLoginHint(
   kundeId: string
@@ -262,6 +331,8 @@ export async function duplicateKunde(
   delete payload.kundennummer
   delete payload.gesamt_umsatz
   delete payload.letzte_aktivitaet
+  delete payload.spam_markiert_am
+  payload.ist_spam = false
   payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
   if (payload.email) payload.email = null
 

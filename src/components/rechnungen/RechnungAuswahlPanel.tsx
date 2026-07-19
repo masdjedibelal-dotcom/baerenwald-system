@@ -113,7 +113,7 @@ export function RechnungAuswahlPanel({
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
     const items: ActionsMenuItem[] = [
       {
-        label: 'Ansehen',
+        label: 'Öffnen',
         icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => {
           onClose?.()

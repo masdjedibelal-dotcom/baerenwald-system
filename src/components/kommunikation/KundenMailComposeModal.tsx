@@ -144,7 +144,7 @@ export function KundenMailComposeModal({
       <Modal
         open={open && !!ctx}
         onClose={onClose}
-        title={`E-Mail schreiben${kontextLabel ? ` · ${kontextLabel}` : ''}`}
+        title={`Mail schreiben${kontextLabel ? ` · ${kontextLabel}` : ''}`}
         size="lg"
         footer={
           <ModalFormFooter

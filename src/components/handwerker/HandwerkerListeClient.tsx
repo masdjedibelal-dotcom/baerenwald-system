@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -433,17 +434,15 @@ export function HandwerkerListeClient({
                   ? gewerkeFallback.split(/[·,]/).map((g) => g.trim()).filter(Boolean).slice(0, 3)
                   : []
             return (
-              <div
+              <Link
                 key={h.id}
-                role="button"
-                tabIndex={0}
+                href={`/handwerker/${h.id}`}
                 className={cn('list-row', selected[h.id] && 'sel')}
                 style={{ gridTemplateColumns: gridCols }}
-                onClick={() => (selectMode ? toggleSel(h.id) : openDetail(h.id))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                onClick={(e) => {
+                  if (selectMode) {
                     e.preventDefault()
-                    selectMode ? toggleSel(h.id) : openDetail(h.id)
+                    toggleSel(h.id)
                   }
                 }}
               >
@@ -501,7 +500,7 @@ export function HandwerkerListeClient({
                 >
                   <MockEntityRowMenu items={rowMenuItems(h)} title="Handwerker" />
                 </div>
-              </div>
+              </Link>
             )
           })
         )}

@@ -89,6 +89,9 @@ export type Kunde = {
   freigabe_modus?: FreigabeModus | null
   freigabe_schwelle_eur?: number | null
   notfall_direkt?: boolean | null
+  /** Spam: kein Rechner, kein Portal-Login/-Register mit dieser E-Mail */
+  ist_spam?: boolean | null
+  spam_markiert_am?: string | null
 }
 
 /** WEG / Gebäude unter Gewerbe- oder Hausverwaltungs-Kunden */
@@ -950,6 +953,9 @@ export type Handwerker = {
   partner_kategorien?: PartnerKategorie | null
   partner_dokumente?: PartnerDokument[] | null
   auth_user_id?: string | null
+  /** Partner vom Portal ausgeschlossen — Login/Register gesperrt */
+  ist_portal_gesperrt?: boolean | null
+  portal_gesperrt_am?: string | null
 }
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'

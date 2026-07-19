@@ -7,7 +7,7 @@ import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
-import { richTextToPlain } from '@/lib/rich-text'
+import { richTextToEditablePlain } from '@/lib/rich-text'
 
 const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
   { value: 'allgemein', label: 'Allgemein' },
@@ -116,7 +116,7 @@ export function PositionModal({
           <Field label="Text" full hint="Erscheint ohne Preis auf dem Dokument">
             <textarea
               className="ta"
-              value={richTextToPlain(p.beschreibung)}
+              value={richTextToEditablePlain(p.beschreibung)}
               onChange={(e) => onChange({ beschreibung: e.target.value })}
               rows={3}
               placeholder="z. B. Hinweis zu Ablauf oder Garantie"
@@ -193,7 +193,7 @@ export function PositionModal({
           <Field label="Beschreibung" full hint="Erscheint beim Kunden">
             <textarea
               className="ta"
-              value={richTextToPlain(p.beschreibung)}
+              value={richTextToEditablePlain(p.beschreibung)}
               onChange={(e) => onChange({ beschreibung: e.target.value })}
               rows={2}
               placeholder="Details zur Leistung…"

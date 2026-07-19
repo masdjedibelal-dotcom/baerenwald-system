@@ -7,6 +7,7 @@ import { ArrowLeft, LogOut } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
+import { TopBarSearch } from '@/components/layout/TopBarSearch'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
@@ -14,7 +15,6 @@ import { cn } from '@/lib/utils'
 
 interface TopBarProps {
   user: User
-  onSearchOpen?: () => void
 }
 
 type Crumb = { label: string; href?: string }
@@ -94,12 +94,11 @@ function pathToBreadcrumbs(pathname: string): {
  * unlayered `.topbar { display:flex }` in mock-design-system.css hat Tailwind
  * `hidden` / `md:hidden` überschrieben → doppelte Suche/Glocke.
  */
-export function TopBar({ user, onSearchOpen }: TopBarProps) {
+export function TopBar({ user }: TopBarProps) {
   const pathname = usePathname() ?? '/'
   const router = useRouter()
   const { title, parents, cta } = pathToBreadcrumbs(pathname)
   const parentHref = parents[parents.length - 1]?.href ?? null
-  const isListRoot = parents.length === 0
   const { name, email } = userDisplay(user)
   const [menuOpen, setMenuOpen] = useState(false)
   const avatarRef = useRef<HTMLButtonElement>(null)
@@ -146,14 +145,7 @@ export function TopBar({ user, onSearchOpen }: TopBarProps) {
         <span className="truncate">{title}</span>
       </div>
 
-      {isListRoot ? (
-        <button type="button" className="topbar-search-trigger" onClick={() => onSearchOpen?.()}>
-          <MockIcon ctx="default" n="search" size={16} />
-          <span>Suchen…</span>
-        </button>
-      ) : (
-        <div className="topbar-spacer" />
-      )}
+      <TopBarSearch />
 
       <div className="topbar-actions">
         {cta ? (

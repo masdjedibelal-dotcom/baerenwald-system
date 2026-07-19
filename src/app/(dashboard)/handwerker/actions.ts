@@ -1,7 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   buildHandwerkerStammDbPayload,
   validateHandwerkerStammPflicht,
@@ -13,6 +15,9 @@ import {
   VERTRAEGE_PDFS_BUCKET,
 } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
+
+/** Lange Auth-Sperre (gleiche Dauer wie bei Spam-Kunden / deaktivierten CRM-Mitarbeitern). */
+const AUTH_BAN_DURATION = '876600h'
 
 export type HandwerkerFormInput = {
   firma: string | null
@@ -197,6 +202,17 @@ export type HandwerkerDetailPayload = {
 const HANDWERKER_DETAIL_SELECT_BASE = `
   id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
   ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
+  adresse, partner_kategorie_id, auth_user_id, ist_portal_gesperrt, portal_gesperrt_am,
+  partner_kategorien ( id, name, slug, sort_order ),
+  partner_dokumente (
+    id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
+    status, freigegeben_am, ablehnung_grund
+  )
+`
+
+const HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL = `
+  id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
+  ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
   adresse, partner_kategorie_id,
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
@@ -210,52 +226,65 @@ const HANDWERKER_BEWERTUNG_SELECT = `
   bewertung_kommunikation, bewertung_preis_leistung, bewertung_anzahl
 `
 
-function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false
-  const msg = (error.message ?? '').toLowerCase()
-  return (
-    error.code === '42703' ||
-    error.code === 'PGRST204' ||
-    msg.includes('does not exist') ||
-    (msg.includes('column') && msg.includes('bewertung'))
-  )
+const HANDWERKER_DETAIL_SELECT_MINIMAL = `
+  id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
+  ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
+  adresse, partner_kategorie_id
+`
+
+function normalizeHandwerkerAdresse(row: Handwerker | null): Handwerker | null {
+  if (!row) return null
+  const raw = row.adresse as unknown
+  if (raw == null) return { ...row, adresse: null }
+  if (typeof raw === 'string') return { ...row, adresse: raw }
+  if (typeof raw === 'object') {
+    const o = raw as Record<string, unknown>
+    const parts = [o.strasse, o.street, o.line1, o.plz, o.ort, o.city]
+      .map((x) => (typeof x === 'string' ? x.trim() : ''))
+      .filter(Boolean)
+    const joined = parts.length ? parts.join(', ') : JSON.stringify(raw)
+    return { ...row, adresse: joined }
+  }
+  return { ...row, adresse: String(raw) }
 }
 
 async function fetchHandwerkerDetailRow(
-  supabase: ReturnType<typeof createClient>,
+  _supabase: ReturnType<typeof createClient>,
   id: string
 ): Promise<{ data: Handwerker | null; error: { message: string } | null }> {
   const fullSelect = `${HANDWERKER_DETAIL_SELECT_BASE}, ${HANDWERKER_BEWERTUNG_SELECT}`
-  const first = await supabase.from('handwerker').select(fullSelect).eq('id', id).maybeSingle()
+  const fullNoPortal = `${HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL}, ${HANDWERKER_BEWERTUNG_SELECT}`
+  const attempts = [
+    fullSelect,
+    fullNoPortal,
+    HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL,
+    HANDWERKER_DETAIL_SELECT_MINIMAL,
+  ]
 
-  if (!first.error) {
-    return { data: (first.data as Handwerker | null) ?? null, error: null }
-  }
-
-  if (isMissingColumnError(first.error)) {
-    console.warn(
-      '[loadHandwerkerDetail] Bewertungs-Spalten fehlen — Fallback ohne Ratings:',
-      first.error.message
-    )
-    const fallback = await supabase
-      .from('handwerker')
-      .select(HANDWERKER_DETAIL_SELECT_BASE)
-      .eq('id', id)
-      .maybeSingle()
-    return {
-      data: (fallback.data as Handwerker | null) ?? null,
-      error: fallback.error ? { message: fallback.error.message } : null,
+  let lastError: { message: string } | null = null
+  for (const select of attempts) {
+    const res = await withCrmReadFallback(async (db) => {
+      const r = await db.from('handwerker').select(select).eq('id', id).maybeSingle()
+      return {
+        data: (r.data as Handwerker | null) ?? null,
+        error: r.error ? { message: r.error.message } : null,
+      }
+    })
+    if (!res.error) {
+      return { data: normalizeHandwerkerAdresse(res.data), error: null }
     }
+    lastError = res.error
+    console.warn('[loadHandwerkerDetail] Select-Fallback:', res.error.message)
   }
 
-  console.error('[loadHandwerkerDetail]', first.error.message)
-  return { data: null, error: { message: first.error.message } }
+  console.error('[loadHandwerkerDetail]', lastError?.message)
+  return { data: null, error: lastError }
 }
 
-export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetailPayload> {
+export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetailPayload & { loadError?: string }> {
   const supabase = createClient()
 
-  const [{ data: h }, { data: ahRaw }, angeboteRes, bewertungenRes] = await Promise.all([
+  const [hwRes, ahRes, angeboteRes, bewertungenRes] = await Promise.all([
     fetchHandwerkerDetailRow(supabase, id),
     supabase
       .from('auftrag_handwerker')
@@ -288,9 +317,24 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .limit(12),
   ])
 
-  const hw = (h as Handwerker | null) ?? null
-  const dokumente = (hw?.partner_dokumente ?? []) as PartnerDokument[]
+  // Wenn der volle Join scheitert, Handwerker-Zeile trotzdem laden (ohne Auftrags-Embed)
+  let h = hwRes.data
+  let loadError = hwRes.error?.message
+  if (!h && hwRes.error) {
+    const bare = await supabase
+      .from('handwerker')
+      .select(HANDWERKER_DETAIL_SELECT_MINIMAL)
+      .eq('id', id)
+      .maybeSingle()
+    if (!bare.error && bare.data) {
+      h = normalizeHandwerkerAdresse(bare.data as Handwerker)
+      loadError = undefined
+    }
+  }
 
+  const hw = h
+  const dokumente = (hw?.partner_dokumente ?? []) as PartnerDokument[]
+  const ahRaw = ahRes.error ? [] : (ahRes.data ?? [])
   const rows = ahRaw ?? []
   const auftraege = rows
     .map((r) => {
@@ -394,6 +438,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       offen,
     },
     bewertungen,
+    ...(loadError ? { loadError } : {}),
   }
 }
 
@@ -721,6 +766,8 @@ export async function duplicateHandwerker(
   delete payload.created_at
   delete payload.updated_at
   delete payload.auth_user_id
+  delete payload.portal_gesperrt_am
+  payload.ist_portal_gesperrt = false
   payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
   if (payload.email) payload.email = null
 
@@ -733,4 +780,74 @@ export async function duplicateHandwerker(
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
   revalidatePath('/handwerker')
   return { ok: true, id: inserted.id as string }
+}
+
+/**
+ * Partner vom Portal ausschließen / wieder freigeben.
+ * Gesperrt → kein Login/Register; bestehendes Auth-Konto wird gebannt.
+ */
+export async function setHandwerkerPortalGesperrt(
+  handwerkerId: string,
+  gesperrt: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = handwerkerId?.trim()
+  if (!id) return { ok: false, message: 'Handwerker fehlt.' }
+
+  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db.from('handwerker').select('id, auth_user_id, email').eq('id', id).maybeSingle()
+  )
+  if (loadErr || !row) {
+    return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+  }
+
+  const { error: upErr } = await withCrmReadFallback(async (db) =>
+    db
+      .from('handwerker')
+      .update({
+        ist_portal_gesperrt: gesperrt,
+        portal_gesperrt_am: gesperrt ? new Date().toISOString() : null,
+      })
+      .eq('id', id)
+  )
+  if (upErr) {
+    const msg = upErr.message ?? ''
+    if (
+      msg.includes('ist_portal_gesperrt') ||
+      msg.includes('does not exist') ||
+      msg.includes('schema cache')
+    ) {
+      return {
+        ok: false,
+        message:
+          'Portal-Sperre-Spalte fehlt in der Datenbank — bitte Migration handwerker_portal_gesperrt ausführen.',
+      }
+    }
+    return { ok: false, message: upErr.message }
+  }
+
+  const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
+  if (authUserId) {
+    const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+      ban_duration: gesperrt ? AUTH_BAN_DURATION : 'none',
+    })
+    if (banErr) {
+      console.error('[setHandwerkerPortalGesperrt] Auth-Ban fehlgeschlagen:', banErr.message)
+    }
+    if (gesperrt) {
+      try {
+        const admin = supabaseAdmin.auth.admin as {
+          signOut?: (uid: string, scope?: string) => Promise<unknown>
+        }
+        if (typeof admin.signOut === 'function') {
+          await admin.signOut(authUserId, 'global')
+        }
+      } catch (e) {
+        console.error('[setHandwerkerPortalGesperrt] Sign-out fehlgeschlagen:', e)
+      }
+    }
+  }
+
+  revalidatePath('/handwerker')
+  revalidatePath(`/handwerker/${id}`)
+  return { ok: true }
 }

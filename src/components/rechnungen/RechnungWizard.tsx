@@ -474,29 +474,35 @@ export function RechnungWizard({
       }
       const nextMeta = buildMetaForSave()
       setSaving(true)
-      const res = await saveRechnungWizardDraft({
-        rechnungId,
-        auftrag_id: bootstrap.auftragId,
-        angebot_id: bootstrap.angebotId,
-        kunde_id: kundeId,
-        positionen: positionenBerechnet,
-        meta: nextMeta,
-        modus: rechnungsart === 'abschlag' ? 'abschlag' : bootstrap.modus ?? 'voll',
-        zahlungsplan: null,
-        zahlungsplanSpeichern: false,
-      })
-      setSaving(false)
-      if (!res.ok) {
-        toast.error(res.message)
+      try {
+        const res = await saveRechnungWizardDraft({
+          rechnungId,
+          auftrag_id: bootstrap.auftragId,
+          angebot_id: bootstrap.angebotId,
+          kunde_id: kundeId,
+          positionen: positionenBerechnet,
+          meta: nextMeta,
+          modus: rechnungsart === 'abschlag' ? 'abschlag' : bootstrap.modus ?? 'voll',
+          zahlungsplan: null,
+          zahlungsplanSpeichern: false,
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          return null
+        }
+        setRechnungId(res.rechnungId)
+        setVersandRechnungId(res.rechnungId)
+        if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
+        setMeta(nextMeta)
+        savedSnapshotRef.current = draftSnapshot
+        setDraftDirty(false)
+        return res.rechnungId
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
+      } finally {
+        setSaving(false)
       }
-      setRechnungId(res.rechnungId)
-      setVersandRechnungId(res.rechnungId)
-      if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
-      setMeta(nextMeta)
-      savedSnapshotRef.current = draftSnapshot
-      setDraftDirty(false)
-      return res.rechnungId
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildMeta uses current closure
     [
@@ -534,35 +540,40 @@ export function RechnungWizard({
     }
     const nextMeta = buildMetaForSave()
     setSaving(true)
-    const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
-    if (!planSave.ok) {
+    try {
+      const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
+      if (!planSave.ok) {
+        toast.error(planSave.message)
+        return null
+      }
+      const res = await createAllAbschlagRechnungenFromWizard({
+        auftrag_id: bootstrap.auftragId,
+        angebot_id: bootstrap.angebotId,
+        kunde_id: kundeId,
+        positionen: positionenBerechnet,
+        meta: nextMeta,
+        zahlungsplan: plan,
+        versandZeileId: aktivRate,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return null
+      }
+      setAbschlagRechnungen(res.rechnungen)
+      setVersandRechnungId(res.versandRechnungId)
+      setRechnungId(res.versandRechnungId)
+      const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
+      if (nr?.trim()) setRechnungsnummer(nr.trim())
+      setMeta(nextMeta)
+      savedSnapshotRef.current = draftSnapshot
+      setDraftDirty(false)
+      return res.versandRechnungId
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      return null
+    } finally {
       setSaving(false)
-      toast.error(planSave.message)
-      return null
     }
-    const res = await createAllAbschlagRechnungenFromWizard({
-      auftrag_id: bootstrap.auftragId,
-      angebot_id: bootstrap.angebotId,
-      kunde_id: kundeId,
-      positionen: positionenBerechnet,
-      meta: nextMeta,
-      zahlungsplan: plan,
-      versandZeileId: aktivRate,
-    })
-    setSaving(false)
-    if (!res.ok) {
-      toast.error(res.message)
-      return null
-    }
-    setAbschlagRechnungen(res.rechnungen)
-    setVersandRechnungId(res.versandRechnungId)
-    setRechnungId(res.versandRechnungId)
-    const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
-    if (nr?.trim()) setRechnungsnummer(nr.trim())
-    setMeta(nextMeta)
-    savedSnapshotRef.current = draftSnapshot
-    setDraftDirty(false)
-    return res.versandRechnungId
   }, [
     bootstrap.auftragId,
     bootstrap.angebotId,
@@ -599,46 +610,56 @@ export function RechnungWizard({
       previewNr
 
     setSaving(true)
-    await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
+    try {
+      const sync = await syncRechnungWizardMetaToEntwurf(id, {
+        kunde_id: kundeId,
+        meta: nextMeta,
+      })
+      if (!sync.ok) {
+        toast.error(sync.message)
+        return
+      }
 
-    if (!sendMail) {
-      const res = await finalizeRechnungWizardWithoutMail(id)
-      setSaving(false)
+      if (!sendMail) {
+        const res = await finalizeRechnungWizardWithoutMail(id)
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        toast.success(
+          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+        )
+        onDone?.(id)
+        onClose()
+        router.refresh()
+        return
+      }
+
+      const to = mailTo.filter((e) => isValidEmail(e))
+      if (!to.length) {
+        toast.error('Mindestens eine gültige Empfänger-E-Mail erforderlich.')
+        return
+      }
+      const res = await sendRechnungWizard({
+        rechnungId: id,
+        mailTo: to,
+        mailCc: mailCc.filter((e) => isValidEmail(e)),
+      })
       if (!res.ok) {
         toast.error(res.message)
         return
       }
       toast.success(
-        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
       )
       onDone?.(id)
       onClose()
       router.refresh()
-      return
-    }
-
-    const to = mailTo.filter((e) => isValidEmail(e))
-    if (!to.length) {
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+    } finally {
       setSaving(false)
-      toast.error('Mindestens eine gültige Empfänger-E-Mail erforderlich.')
-      return
     }
-    const res = await sendRechnungWizard({
-      rechnungId: id,
-      mailTo: to,
-      mailCc: mailCc.filter((e) => isValidEmail(e)),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      toast.error(res.message)
-      return
-    }
-    toast.success(
-      `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
-    )
-    onDone?.(id)
-    onClose()
-    router.refresh()
   }
 
   function handleRequestClose() {
@@ -652,7 +673,12 @@ export function RechnungWizard({
   }
 
   async function handleWeiter() {
-    await goNextStep()
+    if (saving) return
+    try {
+      await goNextStep()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
+    }
   }
 
   if (!mounted) return null
@@ -660,13 +686,18 @@ export function RechnungWizard({
   const desktopActions = (
     <div className="wizard-nav-actions">
       {step > 1 ? (
-        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep}>
+        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
           Zurück
         </MockBtn>
       ) : null}
       {step < 4 ? (
-        <MockBtn kind="primary" icon="chevron-right" onClick={() => void handleWeiter()}>
-          Weiter
+        <MockBtn
+          kind="primary"
+          icon="chevron-right"
+          disabled={saving}
+          onClick={() => void handleWeiter()}
+        >
+          {saving ? 'Speichern…' : 'Weiter'}
         </MockBtn>
       ) : (
         <>
@@ -675,7 +706,7 @@ export function RechnungWizard({
             disabled={saving || (hasPlan && !planOk)}
             onClick={() => void handleFinish(false)}
           >
-            Erstellen
+            {saving ? 'Erstellen…' : 'Erstellen'}
           </MockBtn>
           <MockBtn
             kind="primary"
@@ -694,15 +725,37 @@ export function RechnungWizard({
     step < 4 ? (
       <>
         {step > 1 ? (
-          <MockBtn sm kind="ghost" icon="chevron-left" onClick={goPrevStep} title="Zurück" />
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="chevron-left"
+            onClick={goPrevStep}
+            disabled={saving}
+            title="Zurück"
+          />
         ) : null}
-        <MockBtn sm kind="primary" onClick={() => void handleWeiter()}>
-          Weiter
+        <MockBtn sm kind="primary" disabled={saving} onClick={() => void handleWeiter()}>
+          {saving ? '…' : 'Weiter'}
         </MockBtn>
       </>
     ) : (
       <>
-        <MockBtn sm kind="ghost" icon="chevron-left" onClick={goPrevStep} title="Zurück" />
+        <MockBtn
+          sm
+          kind="ghost"
+          icon="chevron-left"
+          onClick={goPrevStep}
+          disabled={saving}
+          title="Zurück"
+        />
+        <MockBtn
+          sm
+          kind="ghost"
+          disabled={saving || (hasPlan && !planOk)}
+          onClick={() => void handleFinish(false)}
+        >
+          Erstellen
+        </MockBtn>
         <MockBtn
           sm
           kind="primary"

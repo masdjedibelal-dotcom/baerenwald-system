@@ -148,8 +148,9 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
   return {
     id: z.id,
     gewerk: z.gewerkName?.trim() || GEWERK_NAME_ALLGEMEIN,
-    name: z.bezeichnung.trim() || 'Position',
-    beschreibung: z.positionBeschreibung?.trim() || undefined,
+    // Leer lassen dürfen — sonst springt der Editor bei Löschen zurück auf „Position“
+    name: z.bezeichnung ?? '',
+    beschreibung: z.positionBeschreibung ?? undefined,
     menge: z.menge,
     einheit: z.einheit,
     preis: z.vkNetto,
@@ -201,7 +202,7 @@ export function dokumentZeilenToPosBoardLines(zeilen: DokumentZeile[]): PosBoard
       out.push({
         id: z.id,
         gewerk: GEWERK_NAME_ALLGEMEIN,
-        name: z.titel?.trim() || 'Freitext',
+        name: z.titel ?? '',
         beschreibung: z.text ?? '',
         menge: 0,
         einheit: '',
@@ -215,7 +216,7 @@ export function dokumentZeilenToPosBoardLines(zeilen: DokumentZeile[]): PosBoard
       out.push({
         id: z.id,
         gewerk: GEWERK_NAME_ALLGEMEIN,
-        name: z.bezeichnung?.trim() || 'Nachlass',
+        name: z.bezeichnung ?? '',
         beschreibung: '',
         menge: 1,
         einheit: z.modus === 'prozent' ? '%' : '€',
@@ -254,8 +255,9 @@ export function posBoardLinesToDokumentZeilen(
         ...(prev ?? neueFreitextZeile()),
         id: line.id,
         typ: 'freitext',
-        titel: line.name?.trim() || prev?.titel || '',
-        text: line.beschreibung?.trim() || prev?.text || '',
+        // Kein Fallback auf prev — sonst lassen sich Titel/Text nicht leeren / Leerzeichen tippen
+        titel: line.name ?? '',
+        text: line.beschreibung ?? '',
       })
       continue
     }
@@ -265,7 +267,7 @@ export function posBoardLinesToDokumentZeilen(
         ...(prev ?? neueGesamtrabattZeile()),
         id: line.id,
         typ: 'gesamtrabatt',
-        bezeichnung: line.name?.trim() || prev?.bezeichnung || 'Nachlass',
+        bezeichnung: line.name ?? prev?.bezeichnung ?? 'Nachlass',
         modus: line.nachlassModus ?? prev?.modus ?? 'prozent',
         wert: Math.max(0, Number(line.preis) || 0),
       }

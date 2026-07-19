@@ -98,7 +98,14 @@ export async function persistPdfForRechnung(
     .from('rechnungen-pdfs')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
 
-  if (upErr) return { ok: false, message: upErr.message }
+  if (upErr) {
+    const raw = upErr.message ?? ''
+    const hint =
+      /bucket not found|bucket.*does not exist|storage.*not found/i.test(raw)
+        ? ' — Speicher-Bucket „rechnungen-pdfs“ fehlt: `npm run db:storage-buckets` oder in Supabase → Storage einen öffentlichen Bucket `rechnungen-pdfs` anlegen.'
+        : ''
+    return { ok: false, message: raw + hint }
+  }
 
   const { data: pub } = supabaseAdmin.storage.from('rechnungen-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl

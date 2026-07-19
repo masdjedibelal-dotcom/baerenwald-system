@@ -74,11 +74,8 @@ async function persistAngebotPdfNachEntwurfSpeichern(
   angebotId: string,
   leadId: string | null,
   opts?: { asSystem?: boolean }
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const pdf = await persistPdfForAngebot(angebotId, { skipRevalidate: true })
-  if (!pdf.ok) {
-    console.warn('[saveAngebotWizardDraft] PDF:', pdf.message)
-  }
   if (!opts?.asSystem) {
     revalidatePath('/angebote')
     revalidatePath(`/angebote/${angebotId}`)
@@ -86,6 +83,38 @@ async function persistAngebotPdfNachEntwurfSpeichern(
       revalidatePath(`/anfragen/${leadId}`)
       revalidatePath('/anfragen')
     }
+  }
+  if (!pdf.ok) {
+    console.warn('[saveAngebotWizardDraft] PDF:', pdf.message)
+    return { ok: false, message: pdf.message }
+  }
+  return { ok: true }
+}
+
+/** PDF erzeugen und speichern — ohne E-Mail (wie Rechnung „Erstellen“). */
+export async function finalizeAngebotWizardWithoutMail(
+  angebotId: string
+): Promise<{ ok: true; angebotsnr: string | null } | { ok: false; message: string }> {
+  const pdf = await persistPdfForAngebot(angebotId)
+  if (!pdf.ok) return pdf
+
+  const { data: row } = await supabaseAdmin
+    .from('angebote')
+    .select('angebotsnr, lead_id')
+    .eq('id', angebotId)
+    .maybeSingle()
+
+  revalidatePath('/angebote')
+  revalidatePath(`/angebote/${angebotId}`)
+  const leadId = (row as { lead_id?: string | null } | null)?.lead_id
+  if (leadId) {
+    revalidatePath(`/anfragen/${leadId}`)
+    revalidatePath('/anfragen')
+  }
+
+  return {
+    ok: true,
+    angebotsnr: (row as { angebotsnr?: string | null } | null)?.angebotsnr ?? null,
   }
 }
 

@@ -141,7 +141,7 @@ export function AngebotAuswahlPanel({
     const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
     const items: ActionsMenuItem[] = [
       {
-        label: 'Ansehen',
+        label: 'Öffnen',
         icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => {
           onClose?.()

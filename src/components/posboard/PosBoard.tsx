@@ -168,7 +168,7 @@ export function PosBoard({
     const id = neuePosBoardLine().id
     const np: PosBoardLine = makeNew
       ? { ...makeNew(gewerk), id, kind: 'position' }
-      : neuePosBoardLine({ gewerk: gewerk || '', id, kind: 'position', name: 'Neue Position' })
+      : neuePosBoardLine({ gewerk: gewerk || '', id, kind: 'position', name: '' })
     onChange([...positionen, np])
     setEditId(id)
   }

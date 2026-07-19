@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter } from 'next/navigation'
@@ -381,17 +382,15 @@ export function PartnerNetzwerkClient({
           />
         ) : (
           pageItems.map((p) => (
-            <div
+            <Link
               key={p.id}
-              role="button"
-              tabIndex={0}
+              href={`/partner/${p.id}`}
               className={cn('list-row', selected[p.id] && 'sel')}
               style={{ gridTemplateColumns: gridCols }}
-              onClick={() => (selectMode ? toggleSel(p.id) : openDetail(p.id))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+              onClick={(e) => {
+                if (selectMode) {
                   e.preventDefault()
-                  selectMode ? toggleSel(p.id) : openDetail(p.id)
+                  toggleSel(p.id)
                 }
               }}
             >
@@ -441,7 +440,7 @@ export function PartnerNetzwerkClient({
               >
                 <MockEntityRowMenu items={rowMenuItems(p)} title="Partner" />
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>
