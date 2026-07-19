@@ -30,6 +30,10 @@ export type PosTableGroup = {
   items: PosTableItem[]
 }
 
+type DragPayload =
+  | { type: 'item'; id: string }
+  | { type: 'group'; gewerk: string }
+
 function PosTableMenu({ items }: { items: EntityMenuItem[] }) {
   return <MockEntityRowMenu items={items} title="Position" />
 }
@@ -69,6 +73,7 @@ export function PosTable({
   dnd,
   onReorder,
   onDropToGroup,
+  onReorderGroup,
   showTotals,
   netto,
   ust,
@@ -90,6 +95,8 @@ export function PosTable({
   dnd?: boolean
   onReorder?: (draggedId: string, targetId: string) => void
   onDropToGroup?: (draggedId: string, gewerk: string) => void
+  /** Gewerk-Abschnitte per Drag umsortieren */
+  onReorderGroup?: (draggedGewerk: string, targetGewerk: string) => void
   showTotals?: boolean
   netto?: number
   ust?: number
@@ -97,11 +104,20 @@ export function PosTable({
   disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
 }) {
   const sel = selected ?? {}
-  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragPayload, setDragPayload] = useState<DragPayload | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [overGroup, setOverGroup] = useState<string | null>(null)
   const [addOpenFor, setAddOpenFor] = useState<string | null>(null)
-  const dragRef = useRef<string | null>(null)
+  const dragRef = useRef<DragPayload | null>(null)
   const hasGroups = (groups ?? []).length > 0
+  const groupDnd = Boolean(dnd && onReorderGroup)
+
+  const clearDrag = () => {
+    dragRef.current = null
+    setDragPayload(null)
+    setOverId(null)
+    setOverGroup(null)
+  }
 
   return (
     <div className="postable2">
@@ -109,24 +125,82 @@ export function PosTable({
         const items = g.items ?? []
         const allSel = Boolean(selectable && items.length > 0 && items.every((it) => sel[it.id]))
         const addOpen = Boolean(onAddKind && addOpenFor === g.id)
+        const isGroupOver = Boolean(
+          groupDnd &&
+            overGroup === g.gewerk &&
+            dragPayload?.type === 'group' &&
+            dragPayload.gewerk !== g.gewerk
+        )
+        const isGroupDragging = Boolean(
+          dragPayload?.type === 'group' && dragPayload.gewerk === g.gewerk
+        )
         return (
-          <div key={g.id}>
+          <div key={g.id} style={{ opacity: isGroupDragging ? 0.45 : 1 }}>
             <div
-              className="pt2-sub"
-              onDragOver={dnd ? (e) => e.preventDefault() : undefined}
+              className={`pt2-sub${isGroupOver ? ' is-drag-over' : ''}`}
+              draggable={groupDnd || undefined}
+              onDragStart={
+                groupDnd
+                  ? (e) => {
+                      const t = e.target as HTMLElement
+                      if (t.closest('button, a, [role="button"], .row-actions, input, select')) {
+                        e.preventDefault()
+                        return
+                      }
+                      const payload: DragPayload = { type: 'group', gewerk: g.gewerk }
+                      dragRef.current = payload
+                      setDragPayload(payload)
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData('text/plain', `group:${g.gewerk}`)
+                    }
+                  : undefined
+              }
+              onDragEnd={groupDnd ? clearDrag : undefined}
+              onDragOver={
+                dnd
+                  ? (e) => {
+                      e.preventDefault()
+                      const drag = dragRef.current
+                      if (drag?.type === 'group' && drag.gewerk !== g.gewerk) {
+                        if (overGroup !== g.gewerk) setOverGroup(g.gewerk)
+                      } else if (drag?.type === 'item') {
+                        if (overGroup !== g.gewerk) setOverGroup(g.gewerk)
+                      }
+                    }
+                  : undefined
+              }
+              onDragLeave={
+                dnd
+                  ? () => {
+                      setOverGroup((cur) => (cur === g.gewerk ? null : cur))
+                    }
+                  : undefined
+              }
               onDrop={
                 dnd
                   ? (e) => {
                       e.preventDefault()
-                      const d = dragRef.current
-                      if (d && onDropToGroup) onDropToGroup(d, g.gewerk)
-                      dragRef.current = null
-                      setDragId(null)
-                      setOverId(null)
+                      e.stopPropagation()
+                      const drag = dragRef.current
+                      if (drag?.type === 'group' && onReorderGroup && drag.gewerk !== g.gewerk) {
+                        onReorderGroup(drag.gewerk, g.gewerk)
+                      } else if (drag?.type === 'item' && onDropToGroup) {
+                        onDropToGroup(drag.id, g.gewerk)
+                      }
+                      clearDrag()
                     }
                   : undefined
               }
+              style={{
+                boxShadow: isGroupOver ? 'inset 0 2px 0 var(--green)' : undefined,
+                cursor: groupDnd ? 'grab' : undefined,
+              }}
             >
+              {groupDnd ? (
+                <span className="drag" title="Gewerk ziehen zum Sortieren">
+                  <MockIcon ctx="default" n="grip-vertical" size={15} />
+                </span>
+              ) : null}
               {selectable ? (
                 <span
                   onClick={() => onToggleGroup?.(items, allSel)}
@@ -175,7 +249,12 @@ export function PosTable({
               </div>
             ) : null}
             {items.map((it) => {
-              const isOver = Boolean(dnd && overId === it.id && dragId && dragId !== it.id)
+              const isOver = Boolean(
+                dnd &&
+                  overId === it.id &&
+                  dragPayload?.type === 'item' &&
+                  dragPayload.id !== it.id
+              )
               return (
                 <div
                   key={it.id}
@@ -184,44 +263,42 @@ export function PosTable({
                   onDragStart={
                     dnd
                       ? (e) => {
-                          dragRef.current = it.id
-                          setDragId(it.id)
+                          e.stopPropagation()
+                          const payload: DragPayload = { type: 'item', id: it.id }
+                          dragRef.current = payload
+                          setDragPayload(payload)
                           e.dataTransfer.effectAllowed = 'move'
+                          e.dataTransfer.setData('text/plain', `item:${it.id}`)
                         }
                       : undefined
                   }
                   onDragOver={
                     dnd
                       ? (e) => {
+                          if (dragRef.current?.type !== 'item') return
                           e.preventDefault()
+                          e.stopPropagation()
                           if (overId !== it.id) setOverId(it.id)
                         }
                       : undefined
                   }
-                  onDragEnd={
-                    dnd
-                      ? () => {
-                          dragRef.current = null
-                          setDragId(null)
-                          setOverId(null)
-                        }
-                      : undefined
-                  }
+                  onDragEnd={dnd ? clearDrag : undefined}
                   onDrop={
                     dnd
                       ? (e) => {
                           e.preventDefault()
-                          const d = dragRef.current
-                          if (d && d !== it.id && onReorder) onReorder(d, it.id)
-                          dragRef.current = null
-                          setDragId(null)
-                          setOverId(null)
+                          e.stopPropagation()
+                          const drag = dragRef.current
+                          if (drag?.type === 'item' && drag.id !== it.id && onReorder) {
+                            onReorder(drag.id, it.id)
+                          }
+                          clearDrag()
                         }
                       : undefined
                   }
                   style={{
                     boxShadow: isOver ? 'inset 0 2px 0 var(--green)' : 'none',
-                    opacity: dragId === it.id ? 0.4 : 1,
+                    opacity: dragPayload?.type === 'item' && dragPayload.id === it.id ? 0.4 : 1,
                   }}
                 >
                   <div className="pt2-ctrl">

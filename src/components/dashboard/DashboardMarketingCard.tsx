@@ -11,43 +11,36 @@ function formatNum(n: number | null | undefined): string {
   return new Intl.NumberFormat('de-DE').format(Math.round(n))
 }
 
-function MetricTile({
+/** Kompakte Mock-KPI-Kachel: Label oben, Wert + Detail in einer Zeile. */
+function CompactKpi({
   label,
   value,
-  sub,
-  icon,
+  detail,
+  detailTone = 'muted',
   muted,
   onErrorClick,
 }: {
   label: string
   value: string
-  sub: string
-  icon: string
+  detail: string
+  detailTone?: 'muted' | 'positive'
   muted?: boolean
   onErrorClick?: () => void
 }) {
   return (
-    <div className="metric">
-      <div className="label">
-        <MockIcon ctx="default" n={icon} size={14} />
-        {label}
-      </div>
-      <div className={`value${muted ? '' : ' green'}`}>{value}</div>
-      <div className="delta" style={{ color: 'var(--text-3)' }}>
+    <div className="mkt-kpi">
+      <div className="mkt-kpi-label">{label}</div>
+      <div className="mkt-kpi-row">
+        <span className={`mkt-kpi-val${muted ? ' muted' : ''}`}>{value}</span>
         {onErrorClick ? (
-          <button
-            type="button"
-            className="text-[inherit] underline decoration-dotted underline-offset-2 hover:text-[var(--text)]"
-            onClick={onErrorClick}
-          >
-            {sub}
+          <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
+            {detail}
           </button>
         ) : (
-          sub
+          <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
+            {detail}
+          </span>
         )}
-      </div>
-      <div className="icon-bg" aria-hidden>
-        <MockIcon ctx="default" n={icon} size={64} />
       </div>
     </div>
   )
@@ -61,6 +54,15 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
     const counts = data.funnelStages.map((s) => s.count)
     return Math.max(1, ...counts, data.rechnerStart ?? 0)
   }, [data.funnelStages, data.rechnerStart])
+
+  const worstDropKey = useMemo(() => {
+    let best: (typeof data.funnelStages)[number] | null = null
+    for (const s of data.funnelStages) {
+      if (s.dropoffPct == null || s.dropoffLost == null || s.dropoffLost <= 0) continue
+      if (!best || s.dropoffPct > (best.dropoffPct ?? -1)) best = s
+    }
+    return best?.key ?? null
+  }, [data.funnelStages])
 
   return (
     <div className="card">
@@ -90,12 +92,11 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
       <div className="card-b" style={{ paddingTop: 4 }}>
         {tab === 'marketing' ? (
           <>
-            <div className="metrics metrics--strip" style={{ marginBottom: 0 }}>
-              <MetricTile
+            <div className="mkt-kpi-grid">
+              <CompactKpi
                 label="Website-Besuche"
                 value={data.pageviewsOk ? formatNum(data.pageviews) : '—'}
-                sub={data.pageviewsOk ? 'Website' : 'Fehler'}
-                icon="eye"
+                detail={data.pageviewsOk ? 'Website' : 'Fehler'}
                 muted={!data.pageviewsOk || data.pageviews == null}
                 onErrorClick={
                   !data.pageviewsOk && data.pageviewsError
@@ -103,11 +104,10 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     : undefined
                 }
               />
-              <MetricTile
+              <CompactKpi
                 label="Rechner gestartet"
                 value={data.funnelOk ? formatNum(data.rechnerStart) : '—'}
-                sub={data.funnelOk ? 'PostHog' : 'Fehler'}
-                icon="calculator"
+                detail={data.funnelOk ? 'PostHog' : 'Fehler'}
                 muted={!data.funnelOk || data.rechnerStart == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -115,17 +115,19 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     : undefined
                 }
               />
-              <MetricTile
+              <CompactKpi
                 label="Anfrage abgeschickt"
                 value={data.funnelOk ? formatNum(data.rechnerLead) : '—'}
-                sub={
-                  data.funnelOk && data.rechnerStart && data.rechnerStart > 0 && data.rechnerLead != null
+                detail={
+                  data.funnelOk &&
+                  data.rechnerStart &&
+                  data.rechnerStart > 0 &&
+                  data.rechnerLead != null
                     ? `${Math.round((data.rechnerLead / data.rechnerStart) * 1000) / 10}% vom Start`
                     : data.funnelOk
                       ? 'PostHog'
                       : 'Fehler'
                 }
-                icon="send"
                 muted={!data.funnelOk || data.rechnerLead == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -133,15 +135,14 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     : undefined
                 }
               />
-              <MetricTile
+              <CompactKpi
                 label="E-Mail-Zustellrate"
                 value={
                   data.resendOk && data.deliveryRatePct != null
                     ? `${formatNum(data.deliveryRatePct)}%`
                     : '—'
                 }
-                sub={data.resendOk ? 'E-Mail' : 'Fehler'}
-                icon="mail"
+                detail={data.resendOk ? 'E-Mail' : 'Fehler'}
                 muted={!data.resendOk || data.deliveryRatePct == null}
                 onErrorClick={
                   !data.resendOk && data.resendError
@@ -151,79 +152,62 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               />
             </div>
 
-            <div className="mt-4">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">
-                Rechner-Funnel
-              </p>
-              <p className="mb-2 text-[11.5px] text-[var(--text-3)]">
-                Meilensteine · Absprung zum nächsten Schritt
-              </p>
+            <div className="mkt-funnel-block">
+              <p className="mkt-funnel-h">Rechner-Funnel</p>
               {data.funnelOk && data.funnelStages.length > 0 ? (
-                <div className="overflow-x-auto rounded-[10px] border border-[var(--border)]">
-                  <div className="flex min-w-[420px] flex-col gap-1.5 p-3">
-                    {(() => {
-                      const worst = data.funnelStages.reduce(
-                        (best, s) =>
-                          s.dropoffPct != null &&
-                          s.dropoffLost != null &&
-                          s.dropoffLost > 0 &&
-                          s.dropoffPct > (best?.dropoffPct ?? -1)
-                            ? s
-                            : best,
-                        null as (typeof data.funnelStages)[number] | null
-                      )
-                      return data.funnelStages.map((s) => {
-                        const showDrop =
-                          s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
-                        const isWorst = worst != null && worst.key === s.key
-                        return (
-                          <div key={s.key}>
-                            {showDrop ? (
-                              <div
-                                className={
-                                  isWorst
-                                    ? 'mb-1 inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700'
-                                    : 'mb-1 inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-3)]'
-                                }
-                              >
-                                ↓ −{s.dropoffPct}% · −{formatNum(s.dropoffLost)}
-                                {isWorst ? ' · größter Absprung' : ''}
-                              </div>
-                            ) : null}
-                            <div className="grid grid-cols-[minmax(120px,1.2fr)_72px_minmax(80px,1fr)_48px] items-center gap-2">
-                              <div className="truncate text-[12.5px] font-medium text-[var(--text)]">
-                                {s.label}
-                              </div>
-                              <div className="text-right text-[12.5px] tabular-nums text-[var(--text)]">
-                                {formatNum(s.count)}
-                              </div>
-                              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${Math.round((s.count / maxFunnel) * 100)}%`,
-                                    background: 'var(--green)',
-                                  }}
-                                />
-                              </div>
-                              <div className="text-right text-[11.5px] tabular-nums text-[var(--text-3)]">
-                                {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    })()}
-                  </div>
-                  {data.funnelError ? (
-                    <p className="border-t border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-3)]">
-                      Hinweis: {data.funnelError}
-                    </p>
-                  ) : null}
+                <div className="mkt-funnel-list">
+                  {data.funnelStages.map((s) => {
+                    const hasDrop =
+                      s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
+                    const isWorst = worstDropKey === s.key
+                    const detail = hasDrop
+                      ? `↓ −${s.dropoffPct}% · −${formatNum(s.dropoffLost)}${
+                          isWorst ? ' · größter Absprung' : ''
+                        }`
+                      : s.key === 'start'
+                        ? 'Start'
+                        : s.key === 'lead'
+                          ? 'Conversion'
+                          : null
+                    return (
+                      <div key={s.key} className="mkt-funnel-row">
+                        <div className="mkt-funnel-left">
+                          <span className="mkt-funnel-title">{s.label}</span>
+                          {detail ? (
+                            <span
+                              className={
+                                isWorst
+                                  ? 'mkt-funnel-detail worst'
+                                  : 'mkt-funnel-detail'
+                              }
+                            >
+                              {detail}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mkt-funnel-bar">
+                          <div
+                            className="mkt-funnel-bar-fill"
+                            style={{
+                              width: `${Math.round((s.count / maxFunnel) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="mkt-funnel-nums">
+                          <span className="mkt-funnel-count">{formatNum(s.count)}</span>
+                          <span className="mkt-funnel-pct">
+                            {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
-                <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[12.5px] text-[var(--text-3)]">
-                  {data.funnelOk ? 'Noch keine Rechner-Events im Zeitraum.' : 'Funnel nicht verfügbar.'}
+                <div className="mkt-funnel-empty">
+                  {data.funnelOk
+                    ? 'Noch keine Rechner-Events im Zeitraum.'
+                    : 'Funnel nicht verfügbar.'}
                   {!data.funnelOk && data.funnelError ? (
                     <>
                       {' '}
@@ -238,26 +222,27 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                   ) : null}
                 </div>
               )}
+              {data.funnelOk && data.funnelError ? (
+                <p className="mkt-funnel-hint">Hinweis: {data.funnelError}</p>
+              ) : null}
             </div>
           </>
         ) : (
           <>
-            <div className="metrics metrics--strip" style={{ marginBottom: 0 }}>
-              <MetricTile
+            <div className="mkt-kpi-grid mkt-kpi-grid--2">
+              <CompactKpi
                 label="Google-Klicks"
                 value={data.gscOk ? formatNum(data.gscClicks) : '—'}
-                sub={data.gscOk ? 'Search Console' : 'Fehler'}
-                icon="brand-google"
+                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscClicks == null}
                 onErrorClick={
                   !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined
                 }
               />
-              <MetricTile
+              <CompactKpi
                 label="Impressionen"
                 value={data.gscOk ? formatNum(data.gscImpressions) : '—'}
-                sub={data.gscOk ? 'Search Console' : 'Fehler'}
-                icon="list-search"
+                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscImpressions == null}
                 onErrorClick={
                   !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined

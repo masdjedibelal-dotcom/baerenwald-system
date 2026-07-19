@@ -120,6 +120,9 @@ export function PosBoard({
   const [preislisteOpen, setPreislisteOpen] = useState(false)
   const [preislistePick, setPreislistePick] = useState('')
   const [preislisteTargetGewerk, setPreislisteTargetGewerk] = useState<string | null>(null)
+  const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
+  const [gewerkAddPick, setGewerkAddPick] = useState('')
+  const [gewerkAddCustom, setGewerkAddCustom] = useState('')
 
   const _line = lineOf ?? posBoardLineNetto
 
@@ -248,12 +251,26 @@ export function PosBoard({
   }
 
   const addGewerk = () => {
-    const names = new Set(positionen.map(gewerkOf))
-    let n = 1
-    let name = 'Neues Gewerk'
-    while (names.has(name)) {
-      name = `Neues Gewerk ${++n}`
+    setGewerkAddPick('')
+    setGewerkAddCustom('')
+    setGewerkAddOpen(true)
+  }
+
+  const confirmAddGewerk = () => {
+    const used = new Set(positionen.map(gewerkOf))
+    const fromSelect = gewerkAddPick.trim()
+    const fromCustom = gewerkAddCustom.trim()
+    let name = fromCustom || fromSelect
+    if (!name) return
+    if (used.has(name)) {
+      let n = 2
+      const base = name
+      while (used.has(`${base} ${n}`)) n += 1
+      name = `${base} ${n}`
     }
+    setGewerkAddOpen(false)
+    setGewerkAddPick('')
+    setGewerkAddCustom('')
     addPosition(name)
   }
 
@@ -302,6 +319,28 @@ export function PosBoard({
     })
     arr.splice(lastIdx + 1, 0, moved)
     onChange(arr)
+  }
+
+  /** Gewerk-Abschnitte als Blöcke umsortieren (Flat-Array-Reihenfolge). */
+  const reorderGroups = (draggedGewerk: string, targetGewerk: string) => {
+    if (!onChange || draggedGewerk === targetGewerk) return
+    const map = new Map<string, PosBoardLine[]>()
+    const order: string[] = []
+    for (const p of positionen) {
+      const g = gewerkOf(p)
+      if (!map.has(g)) {
+        map.set(g, [])
+        order.push(g)
+      }
+      map.get(g)!.push(p)
+    }
+    const fromIdx = order.indexOf(draggedGewerk)
+    if (fromIdx < 0 || !order.includes(targetGewerk)) return
+    order.splice(fromIdx, 1)
+    const insertAt = order.indexOf(targetGewerk)
+    if (insertAt < 0) return
+    order.splice(insertAt, 0, draggedGewerk)
+    onChange(order.flatMap((g) => map.get(g) ?? []))
   }
 
   const netto = positionen.reduce((s, p) => s + _line(p), 0)
@@ -422,6 +461,11 @@ export function PosBoard({
     return Array.from(new Set([...gewerke, ...fromLines]))
   }, [positionen, gewerke])
 
+  const gewerkeZumHinzufuegen = useMemo(() => {
+    const used = new Set(positionen.map(gewerkOf))
+    return gewerke.filter((g) => g.trim() && !used.has(g.trim()))
+  }, [gewerke, positionen])
+
   const aktivePreislisten = useMemo(
     () => preislisten.filter((p) => p.aktiv !== false),
     [preislisten]
@@ -522,6 +566,7 @@ export function PosBoard({
         dnd={editable}
         onReorder={reorder}
         onDropToGroup={dropToGroup}
+        onReorderGroup={reorderGroups}
         showTotals={showUst !== false}
         netto={netto}
         ust={ust}
@@ -548,7 +593,7 @@ export function PosBoard({
         <MockModal
           open
           onClose={() => setGEdit(null)}
-          icon="folder"
+          icon="folder-open"
           title="Gewerk bearbeiten"
           sub={gEdit}
           footer={
@@ -580,6 +625,73 @@ export function PosBoard({
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
             Benennt das Gewerk für alle Positionen dieser Gruppe um.
+          </div>
+        </MockModal>
+      ) : null}
+      {gewerkAddOpen ? (
+        <MockModal
+          open
+          onClose={() => {
+            setGewerkAddOpen(false)
+            setGewerkAddPick('')
+            setGewerkAddCustom('')
+          }}
+          icon="folder"
+          title="Gewerk hinzufügen"
+          sub="Abschnitt aus Stammdaten oder freier Bezeichnung"
+          footer={
+            <>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                sm
+                kind="primary"
+                icon="check"
+                disabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
+                onClick={confirmAddGewerk}
+              >
+                Hinzufügen
+              </MockBtn>
+            </>
+          }
+        >
+          {gewerkeZumHinzufuegen.length > 0 ? (
+            <div className="field">
+              <div className="field-label">Aus Stammdaten</div>
+              <select
+                className="sel"
+                value={gewerkAddPick}
+                onChange={(e) => {
+                  setGewerkAddPick(e.target.value)
+                  if (e.target.value) setGewerkAddCustom('')
+                }}
+                autoFocus
+              >
+                <option value="">Gewerk wählen…</option>
+                {gewerkeZumHinzufuegen.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
+              {gewerke.length === 0
+                ? 'Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.'
+                : 'Alle Stammdaten-Gewerke sind bereits als Abschnitt vorhanden.'}
+            </div>
+          )}
+          <div className="field" style={{ marginTop: gewerkeZumHinzufuegen.length ? 12 : 0 }}>
+            <div className="field-label">Oder freie Bezeichnung</div>
+            <input
+              className="txt"
+              value={gewerkAddCustom}
+              onChange={(e) => {
+                setGewerkAddCustom(e.target.value)
+                if (e.target.value.trim()) setGewerkAddPick('')
+              }}
+              placeholder="z.B. Trockenbau · 1. OG"
+            />
           </div>
         </MockModal>
       ) : null}

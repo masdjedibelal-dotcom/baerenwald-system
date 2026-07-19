@@ -865,6 +865,7 @@ export function AngebotWizard({
             showUst
             gewerke={gewerkNamen}
             preislisten={preislisten}
+            hideAddGewerk={dokumentTyp === 'einfach'}
           />
         </>
       ) : null}

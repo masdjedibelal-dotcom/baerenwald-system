@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  MockBadge,
   MockBtn,
   MockChip,
   MockEmpty,
@@ -708,10 +709,7 @@ export function VorgaengeListeClient({
                   {formatDatum(v.updatedAt)}
                 </div>
                 <div className="vg-status">
-                  <span className={cn('st-dot', `st-${kind}`)}>
-                    <span className="d" />
-                    {label}
-                  </span>
+                  <MockBadge kind={kind}>{label}</MockBadge>
                 </div>
                 <div className="vg-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
                   <MockEntityRowMenu items={rowMenuItems(v)} title="Vorgang" />

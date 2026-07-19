@@ -191,7 +191,7 @@ export const STANDARD_TEMPLATES: StandardTemplateSeed[] = [
   {
     name: 'Abnahme-Checkliste Allgemein',
     typ: 'handwerker',
-    subtyp: 'standard',
+    subtyp: 'abnahme',
     phase: 'abnahme',
     gewerk_id: null,
     felder: [
@@ -239,11 +239,34 @@ export const STANDARD_TEMPLATES: StandardTemplateSeed[] = [
   },
 ]
 
+/** Alte Doppel-/Vorab-Seeds — nicht mehr anlegen, in DB deaktivieren. */
+export const OBSOLETE_FORMULAR_TEMPLATE_NAMES = [
+  'Bad & Sanitär — Vorab',
+  'Heizung — Vorab',
+  'Allgemein — Abnahme',
+] as const
+
 export type EnsureStandardTemplatesResult = {
   ok: true
   inserted: number
   skipped: number
+  deactivated: number
 } | { ok: false; message: string }
+
+/** Deaktiviert überholte Standard-Vorlagen (idempotent). */
+export async function deactivateObsoleteFormularTemplates(): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from('formular_templates')
+    .update({ aktiv: false })
+    .in('name', [...OBSOLETE_FORMULAR_TEMPLATE_NAMES])
+    .eq('aktiv', true)
+    .select('id')
+  if (error) {
+    console.error('deactivateObsoleteFormularTemplates', error.message)
+    return 0
+  }
+  return data?.length ?? 0
+}
 
 /** Legt fehlende Standard-Templates an (idempotent nach `name`). */
 export async function ensureStandardTemplates(): Promise<EnsureStandardTemplatesResult> {
@@ -272,5 +295,6 @@ export async function ensureStandardTemplates(): Promise<EnsureStandardTemplates
     if (insErr) return { ok: false, message: insErr.message }
     inserted += 1
   }
-  return { ok: true, inserted, skipped }
+  const deactivated = await deactivateObsoleteFormularTemplates()
+  return { ok: true, inserted, skipped, deactivated }
 }

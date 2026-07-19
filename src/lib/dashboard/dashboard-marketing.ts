@@ -73,7 +73,6 @@ const FUNNEL_MILESTONES: Array<{
   label: string
   match: (label: string) => boolean
 }> = [
-  { key: 'trust', label: 'Trust', match: (l) => /\btrust\b/i.test(l) },
   { key: 'situation', label: 'Situation', match: (l) => /situation/i.test(l) },
   {
     key: 'bereich',
@@ -83,14 +82,14 @@ const FUNNEL_MILESTONES: Array<{
   {
     key: 'groesse',
     label: 'Größe & Details',
-    match: (l) => /gr[oö]sse|fl[aä]che|ausstattung|\bbad\b/i.test(l),
+    match: (l) => /gr[oö]sse|fl[aä]che|ausstattung|\bbad\b|umfang/i.test(l),
   },
   {
     key: 'preis',
     label: 'Preis & Ergebnis',
     match: (l) => /preis|ergebnis/i.test(l),
   },
-  { key: 'plz', label: 'PLZ / Ort', match: (l) => /\bplz\b|ort/i.test(l) },
+  { key: 'plz', label: 'PLZ / Ort', match: (l) => /\bplz\b|\bort\b/i.test(l) },
   {
     key: 'kontakt',
     label: 'Kontakt',

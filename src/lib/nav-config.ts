@@ -139,8 +139,6 @@ export const SUB_LABELS: Record<string, Record<string, string>> = {
     benutzer: 'Team',
     preise: 'Preislisten',
     formulare: 'Formulare',
-    email: 'Benachrichtigungen',
-    kommunikation: 'Textbausteine',
     integration: 'Integrationen',
     compliance: 'Compliance',
     datenschutz: 'Datenschutz & DSGVO',
