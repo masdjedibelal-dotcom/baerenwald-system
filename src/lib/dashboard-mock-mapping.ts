@@ -96,6 +96,26 @@ export function isAktiverAuftragStatus(status: string | null | undefined): boole
   return s === 'offen' || s === 'in_arbeit' || s === 'abnahme'
 }
 
+/** Angebot vom Kunden angenommen (Funnel-Stufe „Angebot“). */
+export function isAngenommenesAngebotStatus(
+  status: string | null | undefined,
+  statusEinfach?: string | null
+): boolean {
+  const fine = String(status ?? '').toLowerCase()
+  const einfach = String(statusEinfach ?? '').toLowerCase()
+  return (
+    fine === 'kunde_akzeptiert' ||
+    fine === 'angenommen' ||
+    einfach === 'angenommen'
+  )
+}
+
+/** Auftrag zählt im Vertriebs-Funnel: aktiv oder abgeschlossen (ohne Storno). */
+export function isFunnelAuftragStatus(status: string | null | undefined): boolean {
+  const s = String(status ?? '').toLowerCase()
+  return s === 'offen' || s === 'in_arbeit' || s === 'abnahme' || s === 'abgeschlossen'
+}
+
 /** KPI: Offene Rechnungen = gestellt/offen (gesendet; Überfällig ist Untermenge) */
 export function isOffeneRechnungStatus(status: string | null | undefined): boolean {
   const s = String(status ?? '').toLowerCase()

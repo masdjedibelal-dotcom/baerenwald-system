@@ -2,7 +2,6 @@ import 'server-only'
 
 import {
   type DashboardZeitraum,
-  inZeitraum,
   zeitraumStartIso,
 } from '@/lib/dashboard/dashboard-analytics'
 import { fetchGscSummary } from '@/lib/ki-hub/sources/google'
@@ -13,8 +12,6 @@ import {
   type RechnerFunnelStep,
 } from '@/lib/ki-hub/sources/posthog'
 import { fetchResendSummary } from '@/lib/ki-hub/sources/resend'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
-import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 
 export type DashboardMarketingTopQuery = {
   query: string
@@ -28,12 +25,10 @@ export type DashboardMarketingFunnelStage = {
   count: number
   /** Anteil vom Rechner-Start (0–100), null wenn Start = 0 */
   pctOfStart: number | null
-}
-
-export type DashboardMarketingNachfrageZeile = {
-  typ: 'gewerk' | 'leistung' | 'ort'
-  label: string
-  count: number
+  /** Absprung gegenüber vorherigem Meilenstein (0–100), null beim ersten Schritt */
+  dropoffPct: number | null
+  /** Absolute Verluste gegenüber vorherigem Meilenstein */
+  dropoffLost: number | null
 }
 
 export type DashboardMarketingSnapshot = {
@@ -54,8 +49,6 @@ export type DashboardMarketingSnapshot = {
   funnelStages: DashboardMarketingFunnelStage[]
   rechnerStart: number | null
   rechnerLead: number | null
-  /** Top Gewerke / Leistungen / Orte aus CRM-Anfragen */
-  nachfrage: DashboardMarketingNachfrageZeile[]
 }
 
 /** Datumsspanne für Marketing-Quellen — entspricht dem Dashboard-Zeitfilter. */
@@ -74,138 +67,36 @@ export function marketingDateRange(
   return { from: d.toISOString().slice(0, 10), to }
 }
 
-const SITUATION_LABELS: Record<string, string> = {
-  erneuern: 'Umbau & Modernisierung',
-  kaputt: 'Reparatur & Notfall',
-  notfall: 'Notfall',
-  neubauen: 'Neu bauen / Ausbau',
-  betreuung: 'Betreuung',
-  gewerbe: 'Gewerbe',
-}
-
-function topFromMap(map: Map<string, number>, limit: number): Array<{ label: string; count: number }> {
-  return Array.from(map.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'de'))
-    .slice(0, limit)
-}
-
-function leistungenAusFunnelDaten(raw: unknown): string[] {
-  if (!raw || typeof raw !== 'object') return []
-  const d = raw as Record<string, unknown>
-  const out: string[] = []
-  const push = (v: unknown) => {
-    const s = String(v ?? '').trim()
-    if (s) out.push(s)
-  }
-  if (Array.isArray(d.leistungen)) {
-    for (const x of d.leistungen) {
-      if (typeof x === 'string') push(x)
-      else if (x && typeof x === 'object') {
-        const o = x as Record<string, unknown>
-        push(o.name ?? o.leistung ?? o.label ?? o.titel)
-      }
-    }
-  }
-  if (Array.isArray(d.was_zeilen)) {
-    for (const x of d.was_zeilen) {
-      if (typeof x === 'string') push(x)
-      else if (x && typeof x === 'object') {
-        const o = x as Record<string, unknown>
-        push(o.name ?? o.leistung ?? o.label)
-      }
-    }
-  }
-  if (Array.isArray(d.positionen)) {
-    for (const x of d.positionen) {
-      if (x && typeof x === 'object') {
-        const o = x as Record<string, unknown>
-        push(o.leistung_name ?? o.leistung ?? o.name)
-      }
-    }
-  }
-  return out
-}
-
-async function loadNachfrageFromLeads(
-  zeitraum: DashboardZeitraum
-): Promise<DashboardMarketingNachfrageZeile[]> {
-  const startIso = zeitraumStartIso(zeitraum)
-  try {
-    const { data, error } = await withCrmReadFallback(async (db) =>
-      db
-        .from('leads')
-        .select('id, status, situation, bereiche, plz, ort, funnel_daten, created_at')
-        .order('created_at', { ascending: false })
-        .limit(2000)
-    )
-    if (error) throw error
-
-    type LeadRow = {
-      id: string
-      status: string | null
-      situation: string | null
-      bereiche: string[] | null
-      plz: string | null
-      ort: string | null
-      funnel_daten: unknown
-      created_at: string
-    }
-
-    const leads = ((data ?? []) as LeadRow[]).filter((row) => {
-      if (String(row.status ?? '').toLowerCase() === 'abgebrochen') return false
-      return inZeitraum(row.created_at, startIso)
-    })
-
-    const gewerkMap = new Map<string, number>()
-    const leistungMap = new Map<string, number>()
-    const ortMap = new Map<string, number>()
-
-    for (const lead of leads) {
-      const bereiche = Array.isArray(lead.bereiche) ? lead.bereiche : []
-      for (const b of bereiche) {
-        const label = String(b ?? '').trim()
-        if (label) gewerkMap.set(label, (gewerkMap.get(label) ?? 0) + 1)
-      }
-
-      const sitKey = String(lead.situation ?? '').trim()
-      if (sitKey) {
-        const sitLabel = SITUATION_LABELS[sitKey] ?? sitKey
-        leistungMap.set(sitLabel, (leistungMap.get(sitLabel) ?? 0) + 1)
-      }
-      for (const name of leistungenAusFunnelDaten(lead.funnel_daten)) {
-        leistungMap.set(name, (leistungMap.get(name) ?? 0) + 1)
-      }
-
-      const ort = String(lead.ort ?? '').trim()
-      const plz = String(lead.plz ?? '').trim()
-      const ortLabel = [plz, ort].filter(Boolean).join(' ')
-      if (ortLabel) ortMap.set(ortLabel, (ortMap.get(ortLabel) ?? 0) + 1)
-    }
-
-    const rows: DashboardMarketingNachfrageZeile[] = [
-      ...topFromMap(gewerkMap, 8).map((r) => ({
-        typ: 'gewerk' as const,
-        label: r.label,
-        count: r.count,
-      })),
-      ...topFromMap(leistungMap, 8).map((r) => ({
-        typ: 'leistung' as const,
-        label: r.label,
-        count: r.count,
-      })),
-      ...topFromMap(ortMap, 8).map((r) => ({
-        typ: 'ort' as const,
-        label: r.label,
-        count: r.count,
-      })),
-    ]
-    return rows.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'de')).slice(0, 20)
-  } catch (e) {
-    console.error('[loadNachfrageFromLeads]', e)
-    return []
-  }
-}
+/** Feste Meilensteine — Rohschritte werden per Label zugeordnet und zusammengefasst. */
+const FUNNEL_MILESTONES: Array<{
+  key: string
+  label: string
+  match: (label: string) => boolean
+}> = [
+  { key: 'trust', label: 'Trust', match: (l) => /\btrust\b/i.test(l) },
+  { key: 'situation', label: 'Situation', match: (l) => /situation/i.test(l) },
+  {
+    key: 'bereich',
+    label: 'Bereich / Gewerk',
+    match: (l) => /bereich|gewerk/i.test(l),
+  },
+  {
+    key: 'groesse',
+    label: 'Größe & Details',
+    match: (l) => /gr[oö]sse|fl[aä]che|ausstattung|\bbad\b/i.test(l),
+  },
+  {
+    key: 'preis',
+    label: 'Preis & Ergebnis',
+    match: (l) => /preis|ergebnis/i.test(l),
+  },
+  { key: 'plz', label: 'PLZ / Ort', match: (l) => /\bplz\b|ort/i.test(l) },
+  {
+    key: 'kontakt',
+    label: 'Kontakt',
+    match: (l) => /kontakt|danke/i.test(l),
+  },
+]
 
 function buildFunnelStages(
   start: number,
@@ -215,22 +106,46 @@ function buildFunnelStages(
   const pct = (n: number): number | null =>
     start > 0 ? Math.round((n / start) * 1000) / 10 : null
 
-  const stages: DashboardMarketingFunnelStage[] = [
-    { key: 'start', label: 'Rechner gestartet', count: start, pctOfStart: start > 0 ? 100 : null },
-    ...steps.map((s) => ({
+  const bucketMax = new Map<string, number>()
+  for (const step of steps) {
+    const label = step.label.trim()
+    const milestone = FUNNEL_MILESTONES.find((m) => m.match(label))
+    if (!milestone) continue
+    const prev = bucketMax.get(milestone.key) ?? 0
+    if (step.count > prev) bucketMax.set(milestone.key, step.count)
+  }
+
+  const raw: Array<{ key: string; label: string; count: number }> = [
+    { key: 'start', label: 'Rechner gestartet', count: start },
+    ...FUNNEL_MILESTONES.filter((m) => bucketMax.has(m.key)).map((m) => ({
+      key: m.key,
+      label: m.label,
+      count: bucketMax.get(m.key) ?? 0,
+    })),
+    { key: 'lead', label: 'Anfrage abgeschickt', count: lead },
+  ]
+
+  return raw.map((s, i) => {
+    const prev = i > 0 ? raw[i - 1]! : null
+    let dropoffPct: number | null = null
+    let dropoffLost: number | null = null
+    if (prev && prev.count > 0) {
+      const lost = Math.max(0, prev.count - s.count)
+      dropoffLost = lost
+      dropoffPct = Math.round((lost / prev.count) * 1000) / 10
+    } else if (prev) {
+      dropoffLost = 0
+      dropoffPct = 0
+    }
+    return {
       key: s.key,
       label: s.label,
       count: s.count,
       pctOfStart: pct(s.count),
-    })),
-    {
-      key: 'lead',
-      label: 'Anfrage abgeschickt',
-      count: lead,
-      pctOfStart: pct(lead),
-    },
-  ]
-  return stages
+      dropoffPct,
+      dropoffLost,
+    }
+  })
 }
 
 /** Leichtes Laden der Marketing-Zahlen für das Haupt-Dashboard (ohne vollen KI-Hub-Payload). */
@@ -239,7 +154,7 @@ export async function loadDashboardMarketing(
 ): Promise<DashboardMarketingSnapshot> {
   const range = marketingDateRange(zeitraum)
 
-  const [posthog, funnel, google, resend, nachfrage] = await Promise.all([
+  const [posthog, funnel, google, resend] = await Promise.all([
     fetchPostHogSummary(range).catch(() => ({
       status: 'unavailable' as const,
       error: 'PostHog nicht erreichbar',
@@ -260,7 +175,6 @@ export async function loadDashboardMarketing(
       error: 'Resend nicht erreichbar',
       data: undefined,
     })),
-    loadNachfrageFromLeads(zeitraum),
   ])
 
   const pageviewsRaw = posthog.data?.pageviews ?? posthog.data?.pageviews_7d
@@ -325,6 +239,5 @@ export async function loadDashboardMarketing(
     funnelStages,
     rechnerStart,
     rechnerLead,
-    nachfrage,
   }
 }

@@ -318,6 +318,11 @@
   overflow: auto;
   background: var(--bg);
 }
+@media (max-width: 760px) {
+  .page {
+    background: var(--bg-soft);
+  }
+}
 .page-inner {
   padding: 20px 24px 40px;
   max-width: 1400px;
@@ -465,12 +470,18 @@ div.input input {
 }
 div.input input::placeholder { color: var(--text-4); }
 
-/* Card */
+/* Card — Section-Elevation (Listen-Rows bleiben flach) */
 .card {
   background: var(--card);
   border: 0.5px solid var(--border);
   border-radius: var(--r);
   box-shadow: var(--shadow);
+}
+@media (max-width: 760px) {
+  .card {
+    box-shadow: var(--shadow-mobile);
+    border-color: rgba(22, 32, 27, 0.06);
+  }
 }
 .card-h {
   padding: 15px 18px;
@@ -581,12 +592,19 @@ div.input input::placeholder { color: var(--text-4); }
   margin-bottom: 14px;
 }
 
-/* List card */
+/* List card — Container mit Elevation, Rows darunter bleiben flach */
 .listcard {
   background: var(--card);
   border: 0.5px solid var(--border);
   border-radius: var(--r);
   overflow: hidden;
+  box-shadow: var(--shadow);
+}
+@media (max-width: 760px) {
+  .listcard {
+    box-shadow: var(--shadow-mobile);
+    border-color: rgba(22, 32, 27, 0.06);
+  }
 }
 .list-row {
   display: grid;
@@ -783,6 +801,55 @@ div.input input::placeholder { color: var(--text-4); }
   color: var(--bg-soft);
   pointer-events: none;
   opacity: 0.85;
+}
+
+/** Nested in a parent card: one strip, no per-tile borders (avoids double frames). */
+.metrics.metrics--strip {
+  gap: 0;
+  margin-bottom: 0;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.metrics.metrics--strip .metric {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 14px 16px;
+}
+.metrics.metrics--strip .metric + .metric {
+  border-left: 0.5px solid var(--border);
+}
+.metrics.metrics--strip .metric:hover {
+  box-shadow: none;
+  transform: none;
+  background: rgba(255, 255, 255, 0.55);
+}
+.metrics.metrics--strip .metric .icon-bg {
+  opacity: 0.45;
+}
+
+@media (max-width: 760px) {
+  .metrics.metrics--strip .metric {
+    border-left: none !important;
+  }
+  .metrics.metrics--strip .metric:nth-child(2n) {
+    border-left: 0.5px solid var(--border) !important;
+  }
+  .metrics.metrics--strip .metric:nth-child(n + 3) {
+    border-top: 0.5px solid var(--border);
+  }
+}
+
+@media (max-width: 420px) {
+  .metrics.metrics--strip .metric {
+    border-left: none !important;
+  }
+  .metrics.metrics--strip .metric + .metric {
+    border-top: 0.5px solid var(--border);
+  }
 }
 
 /* Timeline */
@@ -1085,6 +1152,16 @@ div.input input::placeholder { color: var(--text-4); }
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
+}
+@media (max-width: 760px) {
+  .kpi-card {
+    box-shadow: var(--shadow-mobile);
+    border-color: rgba(22, 32, 27, 0.06);
+  }
+  .kpi-card:hover {
+    box-shadow: var(--shadow-mobile);
+    transform: none;
+  }
 }
 .kpi-card:hover { border-color: var(--green); box-shadow: var(--shadow-pop, 0 6px 22px rgba(0,0,0,0.08)); }
 .kpi-card:active { transform: translateY(1px); }
@@ -3182,7 +3259,15 @@ div.input input::placeholder { color: var(--text-4); }
 @media (max-width: 760px) {/* Vorgänge → gestapelte Cards (Grid, einheitlich) */
 
   
-.listcard { overflow: visible; display: flex; flex-direction: column; gap: 10px; background: transparent; border: none; }
+.listcard {
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
 
   
 .vg-row.head { display: none !important; }
@@ -3201,9 +3286,9 @@ div.input input::placeholder { color: var(--text-4); }
     width: 100%;
     padding: 13px 14px;
     background: var(--card);
-    border: 0.5px solid var(--border);
+    border: 0.5px solid rgba(22, 32, 27, 0.06);
     border-radius: 12px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-mobile);
   }
 
   
@@ -3848,9 +3933,9 @@ div.input input::placeholder { color: var(--text-4); }
     min-width: 0;
     padding: 13px 44px 13px 14px;
     background: var(--card);
-    border: 0.5px solid var(--border);
+    border: 0.5px solid rgba(22, 32, 27, 0.06);
     border-radius: 12px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-mobile);
     margin-bottom: 10px;
   }
 

@@ -53,29 +53,14 @@ function MetricTile({
   )
 }
 
-const NACHFRAGE_TYP_LABEL: Record<string, string> = {
-  gewerk: 'Gewerk',
-  leistung: 'Leistung',
-  ort: 'Ort',
-}
-
 export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnapshot }) {
   const [tab, setTab] = useState<'marketing' | 'sichtbarkeit'>('marketing')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
-  const [nachfrageFilter, setNachfrageFilter] = useState<'alle' | 'gewerk' | 'leistung' | 'ort'>(
-    'alle'
-  )
 
   const maxFunnel = useMemo(() => {
     const counts = data.funnelStages.map((s) => s.count)
     return Math.max(1, ...counts, data.rechnerStart ?? 0)
   }, [data.funnelStages, data.rechnerStart])
-
-  const nachfrageRows = useMemo(() => {
-    const rows = data.nachfrage ?? []
-    if (nachfrageFilter === 'alle') return rows
-    return rows.filter((r) => r.typ === nachfrageFilter)
-  }, [data.nachfrage, nachfrageFilter])
 
   return (
     <div className="card">
@@ -105,7 +90,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
       <div className="card-b" style={{ paddingTop: 4 }}>
         {tab === 'marketing' ? (
           <>
-            <div className="metrics" style={{ marginBottom: 0 }}>
+            <div className="metrics metrics--strip" style={{ marginBottom: 0 }}>
               <MetricTile
                 label="Website-Besuche"
                 value={data.pageviewsOk ? formatNum(data.pageviews) : '—'}
@@ -170,31 +155,65 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">
                 Rechner-Funnel
               </p>
+              <p className="mb-2 text-[11.5px] text-[var(--text-3)]">
+                Meilensteine · Absprung zum nächsten Schritt
+              </p>
               {data.funnelOk && data.funnelStages.length > 0 ? (
                 <div className="overflow-x-auto rounded-[10px] border border-[var(--border)]">
-                  <div className="flex min-w-[480px] flex-col gap-2 p-3">
-                    {data.funnelStages.map((s) => (
-                      <div key={s.key} className="grid grid-cols-[minmax(120px,1.2fr)_72px_minmax(80px,1fr)_48px] items-center gap-2">
-                        <div className="truncate text-[12.5px] font-medium text-[var(--text)]">
-                          {s.label}
-                        </div>
-                        <div className="text-right text-[12.5px] tabular-nums text-[var(--text)]">
-                          {formatNum(s.count)}
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${Math.round((s.count / maxFunnel) * 100)}%`,
-                              background: 'var(--green)',
-                            }}
-                          />
-                        </div>
-                        <div className="text-right text-[11.5px] tabular-nums text-[var(--text-3)]">
-                          {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex min-w-[420px] flex-col gap-1.5 p-3">
+                    {(() => {
+                      const worst = data.funnelStages.reduce(
+                        (best, s) =>
+                          s.dropoffPct != null &&
+                          s.dropoffLost != null &&
+                          s.dropoffLost > 0 &&
+                          s.dropoffPct > (best?.dropoffPct ?? -1)
+                            ? s
+                            : best,
+                        null as (typeof data.funnelStages)[number] | null
+                      )
+                      return data.funnelStages.map((s) => {
+                        const showDrop =
+                          s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
+                        const isWorst = worst != null && worst.key === s.key
+                        return (
+                          <div key={s.key}>
+                            {showDrop ? (
+                              <div
+                                className={
+                                  isWorst
+                                    ? 'mb-1 inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700'
+                                    : 'mb-1 inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-3)]'
+                                }
+                              >
+                                ↓ −{s.dropoffPct}% · −{formatNum(s.dropoffLost)}
+                                {isWorst ? ' · größter Absprung' : ''}
+                              </div>
+                            ) : null}
+                            <div className="grid grid-cols-[minmax(120px,1.2fr)_72px_minmax(80px,1fr)_48px] items-center gap-2">
+                              <div className="truncate text-[12.5px] font-medium text-[var(--text)]">
+                                {s.label}
+                              </div>
+                              <div className="text-right text-[12.5px] tabular-nums text-[var(--text)]">
+                                {formatNum(s.count)}
+                              </div>
+                              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${Math.round((s.count / maxFunnel) * 100)}%`,
+                                    background: 'var(--green)',
+                                  }}
+                                />
+                              </div>
+                              <div className="text-right text-[11.5px] tabular-nums text-[var(--text-3)]">
+                                {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
                   </div>
                   {data.funnelError ? (
                     <p className="border-t border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-3)]">
@@ -220,70 +239,10 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                 </div>
               )}
             </div>
-
-            <div className="mt-4">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">
-                  Meist angefragt
-                </p>
-                <div className="seg" role="group" aria-label="Nachfrage-Filter">
-                  {(
-                    [
-                      ['alle', 'Alle'],
-                      ['gewerk', 'Gewerke'],
-                      ['leistung', 'Leistungen'],
-                      ['ort', 'Orte'],
-                    ] as const
-                  ).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className={nachfrageFilter === id ? 'on' : undefined}
-                      onClick={() => setNachfrageFilter(id)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {nachfrageRows.length > 0 ? (
-                <div className="overflow-x-auto rounded-[10px] border border-[var(--border)]">
-                  <table className="w-full text-left text-[12.5px]">
-                    <thead>
-                      <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-[0.03em] text-[var(--text-3)]">
-                        <th className="px-3 py-2 font-semibold">Typ</th>
-                        <th className="px-3 py-2 font-semibold">Bezeichnung</th>
-                        <th className="px-3 py-2 text-right font-semibold">Anfragen</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {nachfrageRows.map((r) => (
-                        <tr
-                          key={`${r.typ}-${r.label}`}
-                          className="border-b border-[var(--border)] last:border-0"
-                        >
-                          <td className="px-3 py-2 text-[var(--text-3)]">
-                            {NACHFRAGE_TYP_LABEL[r.typ] ?? r.typ}
-                          </td>
-                          <td className="px-3 py-2 text-[var(--text)]">{r.label}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {formatNum(r.count)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[12.5px] text-[var(--text-3)]">
-                  Noch keine Anfragen mit Gewerk / Ort im Zeitraum.
-                </div>
-              )}
-            </div>
           </>
         ) : (
           <>
-            <div className="metrics" style={{ marginBottom: 0 }}>
+            <div className="metrics metrics--strip" style={{ marginBottom: 0 }}>
               <MetricTile
                 label="Google-Klicks"
                 value={data.gscOk ? formatNum(data.gscClicks) : '—'}

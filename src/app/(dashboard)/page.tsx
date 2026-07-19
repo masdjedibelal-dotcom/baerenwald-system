@@ -5,6 +5,8 @@ import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
   isAktiverAuftragStatus,
+  isAngenommenesAngebotStatus,
+  isFunnelAuftragStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
 } from '@/lib/dashboard-mock-mapping'
@@ -14,6 +16,7 @@ import {
   buildKundenRanking,
   buildUmsatzverlauf12m,
   buildVertriebsFunnel,
+  countUniqueVorgaengeByLead,
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
@@ -156,7 +159,10 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
   const auftraege = auftraegeRaw as Array<Record<string, unknown>>
   const rechnungen = rechnungenRaw as Array<{ id: string; status: string; created_at: string }>
 
-  const leadsZ = leads.filter((l) => inZeitraum(l.created_at, startIso))
+  const leadsZ = leads.filter((l) => {
+    if (!inZeitraum(l.created_at, startIso)) return false
+    return String(l.status ?? '').toLowerCase() !== 'abgebrochen'
+  })
   const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
   const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, startIso))
@@ -210,10 +216,32 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
     }))
   )
 
+  const angeboteAngenommen = angeboteZ.filter((a) => {
+    if (!isAngenommenesAngebotStatus(a.status as string, a.status_einfach as string | null)) {
+      return false
+    }
+    // Nur angenommene Angebote, die zu einem Auftrag gehören
+    if (a.auftrag_id) return true
+    const aufs = a.auftraege
+    if (Array.isArray(aufs)) return aufs.length > 0
+    return Boolean(aufs)
+  })
+  const auftraegeFunnel = auftraegeZ.filter((a) => isFunnelAuftragStatus(a.status as string))
+
   const funnel = buildVertriebsFunnel({
     anfragen: leadsZ.length,
-    angebote: angeboteZ.length,
-    auftraege: auftraegeZ.length,
+    angebote: countUniqueVorgaengeByLead(
+      angeboteAngenommen.map((a) => ({
+        id: String(a.id ?? ''),
+        lead_id: (a.lead_id as string | null) ?? null,
+      }))
+    ),
+    auftraege: countUniqueVorgaengeByLead(
+      auftraegeFunnel.map((a) => ({
+        id: String(a.id ?? ''),
+        lead_id: (a.lead_id as string | null) ?? null,
+      }))
+    ),
   })
 
   const gewerk = buildGewerkUmsatz(

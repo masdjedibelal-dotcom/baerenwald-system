@@ -324,24 +324,28 @@ export type FunnelStufe = {
 
 export function buildVertriebsFunnel(input: {
   anfragen: number
+  /** Angenommene Angebote (Lead-eindeutig empfohlen). */
   angebote: number
+  /** Aktive oder abgeschlossene Aufträge (Lead-eindeutig empfohlen). */
   auftraege: number
 }): { stufen: FunnelStufe[]; conversionGesamt: number; dropoffs: { after: string; lost: number; rate: number }[] } {
-  const a = input.anfragen
-  const b = input.angebote
-  const c = input.auftraege
+  // Monoton halten: Folge-Stufen dürfen die vorherige nicht übersteigen (1:n-Schutz)
+  const a = Math.max(0, input.anfragen)
+  const b = Math.min(Math.max(0, input.angebote), a)
+  const c = Math.min(Math.max(0, input.auftraege), b)
+
   const stufen: FunnelStufe[] = [
     { key: 'anfrage', label: 'Anfragen', count: a, rate: 100, color: '#3B82F6' },
     {
       key: 'angebot',
-      label: 'Angebote',
+      label: 'Angebote angenommen',
       count: b,
       rate: a > 0 ? Math.round((b / a) * 100) : 0,
       color: '#F59E0B',
     },
     {
       key: 'auftrag',
-      label: 'Aufträge',
+      label: 'Aufträge aktiv/fertig',
       count: c,
       rate: a > 0 ? Math.round((c / a) * 100) : 0,
       color: '#2E7D52',
@@ -352,14 +356,33 @@ export function buildVertriebsFunnel(input: {
   if (a > 0) {
     const lost1 = Math.max(0, a - b)
     dropoffs.push({ after: 'anfrage', lost: lost1, rate: Math.round((lost1 / a) * 100) })
+  }
+  if (b > 0) {
     const lost2 = Math.max(0, b - c)
     dropoffs.push({
       after: 'angebot',
       lost: lost2,
-      rate: b > 0 ? Math.round((lost2 / b) * 100) : 0,
+      rate: Math.round((lost2 / b) * 100),
     })
   }
 
   const conversionGesamt = a > 0 ? Math.round((c / a) * 100) : 0
   return { stufen, conversionGesamt, dropoffs }
+}
+
+/** Zählt eindeutige Vorgänge (Lead-ID), Fallback ohne Lead = eigene ID. */
+export function countUniqueVorgaengeByLead(
+  rows: Array<{ id?: string | null; lead_id?: string | null }>
+): number {
+  const keys = new Set<string>()
+  for (const row of rows) {
+    const leadId = String(row.lead_id ?? '').trim()
+    if (leadId) {
+      keys.add(`lead:${leadId}`)
+      continue
+    }
+    const id = String(row.id ?? '').trim()
+    if (id) keys.add(`id:${id}`)
+  }
+  return keys.size
 }
