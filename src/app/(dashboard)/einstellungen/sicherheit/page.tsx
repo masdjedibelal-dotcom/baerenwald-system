@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import { EinstellungenSicherheitClient } from '@/components/einstellungen/EinstellungenSicherheitClient'
 
-/** Entfernt aus Einstellungen-Nav — Sicherheit & DSGVO. */
-export default function EinstellungenSicherheitRedirect() {
-  redirect('/einstellungen/firma')
+export const metadata: Metadata = {
+  title: 'Sicherheit & DSGVO',
+}
+
+export default function EinstellungenSicherheitPage() {
+  return <EinstellungenSicherheitClient />
 }

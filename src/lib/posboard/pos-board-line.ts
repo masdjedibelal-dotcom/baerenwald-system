@@ -1,5 +1,10 @@
 import { positionVkNettoStueck } from '@/lib/angebot-positionen'
 import {
+  splitNettoStueck,
+  type KostenVerteilung,
+} from '@/lib/angebot-kosten-split'
+import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
+import {
   GEWERK_NAME_ALLGEMEIN,
   neueArtikelZeile,
   neueFreitextZeile,
@@ -24,11 +29,18 @@ export type PosBoardLine = {
   /** Einzelpreis netto (bei Nachlass: Wert; Modus über nachlassModus) */
   preis: number
   ust?: number
+  /** Kostenart für PDF-Ausweis (Allgemein / Lohn / Material) */
+  kostenverteilung?: KostenVerteilung
   /** Zeilentyp — Standard Position */
   kind?: PosBoardLineKind
   /** Nur kind=nachlass */
   nachlassModus?: 'prozent' | 'betrag'
   preisliste_id?: string | null
+}
+
+function parseKostenverteilung(v: unknown): KostenVerteilung {
+  if (v === 'lohn' || v === 'material' || v === 'allgemein') return v
+  return 'allgemein'
 }
 
 export const POS_BOARD_DEFAULT_GEWERK = 'Allgemein'
@@ -47,6 +59,7 @@ export function neuePosBoardLine(partial?: Partial<PosBoardLine>): PosBoardLine 
     einheit: 'Stück',
     preis: 0,
     ust: 19,
+    kostenverteilung: 'allgemein',
     ...partial,
   }
 }
@@ -73,6 +86,7 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
     einheit: p.einheit || 'Stück',
     preis: positionVkNettoStueck(p),
     ust: p.mwst_satz != null ? Number(p.mwst_satz) : 19,
+    kostenverteilung: parseKostenverteilung(p.kostenverteilung),
   }
 }
 
@@ -83,6 +97,14 @@ export function posBoardLineToAngebotPosition(
   const m = Math.max(line.menge || 1, 0.0001)
   const vk = Math.round((Number(line.preis) || 0) * 100) / 100
   const lineTotal = Math.round(vk * m * 100) / 100
+  const kostenverteilung = parseKostenverteilung(
+    line.kostenverteilung ?? base?.kostenverteilung
+  )
+  const { lohn_netto, material_netto } = splitNettoStueck(vk, {
+    firm: defaultFirmenEinstellungen(),
+    leistung: line.name,
+    kostenverteilung,
+  })
   return {
     ...(base ?? {}),
     id: line.id,
@@ -93,8 +115,8 @@ export function posBoardLineToAngebotPosition(
     leistung: line.name,
     leistung_name: line.name,
     beschreibung: line.beschreibung ?? '',
-    lohn_netto: vk,
-    material_netto: 0,
+    lohn_netto,
+    material_netto,
     vk_netto: vk,
     gesamt_min: lineTotal,
     gesamt_max: lineTotal,
@@ -103,6 +125,7 @@ export function posBoardLineToAngebotPosition(
     mwst_satz: line.ust ?? 19,
     preis_typ: 'fix',
     einkaufspreis: base?.einkaufspreis,
+    kostenverteilung,
   }
 }
 
@@ -131,6 +154,7 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
     einheit: z.einheit,
     preis: z.vkNetto,
     ust: z.mwstSatz,
+    kostenverteilung: parseKostenverteilung(z.kostenverteilung),
   }
 }
 
@@ -140,6 +164,9 @@ export function posBoardLineToDokumentArtikel(
 ): DokumentArtikelZeile {
   const mwst: MwstSatzOption =
     line.ust === 0 || line.ust === 7 ? line.ust : 19
+  const kostenverteilung = parseKostenverteilung(
+    line.kostenverteilung ?? base?.kostenverteilung
+  )
   return {
     ...neueArtikelZeile({
       id: line.id,
@@ -155,7 +182,7 @@ export function posBoardLineToDokumentArtikel(
       gewerk_block_key: base?.gewerk_block_key,
       preisliste_id: line.preisliste_id ?? base?.preisliste_id,
       kostenart: base?.kostenart,
-      kostenverteilung: base?.kostenverteilung,
+      kostenverteilung,
       rabattProzent: base?.rabattProzent ?? 0,
       fachbetriebHinweisAnzeigen: base?.fachbetriebHinweisAnzeigen,
     }),

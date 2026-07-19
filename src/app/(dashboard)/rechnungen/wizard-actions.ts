@@ -40,7 +40,7 @@ import {
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
-  positionenFuerZahlungsplanZeile,
+  positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
   rechnungPositionenMitAuftrag,
@@ -268,7 +268,13 @@ export async function loadRechnungWizardKunde(
 
 export async function loadRechnungWizardBootstrapFromAuftrag(
   auftragId: string,
-  opts?: { naechsterAbschlag?: boolean }
+  opts?: {
+    naechsterAbschlag?: boolean
+    /** Explizite Planzeile (vom Zahlplan-Tab) — Wizard fragt nicht erneut. */
+    abschlagZeileId?: string | null
+    /** Vollrechnung ohne Abschlagsplan-Vorlage. */
+    vollOhnePlan?: boolean
+  }
 ): Promise<{ ok: true; bootstrap: RechnungWizardBootstrap } | { ok: false; message: string }> {
   try {
     const supabase = createClient()
@@ -283,9 +289,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       parseInt(firm.zahlungsziel_tage, 10) || defaultZahlungszielTage(kunde?.typ)
     )
     const rechnungen = await rechnungenAbschlagLinks(supabase, auftragId)
-    const planResolved = basis.zahlungsplan?.zeilen.length
-      ? basis.zahlungsplan
-      : zahlungsplanVorlage50_50()
+    const gespeicherterPlan = basis.zahlungsplan?.zeilen.length ? basis.zahlungsplan : null
     const metaDefaults = defaultRechnungWizardMeta(zt, {
       leistungszeitraum_von: basis.leistungszeitraum_von,
       leistungszeitraum_bis: basis.leistungszeitraum_bis,
@@ -297,26 +301,66 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     let meta: RechnungWizardMeta = metaDefaults
     let modus: 'voll' | 'abschlag' = 'voll'
     let zahlungsplanBearbeiten = false
+    let zahlungsplan: Zahlungsplan | null = gespeicherterPlan
+    let abschlag: RechnungWizardBootstrap['abschlag'] = null
 
-    if (opts?.naechsterAbschlag) {
-      const kontext = berechneZahlungsplan(planResolved, basis.gesamtNetto)
-      const naechste = naechsteOffeneAbschlagZeile(planResolved, kontext, rechnungen)
-      if (!naechste) {
-        return { ok: false, message: 'Alle Abschläge sind bereits abgerechnet.' }
+    const willAbschlag =
+      !opts?.vollOhnePlan &&
+      Boolean(opts?.abschlagZeileId?.trim() || opts?.naechsterAbschlag)
+
+    if (willAbschlag) {
+      if (!gespeicherterPlan) {
+        return {
+          ok: false,
+          message: 'Kein Abschlagsplan hinterlegt. Bitte zuerst einen Zahlplan anlegen.',
+        }
+      }
+      const kontext = berechneZahlungsplan(gespeicherterPlan, basis.gesamtNetto)
+      const zeile = opts?.abschlagZeileId?.trim()
+        ? kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
+        : naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
+      if (!zeile) {
+        return {
+          ok: false,
+          message: opts?.abschlagZeileId?.trim()
+            ? 'Abschlag nicht gefunden.'
+            : 'Alle Abschläge sind bereits abgerechnet.',
+        }
+      }
+      if (abschlagBereitsAbgerechnet(zeile.id, rechnungen)) {
+        return {
+          ok: false,
+          message: 'Für diesen Abschlag existiert bereits eine Rechnung.',
+        }
       }
       meta = {
         ...metaDefaults,
         zahlungsart: 'abschlaege',
-        abschlag_zeile_id: naechste.id,
+        abschlag_zeile_id: zeile.id,
         zahlungsbedingungen: zahlungstextFuerAbschlagZeile(
-          planResolved,
+          gespeicherterPlan,
           basis.gesamtNetto,
           zt,
-          naechste
+          zeile
         ),
+        faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am,
       }
       modus = 'abschlag'
-      zahlungsplanBearbeiten = !basis.zahlungsplan?.zeilen.length
+      zahlungsplan = gespeicherterPlan
+      zahlungsplanBearbeiten = false
+      abschlag = {
+        zeileId: zeile.id,
+        zeileIndex: zeile.index,
+        zeileTitel: zeile.titel,
+        rechnungArt: rechnungArtFuerZeile(zeile),
+        istSchluss: zeile.istSchluss,
+        gesamtNetto: kontext.gesamtNetto,
+        gesamtBrutto: kontext.gesamtBrutto,
+        bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+      }
+    } else if (opts?.vollOhnePlan) {
+      zahlungsplan = null
+      modus = 'voll'
     }
 
     return {
@@ -333,7 +377,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
         modus,
-        zahlungsplan: planResolved,
+        abschlag,
+        zahlungsplan,
         zahlungsplanBearbeiten,
         gesamtNetto: basis.gesamtNetto,
         rechnungenAbschlag: rechnungen,
@@ -644,7 +689,20 @@ export async function saveRechnungWizardDraft(
       }
     }
     const zeilenPos = zeile
-      ? positionenFuerZahlungsplanZeile(zeile, positionen, input.zahlungsplan)
+      ? positionenFuerAbschlagRechnung({
+          zeile,
+          allePositionen: positionen,
+          plan: input.zahlungsplan,
+          gesamtNetto,
+          auftragsReferenz: '',
+          projektTitel: '',
+          bereitsGestelltBrutto: berechneBereitsGestellt(
+            await rechnungenAbschlagLinks(
+              supabaseForBerechnung,
+              input.auftrag_id as string
+            )
+          ).brutto,
+        })
       : positionen
     liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
       berechnungVoll,
@@ -796,7 +854,18 @@ export async function createAllAbschlagRechnungenFromWizard(
 
   for (const zeile of kontext.zeilen) {
     const rechnungArt = rechnungArtFuerZeile(zeile) as 'abschlag' | 'schluss'
-    const zeilenPos = positionenFuerZahlungsplanZeile(zeile, allePositionen, input.zahlungsplan!)
+    const bereits = berechneBereitsGestellt(
+      bestehend.filter((r) => r.zahlungsplan_abschlag_id !== zeile.id)
+    )
+    const zeilenPos = positionenFuerAbschlagRechnung({
+      zeile,
+      allePositionen,
+      plan: input.zahlungsplan!,
+      gesamtNetto,
+      auftragsReferenz: '',
+      projektTitel: '',
+      bereitsGestelltBrutto: bereits.brutto,
+    })
     const liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
       berechnungVoll,
       zeile,

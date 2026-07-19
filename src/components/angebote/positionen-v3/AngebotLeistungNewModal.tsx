@@ -6,8 +6,15 @@ import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import { addAngebotPosition } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import type { AngebotGewerkBlock } from '@/components/angebote/positionen-v3/utils'
+import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 
 type GewerkOpt = { id: string; name: string; slug: string }
+
+const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
+  { value: 'allgemein', label: 'Allgemein' },
+  { value: 'lohn', label: 'Lohn' },
+  { value: 'material', label: 'Material' },
+]
 
 export function AngebotLeistungNewModal({
   open,
@@ -32,6 +39,7 @@ export function AngebotLeistungNewModal({
   const [ek, setEk] = useState('')
   const [menge, setMenge] = useState('1')
   const [einheit, setEinheit] = useState('Stk.')
+  const [kostenverteilung, setKostenverteilung] = useState<KostenVerteilung>('allgemein')
 
   useEffect(() => {
     if (!open) return
@@ -41,6 +49,7 @@ export function AngebotLeistungNewModal({
     setEk('')
     setMenge('1')
     setEinheit('Stk.')
+    setKostenverteilung('allgemein')
     setGewerkSlug(block?.gewerkSlug ?? gewerke[0]?.slug ?? '')
   }, [open, block, gewerke])
 
@@ -80,6 +89,7 @@ export function AngebotLeistungNewModal({
         ek_netto: ekNum != null && Number.isFinite(ekNum) ? ekNum : null,
         menge: mengeNum > 0 ? mengeNum : 1,
         einheit: einheit.trim() || 'Stk.',
+        kostenverteilung,
       })
       if (!r.ok) {
         toast.error(r.message)
@@ -138,6 +148,24 @@ export function AngebotLeistungNewModal({
             value={beschreibung}
             onChange={(e) => setBeschreibung(e.target.value)}
           />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="input-label">Kostenart</label>
+          <div className="seg" role="group" aria-label="Kostenart">
+            {KOSTENART_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={kostenverteilung === opt.value ? 'on' : undefined}
+                onClick={() => setKostenverteilung(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-bw-muted">
+            Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung
+          </p>
         </div>
         <div>
           <label className="input-label">VK netto *</label>

@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
 import {
-  AngebotWizardHandwerkerStep,
   buildGewerkHandwerkerZuweisungen,
   gewerkHandwerkerZuweisungenToMaps,
   type GewerkHandwerkerZuweisung,
@@ -87,7 +86,6 @@ function kundenName(lead: LeadDetail) {
 const WIZARD_STEP_LABELS = [
   'Typ & Projekt',
   'Positionen',
-  'Handwerker',
   'Finalisieren',
   'Vorschau',
   'Versenden',
@@ -136,13 +134,13 @@ function regionLabel(lead: LeadDetail): string {
 
 /**
  * Angebots-Wizard:
- * Typ & Projekt → Positionen → Handwerker → Finalisieren → Vorschau → Versenden
+ * Typ & Projekt → Positionen → Finalisieren → Vorschau → Versenden
  */
 export function AngebotWizard({
   lead,
   gewerke,
   preislisten,
-  handwerker = [],
+  handwerker: _handwerker = [],
   firm: firmProp,
   bootstrap = null,
   onClose,
@@ -152,6 +150,7 @@ export function AngebotWizard({
   lead: LeadDetail
   gewerke: Gewerk[]
   preislisten: Preisliste[]
+  /** @deprecated HW-Schritt entfernt — Prop bleibt für Aufrufer-Kompatibilität */
   handwerker?: Handwerker[]
   firm?: FirmenEinstellungen
   kundenObjekte?: KundenObjekt[]
@@ -160,6 +159,7 @@ export function AngebotWizard({
   onDone?: (angebotId: string) => void
   onSaved?: (angebotId: string) => void
 }) {
+  void _handwerker
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [leadState, setLeadState] = useState(lead)
@@ -515,7 +515,7 @@ export function AngebotWizard({
 
   /** Weiter — vor Vorschau Entwurf speichern für PDF */
   async function handleWeiter() {
-    if (step === 4) {
+    if (step === 3) {
       const id = await ensureDraftForPreview()
       if (!id) return
     }
@@ -600,7 +600,6 @@ export function AngebotWizard({
   if (!mounted) return null
 
   const wizardSteps = WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
-  const brand = firm.firmenname?.trim() || 'Bärenwald München'
   const finishLabel = istAuftragKorrektur ? 'Korrektur an Kunden senden' : 'Angebot versenden'
 
   const wizardDesktopActions = (
@@ -871,17 +870,6 @@ export function AngebotWizard({
       ) : null}
 
       {step === 3 ? (
-        <AngebotWizardHandwerkerStep
-          zeilen={zeilen}
-          gewerke={gewerke}
-          handwerker={handwerker}
-          zuweisungen={hwZuweisungen}
-          onChange={setHwZuweisungen}
-          disabled={saving}
-        />
-      ) : null}
-
-      {step === 4 ? (
         <div className="form-grid form-grid--sheet">
           <MockField label="Angebotstitel" full>
             <input
@@ -940,7 +928,7 @@ export function AngebotWizard({
         </div>
       ) : null}
 
-      {step === 5 ? (
+      {step === 4 ? (
         <AngebotWizardPdfPreview
           angebotId={angebotId}
           loading={previewLoading || saving || !angebotId}
@@ -948,12 +936,12 @@ export function AngebotWizard({
         />
       ) : null}
 
-      {step === 6 ? (
+      {step === 5 ? (
         <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-              Empfänger und Betreff prüfen — E-Mail-Vorschau wie beim Kunden
+              Empfänger und Betreff prüfen — Vorschau zeigt die echte Versand-Vorlage
             </div>
           </div>
 
@@ -1015,21 +1003,12 @@ export function AngebotWizard({
             E-Mail-Vorschau
           </div>
           <AngebotWizardMailPreview
-            brand={brand}
-            titel={mailBetreff.trim() || meta.titel.trim() || `Angebot ${projekt}`}
-            gueltigBis={meta.gueltig_bis}
+            angebotId={angebotId}
+            betreff={mailBetreff.trim() || undefined}
             einleitung={meta.einleitung}
             schluss={meta.schluss}
-            positionen={posBoardLines}
-            netto={mailSummen.nettoMin}
-            ust={mailSummen.mwstBetragMin}
-            brutto={mailSummen.bruttoMin}
-            empfaengerMail={mailTo[0] || email || 'kunde@beispiel.de'}
-            komplex={dokumentTyp === 'projekt'}
-            projektTitel={meta.leistungsumfang.trim() || projekt}
-            projektBeschreibung={projektbeschreibung}
-            fotos={projektFotos}
-            zahlfristText={zahlfristText}
+            leistungsumfang={meta.leistungsumfang.trim() || projekt}
+            empfaengerHint={mailTo[0] || email || undefined}
           />
 
           <div

@@ -12,7 +12,7 @@ export const ENTITY_DETAIL_TAB_LABELS = {
   dokumente: 'Dokumente',
   notizen: 'Notizen',
   uebersicht: 'Übersicht',
-  zahlplan: 'Zahlplan',
+  zahlplan: 'Zahlung & Rechnung',
   bautagebuch: 'Bautagebuch',
   schritte: 'Nächste Schritte',
   leistung: 'Leistungen',

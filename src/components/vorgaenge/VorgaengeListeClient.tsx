@@ -105,12 +105,18 @@ export function VorgaengeListeClient({
   embedded = false,
   restrictPartnerName,
   restrictHandwerkerId,
+  restrictKundeId,
+  restrictLeadIds,
 }: {
   rows: VorgangListeRow[]
   embedded?: boolean
   restrictPartnerName?: string
   /** Nur Vorgänge, in denen dieser Handwerker vorkommt (Mock `restrictHandwerker`). */
   restrictHandwerkerId?: string
+  /** Nur Vorgänge dieses Kunden (Mock `restrictKunde`). */
+  restrictKundeId?: string
+  /** Alternative: auf Lead-IDs einschränken (z. B. Melder + Auftraggeber). */
+  restrictLeadIds?: string[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -150,19 +156,20 @@ export function VorgaengeListeClient({
     (phase: (typeof VORGANG_PHASES)[number]) => {
       setFilter(phase)
       setStatusFilter([])
-      syncPhaseToUrl(phase)
+      if (!embedded) syncPhaseToUrl(phase)
     },
-    [syncPhaseToUrl]
+    [embedded, syncPhaseToUrl]
   )
 
   useEffect(() => {
+    if (embedded) return
     const tab = searchParams.get('tab') ?? searchParams.get('phase')
     if (isVorgangPhase(tab)) {
       setFilter(tab)
     } else if (!tab) {
       setFilter('alle')
     }
-  }, [searchParams])
+  }, [embedded, searchParams])
 
   const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
 
@@ -198,8 +205,16 @@ export function VorgaengeListeClient({
     if (hwId) {
       next = next.filter((r) => (r.handwerkerIds ?? []).includes(hwId))
     }
+    const leadIds =
+      restrictLeadIds && restrictLeadIds.length > 0 ? new Set(restrictLeadIds) : null
+    const kundeId = restrictKundeId?.trim() || null
+    if (leadIds || kundeId) {
+      next = next.filter(
+        (r) => (kundeId != null && r.kundeId === kundeId) || (leadIds != null && leadIds.has(r.leadId))
+      )
+    }
     return next
-  }, [rows, restrictPartnerName, restrictHandwerkerId])
+  }, [rows, restrictPartnerName, restrictHandwerkerId, restrictKundeId, restrictLeadIds])
 
   const statusOptions = useMemo(() => {
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
@@ -369,8 +384,6 @@ export function VorgaengeListeClient({
 
   return (
     <div>
-      {!embedded ? (
-      <>
       <div className="listbar">
         <div className="listbar-chips">
           {VORGANG_PHASES.map((p) => (
@@ -416,7 +429,7 @@ export function VorgaengeListeClient({
             onClick={() =>
               runMockListExport(
                 exportToCSV,
-                (filtered.length ? filtered : rows).map(toExportRow),
+                (filtered.length ? filtered : baseRows).map(toExportRow),
                 EXPORT_FIELDS,
                 'vorgaenge'
               )
@@ -548,10 +561,8 @@ export function VorgaengeListeClient({
           </label>
         </div>
       </MockModal>
-      </>
-      ) : null}
 
-      {!embedded && selectMode && selectedCount > 0 ? (
+      {selectMode && selectedCount > 0 ? (
         <div className="bulkbar">
           <span>
             <b>{selectedCount}</b> ausgewählt
@@ -579,7 +590,7 @@ export function VorgaengeListeClient({
         </div>
       ) : null}
 
-      <div className={cn('listcard', selectMode && !embedded && 'vg-selectmode')}>
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
         <div className="vg-row head">
           {selectMode ? (
             <div
@@ -715,7 +726,7 @@ export function VorgaengeListeClient({
         pageIndex={pageIndex}
         totalPages={totalPages}
         total={total}
-        pageSize={embedded ? 5 : pageSize}
+        pageSize={pageSize}
         unit="Vorgänge"
         onPageChange={(p) => setPageIndex(p - 1)}
       />

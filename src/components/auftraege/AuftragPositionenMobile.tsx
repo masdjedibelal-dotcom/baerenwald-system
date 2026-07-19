@@ -211,6 +211,19 @@ export function AuftragPositionenMobile({
       patchBlock(block, { end_datum: draftBis || null })
     }
   }
+
+  function saveGewerkDraft(block: AuftragGewerkBlock) {
+    commitGewerkName(block)
+    commitGewerkDates(block)
+  }
+
+  function cancelGewerkDraft(block: AuftragGewerkBlock) {
+    const zt = gewerkZeitraum(block)
+    setDraftName(block.gewerkName)
+    setDraftVon(zt.von ?? '')
+    setDraftBis(zt.bis ?? '')
+  }
+
   function patchBlock(
     block: AuftragGewerkBlock,
     meta: Omit<Parameters<typeof updateAuftragGewerkBlockMeta>[0], 'auftragId' | 'positionIds'>
@@ -339,11 +352,39 @@ export function AuftragPositionenMobile({
       >
         {sheetView === 'gewerk' && activeBlock ? (
           <div className="space-y-4">
+            {(() => {
+              const zt = gewerkZeitraum(activeBlock)
+              const dirty =
+                draftName.trim() !== activeBlock.gewerkName ||
+                (draftVon || '') !== (zt.von ?? '') ||
+                (draftBis || '') !== (zt.bis ?? '')
+              return dirty ? (
+                <div className="inline-edit-actions flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending || pendingLocal}
+                    onClick={() => cancelGewerkDraft(activeBlock)}
+                  >
+                    Abbrechen
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={pending || pendingLocal}
+                    onClick={() => saveGewerkDraft(activeBlock)}
+                  >
+                    Speichern
+                  </Button>
+                </div>
+              ) : null
+            })()}
             <Input
               label="Gewerk"
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              onBlur={() => commitGewerkName(activeBlock)}
               disabled={pending || pendingLocal}
             />
             <div className="grid grid-cols-2 gap-2">
@@ -352,7 +393,6 @@ export function AuftragPositionenMobile({
                 type="date"
                 value={draftVon}
                 onChange={(e) => setDraftVon(e.target.value)}
-                onBlur={() => commitGewerkDates(activeBlock)}
                 disabled={pending || pendingLocal}
               />
               <Input
@@ -360,7 +400,6 @@ export function AuftragPositionenMobile({
                 type="date"
                 value={draftBis}
                 onChange={(e) => setDraftBis(e.target.value)}
-                onBlur={() => commitGewerkDates(activeBlock)}
                 disabled={pending || pendingLocal}
               />
             </div>

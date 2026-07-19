@@ -31,6 +31,7 @@ export async function saveFormularTemplate(
     const { error } = await supabase.from('formular_templates').update(payload).eq('id', templateId)
     if (error) throw new Error(error.message)
     revalidatePath('/formulare')
+    revalidatePath('/einstellungen/formulare')
     revalidatePath(`/formulare/${templateId}/bearbeiten`)
     return templateId
   }
@@ -44,6 +45,7 @@ export async function saveFormularTemplate(
   if (error || !row) throw new Error(error?.message ?? 'Speichern fehlgeschlagen')
   const id = row.id as string
   revalidatePath('/formulare')
+  revalidatePath('/einstellungen/formulare')
   revalidatePath(`/formulare/${id}/bearbeiten`)
   return id
 }
@@ -57,4 +59,5 @@ export async function deleteFormularTemplate(templateId: string): Promise<void> 
 
   if (error) throw new Error(error.message)
   revalidatePath('/formulare')
+  revalidatePath('/einstellungen/formulare')
 }

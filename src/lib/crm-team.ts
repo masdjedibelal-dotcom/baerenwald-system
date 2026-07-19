@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { crmRoleFromUser } from '@/lib/auth/crm-access'
 
 export type CrmTeamMitglied = {
   id: string
@@ -25,7 +26,9 @@ export async function loadCrmTeamMitglieder(): Promise<CrmTeamMitglied[]> {
     return []
   }
 
-  const users = (authData.users ?? []).filter((u) => !u.banned_until)
+  const users = (authData.users ?? []).filter(
+    (u) => !u.banned_until && crmRoleFromUser(u) != null
+  )
   if (!users.length) return []
 
   const ids = users.map((u) => u.id)

@@ -8,6 +8,8 @@ import {
   neuePositionsId,
   summenAusPositionen,
 } from '@/lib/angebot-positionen'
+import { splitNettoStueck, type KostenVerteilung } from '@/lib/angebot-kosten-split'
+import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import { syncAngebotPositionenZuAuftrag } from '@/lib/auftraege/sync-angebot-zu-auftrag'
 import { istFreitextPosition, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -50,13 +52,21 @@ function insertIndexForBlock(positionen: AngebotPosition[], blockKey: string | n
   return lastIdx >= 0 ? lastIdx + 1 : positionen.length
 }
 
-function vkLineFromInput(vkNetto: number, menge: number): { lohn_netto: number; material_netto: number; gesamt_min: number; gesamt_max: number } {
+function vkLineFromInput(
+  vkNetto: number,
+  menge: number,
+  kostenverteilung: KostenVerteilung = 'allgemein'
+): { lohn_netto: number; material_netto: number; gesamt_min: number; gesamt_max: number } {
   const m = Math.max(menge, 0.0001)
   const line = Math.round(Math.max(vkNetto, 0) * 100) / 100
   const stueck = Math.round((line / m) * 100) / 100
+  const { lohn_netto, material_netto } = splitNettoStueck(stueck, {
+    firm: defaultFirmenEinstellungen(),
+    kostenverteilung,
+  })
   return {
-    lohn_netto: stueck,
-    material_netto: 0,
+    lohn_netto,
+    material_netto,
     gesamt_min: line,
     gesamt_max: line,
   }
@@ -152,7 +162,13 @@ export async function updateAngebotPositionSteuerung(
     data.vk_netto != null && Number.isFinite(data.vk_netto)
       ? Math.max(0, data.vk_netto)
       : (current.lohn_netto + current.material_netto) * menge
-  const vkParts = vkLineFromInput(vkLine, menge)
+  const kostenverteilung: KostenVerteilung =
+    current.kostenverteilung === 'lohn' ||
+    current.kostenverteilung === 'material' ||
+    current.kostenverteilung === 'allgemein'
+      ? current.kostenverteilung
+      : 'allgemein'
+  const vkParts = vkLineFromInput(vkLine, menge, kostenverteilung)
 
   const ekInput =
     data.ek_netto !== undefined
@@ -197,6 +213,7 @@ export async function addAngebotPosition(
     ek_netto?: number | null
     menge?: number | null
     einheit?: string | null
+    kostenverteilung?: KostenVerteilung | null
   }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const gate = await assertAngebotEditable(angebotId)
@@ -212,8 +229,15 @@ export async function addAngebotPosition(
     return { ok: false, message: 'VK netto ist erforderlich.' }
   }
 
+  const kostenverteilung: KostenVerteilung =
+    data.kostenverteilung === 'lohn' ||
+    data.kostenverteilung === 'material' ||
+    data.kostenverteilung === 'allgemein'
+      ? data.kostenverteilung
+      : 'allgemein'
+
   const menge = data.menge != null && Number.isFinite(data.menge) && data.menge > 0 ? data.menge : 1
-  const vkParts = vkLineFromInput(vkNum, menge)
+  const vkParts = vkLineFromInput(vkNum, menge, kostenverteilung)
   const einkaufspreis = ekStueckFromInput(data.ek_netto, menge)
   const blockKey = data.gewerk_block_key?.trim() || `${data.gewerk_slug}-${Date.now()}`
   const id = neuePositionsId()
@@ -235,6 +259,7 @@ export async function addAngebotPosition(
     gesamt_max: vkParts.gesamt_max,
     preis_typ: 'fix',
     einkaufspreis,
+    kostenverteilung,
   }
 
   const next = [...gate.positionen]

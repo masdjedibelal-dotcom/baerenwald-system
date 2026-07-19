@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import { EinstellungenIntegrationenMock } from '@/components/einstellungen/EinstellungenIntegrationenMock'
 
-/** Entfernt aus Einstellungen-Nav — Integrationen / Erweiterungen. */
-export default function EinstellungenIntegrationRedirect() {
-  redirect('/einstellungen/firma')
+export const metadata: Metadata = {
+  title: 'Integrationen',
+}
+
+export default function EinstellungenIntegrationPage() {
+  return <EinstellungenIntegrationenMock />
 }

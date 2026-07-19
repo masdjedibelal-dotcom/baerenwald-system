@@ -327,9 +327,27 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
       : null,
   }))
 
-  const notizen = [...(row.kunden_notizen ?? [])].sort(
+  const notizenRaw = [...(row.kunden_notizen ?? [])].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  ) as KundenNotizRow[]
+
+  const notizUserIds = Array.from(
+    new Set(notizenRaw.map((n) => n.erstellt_von).filter((id): id is string => Boolean(id?.trim())))
   )
+  let notizen = notizenRaw
+  if (notizUserIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, name')
+      .in('id', notizUserIds)
+    const nameById = new Map((profiles ?? []).map((p) => [p.id as string, (p.name as string) ?? '']))
+    notizen = notizenRaw.map((n) => ({
+      ...n,
+      user_profiles: n.erstellt_von
+        ? { name: nameById.get(n.erstellt_von)?.trim() || '' }
+        : null,
+    }))
+  }
 
   const em = row.email?.trim()
   const byMail = em

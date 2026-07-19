@@ -35,6 +35,7 @@ export function AbnahmeMaengelBearbeitenFlow({
   const [loading, setLoading] = useState(true)
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [maengel, setMaengel] = useState<AbnahmeMangel[]>([])
+  const baselineRef = useRef<AbnahmeMangel[]>([])
   const [uploadTarget, setUploadTarget] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -49,9 +50,25 @@ export function AbnahmeMaengelBearbeitenFlow({
       }
       setPunkte(saved.punkte)
       setMaengel(saved.maengel)
+      baselineRef.current = structuredClone(saved.maengel)
       setLoading(false)
     })()
   }, [auftragId, onClose])
+
+  function mangelDirty(m: AbnahmeMangel) {
+    const b = baselineRef.current.find((x) => x.punkt_id === m.punkt_id)
+    if (!b) return true
+    return (
+      (m.beschreibung ?? '') !== (b.beschreibung ?? '') ||
+      (m.frist?.slice(0, 10) ?? '') !== (b.frist?.slice(0, 10) ?? '')
+    )
+  }
+
+  function abbrechenMangel(punktId: string) {
+    const b = baselineRef.current.find((x) => x.punkt_id === punktId)
+    if (!b) return
+    setMaengel((prev) => prev.map((x) => (x.punkt_id === punktId ? structuredClone(b) : x)))
+  }
 
   async function uploadFoto(files: FileList | null, punktId: string) {
     if (!files?.length) return
@@ -106,6 +123,7 @@ export function AbnahmeMaengelBearbeitenFlow({
       if (fresh) {
         setPunkte(fresh.punkte)
         setMaengel(fresh.maengel)
+        baselineRef.current = structuredClone(fresh.maengel)
       }
       toast.success('Mangel aktualisiert — PDF neu erstellt')
       if (fresh && countOffeneMaengel(fresh.maengel) === 0) onDone()
@@ -192,11 +210,6 @@ export function AbnahmeMaengelBearbeitenFlow({
                   )
                   setMaengel(next)
                 }}
-                onBlur={() => {
-                  if (m.beschreibung.trim()) {
-                    void patchMangel(m.punkt_id, { status: m.status ?? 'offen', beschreibung: m.beschreibung })
-                  }
-                }}
               />
               <Input
                 label="Frist"
@@ -209,8 +222,35 @@ export function AbnahmeMaengelBearbeitenFlow({
                     prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, frist } : x))
                   )
                 }}
-                onBlur={() => void patchMangel(m.punkt_id, { status: m.status ?? 'offen', frist: m.frist })}
               />
+              {mangelDirty(m) ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => abbrechenMangel(m.punkt_id)}
+                  >
+                    Abbrechen
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    loading={pending}
+                    onClick={() =>
+                      void patchMangel(m.punkt_id, {
+                        status: m.status ?? 'offen',
+                        beschreibung: m.beschreibung,
+                        frist: m.frist,
+                      })
+                    }
+                  >
+                    Speichern
+                  </Button>
+                </div>
+              ) : null}
               {(m.verlauf ?? []).length > 0 ? (
                 <ul className="mt-2 space-y-0.5 text-[11px] text-bw-text-muted">
                   {m.verlauf!.map((v, i) => (

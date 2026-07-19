@@ -611,6 +611,114 @@ export async function sendRechnung(
   return { ok: true }
 }
 
+/** Echte Kunden-Mail-HTML wie beim Versand (ohne PDF / Statusänderung). */
+export async function previewRechnungKundeMail(input: {
+  rechnungId: string
+  betreff?: string
+  einleitung?: string | null
+  brutto?: number
+  faelligAm?: string | null
+  projektTitel?: string | null
+  rechnungsnummer?: string | null
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  const rechnungId = input.rechnungId.trim()
+  if (!rechnungId) return { ok: false, message: 'Rechnung fehlt' }
+
+  type RechnungPreviewRow = {
+    rechnungsnummer: string | null
+    status: string | null
+    beleg_typ: string | null
+    faellig_am: string | null
+    brutto: number | null
+    mail_einleitung?: string | null
+    mail_betreff?: string | null
+    kunden: Kunde | Kunde[] | null
+    angebote: unknown
+    auftraege: unknown
+  }
+
+  const { data: rec, error: loadErr } = await withCrmReadFallback<RechnungPreviewRow>(async (db) =>
+    db
+      .from('rechnungen')
+      .select(
+        `
+      rechnungsnummer,
+      status,
+      beleg_typ,
+      faellig_am,
+      brutto,
+      mail_einleitung,
+      mail_betreff,
+      kunden(name, email, typ, vorname, nachname),
+      angebote(leistungsumfang, notizen),
+      auftraege(titel, angebote(leistungsumfang, notizen))
+    `
+      )
+      .eq('id', rechnungId)
+      .maybeSingle()
+  )
+
+  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
+
+  const rechnungsnummer =
+    input.rechnungsnummer?.trim() ||
+    (rec.rechnungsnummer as string | null)?.trim() ||
+    'RE-Entwurf'
+
+  const kRaw = rec.kunden as Kunde | Kunde[] | null
+  const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
+  const branding = await getMailBranding(supabaseAdmin)
+  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
+  const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
+
+  const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
+  const aufRaw = rec.auftraege
+  const auftrag = Array.isArray(aufRaw) ? aufRaw[0] : aufRaw
+  const angAuftrag = auftrag?.angebote
+    ? Array.isArray(auftrag.angebote)
+      ? auftrag.angebote[0]
+      : auftrag.angebote
+    : null
+  const projektTitelDb = resolveRechnungProjektTitel({
+    angebot: angRechnung ?? angAuftrag,
+    auftragTitel: (auftrag?.titel as string | null) ?? null,
+    fallback: '',
+  })
+
+  const faelligRaw =
+    input.faelligAm !== undefined ? input.faelligAm : (rec.faellig_am as string | null)
+  const faelligAm =
+    faelligRaw && /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(faelligRaw.trim())
+      ? faelligRaw.trim()
+      : formatDatumDeFromIso(faelligRaw)
+
+  const tpl = buildRechnungMail(
+    {
+      anrede,
+      begruessung,
+      rechnungsnummer,
+      brutto: input.brutto !== undefined ? input.brutto : Number(rec.brutto ?? 0),
+      faelligAm,
+      projektTitel:
+        input.projektTitel !== undefined
+          ? input.projektTitel
+          : projektTitelDb || null,
+      mailEinleitung:
+        input.einleitung !== undefined
+          ? input.einleitung
+          : (rec.mail_einleitung as string | null)?.trim() || null,
+      mailBetreff:
+        input.betreff !== undefined
+          ? input.betreff?.trim() || null
+          : (rec.mail_betreff as string | null)?.trim() || null,
+    },
+    branding
+  )
+
+  return { ok: true, html: tpl.html, betreff: tpl.betreff }
+}
+
 function tageSeitFaelligkeitYmd(faelligAm: string | null): number {
   if (!faelligAm) return 0
   const parts = faelligAm.split('-').map((x) => parseInt(x, 10))

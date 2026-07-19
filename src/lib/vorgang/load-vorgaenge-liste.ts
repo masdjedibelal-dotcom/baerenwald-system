@@ -104,7 +104,12 @@ export async function loadVorgaengeListe(): Promise<{
     funnel_daten: unknown
     created_at: string
     updated_at: string
-    kunden?: { name?: string | null; vorname?: string | null; nachname?: string | null } | null
+    kunden?: {
+      id?: string | null
+      name?: string | null
+      vorname?: string | null
+      nachname?: string | null
+    } | null
   }
 
   const leads = filterOutLegacyDemoLeads(leadsRes.data as unknown as LeadRow[])
@@ -252,6 +257,7 @@ export async function loadVorgaengeListe(): Promise<{
     return {
       ...resolved,
       leadId: lead.id,
+      kundeId: kunde?.id?.trim() || null,
       kundeName,
       wertLabel,
       detailHref: detailHrefForPhase(resolved.phase, resolved.entityId, lead.id),

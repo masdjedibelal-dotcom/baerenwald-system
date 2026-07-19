@@ -246,6 +246,33 @@ export function berechneZahlungsplan(
   return { gesamtNetto, gesamtBrutto, zeilen }
 }
 
+/** Planzeile → Rechnungspositionen: zugeordnete Leistungen, sonst Pauschale aus Planbetrag. */
+export function positionenFuerAbschlagRechnung(input: {
+  zeile: ZahlungsplanZeileBerechnet
+  allePositionen: AngebotPosition[]
+  plan: Zahlungsplan
+  gesamtNetto: number
+  auftragsReferenz: string
+  projektTitel: string
+  bereitsGestelltBrutto: number
+}): AngebotPosition[] {
+  const assigned = positionenFuerZahlungsplanZeile(
+    input.zeile,
+    input.allePositionen,
+    input.plan
+  )
+  if (assigned.length > 0) return assigned
+  return [
+    buildAbschlagPauschalPosition({
+      zeile: input.zeile,
+      gesamtNetto: input.gesamtNetto,
+      auftragsReferenz: input.auftragsReferenz,
+      projektTitel: input.projektTitel,
+      bereitsGestelltBrutto: input.bereitsGestelltBrutto,
+    }),
+  ]
+}
+
 export function rechnungArtFuerZeile(zeile: ZahlungsplanZeileBerechnet): RechnungArt {
   return zeile.istSchluss ? 'schluss' : 'abschlag'
 }

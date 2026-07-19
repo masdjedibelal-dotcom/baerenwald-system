@@ -374,7 +374,7 @@ export async function createAbschlussberichtPdf(
   if (!voraus.hasAbnahme) {
     return {
       ok: false,
-      message: 'Abschlussbericht erst nach signiertem Abnahmeprotokoll möglich.',
+      message: 'Abschlussbericht erst nach Abnahmeprotokoll-PDF möglich.',
     }
   }
 

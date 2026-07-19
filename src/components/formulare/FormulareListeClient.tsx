@@ -1,243 +1,194 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { FileText } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { EmptyState } from '@/components/layout/EmptyState'
-import { ListFilterSection } from '@/components/layout/ListPageParts'
-import { AppListScreen } from '@/components/layout/app'
-import { ListFilterBar } from '@/components/ui/ListFilterBar'
-import { ListAvatar } from '@/components/ui/ListAvatar'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
-import type { FormularTemplate } from '@/lib/types'
-import { formatRelativeDate } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { toast } from '@/components/ui/app-toast'
+import {
+  deleteFormularTemplate,
+  duplicateFormularTemplate,
+  type FormularListeZeile,
+} from '@/app/(dashboard)/formulare/actions'
 
-type TemplateRow = FormularTemplate & { updated_at?: string | null }
+const COLS = '28px 1.6fr 1fr 120px 70px'
 
-type FilterKey =
-  | 'alle'
-  | 'bautagebuch'
-  | 'checkliste'
-  | 'pruefprotokoll'
-  | 'abnahme'
-  | 'sonstiges'
-
-type SortKey = 'neueste' | 'name' | 'felder'
-
-const SUBTYP_LABELS: Record<string, string> = {
-  bautagebuch: 'Bautagebuch',
-  checkliste: 'Checkliste',
-  pruefprotokoll: 'Prüfprotokoll',
-  abnahme: 'Abnahme',
-  sonstiges: 'Sonstiges',
-}
-
-function subtypLabel(subtyp?: string | null) {
-  if (!subtyp) return 'Sonstiges'
-  return SUBTYP_LABELS[subtyp] ?? subtyp
-}
-
-function passtZuFilter(f: TemplateRow, filter: FilterKey): boolean {
-  if (filter === 'alle') return true
-  if (filter === 'sonstiges') return !f.subtyp || f.subtyp === 'sonstiges'
-  return f.subtyp === filter
-}
-
-export function FormulareListeClient({ templates }: { templates: FormularTemplate[] }) {
-  const formulare = templates as TemplateRow[]
-  const [filter, setFilter] = useState<FilterKey>('alle')
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebouncedValue(q, 300)
-  const [modal, setModal] = useState<FormularTemplate | null>(null)
-  const [sortierung, setSortierung] = useState<SortKey>('neueste')
-
-  const filterOptionen = useMemo(
-    () => [
-      { label: 'Alle', value: 'alle' as const, count: formulare.length },
-      {
-        label: 'Bautagebuch',
-        value: 'bautagebuch' as const,
-        count: formulare.filter((f) => f.subtyp === 'bautagebuch').length,
-      },
-      {
-        label: 'Checkliste',
-        value: 'checkliste' as const,
-        count: formulare.filter((f) => f.subtyp === 'checkliste').length,
-      },
-      {
-        label: 'Prüfprotokoll',
-        value: 'pruefprotokoll' as const,
-        count: formulare.filter((f) => f.subtyp === 'pruefprotokoll').length,
-      },
-      {
-        label: 'Abnahme',
-        value: 'abnahme' as const,
-        count: formulare.filter((f) => f.subtyp === 'abnahme').length,
-      },
-      {
-        label: 'Sonstiges',
-        value: 'sonstiges' as const,
-        count: formulare.filter((f) => !f.subtyp || f.subtyp === 'sonstiges').length,
-      },
-    ],
-    [formulare]
+function Sec({
+  title,
+  icon,
+  actions,
+  children,
+}: {
+  title: string
+  icon?: string
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <div style={{ flex: 1 }} />
+        {actions}
+      </div>
+      <div>{children}</div>
+    </div>
   )
+}
 
-  const filtered = useMemo(() => {
-    const needle = debouncedQ.trim().toLowerCase()
-    return formulare.filter((f) => {
-      if (!passtZuFilter(f, filter)) return false
-      if (!needle) return true
-      const hay = [f.name, f.subtyp].filter(Boolean).join(' ').toLowerCase()
-      return hay.includes(needle)
-    })
-  }, [formulare, filter, debouncedQ])
+/** Mock-Typ: Abnahme · Update · Vorab · Service */
+function typLabel(f: FormularListeZeile): string {
+  const phase = (f.phase ?? '').toLowerCase()
+  const sub = (f.subtyp ?? '').toLowerCase()
+  if (phase === 'abnahme' || sub === 'abnahme') return 'Abnahme'
+  if (phase === 'update' || sub === 'bautagebuch' || sub === 'bautagebuch_kurz') return 'Update'
+  if (phase === 'vorab' || sub === 'checkliste') return 'Vorab'
+  if (sub === 'regiebericht' || sub === 'behinderung' || sub === 'pruefprotokoll') return 'Service'
+  return 'Service'
+}
 
-  const sorted = useMemo(() => {
-    const list = [...filtered]
-    list.sort((a, b) => {
-      if (sortierung === 'name') return a.name.localeCompare(b.name, 'de')
-      if (sortierung === 'felder') return (b.felder?.length || 0) - (a.felder?.length || 0)
-      return (
-        new Date(b.updated_at || b.created_at || 0).getTime() -
-        new Date(a.updated_at || a.created_at || 0).getTime()
-      )
+/** Mock-Parität: Formulare-Liste unter Einstellungen. */
+export function FormulareListeClient({ templates }: { templates: FormularListeZeile[] }) {
+  const router = useRouter()
+  const [rows, setRows] = useState(templates)
+  const [pending, startTransition] = useTransition()
+
+  const aktiv = useMemo(() => rows.filter((r) => r.aktiv !== false), [rows])
+
+  function onDuplizieren(f: FormularListeZeile) {
+    startTransition(async () => {
+      const r = await duplicateFormularTemplate(f.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Formular dupliziert')
+      router.push(`/formulare/${r.id}/bearbeiten`)
+      router.refresh()
     })
-    return list
-  }, [filtered, sortierung])
+  }
+
+  function onLoeschen(f: FormularListeZeile) {
+    if (!confirm(`„${f.name}“ löschen?`)) return
+    startTransition(async () => {
+      const r = await deleteFormularTemplate(f.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setRows((prev) => prev.filter((x) => x.id !== f.id))
+      toast.success('Formular gelöscht')
+      router.refresh()
+    })
+  }
 
   return (
-    <AppListScreen
-      filters={
-        <ListFilterSection
-          chipGroups={[
-            {
-              label: 'Typ',
-              options: filterOptionen,
-              selected: [filter],
-              onChange: (vals) => setFilter((vals[0] as FilterKey) || 'alle'),
-            },
-          ]}
-        >
-          <ListFilterBar
-            hideStatusFilter
-            hideZeitraumFilter
-            statusLabel="—"
-            statusOptions={[{ value: '', label: '—' }]}
-            statusValue=""
-            onStatusChange={() => {}}
-            zeitraumValue="alle"
-            onZeitraumChange={() => {}}
-            showCustomDates={false}
-            customFrom=""
-            customTo=""
-            onCustomFromChange={() => {}}
-            onCustomToChange={() => {}}
-            searchValue={q}
-            onSearchChange={setQ}
-            searchPlaceholder="Vorlagen suchen…"
-            onReset={() => {
-              setFilter('alle')
-              setQ('')
-            }}
-            hasActiveFilters={filter !== 'alle' || !!q.trim()}
-            resultCount={sorted.length}
-            sort={{
-              options: [
-                { field: 'neueste', label: 'Neueste zuerst' },
-                { field: 'name', label: 'Name A–Z' },
-                { field: 'felder', label: 'Meiste Felder' },
-              ],
-              currentField: sortierung,
-              currentDir: null,
-              onSort: (f) => setSortierung((f || 'neueste') as SortKey),
-            }}
-          />
-        </ListFilterSection>
+    <Sec
+      title={`Formulare · ${aktiv.length}`}
+      icon="forms"
+      actions={
+        <MockBtn sm kind="primary" icon="plus" onClick={() => router.push('/formulare/neu')}>
+          Formular
+        </MockBtn>
       }
     >
-      <PageHeader
-        action={
-          <Link href="/formulare/neu" className="btn primary sm inline-flex items-center justify-center">
-            + Formular
+      {aktiv.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>
+          Noch keine Formular-Vorlagen.{' '}
+          <Link href="/formulare/neu" style={{ color: 'var(--green)' }}>
+            Erstes Formular anlegen
           </Link>
-        }
-      />
-
-      <div>
-        {sorted.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title={formulare.length === 0 ? 'Noch keine Formular-Vorlagen' : 'Keine Treffer'}
-            description={
-              formulare.length === 0
-                ? 'Legen Sie ein neues Template an, um Formulare für Handwerker zu nutzen.'
-                : 'Filter anpassen.'
-            }
-            action={
-              formulare.length === 0 ? (
-                <Link href="/formulare/neu" className="btn primary sm">
-                  + Erstes Template anlegen
-                </Link>
-              ) : null
-            }
-          />
-        ) : (
-          <ul className="m-0 list-none space-y-3 p-0">
-            {sorted.map((formular) => (
-              <li key={formular.id} className="list-none">
-                <div className="app-entity-card app-entity-list-row">
-                  <Link
-                    href={`/formulare/${formular.id}/bearbeiten`}
-                    className="app-entity-list-row__main block min-w-0 text-inherit no-underline"
-                  >
-                    <div className="flex gap-3">
-                      <div className="app-entity-list-row__avatar shrink-0">
-                        <ListAvatar name={formular.name} tone="soft" />
-                      </div>
-                      <div className="app-entity-list-row__body min-w-0 flex-1">
-                        <p className="app-entity-list-row__title">{formular.name}</p>
-                        <p className="app-entity-list-row__line">
-                          {formular.felder?.length || 0} Felder · {subtypLabel(formular.subtyp)}
-                        </p>
-                        <p className="app-entity-list-row__line">
-                          {formatRelativeDate(formular.updated_at || formular.created_at || '')}
-                        </p>
-                      </div>
-                      {!formular.aktiv ? (
-                        <span className="rounded-md bg-bw-hover px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
-                          Inaktiv
-                        </span>
-                      ) : null}
-                    </div>
-                  </Link>
-                  <div className="app-entity-list-row__footer mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn ghost sm"
-                      onClick={() => setModal(formular)}
-                    >
-                      Vorschau
-                    </button>
-                    <Link href={`/formulare/${formular.id}/bearbeiten`} className="btn ghost sm">
-                      Bearbeiten
-                    </Link>
-                  </div>
+        </p>
+      ) : (
+        <div style={{ margin: 0 }}>
+          <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
+            <div />
+            <div>Name</div>
+            <div>Typ</div>
+            <div>Genutzt</div>
+            <div />
+          </div>
+          {aktiv.map((f) => {
+            const fields = f.felder?.length ?? 0
+            return (
+              <div
+                key={f.id}
+                className="list-row"
+                style={{
+                  gridTemplateColumns: COLS,
+                  cursor: 'default',
+                  alignItems: 'center',
+                }}
+              >
+                <MockIcon ctx="row" n="file-text" size={18} style={{ color: 'var(--text-3)' }} />
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                  }}
+                >
+                  {f.name}
+                  <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>
+                    {' '}
+                    · {fields} Feld{fields === 1 ? '' : 'er'}
+                  </span>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <FormularVorschauModal
-        open={!!modal}
-        onClose={() => setModal(null)}
-        name={modal?.name ?? ''}
-        felder={modal?.felder ?? []}
-      />
-    </AppListScreen>
+                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{typLabel(f)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {f.genutzt}× genutzt
+                </div>
+                <div style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}>
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="pencil"
+                    title="Editor"
+                    disabled={pending}
+                    onClick={() => router.push(`/formulare/${f.id}/bearbeiten`)}
+                  />
+                  <MockEntityRowMenu
+                    items={[
+                      {
+                        icon: 'pencil',
+                        label: 'Bearbeiten',
+                        onClick: () => router.push(`/formulare/${f.id}/bearbeiten`),
+                      },
+                      {
+                        icon: 'copy',
+                        label: 'Duplizieren',
+                        onClick: () => onDuplizieren(f),
+                      },
+                      'sep',
+                      {
+                        icon: 'trash',
+                        label: 'Löschen',
+                        danger: true,
+                        onClick: () => onLoeschen(f),
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Sec>
   )
 }

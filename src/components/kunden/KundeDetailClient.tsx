@@ -1,26 +1,18 @@
 'use client'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
-import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
+import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
+import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
-import { ListGridShell } from '@/components/layout/ListPageParts'
-import { DetailProp } from '@/components/ui/detail-prop'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
-import {
-  CrmDokumenteTabelle,
-  type CrmDokumentZeile,
-} from '@/components/dokumente/CrmDokumenteTabelle'
-import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
-import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
-import { LeadStatusBadge } from '@/components/ui/Badge'
+import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
@@ -34,6 +26,8 @@ import {
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
+import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
+import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import type { KundenObjekt } from '@/lib/types'
 import {
   kundeNeueAnfrageHref,
@@ -41,13 +35,11 @@ import {
   kundeNeuesAngebotHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
 import { DetailHead } from '@/components/layout/DetailHead'
-import { DetailResponsiveTabs } from '@/components/layout/app'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
@@ -58,16 +50,11 @@ import {
 } from '@/lib/portal-utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
-import type { AngebotStatus, AuftragStatus, LeadStatus } from '@/lib/types'
-import { betragAnzeige, resolveStatusEinfach } from '@/lib/angebot-einfach'
-import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
-import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
-import { BEREICH_LABELS, formatAnfragePreisAnzeige, formatDatum, formatRelativeDate } from '@/lib/utils'
 import { parseEmailTokens } from '@/lib/email-recipients'
-import { StammdatenVerknuepfungen } from '@/components/stammdaten/StammdatenVerknuepfungen'
-import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
+import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 
@@ -105,11 +92,6 @@ function buildEditFormFromKunde(k: KundeDetailPayload) {
   }
 }
 
-function formatEur(n: number | null | undefined) {
-  if (n == null || Number.isNaN(n)) return '—'
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
 function normalizeAuftragAngebote(
   raw:
     | {
@@ -131,85 +113,30 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-function angebotAgg(
-  a: {
-    angebote?:
-      | { gesamt_fix: number | null; gesamt_min: number | null; gesamt_max: number | null; pdf_url?: string | null }
-      | {
-          gesamt_fix: number | null
-          gesamt_min: number | null
-          gesamt_max: number | null
-          pdf_url?: string | null
-        }[]
-      | null
-  } | null
-) {
-  const ag = a?.angebote
-  if (!ag) return null
-  return Array.isArray(ag) ? ag[0] : ag
-}
-
-function auftragTitelFromRechnung(r: NonNullable<KundeDetailPayload['rechnungen']>[0]): string {
-  const rel = r.auftraege
-  if (!rel) return '—'
-  const t = Array.isArray(rel) ? rel[0]?.titel : rel.titel
-  return t?.trim() || '—'
-}
-
-function isRechnungUeberfaellig(r: { status: string; faellig_am?: string | null }) {
-  if (r.status === 'bezahlt' || r.status === 'storniert') return false
-  if (!r.faellig_am) return false
-  return new Date(r.faellig_am).getTime() < Date.now()
-}
-
-function rechnungStatusBadge(r: { status: string; faellig_am?: string | null }) {
-  if (isRechnungUeberfaellig(r)) {
-    return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Überfällig</MockBadge>
-  }
-  const st = r.status as RechnungStatus
-  if (st === 'bezahlt') return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>{RECHNUNG_STATUS_LABELS.bezahlt}</MockBadge>
-  if (st === 'gesendet') return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{RECHNUNG_STATUS_LABELS.gesendet}</MockBadge>
-  if (st === 'storniert') return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>{RECHNUNG_STATUS_LABELS.storniert}</MockBadge>
-  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>{RECHNUNG_STATUS_LABELS.entwurf}</MockBadge>
-}
-
 type KundeDetailTab = 'uebersicht' | 'objekte' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
-
-const DESKTOP_KUNDE_TABS_BASE: KundeDetailTab[] = [
-  'uebersicht',
-  'stammdaten',
-  'vorgaenge',
-  'dokumente',
-  'notizen',
-]
-const MOBILE_KUNDE_TABS_BASE: KundeDetailTab[] = DESKTOP_KUNDE_TABS_BASE
 
 export function KundeDetailClient({
   kunde: initialKunde,
   customFieldDefs,
   customValues: initialValues,
   kundenObjekte = [],
-  verwandteStammdaten = [],
+  vorgaengeRows = [],
 }: {
   kunde: KundeDetailPayload
   customFieldDefs: CustomFieldDefinition[]
   customValues: CustomFieldValueRow[]
   kundenObjekte?: KundenObjekt[]
-  verwandteStammdaten?: StammdatenKontaktTreffer[]
+  vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
-  const [interneNotiz, setInterneNotiz] = useState(initialKunde.notizen ?? '')
   const [pending, startTransition] = useTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const interneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const kundeRef = useRef(kunde)
-  kundeRef.current = kunde
-  const [editOpen, setEditOpen] = useState(false)
+  const [editingKontakt, setEditingKontakt] = useState(false)
   const [editErr, setEditErr] = useState<string | null>(null)
   const [portalModalOpen, setPortalModalOpen] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -240,239 +167,59 @@ export function KundeDetailClient({
 
   useEffect(() => {
     setKunde(initialKunde)
-    setInterneNotiz(initialKunde.notizen ?? '')
     setEditForm(buildEditFormFromKunde(initialKunde))
   }, [initialKunde])
 
-  useEffect(() => {
-    if (interneTimer.current) clearTimeout(interneTimer.current)
-    interneTimer.current = setTimeout(() => {
-      const k = kundeRef.current
-      const t = interneNotiz.trim()
-      if (t === (k.notizen ?? '').trim()) return
-      void (async () => {
-        const r = await saveKunde(
-          {
-            typ: k.typ,
-            name: istKundeFirmaPflichtTyp(k.typ) ? k.name : null,
-            vorname: k.vorname ?? null,
-            nachname: k.nachname ?? null,
-            strasse: k.strasse ?? k.adresse,
-            hausnummer: k.hausnummer ?? null,
-            telefon: k.telefon,
-            email: k.email,
-            plz: k.plz,
-            ort: k.ort,
-            webseite: k.webseite,
-            ansprechpartner: k.ansprechpartner,
-            quelle: k.quelle,
-            notizen: t || null,
-            stammPflicht: false,
-          },
-          k.id
-        )
-        if (r.ok) refresh()
-      })()
-    }, 800)
-    return () => {
-      if (interneTimer.current) clearTimeout(interneTimer.current)
-    }
-  }, [interneNotiz, router])
-
   const rechnungen = useMemo(() => kunde.rechnungen ?? [], [kunde.rechnungen])
-  const offenSumme = useMemo(
-    () =>
-      rechnungen
-        .filter((r) => r.status !== 'bezahlt' && r.status !== 'storniert')
-        .reduce((s, r) => s + (Number(r.brutto) || 0), 0),
-    [rechnungen]
-  )
-
-  const einbehalteFlat = useMemo(() => {
-    const rows: { id: string; label: string; betrag: number; freigabe: string; auftrag: string }[] = []
-    for (const a of kunde.auftraege ?? []) {
-      const atitel = a.titel?.trim() || 'Auftrag'
-      for (const e of a.einbehalte ?? []) {
-        const hw = e.handwerker
-        const label = hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
-        rows.push({
-          id: e.id,
-          label,
-          betrag: Number(e.einbehalt_betrag) || 0,
-          freigabe: e.freigabe_datum,
-          auftrag: atitel,
-        })
-      }
-    }
-    return rows
-  }, [kunde.auftraege])
-
-  const einbehaltSumme = useMemo(() => einbehalteFlat.reduce((s, e) => s + e.betrag, 0), [einbehalteFlat])
-
-  const auftraegeCount = kunde.auftraege?.length ?? 0
-  const anfragenCount = kunde.leads?.length ?? 0
-
-  const alleAngebote = useMemo(() => {
-    type Zeile = {
-      id: string
-      status: string
-      status_einfach?: string | null
-      gueltig_bis?: string | null
-      gesamt_fix: number | null
-      gesamt_min: number | null
-      gesamt_max: number | null
-      created_at?: string | null
-      bezug: string
-    }
-    const byId = new Map<string, Zeile>()
-    for (const l of kunde.leads ?? []) {
-      const leadLabel =
-        leadSituationDisplay(l.situation) ||
-        (l.bereiche?.length ? l.bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ') : 'Anfrage')
-      for (const a of l.angebote ?? []) {
-        byId.set(a.id, {
-          id: a.id,
-          status: a.status,
-          status_einfach: a.status_einfach,
-          gueltig_bis: a.gueltig_bis,
-          gesamt_fix: a.gesamt_fix,
-          gesamt_min: a.gesamt_min,
-          gesamt_max: a.gesamt_max,
-          created_at: a.created_at,
-          bezug: leadLabel,
-        })
-      }
-    }
-    for (const a of kunde.auftraege ?? []) {
-      for (const ang of normalizeAuftragAngebote(a.angebote) as Array<{
-        id: string
-        status?: string
-        status_einfach?: string | null
-        gueltig_bis?: string | null
-        gesamt_fix?: number | null
-        gesamt_min?: number | null
-        gesamt_max?: number | null
-        created_at?: string | null
-      }>) {
-        if (!ang?.id || byId.has(ang.id)) continue
-        byId.set(ang.id, {
-          id: ang.id,
-          status: ang.status ?? 'entwurf',
-          status_einfach: ang.status_einfach ?? null,
-          gueltig_bis: ang.gueltig_bis ?? null,
-          gesamt_fix: ang.gesamt_fix ?? null,
-          gesamt_min: ang.gesamt_min ?? null,
-          gesamt_max: ang.gesamt_max ?? null,
-          created_at: ang.created_at,
-          bezug: a.titel?.trim() || 'Auftrag',
-        })
-      }
-    }
-    return Array.from(byId.values()).sort(
-      (x, y) => new Date(y.created_at ?? 0).getTime() - new Date(x.created_at ?? 0).getTime()
-    )
-  }, [kunde.leads, kunde.auftraege])
-
-  const angeboteCount = alleAngebote.length
-  const avgAuftrag =
-    auftraegeCount > 0 && (kunde.gesamt_umsatz ?? 0) > 0
-      ? (kunde.gesamt_umsatz ?? 0) / auftraegeCount
-      : null
 
   const dokumenteCount = useMemo(() => {
-    let n = (kunde.kunden_dokumente ?? []).filter((d) => d.typ !== 'protokoll').length
-    for (const l of kunde.leads ?? []) {
-      n += (l.angebote ?? []).filter((a) => a.pdf_url).length
-    }
+    let n = (kunde.kunden_dokumente ?? []).filter(
+      (d) => d.typ !== 'protokoll' && d.datei_url?.trim()
+    ).length
+    const seenAngebote = new Set<string>()
     for (const a of kunde.auftraege ?? []) {
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
-        if (ang?.pdf_url?.trim()) n += 1
+        if (ang?.id && !seenAngebote.has(ang.id)) {
+          seenAngebote.add(ang.id)
+          n += 1
+        }
       }
-      if (a.abnahme_protokoll_url) n += 1
+      if (a.abnahme_protokoll_url?.trim()) n += 1
+      n += 1 // Abschlussdokumentation
     }
-    n += rechnungen.filter((r) => r.pdf_url).length
+    for (const l of kunde.leads ?? []) {
+      for (const ang of l.angebote ?? []) {
+        if (!ang?.id || seenAngebote.has(ang.id)) continue
+        if ('auftrag_id' in ang && ang.auftrag_id) continue
+        seenAngebote.add(ang.id)
+        n += 1
+      }
+    }
+    n += rechnungen.length
     return n
   }, [kunde, rechnungen])
 
   const zeigtOrganisationTab =
     istKundeGewerbeTyp(kunde.typ) || kunde.portal_modus === 'organisation'
 
-  const angeboteAnAuftrag = useMemo(() => {
-    const byAuftrag = new Map<string, CrmDokumentZeile[]>()
-    for (const l of kunde.leads ?? []) {
-      for (const ang of l.angebote ?? []) {
-        const aid = 'auftrag_id' in ang ? ang.auftrag_id : null
-        if (!aid) continue
-        const list = byAuftrag.get(aid) ?? []
-        list.push({
-          id: `angebot-${ang.id}`,
-          datum: ang.created_at ?? l.created_at,
-          name: `Angebot ${ang.id.slice(0, 8).toUpperCase()}`,
-          href: ang.pdf_url?.trim() || `/api/angebote/${ang.id}/pdf`,
-        })
-        byAuftrag.set(aid, list)
-      }
-    }
-    return byAuftrag
-  }, [kunde.leads])
-
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
   const zeigtObjekteTab = istKundeHausverwaltungTyp(kunde.typ)
 
-  const desktopKundeTabIds = useMemo((): KundeDetailTab[] => {
-    if (!zeigtObjekteTab) return DESKTOP_KUNDE_TABS_BASE
-    return ['uebersicht', 'objekte', 'stammdaten', 'vorgaenge', 'dokumente', 'notizen']
-  }, [zeigtObjekteTab])
-
-  const mobileKundeTabIds = desktopKundeTabIds
-
-  const desktopDetailTabs = useMemo(
-    () => {
-      const tabs = [
-        { id: 'uebersicht' as const, label: 'Übersicht', iconName: 'layout-dashboard' },
-        ...(zeigtObjekteTab
-          ? [{ id: 'objekte' as const, label: 'Objekte', iconName: 'building' }]
-          : []),
-        { id: 'stammdaten' as const, label: 'Stammdaten', iconName: 'clipboard-list' },
-        {
-          id: 'vorgaenge' as const,
-          label: 'Vorgänge',
-          iconName: 'folders',
-          count: anfragenCount + angeboteCount + auftraegeCount || undefined,
-        },
-        {
-          id: 'dokumente' as const,
-          label: 'Dokumente',
-          iconName: 'files',
-          count: dokumenteCount || undefined,
-        },
-        { id: 'notizen' as const, label: 'Notizen', iconName: 'messages' },
-      ]
-      return tabs
-    },
-    [anfragenCount, angeboteCount, auftraegeCount, dokumenteCount, zeigtObjekteTab]
-  )
-
-  const mobileDetailTabs = desktopDetailTabs
-
-  const ueberfaellig = useMemo(() => {
-    const now = Date.now()
-    return rechnungen.filter((r) => {
-      if (r.status === 'bezahlt' || r.status === 'storniert') return false
-      if (!r.faellig_am) return false
-      const t = new Date(r.faellig_am).getTime()
-      return t < now
-    })
-  }, [rechnungen])
-
-  function openEditModal() {
+  function beginEditKontakt() {
     setEditErr(null)
     setEditForm(buildEditFormFromKunde(kunde))
-    setEditOpen(true)
+    setTab('stammdaten')
+    setEditingKontakt(true)
   }
 
-  function saveKundeModal() {
+  function cancelEditKontakt() {
+    setEditingKontakt(false)
+    setEditErr(null)
+    setEditForm(buildEditFormFromKunde(kunde))
+  }
+
+  function saveKundeStamm() {
     setEditErr(null)
     startTransition(async () => {
       const firmaPflicht = istKundeFirmaPflichtTyp(editForm.typ)
@@ -491,7 +238,6 @@ export function KundeDetailClient({
           webseite: editForm.webseite || null,
           ansprechpartner: editForm.ansprechpartner || null,
           quelle: editForm.quelle || null,
-          notizen: interneNotiz.trim() || null,
         },
         kunde.id
       )
@@ -519,7 +265,7 @@ export function KundeDetailClient({
         adresse: [editForm.strasse, editForm.hausnummer].filter(Boolean).join(' ') || null,
       }))
       toast.success('Stammdaten gespeichert')
-      setEditOpen(false)
+      setEditingKontakt(false)
       refresh()
     })
   }
@@ -618,116 +364,203 @@ export function KundeDetailClient({
       </Card>
     ) : null
 
-  const stammdatenCard = (
-    <Card
-      collapsible
+  const adresseAnzeige = [
+    [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') || kunde.adresse,
+    [kunde.plz, kunde.ort].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ') || '—'
+
+  const kontaktCard = (
+    <InlineEditSection
       title="Stammdaten"
-      action={
-        <button type="button" onClick={openEditModal} className="btn ghost sm" aria-label="Bearbeiten">
-          <MockIcon ctx="btn" n="pencil" size={14} />
-        </button>
-      }
+      editing={editingKontakt}
+      onStartEdit={beginEditKontakt}
+      onCancel={cancelEditKontakt}
+      onSave={saveKundeStamm}
+      saving={pending}
     >
-      {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
+      {editingKontakt ? (
+        <p className="inline-edit-hint">
+          <MockIcon ctx="default" n="info-circle" size={14} />
+          Hervorgehobene Felder sind bearbeitbar.
+        </p>
+      ) : null}
+      {editErr ? <p className="mb-2 text-sm text-status-cancel-text">{editErr}</p> : null}
+      {kundenStamm.fehlendeRechnungsfelder.length > 0 && !editingKontakt ? (
         <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
           Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
         </p>
       ) : null}
       <div className="props">
-        {kundenStamm.kundennummer ? (
-          <DetailProp label="Kundennr.">{kundenStamm.kundennummer}</DetailProp>
-        ) : null}
-        {istKundeFirmaPflichtTyp(kunde.typ) ? (
+        {editingKontakt ? (
           <>
-            <DetailProp label="Firma">{kunde.name?.trim() || '—'}</DetailProp>
-            {kundenStamm.vorname ? (
-              <DetailProp label="Vorname (Ansprechpartner)">{kundenStamm.vorname}</DetailProp>
+            <InlineEditField label="Typ" editing value={kundentypLabel(editForm.typ)}>
+              <select
+                className="input"
+                value={editForm.typ}
+                onChange={(e) => setEditForm((f) => ({ ...f, typ: e.target.value }))}
+              >
+                {TYP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </InlineEditField>
+            {istKundeFirmaPflichtTyp(editForm.typ) ? (
+              <InlineEditField
+                label={istKundeHausverwaltungTyp(editForm.typ) ? 'Firma' : 'Firma / Name'}
+                editing
+                value={editForm.firmaName || '—'}
+              >
+                <input
+                  className="input"
+                  value={editForm.firmaName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firmaName: e.target.value }))}
+                  autoFocus
+                />
+              </InlineEditField>
             ) : null}
-            {kundenStamm.nachname ? (
-              <DetailProp label="Nachname (Ansprechpartner)">{kundenStamm.nachname}</DetailProp>
+            <InlineEditField label="Vorname" editing value={editForm.vorname || '—'}>
+              <input
+                className="input"
+                value={editForm.vorname}
+                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
+                autoFocus={!istKundeFirmaPflichtTyp(editForm.typ)}
+              />
+            </InlineEditField>
+            <InlineEditField
+              label={istKundeFirmaPflichtTyp(editForm.typ) ? 'Nachname (Ansprechpartner)' : 'Nachname'}
+              editing
+              value={editForm.nachname || '—'}
+            >
+              <input
+                className="input"
+                value={editForm.nachname}
+                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Straße" editing value={editForm.strasse || '—'}>
+              <input
+                className="input"
+                value={editForm.strasse}
+                onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Hausnummer" editing value={editForm.hausnummer || '—'}>
+              <input
+                className="input"
+                value={editForm.hausnummer}
+                onChange={(e) => setEditForm((f) => ({ ...f, hausnummer: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="PLZ" editing value={editForm.plz || '—'}>
+              <input
+                className="input"
+                value={editForm.plz}
+                onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Ort" editing value={editForm.ort || '—'}>
+              <input
+                className="input"
+                value={editForm.ort}
+                onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Telefon" editing value={editForm.telefon || '—'}>
+              <input
+                className="input"
+                type="tel"
+                value={editForm.telefon}
+                onChange={(e) => setEditForm((f) => ({ ...f, telefon: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="E-Mail" editing value={editForm.email || '—'}>
+              <input
+                className="input"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </InlineEditField>
+            {istKundeNurGewerbeTyp(editForm.typ) ? (
+              <InlineEditField label="Ansprechpartner" editing value={editForm.ansprechpartner || '—'}>
+                <input
+                  className="input"
+                  value={editForm.ansprechpartner}
+                  onChange={(e) => setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))}
+                />
+              </InlineEditField>
             ) : null}
+            <InlineEditField label="Webseite" editing value={editForm.webseite || '—'}>
+              <input
+                className="input"
+                value={editForm.webseite}
+                onChange={(e) => setEditForm((f) => ({ ...f, webseite: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField
+              label="Quelle"
+              editing
+              value={(QUELLE_LABELS[editForm.quelle] ?? editForm.quelle) || '—'}
+            >
+              <select
+                className="input"
+                value={editForm.quelle}
+                onChange={(e) => setEditForm((f) => ({ ...f, quelle: e.target.value }))}
+              >
+                <option value="">—</option>
+                {Object.entries(QUELLE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </InlineEditField>
           </>
         ) : (
           <>
-            {kundenStamm.vorname ? <DetailProp label="Vorname">{kundenStamm.vorname}</DetailProp> : null}
-            <DetailProp label="Nachname">{kundenStamm.nachname || '—'}</DetailProp>
+            <InlineEditField
+              label="Telefon"
+              editing={false}
+              link={Boolean(kundenStamm.telefon)}
+              value={
+                kundenStamm.telefon ? (
+                  <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <InlineEditField
+              label="E-Mail"
+              editing={false}
+              link={Boolean(kundenStamm.email)}
+              value={
+                kundenStamm.email ? (
+                  <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <InlineEditField label="Adresse" editing={false} value={adresseAnzeige} />
+            <InlineEditField label="Typ" editing={false} value={kundentypLabel(kunde.typ)} />
           </>
         )}
-        {kundenStamm.ansprechpartner && istKundeNurGewerbeTyp(kunde.typ) ? (
-          <DetailProp label="Ansprechpartner">{kundenStamm.ansprechpartner}</DetailProp>
-        ) : null}
-        <DetailProp label="Straße">{kundenStamm.strasse || '—'}</DetailProp>
-        <DetailProp label="Hausnummer">{kundenStamm.hausnummer || '—'}</DetailProp>
-        <DetailProp label="Postleitzahl">{kundenStamm.plz || '—'}</DetailProp>
-        <DetailProp label="Ort">{kundenStamm.ort || '—'}</DetailProp>
-        <DetailProp label="Kundentyp">{kundentypLabel(kunde.typ)}</DetailProp>
-        <DetailProp label="Telefon">
-          {kundenStamm.telefon ? (
-            <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        <DetailProp label="E-Mail">
-          {kundenStamm.email ? (
-            <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
-          ) : (
-            '—'
-          )}
-        </DetailProp>
-        {kundenStamm.ust_id ? <DetailProp label="USt-IdNr.">{kundenStamm.ust_id}</DetailProp> : null}
-        {kunde.quelle ? (
-          <DetailProp label="Quelle">{QUELLE_LABELS[kunde.quelle] ?? kunde.quelle}</DetailProp>
-        ) : null}
-        {kunde.webseite ? (
-          <DetailProp label="Webseite">
-            <a
-              href={kunde.webseite.startsWith('http') ? kunde.webseite : `https://${kunde.webseite}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {kunde.webseite}
-            </a>
-          </DetailProp>
-        ) : null}
-        {kunde.geburtstag ? (
-          <DetailProp label="Geburtstag">{formatDatum(kunde.geburtstag)}</DetailProp>
-        ) : null}
       </div>
-    </Card>
+    </InlineEditSection>
   )
 
-  const fixedOverview = (
-    <div className="space-y-3">
-      <Card title="Kontakt">
-        <div className="props">
-          <DetailProp label="Name">{kundeDisplayName(kunde)}</DetailProp>
-          <DetailProp label="Telefon">
-            {kundenStamm.telefon ? (
-              <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
-            ) : (
-              '—'
-            )}
-          </DetailProp>
-          <DetailProp label="E-Mail">
-            {kundenStamm.email ? (
-              <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
-            ) : (
-              '—'
-            )}
-          </DetailProp>
-          <DetailProp label="Typ">{kundentypLabel(kunde.typ)}</DetailProp>
-        </div>
-      </Card>
-      <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
-    </div>
-  )
+  const fixedOverview = <KundeWirtschaftlicheUebersicht kunde={kunde} />
 
   const tabStammdaten = (
-    <div className="space-y-3">
-      {stammdatenCard}
+    <>
+      {kontaktCard}
       {zusatzfelderCard}
-    </div>
+    </>
   )
 
   const tabObjekte = zeigtObjekteTab ? (
@@ -740,379 +573,60 @@ export function KundeDetailClient({
   ) : null
 
   const tabNotizen = (
-    <Card title="Notizen">
-      <p className="mb-2 text-xs text-bw-text-muted">Wird automatisch gespeichert</p>
-      <Textarea
-        placeholder="Interne Kundennotiz…"
-        value={interneNotiz}
-        onChange={(e) => setInterneNotiz(e.target.value)}
-        rows={8}
-      />
-    </Card>
+    <KundenNotizenTab
+      kundeId={kunde.id}
+      notizen={kunde.kunden_notizen ?? []}
+      legacyNotiz={kunde.notizen}
+      onReload={() => refresh()}
+    />
   )
 
   const tabDokumenteInhalt = (
-    <div className="space-y-10">
-      {(kunde.auftraege ?? []).map((a) => {
-        const atitel = a.titel?.trim() || 'Auftrag'
-        const angeboteZeilen: CrmDokumentZeile[] = [
-          ...normalizeAuftragAngebote(a.angebote).map((ang) => ({
-            id: `angebot-${ang.id}`,
-            datum: ang.created_at ?? a.created_at,
-            name: `Angebot ${String(ang.id).slice(0, 8).toUpperCase()}`,
-            href: ang.pdf_url?.trim() || `/api/angebote/${String(ang.id)}/pdf`,
-          })),
-          ...(angeboteAnAuftrag.get(a.id) ?? []).filter(
-            (z) => !normalizeAuftragAngebote(a.angebote).some((ang) => z.id === `angebot-${ang.id}`)
-          ),
-        ]
-        const rechnungZeilen: CrmDokumentZeile[] = rechnungen
-          .filter((r) => r.auftrag_id === a.id)
-          .map((r) => ({
-            id: `rechnung-${r.id}`,
-            name: r.rechnungsnummer?.trim() || 'Rechnung',
-            datum: r.rechnungsdatum,
-            href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
-          }))
-        const dokumentationZeilen: CrmDokumentZeile[] = []
-        if (a.abnahme_protokoll_url) {
-          dokumentationZeilen.push({
-            id: `abnahme-${a.id}`,
-            name: 'Abnahmeprotokoll',
-            datum: a.created_at,
-            href: a.abnahme_protokoll_url,
-          })
-        }
-        dokumentationZeilen.push({
-          id: `abschluss-${a.id}`,
-          name: 'Abschlussdokumentation (PDF)',
-          datum: a.created_at,
-          href: `/api/auftraege/${a.id}/abschlussdokumentation/pdf`,
-        })
-        return (
-          <section key={a.id} className="space-y-4">
-            <h3 className="border-b border-bw-border pb-2 text-sm font-semibold text-bw-text">
-              <Link href={`/auftraege/${a.id}`} className="text-bw-link hover:underline">
-                Auftrag: {atitel}
-              </Link>
-            </h3>
-            <div className="space-y-3">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Angebote</h4>
-              <CrmDokumenteTabelle zeilen={angeboteZeilen} emptyDescription="Keine Angebots-PDFs." />
-            </div>
-            <div className="space-y-3">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Rechnungen</h4>
-              <CrmDokumenteTabelle zeilen={rechnungZeilen} emptyDescription="Keine Rechnungs-PDFs." />
-            </div>
-            <div className="space-y-3">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">
-                Abnahme & Dokumentation
-              </h4>
-              <CrmDokumenteTabelle
-                zeilen={dokumentationZeilen}
-                emptyDescription="Keine Abnahme- oder Protokolldokumente."
-              />
-            </div>
-          </section>
-        )
-      })}
-
-      {(kunde.leads ?? [])
-        .filter((l) => (l.angebote ?? []).some((ang) => !('auftrag_id' in ang) || !ang.auftrag_id))
-        .map((l) => {
-          const titel =
-            leadSituationDisplay(l.situation) ||
-            (l.bereiche?.length ? l.bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ') : 'Anfrage')
-          const zeilen: CrmDokumentZeile[] = (l.angebote ?? [])
-            .filter((ang) => !('auftrag_id' in ang) || !ang.auftrag_id)
-            .map((ang) => ({
-              id: `angebot-${ang.id}`,
-              datum: ang.created_at ?? l.created_at,
-              name: `Angebot ${ang.id.slice(0, 8).toUpperCase()}`,
-              href: ang.pdf_url?.trim() || `/api/angebote/${ang.id}/pdf`,
-            }))
-          if (!zeilen.length) return null
-          return (
-            <section key={l.id} className="space-y-3">
-              <h3 className="border-b border-bw-border pb-2 text-sm font-semibold text-bw-text">
-                <Link href={`/anfragen/${l.id}`} className="text-bw-link hover:underline">
-                  Anfrage: {titel}
-                </Link>
-              </h3>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-bw-text-muted">Angebote</h4>
-              <CrmDokumenteTabelle zeilen={zeilen} emptyDescription="Keine Angebots-PDFs." />
-            </section>
-          )
-        })}
-
-      <section className="space-y-3">
-        <h3 className="border-b border-bw-border pb-2 text-sm font-semibold uppercase tracking-wide text-bw-text">
-          Sonstige Dokumente
-        </h3>
-        <CrmDokumenteTabelle
-          zeilen={(kunde.kunden_dokumente ?? [])
-            .filter((d) => d.datei_url?.trim())
-            .map((d) => ({
-              id: d.id,
-              name: d.name,
-              datum: d.created_at,
-              href: d.datei_url!.trim(),
-            }))}
-          emptyDescription="Noch keine sonstigen Dokumente."
-        />
-        <div className="kunde-dok-upload">
-          Datei hierher ziehen oder <span className="font-medium text-bw-link">Datei auswählen</span>
-          <div className="kunde-dok-upload__hint">PDF, JPG, PNG · max 10MB (Upload folgt)</div>
-        </div>
-      </section>
-    </div>
+    <KundenDokumenteTab
+      kundeId={kunde.id}
+      dokumente={kunde.kunden_dokumente ?? []}
+      auftraege={kunde.auftraege ?? []}
+      leads={kunde.leads ?? []}
+      rechnungen={rechnungen}
+      onReload={() => refresh()}
+    />
   )
 
-  const AUFTRAEGE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px'
-  const ANFRAGEN_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
-  const ANGEBOTE_GRID_COLS = '100px minmax(180px,2fr) 110px 100px 100px'
-
-  function VorgaengeSectionHeading({ title, count }: { title: string; count?: number }) {
-    return (
-      <div className="flex items-baseline justify-between gap-2 border-b border-bw-border pb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-bw-text">{title}</h3>
-        {count != null ? <span className="text-xs tabular-nums text-bw-text-muted">{count}</span> : null}
-      </div>
-    )
-  }
-
-  const tabAnfragen = (
-    <section className="space-y-2">
-      <VorgaengeSectionHeading title="Anfragen" count={(kunde.leads ?? []).length || undefined} />
-      {(kunde.leads ?? []).length === 0 ? (
-        <p className="py-4 text-center text-sm text-bw-text-muted">
-          Noch keine Anfragen.{' '}
-          <Link href={kundeNeueAnfrageHref(kunde.id)} className="text-bw-link hover:underline">
-            Anfrage anlegen
-          </Link>
-        </p>
-      ) : (
-        <ListGridShell minWidth="720px">
-          <div className="list-row-grid head" style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}>
-            <div>Nr.</div>
-            <div>Anfrage</div>
-            <div>Eingegangen</div>
-            <div className="text-right">Preisrahmen</div>
-            <div>Status</div>
-          </div>
-          {[...(kunde.leads ?? [])]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((l) => {
-              const titel =
-                leadSituationDisplay(l.situation) ||
-                (l.bereiche?.length ? l.bereiche.join(' + ') : 'Anfrage')
-              const bereiche = bereicheFuerAnzeige(l.bereiche, l.situation)
-              const bereicheText = bereiche.length
-                ? bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-                : null
-              return (
-                <Link
-                  key={l.id}
-                  href={`/anfragen/${l.id}`}
-                  className="list-row-grid"
-                  style={{ gridTemplateColumns: ANFRAGEN_GRID_COLS }}
-                >
-                  <div className="font-mono text-xs text-bw-text-muted">{l.id.slice(0, 8).toUpperCase()}</div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-bw-text">{titel}</p>
-                    {bereicheText ? (
-                      <p className="truncate text-xs text-bw-text-muted">{bereicheText}</p>
-                    ) : null}
-                  </div>
-                  <p className="text-[13px] tabular-nums text-bw-text-muted">{formatDatum(l.created_at)}</p>
-                  <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                    {formatAnfragePreisAnzeige(
-                      l.kanal,
-                      l.budget_ca,
-                      l.preis_min,
-                      l.preis_max,
-                      l.funnel_daten
-                    )}
-                  </p>
-                  <LeadStatusBadge status={l.status as LeadStatus} />
-                </Link>
-              )
-            })}
-        </ListGridShell>
-      )}
-    </section>
+  const kundeLeadIds = useMemo(
+    () => (kunde.leads ?? []).map((l) => l.id).filter(Boolean),
+    [kunde.leads]
   )
 
-  const tabAngebote = (
-    <section className="space-y-2">
-      <VorgaengeSectionHeading title="Angebote" count={alleAngebote.length || undefined} />
-      {alleAngebote.length === 0 ? (
-        <p className="py-4 text-center text-sm text-bw-text-muted">
-          Noch keine Angebote.{' '}
-          <Link href={kundeNeuesAngebotHref(kunde)} className="text-bw-link hover:underline">
-            Angebot anlegen
-          </Link>
-        </p>
-      ) : (
-        <ListGridShell minWidth="720px">
-          <div className="list-row-grid head" style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}>
-            <div>Nr.</div>
-            <div>Bezug</div>
-            <div className="text-right">Betrag</div>
-            <div>Erstellt</div>
-            <div>Status</div>
-          </div>
-          {alleAngebote.map((a) => (
-            <Link
-              key={a.id}
-              href={`/angebote/${a.id}`}
-              className="list-row-grid"
-              style={{ gridTemplateColumns: ANGEBOTE_GRID_COLS }}
-            >
-              <div className="font-mono text-xs text-bw-text-muted">{a.id.slice(0, 8).toUpperCase()}</div>
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-medium text-bw-text">{a.bezug}</p>
-                <p className="truncate text-xs text-bw-text-muted">
-                  {a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                </p>
-              </div>
-              <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">
-                {betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max)}
-              </p>
-              <p className="text-[13px] tabular-nums text-bw-text-muted">
-                {a.created_at ? formatDatum(a.created_at) : '—'}
-              </p>
-              <AngebotEinfachStatusBadge
-                status={resolveStatusEinfach({
-                  status: a.status as AngebotStatus,
-                  status_einfach: a.status_einfach ?? null,
-                  gueltig_bis: a.gueltig_bis ?? null,
-                })}
-              />
-            </Link>
-          ))}
-        </ListGridShell>
-      )}
-    </section>
-  )
-
-  const tabAuftraege = (
-    <section className="space-y-2">
-      <VorgaengeSectionHeading title="Aufträge" count={(kunde.auftraege ?? []).length || undefined} />
-      {(kunde.auftraege ?? []).length === 0 ? (
-        <p className="py-4 text-center text-sm text-bw-text-muted">
-          Noch keine Aufträge.{' '}
-          <Link href={kundeNeuerAuftragHref(kunde)} className="text-bw-link hover:underline">
-            Auftrag anlegen
-          </Link>
-        </p>
-      ) : (
-        <ListGridShell minWidth="720px">
-          <div className="list-row-grid head" style={{ gridTemplateColumns: AUFTRAEGE_GRID_COLS }}>
-            <div>Nr.</div>
-            <div>Auftrag</div>
-            <div className="text-right">Wert</div>
-            <div>Status</div>
-          </div>
-          {(kunde.auftraege ?? [])
-            .slice()
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((a) => {
-            const agg = angebotAgg(a)
-            const wert = betragAnzeige(agg?.gesamt_fix ?? null, agg?.gesamt_min ?? null, agg?.gesamt_max ?? null)
-            return (
-              <Link
-                key={a.id}
-                href={`/auftraege/${a.id}`}
-                className="list-row-grid"
-                style={{ gridTemplateColumns: AUFTRAEGE_GRID_COLS }}
-              >
-                <div className="font-mono text-xs text-bw-text-muted">{a.id.slice(0, 8).toUpperCase()}</div>
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-bw-text">{a.titel?.trim() || 'Auftrag'}</p>
-                  <p className="truncate text-xs text-bw-text-muted">
-                    {a.end_datum ? `bis ${formatDatum(a.end_datum)}` : formatDatum(a.created_at)}
-                  </p>
-                </div>
-                <p className="text-right text-[13px] font-medium tabular-nums text-bw-text">{wert}</p>
-                <AuftragStatusBadge status={a.status as AuftragStatus} />
-              </Link>
-            )
-          })}
-        </ListGridShell>
-      )}
-    </section>
-  )
+  const kundeVorgaengeCount = useMemo(() => {
+    const ids = new Set(kundeLeadIds)
+    return vorgaengeRows.filter(
+      (r) => r.kundeId === kunde.id || ids.has(r.leadId)
+    ).length
+  }, [vorgaengeRows, kundeLeadIds, kunde.id])
 
   const tabVorgaenge = (
-    <div className="space-y-8">
-      {tabAnfragen}
-      {tabAngebote}
-      {tabAuftraege}
-    </div>
+    <Suspense
+      fallback={
+        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Vorgänge werden geladen…
+        </p>
+      }
+    >
+      <VorgaengeListeClient
+        rows={vorgaengeRows}
+        embedded
+        restrictKundeId={kunde.id}
+        restrictLeadIds={kundeLeadIds}
+      />
+    </Suspense>
   )
-
-  const RECHNUNG_GRID_COLS_SIMPLE = '120px minmax(140px,1.5fr) 110px 100px'
-
-  const tabRechnungen = (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <VorgaengeSectionHeading title="Rechnungen" count={rechnungen.length || undefined} />
-        {rechnungen.length === 0 ? (
-          <p className="py-4 text-center text-sm text-bw-text-muted">Noch keine Rechnungen für diesen Kunden.</p>
-        ) : (
-          <ListGridShell minWidth="640px">
-            <div className="list-row-grid head" style={{ gridTemplateColumns: RECHNUNG_GRID_COLS_SIMPLE }}>
-              <div>Nr.</div>
-              <div>Beschreibung</div>
-              <div className="text-right">Betrag</div>
-              <div>Status</div>
-            </div>
-            {[...rechnungen]
-              .sort(
-                (a, b) =>
-                  new Date(b.rechnungsdatum ?? 0).getTime() - new Date(a.rechnungsdatum ?? 0).getTime()
-              )
-              .map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/rechnungen/${r.id}`}
-                  className="list-row-grid"
-                  style={{ gridTemplateColumns: RECHNUNG_GRID_COLS_SIMPLE }}
-                >
-                  <div className="font-mono text-xs text-bw-text-muted">{r.rechnungsnummer}</div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-bw-text">
-                      {auftragTitelFromRechnung(r)}
-                    </p>
-                    <p className="truncate text-xs text-bw-text-muted">{formatDatum(r.rechnungsdatum)}</p>
-                  </div>
-                  <p className="text-right text-[13px] font-semibold tabular-nums text-bw-text">
-                    {formatEur(r.brutto)}
-                  </p>
-                  {rechnungStatusBadge(r)}
-                </Link>
-              ))}
-          </ListGridShell>
-        )}
-      </section>
-
-    </div>
-  )
-
-  const ansprechperson = [kunde.vorname, kunde.nachname].filter(Boolean).join(' ').trim()
-  const headSubParts = [
-    QUELLE_LABELS[kunde.quelle ?? ''] ?? null,
-    [kunde.plz, kunde.ort].filter(Boolean).join(' '),
-    ansprechperson || kunde.ansprechpartner || null,
-  ].filter(Boolean) as string[]
 
   const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
     const items: ActionsMenuItem[] = [
       {
         label: 'Bearbeiten',
         icon: mockMenuIcon('pencil', 16),
-        onClick: openEditModal,
+        onClick: beginEditKontakt,
       },
       {
         label: 'Mail schreiben',
@@ -1185,45 +699,80 @@ export function KundeDetailClient({
     />
   ) : null
 
-  const stammdatenInhalt = tabStammdaten
+  const stammdatenInhalt = (
+    <>
+      {tabStammdaten}
+      {zeigtOrganisationTab ? tabOrganisation : null}
+    </>
+  )
 
-  const renderTabContent = (active: KundeDetailTab) => {
-    if (active === 'uebersicht') return fixedOverview
-    if (active === 'objekte') return tabObjekte
-    if (active === 'stammdaten') {
-      return (
-        <div className="space-y-3">
-          {tabStammdaten}
-          {zeigtOrganisationTab ? tabOrganisation : null}
-        </div>
-      )
-    }
-    if (active === 'vorgaenge') return tabVorgaenge
-    if (active === 'notizen') return tabNotizen
-    return tabDokumenteInhalt
-  }
-
-  const desktopTabContent = renderTabContent(tab)
-  const mobileTabContent = renderTabContent(tab)
+  const detailShellGroups: DetailShellGroup[] = [
+    {
+      id: 'uebersicht',
+      label: 'Übersicht',
+      icon: 'layout-dashboard',
+      render: () => fixedOverview,
+    },
+    ...(zeigtObjekteTab
+      ? [
+          {
+            id: 'objekte' as const,
+            label: 'Objekte',
+            icon: 'building',
+            count: kundenObjekte.length || undefined,
+            render: () => tabObjekte,
+          },
+        ]
+      : []),
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      count: kundeVorgaengeCount || undefined,
+      render: () => tabVorgaenge,
+    },
+    {
+      id: 'dokumente',
+      label: 'Dokumente',
+      icon: 'files',
+      count: dokumenteCount || undefined,
+      render: () => tabDokumenteInhalt,
+    },
+    {
+      id: 'notizen',
+      label: 'Notizen',
+      icon: 'messages',
+      count:
+        (kunde.kunden_notizen?.length ?? 0) || (kunde.notizen?.trim() ? 1 : 0) || undefined,
+      render: () => tabNotizen,
+    },
+  ]
 
   return (
     <div className="space-y-4 pb-6">
+      <MockDetailBackLink href="/kunden" label="Zurück zu Kunden" />
       <DetailHead
-        backHref="/kunden"
-        backLabel="Zurück zu Kunden"
-        title={
-          <div className="detail-head-title-row">
-            <span>{kundeDisplayName(kunde)}</span>
+        title={kundeDisplayName(kunde)}
+        badges={
+          <>
             <TypBadge typ={kunde.typ} />
-          </div>
-        }
-        sub={
-          [
-            kunde.created_at ? `Kunde seit ${formatDatum(kunde.created_at)}` : null,
-            headSubParts.join(' · ') || null,
-          ]
-            .filter(Boolean)
-            .join(' · ') || 'Kunde'
+            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
+              <span className="inline-flex items-center gap-1">
+                <MockIcon
+                  ctx="default"
+                  n={hasPortalAccount ? 'plug' : 'circle-x'}
+                  size={10}
+                />
+                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
+              </span>
+            </MockBadge>
+          </>
         }
         actions={
           <ActionsMenu
@@ -1243,22 +792,10 @@ export function KundeDetailClient({
         }
       />
 
-      <DetailResponsiveTabs
-        tab={tab}
-        onTabChange={setTab}
-        desktopOverview={fixedOverview}
-        desktopTabs={
-          <DetailTabBar tabs={desktopDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
-        }
-        mobileTabs={
-          <DetailTabBar tabs={mobileDetailTabs} value={tab} onChange={(id) => setTab(id as KundeDetailTab)} />
-        }
-        desktopTabContent={desktopTabContent}
-        mobileTabContent={mobileTabContent}
-        mobileDefaultTab="uebersicht"
-        desktopDefaultTab="uebersicht"
-        mobileTabIds={mobileKundeTabIds}
-        desktopTabIds={desktopKundeTabIds}
+      <DetailShell
+        groups={detailShellGroups}
+        value={tab}
+        onChange={(id) => setTab(id as KundeDetailTab)}
       />
 
       <Modal
@@ -1332,119 +869,6 @@ export function KundeDetailClient({
             Der Button in der Mail führt immer zu <strong>/portal/login</strong>. Mehrere Adressen in „An“/„CC“
             mit Semikolon trennen.
           </p>
-        </div>
-      </Modal>
-
-      <Modal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        title="Kunde bearbeiten"
-        size="md"
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" onClick={saveKundeModal} loading={pending}>
-              Speichern
-            </Button>
-          </div>
-        }
-      >
-        {editErr ? <p className="mb-3 text-sm text-status-cancel-text">{editErr}</p> : null}
-        <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-          <Select
-            label="Typ *"
-            name="typ"
-            value={editForm.typ}
-            onChange={(e) => setEditForm((f) => ({ ...f, typ: e.target.value }))}
-            options={TYP_OPTIONS}
-          />
-          {istKundeFirmaPflichtTyp(editForm.typ) ? (
-            <Input
-              label={istKundeHausverwaltungTyp(editForm.typ) ? 'Firma *' : 'Firma / Name *'}
-              value={editForm.firmaName}
-              onChange={(e) => setEditForm((f) => ({ ...f, firmaName: e.target.value }))}
-            />
-          ) : null}
-          {istKundeFirmaPflichtTyp(editForm.typ) ? (
-            <>
-              <Input
-                label="Vorname (Ansprechpartner)"
-                value={editForm.vorname}
-                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
-              />
-              <Input
-                label="Nachname (Ansprechpartner)"
-                value={editForm.nachname}
-                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
-              />
-            </>
-          ) : null}
-          {!istKundeFirmaPflichtTyp(editForm.typ) ? (
-            <>
-              <Input
-                label="Vorname"
-                value={editForm.vorname}
-                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
-              />
-              <Input
-                label="Nachname *"
-                value={editForm.nachname}
-                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
-              />
-            </>
-          ) : null}
-          <Input
-            label="Straße *"
-            value={editForm.strasse}
-            onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
-          />
-          <Input
-            label="Hausnummer *"
-            value={editForm.hausnummer}
-            onChange={(e) => setEditForm((f) => ({ ...f, hausnummer: e.target.value }))}
-          />
-          <Input
-            label="Postleitzahl *"
-            value={editForm.plz}
-            onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))}
-          />
-          <Input label="Ort *" value={editForm.ort} onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))} />
-          <Input
-            label="Telefon"
-            type="tel"
-            value={editForm.telefon}
-            onChange={(e) => setEditForm((f) => ({ ...f, telefon: e.target.value }))}
-          />
-          <Input
-            label="E-Mail"
-            type="email"
-            value={editForm.email}
-            onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-          />
-          <Input
-            label="Webseite"
-            value={editForm.webseite}
-            onChange={(e) => setEditForm((f) => ({ ...f, webseite: e.target.value }))}
-          />
-          {istKundeNurGewerbeTyp(editForm.typ) ? (
-            <Input
-              label="Ansprechpartner"
-              value={editForm.ansprechpartner}
-              onChange={(e) => setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))}
-            />
-          ) : null}
-          <Select
-            label="Quelle"
-            name="quelle"
-            value={editForm.quelle}
-            onChange={(e) => setEditForm((f) => ({ ...f, quelle: e.target.value }))}
-            options={[
-              { value: '', label: '—' },
-              ...Object.entries(QUELLE_LABELS).map(([value, label]) => ({ value, label })),
-            ]}
-          />
         </div>
       </Modal>
 

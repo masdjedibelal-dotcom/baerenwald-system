@@ -16,6 +16,7 @@ import {
   abnahmePunkteStatistik,
   buildAbnahmePunkteInitial,
   gruppiereAbnahmePunkte,
+  leistungFuerAbnahmeAusgewaehlt,
   maengelAusPunkten,
   neuerAbnahmePunktFreitext,
   notizenFuerLeistung,
@@ -28,18 +29,12 @@ import { looksLikeHtml, richTextToPlain } from '@/lib/rich-text'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-type AbnahmeArt = 'vor_ort' | 'schriftlich'
-
 function sanitizePunkte(punkte: AbnahmePunkt[]): AbnahmePunkt[] {
   return punkte.map((p) => {
     const raw = p.beschreibung ?? ''
     if (!raw || !looksLikeHtml(raw)) return p
     return { ...p, beschreibung: richTextToPlain(raw) }
   })
-}
-
-function leistungAbgenommen(punkte: AbnahmePunkt[]): boolean {
-  return punkte.length > 0 && punkte.every((p) => p.status === 'ok')
 }
 
 function leistungHatMangel(punkte: AbnahmePunkt[]): boolean {
@@ -56,15 +51,11 @@ function leistungSubtitle(leistungName: string, punkte: AbnahmePunkt[]): string 
 }
 
 function metaNotizen(opts: {
-  abnahmeArt: AbnahmeArt
   abnehmerName: string
-  maengelfrei: boolean
   frei?: string
 }): string | null {
   const parts = [
-    `Art der Abnahme: ${opts.abnahmeArt === 'vor_ort' ? 'Vor Ort' : 'Schriftlich'}`,
     opts.abnehmerName.trim() ? `Abnehmender: ${opts.abnehmerName.trim()}` : null,
-    opts.maengelfrei ? 'Mängelfreie Abnahme' : null,
     opts.frei?.trim() || null,
   ].filter(Boolean)
   return parts.length ? parts.join('\n') : null
@@ -90,30 +81,28 @@ export function AuftragAbnahmeprotokollInline({
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [abnahmeDatum, setAbnahmeDatum] = useState(heuteYmd())
   const [abnehmerName, setAbnehmerName] = useState(kundeName)
-  const [abnahmeArt, setAbnahmeArt] = useState<AbnahmeArt>('vor_ort')
-  const [maengelfrei, setMaengelfrei] = useState(true)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [gesendetAt, setGesendetAt] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const initialized = useRef(false)
+  const baselineRef = useRef<{
+    punkte: AbnahmePunkt[]
+    abnahmeDatum: string
+    abnehmerName: string
+  } | null>(null)
 
   const blocks = useMemo(() => gruppiereAbnahmePunkte(punkte), [punkte])
   const leistungen = useMemo(
     () => blocks.flatMap((b) => b.leistungen.map((l) => ({ ...l, gewerk: b.gewerk }))),
     [blocks]
   )
-  const abgenommenCount = useMemo(
-    () => leistungen.filter((l) => leistungAbgenommen(l.punkte)).length,
+  const ausgewaehltCount = useMemo(
+    () => leistungen.filter((l) => leistungFuerAbnahmeAusgewaehlt(l.punkte)).length,
     [leistungen]
   )
   const gesamtLeistungen = leistungen.length
   const statistik = useMemo(() => abnahmePunkteStatistik(punkte), [punkte])
-  const alleAbgenommen = gesamtLeistungen > 0 && abgenommenCount === gesamtLeistungen
-  const kannSignieren = alleAbgenommen && Boolean(abnahmeDatum.trim()) && !pending
-  const statusLabel = gesendetAt || pdfUrl ? 'Abgeschlossen' : alleAbgenommen ? 'Bereit' : 'Offen'
-  const statusKind = gesendetAt || pdfUrl ? 'aktiv' : alleAbgenommen ? 'aktiv' : 'warten'
+  const statusLabel = pdfUrl ? 'PDF erstellt' : ausgewaehltCount > 0 ? 'Bereit' : 'Offen'
+  const statusKind = pdfUrl ? 'aktiv' : ausgewaehltCount > 0 ? 'aktiv' : 'warten'
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -122,8 +111,6 @@ export function AuftragAbnahmeprotokollInline({
       setPunkte(sanitizePunkte(saved.punkte))
       setAbnahmeDatum(saved.abnahme_datum?.slice(0, 10) || heuteYmd())
       setPdfUrl(saved.pdf_url)
-      setGesendetAt(saved.an_kunde_gesendet_at)
-      setMaengelfrei(abnahmePunkteStatistik(saved.punkte).mangel === 0)
     } else {
       const initial = buildAbnahmePunkteInitial({
         positionen,
@@ -133,28 +120,51 @@ export function AuftragAbnahmeprotokollInline({
       setPunkte(sanitizePunkte(initial))
       setAbnahmeDatum(heuteYmd())
       setPdfUrl(null)
-      setGesendetAt(null)
-      setMaengelfrei(true)
     }
     setAbnehmerName(kundeName)
     setDirty(false)
     setLoading(false)
-    initialized.current = true
+    const nextPunkte = sanitizePunkte(
+      saved?.punkte.length
+        ? saved.punkte
+        : buildAbnahmePunkteInitial({ positionen, angebotPositionen, gewerke })
+    )
+    const nextDatum = saved?.abnahme_datum?.slice(0, 10) || heuteYmd()
+    baselineRef.current = {
+      punkte: structuredClone(nextPunkte),
+      abnahmeDatum: nextDatum,
+      abnehmerName: kundeName,
+    }
   }, [auftragId, positionen, angebotPositionen, gewerke, kundeName])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
-  function patchPunkte(next: AbnahmePunkt[]) {
-    setPunkte(next)
-    setDirty(true)
-    if (maengelfrei && next.some((p) => p.status === 'mangel')) {
-      setMaengelfrei(false)
+  function captureBaseline() {
+    baselineRef.current = {
+      punkte: structuredClone(punkte),
+      abnahmeDatum,
+      abnehmerName,
     }
   }
 
-  function persist(opts?: { regeneratePdf?: boolean; silent?: boolean }) {
+  function abbrechen() {
+    const b = baselineRef.current
+    if (!b) return
+    setPunkte(structuredClone(b.punkte))
+    setAbnahmeDatum(b.abnahmeDatum)
+    setAbnehmerName(b.abnehmerName)
+    setDirty(false)
+    setEditMode(false)
+  }
+
+  function patchPunkte(next: AbnahmePunkt[]) {
+    setPunkte(next)
+    setDirty(true)
+  }
+
+  function persist(opts?: { regeneratePdf?: boolean }) {
     return new Promise<boolean>((resolve) => {
       startTransition(async () => {
         const r = await saveAbnahmeprotokollDraft({
@@ -162,97 +172,35 @@ export function AuftragAbnahmeprotokollInline({
           abnahmeDatum: abnahmeDatum || heuteYmd(),
           punkte,
           maengel: maengelAusPunkten(punkte),
-          notizen: metaNotizen({ abnahmeArt, abnehmerName, maengelfrei }),
+          notizen: metaNotizen({ abnehmerName }),
           regeneratePdf: opts?.regeneratePdf,
         })
         if (!r.ok) {
-          if (!opts?.silent) toast.error(r.message)
+          toast.error(r.message)
           resolve(false)
           return
         }
         setDirty(false)
-        if (!opts?.silent) onChanged?.()
+        captureBaseline()
+        onChanged?.()
         resolve(true)
       })
     })
   }
 
-  useEffect(() => {
-    if (!initialized.current || !dirty || editMode) return
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      void persist({ silent: true }).then((ok) => {
-        if (ok) onChanged?.()
-      })
-    }, 900)
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, punkte, abnahmeDatum, abnehmerName, abnahmeArt, maengelfrei, editMode])
-
   function toggleLeistung(leistungId: string, current: AbnahmePunkt[]) {
-    const nextOk = !leistungAbgenommen(current)
+    const nextSelected = !leistungFuerAbnahmeAusgewaehlt(current)
     patchPunkte(
       punkte.map((p) => {
         const key = p.leistung_id?.trim() || p.id
         if (key !== leistungId) return p
-        return { ...p, status: nextOk ? 'ok' : 'offen' }
+        return { ...p, status: nextSelected ? 'ok' : 'offen' }
       })
     )
   }
 
   function setLeistungNotizen(leistungId: string, next: string[]) {
     patchPunkte(setNotizenFuerLeistung(punkte, leistungId, next))
-  }
-
-  function onMaengelfreiToggle() {
-    const next = !maengelfrei
-    setMaengelfrei(next)
-    setDirty(true)
-    if (next) {
-      patchPunkte(punkte.map((p) => (p.status === 'mangel' ? { ...p, status: 'offen' } : p)))
-    }
-  }
-
-  function signieren() {
-    if (!kannSignieren) {
-      toast.error('Zum Signieren alle Leistungen abnehmen und ein Abnahmedatum erfassen.')
-      return
-    }
-    startTransition(async () => {
-      const existing = await loadAbnahmeprotokollSummary(auftragId)
-      const payload = {
-        auftragId,
-        abnahmeDatum,
-        punkte,
-        maengel: maengelAusPunkten(punkte),
-        notizen: metaNotizen({ abnahmeArt, abnehmerName, maengelfrei }),
-      }
-      if (existing) {
-        const r = await saveAbnahmeprotokollDraft({ ...payload, regeneratePdf: true })
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        const again = await loadAbnahmeprotokollSummary(auftragId)
-        setPdfUrl(again?.pdf_url ?? null)
-        setGesendetAt(again?.an_kunde_gesendet_at ?? new Date().toISOString())
-        if (again?.pdf_url) window.open(again.pdf_url, '_blank', 'noopener,noreferrer')
-      } else {
-        const r = await saveAbnahmeprotokollPdfOnly(payload)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        setPdfUrl(r.publicUrl)
-        setGesendetAt(new Date().toISOString())
-        downloadPdfFromBase64(r.pdfBase64, r.filename)
-      }
-      setDirty(false)
-      toast.success('Abnahmeprotokoll signiert')
-      onChanged?.()
-    })
   }
 
   function alsPdf() {
@@ -263,7 +211,7 @@ export function AuftragAbnahmeprotokollInline({
         abnahmeDatum: abnahmeDatum || heuteYmd(),
         punkte,
         maengel: maengelAusPunkten(punkte),
-        notizen: metaNotizen({ abnahmeArt, abnehmerName, maengelfrei }),
+        notizen: metaNotizen({ abnehmerName }),
       }
       if (existing) {
         const r = await saveAbnahmeprotokollDraft({ ...payload, regeneratePdf: true })
@@ -284,6 +232,7 @@ export function AuftragAbnahmeprotokollInline({
         downloadPdfFromBase64(r.pdfBase64, r.filename)
       }
       setDirty(false)
+      captureBaseline()
       toast.success('PDF erstellt')
       onChanged?.()
     })
@@ -311,13 +260,14 @@ export function AuftragAbnahmeprotokollInline({
           <MockBadge kind={statusKind}>{statusLabel}</MockBadge>
         </div>
         <p className="abnahme-inline__lead">
-          Vor-Ort-Begehung mit dem Kunden: jede Leistung abnehmen, Mängel erfassen, dann durch den
-          Kunden signieren lassen.
+          Nur abnahme-relevante Leistungen anhaken — nicht ausgewählte erscheinen nicht im PDF.
+          Danach als PDF speichern.
         </p>
         <div className="abnahme-inline__progress">
           <Clock className="h-4 w-4 shrink-0" aria-hidden />
           <span>
-            {abgenommenCount}/{gesamtLeistungen || statistik.gesamt} Leistungen abgenommen
+            {ausgewaehltCount}/{gesamtLeistungen || statistik.gesamt} Leistungen für Abnahme
+            ausgewählt
           </span>
         </div>
       </div>
@@ -328,27 +278,53 @@ export function AuftragAbnahmeprotokollInline({
             <p className="text-[13px] text-bw-text-muted">
               Gewerke und Leistungen anpassen — Checkpunkte ergänzen oder entfernen.
             </p>
-            <MockBtn
-              sm
-              kind="primary"
-              onClick={() => {
-                void persist().then((ok) => {
-                  if (ok) {
-                    toast.success('Checkliste gespeichert')
-                    setEditMode(false)
-                  }
-                })
-              }}
-              disabled={pending}
-            >
-              Fertig
-            </MockBtn>
+            <div className="inline-edit-actions">
+              <MockBtn sm kind="ghost" onClick={abbrechen} disabled={pending}>
+                Abbrechen
+              </MockBtn>
+              <MockBtn
+                sm
+                kind="primary"
+                onClick={() => {
+                  void persist().then((ok) => {
+                    if (ok) {
+                      toast.success('Checkliste gespeichert')
+                      setEditMode(false)
+                    }
+                  })
+                }}
+                disabled={pending}
+              >
+                Speichern
+              </MockBtn>
+            </div>
           </div>
           <AbnahmeprotokollChecklist punkte={punkte} onChange={patchPunkte} mode="edit" />
         </div>
       ) : (
         <div className="abnahme-inline__list">
-          <p className="abnahme-inline__section-label">Leistungen begehen &amp; abnehmen</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="abnahme-inline__section-label mb-0">Leistungen für Abnahme auswählen</p>
+            {dirty ? (
+              <div className="inline-edit-actions">
+                <MockBtn sm kind="ghost" onClick={abbrechen} disabled={pending}>
+                  Abbrechen
+                </MockBtn>
+                <MockBtn
+                  sm
+                  kind="primary"
+                  disabled={pending}
+                  onClick={() => {
+                    void persist().then((ok) => {
+                      if (ok) toast.success('Gespeichert')
+                    })
+                  }}
+                >
+                  Speichern
+                </MockBtn>
+              </div>
+            ) : null}
+          </div>
           {blocks.length === 0 ? (
             <div className="abnahme-empty">
               <MockIcon ctx="empty" n="checklist" size={26} />
@@ -363,7 +339,7 @@ export function AuftragAbnahmeprotokollInline({
                 <h3 className="abnahme-inline__gewerk-title">{block.gewerk}</h3>
                 <ul className="abnahme-inline__items">
                   {block.leistungen.map((leistung) => {
-                    const done = leistungAbgenommen(leistung.punkte)
+                    const selected = leistungFuerAbnahmeAusgewaehlt(leistung.punkte)
                     const mangel = leistungHatMangel(leistung.punkte)
                     const sub = leistungSubtitle(leistung.leistung_name, leistung.punkte)
                     const notizen = notizenFuerLeistung(leistung.punkte)
@@ -373,18 +349,18 @@ export function AuftragAbnahmeprotokollInline({
                           type="button"
                           className={cn(
                             'abnahme-inline__check',
-                            done && 'is-ok',
-                            mangel && !done && 'is-mangel'
+                            selected && 'is-ok',
+                            mangel && !selected && 'is-mangel'
                           )}
-                          aria-pressed={done}
+                          aria-pressed={selected}
                           aria-label={
-                            done
-                              ? `${leistung.leistung_name} abgenommen`
-                              : `${leistung.leistung_name} abnehmen`
+                            selected
+                              ? `${leistung.leistung_name} für Abnahme ausgewählt`
+                              : `${leistung.leistung_name} für Abnahme auswählen`
                           }
                           onClick={() => toggleLeistung(leistung.leistung_id, leistung.punkte)}
                         >
-                          {done ? <Check className="h-4 w-4" strokeWidth={3} aria-hidden /> : null}
+                          {selected ? <Check className="h-4 w-4" strokeWidth={3} aria-hidden /> : null}
                         </button>
                         <div className="abnahme-inline__item-body">
                           <p className="abnahme-inline__item-title">{leistung.leistung_name}</p>
@@ -429,16 +405,7 @@ export function AuftragAbnahmeprotokollInline({
 
       {!editMode ? (
         <div className="abnahme-inline__sign">
-          <button
-            type="button"
-            className="abnahme-inline__maengel-row"
-            onClick={onMaengelfreiToggle}
-          >
-            <span className={cn('switch', maengelfrei && 'on')} aria-hidden />
-            <span>Mängelfreie Abnahme</span>
-          </button>
-
-          <p className="abnahme-inline__sign-label">Abnahme &amp; Signatur</p>
+          <p className="abnahme-inline__sign-label">Abnahme &amp; PDF</p>
 
           <div className="abnahme-inline__fields">
             <Input
@@ -450,37 +417,6 @@ export function AuftragAbnahmeprotokollInline({
                 setDirty(true)
               }}
             />
-            <div>
-              <span className="input-label">Art der Abnahme</span>
-              <div className="segment-toggle mt-1">
-                <button
-                  type="button"
-                  className={cn(
-                    'segment-toggle-btn',
-                    abnahmeArt === 'vor_ort' && 'segment-toggle-btn--active'
-                  )}
-                  onClick={() => {
-                    setAbnahmeArt('vor_ort')
-                    setDirty(true)
-                  }}
-                >
-                  Vor Ort
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'segment-toggle-btn',
-                    abnahmeArt === 'schriftlich' && 'segment-toggle-btn--active'
-                  )}
-                  onClick={() => {
-                    setAbnahmeArt('schriftlich')
-                    setDirty(true)
-                  }}
-                >
-                  Schriftlich
-                </button>
-              </div>
-            </div>
             <Input
               label="Name des Abnehmenden (Kunde)"
               value={abnehmerName}
@@ -491,21 +427,38 @@ export function AuftragAbnahmeprotokollInline({
             />
           </div>
 
+          {dirty ? (
+            <div className="abnahme-inline__actions inline-edit-actions">
+              <MockBtn kind="ghost" onClick={abbrechen} disabled={pending}>
+                Abbrechen
+              </MockBtn>
+              <MockBtn
+                kind="primary"
+                icon="check"
+                disabled={pending}
+                onClick={() => {
+                  void persist().then((ok) => {
+                    if (ok) toast.success('Gespeichert')
+                  })
+                }}
+              >
+                Speichern
+              </MockBtn>
+            </div>
+          ) : null}
+
           <div className="abnahme-inline__actions">
             <MockBtn
               kind="primary"
-              icon="check"
-              disabled={!kannSignieren}
-              onClick={signieren}
+              icon="file-text"
+              disabled={pending || punkte.length === 0 || dirty}
+              onClick={alsPdf}
             >
-              Vom Kunden signieren
-            </MockBtn>
-            <MockBtn kind="ghost" icon="file-text" disabled={pending || punkte.length === 0} onClick={alsPdf}>
               Als PDF
             </MockBtn>
           </div>
           <p className="abnahme-inline__hint">
-            Zum Signieren alle Leistungen abnehmen, ein Abnahmedatum erfassen.
+            Abnahmedatum erfassen und Änderungen speichern, danach PDF erstellen.
           </p>
         </div>
       ) : null}

@@ -4,14 +4,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
-import { createPartner } from '@/app/(dashboard)/partner/actions'
 import { saveKunde } from '@/app/actions/kunden'
 import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadKanal } from '@/lib/types'
 
-type Art = '' | 'vorgang' | 'kunde' | 'handwerker' | 'partner'
+type Art = '' | 'vorgang' | 'kunde' | 'handwerker'
 type VorgangTyp = '' | 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
 type Preset = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung' | 'kunde' | 'handwerker' | 'partner'
 
@@ -21,8 +21,9 @@ const PRESET_MAP: Record<Preset, [Art, VorgangTyp]> = {
   auftrag: ['vorgang', 'auftrag'],
   rechnung: ['vorgang', 'rechnung'],
   kunde: ['kunde', ''],
+  /** Sidepanel „Partner“ = Handwerker-Entity */
   handwerker: ['handwerker', ''],
-  partner: ['partner', ''],
+  partner: ['handwerker', ''],
 }
 
 const TITEL_MAP: Record<Preset, string> = {
@@ -31,15 +32,14 @@ const TITEL_MAP: Record<Preset, string> = {
   auftrag: 'Neuer Auftrag',
   rechnung: 'Neue Rechnung',
   kunde: 'Neuer Kunde',
-  handwerker: 'Neuer Handwerker',
+  handwerker: 'Neuer Partner',
   partner: 'Neuer Partner',
 }
 
 const ART_OPTIONS = [
   { v: 'vorgang' as const, ic: 'folders', label: 'Vorgang', d: 'Anfrage, Angebot, Auftrag, Rechnung' },
   { v: 'kunde' as const, ic: 'users', label: 'Kunde', d: 'Neuen Kunden anlegen' },
-  { v: 'handwerker' as const, ic: 'tool', label: 'Handwerker', d: 'Partnerbetrieb anlegen' },
-  { v: 'partner' as const, ic: 'building', label: 'Partner', d: 'Netzwerk-Partner anlegen' },
+  { v: 'handwerker' as const, ic: 'tool', label: 'Partner', d: 'Partnerbetrieb anlegen' },
 ]
 
 const VORGANG_OPTIONS = [
@@ -94,7 +94,6 @@ export function NeuErstellenClient() {
   const backHref = useMemo(() => {
     if (art === 'kunde') return '/kunden'
     if (art === 'handwerker') return '/handwerker'
-    if (art === 'partner') return '/partner'
     return '/vorgaenge'
   }, [art])
 
@@ -183,31 +182,8 @@ export function NeuErstellenClient() {
         toast.error(r.message)
         return
       }
-      toast.success('Handwerker angelegt')
-      router.push(`/handwerker/${r.id}`)
-    })
-  }
-
-  function submitPartner() {
-    const name = (f.name ?? '').trim()
-    if (!name) {
-      toast.error('Bitte Name angeben.')
-      return
-    }
-    startTransition(async () => {
-      const r = await createPartner({
-        name,
-        kategorie: (f.category ?? '').trim() || null,
-        ansprechpartner: (f.contact ?? '').trim() || null,
-        telefon: (f.tel ?? '').trim() || null,
-        email: (f.mail ?? '').trim() || null,
-      })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
       toast.success('Partner angelegt')
-      router.push(`/partner/${r.id}`)
+      router.push(`/handwerker/${r.id}`)
     })
   }
 
@@ -428,51 +404,44 @@ export function NeuErstellenClient() {
           <div className="neu-fields">
             <div className="form-section-h">Kunden-Daten</div>
             <div className="form-grid">
-              <label className="field full">
-                <span className="field-label">
-                  Name <span className="req">*</span>
-                </span>
+              <MockField label="Name" required full>
                 <input
-                  className="field-inp"
+                  className="txt"
                   value={f.name ?? ''}
                   onChange={(e) => set('name', e.target.value)}
                   placeholder="Name / Firma"
                   autoFocus
                 />
-              </label>
-              <label className="field">
-                <span className="field-label">Typ</span>
+              </MockField>
+              <MockField label="Typ">
                 <select
-                  className="field-inp"
+                  className="sel"
                   value={f.type ?? ''}
                   onChange={(e) => set('type', e.target.value)}
                 >
                   <option value="">wählen…</option>
-                  {['Privat', 'Hausverwaltung', 'Gewerbe'].map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
+                  <option value="Privat">Privat</option>
+                  <option value="Hausverwaltung">HV</option>
+                  <option value="Gewerbe">Gewerbe</option>
                 </select>
-              </label>
-              <label className="field">
-                <span className="field-label">Telefon</span>
+              </MockField>
+              <MockField label="Telefon">
                 <input
-                  className="field-inp"
+                  className="txt"
                   value={f.tel ?? ''}
                   onChange={(e) => set('tel', e.target.value)}
                   placeholder="089 …"
                 />
-              </label>
-              <label className="field full">
-                <span className="field-label">E-Mail</span>
+              </MockField>
+              <MockField label="E-Mail" full>
                 <input
-                  className="field-inp"
+                  className="txt"
+                  type="email"
                   value={f.mail ?? ''}
                   onChange={(e) => set('mail', e.target.value)}
                   placeholder="mail@…"
                 />
-              </label>
+              </MockField>
             </div>
             <div className="neu-actions">
               <MockBtn kind="ghost" onClick={() => router.push('/kunden')}>
@@ -488,47 +457,42 @@ export function NeuErstellenClient() {
 
         {art === 'handwerker' ? (
           <div className="neu-fields">
-            <div className="form-section-h">Handwerker-Daten</div>
+            <div className="form-section-h">Partner-Daten</div>
             <div className="form-grid">
-              <label className="field full">
-                <span className="field-label">
-                  Name <span className="req">*</span>
-                </span>
+              <MockField label="Name" required full>
                 <input
-                  className="field-inp"
+                  className="txt"
                   value={f.name ?? ''}
                   onChange={(e) => set('name', e.target.value)}
                   placeholder="Betrieb / Name"
                   autoFocus
                 />
-              </label>
-              <label className="field">
-                <span className="field-label">Gewerk</span>
+              </MockField>
+              <MockField label="Gewerk">
                 <input
-                  className="field-inp"
+                  className="txt"
                   value={f.category ?? ''}
                   onChange={(e) => set('category', e.target.value)}
                   placeholder="z.B. Sanitär"
                 />
-              </label>
-              <label className="field">
-                <span className="field-label">Telefon</span>
+              </MockField>
+              <MockField label="Telefon">
                 <input
-                  className="field-inp"
+                  className="txt"
                   value={f.tel ?? ''}
                   onChange={(e) => set('tel', e.target.value)}
                   placeholder="0170 …"
                 />
-              </label>
-              <label className="field full">
-                <span className="field-label">E-Mail</span>
+              </MockField>
+              <MockField label="E-Mail" full>
                 <input
-                  className="field-inp"
+                  className="txt"
+                  type="email"
                   value={f.mail ?? ''}
                   onChange={(e) => set('mail', e.target.value)}
                   placeholder="mail@…"
                 />
-              </label>
+              </MockField>
             </div>
             <div className="neu-actions">
               <MockBtn kind="ghost" onClick={() => router.push('/handwerker')}>
@@ -536,77 +500,6 @@ export function NeuErstellenClient() {
               </MockBtn>
               <div style={{ flex: 1 }} />
               <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitHandwerker}>
-                Handwerker anlegen
-              </MockBtn>
-            </div>
-          </div>
-        ) : null}
-
-        {art === 'partner' ? (
-          <div className="neu-fields">
-            <div className="form-section-h">Partner-Daten</div>
-            <div className="form-grid">
-              <label className="field full">
-                <span className="field-label">
-                  Name <span className="req">*</span>
-                </span>
-                <input
-                  className="field-inp"
-                  value={f.name ?? ''}
-                  onChange={(e) => set('name', e.target.value)}
-                  placeholder="Firma / Name"
-                  autoFocus
-                />
-              </label>
-              <label className="field">
-                <span className="field-label">Kategorie</span>
-                <select
-                  className="field-inp"
-                  value={f.category ?? ''}
-                  onChange={(e) => set('category', e.target.value)}
-                >
-                  <option value="">wählen…</option>
-                  {['Versicherung', 'Finanzierung', 'Makler', 'Planung', 'Logistik'].map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field-label">Ansprechpartner</span>
-                <input
-                  className="field-inp"
-                  value={f.contact ?? ''}
-                  onChange={(e) => set('contact', e.target.value)}
-                  placeholder="Name"
-                />
-              </label>
-              <label className="field">
-                <span className="field-label">Telefon</span>
-                <input
-                  className="field-inp"
-                  value={f.tel ?? ''}
-                  onChange={(e) => set('tel', e.target.value)}
-                  placeholder="089 …"
-                />
-              </label>
-              <label className="field full">
-                <span className="field-label">E-Mail</span>
-                <input
-                  className="field-inp"
-                  value={f.mail ?? ''}
-                  onChange={(e) => set('mail', e.target.value)}
-                  placeholder="mail@…"
-                />
-              </label>
-            </div>
-            <div className="neu-actions">
-              <MockBtn kind="ghost" onClick={() => router.push('/partner')}>
-                Abbrechen
-              </MockBtn>
-              <div style={{ flex: 1 }} />
-              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitPartner}>
                 Partner anlegen
               </MockBtn>
             </div>

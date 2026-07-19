@@ -1541,6 +1541,109 @@ export async function sendAngebotToKunde(
   return { ok: true as const }
 }
 
+/** Echte Kunden-Mail-HTML wie beim Versand (ohne PDF / Statusänderung). */
+export async function previewAngebotKundeMail(input: {
+  angebotId: string
+  betreff?: string
+  einleitung?: string | null
+  schluss?: string | null
+  leistungsumfang?: string | null
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  const angebotId = input.angebotId.trim()
+  if (!angebotId) return { ok: false, message: 'Angebot fehlt' }
+
+  const detail = await loadAngebotDetailAdmin(angebotId)
+  if (!detail) return { ok: false, message: 'Angebot nicht gefunden' }
+
+  const posMail = normalizeAngebotPositionen(detail.positionen)
+  const summenMail = summenAusPositionen(posMail, 19)
+  const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
+    fetchFirmenEinstellungen(supabaseAdmin),
+    getMailBranding(supabaseAdmin),
+    projektOderStatusLink(detail.lead_id),
+    loadKiVizMailPreviewUrl(angebotId),
+  ])
+  const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
+  const gueltigFallback = new Date(
+    Date.now() + gueltigTage * 24 * 60 * 60 * 1000
+  ).toLocaleDateString('de-DE')
+  const gueltig = detail.gueltig_bis
+    ? (() => {
+        try {
+          return new Date(detail.gueltig_bis as string).toLocaleDateString('de-DE')
+        } catch {
+          return gueltigFallback
+        }
+      })()
+    : gueltigFallback
+
+  const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
+    plz: detail.leads?.plz ?? null,
+    kontakt_name: detail.leads?.kontakt_name ?? null,
+  })
+  const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
+  const portalAudience = portalAudienceFromKunde(detail.kunden)
+  const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
+  const angebotNr = detail.angebotsnr?.trim()
+  const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
+  const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
+  const anrede = parseAngebotAnrede(detail.notizen, kundeTyp)
+  const leistungsumfang =
+    input.leistungsumfang?.trim() ||
+    detail.leistungsumfang?.trim() ||
+    wizardMeta?.leistungsumfang?.trim() ||
+    detail.notizen?.trim()?.slice(0, 80) ||
+    'Ihr Projekt'
+  const einleitung =
+    input.einleitung !== undefined ? input.einleitung : wizardMeta?.einleitung
+  const schluss = input.schluss !== undefined ? input.schluss : wizardMeta?.schluss
+  const istKorrektur = Boolean(detail.gesendet_kunde_at)
+  const betreffOverride = input.betreff?.trim()
+
+  if (angebotNr) {
+    const betreff =
+      betreffOverride || angebotMailBetreff(anrede, angebotNr, branding.firmenname)
+    const html = buildAngebotMail(
+      {
+        ...kundenAnrede,
+        angebotsnr: angebotNr,
+        leistungsumfang,
+        gesamt_brutto: summenMail.bruttoMin,
+        gueltig_bis: gueltig,
+        anrede,
+        einleitung: einleitung ?? undefined,
+        schluss: schluss ?? undefined,
+        istKorrektur,
+        portalLink: portalLink ?? undefined,
+        portalAudience,
+        visualisierung_vorschau_url: vizPreviewUrl,
+      },
+      branding
+    )
+    return { ok: true, html, betreff }
+  }
+
+  const tpl = mailAngebot(
+    {
+      name: kundenAnrede.name,
+      positionen: posMail,
+      gesamt_min: summenMail.nettoMin,
+      gesamt_max: summenMail.nettoMax,
+      lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
+      gueltig_bis: gueltig,
+      statusLink,
+      kundeTyp,
+      visualisierung_vorschau_url: vizPreviewUrl,
+    },
+    branding
+  )
+  return {
+    ok: true,
+    html: tpl.html,
+    betreff: betreffOverride || tpl.betreff,
+  }
+}
+
 export async function markKundeAbgelehnt(angebotId: string) {
   return setAngebotStatus(angebotId, 'abgelehnt')
 }

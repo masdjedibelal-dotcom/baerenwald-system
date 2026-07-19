@@ -177,7 +177,7 @@ export function FabVorgangStartModal({
               className="text-bw-link underline"
               onClick={() => {
                 onClose()
-                router.push('/kunden?neu=1')
+                router.push('/neu?art=kunde')
               }}
             >
               Kunden anlegen

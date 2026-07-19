@@ -15,7 +15,7 @@ import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@
 import { runDuplicateAuftrag } from '@/lib/list-actions'
 import { AuftragDetailsTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
-import { AuftragZahlungsplanSection } from '@/components/auftraege/AuftragZahlungsplanSection'
+import { AuftragZahlungsplanSection, type RechnungErstellenOpts } from '@/components/auftraege/AuftragZahlungsplanSection'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
@@ -67,6 +67,7 @@ import {
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import {
   defaultZahlungszielTage,
@@ -122,14 +123,24 @@ function AuftragNotizenPanel({
           <MockIcon ctx="emphasis" n="messages" size={16} />
           Notizen
         </div>
-        <button
-          type="button"
-          className="btn primary sm"
-          disabled={pending || val === initial}
-          onClick={speichern}
-        >
-          Speichern
-        </button>
+        <div className="inline-edit-actions">
+          <button
+            type="button"
+            className="btn ghost sm"
+            disabled={pending || val === initial}
+            onClick={() => setVal(initial)}
+          >
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            className="btn primary sm"
+            disabled={pending || val === initial}
+            onClick={speichern}
+          >
+            Speichern
+          </button>
+        </div>
       </div>
       <div className="card-b">
         <textarea
@@ -386,34 +397,43 @@ export function AuftragDetailClient({
     setNachtragPickerOpen(true)
   }, [hauptvertraegeFuerNachtrag, startNachtragWizard])
 
-  const openRechnungErstellen = useCallback(() => {
-    if (rechnungenListe.length === 0) {
+  const openRechnungErstellen = useCallback(
+    (opts?: RechnungErstellenOpts) => {
       if (isMobile) {
-        router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
+        const q = new URLSearchParams()
+        if (opts?.zeileId) q.set('abschlag', opts.zeileId)
+        if (opts?.voll) q.set('voll', '1')
+        if (opts?.naechsterAbschlag) q.set('naechster', '1')
+        const qs = q.toString()
+        router.push(
+          `/auftraege/${detail.id}/rechnungen-auswahl${qs ? `?${qs}` : ''}`
+        )
         return
       }
-      startTransition(async () => {
-        const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+
+      const startWizard = async () => {
+        const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {
+          abschlagZeileId: opts?.zeileId,
+          naechsterAbschlag: Boolean(opts?.naechsterAbschlag),
+          vollOhnePlan: Boolean(opts?.voll),
+        })
         if (!res.ok) {
           toast.error(res.message)
           return
         }
         openRechnungWizard(res.bootstrap)
-      })
-      return
-    }
-    if (isMobile) {
-      router.push(`/auftraege/${detail.id}/rechnungen-auswahl`)
-      return
-    }
-    setRechnungAuswahlOpen(true)
-  }, [
-    detail.id,
-    isMobile,
-    openRechnungWizard,
-    rechnungenListe.length,
-    router,
-  ])
+      }
+
+      if (rechnungenListe.length === 0 || opts?.zeileId || opts?.voll || opts?.naechsterAbschlag) {
+        startTransition(() => {
+          void startWizard()
+        })
+        return
+      }
+      setRechnungAuswahlOpen(true)
+    },
+    [detail.id, isMobile, openRechnungWizard, rechnungenListe.length, router]
+  )
 
   useEffect(() => {
     setDetail(initial)
@@ -480,6 +500,7 @@ export function AuftragDetailClient({
   }, [detail.kunden])
 
   const istAbgeschlossen = detail.status === 'abgeschlossen'
+  const istStorniert = detail.status === 'storniert'
 
   /** Nur Aktionen, die nicht schon über Header-CTA oder Detail-Tabs erreichbar sind */
   const aktionenMenuItems = useMemo(() => {
@@ -709,23 +730,8 @@ export function AuftragDetailClient({
   const auftragNettoSumme = useMemo(() => {
     const ap = detail.auftrag_positionen ?? []
     if (ap.length) {
-      return auftragSummenAusPositionen(
-        ap.map((p) => ({
-          id: p.id,
-          gewerk_id: '',
-          gewerk_slug: p.gewerk_slug ?? '',
-          gewerk_name: p.gewerk_name ?? '',
-          leistung: p.leistung_name ?? '',
-          beschreibung: p.beschreibung ?? '',
-          menge: p.menge ?? 1,
-          einheit: p.einheit ?? '',
-          lohn_netto: p.lohn_fix ?? 0,
-          material_netto: p.material_fix ?? 0,
-          gesamt_min: p.preis_fix ?? 0,
-          gesamt_max: p.preis_fix ?? 0,
-          preis_typ: 'fix' as const,
-        }))
-      ).netto
+      // Auftrag: lohn_fix/material_fix/preis_fix sind Zeilensummen — erst in Stückpreise wandeln
+      return auftragSummenAusPositionen(auftragPositionenToAngebotPositionen(ap)).netto
     }
     const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
     const raw = (ang as { positionen?: unknown } | null)?.positionen
@@ -767,7 +773,7 @@ export function AuftragDetailClient({
     },
     {
       id: 'finanzen',
-      label: 'Zahlplan',
+      label: 'Zahlung & Rechnung',
       icon: 'calculator',
       render: () => finanzenInhalt,
     },
@@ -844,7 +850,7 @@ export function AuftragDetailClient({
         meta: headMeta,
         actions: (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {istAbgeschlossen ? (
+            {!istStorniert ? (
               <button
                 type="button"
                 className="btn primary sm inline-flex shrink-0 gap-1.5"
@@ -853,16 +859,17 @@ export function AuftragDetailClient({
                 <MockIcon ctx="btn" n="file-invoice" size={15} />
                 Rechnung erstellen
               </button>
-            ) : (
+            ) : null}
+            {!istAbgeschlossen && !istStorniert ? (
               <button
                 type="button"
-                className="btn primary sm inline-flex shrink-0 gap-1.5"
+                className="btn ghost sm inline-flex shrink-0 gap-1.5"
                 onClick={openAuftragAbschliessen}
               >
                 <MockIcon ctx="btn" n="checks" size={15} />
                 Auftrag abschließen
               </button>
-            )}
+            ) : null}
             <ActionsMenu
               trigger={
                 <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
@@ -899,7 +906,9 @@ export function AuftragDetailClient({
         onNeueRechnung={() => {
           setRechnungAuswahlOpen(false)
           startTransition(async () => {
-            const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {
+              vollOhnePlan: true,
+            })
             if (!res.ok) {
               toast.error(res.message)
               return

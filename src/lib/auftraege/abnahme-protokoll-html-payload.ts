@@ -3,6 +3,7 @@ import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import {
+  filterAbnahmePunkteFuerDokument,
   gruppiereAbnahmePunkte,
   type AbnahmeMangel,
   type AbnahmePunkt,
@@ -61,7 +62,7 @@ export function buildAbnahmeProtokollHtmlInput(
     abnahmeDatum: formatDe(input.abnahmeDatum),
     kunde_name: kunde.name?.trim() || '—',
     kunde_adresse: kundeAdresseZeilen(kunde),
-    gewerke: gruppiereAbnahmePunkte(input.punkte),
+    gewerke: gruppiereAbnahmePunkte(filterAbnahmePunkteFuerDokument(input.punkte)),
     maengel: input.maengel,
     notizen: input.notizen?.trim() || null,
   }

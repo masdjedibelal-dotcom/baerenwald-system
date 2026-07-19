@@ -19,7 +19,6 @@ import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import { KundeModal } from '@/components/kunden/KundeModal'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 
@@ -66,7 +65,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
 
-  const [modalOpen, setModalOpen] = useState(false)
   const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
@@ -76,17 +74,11 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
 
-  function closeNeuModal() {
-    setModalOpen(false)
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('neu')
-    const q = params.toString()
-    router.replace(q ? `/kunden?${q}` : '/kunden', { scroll: false })
-  }
-
   useEffect(() => {
-    if (searchParams.get('neu') === '1') setModalOpen(true)
-  }, [searchParams])
+    if (searchParams.get('neu') === '1') {
+      router.replace('/neu?art=kunde')
+    }
+  }, [searchParams, router])
 
   const typCounts = useMemo(() => {
     let privat = 0
@@ -419,8 +411,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         unit="Kunden"
         onPageChange={(p) => setPageIndex(p - 1)}
       />
-
-      <KundeModal open={modalOpen} onClose={closeNeuModal} editKunde={null} />
     </div>
   )
 }

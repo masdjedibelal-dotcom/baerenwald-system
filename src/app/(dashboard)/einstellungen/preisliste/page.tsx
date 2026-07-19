@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function EinstellungenPreislisteRedirectPage() {
-  redirect('/preislisten')
+  redirect('/einstellungen/preise')
 }

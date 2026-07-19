@@ -144,7 +144,7 @@ export function AbschlussdokumentationModal({
       key: 'abnahmeprotokoll',
       label: 'Abnahmeprotokoll',
       ready: vorschau.hasAbnahme,
-      hint: 'Noch nicht signiert — wird nicht mitgesendet',
+      hint: 'Noch kein PDF — wird nicht mitgesendet',
     },
     {
       key: 'abschlussbericht',

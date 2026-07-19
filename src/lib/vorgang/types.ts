@@ -80,6 +80,7 @@ export type ResolvedVorgang = {
 /** Zeile in `/vorgaenge` (Resolver + Listen-Metadaten). */
 export type VorgangListeRow = ResolvedVorgang & {
   leadId: string
+  kundeId?: string | null
   kundeName: string | null
   wertLabel: string | null
   detailHref: string

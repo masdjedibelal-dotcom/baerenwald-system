@@ -1,6 +1,7 @@
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition } from '@/lib/types'
+import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type DashboardZeitraum = '30d' | '90d' | 'year' | 'all'
 
@@ -64,14 +65,20 @@ export function auftragNetto(auftrag: {
         positionen?: unknown
       }[]
     | null
-  auftrag_positionen?: AngebotPosition[] | null
+  auftrag_positionen?: AuftragPosition[] | AngebotPosition[] | null
 }): number {
   const ang = Array.isArray(auftrag.angebote) ? auftrag.angebote[0] : auftrag.angebote
   const fromAng = angebotNetto(ang)
   if (fromAng > 0) return fromAng
   const pos = auftrag.auftrag_positionen
-  if (pos?.length) return auftragSummenAusPositionen(pos as never).netto
-  return 0
+  if (!pos?.length) return 0
+  const first = pos[0] as AuftragPosition & AngebotPosition
+  if ('preis_fix' in first || 'lohn_fix' in first || 'leistung_name' in first) {
+    return auftragSummenAusPositionen(
+      auftragPositionenToAngebotPositionen(pos as AuftragPosition[])
+    ).netto
+  }
+  return auftragSummenAusPositionen(pos as AngebotPosition[]).netto
 }
 
 export type UmsatzMonat = {

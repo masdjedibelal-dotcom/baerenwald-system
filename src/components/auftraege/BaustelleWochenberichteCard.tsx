@@ -33,6 +33,20 @@ export function BaustelleWochenberichteCard({
   const [jahr, setJahr] = useState(() => isoKalenderwoche(heuteYmd()).jahr)
   const [fazit, setFazit] = useState('')
   const [ausblick, setAusblick] = useState('')
+  const [editDrafts, setEditDrafts] = useState<
+    Record<string, { fazit: string; ausblick: string }>
+  >({})
+
+  function draftFor(w: AuftragWochenbericht) {
+    return editDrafts[w.id] ?? { fazit: w.fazit ?? '', ausblick: w.ausblick ?? '' }
+  }
+
+  function setDraft(w: AuftragWochenbericht, patch: Partial<{ fazit: string; ausblick: string }>) {
+    setEditDrafts((prev) => {
+      const cur = prev[w.id] ?? { fazit: w.fazit ?? '', ausblick: w.ausblick ?? '' }
+      return { ...prev, [w.id]: { ...cur, ...patch } }
+    })
+  }
 
   function create() {
     startTransition(async () => {
@@ -61,7 +75,15 @@ export function BaustelleWochenberichteCard({
         ausblick: nextAusblick,
       })
       if (!r.ok) toast.error(r.message)
-      else onChanged()
+      else {
+        toast.success('Wochenbericht gespeichert')
+        setEditDrafts((prev) => {
+          const next = { ...prev }
+          delete next[w.id]
+          return next
+        })
+        onChanged()
+      }
     })
   }
 
@@ -131,6 +153,9 @@ export function BaustelleWochenberichteCard({
           {wochenberichte.map((w) => {
             const wn = String(w.wochen_nummer).padStart(2, '0')
             const open = expandedId === w.id
+            const draft = draftFor(w)
+            const dirty =
+              draft.fazit !== (w.fazit ?? '') || draft.ausblick !== (w.ausblick ?? '')
             return (
               <div key={w.id} className="rounded-lg border border-bw-border">
                 <button
@@ -152,31 +177,51 @@ export function BaustelleWochenberichteCard({
                   <div className="space-y-3 border-t border-bw-border px-3 py-3">
                     <Textarea
                       label="Wochenzusammenfassung"
-                      defaultValue={w.fazit ?? ''}
-                      onBlur={(e) => {
-                        if (e.target.value !== (w.fazit ?? '')) {
-                          saveText(w, e.target.value, w.ausblick ?? '')
-                        }
-                      }}
+                      value={draft.fazit}
+                      onChange={(e) => setDraft(w, { fazit: e.target.value })}
                       rows={3}
                     />
                     <Textarea
                       label="Ausblick"
-                      defaultValue={w.ausblick ?? ''}
-                      onBlur={(e) => {
-                        if (e.target.value !== (w.ausblick ?? '')) {
-                          saveText(w, w.fazit ?? '', e.target.value)
-                        }
-                      }}
+                      value={draft.ausblick}
+                      onChange={(e) => setDraft(w, { ausblick: e.target.value })}
                       rows={2}
                     />
+                    {dirty ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() =>
+                            setEditDrafts((prev) => {
+                              const next = { ...prev }
+                              delete next[w.id]
+                              return next
+                            })
+                          }
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => saveText(w, draft.fazit, draft.ausblick)}
+                        >
+                          Speichern
+                        </Button>
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="primary"
                         size="sm"
                         className="gap-1"
-                        disabled={pending}
+                        disabled={pending || dirty}
                         onClick={() => generatePdf(w)}
                       >
                         <Download className="h-3.5 w-3.5" />
@@ -187,7 +232,7 @@ export function BaustelleWochenberichteCard({
                         variant="secondary"
                         size="sm"
                         className="gap-1"
-                        disabled={pending}
+                        disabled={pending || dirty}
                         onClick={() => generateRegiePdf(w)}
                       >
                         Regiebericht KW

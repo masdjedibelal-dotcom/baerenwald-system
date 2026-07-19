@@ -275,6 +275,19 @@ export function abnahmePunkteStatistik(punkte: AbnahmePunkt[]): {
   return { ok, mangel, offen, gesamt: punkte.length }
 }
 
+/**
+ * Leistung für Abnahme ausgewählt (Haken) — nicht „abgenommen“.
+ * `offen` = nicht abnahme-relevant, wird in PDFs weggelassen.
+ */
+export function leistungFuerAbnahmeAusgewaehlt(punkte: AbnahmePunkt[]): boolean {
+  return punkte.length > 0 && punkte.every((p) => p.status !== 'offen')
+}
+
+/** Nur ausgewählte Abnahmepunkte für PDF/Dokumente (ohne Status-„Abgenommen“). */
+export function filterAbnahmePunkteFuerDokument(punkte: AbnahmePunkt[]): AbnahmePunkt[] {
+  return punkte.filter((p) => p.status === 'ok' || p.status === 'mangel')
+}
+
 export function buildAbnahmePunkteInitial(
   opts: {
     positionen: AuftragPosition[]

@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import { EinstellungenBenachrichtigungenCard } from '@/components/einstellungen/EinstellungenMockToggles'
 
-/** Entfernt aus Einstellungen-Nav (Mock: nur bis Formulare). */
-export default function EinstellungenKommunikationRedirect() {
-  redirect('/einstellungen/firma')
+export const metadata: Metadata = {
+  title: 'Benachrichtigungen',
+}
+
+export default function EinstellungenKommunikationPage() {
+  return <EinstellungenBenachrichtigungenCard />
 }

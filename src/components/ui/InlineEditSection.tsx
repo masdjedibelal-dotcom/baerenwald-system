@@ -73,6 +73,7 @@ export function InlineEditField({
   editing,
   children,
   value,
+  link,
 }: {
   label: string
   editing: boolean
@@ -80,11 +81,13 @@ export function InlineEditField({
   children?: ReactNode
   /** Anzeigewert (View-Modus) */
   value?: ReactNode
+  /** View-Modus: grüner Link-Stil (Telefon / E-Mail) */
+  link?: boolean
 }) {
   return (
     <div className={cn('prop', editing && 'inline-edit-field')}>
-      <div className="k">{label}</div>
-      <div className="v">{editing ? children : value ?? '—'}</div>
+      <div className="prop-l">{label}</div>
+      <div className={cn('prop-v', !editing && link && 'link')}>{editing ? children : value ?? '—'}</div>
     </div>
   )
 }

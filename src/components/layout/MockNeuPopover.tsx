@@ -17,9 +17,8 @@ const VORGANG_ITEMS: Array<{ ic: string; label: string; art: FabVorgangArt }> = 
 ]
 
 const STAMM_ITEMS: Array<{ ic: string; label: string; href: string }> = [
-  { ic: 'users', label: 'Kunde', href: '/kunden?neu=1' },
-  { ic: 'tool', label: 'Handwerker', href: '/handwerker?neu=1' },
-  { ic: 'building', label: 'Partner', href: '/partner?neu=1' },
+  { ic: 'users', label: 'Kunde', href: '/neu?art=kunde' },
+  { ic: 'tool', label: 'Partner', href: '/neu?art=handwerker' },
 ]
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {

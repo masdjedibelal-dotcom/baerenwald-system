@@ -37,8 +37,8 @@ function nav(
 }
 
 /**
- * Sidebar: eine Sektion „Arbeit“ (Dashboard, Vorgänge, Kunden, Handwerker) + Planung (Kalender).
- * Partner nicht in der Nav — Route bleibt erreichbar.
+ * Sidebar: Arbeit (Dashboard, Vorgänge, Kunden, Partner) + Planung (Kalender).
+ * Route `/handwerker` bleibt; Label in der Nav ist „Partner“.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -53,7 +53,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
         '/rechnungen',
       ]),
       nav('/kunden', 'users', 'Kunden'),
-      nav('/handwerker', 'tool', 'Handwerker'),
+      nav('/handwerker', 'tool', 'Partner'),
     ],
   },
   {

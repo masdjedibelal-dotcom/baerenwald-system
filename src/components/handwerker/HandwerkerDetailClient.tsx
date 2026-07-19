@@ -6,23 +6,19 @@ import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
-import { FormSheet } from '@/components/ui/FormSheet'
-import { useIsMobile } from '@/hooks/useIsMobile'
-import { PropertyRow } from '@/components/ui/PropertyRow'
 import { Textarea } from '@/components/ui/Textarea'
+import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
-import { HandwerkerComplianceTab } from '@/components/handwerker/HandwerkerComplianceTab'
+import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
-  complianceDokumentStatus,
-  dokumentFuerTyp,
   filterStandardComplianceTypen,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
+import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { ClientOnly } from '@/components/ui/ClientOnly'
@@ -51,8 +47,6 @@ import {
   normalizeHandwerkerNamen,
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
-import { StammdatenVerknuepfungen } from '@/components/stammdaten/StammdatenVerknuepfungen'
-import type { StammdatenKontaktTreffer } from '@/lib/stammdaten-kontakt'
 import {
   getPartnerPortalMailDraft,
   previewPartnerPortalMail,
@@ -67,13 +61,9 @@ import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateHandwerker } from '@/lib/list-actions'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
-import { cn, formatRelativeDate } from '@/lib/utils'
+import { formatRelativeDate } from '@/lib/utils'
 
 type HandwerkerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
-
-function formatEurCompact(n: number): string {
-  return `${Math.round(n).toLocaleString('de-DE')} €`
-}
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -129,30 +119,12 @@ function bewertungKategorieWert(
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
-function complianceRowMeta(status: ReturnType<typeof complianceDokumentStatus>): {
-  label: string
-  tone: 'ok' | 'warn' | 'bad'
-  icon: 'check' | 'alert-triangle' | 'circle-x'
-} {
-  if (status === 'ok') {
-    return { label: 'geprüft', tone: 'ok', icon: 'check' }
-  }
-  if (status === 'warnung') {
-    return { label: 'läuft ab', tone: 'warn', icon: 'alert-triangle' }
-  }
-  if (status === 'abgelaufen') {
-    return { label: 'abgelaufen', tone: 'bad', icon: 'circle-x' }
-  }
-  return { label: 'fehlt', tone: 'bad', icon: 'alert-triangle' }
-}
-
 export function HandwerkerDetailClient({
   payload,
   gewerkeSlugs,
   gewerke = [],
   complianceTypen,
   rahmenVertrag = null,
-  verwandteStammdaten = [],
   vorgaengeRows = [],
 }: {
   payload: HandwerkerDetailPayload
@@ -160,11 +132,9 @@ export function HandwerkerDetailClient({
   gewerke?: Gewerk[]
   complianceTypen: ComplianceDokumentTyp[]
   rahmenVertrag?: HandwerkerVertragRow | null
-  verwandteStammdaten?: StammdatenKontaktTreffer[]
   vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
-  const isMobile = useIsMobile()
   const hw = payload.handwerker as Handwerker
   const slugToName = useMemo(
     () => new Map(gewerkeSlugs.map((g) => [g.slug.toLowerCase(), g.name])),
@@ -182,7 +152,8 @@ export function HandwerkerDetailClient({
   const [notizDraft, setNotizDraft] = useState('')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [modalOpen, setModalOpen] = useState(false)
+  const [editingKontakt, setEditingKontakt] = useState(false)
+  const [editingBank, setEditingBank] = useState(false)
   const [rahmenWizardOpen, setRahmenWizardOpen] = useState(false)
   const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
     useState<RahmenVertragWizardBootstrap | null>(null)
@@ -218,20 +189,50 @@ export function HandwerkerDetailClient({
   }, [hw.id, hw.notizen])
 
   useEffect(() => {
-    if (modalOpen) {
-      const k = normalizeHandwerkerNamen(hw)
-      setFormFirma(k.firma)
-      setFormVorname(k.vorname)
-      setFormNachname(k.nachname)
-      setFormTelefon(hw.telefon ?? '')
-      setFormEmail(hw.email ?? '')
-      setFormAdresse(hw.adresse ?? '')
-      setFormIban(hw.iban ?? '')
-      setFormUstid(hw.ustid ?? '')
-      setFormSteuernummer(hw.steuernummer ?? '')
-      setErr(null)
-    }
-  }, [modalOpen, hw])
+    if (editingKontakt || editingBank) return
+    const k = normalizeHandwerkerNamen(hw)
+    setFormFirma(k.firma)
+    setFormVorname(k.vorname)
+    setFormNachname(k.nachname)
+    setFormTelefon(hw.telefon ?? '')
+    setFormEmail(hw.email ?? '')
+    setFormAdresse(hw.adresse ?? '')
+    setFormIban(hw.iban ?? '')
+    setFormUstid(hw.ustid ?? '')
+    setFormSteuernummer(hw.steuernummer ?? '')
+  }, [hw, editingKontakt, editingBank])
+
+  function syncFormFromHw() {
+    const k = normalizeHandwerkerNamen(hw)
+    setFormFirma(k.firma)
+    setFormVorname(k.vorname)
+    setFormNachname(k.nachname)
+    setFormTelefon(hw.telefon ?? '')
+    setFormEmail(hw.email ?? '')
+    setFormAdresse(hw.adresse ?? '')
+    setFormIban(hw.iban ?? '')
+    setFormUstid(hw.ustid ?? '')
+    setFormSteuernummer(hw.steuernummer ?? '')
+    setErr(null)
+  }
+
+  function beginEditKontakt() {
+    syncFormFromHw()
+    setEditingBank(false)
+    setEditingKontakt(true)
+  }
+
+  function beginEditBank() {
+    syncFormFromHw()
+    setEditingKontakt(false)
+    setEditingBank(true)
+  }
+
+  function cancelEditStamm() {
+    setEditingKontakt(false)
+    setEditingBank(false)
+    syncFormFromHw()
+  }
 
   useEffect(() => {
     void (async () => {
@@ -283,13 +284,14 @@ export function HandwerkerDetailClient({
     })
   }, [hw.id, rahmenVertrag?.id])
 
-  const saveKontaktModal = useCallback(() => {
+  const saveHandwerkerStamm = useCallback(() => {
     const pflicht = validateHandwerkerStammPflicht({
       firma: formFirma,
       vorname: formVorname,
       nachname: formNachname,
     })
     if (pflicht) {
+      toast.error(pflicht)
       setErr(pflicht)
       return
     }
@@ -315,11 +317,14 @@ export function HandwerkerDetailClient({
     startTransition(async () => {
       const r = await updateHandwerker(hw.id, input)
       if (!r.ok) {
+        toast.error(r.message)
         setErr(r.message)
         return
       }
-      setModalOpen(false)
+      setEditingKontakt(false)
+      setEditingBank(false)
       setErr(null)
+      toast.success('Gespeichert')
       router.refresh()
     })
   }, [
@@ -411,7 +416,10 @@ export function HandwerkerDetailClient({
         mail: hw.email,
       },
       {
-        onEdit: () => setModalOpen(true),
+        onEdit: () => {
+          setTab('stammdaten')
+          beginEditKontakt()
+        },
         onCopy: () => runDuplicateHandwerker(hw.id, router),
         onPortal: isCrmAdmin
           ? () => {
@@ -445,40 +453,7 @@ export function HandwerkerDetailClient({
 
   const uebersichtInhalt = (
     <div className="space-y-5">
-      <MockUebersichtCard
-        stats={[
-          {
-            icon: 'inbox',
-            label: 'Angefragt',
-            value: payload.stats.angefragt,
-          },
-          {
-            icon: 'file-invoice',
-            label: 'Angebote',
-            value: payload.stats.angebote,
-          },
-          {
-            icon: 'tool',
-            label: 'Aufträge',
-            value: payload.stats.auftraegeAktiv,
-          },
-          {
-            icon: 'calculator',
-            label: 'Volumen',
-            value: formatEurCompact(payload.stats.volumen),
-          },
-          {
-            icon: 'trending-up',
-            label: 'Ø Auftrag',
-            value: formatEurCompact(payload.stats.avgAuftrag),
-          },
-          {
-            icon: 'clock',
-            label: 'Offen',
-            value: formatEurCompact(payload.stats.offen),
-          },
-        ]}
-      />
+      <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
       <div className="card">
         <div className="card-h">
@@ -557,25 +532,64 @@ export function HandwerkerDetailClient({
 
   const stammdatenInhalt = (
     <>
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="users" size={16} />
-            Kontakt
-          </div>
-          <MockBtn sm kind="ghost" icon="pencil" onClick={() => setModalOpen(true)}>
-            Bearbeiten
-          </MockBtn>
-        </div>
-        <div className="card-b space-y-1">
-          <PropertyRow label="Betrieb" value={handwerkerDisplayName(hw)} editable={false} />
-          <PropertyRow
+      <InlineEditSection
+        title="Kontakt"
+        icon="users"
+        editing={editingKontakt}
+        onStartEdit={beginEditKontakt}
+        onCancel={cancelEditStamm}
+        onSave={saveHandwerkerStamm}
+        saving={pending}
+      >
+        {editingKontakt ? (
+          <p className="inline-edit-hint">
+            <MockIcon ctx="default" n="info-circle" size={14} />
+            Hervorgehobene Felder sind bearbeitbar.
+          </p>
+        ) : null}
+        {err && editingKontakt ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
+        <div className="props">
+          <InlineEditField
+            label="Betrieb"
+            editing={editingKontakt}
+            value={handwerkerDisplayName(hw)}
+          >
+            <input
+              className="input"
+              value={formFirma}
+              onChange={(e) => setFormFirma(e.target.value)}
+              placeholder="Firmenname"
+              autoFocus
+            />
+          </InlineEditField>
+          {editingKontakt ? (
+            <>
+              <InlineEditField label="Vorname (GF)" editing value={formVorname || '—'}>
+                <input
+                  className="input"
+                  value={formVorname}
+                  onChange={(e) => setFormVorname(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="Nachname (GF)" editing value={formNachname || '—'}>
+                <input
+                  className="input"
+                  value={formNachname}
+                  onChange={(e) => setFormNachname(e.target.value)}
+                />
+              </InlineEditField>
+            </>
+          ) : handwerkerGfName(hw) ? (
+            <InlineEditField label="Geschäftsführer" editing={false} value={handwerkerGfName(hw)} />
+          ) : null}
+          <InlineEditField
             label="Gewerk"
+            editing={false}
             value={gewerkNamen.join(', ') || kategorie || '—'}
-            editable={false}
           />
-          <PropertyRow
+          <InlineEditField
             label="Telefon"
+            editing={editingKontakt}
             value={
               hw.telefon ? (
                 <a href={`tel:${String(hw.telefon).replace(/\s/g, '')}`} className="text-bw-link hover:underline">
@@ -585,10 +599,17 @@ export function HandwerkerDetailClient({
                 '—'
               )
             }
-            editable={false}
-          />
-          <PropertyRow
+          >
+            <input
+              className="input"
+              type="tel"
+              value={formTelefon}
+              onChange={(e) => setFormTelefon(e.target.value)}
+            />
+          </InlineEditField>
+          <InlineEditField
             label="E-Mail"
+            editing={editingKontakt}
             value={
               hw.email ? (
                 <a href={`mailto:${hw.email}`} className="text-bw-link hover:underline">
@@ -598,85 +619,59 @@ export function HandwerkerDetailClient({
                 '—'
               )
             }
-            editable={false}
-          />
-          <PropertyRow label="Einsatzgebiet" value={hw.adresse || '—'} editable={false} />
-          {handwerkerGfName(hw) ? (
-            <PropertyRow label="Geschäftsführer" value={handwerkerGfName(hw)} editable={false} />
-          ) : null}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="shield-check" size={16} />
-            Compliance
-          </div>
-          <ComplianceBadge status={hw.compliance_status} />
-        </div>
-        <div className="card-b">
-          {complianceTypenStandard.length === 0 ? (
-            <p className="text-[13px] text-[var(--text-3)]">Keine Compliance-Typen konfiguriert.</p>
-          ) : (
-            complianceTypenStandard.map((typ) => {
-              const doc = dokumentFuerTyp(payload.dokumente, typ.slug, {
-                handwerkerId: hw.id,
-                auftragId: null,
-              })
-              const st = complianceDokumentStatus(typ, doc)
-              const row = complianceRowMeta(st)
-              const sub =
-                doc?.gueltig_bis != null
-                  ? `gültig bis ${String(doc.gueltig_bis).slice(0, 10).split('-').reverse().join('.')}`
-                  : row.label === 'geprüft'
-                    ? 'geprüft'
-                    : row.label
-              return (
-                <div key={typ.id} className="setting-row">
-                  <div>
-                    <div className="lbl">{typ.bezeichnung}</div>
-                    <div className="sub">{sub}</div>
-                  </div>
-                  <MockIcon
-                    ctx="default"
-                    n={row.icon}
-                    size={20}
-                    className={cn(
-                      row.tone === 'ok' && 'text-[var(--green)]',
-                      row.tone === 'warn' && 'text-[var(--yel-tx,#c0622b)]',
-                      row.tone === 'bad' && 'text-[var(--red-tx)]'
-                    )}
-                  />
-                </div>
-              )
-            })
-          )}
-          <button
-            type="button"
-            className="mt-2 text-[12.5px] font-medium text-[var(--green)] hover:underline"
-            onClick={() => setTab('dokumente')}
           >
-            Alle Nachweise verwalten →
-          </button>
+            <input
+              className="input"
+              type="email"
+              value={formEmail}
+              onChange={(e) => setFormEmail(e.target.value)}
+            />
+          </InlineEditField>
+          <InlineEditField
+            label="Einsatzgebiet"
+            editing={editingKontakt}
+            value={hw.adresse || '—'}
+          >
+            <input
+              className="input"
+              value={formAdresse}
+              onChange={(e) => setFormAdresse(e.target.value)}
+            />
+          </InlineEditField>
         </div>
-      </div>
+      </InlineEditSection>
 
-      <StammdatenVerknuepfungen verwandte={verwandteStammdaten} />
-
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Bank &amp; Steuer</div>
-          <MockBtn sm kind="ghost" icon="pencil" onClick={() => setModalOpen(true)}>
-            Bearbeiten
-          </MockBtn>
+      <InlineEditSection
+        title="Bank & Steuer"
+        editing={editingBank}
+        onStartEdit={beginEditBank}
+        onCancel={cancelEditStamm}
+        onSave={saveHandwerkerStamm}
+        saving={pending}
+      >
+        {editingBank ? (
+          <p className="inline-edit-hint">
+            <MockIcon ctx="default" n="info-circle" size={14} />
+            Hervorgehobene Felder sind bearbeitbar.
+          </p>
+        ) : null}
+        {err && editingBank ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
+        <div className="props">
+          <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
+            <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
+          </InlineEditField>
+          <InlineEditField label="USt-ID" editing={editingBank} value={hw.ustid || '—'}>
+            <input className="input" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
+          </InlineEditField>
+          <InlineEditField label="Steuernummer" editing={editingBank} value={hw.steuernummer || '—'}>
+            <input
+              className="input"
+              value={formSteuernummer}
+              onChange={(e) => setFormSteuernummer(e.target.value)}
+            />
+          </InlineEditField>
         </div>
-        <div className="card-b space-y-1">
-          <PropertyRow label="IBAN" value={hw.iban || '—'} editable={false} />
-          <PropertyRow label="USt-ID" value={hw.ustid || '—'} editable={false} />
-          <PropertyRow label="Steuernummer" value={hw.steuernummer || '—'} editable={false} />
-        </div>
-      </div>
+      </InlineEditSection>
 
       {rahmenVertrag?.pdf_url ? (
         <div className="card">
@@ -737,14 +732,22 @@ export function HandwerkerDetailClient({
   )
 
   const dokumenteInhalt = (
-    <HandwerkerComplianceTab
-      handwerkerId={hw.id}
-      handwerkerGewerke={hwGewerkSlugs}
-      gewerke={gewerke}
-      dokumente={payload.dokumente}
-      complianceTypen={complianceTypen}
-      rahmenVertrag={rahmenVertrag}
-    />
+    <div className="card">
+      <div className="card-h">
+        <div className="card-title title">
+          <MockIcon ctx="emphasis" n="shield-check" size={16} />
+          Compliance
+        </div>
+        <ComplianceBadge status={hw.compliance_status} />
+      </div>
+      <div className="card-b">
+        <HandwerkerComplianceUnterlagenTable
+          handwerkerId={hw.id}
+          dokumente={payload.dokumente}
+          typen={complianceTypenStandard}
+        />
+      </div>
+    </div>
   )
 
   const vorgaengeCount = useMemo(
@@ -809,25 +812,17 @@ export function HandwerkerDetailClient({
           </>
         }
         meta={
-          <>
-            <span>{kategorie}</span>
-            {bewertungGesamt != null && bewertungGesamt > 0 ? (
-              <>
-                <span className="sep" aria-hidden>
-                  ·
-                </span>
-                <span className="rating inline-flex items-center gap-1">
-                  <MockIcon
-                    ctx="default"
-                    n="star-filled"
-                    size={12}
-                    className="text-[var(--yel-tx,#c9a227)]"
-                  />
-                  {formatHandwerkerBewertung(bewertungGesamt)}
-                </span>
-              </>
-            ) : null}
-          </>
+          bewertungGesamt != null && bewertungGesamt > 0 ? (
+            <span className="rating inline-flex items-center gap-1">
+              <MockIcon
+                ctx="default"
+                n="star-filled"
+                size={12}
+                className="text-[var(--yel-tx,#c9a227)]"
+              />
+              {formatHandwerkerBewertung(bewertungGesamt)}
+            </span>
+          ) : undefined
         }
         actions={
           <ActionsMenu
@@ -852,68 +847,6 @@ export function HandwerkerDetailClient({
         value={tab}
         onChange={(id) => setTab(id as HandwerkerDetailTab)}
       />
-
-      {(() => {
-        const editForm = (
-          <div className="space-y-4">
-            {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
-            <Input label="Firmenname *" value={formFirma} onChange={(e) => setFormFirma(e.target.value)} />
-            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-              <Input
-                label="Vorname (Geschäftsführer)"
-                value={formVorname}
-                onChange={(e) => setFormVorname(e.target.value)}
-              />
-              <Input
-                label="Nachname (Geschäftsführer)"
-                value={formNachname}
-                onChange={(e) => setFormNachname(e.target.value)}
-              />
-            </div>
-            <Input label="Telefon" type="tel" value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} />
-            <Input label="E-Mail" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
-            <Input label="Adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} />
-            <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-              <Input label="IBAN" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
-              <Input label="USt-ID" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
-            </div>
-            <Input
-              label="Steuernummer"
-              value={formSteuernummer}
-              onChange={(e) => setFormSteuernummer(e.target.value)}
-            />
-          </div>
-        )
-        const editFooter = (
-          <div className="flex gap-2">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" className="flex-1" onClick={saveKontaktModal} disabled={pending}>
-              Speichern
-            </Button>
-          </div>
-        )
-        if (isMobile) {
-          return (
-            <FormSheet
-              open={modalOpen}
-              onClose={() => setModalOpen(false)}
-              breadcrumb="Handwerker"
-              title="Bearbeiten"
-              footer={editFooter}
-            >
-              {editForm}
-            </FormSheet>
-          )
-        }
-        return (
-          <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Handwerker bearbeiten" size="md">
-            {editForm}
-            <div className="mt-4">{editFooter}</div>
-          </Modal>
-        )
-      })()}
 
       <Modal
         open={portalModalOpen}

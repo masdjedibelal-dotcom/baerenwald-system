@@ -1,39 +1,185 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
+import { useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
-import { BrandLogo } from '@/components/brand/BrandLogo'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { toast } from '@/components/ui/app-toast'
 
-const MWST_OPTIONS = [
-  { value: '19', label: '19 %' },
-  { value: '7', label: '7 %' },
-  { value: '0', label: '0 %' },
+function Sec({
+  title,
+  actions,
+  children,
+}: {
+  title: string
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <div style={{ flex: 1 }} />
+        {actions}
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+type StammKey =
+  | 'firmenname'
+  | 'geschaeftsfuehrer'
+  | 'adresse'
+  | 'ust_id'
+  | 'telefon'
+  | 'email'
+  | 'bank'
+
+type StammRow = { key: StammKey; label: string; link?: boolean }
+
+const STAMM_ROWS: StammRow[] = [
+  { key: 'firmenname', label: 'Firma' },
+  { key: 'geschaeftsfuehrer', label: 'Inhaber' },
+  { key: 'adresse', label: 'Adresse' },
+  { key: 'ust_id', label: 'USt-IdNr.' },
+  { key: 'telefon', label: 'Telefon', link: true },
+  { key: 'email', label: 'E-Mail', link: true },
+  { key: 'bank', label: 'Bankverbindung' },
 ]
 
-export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen }) {
+function formatAdresse(v: FirmenEinstellungen): string {
+  return [v.strasse, [v.plz, v.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+}
+
+function formatBank(v: FirmenEinstellungen): string {
+  const iban = v.iban?.trim()
+  const short =
+    iban && iban.length > 8 ? `IBAN …${iban.slice(-4)}` : iban ? `IBAN ${iban}` : ''
+  return [v.bank_name?.trim(), short].filter(Boolean).join(' · ') || '—'
+}
+
+function displayValue(v: FirmenEinstellungen, key: StammKey): string {
+  if (key === 'adresse') return formatAdresse(v) || '—'
+  if (key === 'bank') return formatBank(v)
+  return (v[key] as string)?.trim() || '—'
+}
+
+function parseAdresse(text: string, base: FirmenEinstellungen): FirmenEinstellungen {
+  const next = { ...base }
+  const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
+  if (parts.length === 0) {
+    next.strasse = text
+    return next
+  }
+  next.strasse = parts[0] ?? text
+  if (parts.length >= 2) {
+    const m = parts[1].match(/^(\d{4,5})\s+(.+)$/)
+    if (m) {
+      next.plz = m[1]
+      next.ort = m[2]
+    } else {
+      next.ort = parts[1]
+    }
+  }
+  return next
+}
+
+function parseBank(text: string, base: FirmenEinstellungen): FirmenEinstellungen {
+  const next = { ...base }
+  const ibanMatch = text.match(/IBAN\s*[.…]*\s*([A-Z0-9]+)/i)
+  if (ibanMatch) {
+    const raw = ibanMatch[1].replace(/[.…]/g, '')
+    if (raw.length >= 8) next.iban = raw
+  } else {
+    const bare = text.match(/\b([A-Z]{2}\d{2}[A-Z0-9]{10,30})\b/i)
+    if (bare) next.iban = bare[1].toUpperCase()
+  }
+  const namePart = text.split(/[·•|]/)[0]?.replace(/\s*IBAN.*/i, '').trim()
+  if (namePart) next.bank_name = namePart
+  return next
+}
+
+export function FirmaBrandingForm({
+  initial,
+  naechsteRechnungsnummer,
+}: {
+  initial: FirmenEinstellungen
+  /** z. B. „0184“ oder „2069“ für Anzeige unter Rechnungsnummern */
+  naechsteRechnungsnummer?: string | null
+}) {
   const [v, setV] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [uploading, setUploading] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Record<StammKey, string>>(() => ({
+    firmenname: initial.firmenname,
+    geschaeftsfuehrer: initial.geschaeftsfuehrer,
+    adresse: formatAdresse(initial),
+    ust_id: initial.ust_id,
+    telefon: initial.telefon,
+    email: initial.email,
+    bank: formatBank(initial) === '—' ? '' : formatBank(initial),
+  }))
+  const [editZahlungsziel, setEditZahlungsziel] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function set<K extends keyof FirmenEinstellungen>(key: K, value: string) {
-    setV((s) => ({ ...s, [key]: value }))
+  const zahlungszielLabel = useMemo(() => {
+    const n = Number(v.zahlungsziel_tage) || 14
+    return `${n} Tage`
+  }, [v.zahlungsziel_tage])
+
+  const reNrSub = useMemo(() => {
+    const base = 'Format: RE-{JAHR}-{NNNN}'
+    const nr = naechsteRechnungsnummer?.trim()
+    return nr ? `${base} · aktuell ${nr}` : base
+  }, [naechsteRechnungsnummer])
+
+  function startEdit() {
+    setDraft({
+      firmenname: v.firmenname,
+      geschaeftsfuehrer: v.geschaeftsfuehrer,
+      adresse: formatAdresse(v),
+      ust_id: v.ust_id,
+      telefon: v.telefon,
+      email: v.email,
+      bank: formatBank(v) === '—' ? '' : formatBank(v),
+    })
+    setEditing(true)
   }
 
-  function save() {
+  function cancelEdit() {
+    setEditing(false)
+  }
+
+  function saveStamm() {
     startTransition(async () => {
-      const r = await saveEinstellungen(v)
+      let next: FirmenEinstellungen = {
+        ...v,
+        firmenname: draft.firmenname,
+        geschaeftsfuehrer: draft.geschaeftsfuehrer,
+        ust_id: draft.ust_id,
+        telefon: draft.telefon,
+        email: draft.email,
+      }
+      next = parseAdresse(draft.adresse, next)
+      next = parseBank(draft.bank, next)
+      const r = await saveEinstellungen(next)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
+      setV(next)
+      setEditing(false)
       toast.success('Gespeichert')
     })
   }
@@ -52,7 +198,7 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
         return
       }
       if (j.url) {
-        const next = { ...v, logo_url: j.url! }
+        const next = { ...v, logo_url: j.url }
         setV(next)
         const r = await saveEinstellungen(next)
         if (!r.ok) {
@@ -67,221 +213,174 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
     }
   }
 
-  function removeLogo() {
-    setV((s) => ({ ...s, logo_url: '' }))
+  function saveZahlungsziel(tage: string) {
+    const cleaned = String(Math.max(1, Number(tage) || 14))
+    const next = { ...v, zahlungsziel_tage: cleaned }
+    setV(next)
+    setEditZahlungsziel(false)
     startTransition(async () => {
-      const next = { ...v, logo_url: '' }
       const r = await saveEinstellungen(next)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Logo entfernt')
+      toast.success('Zahlungsziel gespeichert')
     })
   }
 
-  const adresse = [v.strasse, [v.plz, v.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
-  const bankLabel = [v.bank_name, v.iban ? `IBAN ${v.iban}` : ''].filter(Boolean).join(' · ') || '—'
-
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <MockBtn sm kind="primary" icon="check" disabled={pending} onClick={() => save()}>
-          Speichern
-        </MockBtn>
-      </div>
+    <div className="einstellungen-firma-grid">
+      <Sec title="Stammdaten">
+        <div className="props">
+          {STAMM_ROWS.map((r) => {
+            const value = displayValue(v, r.key)
+            return (
+              <div className="prop" key={r.key}>
+                <div className="prop-l">{r.label}</div>
+                {editing ? (
+                  <input
+                    className="txt"
+                    style={{ height: 30 }}
+                    value={draft[r.key]}
+                    onChange={(e) => setDraft((d) => ({ ...d, [r.key]: e.target.value }))}
+                    placeholder={r.key === 'bank' ? 'Bank · IBAN …' : undefined}
+                  />
+                ) : r.link && value !== '—' ? (
+                  <div className="prop-v link">
+                    {r.key === 'telefon' ? (
+                      <a href={`tel:${value.replace(/\s/g, '')}`}>{value}</a>
+                    ) : r.key === 'email' ? (
+                      <a href={`mailto:${value}`}>{value}</a>
+                    ) : (
+                      value
+                    )}
+                  </div>
+                ) : (
+                  <div className="prop-v">{value}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>
+          {editing ? (
+            <>
+              <MockBtn sm kind="primary" icon="check" disabled={pending} onClick={saveStamm}>
+                Speichern
+              </MockBtn>
+              <MockBtn sm kind="ghost" disabled={pending} onClick={cancelEdit}>
+                Abbrechen
+              </MockBtn>
+            </>
+          ) : (
+            <MockBtn sm onClick={startEdit}>
+              Bearbeiten
+            </MockBtn>
+          )}
+        </div>
+      </Sec>
 
-      <div className="einstellungen-firma-grid">
-        <MockCard title="Stammdaten">
-          <div className="space-y-3">
-            <Input
-              label="Firma"
-              required
-              value={v.firmenname}
-              onChange={(e) => set('firmenname', e.target.value)}
-            />
-            <Input
-              label="Inhaber"
-              value={v.geschaeftsfuehrer}
-              onChange={(e) => set('geschaeftsfuehrer', e.target.value)}
-              placeholder="z. B. Beran Cakmak"
-            />
-            <div className="form-grid-2">
-              <Input label="Straße" value={v.strasse} onChange={(e) => set('strasse', e.target.value)} />
-              <Input label="Rechtsform" value={v.rechtsform} onChange={(e) => set('rechtsform', e.target.value)} />
-              <Input label="PLZ" value={v.plz} onChange={(e) => set('plz', e.target.value)} />
-              <Input label="Ort" value={v.ort} onChange={(e) => set('ort', e.target.value)} />
-            </div>
-            {adresse ? (
-              <p className="text-[12px] text-[var(--text-3)]">Adresse: {adresse}</p>
-            ) : null}
-            <Input label="USt-IdNr." value={v.ust_id} onChange={(e) => set('ust_id', e.target.value)} />
-            <Input
-              label="Steuernummer"
-              value={v.steuernummer}
-              onChange={(e) => set('steuernummer', e.target.value)}
-            />
-            <Input
-              label="Telefon"
-              type="tel"
-              value={v.telefon}
-              onChange={(e) => set('telefon', e.target.value)}
-            />
-            <Input
-              label="E-Mail"
-              type="email"
-              value={v.email}
-              onChange={(e) => set('email', e.target.value)}
-            />
-            <div className="form-grid-2">
-              <Input label="Bank" value={v.bank_name} onChange={(e) => set('bank_name', e.target.value)} />
-              <Input label="BIC" value={v.bic} onChange={(e) => set('bic', e.target.value)} />
-              <Input
-                label="IBAN"
-                value={v.iban}
-                onChange={(e) => set('iban', e.target.value)}
-                className="md:col-span-2"
-              />
-            </div>
-            <p className="text-[12px] text-[var(--text-3)]">Bankverbindung: {bankLabel}</p>
+      <Sec title="Brand & Rechnung">
+        <div className="setting-row">
+          <div>
+            <div className="lbl">Logo</div>
+            <div className="sub">Wird auf Rechnungen und Angeboten verwendet</div>
           </div>
-        </MockCard>
-
-        <MockCard title="Brand & Rechnung">
-          <div className="setting-row">
-            <div>
-              <div className="lbl">Logo</div>
-              <div className="sub">Wird auf Rechnungen und Angeboten verwendet</div>
-            </div>
-            <MockBtn
-              sm
-              icon="upload"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {v.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={v.logo_url}
+                alt=""
+                style={{
+                  height: 28,
+                  maxWidth: 72,
+                  objectFit: 'contain',
+                  borderRadius: 4,
+                  border: '0.5px solid var(--border)',
+                  background: '#fff',
+                }}
+              />
+            ) : null}
+            <MockBtn sm icon="upload" disabled={uploading || pending} onClick={() => fileRef.current?.click()}>
               {uploading ? '…' : 'Hochladen'}
             </MockBtn>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/svg+xml"
-            className="hidden"
-            onChange={(e) => void onLogoFile(e.target.files?.[0] ?? null)}
-          />
-          {v.logo_url ? (
-            <div className="mb-3 flex flex-wrap items-end gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={v.logo_url}
-                alt="Logo-Vorschau"
-                className="max-h-16 max-w-[180px] rounded border border-[var(--border)] bg-white object-contain p-2"
-              />
-              <MockBtn sm kind="ghost" onClick={removeLogo}>
-                Entfernen
-              </MockBtn>
-            </div>
-          ) : (
-            <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white p-3">
-              <BrandLogo variant="green" height={36} />
-              <p className="text-[12px] text-[var(--text-3)]">Standard-Logo aktiv</p>
-            </div>
-          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/svg+xml"
+          className="hidden"
+          onChange={(e) => void onLogoFile(e.target.files?.[0] ?? null)}
+        />
 
-          <div className="setting-row">
-            <div>
-              <div className="lbl">Zahlungsziel</div>
-              <div className="sub">Standardfrist nach Rechnungsversand</div>
-            </div>
-            <Input
-              type="number"
-              min={1}
-              value={v.zahlungsziel_tage}
-              onChange={(e) => set('zahlungsziel_tage', e.target.value)}
-              className="w-[88px]"
-            />
+        <div className="setting-row">
+          <div>
+            <div className="lbl">Primärfarbe</div>
+            <div className="sub">Akzentfarbe in PDF-Vorlagen</div>
           </div>
-
-          <div className="setting-row">
-            <div>
-              <div className="lbl">Angebot gültig</div>
-              <div className="sub">Gültigkeit in Tagen</div>
-            </div>
-            <Input
-              type="number"
-              min={1}
-              value={v.angebot_gueltig_tage}
-              onChange={(e) => set('angebot_gueltig_tage', e.target.value)}
-              className="w-[88px]"
-            />
-          </div>
-
-          <div className="setting-row">
-            <div>
-              <div className="lbl">MwSt. Standard</div>
-              <div className="sub">Standard-Steuersatz</div>
-            </div>
-            <select
-              className="input w-[100px]"
-              value={v.mwst_satz}
-              onChange={(e) => set('mwst_satz', e.target.value)}
-            >
-              {MWST_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <label className="mt-2 flex cursor-pointer items-start gap-2 text-[13px] text-[var(--text)]">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={v.kleinunternehmer === '1' || v.kleinunternehmer === 'true'}
-              onChange={(e) => set('kleinunternehmer', e.target.checked ? '1' : '')}
-            />
-            <span>
-              <span className="font-medium">Kleinunternehmer (§ 19 UStG)</span>
-              <span className="mt-0.5 block text-[11.5px] text-[var(--text-3)]">
-                Keine Umsatzsteuer auf Rechnungen; Pflichthinweis wird ergänzt.
-              </span>
-            </span>
-          </label>
-        </MockCard>
-      </div>
-
-      <MockCard title="Angebot — Kosten & Anfahrt">
-        <div className="form-grid-2">
-          <Input
-            label="Anfahrt Pauschale (netto, €)"
-            type="number"
-            min={0}
-            step="0.01"
-            value={v.anfahrt_pauschale_netto}
-            onChange={(e) => set('anfahrt_pauschale_netto', e.target.value)}
-          />
-          <Input
-            label="Bezeichnung Anfahrt"
-            value={v.anfahrt_leistung_text}
-            onChange={(e) => set('anfahrt_leistung_text', e.target.value)}
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              background: 'var(--green)',
+              border: '0.5px solid var(--border)',
+            }}
+            title="Markengrün"
           />
         </div>
-      </MockCard>
 
-      <MockCard title="PDF Fußzeile">
-        <Textarea
-          value={v.pdf_fusszeile}
-          onChange={(e) => set('pdf_fusszeile', e.target.value)}
-          rows={3}
-        />
-      </MockCard>
+        <div className="setting-row">
+          <div>
+            <div className="lbl">Rechnungsnummern</div>
+            <div className="sub">{reNrSub}</div>
+          </div>
+          <MockBtn sm kind="ghost" onClick={() => toast.message('Rechnungsnummern: Anpassung folgt')}>
+            Anpassen
+          </MockBtn>
+        </div>
 
-      <div className="flex justify-end">
-        <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
-          Speichern
-        </Button>
-      </div>
+        <div className="setting-row">
+          <div>
+            <div className="lbl">Zahlungsziel</div>
+            <div className="sub">Standardfrist nach Rechnungsversand</div>
+          </div>
+          {editZahlungsziel ? (
+            <input
+              className="txt"
+              type="number"
+              min={1}
+              autoFocus
+              defaultValue={v.zahlungsziel_tage || '14'}
+              onBlur={(e) => saveZahlungsziel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveZahlungsziel((e.target as HTMLInputElement).value)
+                if (e.key === 'Escape') setEditZahlungsziel(false)
+              }}
+              style={{ width: 72, height: 30, textAlign: 'right' }}
+              aria-label="Zahlungsziel in Tagen"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditZahlungsziel(true)}
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--text)',
+              }}
+            >
+              {zahlungszielLabel}
+            </button>
+          )}
+        </div>
+      </Sec>
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -20,9 +21,19 @@ import {
   type ZahlplanRateStatus,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
+import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
+
+export type RechnungErstellenOpts = {
+  /** Abschlagszeile — Wizard startet vorselektiert ohne erneute Auswahl. */
+  zeileId?: string
+  /** Vollrechnung ohne Abschlagsplan. */
+  voll?: boolean
+  /** Nächste offene Planzeile. */
+  naechsterAbschlag?: boolean
+}
 
 function rateBadge(st: ZahlplanRateStatus) {
   if (st === 'bezahlt') {
@@ -46,6 +57,14 @@ function rateBadge(st: ZahlplanRateStatus) {
   )
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  entwurf: 'Entwurf',
+  gesendet: 'Gesendet',
+  bezahlt: 'Bezahlt',
+  ueberfaellig: 'Überfällig',
+  storniert: 'Storniert',
+}
+
 export function AuftragZahlungsplanSection({
   auftragId,
   zahlungsplanRaw,
@@ -57,9 +76,8 @@ export function AuftragZahlungsplanSection({
   auftragId: string
   zahlungsplanRaw: unknown
   gesamtNetto: number
-  rechnungen: RechnungAbschlagLink[]
-  /** Öffnet den echten Rechnungs-Flow (Auswahl/Wizard). */
-  onCreateInvoice: () => void
+  rechnungen: RechnungAuswahlZeile[]
+  onCreateInvoice: (opts?: RechnungErstellenOpts) => void
   onRefresh?: () => void
 }) {
   const router = useRouter()
@@ -71,6 +89,19 @@ export function AuftragZahlungsplanSection({
   const [editorOpen, setEditorOpen] = useState(false)
   const [pending, startTransition] = useTransition()
 
+  const abschlagLinks = useMemo(
+    () =>
+      rechnungen.map((r) => ({
+        id: r.id,
+        brutto: r.brutto,
+        status: String(r.status),
+        zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
+        rechnung_art: r.rechnung_art ?? null,
+        faellig_am: r.faellig_am ?? null,
+      })) as RechnungAbschlagLink[],
+    [rechnungen]
+  )
+
   const kontext = useMemo(() => berechneZahlungsplan(plan, gesamtNetto), [plan, gesamtNetto])
   const totalBrutto = kontext.gesamtBrutto
 
@@ -78,14 +109,14 @@ export function AuftragZahlungsplanSection({
     let bezahlt = 0
     let gestellt = 0
     for (const z of kontext.zeilen) {
-      const st = zahlplanRateStatus(z.id, rechnungen)
-      const r = rechnungFuerAbschlagZeile(z.id, rechnungen)
+      const st = zahlplanRateStatus(z.id, abschlagLinks)
+      const r = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
       const betrag = Number(r?.brutto ?? z.brutto) || 0
       if (st === 'bezahlt') bezahlt += betrag
       else if (st === 'gestellt') gestellt += betrag
     }
     return { bezahltBrutto: bezahlt, gestelltBrutto: gestellt }
-  }, [kontext.zeilen, rechnungen])
+  }, [kontext.zeilen, abschlagLinks])
 
   const pct = totalBrutto > 0 ? Math.round((bezahltBrutto / totalBrutto) * 100) : 0
   const hasPlan = plan.zeilen.length > 0
@@ -111,13 +142,13 @@ export function AuftragZahlungsplanSection({
 
   function rowMenu(zeileId: string, st: ZahlplanRateStatus): EntityMenuItem[] {
     const items: EntityMenuItem[] = []
-    const r = rechnungFuerAbschlagZeile(zeileId, rechnungen)
+    const r = rechnungFuerAbschlagZeile(zeileId, abschlagLinks)
 
     if (st === 'geplant') {
       items.push({
         icon: 'file-invoice',
         label: 'Rechnung erstellen',
-        onClick: () => onCreateInvoice(),
+        onClick: () => onCreateInvoice({ zeileId }),
       })
     }
 
@@ -138,7 +169,6 @@ export function AuftragZahlungsplanSection({
           })
         },
       })
-      // „Nochmal versenden“ → OFFENE-PUNKTE (kein verdrahteter Resend von hier)
     }
 
     if (st === 'bezahlt' && r?.id) {
@@ -163,14 +193,47 @@ export function AuftragZahlungsplanSection({
     return items
   }
 
+  const rechnungenListeUi =
+    rechnungen.length > 0 ? (
+      <MockCard title="Rechnungen" icon="file-invoice">
+        <div className="zahlplan-table-wrap" style={{ marginTop: 0 }}>
+          {rechnungen.map((r) => (
+            <div key={r.id} className="list-row zahlplan-row">
+              <div className="zahlplan-row__label">
+                <Link href={`/rechnungen/${r.id}`} className="text-bw-link">
+                  {r.rechnungsnummer?.trim() || 'Rechnung'}
+                </Link>
+                <span className="zahlplan-row__pct">
+                  {' '}
+                  · {STATUS_LABEL[String(r.status)] ?? r.status}
+                </span>
+              </div>
+              <div className="zahlplan-row__betrag">
+                {formatEurBetrag(Number(r.brutto ?? 0))}
+              </div>
+              <div className="zahlplan-row__faellig">
+                {r.faellig_am ? formatDatum(String(r.faellig_am).slice(0, 10)) : '—'}
+              </div>
+              <div />
+              <div />
+            </div>
+          ))}
+        </div>
+      </MockCard>
+    ) : null
+
+  const rechnungenBlock = rechnungenListeUi ? (
+    <div style={{ marginTop: 14 }}>{rechnungenListeUi}</div>
+  ) : null
+
   if (gesamtNetto <= 0) {
     return (
-      <MockCard title="Zahlplan" icon="calculator">
+      <MockCard title="Zahlung & Rechnung" icon="calculator">
         <div className="zahlplan-empty">
           <MockIcon ctx="empty" n="calculator" size={26} />
-          <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
+          <div className="zahlplan-empty__title">Noch keine Auftragssumme</div>
           <div className="zahlplan-empty__text">
-            Zuerst Auftragspositionen mit Betrag anlegen, dann die Auftragssumme in Abschläge aufteilen.
+            Zuerst Auftragspositionen mit Betrag anlegen, dann Rechnung oder Abschläge erstellen.
           </div>
         </div>
       </MockCard>
@@ -180,19 +243,25 @@ export function AuftragZahlungsplanSection({
   if (!hasPlan) {
     return (
       <>
-        <MockCard title="Zahlplan" icon="calculator">
+        <MockCard title="Zahlung & Rechnung" icon="calculator">
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
-            <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
+            <div className="zahlplan-empty__title">Rechnung oder Abschlagsplan</div>
             <div className="zahlplan-empty__text">
-              Teile die Auftragssumme von <b>{formatEurBetrag(gesamtNetto)}</b> netto in Abschläge auf — z. B. 30 %
-              bei Beginn, 40 % nach Rohbau, 30 % zur Schlussrechnung.
+              Eine <b>Vollrechnung</b> über {formatEurBetrag(gesamtNetto)} netto — oder die Summe
+              in Abschläge aufteilen (z. B. 30 / 40 / 30).
             </div>
-            <MockBtn kind="primary" icon="plus" onClick={() => setEditorOpen(true)}>
-              Abschlagsplan erstellen
-            </MockBtn>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+              <MockBtn kind="primary" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
+                Rechnung erstellen
+              </MockBtn>
+              <MockBtn kind="ghost" icon="plus" onClick={() => setEditorOpen(true)}>
+                Abschlagsplan anlegen
+              </MockBtn>
+            </div>
           </div>
         </MockCard>
+        {rechnungenBlock}
         <AbschlagsplanEditorModal
           open={editorOpen}
           onClose={() => setEditorOpen(false)}
@@ -208,21 +277,26 @@ export function AuftragZahlungsplanSection({
   return (
     <>
       <MockCard
-        title="Zahlplan"
+        title="Abschlagsplan"
         icon="calculator"
         actions={
           <>
             <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditorOpen(true)}>
               Plan bearbeiten
             </MockBtn>
+            <MockBtn sm kind="ghost" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
+              Vollrechnung
+            </MockBtn>
             <MockBtn
               sm
               kind="primary"
               icon="file-invoice"
               onClick={() => {
-                const next = kontext.zeilen.find((z) => zahlplanRateStatus(z.id, rechnungen) === 'geplant')
-                if (next) onCreateInvoice()
-                else onCreateInvoice()
+                const next = kontext.zeilen.find(
+                  (z) => zahlplanRateStatus(z.id, abschlagLinks) === 'geplant'
+                )
+                if (next) onCreateInvoice({ zeileId: next.id })
+                else onCreateInvoice({ naechsterAbschlag: true })
               }}
             >
               Nächste Rechnung
@@ -252,8 +326,8 @@ export function AuftragZahlungsplanSection({
             <div />
           </div>
           {kontext.zeilen.map((z) => {
-            const st = zahlplanRateStatus(z.id, rechnungen)
-            const r = rechnungFuerAbschlagZeile(z.id, rechnungen)
+            const st = zahlplanRateStatus(z.id, abschlagLinks)
+            const r = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
             const betrag = Number(r?.brutto ?? z.brutto) || 0
             const pctLabel =
               z.typ === 'prozent'
@@ -283,7 +357,21 @@ export function AuftragZahlungsplanSection({
             )
           })}
         </div>
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 12,
+            color: 'var(--text-3)',
+            lineHeight: 1.45,
+          }}
+        >
+          Abschläge erscheinen als Pauschalzeile (Planbetrag). Die volle Leistungsaufstellung
+          gehört in den Leistungsnachweis bzw. die Schlussrechnung — pro Rate unter ⋮
+          „Rechnung erstellen“.
+        </p>
       </MockCard>
+
+      {rechnungenBlock}
 
       <AbschlagsplanEditorModal
         open={editorOpen}

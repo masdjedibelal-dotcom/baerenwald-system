@@ -103,16 +103,27 @@ export function AuftragDetailKopf({
             placeholder="z. B. Fliesen Wand fertigstellen, dann Heizkörper anschließen"
             className="!text-sm"
           />
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            className="mt-2"
-            loading={pending}
-            onClick={speichernNaechsterSchritt}
-          >
-            Speichern
-          </Button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending || naechster === (detail.naechster_schritt ?? '')}
+              onClick={() => setNaechster(detail.naechster_schritt ?? '')}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              loading={pending}
+              disabled={naechster === (detail.naechster_schritt ?? '')}
+              onClick={speichernNaechsterSchritt}
+            >
+              Speichern
+            </Button>
+          </div>
         </section>
 
         <section className="rounded-lg border border-bw-border bg-bw-card p-4">

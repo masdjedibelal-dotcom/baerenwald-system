@@ -116,19 +116,27 @@ function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
     return `<p style="font-size:9pt;color:${MUTED};">Keine Abnahmepunkte.</p>`
   }
   return gewerke
-    .map((g) => {
+    .map((g, gi) => {
       const leistungen = g.leistungen
-        .map((l) => {
+        .map((l, li) => {
           const bullets = l.punkte.map((p) => checklistBulletHtml(p)).join('')
           const notizen = leistungNotizenHtml(notizenFuerLeistung(l.punkte))
-          return `<div style="margin:0 0 14px;padding:10px 0 0;border-top:1px solid ${BORDER};page-break-inside:avoid;">
+          const topBorder =
+            li === 0
+              ? 'padding-top:4px;border-top:none;'
+              : 'padding:10px 0 0;border-top:1px solid ' + BORDER + ';'
+          return `<div style="margin:0 0 14px;${topBorder}page-break-inside:avoid;">
             <p style="margin:0 0 8px;font-size:9.5pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>
             <ul style="margin:0;padding:0;">${bullets}</ul>
             ${notizen}
           </div>`
         })
         .join('')
-      return `<div style="margin-bottom:8px;padding-top:12px;border-top:2px solid ${ACCENT};page-break-inside:avoid;">
+      const gewerkTop =
+        gi === 0
+          ? 'margin-bottom:8px;padding-top:0;border-top:none;'
+          : `margin-bottom:8px;padding-top:12px;border-top:2px solid ${ACCENT};`
+      return `<div style="${gewerkTop}page-break-inside:avoid;">
         <h3 style="margin:0 0 4px;font-size:10.5pt;font-weight:700;color:${ACCENT};">${esc(g.gewerk)}</h3>
         ${leistungen}
       </div>`

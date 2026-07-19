@@ -60,6 +60,7 @@ export async function syncNeueLeistungenToPreisliste(
 
   if (created > 0) {
     revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
     revalidatePath('/einstellungen/gewerke')
     revalidatePath('/angebote/neu')
   }
@@ -82,6 +83,7 @@ export async function updatePreisliste(
   const { error } = await supabase.from('preislisten').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
   revalidatePath('/einstellungen/gewerke')
   return { ok: true }
 }
@@ -110,6 +112,7 @@ export async function createPreisliste(input: {
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
   revalidatePath('/einstellungen/gewerke')
   return { ok: true, id: data.id as string }
 }
@@ -128,6 +131,7 @@ export async function setGewerkAktiv(
   const { error } = await supabase.from('gewerke').update({ aktiv }).eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
   revalidatePath('/einstellungen/gewerke')
   return { ok: true }
 }
@@ -142,6 +146,7 @@ export async function updateGewerk(
   const { error } = await supabase.from('gewerke').update({ name: trimmed }).eq('id', id)
   if (error) return { ok: false, message: error.message }
   revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
   revalidatePath('/einstellungen/gewerke')
   return { ok: true }
 }
@@ -169,6 +174,7 @@ export async function createGewerk(
 
     if (error || !data) return { ok: false, message: error?.message ?? 'Anlegen fehlgeschlagen' }
     revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
     revalidatePath('/einstellungen/gewerke')
     return { ok: true, id: data.id as string, slug: data.slug as string, name: data.name as string }
   }

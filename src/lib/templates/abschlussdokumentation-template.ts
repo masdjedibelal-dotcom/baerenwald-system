@@ -2,7 +2,7 @@
  * HTML für Abschlussdokumentation-PDF (A4, Bärenwald-Layout wie Angebot/Rechnung).
  */
 
-import { gruppiereAbnahmePunkte, type AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import { filterAbnahmePunkteFuerDokument, gruppiereAbnahmePunkte, type AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
 import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
@@ -305,24 +305,24 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
   return `<table style="width:100%;border-collapse:collapse;font-size:${fs};">${head}<tbody>${rows}</tbody></table>${summenHtml}`
 }
 
-function abnahmeStatusLabel(status: AbnahmePunkt['status']): { label: string; color: string; bg: string } {
-  if (status === 'ok') return { label: 'Abgenommen', color: '#166534', bg: '#DCFCE7' }
-  if (status === 'mangel') return { label: 'Mangel', color: '#991B1B', bg: '#FEE2E2' }
-  return { label: 'Offen', color: '#4B5563', bg: '#F3F4F6' }
-}
-
 function abnahmeHtml(punkte: AbnahmePunkt[]): string {
-  return gruppiereAbnahmePunkte(punkte)
+  const selected = filterAbnahmePunkteFuerDokument(punkte)
+  if (!selected.length) {
+    return `<p style="margin:0;font-size:9pt;color:${MUTED};">Keine Leistungen für die Abnahme ausgewählt.</p>`
+  }
+  return gruppiereAbnahmePunkte(selected)
     .map((block) => {
       const leistungen = block.leistungen
         .map((l) => {
           const bullets = l.punkte
             .map((pt) => {
-              const st = abnahmeStatusLabel(pt.status)
+              const mangel =
+                pt.status === 'mangel'
+                  ? `<span style="display:inline-block;min-width:56px;padding:2px 6px;border-radius:999px;font-size:7pt;font-weight:700;background:#FEE2E2;color:#991B1B;margin-right:6px;">Mangel</span>`
+                  : ''
               const notiz = pt.notiz?.trim()
               return `<li style="margin:0 0 4px;font-size:8.5pt;list-style:none;">
-                <span style="display:inline-block;min-width:72px;padding:2px 6px;border-radius:999px;font-size:7pt;font-weight:700;background:${st.bg};color:${st.color};">${st.label}</span>
-                ${esc(pt.beschreibung)}
+                ${mangel}${esc(pt.beschreibung)}
                 ${notiz ? `<span style="color:${MUTED};"> — ${esc(notiz)}</span>` : ''}
               </li>`
             })

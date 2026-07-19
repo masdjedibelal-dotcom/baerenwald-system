@@ -1,28 +1,74 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
-import { useState, useTransition } from 'react'
-import { Pencil } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { useState, useTransition, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { Modal } from '@/components/ui/Modal'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
-import {
-  EinstellungenListBody,
-  EinstellungenListItem,
-  EinstellungenListMeta,
-} from '@/components/einstellungen/EinstellungenUi'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
   inviteBenutzer,
   loadBenutzerListe,
   setBenutzerAktiv,
-  syncBenutzerPartnerPortal,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
-import { useRouter } from 'next/navigation'
+
+const COLS = '42px 2fr 1.5fr 1fr 90px'
+
+function Sec({
+  title,
+  actions,
+  children,
+}: {
+  title: string
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <div style={{ flex: 1 }} />
+        {actions}
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+function initialsFromName(name: string, email: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
+  }
+  if (parts.length === 1 && parts[0]!.length >= 2) {
+    return parts[0]!.slice(0, 2).toUpperCase()
+  }
+  const local = email.split('@')[0] ?? '?'
+  return local.slice(0, 2).toUpperCase() || '?'
+}
+
+function rolleLabel(rolle: BenutzerZeile['rolle']): string {
+  return rolle === 'admin' ? 'Inhaber' : 'Projektleitung'
+}
+
+function avatarColor(u: BenutzerZeile, index: number): string {
+  if (u.rolle === 'admin') return 'green'
+  const cycle = ['', 'yellow', ''] as const
+  return cycle[index % cycle.length] ?? ''
+}
 
 export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeile[] }) {
   const router = useRouter()
@@ -41,6 +87,13 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     const next = await loadBenutzerListe()
     setRows(next)
     router.refresh()
+  }
+
+  function openEdit(u: BenutzerZeile) {
+    setEdit(u)
+    setEditName(u.name)
+    setEditTelefon(u.telefon)
+    setEditRolle(u.rolle)
   }
 
   function sendInvite() {
@@ -76,92 +129,124 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     })
   }
 
-  async function toggleAktiv(u: BenutzerZeile, aktiv: boolean) {
-    const r = await setBenutzerAktiv(u.id, aktiv)
-    if (!r.ok) {
-      toast.error(r.message)
-      return
-    }
-    toast.success(aktiv ? 'Wieder aktiviert' : 'Deaktiviert')
-    await refresh()
+  function removeUser(u: BenutzerZeile) {
+    startTransition(async () => {
+      const r = await setBenutzerAktiv(u.id, false)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Teammitglied entfernt')
+      await refresh()
+    })
   }
 
   return (
-    <div className="space-y-4">
-      <Card
+    <>
+      <Sec
         title="Teammitglieder"
-        action={
-          <Button type="button" variant="primary" className="sm" onClick={() => setInviteOpen(true)}>
+        actions={
+          <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
             Einladen
-          </Button>
+          </MockBtn>
         }
       >
-        <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Benutzer.' : undefined}>
-          {rows.map((u) => (
-            <EinstellungenListItem key={u.id}>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-medium text-bw-text">{u.name}</p>
-                <EinstellungenListMeta>{u.email}</EinstellungenListMeta>
-                <EinstellungenListMeta className="mt-0.5">
-                  {u.rolle === 'admin' ? 'Admin' : 'Manager'}
-                  {u.telefon ? ` · ${u.telefon}` : ' · Kein Handy'}
-                  {u.partnerPortal ? ' · Partner-Portal' : ' · Nur CRM'}
-                </EinstellungenListMeta>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <MockBadge kind={hubSpotStatusToMockBadgeKind(u.aktiv ? 'done' : 'cancel')}>{u.aktiv ? 'Aktiv' : 'Deaktiviert'}</MockBadge>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setEdit(u)
-                    setEditName(u.name)
-                    setEditTelefon(u.telefon)
-                    setEditRolle(u.rolle)
+        {rows.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>Noch keine Benutzer.</p>
+        ) : (
+          <div style={{ margin: 0 }}>
+            <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
+              <div />
+              <div>Name</div>
+              <div>E-Mail</div>
+              <div>Rolle</div>
+              <div />
+            </div>
+            {rows.map((u, i) => {
+              const initials = initialsFromName(u.name, u.email)
+              const color = avatarColor(u, i)
+              return (
+                <div
+                  key={u.id}
+                  className="list-row"
+                  style={{
+                    gridTemplateColumns: COLS,
+                    cursor: 'default',
+                    alignItems: 'center',
+                    opacity: u.aktiv ? 1 : 0.55,
                   }}
                 >
-                  <Pencil className="h-4 w-4" aria-hidden />
-                  Bearbeiten
-                </Button>
-                {!u.partnerPortal ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => {
-                      startTransition(async () => {
-                        const r = await syncBenutzerPartnerPortal(u.id)
-                        if (!r.ok) {
-                          toast.error(r.message)
-                          return
-                        }
-                        toast.success(
-                          r.handwerkerName
-                            ? `Partner-Portal verknüpft (${r.handwerkerName})`
-                            : 'Kein Handwerker-Stamm mit dieser E-Mail gefunden'
-                        )
-                        await refresh()
-                      })
-                    }}
-                  >
-                    Portal verknüpfen
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant={u.aktiv ? 'danger' : 'secondary'}
-                  size="sm"
-                  onClick={() => void toggleAktiv(u, !u.aktiv)}
-                >
-                  {u.aktiv ? 'Deaktivieren' : 'Aktivieren'}
-                </Button>
-              </div>
-            </EinstellungenListItem>
-          ))}
-        </EinstellungenListBody>
-      </Card>
+                  <div className={`avatar ${color}`.trim()} aria-hidden>
+                    {initials}
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.name}
+                    {!u.aktiv ? (
+                      <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.email || '—'}
+                  </div>
+                  <div>
+                    <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} className="row-actions always">
+                    <MockEntityRowMenu
+                      items={[
+                        {
+                          icon: 'pencil',
+                          label: 'Bearbeiten',
+                          onClick: () => openEdit(u),
+                        },
+                        {
+                          icon: 'user',
+                          label: 'Rolle ändern',
+                          onClick: () => openEdit(u),
+                        },
+                        {
+                          icon: 'mail',
+                          label: 'E-Mail schreiben',
+                          onClick: () => {
+                            if (u.email) window.open(`mailto:${u.email}`)
+                          },
+                        },
+                        'sep' as const,
+                        ...(u.aktiv
+                          ? [
+                              {
+                                icon: 'trash' as const,
+                                label: 'Entfernen',
+                                danger: true as const,
+                                onClick: () => removeUser(u),
+                              },
+                            ]
+                          : [
+                              {
+                                icon: 'check' as const,
+                                label: 'Aktivieren',
+                                onClick: () => {
+                                  startTransition(async () => {
+                                    const r = await setBenutzerAktiv(u.id, true)
+                                    if (!r.ok) {
+                                      toast.error(r.message)
+                                      return
+                                    }
+                                    toast.success('Wieder aktiviert')
+                                    await refresh()
+                                  })
+                                },
+                              },
+                            ]),
+                      ]}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Sec>
 
       <Modal
         open={inviteOpen}
@@ -188,8 +273,8 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
           />
           <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
           <p className="text-xs text-bw-text-muted">
-            Nutze dieselbe E-Mail wie im Handwerker-Stamm — dann funktioniert ein Login für CRM und
-            Partner-Portal.
+            Nur CRM-Mitarbeiter. Handwerker-, Partner- und Kunden-Logins werden hier nicht
+            verwaltet — bitte eine eigene Mitarbeiter-E-Mail verwenden.
           </p>
           <div>
             <label className="input-label" htmlFor="invite-rolle">
@@ -201,8 +286,8 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               value={inviteRolle}
               onChange={(e) => setInviteRolle(e.target.value as 'admin' | 'manager')}
             >
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
+              <option value="manager">Projektleitung</option>
+              <option value="admin">Inhaber</option>
             </select>
           </div>
         </div>
@@ -242,12 +327,12 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               value={editRolle}
               onChange={(e) => setEditRolle(e.target.value as 'admin' | 'manager')}
             >
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
+              <option value="manager">Projektleitung</option>
+              <option value="admin">Inhaber</option>
             </select>
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }

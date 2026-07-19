@@ -152,6 +152,7 @@ export function EntityKundenStammdatenCard({
         <InlineEditField
           label="Telefon"
           editing={editing}
+          link={!editing && Boolean(draft.telefon.trim())}
           value={
             draft.telefon.trim() ? (
               <a href={telHref(draft.telefon)}>{draft.telefon}</a>
@@ -170,6 +171,7 @@ export function EntityKundenStammdatenCard({
         <InlineEditField
           label="E-Mail"
           editing={editing}
+          link={!editing && Boolean(draft.email.trim())}
           value={
             draft.email.trim() ? (
               <a href={`mailto:${draft.email}`}>{draft.email}</a>

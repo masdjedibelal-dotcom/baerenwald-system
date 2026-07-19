@@ -349,44 +349,54 @@ export function AuftragPositionDetailPanel({
       : partner
   const liveMarge = (Number.isFinite(liveVk) ? liveVk : 0) - livePartner - eigen
 
-  function commitDraft(patch: Partial<LeistungDraft>) {
-    const next = { ...draft, ...patch }
-    setDraft(next)
+  function cancelDraft() {
+    setDraft(draftFromPosition(pos, partner))
+  }
+
+  function saveDraft() {
+    const name = draft.leistung_name.trim()
+    if (!name) {
+      toast.error('Leistungsname darf nicht leer sein.')
+      return
+    }
     const serverPatch: Parameters<typeof updateAuftragPositionSteuerung>[2] = {}
-    if (patch.leistung_name !== undefined) {
-      const name = next.leistung_name.trim()
-      if (!name) {
-        toast.error('Leistungsname darf nicht leer sein.')
-        return
-      }
-      if (name !== pos.leistung_name) serverPatch.leistung_name = name
-    }
-    if (patch.beschreibung !== undefined) {
-      const text = next.beschreibung.trim() || null
-      if (text !== (pos.beschreibung?.trim() || null)) serverPatch.beschreibung = text
-    }
-    if (patch.preis_fix !== undefined) {
-      const n = next.preis_fix.trim() ? Number(next.preis_fix) : null
-      if (n !== pos.preis_fix) serverPatch.preis_fix = n != null && Number.isFinite(n) ? n : null
-    }
-    if (patch.preis_partner !== undefined && !view.konditionenAusstehend) {
-      const n = next.preis_partner.trim() ? Number(next.preis_partner) : null
+    if (name !== pos.leistung_name) serverPatch.leistung_name = name
+    const textVal = draft.beschreibung.trim() || null
+    if (textVal !== (pos.beschreibung?.trim() || null)) serverPatch.beschreibung = textVal
+    const nFix = draft.preis_fix.trim() ? Number(draft.preis_fix) : null
+    const parsedFix = nFix != null && Number.isFinite(nFix) ? nFix : null
+    if (parsedFix !== pos.preis_fix) serverPatch.preis_fix = parsedFix
+    if (!view.konditionenAusstehend) {
+      const nPartner = draft.preis_partner.trim() ? Number(draft.preis_partner) : null
       const current = pos.preis_partner ?? (partner > 0 ? partner : null)
-      const parsed = n != null && Number.isFinite(n) ? n : null
-      if (parsed !== current) serverPatch.preis_partner = parsed
+      const parsedPartner = nPartner != null && Number.isFinite(nPartner) ? nPartner : null
+      if (parsedPartner !== current) serverPatch.preis_partner = parsedPartner
     }
-    if (patch.start_datum !== undefined) {
-      const d = next.start_datum || null
-      const current = pos.start_datum?.slice(0, 10) || null
-      if (d !== current) serverPatch.start_datum = d
-    }
-    if (patch.end_datum !== undefined) {
-      const d = next.end_datum || null
-      const current = pos.end_datum?.slice(0, 10) || null
-      if (d !== current) serverPatch.end_datum = d
-    }
+    const startD = draft.start_datum || null
+    if (startD !== (pos.start_datum?.slice(0, 10) || null)) serverPatch.start_datum = startD
+    const endD = draft.end_datum || null
+    if (endD !== (pos.end_datum?.slice(0, 10) || null)) serverPatch.end_datum = endD
     if (Object.keys(serverPatch).length) onSave(serverPatch)
   }
+
+  const baseline = draftFromPosition(pos, partner)
+  const draftDirty =
+    draft.leistung_name !== baseline.leistung_name ||
+    draft.beschreibung !== baseline.beschreibung ||
+    draft.preis_fix !== baseline.preis_fix ||
+    draft.preis_partner !== baseline.preis_partner ||
+    draft.start_datum !== baseline.start_datum ||
+    draft.end_datum !== baseline.end_datum
+  const draftActions = draftDirty ? (
+    <div className="inline-edit-actions flex flex-wrap gap-2">
+      <button type="button" className="btn ghost sm" disabled={pending || pendingLocal} onClick={cancelDraft}>
+        Abbrechen
+      </button>
+      <button type="button" className="btn primary sm" disabled={pending || pendingLocal} onClick={saveDraft}>
+        Speichern
+      </button>
+    </div>
+  ) : null
 
   const nachrichtInput: HandwerkerNachrichtInput = useMemo(() => {
     return {
@@ -417,12 +427,12 @@ export function AuftragPositionDetailPanel({
 
   const tabPreise = (
     <div className="pos-v2-tab-panel space-y-4">
+      {draftActions}
       <div className="leistung-acc-fields">
         <Input
           label="Bezeichnung"
           value={draft.leistung_name}
           onChange={(e) => setDraft((d) => ({ ...d, leistung_name: e.target.value }))}
-          onBlur={(e) => commitDraft({ leistung_name: e.target.value })}
           className="field-full"
           placeholder="Leistungsbezeichnung"
           required
@@ -432,7 +442,6 @@ export function AuftragPositionDetailPanel({
             label="Beschreibung"
             value={draft.beschreibung}
             onChange={(e) => setDraft((d) => ({ ...d, beschreibung: e.target.value }))}
-            onBlur={(e) => commitDraft({ beschreibung: e.target.value })}
             placeholder="z. B. Bestand komplett entfernen"
           />
         </div>
@@ -440,7 +449,6 @@ export function AuftragPositionDetailPanel({
           label="Verkaufspreis (VK)"
           value={draft.preis_fix}
           onChange={(v) => setDraft((d) => ({ ...d, preis_fix: v }))}
-          onBlur={() => commitDraft({ preis_fix: draft.preis_fix })}
         />
         {eigenleistung ? (
           <div className="w-full">
@@ -461,7 +469,6 @@ export function AuftragPositionDetailPanel({
             label="Preis Partner (vereinbart / intern)"
             value={draft.preis_partner}
             onChange={(v) => setDraft((d) => ({ ...d, preis_partner: v }))}
-            onBlur={() => commitDraft({ preis_partner: draft.preis_partner })}
           />
         )}
       </div>
@@ -590,16 +597,15 @@ export function AuftragPositionDetailPanel({
           type="date"
           value={draft.start_datum}
           onChange={(e) => setDraft((d) => ({ ...d, start_datum: e.target.value }))}
-          onBlur={(e) => commitDraft({ start_datum: e.target.value })}
         />
         <Input
           label="Termin bis"
           type="date"
           value={draft.end_datum}
           onChange={(e) => setDraft((d) => ({ ...d, end_datum: e.target.value }))}
-          onBlur={(e) => commitDraft({ end_datum: e.target.value })}
         />
       </div>
+      {draftActions}
       {pos.absprachen?.trim() || pos.notizen_intern?.trim() ? (
         <div className="rounded-lg border border-bw-border bg-bw-bg/60 p-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Notizen</p>

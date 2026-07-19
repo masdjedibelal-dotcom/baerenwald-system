@@ -111,9 +111,38 @@ export function AuftragProjektSteuerung({
         placeholder="z. B. Fliesenleger kommt am Dienstag vormittag"
       />
 
-      <Button type="button" variant="primary" className="mt-4" loading={pending} onClick={speichern}>
-        Speichern
-      </Button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={
+            pending ||
+            (status === detail.status &&
+              fortschritt === (detail.fortschritt ?? 0) &&
+              naechster === (detail.naechster_schritt ?? ''))
+          }
+          onClick={() => {
+            setStatus(detail.status)
+            setFortschritt(detail.fortschritt ?? 0)
+            setNaechster(detail.naechster_schritt ?? '')
+          }}
+        >
+          Abbrechen
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          loading={pending}
+          disabled={
+            status === detail.status &&
+            fortschritt === (detail.fortschritt ?? 0) &&
+            naechster === (detail.naechster_schritt ?? '')
+          }
+          onClick={speichern}
+        >
+          Speichern
+        </Button>
+      </div>
     </section>
   )
 }

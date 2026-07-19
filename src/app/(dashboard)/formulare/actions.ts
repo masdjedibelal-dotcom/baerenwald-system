@@ -138,6 +138,41 @@ export async function loadFormularTemplates(): Promise<FormularTemplate[]> {
   }))
 }
 
+export type FormularListeZeile = FormularTemplate & { genutzt: number }
+
+/** Templates inkl. Nutzung aus `formular_eintraege` (für Einstellungen-Liste). */
+export async function loadFormularTemplatesMitNutzung(): Promise<FormularListeZeile[]> {
+  const templates = await loadFormularTemplates()
+  if (!templates.length) return []
+
+  const supabase = createClient()
+  const { data } = await supabase.from('formular_eintraege').select('template_id')
+  const counts = new Map<string, number>()
+  for (const r of data ?? []) {
+    const id = (r as { template_id?: string | null }).template_id?.trim()
+    if (!id) continue
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+
+  return templates.map((t) => ({ ...t, genutzt: counts.get(t.id) ?? 0 }))
+}
+
+export async function duplicateFormularTemplate(
+  id: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const src = await loadFormularTemplate(id)
+  if (!src) return { ok: false, message: 'Formular nicht gefunden' }
+  return saveFormularTemplate({
+    name: `${src.name.trim()} (Kopie)`,
+    gewerk_id: src.gewerk_id,
+    typ: src.typ,
+    subtyp: src.subtyp ?? null,
+    phase: src.phase,
+    felder: src.felder,
+    aktiv: true,
+  })
+}
+
 export async function loadFormularTemplate(id: string): Promise<FormularTemplate | null> {
   const supabase = createClient()
   const { data, error } = await supabase

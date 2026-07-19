@@ -16,7 +16,6 @@ import {
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
 import type { EntityMenuItem } from '@/lib/entity-menu'
-import { HandwerkerModal } from '@/components/handwerker/HandwerkerModal'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
@@ -118,7 +117,6 @@ export function HandwerkerListeClient({
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
 
-  const [modalOpen, setModalOpen] = useState(false)
   const [gewerkChip, setGewerkChip] = useState('alle')
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
@@ -129,17 +127,11 @@ export function HandwerkerListeClient({
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
 
-  function closeNeuModal() {
-    setModalOpen(false)
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('neu')
-    const q = params.toString()
-    router.replace(q ? `/handwerker?${q}` : '/handwerker', { scroll: false })
-  }
-
   useEffect(() => {
-    if (searchParams.get('neu') === '1') setModalOpen(true)
-  }, [searchParams])
+    if (searchParams.get('neu') === '1') {
+      router.replace('/neu?art=handwerker')
+    }
+  }, [searchParams, router])
 
   const complianceCount = useMemo(
     () => rows.filter((h) => isComplianceNichtOk(h)).length,
@@ -522,17 +514,6 @@ export function HandwerkerListeClient({
         pageSize={pageSize}
         unit="Handwerker"
         onPageChange={(p) => setPageIndex(p - 1)}
-      />
-
-      <HandwerkerModal
-        open={modalOpen}
-        onClose={closeNeuModal}
-        gewerkeOptionen={gewerkeOptionen}
-        onSaved={(id) => {
-          closeNeuModal()
-          router.push(`/handwerker/${id}`)
-          router.refresh()
-        }}
       />
     </div>
   )

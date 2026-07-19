@@ -4,9 +4,16 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
 import { richTextToPlain } from '@/lib/rich-text'
+
+const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
+  { value: 'allgemein', label: 'Allgemein' },
+  { value: 'lohn', label: 'Lohn' },
+  { value: 'material', label: 'Material' },
+]
 
 function Field({
   label,
@@ -191,6 +198,27 @@ export function PositionModal({
               rows={2}
               placeholder="Details zur Leistung…"
             />
+          </Field>
+          <Field
+            label="Kostenart"
+            full
+            hint="Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung"
+          >
+            <div className="seg" role="group" aria-label="Kostenart">
+              {KOSTENART_OPTIONS.map((opt) => {
+                const active = (p.kostenverteilung ?? 'allgemein') === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={active ? 'on' : undefined}
+                    onClick={() => onChange({ kostenverteilung: opt.value })}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
           </Field>
           <Field label="Menge">
             <div style={{ display: 'flex', gap: 4 }}>

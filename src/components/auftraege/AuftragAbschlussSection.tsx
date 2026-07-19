@@ -24,7 +24,7 @@ type Vorschau = {
 }
 
 /**
- * Abschlussbericht-Tab — Bericht erstellen (nach signiertem Protokoll),
+ * Abschlussbericht-Tab — Bericht erstellen (nach Abnahme-PDF),
  * danach Neu erstellen + PDF. Versand läuft über „Auftrag abschließen“.
  */
 export function AuftragAbschlussSection({
@@ -68,7 +68,7 @@ export function AuftragAbschlussSection({
 
   function berichtErstellen() {
     if (!hasAbnahme) {
-      toast.error('Zuerst Abnahmeprotokoll signieren / abschließen.')
+      toast.error('Zuerst Abnahmeprotokoll als PDF erstellen.')
       return
     }
     startTransition(async () => {
@@ -84,32 +84,7 @@ export function AuftragAbschlussSection({
   }
 
   return (
-    <MockCard
-      title="Abschlussbericht"
-      icon="file-text"
-      actions={
-        hatBericht ? (
-          <>
-            <MockBtn sm kind="ghost" icon="download" onClick={() => window.open(url!, '_blank')}>
-              PDF
-            </MockBtn>
-            <MockBtn sm kind="primary" icon="plus" onClick={berichtErstellen} disabled={pending || !hasAbnahme}>
-              Neu erstellen
-            </MockBtn>
-          </>
-        ) : (
-          <MockBtn
-            sm
-            kind="primary"
-            icon="file-text"
-            onClick={berichtErstellen}
-            disabled={pending || !hasAbnahme}
-          >
-            Bericht erstellen
-          </MockBtn>
-        )
-      }
-    >
+    <MockCard title="Abschlussbericht" icon="file-text">
       <div
         style={{
           display: 'flex',
@@ -149,7 +124,7 @@ export function AuftragAbschlussSection({
         >
           <MockIcon ctx="default" n="alert-triangle" size={15} />
           <span>
-            Abnahmeprotokoll noch nicht signiert — im Tab „Abnahmeprotokoll“ abschließen.
+            Abnahmeprotokoll noch ohne PDF — im Tab „Abnahmeprotokoll“ als PDF erstellen.
           </span>
         </div>
       ) : null}
@@ -184,7 +159,7 @@ export function AuftragAbschlussSection({
 
       {!hasAbnahme ? (
         <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--text-3)' }}>
-          Der Bericht kann erstellt werden, sobald das Abnahmeprotokoll signiert ist.
+          Der Bericht kann erstellt werden, sobald das Abnahmeprotokoll als PDF vorliegt.
         </p>
       ) : hatBericht && abschlussGesendetAt ? (
         <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--text-3)' }}>

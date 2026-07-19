@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   requestCrmPasswordReset,
   verifyCrmStaffSession,
@@ -12,10 +13,19 @@ import {
   CRM_LOGIN_INVALID_MESSAGE,
   CRM_LOGIN_PORTAL_ONLY_MESSAGE,
 } from '@/lib/auth/crm-access'
+import { cn } from '@/lib/utils'
+
+const BENEFITS: { icon: string; text: string }[] = [
+  { icon: 'folders', text: 'Alle Vorgänge – von Anfrage bis Rechnung an einem Ort' },
+  { icon: 'users', text: 'Kunden, Handwerker & Partner immer griffbereit' },
+  { icon: 'calendar', text: 'Termine, Angebote & Aufträge im Überblick' },
+]
 
 function LoginPageContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -35,9 +45,9 @@ function LoginPageContent() {
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
-        const { data, error } = await supabase.auth.getUser()
+        const { data, error: userErr } = await supabase.auth.getUser()
         if (cancelled) return
-        if (error || !data.user) return
+        if (userErr || !data.user) return
         const crm = await verifyCrmStaffSession()
         if (!crm.ok) {
           await supabase.auth.signOut()
@@ -46,7 +56,7 @@ function LoginPageContent() {
         }
         router.replace('/')
       } catch {
-        // Supabase nicht erreichbar → User bleibt auf /login.
+        /* offline → Login bleibt */
       }
     })()
     return () => {
@@ -54,7 +64,7 @@ function LoginPageContent() {
     }
   }, [router, supabase, urlError])
 
-  const handleLogin = async () => {
+  async function handleLogin() {
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -79,11 +89,12 @@ function LoginPageContent() {
       return
     }
 
+    void remember
     router.replace('/')
     router.refresh()
   }
 
-  const handleForgot = async () => {
+  async function handleForgot() {
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -94,92 +105,205 @@ function LoginPageContent() {
       return
     }
     setInfo(
-      'Falls ein CRM-Konto mit dieser E-Mail existiert, erhältst du einen Link zum Zurücksetzen — der führt ins CRM, nicht zu MeinBärenwald.'
+      'Falls ein CRM-Konto mit dieser E-Mail existiert, erhältst du einen Link zum Zurücksetzen.'
     )
   }
 
+  function openForgot() {
+    setMode('forgot')
+    setError(null)
+    setInfo(null)
+  }
+
   return (
-    <div className="login-screen">
-      <div className="login-screen__inner">
-        <div className="login-screen__brand">
-          <div className="login-screen__logo">
-            <BrandLogo variant="green" height={40} priority />
+    <div className="crm-login">
+      <aside className="crm-login__brand">
+        <div className="crm-login__brand-head">
+          <div className="crm-login__brand-mark" aria-hidden>
+            <BrandLogo variant="green" height={22} priority />
           </div>
-          <div className="login-screen__title">Bärenwald CRM</div>
-          <div className="login-screen__sub">München</div>
+          <div>
+            <div className="crm-login__brand-name">Bärenwald</div>
+            <div className="crm-login__brand-sub">CRM · München</div>
+          </div>
         </div>
 
-        <div className="card login-screen__card">
-          <div className="login-screen__form">
-            {mode === 'login' ? (
-              <>
-                <div>
-                  <label className="input-label" htmlFor="crm-login-email">
+        <div className="crm-login__brand-copy">
+          <h1 className="crm-login__headline">
+            Alles im Griff.
+            <br />
+            Vom Anruf bis zur Rechnung.
+          </h1>
+          <p className="crm-login__lead">
+            Ihr Arbeitsplatz für den ganzen Tag – Vorgänge, Kunden und Termine an einem Ort, schnell
+            erledigt.
+          </p>
+          <ul className="crm-login__benefits">
+            {BENEFITS.map((b) => (
+              <li key={b.text}>
+                <span className="crm-login__benefit-ico" aria-hidden>
+                  <MockIcon ctx="btn" n={b.icon} size={16} />
+                </span>
+                <span>{b.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      <main className="crm-login__panel">
+        <div className="crm-login__form-wrap">
+          <div className="crm-login__mobile-brand">
+            <div className="crm-login__brand-mark" aria-hidden>
+              <BrandLogo variant="green" height={22} priority />
+            </div>
+            <div>
+              <div className="crm-login__brand-name">Bärenwald</div>
+              <div className="crm-login__brand-sub">CRM · München</div>
+            </div>
+          </div>
+
+          {mode === 'login' ? (
+            <>
+              <h2 className="crm-login__welcome">Willkommen zurück</h2>
+              <p className="crm-login__welcome-sub">Melden Sie sich mit Ihrem Konto an.</p>
+
+              <div className="crm-login__fields">
+                <div className="crm-login__field">
+                  <label className="crm-login__label" htmlFor="crm-login-email">
                     E-Mail
                   </label>
-                  <input
-                    id="crm-login-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="input"
-                    placeholder="name@baerenwald-muenchen.de"
-                    autoComplete="email"
-                    onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-                  />
+                  <div className="crm-login__input-wrap">
+                    <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
+                    <input
+                      id="crm-login-email"
+                      className="crm-login__input"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="b.baerenwald@crm.de"
+                      autoComplete="email"
+                      onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="input-label" htmlFor="crm-login-password">
+                <div className="crm-login__field">
+                  <label className="crm-login__label" htmlFor="crm-login-password">
                     Passwort
                   </label>
-                  <input
-                    id="crm-login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="input"
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-                  />
+                  <div className="crm-login__input-wrap">
+                    <input
+                      id="crm-login-password"
+                      className="crm-login__input crm-login__input--plain"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
+                    />
+                    <button
+                      type="button"
+                      className="crm-login__eye"
+                      aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      onClick={() => setShowPassword((v) => !v)}
+                    >
+                      <MockIcon ctx="btn" n="eye" size={16} />
+                    </button>
+                  </div>
                 </div>
+
+                <div className="crm-login__row">
+                  <label className="crm-login__remember">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                    />
+                    <span>Angemeldet bleiben</span>
+                  </label>
+                  <button type="button" className="crm-login__link" onClick={openForgot}>
+                    Passwort vergessen?
+                  </button>
+                </div>
+
+                {devError ? (
+                  <div className="crm-login__alert crm-login__alert--error">
+                    Dev-Auto-Login fehlgeschlagen: {decodeURIComponent(devError)}
+                  </div>
+                ) : null}
+                {urlError && urlError !== 'portal_only' ? (
+                  <div className="crm-login__alert crm-login__alert--error">
+                    Anmeldung fehlgeschlagen: {decodeURIComponent(urlError)}
+                  </div>
+                ) : null}
+                {error ? (
+                  <div className="crm-login__alert crm-login__alert--error">{error}</div>
+                ) : null}
 
                 <button
                   type="button"
-                  className="login-screen__forgot"
-                  onClick={() => {
-                    setMode('forgot')
-                    setError(null)
-                    setInfo(null)
-                  }}
+                  className={cn('crm-login__submit', loading && 'is-loading')}
+                  disabled={loading || !email.trim() || !password}
+                  onClick={() => void handleLogin()}
                 >
-                  Passwort vergessen?
+                  {loading ? 'Bitte warten…' : 'Anmelden'}
                 </button>
-              </>
-            ) : (
-              <>
-                <p className="login-screen__hint">
-                  CRM-Passwort zurücksetzen — der Link führt zur CRM-URL, nicht zur Website
-                  MeinBärenwald.
-                </p>
-                <div>
-                  <label className="input-label" htmlFor="crm-forgot-email">
-                    CRM-E-Mail
+              </div>
+
+              <p className="crm-login__foot">
+                Probleme bei der Anmeldung?{' '}
+                <button type="button" className="crm-login__link" onClick={openForgot}>
+                  Passwort zurücksetzen
+                </button>
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="crm-login__welcome">Passwort zurücksetzen</h2>
+              <p className="crm-login__welcome-sub">
+                Wir senden einen Link an Ihre CRM-E-Mail.
+              </p>
+
+              <div className="crm-login__fields">
+                <div className="crm-login__field">
+                  <label className="crm-login__label" htmlFor="crm-forgot-email">
+                    E-Mail
                   </label>
-                  <input
-                    id="crm-forgot-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="input"
-                    placeholder="name@baerenwald-muenchen.de"
-                    autoComplete="email"
-                  />
+                  <div className="crm-login__input-wrap">
+                    <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
+                    <input
+                      id="crm-forgot-email"
+                      className="crm-login__input"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="b.baerenwald@crm.de"
+                      autoComplete="email"
+                    />
+                  </div>
                 </div>
+
+                {error ? (
+                  <div className="crm-login__alert crm-login__alert--error">{error}</div>
+                ) : null}
+                {info ? (
+                  <div className="crm-login__alert crm-login__alert--ok">{info}</div>
+                ) : null}
+
                 <button
                   type="button"
-                  className="login-screen__forgot"
+                  className="crm-login__submit"
+                  disabled={loading || !email.trim()}
+                  onClick={() => void handleForgot()}
+                >
+                  {loading ? 'Bitte warten…' : 'Reset-Link senden'}
+                </button>
+
+                <button
+                  type="button"
+                  className="crm-login__back"
                   onClick={() => {
                     setMode('login')
                     setError(null)
@@ -188,59 +312,11 @@ function LoginPageContent() {
                 >
                   ← Zurück zum Login
                 </button>
-              </>
-            )}
-
-            {devError ? (
-              <div className="login-screen__alert login-screen__alert--error">
-                Dev-Auto-Login fehlgeschlagen: {decodeURIComponent(devError)}
               </div>
-            ) : null}
-            {urlError && urlError !== 'portal_only' ? (
-              <div className="login-screen__alert login-screen__alert--error">
-                Anmeldung fehlgeschlagen: {decodeURIComponent(urlError)}
-              </div>
-            ) : null}
-            {error ? (
-              <div className="login-screen__alert login-screen__alert--error">{error}</div>
-            ) : null}
-            {info ? (
-              <div className="login-screen__alert login-screen__alert--ok">{info}</div>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => void (mode === 'login' ? handleLogin() : handleForgot())}
-              disabled={loading || !email.trim() || (mode === 'login' && !password)}
-              className="btn primary w-full"
-            >
-              {loading
-                ? 'Bitte warten…'
-                : mode === 'login'
-                  ? 'Anmelden'
-                  : 'Reset-Link senden'}
-            </button>
-
-            {mode === 'login' ? (
-              <div className="login-screen__demo">
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => {
-                    document.getElementById('crm-login-email')?.focus()
-                  }}
-                >
-                  Direkt zur Demo →
-                </button>
-              </div>
-            ) : null}
-          </div>
+            </>
+          )}
         </div>
-
-        <p className="login-screen__footer">
-          🇩🇪 Server in Deutschland · DSGVO-konform · verschlüsselt
-        </p>
-      </div>
+      </main>
     </div>
   )
 }
@@ -249,8 +325,10 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="login-screen">
-          <p className="login-screen__loading">Laden…</p>
+        <div className="crm-login crm-login--loading">
+          <div className="crm-login__brand-mark" aria-hidden>
+            <BrandLogo variant="green" height={22} priority />
+          </div>
         </div>
       }
     >

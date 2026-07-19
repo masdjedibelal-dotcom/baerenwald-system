@@ -174,7 +174,10 @@ export type HandwerkerDetailPayload = {
     created_at: string
     gewerk_name: string | null
     kunde_name: string | null
+    vereinbarter_preis: number
   }[]
+  /** Angebot-Zuweisungen (für Zeitraum-Filter in der Übersicht) */
+  angebotZuweisungen: { id: string; created_at: string }[]
   stats: {
     gesamt: number
     angenommen: number
@@ -252,7 +255,7 @@ async function fetchHandwerkerDetailRow(
 export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetailPayload> {
   const supabase = createClient()
 
-  const [{ data: h }, { data: ahRaw }, angeboteCountRes, bewertungenRes] = await Promise.all([
+  const [{ data: h }, { data: ahRaw }, angeboteRes, bewertungenRes] = await Promise.all([
     fetchHandwerkerDetailRow(supabase, id),
     supabase
       .from('auftrag_handwerker')
@@ -268,8 +271,10 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .limit(120),
     supabase
       .from('angebot_handwerker')
-      .select('id', { count: 'exact', head: true })
-      .eq('handwerker_id', id),
+      .select('id, created_at')
+      .eq('handwerker_id', id)
+      .order('created_at', { ascending: false })
+      .limit(200),
     supabase
       .from('handwerker_bewertungen')
       .select(
@@ -327,7 +332,11 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   const volumen = auftraege.reduce((s, a) => s + (a.vereinbarter_preis || 0), 0)
   const offen = aktiv.reduce((s, a) => s + (a.vereinbarter_preis || 0), 0)
   const avgAuftrag = gesamt > 0 ? Math.round(volumen / gesamt) : 0
-  const angebote = angeboteCountRes.error ? 0 : (angeboteCountRes.count ?? 0)
+  const angebotZuweisungen = (angeboteRes.error ? [] : angeboteRes.data ?? []).map((r) => ({
+    id: String((r as { id: string }).id),
+    created_at: String((r as { created_at?: string }).created_at ?? ''),
+  }))
+  const angebote = angebotZuweisungen.length
   const angefragt = gesamt + angebote
 
   const bewertungen: HandwerkerDetailBewertung[] = bewertungenRes.error
@@ -361,7 +370,17 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   return {
     handwerker: hw ? { ...hw, partner_dokumente: dokumente } : null,
     dokumente,
-    auftraege: auftraege.map(({ vereinbarter_preis: _p, ...rest }) => rest),
+    auftraege: auftraege.map((a) => ({
+      id: a.id,
+      titel: a.titel,
+      status: a.status,
+      auftrag_status: a.auftrag_status,
+      created_at: a.created_at,
+      gewerk_name: a.gewerk_name,
+      kunde_name: a.kunde_name,
+      vereinbarter_preis: a.vereinbarter_preis,
+    })),
+    angebotZuweisungen,
     stats: {
       gesamt,
       angenommen,

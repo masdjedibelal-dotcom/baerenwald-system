@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { toast } from '@/components/ui/app-toast'
 
 type ToggleRow = {
@@ -18,7 +17,28 @@ const BENACHRICHTIGUNGEN: ToggleRow[] = [
   { id: 'notif_system', label: 'System-Updates', sub: 'Wartung, neue Funktionen', defaultOn: true },
 ]
 
-function MockSettingToggle({ row }: { row: ToggleRow }) {
+function Sec({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <div style={{ flex: 1 }} />
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+function SettingToggle({ row }: { row: ToggleRow }) {
   const [on, setOn] = useState(row.defaultOn ?? false)
   return (
     <div className="setting-row">
@@ -28,7 +48,7 @@ function MockSettingToggle({ row }: { row: ToggleRow }) {
       </div>
       <button
         type="button"
-        className={`sw${on ? ' on' : ''}`}
+        className={`switch${on ? ' on' : ''}`}
         aria-pressed={on}
         onClick={() => {
           setOn((v) => !v)
@@ -39,12 +59,13 @@ function MockSettingToggle({ row }: { row: ToggleRow }) {
   )
 }
 
+/** Mock-Parität: Benachrichtigungen als Setting-Rows mit Switches. */
 export function EinstellungenBenachrichtigungenCard() {
   return (
-    <MockCard title="Benachrichtigungen" icon="bell">
+    <Sec title="Benachrichtigungen">
       {BENACHRICHTIGUNGEN.map((row) => (
-        <MockSettingToggle key={row.id} row={row} />
+        <SettingToggle key={row.id} row={row} />
       ))}
-    </MockCard>
+    </Sec>
   )
 }
