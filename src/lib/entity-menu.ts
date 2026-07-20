@@ -152,14 +152,17 @@ export function buildEntityMenu(
   }
 
   if (type === 'angebot') {
-    const versendet =
-      st === 'gesendet_kunde' || st === 'gesendet' || st === 'abgelaufen'
+    const kannAnnehmen =
+      st === 'gesendet_kunde' ||
+      st === 'gesendet' ||
+      st === 'abgelaufen' ||
+      st === 'entwurf'
     const erledigt =
       st === 'kunde_akzeptiert' || st === 'abgelehnt' || st === 'angenommen'
     const jeVersendet = Boolean(st && st !== 'entwurf')
     const before = A.length
     A.push('sep')
-    if (h.onAccept && versendet) A.push({ icon: 'check', label: 'Angebot annehmen', onClick: h.onAccept })
+    if (h.onAccept && kannAnnehmen) A.push({ icon: 'check', label: 'Angebot annehmen', onClick: h.onAccept })
     if (h.onPdf) A.push({ icon: 'download', label: 'Angebot PDF herunterladen', onClick: h.onPdf })
     if (h.onSend && !erledigt) {
       A.push({

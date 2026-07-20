@@ -149,11 +149,13 @@ export function RechnungWizard({
     [bootstrap.kunde?.vorname, bootstrap.kunde?.nachname].filter(Boolean).join(' ') ||
     'Kunde'
   const kundeEmail = (bootstrap.kunde?.email || '').trim()
+  const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
+  const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
   const auftragLabel =
     bootstrap.auftragsReferenz?.trim() ||
     bootstrap.projektTitel?.trim() ||
     bootstrap.auftragId?.slice(0, 8)?.toUpperCase() ||
-    '—'
+    (istDirektrechnung ? 'Direktrechnung' : '—')
 
   const initialZeilen = useMemo(
     () =>
@@ -170,6 +172,7 @@ export function RechnungWizard({
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
   const [rechnungsart, setRechnungsart] = useState<Rechnungsart>(() => {
+    if (!bootstrap.auftragId?.trim()) return 'schluss'
     if (bootstrap.abschlag?.istSchluss) return 'schluss'
     if (
       bootstrap.modus === 'abschlag' ||
@@ -180,11 +183,12 @@ export function RechnungWizard({
     }
     return 'schluss'
   })
-  const [plan, setPlan] = useState<Zahlungsplan>(() =>
-    bootstrap.zahlungsplan?.zeilen?.length
+  const [plan, setPlan] = useState<Zahlungsplan>(() => {
+    if (!bootstrap.auftragId?.trim()) return emptyZahlungsplan()
+    return bootstrap.zahlungsplan?.zeilen?.length
       ? bootstrap.zahlungsplan
       : emptyZahlungsplan()
-  )
+  })
   const [aktivRate, setAktivRate] = useState<string | null>(
     () => bootstrap.abschlag?.zeileId ?? bootstrap.meta.abschlag_zeile_id ?? null
   )
@@ -207,11 +211,14 @@ export function RechnungWizard({
       fotos: false,
     }
   })
-  const [einleitung, setEinleitung] = useState(
-    () =>
-      bootstrap.meta.einleitung?.trim() ||
-      `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
-  )
+  const [einleitung, setEinleitung] = useState(() => {
+    const existing = bootstrap.meta.einleitung?.trim()
+    if (existing) return existing
+    if (istDirektrechnung) {
+      return `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen erlauben wir uns, folgende Rechnung zu stellen:`
+    }
+    return `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
+  })
   const [mailBetreff, setMailBetreff] = useState(
     () => bootstrap.meta.mail_betreff?.trim() || ''
   )
@@ -292,9 +299,11 @@ export function RechnungWizard({
   const rTitel =
     hasPlan && selRate
       ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.titel}`
-      : `${bootstrap.projektTitel || auftragLabel} — ${
-          rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
-        }`
+      : istDirektrechnung
+        ? bootstrap.projektTitel?.trim() || `Rechnung · ${kundeName}`
+        : `${bootstrap.projektTitel || auftragLabel} — ${
+            rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
+          }`
   const rBrutto = hasPlan && selBerechnet ? selBerechnet.brutto : brutto
   const rFaellig =
     hasPlan && selRate?.faellig_am?.trim()
@@ -433,6 +442,10 @@ export function RechnungWizard({
   }
 
   function enablePlan() {
+    if (!hatAuftrag) {
+      toast.error('Abschlagspläne sind nur mit Auftrag möglich.')
+      return
+    }
     setPlan(zahlungsplanVorlage30_40_30())
   }
 
@@ -446,13 +459,14 @@ export function RechnungWizard({
   }
 
   function buildMetaForSave(): RechnungWizardMeta {
+    const planAktiv = hatAuftrag && hasPlan
     return {
       ...meta,
       einleitung,
       mail_einleitung: einleitung,
       mail_betreff: mailBetreff.trim() || defaultBetreff,
-      zahlungsart: hasPlan ? 'abschlaege' : 'standard',
-      abschlag_zeile_id: hasPlan ? aktivRate : null,
+      zahlungsart: planAktiv ? 'abschlaege' : 'standard',
+      abschlag_zeile_id: planAktiv ? aktivRate : null,
       faellig_am: rFaellig,
     }
   }
@@ -482,7 +496,7 @@ export function RechnungWizard({
           kunde_id: kundeId,
           positionen: positionenBerechnet,
           meta: nextMeta,
-          modus: rechnungsart === 'abschlag' ? 'abschlag' : bootstrap.modus ?? 'voll',
+          modus: hatAuftrag && rechnungsart === 'abschlag' ? 'abschlag' : 'voll',
           zahlungsplan: null,
           zahlungsplanSpeichern: false,
         })
@@ -511,7 +525,7 @@ export function RechnungWizard({
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
-      bootstrap.modus,
+      hatAuftrag,
       positionenBerechnet,
       draftSnapshot,
       meta,
@@ -592,6 +606,10 @@ export function RechnungWizard({
   ])
 
   async function persistDraft(): Promise<string | null> {
+    if (hasPlan && !hatAuftrag) {
+      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Zahlplan entfernen.')
+      return null
+    }
     return hasPlan ? persistPlan() : persistEinzel()
   }
 
@@ -875,7 +893,7 @@ export function RechnungWizard({
                 selbst nicht zeilenweise nötig.
               </div>
             </div>
-          ) : (
+          ) : hatAuftrag ? (
             <div
               style={{
                 display: 'flex',
@@ -908,6 +926,22 @@ export function RechnungWizard({
               <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>
                 Auftrag {auftragLabel} · {kundeName}
               </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
+                Direktrechnung
+              </div>
+              <div style={{ flex: 1 }} />
+              <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>{kundeName}</span>
             </div>
           )}
           <PosBoard
@@ -970,7 +1004,18 @@ export function RechnungWizard({
           </MockField>
 
           <div style={{ marginTop: 18 }}>
-            {!hasPlan ? (
+            {!hatAuftrag ? (
+              <div className="card" style={{ padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Direktrechnung ohne Auftrag</div>
+                <p
+                  className="text-[12.5px] leading-relaxed"
+                  style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
+                >
+                  Abschlagspläne sind nur mit Auftrag möglich. Diese Rechnung wird als einfache
+                  Vollrechnung erstellt.
+                </p>
+              </div>
+            ) : !hasPlan ? (
               <div className="card" style={{ padding: 20 }}>
                 <div className="zahlplan-empty">
                   <MockIcon ctx="empty" n="calculator" size={26} />
@@ -985,288 +1030,298 @@ export function RechnungWizard({
                   </MockBtn>
                 </div>
               </div>
-            ) : rateLocked && selBerechnet ? (
-              <div
-                style={{
-                  padding: '12px 14px',
-                  border: '1px solid var(--green)',
-                  background: 'var(--green-50)',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
-                <MockIcon ctx="btn" n="check" size={16} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    {selBerechnet.titel}
-                    {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                    Vorgewählt aus dem Zahlplan — Betrag{' '}
-                    <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto (Pauschale laut Plan).
-                    Die volle Leistungsaufstellung kannst du als Leistungsnachweis mitsenden.
-                  </div>
-                </div>
-              </div>
             ) : (
               <>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    marginBottom: 10,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div
-                    className="section-h"
-                    style={{ marginBottom: 0, textTransform: 'none', flex: 1 }}
-                  >
-                    Zahlplan
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
-                    Vorlage:
-                  </span>
-                  {PLAN_PRESETS.map((p) => (
-                    <button
-                      key={p.name}
-                      type="button"
-                      className="zahlplan-preset-chip"
-                      onClick={() => setPlan(p.build())}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                  <MockBtn sm kind="ghost" onClick={clearPlan}>
-                    Entfernen
-                  </MockBtn>
-                </div>
-
-                <div
-                  style={{
-                    border: '0.5px solid var(--border)',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    background: 'var(--card)',
-                    boxShadow: 'var(--shadow)',
-                  }}
-                >
+                {rateLocked && selBerechnet ? (
                   <div
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
+                      padding: '12px 14px',
+                      border: '1px solid var(--green)',
+                      background: 'var(--green-50)',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: 10,
-                      padding: '9px 14px',
-                      background: 'var(--bg-soft)',
-                      borderBottom: '0.5px solid var(--border)',
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: 'var(--text-2)',
+                      marginBottom: 14,
                     }}
                   >
-                    <div>Bezeichnung</div>
-                    <div>Art</div>
-                    <div style={{ textAlign: 'right' }}>Anteil</div>
-                    <div style={{ textAlign: 'right' }}>Betrag brutto</div>
-                    <div>Fällig</div>
-                    <div />
+                    <MockIcon ctx="btn" n="check" size={16} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        {selBerechnet.titel}
+                        {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                        Vorgewählt aus dem Zahlplan — Betrag{' '}
+                        <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto (Pauschale laut Plan).
+                        Die volle Leistungsaufstellung kannst du als Leistungsnachweis mitsenden.
+                      </div>
+                    </div>
                   </div>
-                  {plan.zeilen.map((z) => {
-                    const berech = planKontext.zeilen.find((x) => x.id === z.id)
-                    return (
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
                       <div
-                        key={z.id}
+                        className="section-h"
+                        style={{ marginBottom: 0, textTransform: 'none', flex: 1 }}
+                      >
+                        Zahlplan
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
+                        Vorlage:
+                      </span>
+                      {PLAN_PRESETS.map((p) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          className="zahlplan-preset-chip"
+                          onClick={() => setPlan(p.build())}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                      <MockBtn sm kind="ghost" onClick={clearPlan}>
+                        Entfernen
+                      </MockBtn>
+                    </div>
+
+                    <div
+                      style={{
+                        border: '0.5px solid var(--border)',
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        background: 'var(--card)',
+                        boxShadow: 'var(--shadow)',
+                      }}
+                    >
+                      <div
                         style={{
                           display: 'grid',
                           gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
                           gap: 10,
-                          padding: '8px 14px',
+                          padding: '9px 14px',
+                          background: 'var(--bg-soft)',
                           borderBottom: '0.5px solid var(--border)',
-                          alignItems: 'center',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          color: 'var(--text-2)',
                         }}
                       >
-                        <input
-                          className="input"
-                          value={z.titel}
-                          onChange={(e) => patchPlanZeile(z.id, { titel: e.target.value })}
-                          style={{ height: 32 }}
-                        />
-                        <select
-                          className="input"
-                          value={z.typ}
-                          onChange={(e) =>
-                            patchPlanZeile(z.id, {
-                              typ: e.target.value as ZahlungsplanAbschlagTyp,
-                            })
-                          }
-                          style={{ height: 32, fontSize: 12 }}
-                        >
-                          <option value="prozent">Prozent</option>
-                          <option value="betrag">Euro netto</option>
-                          <option value="rest">Rest</option>
-                        </select>
-                        <div style={{ position: 'relative' }}>
-                          <input
-                            className="input"
-                            type="number"
-                            disabled={z.typ === 'rest'}
-                            value={z.typ === 'rest' ? '' : z.wert}
-                            placeholder={z.typ === 'rest' ? 'auto' : undefined}
-                            onChange={(e) =>
-                              patchPlanZeile(z.id, { wert: Number(e.target.value) || 0 })
-                            }
-                            style={{ textAlign: 'right', paddingRight: 28, height: 32 }}
-                          />
-                          <span
-                            style={{
-                              position: 'absolute',
-                              right: 8,
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              fontSize: 12,
-                              color: 'var(--text-3)',
-                            }}
-                          >
-                            {z.typ === 'prozent' ? '%' : z.typ === 'betrag' ? '€' : ''}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 600,
-                            fontVariantNumeric: 'tabular-nums',
-                            fontSize: 13,
-                          }}
-                        >
-                          {formatEurBetrag(berech?.brutto ?? 0)}
-                        </div>
-                        <input
-                          className="input"
-                          type="date"
-                          value={z.faellig_am?.slice(0, 10) ?? ''}
-                          onChange={(e) =>
-                            patchPlanZeile(z.id, { faellig_am: e.target.value || null })
-                          }
-                          style={{ height: 32, fontSize: 12 }}
-                        />
-                        <MockBtn
-                          sm
-                          kind="ghost"
-                          icon="trash"
-                          title="Entfernen"
-                          onClick={() => removePlanZeile(z.id)}
-                        />
+                        <div>Bezeichnung</div>
+                        <div>Art</div>
+                        <div style={{ textAlign: 'right' }}>Anteil</div>
+                        <div style={{ textAlign: 'right' }}>Betrag brutto</div>
+                        <div>Fällig</div>
+                        <div />
                       </div>
-                    )
-                  })}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '8px 14px',
-                      gap: 10,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="pt-add"
-                      style={{ border: 'none', padding: 0, width: 'auto' }}
-                      onClick={addPlanZeile}
-                    >
-                      <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    <span
-                      style={{
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
-                      }}
-                    >
-                      {plan.zeilen.every((z) => z.typ === 'prozent')
-                        ? `Summe ${planProzentSumme(plan)}%${planOk ? '' : ' · muss 100% sein'}`
-                        : planOk
-                          ? 'Plan ok'
-                          : 'Plan prüfen'}
-                    </span>
-                  </div>
-                </div>
-
-                {bootstrap.auftragId ? (
-                  <div style={{ marginTop: 14 }}>
-                    <div
-                      className="section-h"
-                      style={{
-                        marginBottom: 8,
-                        textTransform: 'none',
-                        letterSpacing: 0,
-                        fontSize: 14,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Welche Rechnung jetzt erstellen?
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {planKontext.zeilen.map((z) => {
-                        const on = aktivRate === z.id
+                      {plan.zeilen.map((z) => {
+                        const berech = planKontext.zeilen.find((x) => x.id === z.id)
                         return (
-                          <button
+                          <div
                             key={z.id}
-                            type="button"
-                            onClick={() => setAktivRate(z.id)}
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
                               gap: 10,
-                              padding: '10px 12px',
-                              border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                              background: on ? 'var(--green-50)' : 'var(--card)',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              textAlign: 'left',
+                              padding: '8px 14px',
+                              borderBottom: '0.5px solid var(--border)',
+                              alignItems: 'center',
                             }}
                           >
-                            <span
+                            <input
+                              className="input"
+                              value={z.titel}
+                              onChange={(e) => patchPlanZeile(z.id, { titel: e.target.value })}
+                              style={{ height: 32 }}
+                            />
+                            <select
+                              className="input"
+                              value={z.typ}
+                              onChange={(e) =>
+                                patchPlanZeile(z.id, {
+                                  typ: e.target.value as ZahlungsplanAbschlagTyp,
+                                })
+                              }
+                              style={{ height: 32, fontSize: 12 }}
+                            >
+                              <option value="prozent">Prozent</option>
+                              <option value="betrag">Euro netto</option>
+                              <option value="rest">Rest</option>
+                            </select>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                className="input"
+                                type="number"
+                                disabled={z.typ === 'rest'}
+                                value={z.typ === 'rest' ? '' : z.wert}
+                                placeholder={z.typ === 'rest' ? 'auto' : undefined}
+                                onChange={(e) =>
+                                  patchPlanZeile(z.id, { wert: Number(e.target.value) || 0 })
+                                }
+                                style={{ textAlign: 'right', paddingRight: 28, height: 32 }}
+                              />
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  right: 8,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  fontSize: 12,
+                                  color: 'var(--text-3)',
+                                }}
+                              >
+                                {z.typ === 'prozent' ? '%' : z.typ === 'betrag' ? '€' : ''}
+                              </span>
+                            </div>
+                            <div
                               style={{
-                                width: 17,
-                                height: 17,
-                                borderRadius: 20,
-                                border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                                background: on ? 'var(--green)' : 'transparent',
-                                display: 'grid',
-                                placeItems: 'center',
-                                color: '#fff',
+                                textAlign: 'right',
+                                fontWeight: 600,
+                                fontVariantNumeric: 'tabular-nums',
+                                fontSize: 13,
                               }}
                             >
-                              {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
-                            </span>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500 }}>{z.titel}</div>
-                              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
-                                {z.typ === 'prozent'
-                                  ? `${z.wert}%`
-                                  : z.typ === 'betrag'
-                                    ? formatEurBetrag(z.wert)
-                                    : 'Rest'}
-                                {z.faellig_am
-                                  ? ` · fällig ${formatDateDe(z.faellig_am.slice(0, 10))}`
-                                  : ''}
-                              </div>
+                              {formatEurBetrag(berech?.brutto ?? 0)}
                             </div>
-                            <b style={{ fontVariantNumeric: 'tabular-nums' }}>
-                              {formatEurBetrag(z.brutto)}
-                            </b>
-                          </button>
+                            <input
+                              className="input"
+                              type="date"
+                              value={z.faellig_am?.slice(0, 10) ?? ''}
+                              onChange={(e) =>
+                                patchPlanZeile(z.id, { faellig_am: e.target.value || null })
+                              }
+                              style={{ height: 32, fontSize: 12 }}
+                            />
+                            <MockBtn
+                              sm
+                              kind="ghost"
+                              icon="trash"
+                              title="Entfernen"
+                              onClick={() => removePlanZeile(z.id)}
+                            />
+                          </div>
                         )
                       })}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '8px 14px',
+                          gap: 10,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="pt-add"
+                          style={{ border: 'none', padding: 0, width: 'auto' }}
+                          onClick={addPlanZeile}
+                        >
+                          <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
+                        </button>
+                        <div style={{ flex: 1 }} />
+                        <span
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
+                          }}
+                        >
+                          {plan.zeilen.every((z) => z.typ === 'prozent')
+                            ? `Summe ${planProzentSumme(plan)}%${planOk ? '' : ' · muss 100% sein'}`
+                            : planOk
+                              ? 'Plan ok'
+                              : 'Plan prüfen'}
+                        </span>
+                      </div>
                     </div>
+                  </>
+                )}
+
+                {/* Immer sichtbar, sobald ein Abschlagsplan aktiv ist */}
+                <div style={{ marginTop: 14 }}>
+                  <div
+                    className="section-h"
+                    style={{
+                      marginBottom: 8,
+                      textTransform: 'none',
+                      letterSpacing: 0,
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Welche Abschlagsrechnung jetzt erstellen?
                   </div>
-                ) : null}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {planKontext.zeilen.map((z) => {
+                      const on = aktivRate === z.id
+                      return (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() => {
+                            setAktivRate(z.id)
+                            setRechnungsart(z.istSchluss ? 'schluss' : 'abschlag')
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 12px',
+                            border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                            background: on ? 'var(--green-50)' : 'var(--card)',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 17,
+                              height: 17,
+                              borderRadius: 20,
+                              border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                              background: on ? 'var(--green)' : 'transparent',
+                              display: 'grid',
+                              placeItems: 'center',
+                              color: '#fff',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>{z.titel}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                              {z.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'}
+                              {' · '}
+                              {z.typ === 'prozent'
+                                ? `${z.wert}%`
+                                : z.typ === 'betrag'
+                                  ? formatEurBetrag(z.wert)
+                                  : 'Rest'}
+                              {z.faellig_am
+                                ? ` · fällig ${formatDateDe(z.faellig_am.slice(0, 10))}`
+                                : ''}
+                            </div>
+                          </div>
+                          <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {formatEurBetrag(z.brutto)}
+                          </b>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </>
             )}
           </div>

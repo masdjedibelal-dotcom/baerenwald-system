@@ -453,7 +453,11 @@ export function AngebotDetailPageClient({
       statusEinfach === 'angenommen' ||
       statusEinfach === 'abgelehnt' ||
       Boolean(auftragId)
-    const versendet = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
+    const kannAnnehmen =
+      !auftragId &&
+      (statusEinfach === 'entwurf' ||
+        statusEinfach === 'gesendet' ||
+        statusEinfach === 'abgelaufen')
 
     const baseItems = entityMenuToActionItems(
       buildEntityMenu(
@@ -494,7 +498,7 @@ export function AngebotDetailPageClient({
             }
             setPortalLinkModalOpen(true)
           },
-          onAccept: versendet && !auftragId ? openAcceptModal : undefined,
+          onAccept: kannAnnehmen ? openAcceptModal : undefined,
           onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
           onSend: !erledigt
             ? kannErneutSenden
@@ -584,17 +588,20 @@ export function AngebotDetailPageClient({
           </button>
         )
       }
-      return (
-        <button
-          type="button"
-          className={detailPrimaryBtnClass}
-          disabled={pending}
-          onClick={() => run(() => sendAngebotEinfach(detail.id), 'Angebot gesendet')}
-        >
-          An Kunden senden
-          <MockIcon ctx="btn" n="send" size={14} />
-        </button>
-      )
+      // Entwurf: Annehmen ohne Versand (Auftrag anlegen) — Senden bleibt im Aktionsmenü
+      if (!auftragId) {
+        return (
+          <button
+            type="button"
+            className={detailPrimaryBtnClass}
+            disabled={pending}
+            onClick={openAcceptModal}
+          >
+            <MockIcon ctx="btn" n="check" size={14} />
+            Angebot annehmen
+          </button>
+        )
+      }
     }
     if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
       return (
@@ -795,8 +802,8 @@ export function AngebotDetailPageClient({
       <Modal open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
         <div className="space-y-4">
           <p className="text-sm text-bw-text-muted">
-            Angebot als angenommen markieren, Auftrag anlegen und optional die Auftragsbestätigung an den
-            Kunden senden.
+            Angebot als angenommen markieren und Auftrag anlegen — auch ohne vorherigen Versand an
+            den Kunden. Optional die Auftragsbestätigung per E-Mail senden.
           </p>
           <Input
             label="Start-Datum"

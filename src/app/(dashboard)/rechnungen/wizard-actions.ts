@@ -347,7 +347,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       }
       modus = 'abschlag'
       zahlungsplan = gespeicherterPlan
-      zahlungsplanBearbeiten = false
+      // Explizite Zeile aus Zahlplan-Tab → Plan nicht erneut editieren; sonst auswählbar
+      zahlungsplanBearbeiten = !opts?.abschlagZeileId?.trim()
       abschlag = {
         zeileId: zeile.id,
         zeileIndex: zeile.index,
@@ -361,6 +362,37 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     } else if (opts?.vollOhnePlan) {
       zahlungsplan = null
       modus = 'voll'
+    } else if (gespeicherterPlan) {
+      // Vorhandenen Abschlagsplan aus dem Auftrag immer übernehmen
+      const kontext = berechneZahlungsplan(gespeicherterPlan, basis.gesamtNetto)
+      const zeile = naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
+      zahlungsplan = gespeicherterPlan
+      zahlungsplanBearbeiten = true
+      if (zeile && !abschlagBereitsAbgerechnet(zeile.id, rechnungen)) {
+        meta = {
+          ...metaDefaults,
+          zahlungsart: 'abschlaege',
+          abschlag_zeile_id: zeile.id,
+          zahlungsbedingungen: zahlungstextFuerAbschlagZeile(
+            gespeicherterPlan,
+            basis.gesamtNetto,
+            zt,
+            zeile
+          ),
+          faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am,
+        }
+        modus = 'abschlag'
+        abschlag = {
+          zeileId: zeile.id,
+          zeileIndex: zeile.index,
+          zeileTitel: zeile.titel,
+          rechnungArt: rechnungArtFuerZeile(zeile),
+          istSchluss: zeile.istSchluss,
+          gesamtNetto: kontext.gesamtNetto,
+          gesamtBrutto: kontext.gesamtBrutto,
+          bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+        }
+      }
     }
 
     return {

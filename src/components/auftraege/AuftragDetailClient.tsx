@@ -906,14 +906,20 @@ export function AuftragDetailClient({
         onNeueRechnung={() => {
           setRechnungAuswahlOpen(false)
           startTransition(async () => {
+            // Vorhandenen Abschlagsplan übernehmen (nächste offene Rate), sonst Plan im Wizard
             const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {
-              vollOhnePlan: true,
+              naechsterAbschlag: true,
             })
-            if (!res.ok) {
+            if (res.ok) {
+              openRechnungWizard(res.bootstrap)
+              return
+            }
+            const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            if (!fallback.ok) {
               toast.error(res.message)
               return
             }
-            openRechnungWizard(res.bootstrap)
+            openRechnungWizard(fallback.bootstrap)
           })
         }}
         onWeiterbearbeiten={(bootstrap) => {

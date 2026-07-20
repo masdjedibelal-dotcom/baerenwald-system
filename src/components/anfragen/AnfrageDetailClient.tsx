@@ -411,9 +411,7 @@ export function AnfrageDetailClient({
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
   const canAcceptAngebot =
-    Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet) &&
-    Boolean(angebotFlowSnapshot?.angebotId) &&
-    !auftragId
+    Boolean(angebotFlowSnapshot?.angebotId) && !auftragId
 
   const primaryCtaLabel = canAcceptAngebot ? CTA.angebotAnnehmen : CTA.angebotErstellen
   const primaryCtaIcon = canAcceptAngebot ? 'check' : 'file-invoice'

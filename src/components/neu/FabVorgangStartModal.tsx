@@ -27,7 +27,7 @@ const TITEL: Record<FabVorgangArt, string> = {
 
 /**
  * FAB-Zwischenschritt: immer neu erstellen.
- * 1) Kunde wählen → 2) bei Rechnung optional Auftrag → Wizard/Detail.
+ * 1) Kunde wählen → 2) bei Rechnung optional Vorgang → Wizard/Detail.
  */
 export function FabVorgangStartModal({
   open,
@@ -38,7 +38,7 @@ export function FabVorgangStartModal({
   open: boolean
   art: FabVorgangArt | null
   onClose: () => void
-  /** Optional vorausgewählt (Deep-Link) */
+  /** Optional vorausgewählt (Deep-Link / Kunden-Detail) */
   initialKundeId?: string | null
 }) {
   const router = useRouter()
@@ -51,12 +51,30 @@ export function FabVorgangStartModal({
   const [loadingAuftraege, setLoadingAuftraege] = useState(false)
 
   useEffect(() => {
-    if (!open) return
-    setKundeId(initialKundeId?.trim() || null)
+    if (!open || !art) return
+    const kid = initialKundeId?.trim() || null
+    setKundeId(kid)
     setKunde(null)
-    setStep(1)
     setAuftraege([])
     setAuftragId(null)
+
+    if (art === 'rechnung' && kid) {
+      setStep(2)
+      setLoadingAuftraege(true)
+      void listAuftraegeFuerKunde(kid).then((r) => {
+        setLoadingAuftraege(false)
+        if (!r.ok) {
+          toast.error(r.message)
+          setAuftraege([])
+          return
+        }
+        setAuftraege(r.auftraege)
+      })
+      return
+    }
+
+    setStep(1)
+    setLoadingAuftraege(false)
   }, [open, art, initialKundeId])
 
   if (!art) return null
@@ -153,6 +171,7 @@ export function FabVorgangStartModal({
   }
 
   const weiterDisabled = pending || loadingAuftraege || (step === 1 && !kundeId)
+  const kundeVorausgewaehlt = Boolean(initialKundeId?.trim())
 
   return (
     <Modal
@@ -192,26 +211,29 @@ export function FabVorgangStartModal({
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-bw-text-muted">
-            Optional einen bestehenden Auftrag verknüpfen — oder ohne Auftrag als Direktrechnung
+            Optional einen bestehenden Vorgang verknüpfen — oder ohne Vorgang als Direktrechnung
             weiter.
           </p>
-          {auftraege.length === 0 ? (
+
+          {loadingAuftraege ? (
             <p className="rounded-lg border border-dashed border-bw-border px-3 py-6 text-center text-sm text-bw-text-muted">
-              Keine Aufträge zu diesem Kunden — Rechnung wird ohne Auftrag erstellt.
+              Vorgänge werden geladen…
             </p>
           ) : (
-            <ul className="m-0 max-h-64 list-none divide-y divide-bw-border overflow-auto rounded-lg border border-bw-border p-0">
+            <ul className="m-0 max-h-72 list-none divide-y divide-bw-border overflow-auto rounded-lg border border-bw-border p-0">
               <li>
                 <button
                   type="button"
                   className={cn(
-                    'flex w-full items-center gap-3 px-4 py-3 text-left',
+                    'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left',
                     !auftragId && 'bg-bw-green-bg/35'
                   )}
                   onClick={() => setAuftragId(null)}
                 >
-                  <span className="text-sm font-medium text-bw-text">Ohne Auftrag</span>
-                  <span className="text-[12px] text-bw-text-muted">Direktrechnung</span>
+                  <span className="text-sm font-medium text-bw-text">Ohne Vorgang</span>
+                  <span className="text-[12px] text-bw-text-muted">
+                    Direktrechnung ohne Verknüpfung
+                  </span>
                 </button>
               </li>
               {auftraege.map((a) => {
@@ -239,6 +261,12 @@ export function FabVorgangStartModal({
               })}
             </ul>
           )}
+
+          {!loadingAuftraege && auftraege.length === 0 ? (
+            <p className="text-xs text-bw-text-muted">
+              Keine Vorgänge zu diesem Kunden — „Ohne Vorgang“ ist vorausgewählt.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -247,11 +275,11 @@ export function FabVorgangStartModal({
           kind="ghost"
           disabled={pending}
           onClick={() => {
-            if (step === 2) setStep(1)
+            if (step === 2 && !kundeVorausgewaehlt) setStep(1)
             else onClose()
           }}
         >
-          {step === 2 ? 'Zurück' : 'Abbrechen'}
+          {step === 2 && !kundeVorausgewaehlt ? 'Zurück' : 'Abbrechen'}
         </MockBtn>
         <MockBtn kind="primary" icon="arrow-right" disabled={weiterDisabled} onClick={onWeiter}>
           {pending || loadingAuftraege

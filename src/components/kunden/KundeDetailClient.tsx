@@ -32,8 +32,8 @@ import {
   kundeNeueAnfrageHref,
   kundeNeuesAngebotHref,
   kundeNeuerAuftragHref,
-  kundeNeueRechnungHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
+import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { ActionsMenu } from '@/components/ui/actions-menu'
@@ -162,6 +162,7 @@ export function KundeDetailClient({
   const isCrmAdmin = useIsCrmAdmin()
   const [impersonating, setImpersonating] = useState(false)
   const [spamPending, setSpamPending] = useState(false)
+  const [rechnungModalOpen, setRechnungModalOpen] = useState(false)
   const istSpam = Boolean(kunde.ist_spam)
 
   useEffect(() => {
@@ -727,7 +728,7 @@ export function KundeDetailClient({
           onCreateAnfrage: () => router.push(kundeNeueAnfrageHref(kunde.id)),
           onCreateAngebot: () => router.push(kundeNeuesAngebotHref(kunde)),
           onCreateAuftrag: () => router.push(kundeNeuerAuftragHref(kunde)),
-          onCreateRechnung: () => router.push(kundeNeueRechnungHref(kunde.id)),
+          onCreateRechnung: () => setRechnungModalOpen(true),
           tel: kunde.telefon,
           mail: kunde.email,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id)),
@@ -937,6 +938,13 @@ export function KundeDetailClient({
       </Modal>
 
       {mailCompose.modal}
+
+      <FabVorgangStartModal
+        open={rechnungModalOpen}
+        art={rechnungModalOpen ? 'rechnung' : null}
+        initialKundeId={kunde.id}
+        onClose={() => setRechnungModalOpen(false)}
+      />
     </div>
   )
 }
