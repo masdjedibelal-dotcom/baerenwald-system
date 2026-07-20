@@ -87,9 +87,10 @@ export async function saveKundeOrganisation(
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {
     // Migration ggf. noch nicht angewendet — ohne neues Flag erneut speichern
+    const msg = error.message ?? ''
     if (
       input.kleinreparaturen_ohne_angebot != null &&
-      (error.message?.includes('kleinreparaturen_ohne_angebot') || error.code === 'PGRST204')
+      (msg.includes('kleinreparaturen_ohne_angebot') || msg.includes('PGRST204'))
     ) {
       const { kleinreparaturen_ohne_angebot: _drop, ...ohneFlag } = payload
       void _drop
