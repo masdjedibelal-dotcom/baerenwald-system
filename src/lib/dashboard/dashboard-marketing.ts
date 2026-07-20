@@ -1,8 +1,8 @@
 import 'server-only'
 
 import {
-  type DashboardZeitraum,
-  zeitraumStartIso,
+  type DashboardZeitraumFilter,
+  getDashboardZeitraumRange,
 } from '@/lib/dashboard/dashboard-analytics'
 import { fetchGscSummary } from '@/lib/ki-hub/sources/google'
 import {
@@ -53,18 +53,20 @@ export type DashboardMarketingSnapshot = {
 
 /** Datumsspanne für Marketing-Quellen — entspricht dem Dashboard-Zeitfilter. */
 export function marketingDateRange(
-  z: DashboardZeitraum,
+  filter: DashboardZeitraumFilter,
   now = new Date()
 ): MarketingDateRange {
-  const to = now.toISOString().slice(0, 10)
-  const startIso = zeitraumStartIso(z, now)
-  if (startIso) {
-    return { from: startIso.slice(0, 10), to }
+  const range = getDashboardZeitraumRange(filter, now)
+  if (range) {
+    return {
+      from: range.from.toISOString().slice(0, 10),
+      to: range.to.toISOString().slice(0, 10),
+    }
   }
   // „Gesamt“: Search Console liefert max. ~16 Monate
   const d = new Date(now)
   d.setMonth(d.getMonth() - 16)
-  return { from: d.toISOString().slice(0, 10), to }
+  return { from: d.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
 }
 
 /** Feste Meilensteine — Rohschritte werden per Label zugeordnet und zusammengefasst. */
@@ -149,9 +151,9 @@ function buildFunnelStages(
 
 /** Leichtes Laden der Marketing-Zahlen für das Haupt-Dashboard (ohne vollen KI-Hub-Payload). */
 export async function loadDashboardMarketing(
-  zeitraum: DashboardZeitraum = 'all'
+  zeitraumFilter: DashboardZeitraumFilter = { preset: 'gesamt', von: '', bis: '' }
 ): Promise<DashboardMarketingSnapshot> {
-  const range = marketingDateRange(zeitraum)
+  const range = marketingDateRange(zeitraumFilter)
 
   const [posthog, funnel, google, resend] = await Promise.all([
     fetchPostHogSummary(range).catch(() => ({

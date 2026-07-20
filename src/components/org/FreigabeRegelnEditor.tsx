@@ -1,9 +1,7 @@
 'use client'
 
-import { Shield } from 'lucide-react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
+import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import type { FreigabeModus } from '@/lib/types'
 
 export type FreigabeRegelnValue = {
@@ -12,77 +10,93 @@ export type FreigabeRegelnValue = {
   notfall_direkt: boolean
 }
 
-const FREIGABE_MODUS_OPTS = [
-  { value: 'direkt', label: 'Direkt — ohne Org-Freigabe' },
-  { value: 'freigabe', label: 'Freigabe — Organisation muss freigeben' },
-]
-
-/** Spec Phase D — HV-Freigaberegeln (Autopass/Schwelle/Notfall). */
-export function FreigabeRegelnEditor({
-  value,
-  onChange,
-  disabled,
-  compact,
-}: {
+type Props = {
   value: FreigabeRegelnValue
   onChange: (next: FreigabeRegelnValue) => void
   disabled?: boolean
-  compact?: boolean
-}) {
+  className?: string
+}
+
+/** HV-Freigaberegeln — eingebettet in Organisation & Portal (Mock-Form-Stil). */
+export function FreigabeRegelnEditor({ value, onChange, disabled, className }: Props) {
   const freigabeAktiv = value.freigabe_modus === 'freigabe'
 
+  function patch(partial: Partial<FreigabeRegelnValue>) {
+    if (disabled) return
+    onChange({ ...value, ...partial })
+  }
+
   return (
-    <MockCard
-      title={
-        <span className="inline-flex items-center gap-2">
-          <Shield className="h-4 w-4 text-bw-primary" aria-hidden />
-          Freigabe-Regeln
-        </span>
-      }
-      bodyClassName={compact ? 'p-3 space-y-3' : 'p-4 space-y-4'}
-    >
-      <Select
+    <MockFormSection title="Freigabe-Regeln" icon="shield-check" className={className}>
+      <MockField
         label="Freigabe-Modus"
-        name="freigabe_modus"
-        value={value.freigabe_modus}
-        disabled={disabled}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            freigabe_modus: e.target.value as FreigabeModus,
-          })
+        full
+        hint={
+          freigabeAktiv
+            ? 'Organisation muss Angebote/Aufträge freigeben — optional ab einer Betragsschwelle.'
+            : 'Angebote und Aufträge starten ohne Freigabe durch die Organisation.'
         }
-        options={FREIGABE_MODUS_OPTS}
-      />
+      >
+        <div className="chiprow">
+          <MockChip
+            active={value.freigabe_modus === 'direkt'}
+            onClick={() => patch({ freigabe_modus: 'direkt' })}
+          >
+            Direkt
+          </MockChip>
+          <MockChip
+            active={freigabeAktiv}
+            onClick={() => patch({ freigabe_modus: 'freigabe' })}
+          >
+            Mit Freigabe
+          </MockChip>
+        </div>
+      </MockField>
+
       {freigabeAktiv ? (
         <>
-          <Input
-            label="Freigabe-Schwelle (€ netto)"
-            type="number"
-            min={0}
-            step={100}
-            disabled={disabled}
-            value={value.freigabe_schwelle_eur}
-            onChange={(e) => onChange({ ...value, freigabe_schwelle_eur: e.target.value })}
-            hint="Leer = immer Freigabe nötig. Darüber = Freigabe, darunter = direkt."
-          />
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-bw-text">
+          <MockField
+            label="Schwelle (€ netto)"
+            hint="Leer = immer Freigabe nötig. Darüber Freigabe, darunter direkt."
+          >
             <input
-              type="checkbox"
-              className="mt-0.5"
+              className="txt"
+              type="number"
+              min={0}
+              step={100}
+              placeholder="z. B. 500"
               disabled={disabled}
-              checked={value.notfall_direkt}
-              onChange={(e) => onChange({ ...value, notfall_direkt: e.target.checked })}
+              value={value.freigabe_schwelle_eur}
+              onChange={(e) => patch({ freigabe_schwelle_eur: e.target.value })}
             />
-            <span>
-              <span className="font-medium">Notfall bypass</span>
-              <span className="mt-0.5 block text-xs text-bw-text-muted">
-                Notfall-Meldungen (HV) ohne Org-Freigabe — auch über Schwelle.
-              </span>
-            </span>
-          </label>
+          </MockField>
+          <MockField
+            label="Notfall"
+            full
+            hint="Gilt für Notfall-Meldungen über den HV-Melde-Link."
+          >
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                minHeight: 36,
+                opacity: disabled ? 0.6 : 1,
+              }}
+            >
+              <input
+                type="checkbox"
+                disabled={disabled}
+                checked={value.notfall_direkt}
+                onChange={(e) => patch({ notfall_direkt: e.target.checked })}
+              />
+              Notfall umgeht Freigabe
+            </label>
+          </MockField>
         </>
       ) : null}
-    </MockCard>
+    </MockFormSection>
   )
 }

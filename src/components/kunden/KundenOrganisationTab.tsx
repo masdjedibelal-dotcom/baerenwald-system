@@ -6,6 +6,7 @@ import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
+import { FreigabeRegelnEditor } from '@/components/org/FreigabeRegelnEditor'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { suggestOrgKennungFromName } from '@/lib/org/slug'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
@@ -220,54 +221,20 @@ export function KundenOrganisationTab({
               </div>
             ) : null}
 
-            <MockFormSection title="Freigabe-Workflow" icon="shield-check" className="mt-4">
-              <MockField label="Freigabe-Modus" full>
-                <div className="chiprow">
-                  <MockChip
-                    active={freigabeModus === 'direkt'}
-                    onClick={() => setFreigabeModus('direkt')}
-                  >
-                    Direkt — ohne Org-Freigabe
-                  </MockChip>
-                  <MockChip
-                    active={freigabeModus === 'freigabe'}
-                    onClick={() => setFreigabeModus('freigabe')}
-                  >
-                    Freigabe — Organisation muss freigeben
-                  </MockChip>
-                </div>
-              </MockField>
-              <MockField label="Schwelle (€)" hint="Leer = nur nach Modus">
-                <input
-                  className="txt"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="z. B. 500"
-                  value={schwelle}
-                  onChange={(e) => setSchwelle(e.target.value)}
-                />
-              </MockField>
-              <MockField label="Notfall">
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    minHeight: 36,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={notfallDirekt}
-                    onChange={(e) => setNotfallDirekt(e.target.checked)}
-                  />
-                  Notfall umgeht Freigabe
-                </label>
-              </MockField>
-            </MockFormSection>
+            <FreigabeRegelnEditor
+              className="mt-4"
+              disabled={pending}
+              value={{
+                freigabe_modus: freigabeModus,
+                freigabe_schwelle_eur: schwelle,
+                notfall_direkt: notfallDirekt,
+              }}
+              onChange={(next) => {
+                setFreigabeModus(next.freigabe_modus)
+                setSchwelle(next.freigabe_schwelle_eur)
+                setNotfallDirekt(next.notfall_direkt)
+              }}
+            />
           </>
         ) : null}
 

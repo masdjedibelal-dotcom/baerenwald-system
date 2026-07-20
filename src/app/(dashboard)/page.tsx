@@ -17,11 +17,11 @@ import {
   buildUmsatzverlauf12m,
   buildVertriebsFunnel,
   countUniqueVorgaengeByLead,
+  getDashboardZeitraumRange,
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
-  zeitraumStartIso,
-  type DashboardZeitraum,
+  type DashboardZeitraumFilter,
 } from '@/lib/dashboard/dashboard-analytics'
 import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
@@ -56,9 +56,9 @@ async function safeMaybeSingle<T>(
   }
 }
 
-async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
+async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
   const supabase = createClient()
-  const startIso = zeitraumStartIso(zeitraum)
+  const zeitraumRange = getDashboardZeitraumRange(zeitraumFilter)
 
   let user: { id: string } | null = null
   try {
@@ -142,7 +142,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
           .limit(3000)
       )
     ),
-    loadDashboardMarketing(zeitraum),
+    loadDashboardMarketing(zeitraumFilter),
   ])
 
   const leads = filterOutLegacyDemoLeads(
@@ -160,12 +160,12 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
   const rechnungen = rechnungenRaw as Array<{ id: string; status: string; created_at: string }>
 
   const leadsZ = leads.filter((l) => {
-    if (!inZeitraum(l.created_at, startIso)) return false
+    if (!inZeitraum(l.created_at, zeitraumRange)) return false
     return String(l.status ?? '').toLowerCase() !== 'abgebrochen'
   })
-  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
-  const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
-  const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, startIso))
+  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
+  const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
+  const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, zeitraumRange))
 
   const neueAnfragenCount = leadsZ.filter(
     (l) => String(l.status ?? '').toLowerCase() === 'neu'
@@ -258,7 +258,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
     const auftrag = Array.isArray(z.auftraege) ? z.auftraege[0] : z.auftraege
     const auf = auftrag as Record<string, unknown> | null
     if (!auf?.id) continue
-    if (!inZeitraum(String(auf.created_at ?? ''), startIso)) continue
+    if (!inZeitraum(String(auf.created_at ?? ''), zeitraumRange)) continue
     if (String(auf.status ?? '') === 'storniert') continue
     const hw = Array.isArray(z.handwerker) ? z.handwerker[0] : z.handwerker
     const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
@@ -299,7 +299,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
     const ang = Array.isArray(row.angebote) ? row.angebote[0] : row.angebote
     const a = ang as Record<string, unknown> | null
     if (!a?.id) continue
-    if (!inZeitraum(String(a.created_at ?? ''), startIso)) continue
+    if (!inZeitraum(String(a.created_at ?? ''), zeitraumRange)) continue
     const hw = Array.isArray(row.handwerker) ? row.handwerker[0] : row.handwerker
     const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
     const hwId = String(row.handwerker_id ?? h?.id ?? '')
@@ -376,7 +376,7 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
   return (
     <DashboardClient
       vorname={vorname}
-      zeitraum={zeitraum}
+      zeitraumFilter={zeitraumFilter}
       kpis={kpis}
       marketing={marketing}
       umsatzMonate={umsatzMonate}
@@ -391,8 +391,12 @@ async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { zeitraum?: string }
+  searchParams: { zeitraum?: string; von?: string; bis?: string }
 }) {
-  const zeitraum = parseDashboardZeitraum(searchParams?.zeitraum)
-  return <DashboardData zeitraum={zeitraum} />
+  const zeitraumFilter = parseDashboardZeitraum(
+    searchParams?.zeitraum,
+    searchParams?.von,
+    searchParams?.bis
+  )
+  return <DashboardData zeitraumFilter={zeitraumFilter} />
 }

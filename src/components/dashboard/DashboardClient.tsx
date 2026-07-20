@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { DashboardZeitraumFilterBar } from '@/components/dashboard/DashboardZeitraumFilterBar'
 import {
   gewerkColor,
-  type DashboardZeitraum,
+  type DashboardZeitraumFilter,
   type FunnelStufe,
   type GewerkUmsatzZeile,
   type RankingZeile,
@@ -22,13 +23,6 @@ export type DashboardKpi = {
   value: number
   href: string
 }
-
-const ZEITRAUM_OPTIONS: { id: DashboardZeitraum; label: string }[] = [
-  { id: '30d', label: '30 Tage' },
-  { id: '90d', label: '90 Tage' },
-  { id: 'year', label: 'Dieses Jahr' },
-  { id: 'all', label: 'Gesamt' },
-]
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -343,7 +337,7 @@ function TopRankingCard({
 
 export function DashboardClient({
   vorname,
-  zeitraum,
+  zeitraumFilter,
   kpis,
   marketing,
   umsatzMonate,
@@ -353,7 +347,7 @@ export function DashboardClient({
   rankingKunden,
 }: {
   vorname: string
-  zeitraum: DashboardZeitraum
+  zeitraumFilter: DashboardZeitraumFilter
   kpis: DashboardKpi[]
   marketing: DashboardMarketingSnapshot
   umsatzMonate: UmsatzMonat[]
@@ -383,11 +377,6 @@ export function DashboardClient({
     []
   )
 
-  function setZeitraum(z: DashboardZeitraum) {
-    if (z === 'all') router.replace('/')
-    else router.replace(`/?zeitraum=${encodeURIComponent(z)}`)
-  }
-
   return (
     <div>
       <div
@@ -406,18 +395,7 @@ export function DashboardClient({
             {greeting}, {vorname}
           </div>
         </div>
-        <div className="seg" role="group" aria-label="Zeitraum">
-          {ZEITRAUM_OPTIONS.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              className={zeitraum === o.id ? 'on' : undefined}
-              onClick={() => setZeitraum(o.id)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <DashboardZeitraumFilterBar filter={zeitraumFilter} />
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 22 }}>

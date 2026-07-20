@@ -1,34 +1,145 @@
+import {
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  endOfYear,
+  parseISO,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+} from 'date-fns'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
-export type DashboardZeitraum = '30d' | '90d' | 'year' | 'all'
+export type DashboardZeitraumPreset =
+  | 'heute'
+  | 'diese_woche'
+  | 'dieser_monat'
+  | 'dieses_jahr'
+  | 'gesamt'
+  | 'benutzerdefiniert'
 
-export function parseDashboardZeitraum(raw: string | null | undefined): DashboardZeitraum {
-  if (raw === '30d' || raw === '90d' || raw === 'year' || raw === 'all') return raw
-  return 'all'
+/** @deprecated Alias — nutze DashboardZeitraumPreset */
+export type DashboardZeitraum = DashboardZeitraumPreset
+
+export type DashboardZeitraumFilter = {
+  preset: DashboardZeitraumPreset
+  von: string
+  bis: string
 }
 
-export function zeitraumStartIso(z: DashboardZeitraum, now = new Date()): string | null {
-  if (z === 'all') return null
-  const d = new Date(now)
-  if (z === '30d') {
-    d.setDate(d.getDate() - 30)
-    return d.toISOString()
-  }
-  if (z === '90d') {
-    d.setDate(d.getDate() - 90)
-    return d.toISOString()
-  }
-  // year
-  return new Date(d.getFullYear(), 0, 1).toISOString()
+export const DASHBOARD_ZEITRAUM_OPTIONS: { value: DashboardZeitraumPreset; label: string }[] = [
+  { value: 'heute', label: 'Heute' },
+  { value: 'diese_woche', label: 'Diese Woche' },
+  { value: 'dieser_monat', label: 'Dieser Monat' },
+  { value: 'dieses_jahr', label: 'Dieses Jahr' },
+  { value: 'gesamt', label: 'Gesamt' },
+  { value: 'benutzerdefiniert', label: 'Individuell' },
+]
+
+const LEGACY_ZEITRAUM: Record<string, DashboardZeitraumPreset> = {
+  all: 'gesamt',
+  year: 'dieses_jahr',
+  '30d': 'dieser_monat',
+  '90d': 'dieses_jahr',
 }
 
-export function inZeitraum(iso: string | null | undefined, startIso: string | null): boolean {
-  if (!startIso) return true
+export function parseDashboardZeitraum(
+  raw: string | null | undefined,
+  von?: string | null,
+  bis?: string | null
+): DashboardZeitraumFilter {
+  const presetRaw = raw?.trim() ?? ''
+  const preset = (
+    DASHBOARD_ZEITRAUM_OPTIONS.some((o) => o.value === presetRaw)
+      ? presetRaw
+      : LEGACY_ZEITRAUM[presetRaw] ?? 'gesamt'
+  ) as DashboardZeitraumPreset
+
+  return {
+    preset,
+    von: von?.trim() ?? '',
+    bis: bis?.trim() ?? '',
+  }
+}
+
+/** Liefert [from, to] in lokaler Zeit oder null bei „Gesamt“ / ungültigem Individuell. */
+export function getDashboardZeitraumRange(
+  filter: DashboardZeitraumFilter,
+  now = new Date()
+): { from: Date; to: Date } | null {
+  const { preset, von, bis } = filter
+  if (preset === 'gesamt') return null
+  if (preset === 'heute') {
+    return { from: startOfDay(now), to: endOfDay(now) }
+  }
+  if (preset === 'diese_woche') {
+    return {
+      from: startOfWeek(now, { weekStartsOn: 1 }),
+      to: endOfWeek(now, { weekStartsOn: 1 }),
+    }
+  }
+  if (preset === 'dieser_monat') {
+    return { from: startOfMonth(now), to: endOfMonth(now) }
+  }
+  if (preset === 'dieses_jahr') {
+    return { from: startOfYear(now), to: endOfYear(now) }
+  }
+  if (preset === 'benutzerdefiniert') {
+    if (!von.trim() || !bis.trim()) return null
+    const from = startOfDay(parseISO(von))
+    const to = endOfDay(parseISO(bis))
+    if (from.getTime() > to.getTime()) return null
+    return { from, to }
+  }
+  return null
+}
+
+/** @deprecated Nutze getDashboardZeitraumRange */
+export function zeitraumStartIso(
+  z: DashboardZeitraumPreset | DashboardZeitraumFilter,
+  now = new Date()
+): string | null {
+  const filter =
+    typeof z === 'string' ? parseDashboardZeitraum(z) : z
+  const range = getDashboardZeitraumRange(filter, now)
+  return range?.from.toISOString() ?? null
+}
+
+export function inZeitraum(
+  iso: string | null | undefined,
+  rangeOrStartIso: { from: Date; to: Date } | string | null
+): boolean {
+  if (!rangeOrStartIso) return true
   if (!iso) return false
-  return new Date(iso).getTime() >= new Date(startIso).getTime()
+  const t = new Date(iso).getTime()
+  if (typeof rangeOrStartIso === 'string') {
+    return t >= new Date(rangeOrStartIso).getTime()
+  }
+  return t >= rangeOrStartIso.from.getTime() && t <= rangeOrStartIso.to.getTime()
+}
+
+export function dashboardZeitraumLabel(filter: DashboardZeitraumFilter): string {
+  if (filter.preset === 'benutzerdefiniert' && filter.von && filter.bis) {
+    const fmt = (d: string) =>
+      parseISO(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return `${fmt(filter.von)} – ${fmt(filter.bis)}`
+  }
+  return DASHBOARD_ZEITRAUM_OPTIONS.find((o) => o.value === filter.preset)?.label ?? 'Gesamt'
+}
+
+export function buildDashboardZeitraumHref(filter: DashboardZeitraumFilter): string {
+  if (filter.preset === 'gesamt') return '/'
+  const params = new URLSearchParams()
+  params.set('zeitraum', filter.preset)
+  if (filter.preset === 'benutzerdefiniert') {
+    if (filter.von) params.set('von', filter.von)
+    if (filter.bis) params.set('bis', filter.bis)
+  }
+  return `/?${params.toString()}`
 }
 
 export function angebotNetto(
