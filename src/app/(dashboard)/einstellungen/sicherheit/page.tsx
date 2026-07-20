@@ -1,5 +1,4 @@
-
-mport type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { EinstellungenSicherheitClient } from '@/components/einstellungen/EinstellungenSicherheitClient'
 
 export const metadata: Metadata = {
