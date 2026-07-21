@@ -1,0 +1,22 @@
+{
+  "pipeline": {
+    "threadMerge": { "leadId": "existing-lead-abc12def" },
+    "skipAutoReply": false,
+    "stufe": null,
+    "zuordnung_stufe": null
+  },
+  "parse": {
+    "pflichtfeld_count": 0,
+    "note": "Stufen-Logik entfällt bei Thread-Merge"
+  },
+  "persist": {
+    "neuer_lead": false,
+    "merge": {
+      "leadId": "existing-lead-abc12def",
+      "fotos_append": ["https://storage.example/foto-nachreichung.jpg"],
+      "remove_flags": ["ohne_foto"],
+      "timeline_append": "Anbei die Fotos wie besprochen."
+    },
+    "auto_reply": "Fotos erhalten — danke. (Vorgang ABC12DEF)"
+  }
+}
