@@ -154,7 +154,6 @@ export function ObjektBewohnerSection({
   return (
     <>
       <MockCard
-        collapsible
         title={liste.length ? `Bewohner · ${liste.length}` : 'Bewohner'}
         icon="users"
         actions={
@@ -163,7 +162,7 @@ export function ObjektBewohnerSection({
           </MockBtn>
         }
       >
-        <p className="mb-3 text-[12px]" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Bewohner je Einheit — Einheiten werden im HV-Portal gepflegt.
         </p>
         {einheiten.length === 0 ? (
@@ -189,10 +188,11 @@ export function ObjektBewohnerSection({
                   <div className="lc-title" style={{ fontWeight: 600 }}>
                     {b.name}
                   </div>
-                  <div style={{ color: 'var(--text-2)' }}>
+                  <div className="lc-sub" style={{ color: 'var(--text-2)' }}>
                     {b.objekt_einheiten?.bezeichnung ?? 'Einheit'}
                   </div>
                   <div
+                    className="lc-sub"
                     style={{
                       color: 'var(--text-2)',
                       overflow: 'hidden',

@@ -157,7 +157,6 @@ export function ObjektKontakteSection({
   return (
     <>
       <MockCard
-        collapsible
         title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
         icon="user"
         actions={
@@ -166,7 +165,7 @@ export function ObjektKontakteSection({
           </MockBtn>
         }
       >
-        <p className="mb-3 text-[12px]" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Hausmeister, Beirat, Notfallkontakte — für die Disposition.
         </p>
         {liste.length === 0 ? (
@@ -187,6 +186,7 @@ export function ObjektKontakteSection({
                     {k.name}
                     {k.notiz ? (
                       <div
+                        className="lc-sub"
                         style={{
                           fontSize: 12,
                           fontWeight: 400,
@@ -208,6 +208,7 @@ export function ObjektKontakteSection({
                     </span>
                   </div>
                   <div
+                    className="lc-sub"
                     style={{
                       color: 'var(--text-2)',
                       overflow: 'hidden',
