@@ -61,7 +61,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
     label: 'Planung',
     items: [
       nav('/kalender', 'calendar', 'Kalender'),
-      nav('/ki-analytics', 'sparkles', 'KI Hub'),
+      nav('/ki-analytics', 'sparkles', 'KI Intelligence'),
     ],
   },
 ]
@@ -93,7 +93,7 @@ export const MEHR_TILE_NAV: Array<{
 }> = [
   { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
   { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub', desc: 'Empfehlungen & Funnel' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Intelligence', desc: 'Empfehlungen & Funnel' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
@@ -118,7 +118,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/angebote': { title: 'Angebote', cta: { label: 'Neues Angebot', href: '/neu?art=angebot' } },
   '/einstellungen': { title: 'Einstellungen' },
   '/mehr': { title: 'Mehr' },
-  '/ki-analytics': { title: 'KI Hub' },
+  '/ki-analytics': { title: 'KI Intelligence' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -133,7 +133,7 @@ export const SECTION_LABELS: Record<string, string> = {
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
   mehr: 'Mehr',
-  'ki-analytics': 'KI Hub',
+  'ki-analytics': 'KI Intelligence',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

@@ -235,6 +235,9 @@ export type CreateAngebotInput = {
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
+  /** Bestand / wiederkehrend */
+  ist_wiederkehrend?: boolean | null
+  wiederkehr_turnus?: string | null
 }
 
 async function zahlungsbedingungenFuerSpeichern(
@@ -363,6 +366,11 @@ export async function createAngebot(
       varianten: input.varianten ?? null,
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+      ist_wiederkehrend: input.ist_wiederkehrend === true,
+      wiederkehr_turnus:
+        input.ist_wiederkehrend === true
+          ? input.wiederkehr_turnus?.trim() || null
+          : null,
     })
     .select('id')
     .single()
@@ -393,6 +401,19 @@ export async function createAngebot(
 
   if (input.lead_id) {
     await markLeadAngeboteErsetzt(supabase, input.lead_id, id)
+
+    if (input.ist_wiederkehrend !== undefined) {
+      await supabase
+        .from('leads')
+        .update({
+          ist_wiederkehrend: input.ist_wiederkehrend === true,
+          wiederkehr_turnus:
+            input.ist_wiederkehrend === true
+              ? input.wiederkehr_turnus?.trim() || null
+              : null,
+        })
+        .eq('id', input.lead_id)
+    }
 
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
@@ -561,12 +582,34 @@ export async function updateAngebot(
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
         : {}),
+      ...(input.ist_wiederkehrend !== undefined
+        ? {
+            ist_wiederkehrend: input.ist_wiederkehrend === true,
+            wiederkehr_turnus:
+              input.ist_wiederkehrend === true
+                ? input.wiederkehr_turnus?.trim() || null
+                : null,
+          }
+        : {}),
       updated_at: new Date().toISOString(),
       ...docPatch,
     })
     .eq('id', angebotId)
 
   if (error) return { ok: false, message: error.message }
+
+  if (input.ist_wiederkehrend !== undefined && leadIdForKunde) {
+    await supabase
+      .from('leads')
+      .update({
+        ist_wiederkehrend: input.ist_wiederkehrend === true,
+        wiederkehr_turnus:
+          input.ist_wiederkehrend === true
+            ? input.wiederkehr_turnus?.trim() || null
+            : null,
+      })
+      .eq('id', leadIdForKunde)
+  }
 
   const warBereitsGesendet = Boolean(
     current.gesendet_kunde_at ||
@@ -1997,13 +2040,35 @@ export async function createAuftragFromAngebot(
   if (angebot.lead_id) {
     const { data: leadRow } = await supabaseAdmin
       .from('leads')
-      .select('ist_bauprojekt, kunde_id, auftraggeber_kunde_id')
+      .select('ist_bauprojekt, ist_wiederkehrend, wiederkehr_turnus, kunde_id, auftraggeber_kunde_id')
       .eq('id', angebot.lead_id)
       .maybeSingle()
     istBauprojekt = leadRow?.ist_bauprojekt === true
     if (leadRow) {
       kundeId = leadVertragsKundeId(leadRow) ?? angebot.kunde_id
     }
+  }
+
+  // Bestand bevorzugt vom Angebot, sonst Lead
+  const { data: angWieder } = await supabaseAdmin
+    .from('angebote')
+    .select('ist_wiederkehrend, wiederkehr_turnus')
+    .eq('id', angebotId)
+    .maybeSingle()
+
+  let istWiederkehrend = angWieder?.ist_wiederkehrend === true
+  let wiederkehrTurnus =
+    istWiederkehrend ? (angWieder?.wiederkehr_turnus as string | null) ?? null : null
+  if (!istWiederkehrend && angebot.lead_id) {
+    const { data: leadW } = await supabaseAdmin
+      .from('leads')
+      .select('ist_wiederkehrend, wiederkehr_turnus')
+      .eq('id', angebot.lead_id)
+      .maybeSingle()
+    istWiederkehrend = leadW?.ist_wiederkehrend === true
+    wiederkehrTurnus = istWiederkehrend
+      ? (leadW?.wiederkehr_turnus as string | null) ?? null
+      : null
   }
 
   const { data: auftrag, error: aErr } = await supabaseAdmin
@@ -2024,6 +2089,8 @@ export async function createAuftragFromAngebot(
       betreuer_id: authUser?.id ?? null,
       zahlungsplan: zahlungsplan ?? null,
       ist_bauprojekt: istBauprojekt,
+      ist_wiederkehrend: istWiederkehrend,
+      wiederkehr_turnus: wiederkehrTurnus,
     })
     .select('id, kunden_token')
     .single()

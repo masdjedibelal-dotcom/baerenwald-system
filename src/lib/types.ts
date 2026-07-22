@@ -224,6 +224,9 @@ export type Lead = {
   duplikat_hinweis?: boolean | null
   /** Bauprojekt — erweiterte Unterlagen & Bautagesberichte */
   ist_bauprojekt?: boolean
+  /** Bestand: wiederkehrende Leistung */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
   ki_session_id?: string | null
   ki_zusammenfassung?: string | null
   erstellt_von: string | null
@@ -415,6 +418,9 @@ export type Angebot = {
   gueltig_bis?: string | null
   /** einfach | projekt — Layout & Zusatzfelder */
   dokument_typ?: 'einfach' | 'projekt' | null
+  /** Bestand: wiederkehrendes Angebot */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
   projektbeschreibung?: string | null
   /** Öffentliche Bild-URLs (JSON-Array in DB) */
   fotos_urls?: string[] | unknown | null
@@ -553,6 +559,9 @@ export type Auftrag = {
   kunden_seite_letzter_aufruf?: string | null
   /** Bauprojekt — Bautagesbericht statt kurzem Bautagebuch */
   ist_bauprojekt?: boolean
+  /** Bestand: wiederkehrender Wartungs-/Service-Auftrag */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
   /** Notfall-Direktbeauftragung — CRM-Banner (§4) */
   ist_notfall?: boolean
   /** aufwand | festpreis — Abrechnungshinweis im Notfall-Banner */
@@ -1148,6 +1157,9 @@ export type Rechnung = {
   mwst_aufschluesselung?: MwstAufschluesselungJson[] | null
   status: RechnungStatus
   positionen: RechnungPosition[]
+  /** Bestand: Abrechnung zu wiederkehrendem Auftrag */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
   lohn_netto: number | null
   material_netto: number | null
   netto: number | null

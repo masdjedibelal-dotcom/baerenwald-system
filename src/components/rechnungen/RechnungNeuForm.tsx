@@ -39,6 +39,11 @@ import {
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import type { AngebotPosition, Gewerk, Kunde } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
+import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
+import {
+  defaultVorgangWiederkehr,
+  type VorgangWiederkehr,
+} from '@/lib/vorgang/wiederkehrend'
 
 function addDaysIso(ymd: string, days: number): string {
   const d = new Date(`${ymd}T12:00:00`)
@@ -113,6 +118,7 @@ export function RechnungNeuForm({
     addDaysIso(new Date().toISOString().slice(0, 10), zahlungszielTage)
   )
   const [reverseCharge13b, setReverseCharge13b] = useState(false)
+  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(defaultVorgangWiederkehr)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [mailOpen, setMailOpen] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -179,6 +185,8 @@ export function RechnungNeuForm({
       faellig_am: faellig || null,
       rechnungsdatum,
       reverse_charge_13b: reverseCharge13b,
+      ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+      wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     }
 
     if (savedId) {
@@ -296,6 +304,10 @@ export function RechnungNeuForm({
 
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         {kundenCard}
+
+        <Card className="p-4">
+          <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
+        </Card>
 
         {kann13b ? (
           <Card className="p-4">

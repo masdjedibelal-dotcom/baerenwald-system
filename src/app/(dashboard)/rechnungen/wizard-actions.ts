@@ -75,6 +75,8 @@ export type SaveRechnungWizardDraftPayload = {
   zahlungsplan?: Zahlungsplan | null
   zahlungsplanSpeichern?: boolean
   versandZeileId?: string | null
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 async function positionenAusAuftrag(
@@ -91,6 +93,8 @@ async function positionenAusAuftrag(
   zahlungsplan: Zahlungsplan | null
   gesamtNetto: number
   gesamtBrutto: number
+  ist_wiederkehrend: boolean
+  wiederkehr_turnus: string | null
 }> {
   const gewerke = await loadGewerkeAusfuehrung(supabase)
 
@@ -107,6 +111,8 @@ async function positionenAusAuftrag(
       start_datum,
       end_datum,
       zahlungsplan,
+      ist_wiederkehrend,
+      wiederkehr_turnus,
       angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan),
       auftrag_positionen(*)
     `
@@ -176,6 +182,8 @@ async function positionenAusAuftrag(
     throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
   }
 
+  const aufW = auf as { ist_wiederkehrend?: boolean | null; wiederkehr_turnus?: string | null }
+
   return {
     positionen,
     angebot_id: (auf.angebot_id as string | null) ?? null,
@@ -187,6 +195,8 @@ async function positionenAusAuftrag(
     zahlungsplan,
     gesamtNetto: summen.netto,
     gesamtBrutto: kontext?.gesamtBrutto ?? summen.brutto,
+    ist_wiederkehrend: aufW.ist_wiederkehrend === true,
+    wiederkehr_turnus: aufW.wiederkehr_turnus ?? null,
   }
 }
 
@@ -430,6 +440,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         zahlungsplanBearbeiten,
         gesamtNetto: basis.gesamtNetto,
         rechnungenAbschlag: rechnungen,
+        ist_wiederkehrend: basis.ist_wiederkehrend,
+        wiederkehr_turnus: basis.wiederkehr_turnus,
       },
     }
   } catch (e) {
@@ -570,6 +582,10 @@ export async function loadRechnungWizardBootstrap(
           : null,
       gesamtNetto: basis.gesamtNetto,
       rechnungenAbschlag: rechnungen,
+      ist_wiederkehrend:
+        rec.ist_wiederkehrend === true || basis.ist_wiederkehrend,
+      wiederkehr_turnus:
+        (rec.wiederkehr_turnus as string | null) ?? basis.wiederkehr_turnus,
     },
   }
 }
@@ -865,6 +881,8 @@ function entwurfPayloadAusWizardMeta(
     abschlag_index: zeile?.index ?? null,
     zahlungsplan_abschlag_id: zeileId,
     liste_berechnung,
+    ist_wiederkehrend: input.ist_wiederkehrend,
+    wiederkehr_turnus: input.wiederkehr_turnus,
   }
 }
 

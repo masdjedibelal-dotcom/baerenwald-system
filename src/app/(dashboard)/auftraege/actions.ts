@@ -181,6 +181,8 @@ export async function updateAuftragProjektFelder(
     start_datum?: string | null
     end_datum?: string | null
     ist_bauprojekt?: boolean | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -191,10 +193,16 @@ export async function updateAuftragProjektFelder(
   if (patch.ist_bauprojekt !== undefined) {
     db.ist_bauprojekt = patch.ist_bauprojekt === true ? true : patch.ist_bauprojekt === false ? false : null
   }
+  if (patch.ist_wiederkehrend !== undefined) {
+    const ist = patch.ist_wiederkehrend === true
+    db.ist_wiederkehrend = ist
+    db.wiederkehr_turnus = ist ? patch.wiederkehr_turnus?.trim() || null : null
+  }
   const { error } = await supabase.from('auftraege').update(db).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 

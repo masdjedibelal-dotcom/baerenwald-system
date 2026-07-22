@@ -11,6 +11,7 @@ import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
+import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAllAbschlagRechnungenFromWizard,
@@ -58,6 +59,10 @@ import {
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
 import type { Gewerk, Preisliste } from '@/lib/types'
+import {
+  normalizeVorgangWiederkehr,
+  type VorgangWiederkehr,
+} from '@/lib/vorgang/wiederkehrend'
 import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
@@ -171,6 +176,12 @@ export function RechnungWizard({
   const [step, setStep] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
+  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
+    normalizeVorgangWiederkehr({
+      ist_wiederkehrend: bootstrap.ist_wiederkehrend,
+      wiederkehr_turnus: bootstrap.wiederkehr_turnus,
+    })
+  )
   const [rechnungsart, setRechnungsart] = useState<Rechnungsart>(() => {
     if (!bootstrap.auftragId?.trim()) return 'schluss'
     if (bootstrap.abschlag?.istSchluss) return 'schluss'
@@ -499,6 +510,8 @@ export function RechnungWizard({
           modus: hatAuftrag && rechnungsart === 'abschlag' ? 'abschlag' : 'voll',
           zahlungsplan: null,
           zahlungsplanSpeichern: false,
+          ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+          wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
         if (!res.ok) {
           toast.error(res.message)
@@ -536,6 +549,7 @@ export function RechnungWizard({
       rFaellig,
       rechnungsart,
       defaultBetreff,
+      wiederkehr,
     ]
   )
 
@@ -568,6 +582,8 @@ export function RechnungWizard({
         meta: nextMeta,
         zahlungsplan: plan,
         versandZeileId: aktivRate,
+        ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+        wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
       })
       if (!res.ok) {
         toast.error(res.message)
@@ -944,6 +960,11 @@ export function RechnungWizard({
               <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>{kundeName}</span>
             </div>
           )}
+          <VorgangArtWiederkehrField
+            value={wiederkehr}
+            onChange={setWiederkehr}
+            hint="Bestand — Abrechnung zu wiederkehrendem Auftrag (Wartung, Winterdienst)"
+          />
           <PosBoard
             positionen={posBoardLines}
             onChange={onPosBoardChange}

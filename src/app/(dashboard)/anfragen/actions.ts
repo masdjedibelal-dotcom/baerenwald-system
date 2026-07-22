@@ -273,6 +273,9 @@ export type NeueAnfragePayload = {
   ort?: string | null
   /** Bauprojekt — Bautagesbericht & Leistungs-Compliance */
   ist_bauprojekt?: boolean
+  /** Bestand: wiederkehrende Leistung */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
   /** Manuell im CRM: Bestätigungsmail an Kund:in (Standard: aus) */
   bestaetigungsmail_senden?: boolean
 }
@@ -417,6 +420,11 @@ export async function createAnfrage(
       notizen: payload.notizen.trim() || null,
       funnel_daten: payload.funnel_daten && typeof payload.funnel_daten === 'object' ? payload.funnel_daten : {},
       ist_bauprojekt: payload.ist_bauprojekt === true,
+      ist_wiederkehrend: payload.ist_wiederkehrend === true,
+      wiederkehr_turnus:
+        payload.ist_wiederkehrend === true
+          ? payload.wiederkehr_turnus?.trim() || null
+          : null,
     })
     .select('id')
     .single()
@@ -582,6 +590,13 @@ export async function updateAnfrageAusNeuForm(
   }
 
   if (payload.ist_bauprojekt !== undefined) patch.ist_bauprojekt = payload.ist_bauprojekt === true
+  if (payload.ist_wiederkehrend !== undefined) {
+    patch.ist_wiederkehrend = payload.ist_wiederkehrend === true
+    patch.wiederkehr_turnus =
+      payload.ist_wiederkehrend === true
+        ? payload.wiederkehr_turnus?.trim() || null
+        : null
+  }
 
   if (payload.budget_ca !== undefined) patch.budget_ca = payload.budget_ca
   if (payload.zeitraum_von !== undefined) patch.zeitraum_von = payload.zeitraum_von?.trim() || null

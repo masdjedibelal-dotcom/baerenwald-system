@@ -89,7 +89,7 @@ export function AssistentPanel() {
         aria-label="Assistent"
       >
         <header className="flex items-center gap-2 border-b border-bw-border px-4 py-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#2E7D52] text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-[#7C5CFC] to-[#B56BFF] text-white">
             <MockIcon ctx="btn" n="sparkles" size={16} />
           </span>
           <div className="min-w-0 flex-1">

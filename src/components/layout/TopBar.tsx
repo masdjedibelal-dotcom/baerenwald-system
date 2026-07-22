@@ -159,7 +159,7 @@ export function TopBar({ user }: TopBarProps) {
 
         <button
           type="button"
-          className={cn('btn ghost sm', assistentOpen && 'is-open')}
+          className={cn('btn sm btn-assistent', assistentOpen && 'is-open')}
           aria-label="Assistent öffnen"
           aria-pressed={assistentOpen}
           onClick={() => toggleAssistent()}

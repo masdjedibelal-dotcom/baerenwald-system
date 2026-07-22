@@ -18,8 +18,13 @@ import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { PosTotals } from '@/components/posboard/PosTotals'
+import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
+import {
+  normalizeVorgangWiederkehr,
+  type VorgangWiederkehr,
+} from '@/lib/vorgang/wiederkehrend'
 import {
   finalizeAngebotWizardWithoutMail,
   saveAngebotWizardDraft,
@@ -245,6 +250,19 @@ export function AngebotWizard({
   const [dokumentTyp, setDokumentTyp] = useState<AngebotDokumentTyp>(
     () => bootstrap?.dokumentTyp ?? initialDokumentTypFromLead(leadState.bereiche, leadState.situation)
   )
+  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
+    normalizeVorgangWiederkehr(
+      bootstrap
+        ? {
+            ist_wiederkehrend: bootstrap.ist_wiederkehrend,
+            wiederkehr_turnus: bootstrap.wiederkehr_turnus,
+          }
+        : {
+            ist_wiederkehrend: lead.ist_wiederkehrend,
+            wiederkehr_turnus: lead.wiederkehr_turnus,
+          }
+    )
+  )
   const [projektbeschreibung, setProjektbeschreibung] = useState(() =>
     bootstrap?.projektbeschreibung?.trim() ||
       defaultProjektBeschreibungText(
@@ -301,6 +319,7 @@ export function AngebotWizard({
         zeilen,
         meta,
         dokumentTyp,
+        wiederkehr,
         projektbeschreibung,
         projektFotos,
         mitAnfahrt,
@@ -313,6 +332,7 @@ export function AngebotWizard({
       zeilen,
       meta,
       dokumentTyp,
+      wiederkehr,
       projektbeschreibung,
       projektFotos,
       mitAnfahrt,
@@ -492,6 +512,8 @@ export function AngebotWizard({
               ? zahlungsplan
               : null,
           auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
+          ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+          wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
         if (!res.ok) {
           toast.error(res.message)
@@ -538,6 +560,7 @@ export function AngebotWizard({
       gewerke,
       zahlfristSeg,
       zahlfristDatum,
+      wiederkehr,
       hwZuweisungen,
     ]
   )
@@ -816,6 +839,7 @@ export function AngebotWizard({
               <span className="hint">Projekttitel, Beschreibung, Fotos & Gewerke</span>
             </label>
           </div>
+          <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
           <div className="h-sep" />
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>

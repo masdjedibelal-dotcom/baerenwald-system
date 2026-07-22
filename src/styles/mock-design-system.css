@@ -377,6 +377,20 @@
   align-items: center;
   gap: 8px;
 }
+.btn-assistent {
+  background: linear-gradient(135deg, #7c5cfc 0%, #9b6dff 50%, #b56bff 100%);
+  border: 1px solid transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(124, 92, 252, 0.45);
+}
+.btn-assistent:hover {
+  background: linear-gradient(135deg, #6f4ff0 0%, #8f5ff5 50%, #a85cf5 100%);
+  color: #fff;
+  box-shadow: 0 3px 10px -2px rgba(124, 92, 252, 0.55);
+}
+.btn-assistent.is-open {
+  box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.28), 0 2px 8px -2px rgba(124, 92, 252, 0.45);
+}
 .topbar-avatar {
   width: 30px;
   height: 30px;
@@ -679,12 +693,14 @@ div.input input::placeholder { color: var(--text-4); }
   flex-shrink: 0;
   padding-left: 10px;
 }
-@media (max-width: 760px) {.listbar-actions .listbar-btn-label { display: none; }
-
-  
-.listbar-actions .btn { width: 34px; padding: 0; justify-content: center; }
-
-
+.listbar-actions .btn {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+@media (max-width: 760px) {
+  .listbar-actions .listbar-btn-label { display: none; }
+  .listbar-actions .segment-toggle-btn { padding-left: 10px; padding-right: 10px; }
 }
 
 .toolbar {
@@ -3458,7 +3474,7 @@ div.input input::placeholder { color: var(--text-4); }
 
 .vg-row {
   display: grid;
-  grid-template-columns: minmax(80px,1.4fr) minmax(110px,1.8fr) 168px 96px 84px 92px 96px 32px;
+  grid-template-columns: 36px minmax(80px,1.4fr) minmax(110px,1.8fr) 168px 96px 84px 92px 96px 32px;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
@@ -3467,7 +3483,7 @@ div.input input::placeholder { color: var(--text-4); }
   transition: background 120ms ease;
 }
 .vg-selectmode .vg-row { grid-template-columns: 36px minmax(80px,1.4fr) minmax(110px,1.8fr) 168px 96px 84px 92px 96px 32px; }
-.vg-check { display: none; }
+.vg-check { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .vg-selectmode .vg-check { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .vg-box {
   width: 18px; height: 18px; border-radius: 5px;
@@ -3476,6 +3492,7 @@ div.input input::placeholder { color: var(--text-4); }
   color: #fff; transition: background 120ms ease, border-color 120ms ease;
 }
 .vg-box.on { background: var(--green); border-color: var(--green); }
+.vg-box.partial { background: var(--green-10); border-color: var(--green); color: var(--green); }
 .vg-row:last-child { border-bottom: none; }
 .vg-row:hover { background: var(--bg-soft); }
 .vg-row.sel { background: var(--green-10); }
@@ -3601,18 +3618,18 @@ div.input input::placeholder { color: var(--text-4); }
 
   
 .vg-selectmode .vg-row {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: 28px 1fr auto auto;
     grid-template-areas:
-      "title  phase  check   actions"
-      "kunde  kunde  kunde   kunde"
-      "datum  datum  status  status";
+      "check  title  phase   actions"
+      "check  kunde  kunde   kunde"
+      ".      datum  status  status";
   }
 
   
 .vg-row > * { min-width: 0; }
 
   
-.vg-row > .vg-check { grid-area: check; align-self: center; justify-self: end; }
+.vg-row > .vg-check { grid-area: check; align-self: start; justify-self: start; padding-top: 2px; }
 
   
 .vg-row > .vg-vorgang { grid-area: title; min-width: 0; overflow: hidden; }

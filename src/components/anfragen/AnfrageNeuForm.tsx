@@ -32,8 +32,20 @@ import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
 import { bereicheSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { namenAusFunnelDaten, splitDeutscherVollname } from '@/lib/kunde-namen'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
+import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
+import {
+  normalizeVorgangWiederkehr,
+  type VorgangWiederkehr,
+} from '@/lib/vorgang/wiederkehrend'
 
 const KANAL_VALUES = Object.keys(KANAL_LABELS) as LeadKanal[]
+
+function wiederkehrFromLead(L: LeadDetail | null | undefined): VorgangWiederkehr {
+  return normalizeVorgangWiederkehr({
+    ist_wiederkehrend: L?.ist_wiederkehrend,
+    wiederkehr_turnus: L?.wiederkehr_turnus,
+  })
+}
 
 export const ANFRAGE_NEU_FORM_ID = 'anfrage-neu-form'
 export const ANFRAGE_BEARBEITEN_FORM_ID = 'anfrage-bearbeiten-form'
@@ -179,6 +191,9 @@ export function AnfrageNeuForm({
   const [budgetMax, setBudgetMax] = useState('')
   const [istBauprojekt, setIstBauprojekt] = useState(false)
   const [bauprojektManuell, setBauprojektManuell] = useState(false)
+  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
+    wiederkehrFromLead(bearbeitenLead)
+  )
   const [bestaetigungsmailSenden, setBestaetigungsmailSenden] = useState(false)
 
   const resolvedFormId = formId ?? ANFRAGE_NEU_FORM_ID
@@ -366,6 +381,7 @@ export function AnfrageNeuForm({
     } else setBudgetMax('')
     setIstBauprojekt(L.ist_bauprojekt === true)
     setBauprojektManuell(L.ist_bauprojekt === true)
+    setWiederkehr(wiederkehrFromLead(L))
     // Absichtlich nicht `bearbeitenLead` gesamt: vermeidet Zurücksetzen bei jedem Parent-Render bei offenem Sheet.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Nur bei anderer Lead-Revision neu aufbauen
   }, [bearbeitenLead?.id, bearbeitenLead?.updated_at])
@@ -519,6 +535,8 @@ export function AnfrageNeuForm({
       funnel_daten,
       notizen: interneNotiz.trim(),
       ist_bauprojekt: istBauprojekt,
+      ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+      wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     }
 
     setLoading(true)
@@ -788,6 +806,12 @@ export function AnfrageNeuForm({
               </span>
             </span>
           </label>
+
+          <VorgangArtWiederkehrField
+            value={wiederkehr}
+            onChange={setWiederkehr}
+            className="mt-4"
+          />
         </div>
       </Card>
 

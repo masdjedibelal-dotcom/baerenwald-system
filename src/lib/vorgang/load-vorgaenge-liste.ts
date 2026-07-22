@@ -14,6 +14,7 @@ import {
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
 import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import { resolveListeWiederkehr } from '@/lib/vorgang/wiederkehrend'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
@@ -38,6 +39,8 @@ const VORGAENGE_LEAD_SELECT = `
   kontakt_email,
   kontakt_telefon,
   notizen,
+  ist_wiederkehrend,
+  wiederkehr_turnus,
   ${leadKundeEmbed('id, name, vorname, nachname, typ')},
   ${leadAuftraggeberEmbed('id, name, vorname, nachname, typ, org_anzeigename')}
 `
@@ -65,7 +68,7 @@ export async function loadVorgaengeListe(): Promise<{
     withCrmReadFallback(async (db) =>
       db
         .from('angebote')
-        .select('id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, created_at, updated_at')
+        .select('id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus')
         .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(500)
@@ -73,7 +76,7 @@ export async function loadVorgaengeListe(): Promise<{
     withCrmReadFallback(async (db) =>
       db
         .from('auftraege')
-        .select('id, lead_id, status, titel, created_at, updated_at')
+        .select('id, lead_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus')
         .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(500)
@@ -82,7 +85,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('rechnungen')
         .select(
-          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, rechnung_art, abschlag_index, rechnungsnummer, angebote(lead_id), auftraege(lead_id)'
+          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, angebote(lead_id), auftraege(lead_id)'
         )
         .order('created_at', { ascending: false })
         .limit(500)
@@ -126,6 +129,8 @@ export async function loadVorgaengeListe(): Promise<{
     funnel_daten: unknown
     created_at: string
     updated_at: string
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
     kunden?: {
       id?: string | null
       name?: string | null
@@ -155,6 +160,8 @@ export async function loadVorgaengeListe(): Promise<{
     notizen: string | null
     created_at: string
     updated_at: string | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
   }>
   const auftraege = (auftraegeRes.data ?? []) as Array<{
     id: string
@@ -163,6 +170,8 @@ export async function loadVorgaengeListe(): Promise<{
     titel: string | null
     created_at: string
     updated_at: string | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
   }>
   const rechnungen = (rechnungenRes.data ?? []) as Array<{
     id: string
@@ -175,6 +184,8 @@ export async function loadVorgaengeListe(): Promise<{
     rechnung_art: string | null
     abschlag_index: number | null
     rechnungsnummer: string | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
     angebote?: { lead_id: string | null } | { lead_id: string | null }[] | null
     auftraege?: { lead_id: string | null } | { lead_id: string | null }[] | null
   }>
@@ -195,6 +206,8 @@ export async function loadVorgaengeListe(): Promise<{
         rechnung_art: r.rechnung_art,
         abschlag_index: r.abschlag_index,
         rechnungsnummer: r.rechnungsnummer,
+        ist_wiederkehrend: r.ist_wiederkehrend,
+        wiederkehr_turnus: r.wiederkehr_turnus,
       }
     })
     .filter(Boolean) as Array<{
@@ -208,6 +221,8 @@ export async function loadVorgaengeListe(): Promise<{
     rechnung_art: string | null
     abschlag_index: number | null
     rechnungsnummer: string | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
   }>
 
   const angeboteByLead = groupBy(angebote, (a) => a.lead_id)
@@ -243,6 +258,8 @@ export async function loadVorgaengeListe(): Promise<{
       updated_at: a.updated_at,
       leistungsumfang: a.leistungsumfang,
       notizen: a.notizen,
+      ist_wiederkehrend: a.ist_wiederkehrend,
+      wiederkehr_turnus: a.wiederkehr_turnus,
     }))
     const leadAuftraege = (auftraegeByLead.get(lead.id) ?? []).map((a) => ({
       id: a.id,
@@ -251,6 +268,8 @@ export async function loadVorgaengeListe(): Promise<{
       created_at: a.created_at,
       updated_at: a.updated_at,
       handwerkerAktionOffen: hwAktionByAuftrag.get(a.id) ?? false,
+      ist_wiederkehrend: a.ist_wiederkehrend,
+      wiederkehr_turnus: a.wiederkehr_turnus,
     }))
     const leadRechnungen = (rechnungenByLead.get(lead.id) ?? []).map((r) => ({
       id: r.id,
@@ -262,6 +281,8 @@ export async function loadVorgaengeListe(): Promise<{
       abschlag_index: r.abschlag_index,
       rechnungsnummer: r.rechnungsnummer,
       brutto: r.brutto,
+      ist_wiederkehrend: r.ist_wiederkehrend,
+      wiederkehr_turnus: r.wiederkehr_turnus,
     }))
 
     const resolveInput = {
@@ -278,6 +299,8 @@ export async function loadVorgaengeListe(): Promise<{
         bereiche: lead.bereiche,
         created_at: lead.created_at,
         updated_at: lead.updated_at,
+        ist_wiederkehrend: lead.ist_wiederkehrend,
+        wiederkehr_turnus: lead.wiederkehr_turnus,
       },
       angebote: leadAngebote,
       auftraege: leadAuftraege,
@@ -285,6 +308,14 @@ export async function loadVorgaengeListe(): Promise<{
     }
 
     const resolved = resolveVorgang(resolveInput)
+    const wiederkehr = resolveListeWiederkehr({
+      phase: resolved.phase,
+      entityId: resolved.entityId,
+      lead: resolveInput.lead,
+      angebote: leadAngebote,
+      auftraege: leadAuftraege,
+      rechnungen: leadRechnungen,
+    })
 
     const handwerkerIds = Array.from(
       new Set(
@@ -312,6 +343,8 @@ export async function loadVorgaengeListe(): Promise<{
         resolved.phase === 'rechnung' ? wertLabelFor(resolved.entityId) : null,
       detailHref: detailHrefForPhase(resolved.phase, resolved.entityId, lead.id),
       handwerkerIds,
+      ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
+      wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     })
 
     // Abschlag/Schluss: eigener Rechnungs-Vorgang; Stamm bleibt Auftrag
@@ -319,6 +352,14 @@ export async function loadVorgaengeListe(): Promise<{
       if (!isSatellitenRechnung(r)) continue
       if (r.status === 'storniert') continue
       const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
+      const satWieder = resolveListeWiederkehr({
+        phase: 'rechnung',
+        entityId: r.id,
+        lead: resolveInput.lead,
+        angebote: leadAngebote,
+        auftraege: leadAuftraege,
+        rechnungen: leadRechnungen,
+      })
       rows.push({
         ...sat,
         leadId: lead.id,
@@ -327,6 +368,8 @@ export async function loadVorgaengeListe(): Promise<{
         wertLabel: wertLabelFor(r.id),
         detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
         handwerkerIds,
+        ist_wiederkehrend: satWieder.ist_wiederkehrend,
+        wiederkehr_turnus: satWieder.wiederkehr_turnus,
       })
     }
   }

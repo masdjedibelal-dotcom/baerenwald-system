@@ -14,6 +14,8 @@ export type VorgangAngebotInput = {
   leistungsumfang?: string | null
   notizen?: string | null
   titel?: string | null
+  ist_wiederkehrend?: boolean | null
+  wiederkehr_turnus?: string | null
 }
 
 export type VorgangAuftragInput = {
@@ -23,6 +25,8 @@ export type VorgangAuftragInput = {
   created_at: string
   updated_at?: string | null
   handwerkerAktionOffen?: boolean
+  ist_wiederkehrend?: boolean | null
+  wiederkehr_turnus?: string | null
 }
 
 export type VorgangRechnungInput = {
@@ -39,6 +43,8 @@ export type VorgangRechnungInput = {
   abschlag_index?: number | null
   rechnungsnummer?: string | null
   brutto?: number | null
+  ist_wiederkehrend?: boolean | null
+  wiederkehr_turnus?: string | null
 }
 
 export type VorgangLeadInput = {
@@ -54,6 +60,8 @@ export type VorgangLeadInput = {
   bereiche?: string[] | null
   created_at: string
   updated_at?: string | null
+  ist_wiederkehrend?: boolean | null
+  wiederkehr_turnus?: string | null
 }
 
 export type ResolveVorgangInput = {
@@ -94,6 +102,9 @@ export type VorgangListeRow = ResolvedVorgang & {
   detailHref: string
   /** Handwerker an Auftragspositionen dieses Vorgangs (für Detail-`restrictHandwerker`). */
   handwerkerIds?: string[]
+  /** Bestand: wiederkehrende Leistung (Phase-Entity oder Lead). */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

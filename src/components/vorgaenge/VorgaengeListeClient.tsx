@@ -29,9 +29,10 @@ import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { toast } from '@/components/ui/app-toast'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import { bestandPillLabel } from '@/lib/vorgang/wiederkehrend'
 import { cn, formatDatum } from '@/lib/utils'
 
-const VORGANG_PHASES = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung'] as const
+const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'bestand', 'rechnung'] as const
 
 const PHASE_META: Record<
   VorgangPhase,
@@ -58,7 +59,15 @@ type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 function statusKind(row: VorgangListeRow): string {
   if (row.badges.wartet_freigabe) return 'warten'
   const u = row.unterstatus.toLowerCase()
-  if (u === 'storniert' || u === 'abgebrochen' || u === 'abgelehnt') return 'storniert'
+  if (
+    u === 'storniert' ||
+    u === 'abgebrochen' ||
+    u === 'abgelehnt' ||
+    u === 'abgelaufen' ||
+    u === 'ersetzt'
+  ) {
+    return 'storniert'
+  }
   if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') return 'fertig'
   if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
   if (u === 'gesendet' || u === 'abnahme' || u === 'kontaktiert' || u === 'termin') return 'warten'
@@ -66,12 +75,18 @@ function statusKind(row: VorgangListeRow): string {
 }
 
 function statusLabel(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return 'Wartet auf Freigabe'
+  if (row.badges.wartet_freigabe) return 'Wartet auf Freigabe (HV)'
   return row.unterstatusLabel
 }
 
 function dateKey(row: VorgangListeRow): string {
   return row.updatedAt.replace(/\D/g, '')
+}
+
+/** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
+function isVorgangErledigt(row: VorgangListeRow): boolean {
+  const kind = statusKind(row)
+  return kind === 'storniert' || kind === 'fertig'
 }
 
 /** Parse Anzeige „1.234 €“ → Euro-Zahl für Wert-Filter/Sort. */
@@ -99,8 +114,8 @@ function toExportRow(row: VorgangListeRow): Record<string, unknown> {
   }
 }
 
-function isVorgangPhase(value: string | null): value is (typeof VORGANG_PHASES)[number] {
-  return value != null && (VORGANG_PHASES as readonly string[]).includes(value)
+function isVorgangFilter(value: string | null): value is (typeof VORGANG_FILTERS)[number] {
+  return value != null && (VORGANG_FILTERS as readonly string[]).includes(value)
 }
 
 export function VorgaengeListeClient({
@@ -126,7 +141,7 @@ export function VorgaengeListeClient({
   const { exportToCSV } = useExport()
 
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<(typeof VORGANG_PHASES)[number]>('alle')
+  const [filter, setFilter] = useState<(typeof VORGANG_FILTERS)[number]>('alle')
   const [filterOpen, setFilterOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [fKunde, setFKunde] = useState('')
@@ -135,13 +150,17 @@ export function VorgaengeListeClient({
   const [fWertBis, setFWertBis] = useState('')
   const [fDatumVon, setFDatumVon] = useState('')
   const [fDatumBis, setFDatumBis] = useState('')
-  const [selectMode, setSelectMode] = useState(false)
+  const [lifecycle, setLifecycle] = useState<'offen' | 'erledigt'>('offen')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
 
+  useEffect(() => {
+    setSelected({})
+  }, [lifecycle])
+
   const syncPhaseToUrl = useCallback(
-    (phase: (typeof VORGANG_PHASES)[number]) => {
+    (phase: (typeof VORGANG_FILTERS)[number]) => {
       const params = new URLSearchParams(searchParams.toString())
       params.delete('phase')
       if (phase === 'alle') {
@@ -156,7 +175,7 @@ export function VorgaengeListeClient({
   )
 
   const setPhaseFilter = useCallback(
-    (phase: (typeof VORGANG_PHASES)[number]) => {
+    (phase: (typeof VORGANG_FILTERS)[number]) => {
       setFilter(phase)
       setStatusFilter([])
       if (!embedded) syncPhaseToUrl(phase)
@@ -167,7 +186,7 @@ export function VorgaengeListeClient({
   useEffect(() => {
     if (embedded) return
     const tab = searchParams.get('tab') ?? searchParams.get('phase')
-    if (isVorgangPhase(tab)) {
+    if (isVorgangFilter(tab)) {
       setFilter(tab)
     } else if (!tab) {
       setFilter('alle')
@@ -219,9 +238,27 @@ export function VorgaengeListeClient({
     return next
   }, [rows, restrictPartnerName, restrictHandwerkerId, restrictKundeId, restrictLeadIds])
 
+  const lifecycleCounts = useMemo(() => {
+    let offen = 0
+    let erledigt = 0
+    for (const v of baseRows) {
+      if (isVorgangErledigt(v)) erledigt += 1
+      else offen += 1
+    }
+    return { offen, erledigt }
+  }, [baseRows])
+
+  const lifecycleRows = useMemo(
+    () =>
+      baseRows.filter((v) =>
+        lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+      ),
+    [baseRows, lifecycle]
+  )
+
   const statusOptions = useMemo(() => {
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
-    if (filter !== 'alle' && filter in PHASE_UNTERSTATUS_VALUES) {
+    if (filter !== 'alle' && filter !== 'bestand' && filter in PHASE_UNTERSTATUS_VALUES) {
       const phase = filter as VorgangPhase
       return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
         value: u,
@@ -229,25 +266,36 @@ export function VorgaengeListeClient({
       }))
     }
     const byKey = new Map<string, string>()
-    for (const v of baseRows) {
+    for (const v of lifecycleRows) {
+      if (filter === 'bestand' && !v.ist_wiederkehrend) continue
       if (!byKey.has(v.unterstatus)) byKey.set(v.unterstatus, v.unterstatusLabel)
     }
     return Array.from(byKey.entries())
       .sort((a, b) => a[1].localeCompare(b[1], 'de'))
       .map(([value, label]) => ({ value, label }))
-  }, [baseRows, filter])
+  }, [lifecycleRows, filter])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
-    for (const p of VORGANG_PHASES) {
-      c[p] = p === 'alle' ? baseRows.length : baseRows.filter((v) => v.phase === p).length
+    for (const p of VORGANG_FILTERS) {
+      if (p === 'alle') {
+        c[p] = lifecycleRows.length
+      } else if (p === 'bestand') {
+        c[p] = lifecycleRows.filter((v) => v.ist_wiederkehrend).length
+      } else {
+        c[p] = lifecycleRows.filter((v) => v.phase === p).length
+      }
     }
     return c
-  }, [baseRows])
+  }, [lifecycleRows])
 
   const filteredBase = useMemo(() => {
-    return baseRows.filter((v) => {
-      if (filter !== 'alle' && v.phase !== filter) return false
+    return lifecycleRows.filter((v) => {
+      if (filter === 'bestand') {
+        if (!v.ist_wiederkehrend) return false
+      } else if (filter !== 'alle' && v.phase !== filter) {
+        return false
+      }
       if (statusFilter.length && !statusFilter.includes(v.unterstatus)) return false
       if (
         query &&
@@ -273,7 +321,7 @@ export function VorgaengeListeClient({
       return true
     })
   }, [
-    baseRows,
+    lifecycleRows,
     filter,
     statusFilter,
     query,
@@ -372,7 +420,7 @@ export function VorgaengeListeClient({
     if (row) router.push(row.detailHref)
   }, [router, selectedRows])
 
-  const paginationResetKey = `${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
+  const paginationResetKey = `${lifecycle}|${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
     filtered,
     12,
@@ -381,6 +429,23 @@ export function VorgaengeListeClient({
 
   function openDetail(href: string) {
     router.push(href)
+  }
+
+  const allPageSelected =
+    pageItems.length > 0 && pageItems.every((v) => selected[rowKey(v)])
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelected({})
+      return
+    }
+    const n: Record<string, boolean> = {}
+    filtered.forEach((v) => {
+      n[rowKey(v)] = true
+    })
+    setSelected(n)
   }
 
   const rowMenuItems = useCallback(
@@ -413,46 +478,63 @@ export function VorgaengeListeClient({
     <div>
       <div className="listbar">
         <div className="listbar-chips">
-          {VORGANG_PHASES.map((p) => (
+          {VORGANG_FILTERS.map((p) => (
             <MockChip
               key={p}
               active={filter === p}
               onClick={() => setPhaseFilter(p)}
               count={counts[p]}
-              icon={p !== 'alle' ? PHASE_META[p as VorgangPhase].icon : undefined}
+              icon={
+                p === 'bestand'
+                  ? 'refresh'
+                  : p !== 'alle'
+                    ? PHASE_META[p as VorgangPhase].icon
+                    : undefined
+              }
             >
-              {p === 'alle' ? 'Alle' : PHASE_META[p as VorgangPhase].label}
+              {p === 'alle' ? 'Alle' : p === 'bestand' ? 'Bestand' : PHASE_META[p as VorgangPhase].label}
             </MockChip>
           ))}
         </div>
         <div className="listbar-actions">
+          <div className="segment-toggle" role="group" aria-label="Lebenszyklus">
+            <button
+              type="button"
+              className={cn(
+                'segment-toggle-btn',
+                lifecycle === 'offen' && 'segment-toggle-btn--active'
+              )}
+              onClick={() => setLifecycle('offen')}
+            >
+              Offen {lifecycleCounts.offen}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'segment-toggle-btn',
+                lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+              )}
+              onClick={() => setLifecycle('erledigt')}
+            >
+              Erledigt {lifecycleCounts.erledigt}
+            </button>
+          </div>
           <MockBtn
             icon="filter"
             kind={activeFilterCount ? 'primary' : 'ghost'}
             sm
+            title={
+              activeFilterCount
+                ? `Filter & Suchen (${activeFilterCount})`
+                : 'Filter & Suchen'
+            }
             onClick={() => setFilterOpen(true)}
-          >
-            <span className="listbar-btn-label">
-              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
-            </span>
-          </MockBtn>
-          <MockBtn
-            icon="checks"
-            kind={selectMode ? 'primary' : 'ghost'}
-            sm
-            onClick={() => {
-              setSelectMode((m) => !m)
-              setSelected({})
-            }}
-          >
-            <span className="listbar-btn-label">
-              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
-            </span>
-          </MockBtn>
+          />
           <MockBtn
             icon="download"
             kind="ghost"
             sm
+            title="CSV exportieren"
             onClick={() =>
               runMockListExport(
                 exportToCSV,
@@ -461,9 +543,7 @@ export function VorgaengeListeClient({
                 'vorgaenge'
               )
             }
-          >
-            <span className="listbar-btn-label">Export</span>
-          </MockBtn>
+          />
         </div>
       </div>
 
@@ -518,14 +598,20 @@ export function VorgaengeListeClient({
         </div>
         <div className="form-section-h">Phase</div>
         <div className="chiprow" style={{ marginBottom: 16 }}>
-          {VORGANG_PHASES.map((p) => (
+          {VORGANG_FILTERS.map((p) => (
             <MockChip
               key={p}
               active={filter === p}
               onClick={() => setPhaseFilter(p)}
-              icon={p !== 'alle' ? PHASE_META[p as VorgangPhase].icon : undefined}
+              icon={
+                p === 'bestand'
+                  ? 'refresh'
+                  : p !== 'alle'
+                    ? PHASE_META[p as VorgangPhase].icon
+                    : undefined
+              }
             >
-              {p === 'alle' ? 'Alle' : PHASE_META[p as VorgangPhase].label}
+              {p === 'alle' ? 'Alle' : p === 'bestand' ? 'Bestand' : PHASE_META[p as VorgangPhase].label}
             </MockChip>
           ))}
         </div>
@@ -589,7 +675,7 @@ export function VorgaengeListeClient({
         </div>
       </MockModal>
 
-      {selectMode && selectedCount > 0 ? (
+      {selectedCount > 0 ? (
         <div className="bulkbar">
           <span>
             <b>{selectedCount}</b> ausgewählt
@@ -617,36 +703,22 @@ export function VorgaengeListeClient({
         </div>
       ) : null}
 
-      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+      <div className="listcard vg-selectmode">
         <div className="vg-row head">
-          {selectMode ? (
-            <div
-              className="vg-check"
-              onClick={(e) => {
-                e.stopPropagation()
-                const allOn = filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
-                if (allOn) setSelected({})
-                else {
-                  const n: Record<string, boolean> = {}
-                  filtered.forEach((v) => {
-                    n[rowKey(v)] = true
-                  })
-                  setSelected(n)
-                }
-              }}
-            >
-              <span
-                className={cn(
-                  'vg-box',
-                  filtered.length > 0 && filtered.every((v) => selected[rowKey(v)]) && 'on'
-                )}
-              >
-                {filtered.length > 0 && filtered.every((v) => selected[rowKey(v)]) ? (
-                  <MockIcon ctx="default" n="check" size={12} />
-                ) : null}
-              </span>
-            </div>
-          ) : null}
+          <div
+            className="vg-check"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleSelectAll()
+            }}
+            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
+              {allFilteredSelected || allPageSelected ? (
+                <MockIcon ctx="default" n="check" size={12} />
+              ) : null}
+            </span>
+          </div>
           <MockSortHead col="kunde" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
             Kunde
           </MockSortHead>
@@ -671,8 +743,8 @@ export function VorgaengeListeClient({
         {pageItems.length === 0 ? (
           <MockEmpty
             icon="folder-open"
-            title="Keine Vorgänge"
-            hint="Filter zurücksetzen oder neuen Vorgang anlegen"
+            title={lifecycle === 'erledigt' ? 'Keine erledigten Vorgänge' : 'Keine offenen Vorgänge'}
+            hint="Filter zurücksetzen oder Bucket wechseln"
           />
         ) : (
           pageItems.map((v) => {
@@ -683,29 +755,27 @@ export function VorgaengeListeClient({
               <div
                 key={key}
                 className={cn('vg-row', selected[key] && 'sel')}
-                onClick={() => (selectMode ? toggleSel(key) : openDetail(v.detailHref))}
+                onClick={() => openDetail(v.detailHref)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    selectMode ? toggleSel(key) : openDetail(v.detailHref)
+                    openDetail(v.detailHref)
                   }
                 }}
               >
-                {selectMode ? (
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(key)
-                    }}
-                  >
-                    <span className={cn('vg-box', selected[key] && 'on')}>
-                      {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
-                ) : null}
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(key)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[key] && 'on')}>
+                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
                 <div className="vg-kunde">
                   <span>{v.kundeName ?? '—'}</span>
                 </div>
@@ -713,6 +783,9 @@ export function VorgaengeListeClient({
                   <div className="t" title={v.titel}>
                     {v.titel}
                   </div>
+                  {bestandPillLabel(v) ? (
+                    <MockBadge kind="fertig">{bestandPillLabel(v)}</MockBadge>
+                  ) : null}
                 </div>
                 <div className="vg-phase">
                   <span className="ph-neutral">

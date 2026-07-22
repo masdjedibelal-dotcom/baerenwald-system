@@ -1,9 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
+import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
+import { toast } from '@/components/ui/app-toast'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -17,6 +19,10 @@ import type {
   AuftragDetail,
   Lead,
 } from '@/lib/types'
+import {
+  normalizeVorgangWiederkehr,
+  type VorgangWiederkehr,
+} from '@/lib/vorgang/wiederkehrend'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -78,6 +84,14 @@ export function AuftragDetailsTab({
   const angebotTitel = projektTitel(detail, lead)
   const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
 
+  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
+    normalizeVorgangWiederkehr({
+      ist_wiederkehrend: detail.ist_wiederkehrend,
+      wiederkehr_turnus: detail.wiederkehr_turnus,
+    })
+  )
+  const [wiederkehrSaving, setWiederkehrSaving] = useState(false)
+
   const handwerkerKontext = useMemo((): HandwerkerZuweisenKontext => {
     const k = detail.kunden
     return {
@@ -134,6 +148,42 @@ export function AuftragDetailsTab({
         disabled={!editable}
         fortschritt={fortschritt}
       />
+
+      <div
+        className="card"
+        style={{
+          marginTop: 16,
+          padding: 16,
+          opacity: wiederkehrSaving ? 0.7 : 1,
+        }}
+      >
+        <VorgangArtWiederkehrField
+          value={wiederkehr}
+          onChange={(next) => {
+            if (!editable) return
+            setWiederkehr(next)
+            setWiederkehrSaving(true)
+            void updateAuftragProjektFelder(detail.id, {
+              ist_wiederkehrend: next.ist_wiederkehrend,
+              wiederkehr_turnus: next.wiederkehr_turnus,
+            }).then((r) => {
+              setWiederkehrSaving(false)
+              if (!r.ok) {
+                toast.error(r.message)
+                setWiederkehr(
+                  normalizeVorgangWiederkehr({
+                    ist_wiederkehrend: detail.ist_wiederkehrend,
+                    wiederkehr_turnus: detail.wiederkehr_turnus,
+                  })
+                )
+                return
+              }
+              onSaved?.()
+            })
+          }}
+          hint="Bestand — Winterdienst, Hausmeister, Wartung (Filter in Vorgänge)"
+        />
+      </div>
 
       <AuftragPositionenSteuerungTab
         auftragId={detail.id}

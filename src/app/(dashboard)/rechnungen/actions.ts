@@ -63,6 +63,8 @@ export type RechnungEntwurfPayload = {
   mwst_satz?: number
   /** Listenbetrag = Summe zugeordneter Leistungen (Plan-Prozente nur Info). */
   liste_berechnung?: RechnungBerechnung | null
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 async function validateVorSpeichern(
@@ -151,6 +153,11 @@ export async function createRechnungEntwurf(input: {
       hinweis_35a: input.hinweis_35a ?? null,
       pdf_url: null,
       erstellt_von: user?.id ?? null,
+      ist_wiederkehrend: input.ist_wiederkehrend === true,
+      wiederkehr_turnus:
+        input.ist_wiederkehrend === true
+          ? input.wiederkehr_turnus?.trim() || null
+          : null,
     },
     berechnung,
     { reverse_charge_13b: Boolean(input.reverse_charge_13b) }
@@ -203,6 +210,15 @@ export async function updateRechnungEntwurf(
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id
         ? { zahlungsplan_abschlag_id: input.zahlungsplan_abschlag_id }
+        : {}),
+      ...(input.ist_wiederkehrend !== undefined
+        ? {
+            ist_wiederkehrend: input.ist_wiederkehrend === true,
+            wiederkehr_turnus:
+              input.ist_wiederkehrend === true
+                ? input.wiederkehr_turnus?.trim() || null
+                : null,
+          }
         : {}),
       ...(rechnungsdatum ? { rechnungsdatum } : {}),
       updated_at: new Date().toISOString(),

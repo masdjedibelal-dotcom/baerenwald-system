@@ -68,6 +68,8 @@ export type SaveAngebotWizardDraftPayload = {
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
   /** Nach Speichern: Auftragspositionen aus Angebot übernehmen */
   auftragKorrekturId?: string | null
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 async function persistAngebotPdfNachEntwurfSpeichern(
@@ -235,6 +237,8 @@ export async function saveAngebotWizardDraft(
       wichtige_hinweise: projektFelder.wichtige_hinweise,
       varianten: projektFelder.varianten,
       handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
+      ist_wiederkehrend: input.ist_wiederkehrend,
+      wiederkehr_turnus: input.wiederkehr_turnus,
     }, { asSystem: opts?.asSystem })
     if (!upd.ok) return upd
     const db = opts?.asSystem ? supabaseAdmin : createClient()
@@ -279,6 +283,8 @@ export async function saveAngebotWizardDraft(
     wichtige_hinweise: projektFelder.wichtige_hinweise,
     varianten: projektFelder.varianten,
     handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
+    ist_wiederkehrend: input.ist_wiederkehrend,
+    wiederkehr_turnus: input.wiederkehr_turnus,
   }, { asSystem: opts?.asSystem })
   if (!created.ok) return created
   const db = opts?.asSystem ? supabaseAdmin : createClient()
@@ -366,6 +372,8 @@ export async function loadAngebotWizardBootstrap(
       varianten,
       kunde_objekt_id,
       gesendet_kunde_at,
+      ist_wiederkehrend,
+      wiederkehr_turnus,
       leads(plz, bereiche, situation, kundentyp,       kunden!kunde_id(typ)),
       angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
@@ -397,6 +405,8 @@ export async function loadAngebotWizardBootstrap(
     hinweise: string | null
     varianten?: unknown
     gesendet_kunde_at?: string | null
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
     leads?: {
       plz?: string | null
       bereiche?: unknown
@@ -478,6 +488,8 @@ export async function loadAngebotWizardBootstrap(
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
     bereitsGesendet: Boolean(ang.gesendet_kunde_at),
     zahlungsplan,
+    ist_wiederkehrend: ang.ist_wiederkehrend === true,
+    wiederkehr_turnus: ang.wiederkehr_turnus ?? null,
   }
 
   return { ok: true, bootstrap }
@@ -511,6 +523,8 @@ export async function loadAngebotWizardBootstrapKopie(
       hinweise,
       varianten,
       kunde_objekt_id,
+      ist_wiederkehrend,
+      wiederkehr_turnus,
       leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ)),
       angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
@@ -539,6 +553,8 @@ export async function loadAngebotWizardBootstrapKopie(
     zahlungsplan?: unknown
     hinweise: string | null
     varianten?: unknown
+    ist_wiederkehrend?: boolean | null
+    wiederkehr_turnus?: string | null
     leads?: {
       plz?: string | null
       bereiche?: unknown
@@ -614,6 +630,8 @@ export async function loadAngebotWizardBootstrapKopie(
     varianten: variantenPersist,
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
     zahlungsplan,
+    ist_wiederkehrend: ang.ist_wiederkehrend === true,
+    wiederkehr_turnus: ang.wiederkehr_turnus ?? null,
   }
 
   return { ok: true, bootstrap }

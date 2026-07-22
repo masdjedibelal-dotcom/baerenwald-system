@@ -163,6 +163,9 @@ export type AngebotWizardBootstrap = {
   /** Korrektur aus laufendem Auftrag — kein erneutes Annehmen, Auftrag wird mitgespeichert. */
   auftragKorrektur?: { auftragId: string }
   zahlungsplan?: Zahlungsplan | null
+  /** Bestand: wiederkehrende Leistung */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 /** Für Kopien: angehängte Nummer „(2)“, „(3)“, … am Angebotstitel. */

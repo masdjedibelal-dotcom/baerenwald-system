@@ -2,7 +2,7 @@ import { KiHubClient } from '@/components/ki-hub/KiHubClient'
 import { loadKiClusterAnalysen } from '@/lib/ki/queries'
 
 export const metadata = {
-  title: 'KI Hub — Bärenwald CRM',
+  title: 'KI Intelligence — Bärenwald CRM',
 }
 
 export const dynamic = 'force-dynamic'

@@ -79,6 +79,9 @@ export type RechnungWizardBootstrap = {
   zahlungsplanBearbeiten?: boolean
   gesamtNetto?: number
   rechnungenAbschlag?: RechnungAbschlagLink[]
+  /** Bestand: von Auftrag übernommen oder manuell */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
 }
 
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
