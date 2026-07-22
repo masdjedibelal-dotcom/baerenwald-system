@@ -13,16 +13,16 @@ const OPTIONS: {
   icon: ReactNode
 }[] = [
   {
-    kind: 'position',
-    label: 'Freie Position',
-    sub: 'leer anlegen',
-    icon: <Plus className="h-4 w-4" />,
+    kind: 'preisliste',
+    label: 'Aus Katalog',
+    sub: 'Titel & Variante',
+    icon: <ListFilter className="h-4 w-4" />,
   },
   {
-    kind: 'preisliste',
-    label: 'Aus Preisliste',
-    sub: 'Vorlage wählen',
-    icon: <ListFilter className="h-4 w-4" />,
+    kind: 'position',
+    label: 'Freie Position',
+    sub: 'nur am Angebot',
+    icon: <Plus className="h-4 w-4" />,
   },
   {
     kind: 'freitext',

@@ -11,6 +11,11 @@ import {
   type PosTableBadge,
   type PosTableGroup,
 } from '@/components/posboard/PosTable'
+import { KatalogPickModal } from '@/components/posboard/KatalogPickModal'
+import {
+  PosBoardKiSuggestions,
+  type PosBoardSuggestContext,
+} from '@/components/posboard/PosBoardKiSuggestions'
 import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -60,6 +65,8 @@ export type PosBoardProps = {
   /** Für „Aus Preisliste“ — ohne Liste wird die Option deaktiviert */
   preislisten?: Preisliste[]
   headerAction?: ReactNode
+  /** Anfrage-/Projekttext für Katalog-KI-Vorschläge */
+  suggestContext?: PosBoardSuggestContext | null
   className?: string
 }
 
@@ -109,6 +116,7 @@ export function PosBoard({
   gewerke = [],
   preislisten = [],
   headerAction,
+  suggestContext = null,
   className,
 }: PosBoardProps) {
   const positionen = Array.isArray(positionenProp) ? positionenProp : []
@@ -118,6 +126,7 @@ export function PosBoard({
   const [gName, setGName] = useState('')
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [preislisteOpen, setPreislisteOpen] = useState(false)
+  const [katalogOpen, setKatalogOpen] = useState(false)
   const [preislistePick, setPreislistePick] = useState('')
   const [preislisteTargetGewerk, setPreislisteTargetGewerk] = useState<string | null>(null)
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
@@ -167,8 +176,23 @@ export function PosBoard({
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np: PosBoardLine = makeNew
-      ? { ...makeNew(gewerk), id, kind: 'position' }
-      : neuePosBoardLine({ gewerk: gewerk || '', id, kind: 'position', name: '' })
+      ? {
+          ...makeNew(gewerk),
+          id,
+          kind: 'position',
+          position_quelle: 'frei',
+          variante_id: null,
+          preisliste_id: null,
+        }
+      : neuePosBoardLine({
+          gewerk: gewerk || '',
+          id,
+          kind: 'position',
+          name: '',
+          position_quelle: 'frei',
+          variante_id: null,
+          preisliste_id: null,
+        })
     onChange([...positionen, np])
     setEditId(id)
   }
@@ -230,11 +254,48 @@ export function PosBoard({
       ust: 19,
       kind: 'position',
       preisliste_id: pl.id,
+      variante_id: pl.id,
+      position_quelle: 'katalog',
     })
     onChange([...positionen, np])
     setPreislisteOpen(false)
     setPreislistePick('')
     setPreislisteTargetGewerk(null)
+    setEditId(id)
+  }
+
+  const addFromKatalog = (r: {
+    position: { titel: string; gewerk_name?: string | null }
+    variante: {
+      id: string
+      beschreibung: string
+      einheit: string
+      preis: number
+    }
+    menge: number
+    beschreibung: string
+  }) => {
+    if (!onChange) return
+    const id = neuePosBoardLine().id
+    const gewerkName =
+      preislisteTargetGewerk?.trim() ||
+      r.position.gewerk_name?.trim() ||
+      defaultGewerk()
+    const np = neuePosBoardLine({
+      id,
+      gewerk: gewerkName,
+      name: r.position.titel,
+      beschreibung: r.beschreibung,
+      menge: r.menge,
+      einheit: r.variante.einheit || 'Stück',
+      preis: Number(r.variante.preis) || 0,
+      ust: 19,
+      kind: 'position',
+      preisliste_id: r.variante.id,
+      variante_id: r.variante.id,
+      position_quelle: 'katalog',
+    })
+    onChange([...positionen, np])
     setEditId(id)
   }
 
@@ -244,9 +305,8 @@ export function PosBoard({
     else if (kind === 'freitext') addFreitext(target)
     else if (kind === 'nachlass') addNachlass()
     else if (kind === 'preisliste') {
-      if (preislisten.filter((p) => p.aktiv !== false).length === 0) return
       setPreislisteTargetGewerk(target)
-      setPreislisteOpen(true)
+      setKatalogOpen(true)
     }
   }
 
@@ -471,6 +531,16 @@ export function PosBoard({
     [preislisten]
   )
 
+  const existingVarianteIds = useMemo(
+    () =>
+      new Set(
+        positionen
+          .map((p) => p.variante_id || p.preisliste_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    [positionen]
+  )
+
   return (
     <div className={className}>
       {title ? (
@@ -553,6 +623,25 @@ export function PosBoard({
           </button>
         </div>
       ) : null}
+      {editable && suggestContext?.text?.trim() ? (
+        <PosBoardKiSuggestions
+          context={suggestContext}
+          existingVarianteIds={existingVarianteIds}
+          onAccept={(item) =>
+            addFromKatalog({
+              position: { titel: item.titel, gewerk_name: item.gewerk_name },
+              variante: {
+                id: item.variante_id,
+                beschreibung: item.beschreibung,
+                einheit: item.einheit,
+                preis: item.preis,
+              },
+              menge: 1,
+              beschreibung: item.beschreibung,
+            })
+          }
+        />
+      ) : null}
       <PosTable
         groups={groups}
         onAddKind={editable ? onAddKind : undefined}
@@ -572,7 +661,7 @@ export function PosBoard({
         ust={ust}
         brutto={brutto}
         disabledAddKinds={{
-          preisliste: aktivePreislisten.length === 0,
+          preisliste: false,
         }}
       />
       {editP && helpers
@@ -695,6 +784,17 @@ export function PosBoard({
           </div>
         </MockModal>
       ) : null}
+      {katalogOpen ? (
+        <KatalogPickModal
+          open
+          preferredGewerkName={preislisteTargetGewerk}
+          onClose={() => {
+            setKatalogOpen(false)
+            setPreislisteTargetGewerk(null)
+          }}
+          onPick={addFromKatalog}
+        />
+      ) : null}
       {preislisteOpen ? (
         <MockModal
           open
@@ -704,8 +804,8 @@ export function PosBoard({
             setPreislisteTargetGewerk(null)
           }}
           icon="list-filter"
-          title="Aus Preisliste"
-          sub="Vorlage wählen und als Position übernehmen"
+          title="Aus Preisliste (Legacy)"
+          sub="Fallback bis Katalog importiert ist"
           footer={
             <>
               <div style={{ flex: 1 }} />

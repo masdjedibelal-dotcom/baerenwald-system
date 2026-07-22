@@ -49,6 +49,10 @@ export type DokumentArtikelZeile = {
   /** Gruppierung im Gewerk-Wizard (eindeutig pro Abschnitt, auch bei gleichem gewerk_id) */
   gewerk_block_key?: string
   preisliste_id?: string | null
+  /** Katalog-Variante */
+  variante_id?: string | null
+  /** katalog | frei */
+  position_quelle?: 'katalog' | 'frei' | string | null
   /** Zusatztext unter Leistung (z. B. Fachbetrieb-Hinweis) */
   positionBeschreibung?: string
   /** Fachbetrieb-Hinweis im PDF (Standard aus Gewerk-Einstellungen) */

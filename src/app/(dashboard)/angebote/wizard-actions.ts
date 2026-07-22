@@ -142,7 +142,29 @@ export async function saveAngebotWizardDraft(
   if (Array.isArray(variantenB) && variantenB.length) {
     preislisteSync.push(...syncInputsFromAngebotPositionen(normalizeAngebotPositionen(variantenB)))
   }
+  // No-Op für Katalog — freie Positionen → Lernsignale (KI)
   await syncNeueLeistungenToPreisliste(preislisteSync)
+  const freie = positionen.filter(
+    (p) =>
+      p.position_quelle === 'frei' ||
+      (!p.variante_id && !p.leistung_id && p.leistung?.trim())
+  )
+  if (freie.length) {
+    const { recordKatalogLernsignale } = await import('@/app/(dashboard)/katalog/actions')
+    await recordKatalogLernsignale(
+      freie.map((p) => ({
+        angebotId: input.angebotId,
+        leadId: input.lead_id,
+        gewerkId: p.gewerk_id || null,
+        titel: p.leistung || p.leistung_name || '',
+        beschreibung: p.beschreibung,
+        einheit: p.einheit,
+        preisNetto: Number(p.vk_netto ?? p.lohn_netto) || 0,
+        menge: p.menge,
+        quelle: 'frei' as const,
+      }))
+    )
+  }
 
   const variantenNormalized: AngebotVariantenPersistJson | null =
     dokumentTyp === 'projekt' && input.varianten

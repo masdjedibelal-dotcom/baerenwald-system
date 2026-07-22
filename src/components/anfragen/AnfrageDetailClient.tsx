@@ -31,10 +31,12 @@ import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
+import { EmpfohleneHandwerkerCard } from '@/components/anfragen/EmpfohleneHandwerkerCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import type { EmpfohlenerHandwerker } from '@/lib/empfohlene-handwerker'
 import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 
 const AngebotWizard = dynamic(
@@ -143,6 +145,7 @@ export function AnfrageDetailClient({
   angebotWizardInitial = false,
   projektKontext,
   dbAuftragId = null,
+  empfohleneHandwerker = [],
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
@@ -160,6 +163,7 @@ export function AnfrageDetailClient({
   angebotWizardInitial?: boolean
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
+  empfohleneHandwerker?: EmpfohlenerHandwerker[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -550,6 +554,7 @@ export function AnfrageDetailClient({
     <>
       <HvMeldungKontextCards lead={lead} />
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
+      <EmpfohleneHandwerkerCard handwerker={empfohleneHandwerker} />
     </>
   )
 

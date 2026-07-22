@@ -327,10 +327,14 @@ export type AngebotPosition = {
   gewerk_slug?: string
   /** Abschnitt im Projektangebot (mehrere Blöcke pro Gewerk möglich) */
   gewerk_block_key?: string
-  /** interne Zuordnung Preisliste */
+  /** interne Zuordnung Preisliste / Katalog-Variante (Snapshot-Herkunft) */
   leistung: string
   leistung_id?: string
   leistung_name?: string
+  /** Katalog-Variante (nullable) — Snapshot bleibt bei Katalog-Preisänderung stabil */
+  variante_id?: string | null
+  /** katalog = aus Katalog übernommen; frei = manuell (für KI-Lernsignale) */
+  position_quelle?: 'katalog' | 'frei' | string | null
   /** Kundentext / Gesamtwerk, nicht nur Handwerksleistung */
   beschreibung: string
   /** Festpreis Lohn netto / Einheit */
@@ -549,6 +553,10 @@ export type Auftrag = {
   kunden_seite_letzter_aufruf?: string | null
   /** Bauprojekt — Bautagesbericht statt kurzem Bautagebuch */
   ist_bauprojekt?: boolean
+  /** Notfall-Direktbeauftragung — CRM-Banner (§4) */
+  ist_notfall?: boolean
+  /** aufwand | festpreis — Abrechnungshinweis im Notfall-Banner */
+  notfall_verguetung?: 'aufwand' | 'festpreis' | string | null
   /** HV-Plattform: Kostenträger (Rechnung/Versicherungsakte) */
   kostentraeger?: string | null
   versicherungs_nr?: string | null
@@ -652,8 +660,18 @@ export type AuftragPosition = {
   aenderung_typ?: 'neu' | 'geaendert' | 'entfernt' | string | null
   /** Alter preis_partner vor Preisänderung (Netto-Zeile) */
   preis_alt?: number | null
-  /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt */
+  /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt / Spec-status */
   leistung_status?: string | null
+  /** lv | regie | material */
+  typ?: string | null
+  /** festpreis | aufwand */
+  verguetung?: string | null
+  geschaetzt_std?: number | null
+  stundensatz?: number | null
+  gestartet_am?: string | null
+  erledigt_am?: string | null
+  /** Weitere Arbeit / Regie: nicht_noetig | in_pruefung | anerkannt | abgelehnt */
+  anerkennung_status?: string | null
   absprachen?: string | null
   notizen_intern?: string | null
   sort_order: number | null

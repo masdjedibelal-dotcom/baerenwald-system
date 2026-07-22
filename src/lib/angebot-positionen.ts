@@ -241,6 +241,18 @@ export function normalizeAngebotPosition(
   if (gewerk_block_key) out.gewerk_block_key = gewerk_block_key
   if (leistung_id) out.leistung_id = leistung_id
   if (leistung_name) out.leistung_name = leistung_name
+  const variante_id =
+    r.variante_id != null && String(r.variante_id).trim()
+      ? String(r.variante_id).trim()
+      : leistung_id
+  if (variante_id) out.variante_id = variante_id
+  if (r.position_quelle === 'katalog' || r.position_quelle === 'frei') {
+    out.position_quelle = r.position_quelle
+  } else if (variante_id) {
+    out.position_quelle = 'katalog'
+  } else {
+    out.position_quelle = 'frei'
+  }
   const mwstRaw = num(r.mwst_satz)
   if (mwstRaw === 0 || mwstRaw === 7 || mwstRaw === 19) out.mwst_satz = mwstRaw
   const kostenverteilung = parseKostenverteilung(r.kostenverteilung)

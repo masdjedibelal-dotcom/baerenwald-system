@@ -8,6 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { TopBarSearch } from '@/components/layout/TopBarSearch'
+import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
@@ -100,6 +101,7 @@ export function TopBar({ user }: TopBarProps) {
   const { title, parents, cta } = pathToBreadcrumbs(pathname)
   const parentHref = parents[parents.length - 1]?.href ?? null
   const { name, email } = userDisplay(user)
+  const { open: assistentOpen, toggle: toggleAssistent } = useAssistent()
   const [menuOpen, setMenuOpen] = useState(false)
   const avatarRef = useRef<HTMLButtonElement>(null)
   const [logoutLoading, setLogoutLoading] = useState(false)
@@ -154,6 +156,17 @@ export function TopBar({ user }: TopBarProps) {
             <span className="topbar-cta-label">{cta.label}</span>
           </button>
         ) : null}
+
+        <button
+          type="button"
+          className={cn('btn ghost sm', assistentOpen && 'is-open')}
+          aria-label="Assistent öffnen"
+          aria-pressed={assistentOpen}
+          onClick={() => toggleAssistent()}
+        >
+          <MockIcon ctx="btn" n="sparkles" size={14} />
+          <span className="topbar-cta-label">Assistent</span>
+        </button>
 
         <button
           ref={avatarRef}

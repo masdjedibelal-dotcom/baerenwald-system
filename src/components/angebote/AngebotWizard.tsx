@@ -361,6 +361,28 @@ export function AngebotWizard({
   }
 
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
+
+  const posSuggestContext = useMemo(() => {
+    const text = [
+      meta.leistungsumfang,
+      projektbeschreibung,
+      leadSituationDisplay(leadState.situation),
+      bereicheFuerAnzeige(leadState.bereiche, leadState.situation).join(' '),
+    ]
+      .map((s) => String(s ?? '').trim())
+      .filter(Boolean)
+      .join('\n')
+    if (!text.trim()) return null
+    return {
+      text,
+      gewerkHints: bereicheFuerAnzeige(leadState.bereiche, leadState.situation),
+    }
+  }, [
+    meta.leistungsumfang,
+    projektbeschreibung,
+    leadState.situation,
+    leadState.bereiche,
+  ])
   const gewerkNamen = useMemo(
     () => gewerke.map((g) => g.name).filter(Boolean),
     [gewerke]
@@ -941,6 +963,7 @@ export function AngebotWizard({
             gewerke={gewerkNamen}
             preislisten={preislisten}
             hideAddGewerk={dokumentTyp === 'einfach'}
+            suggestContext={posSuggestContext}
           />
         </>
       ) : null}

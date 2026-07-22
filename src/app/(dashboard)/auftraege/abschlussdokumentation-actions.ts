@@ -327,6 +327,10 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
 }> {
   const detail = await loadAuftragDetail(auftragId)
   const bautagebuch = await listAuftragBautagebuch(auftragId)
+  const { listAuftragPositionEintraege } = await import(
+    '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+  )
+  const posEintraege = await listAuftragPositionEintraege(auftragId)
   const fotos = detail
     ? await collectFotoUrls(detail, bautagebuch)
     : []
@@ -334,8 +338,10 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   const abschlussUrl = detail?.abschlussdokumentation_url?.trim() || null
   return {
     positionenCount: detail?.auftrag_positionen?.length ?? 0,
-    bautagebuchCount: bautagebuch.length,
-    fotoCount: fotos.length,
+    bautagebuchCount: bautagebuch.length + posEintraege.length,
+    fotoCount:
+      fotos.length +
+      posEintraege.reduce((n, e) => n + (e.eintrag_fotos?.length ?? 0), 0),
     hasAbnahme: voraus.hasAbnahme,
     hasAbschlussbericht: Boolean(abschlussUrl),
     hasRechnung: voraus.hasRechnung,

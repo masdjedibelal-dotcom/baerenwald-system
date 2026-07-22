@@ -138,6 +138,25 @@ export function buildRechnungHtmlInput(
   if (kleinunternehmer) hinweiseParts.push(HINWEIS_KLEINUNTERNEHMER)
   if (row.reverse_charge_13b) hinweiseParts.push(HINWEIS_REVERSE_CHARGE_13B)
 
+  const auftragJoin = firstJoin(row.auftraege) as
+    | (Pick<Auftrag, 'id' | 'titel'> & {
+        kostentraeger?: string | null
+        versicherungs_nr?: string | null
+        versicherungsakte_pdf_url?: string | null
+        angebote?: AngebotJoin
+      })
+    | null
+  if (auftragJoin?.kostentraeger === 'versicherung') {
+    const versLines = [
+      'Versicherungsfall — Hinweise für die Abrechnung:',
+      `Policen- / Versicherungs-Nr.: ${auftragJoin.versicherungs_nr?.trim() || '—'}`,
+      auftragJoin.versicherungsakte_pdf_url
+        ? 'Schadenakte: siehe Vorgangs-Dokumente (Schadenakte Versicherung).'
+        : 'Schadenakte: wird im Vorgang bereitgestellt.',
+    ]
+    hinweiseParts.push(versLines.join('\n'))
+  }
+
   const hinweis35a = resolveRechnungHinweis35a(
     row.hinweis_35a,
     row.kunden.typ,
@@ -218,7 +237,7 @@ export async function loadRechnungDetailForPdf(
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      '*, kunden(*), angebote(leistungsumfang, notizen), auftraege(id, titel, angebote(leistungsumfang, notizen))'
+      '*, kunden(*), angebote(leistungsumfang, notizen), auftraege(id, titel, kostentraeger, versicherungs_nr, versicherungsakte_pdf_url, angebote(leistungsumfang, notizen))'
     )
     .eq('id', rechnungId)
     .maybeSingle()

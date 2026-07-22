@@ -35,7 +35,12 @@ export type PosBoardLine = {
   kind?: PosBoardLineKind
   /** Nur kind=nachlass */
   nachlassModus?: 'prozent' | 'betrag'
+  /** Legacy Preisliste-ID (= oft Katalog-Varianten-ID nach Import) */
   preisliste_id?: string | null
+  /** Katalog-Variante (Herkunft) */
+  variante_id?: string | null
+  /** katalog | frei */
+  position_quelle?: 'katalog' | 'frei' | null
 }
 
 function parseKostenverteilung(v: unknown): KostenVerteilung {
@@ -77,6 +82,7 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
   const name = (p.leistung_name || p.leistung || '').trim()
   const beschreibungRaw = (p.beschreibung || '').trim()
   const displayName = name || beschreibungRaw || '(ohne Bezeichnung)'
+  const varianteId = p.variante_id || p.leistung_id || null
   return {
     id: p.id,
     gewerk: p.gewerk_name?.trim() || p.gewerk_id || POS_BOARD_DEFAULT_GEWERK,
@@ -87,6 +93,14 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
     preis: positionVkNettoStueck(p),
     ust: p.mwst_satz != null ? Number(p.mwst_satz) : 19,
     kostenverteilung: parseKostenverteilung(p.kostenverteilung),
+    preisliste_id: varianteId,
+    variante_id: varianteId,
+    position_quelle:
+      p.position_quelle === 'katalog' || p.position_quelle === 'frei'
+        ? p.position_quelle
+        : varianteId
+          ? 'katalog'
+          : 'frei',
   }
 }
 
@@ -114,6 +128,11 @@ export function posBoardLineToAngebotPosition(
     gewerk_block_key: base?.gewerk_block_key,
     leistung: line.name,
     leistung_name: line.name,
+    leistung_id: line.variante_id || line.preisliste_id || base?.leistung_id,
+    variante_id: line.variante_id || line.preisliste_id || base?.variante_id || null,
+    position_quelle:
+      line.position_quelle ||
+      (line.variante_id || line.preisliste_id ? 'katalog' : 'frei'),
     beschreibung: line.beschreibung ?? '',
     lohn_netto,
     material_netto,
@@ -145,6 +164,7 @@ export function posBoardLinesToAngebotPositionen(
 }
 
 export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoardLine {
+  const varianteId = z.variante_id || z.preisliste_id || null
   return {
     id: z.id,
     gewerk: z.gewerkName?.trim() || GEWERK_NAME_ALLGEMEIN,
@@ -156,6 +176,14 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
     preis: z.vkNetto,
     ust: z.mwstSatz,
     kostenverteilung: parseKostenverteilung(z.kostenverteilung),
+    preisliste_id: varianteId,
+    variante_id: varianteId,
+    position_quelle:
+      z.position_quelle === 'katalog' || z.position_quelle === 'frei'
+        ? z.position_quelle
+        : varianteId
+          ? 'katalog'
+          : 'frei',
   }
 }
 
@@ -181,7 +209,11 @@ export function posBoardLineToDokumentArtikel(
       gewerk_id: base?.gewerk_id,
       gewerk_slug: base?.gewerk_slug,
       gewerk_block_key: base?.gewerk_block_key,
-      preisliste_id: line.preisliste_id ?? base?.preisliste_id,
+      preisliste_id: line.variante_id || line.preisliste_id || base?.preisliste_id,
+      variante_id: line.variante_id || line.preisliste_id || base?.variante_id,
+      position_quelle:
+        line.position_quelle ||
+        (line.variante_id || line.preisliste_id ? 'katalog' : 'frei'),
       kostenart: base?.kostenart,
       kostenverteilung,
       rabattProzent: base?.rabattProzent ?? 0,

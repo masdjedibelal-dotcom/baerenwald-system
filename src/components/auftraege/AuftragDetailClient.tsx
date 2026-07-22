@@ -22,7 +22,11 @@ import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLin
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
 import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschlussSection'
+import { AuftragLebenszyklusAbschlussCard } from '@/components/auftraege/AuftragLebenszyklusAbschlussCard'
 import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
+import { AuftragPositionLebenszyklusCard } from '@/components/auftraege/AuftragPositionLebenszyklusCard'
+import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
+import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
 import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragAbnahmeprotokollInline } from '@/components/auftraege/AuftragAbnahmeprotokollInline'
@@ -284,6 +288,7 @@ export function AuftragDetailClient({
     if (tab) setMainTab(tab)
   }, [searchParams, initial.notizen])
   const [abschlussModal, setAbschlussModal] = useState(false)
+  const [notfallModalOpen, setNotfallModalOpen] = useState(false)
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
   const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
@@ -522,6 +527,11 @@ export function AuftragDetailClient({
   /** Nur Aktionen, die nicht schon über Header-CTA oder Detail-Tabs erreichbar sind */
   const aktionenMenuItems = useMemo(() => {
     const extras: EntityMenuItem[] = [
+      {
+        icon: 'alert-triangle',
+        label: 'Direkt beauftragen (Notfall)',
+        onClick: () => setNotfallModalOpen(true),
+      },
       ...(detail.angebot_id
         ? ([
             {
@@ -708,17 +718,25 @@ export function AuftragDetailClient({
   )
 
   const abschlussInhalt = (
-    <AuftragAbschlussSection
-      auftragId={detail.id}
-      istAbgeschlossen={istAbgeschlossen}
-      abschlussUrl={detail.abschlussdokumentation_url}
-      abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
-      onRefresh={() => refresh()}
-    />
+    <div className="space-y-4">
+      <AuftragLebenszyklusAbschlussCard auftragId={detail.id} />
+      <AuftragAbschlussSection
+        auftragId={detail.id}
+        istAbgeschlossen={istAbgeschlossen}
+        abschlussUrl={detail.abschlussdokumentation_url}
+        abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
+        onRefresh={() => refresh()}
+      />
+    </div>
   )
 
   const baustelleInhalt = (
     <div className="space-y-4">
+      <AuftragPositionLebenszyklusCard
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        onChanged={() => refresh()}
+      />
       <AuftragBautagebuchCard
         auftragId={detail.id}
         eintraege={detail.auftrag_bautagebuch ?? []}
@@ -904,10 +922,23 @@ export function AuftragDetailClient({
         ),
       }}
     >
+      <AuftragNotfallBanner
+        istNotfall={Boolean(detail.ist_notfall)}
+        verguetung={detail.notfall_verguetung}
+      />
       <DetailShell
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as AuftragDetailTab)}
+      />
+
+      <NotfallDirektBeauftragenModal
+        open={notfallModalOpen}
+        onClose={() => setNotfallModalOpen(false)}
+        auftragId={detail.id}
+        leadId={detail.lead_id}
+        gewerkName={detail.auftrag_positionen?.[0]?.gewerk_name}
+        onDone={() => refresh()}
       />
 
       <AbschlussdokumentationModal

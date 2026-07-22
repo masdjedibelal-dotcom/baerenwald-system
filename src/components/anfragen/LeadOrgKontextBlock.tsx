@@ -17,6 +17,7 @@ import {
   disponiereHavarieNotmassnahme,
   schlageKostentraegerVor,
 } from '@/lib/org/hv-lead-actions'
+import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import {
   ANLASS_LABELS,
@@ -46,6 +47,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
   const router = useRouter()
   const [fotoIdx, setFotoIdx] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
+  const [notfallModal, setNotfallModal] = useState(false)
   const auftraggeber = lead.auftraggeber
   const objekt = lead.kunden_objekte
   const fotos = fotosAusMelderFunnel(lead.funnel_daten)
@@ -396,6 +398,14 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
               type="button"
               variant="primary"
               size="sm"
+              onClick={() => setNotfallModal(true)}
+            >
+              Direkt beauftragen
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
               loading={busy === 'notmassnahme'}
               onClick={() => {
                 setBusy('notmassnahme')
@@ -409,7 +419,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
                 })
               }}
             >
-              Notmaßnahme disponieren
+              Notmaßnahme (schnell)
             </Button>
             <Button
               type="button"
@@ -474,6 +484,20 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
           </ul>
         </Card>
       ) : null}
+
+      <NotfallDirektBeauftragenModal
+        open={notfallModal}
+        onClose={() => setNotfallModal(false)}
+        leadId={lead.id}
+        gewerkName={
+          Array.isArray(lead.bereiche) && lead.bereiche[0]
+            ? String(lead.bereiche[0])
+            : 'Allgemein'
+        }
+        onDone={(auftragId) => {
+          router.push(`/auftraege/${auftragId}`)
+        }}
+      />
     </div>
   )
 }

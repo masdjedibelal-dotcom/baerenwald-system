@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Settings, Users, Wrench } from 'lucide-react'
+import { Settings, Sparkles, Users, Wrench } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 
 export type NavItemDef = {
@@ -59,7 +59,10 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
     id: 'planung',
     label: 'Planung',
-    items: [nav('/kalender', 'calendar', 'Kalender')],
+    items: [
+      nav('/kalender', 'calendar', 'Kalender'),
+      nav('/ki-analytics', 'sparkles', 'KI Hub'),
+    ],
   },
 ]
 
@@ -90,6 +93,7 @@ export const MEHR_TILE_NAV: Array<{
 }> = [
   { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
   { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Hub', desc: 'Empfehlungen & Funnel' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 

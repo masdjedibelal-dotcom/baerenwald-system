@@ -2,70 +2,19 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import {
-  dedupeNeueLeistungInputs,
-  normLeistungKey,
-  preisFromVkNetto,
-  type NeueLeistungSyncInput,
-} from '@/lib/preislisten/sync-neue-leistungen'
+import type { NeueLeistungSyncInput } from '@/lib/preislisten/sync-neue-leistungen'
 import { toSlug } from '@/lib/utils'
 
-/** Frei erfasste Leistungen in die Preisliste übernehmen (kein Duplikat pro Gewerk + Name). */
+/**
+ * Früher: freie Leistungen → preislisten (Wildwuchs).
+ * Jetzt: No-Op. Freie Positionen bleiben nur im Angebots-Snapshot;
+ * Lernsignale für KI → recordKatalogLernsignale.
+ */
 export async function syncNeueLeistungenToPreisliste(
   inputs: NeueLeistungSyncInput[]
 ): Promise<{ ok: true; created: number } | { ok: false; message: string }> {
-  const pending = dedupeNeueLeistungInputs(inputs)
-  if (!pending.length) return { ok: true, created: 0 }
-
-  const supabase = createClient()
-  const gewerkIds = Array.from(new Set(pending.map((p) => p.gewerk_id.trim())))
-
-  const { data: existing, error: loadErr } = await supabase
-    .from('preislisten')
-    .select('gewerk_id, leistung')
-    .in('gewerk_id', gewerkIds)
-    .eq('aktiv', true)
-
-  if (loadErr) return { ok: false, message: loadErr.message }
-
-  const known = new Set(
-    (existing ?? []).map((r) =>
-      normLeistungKey(String(r.gewerk_id), String(r.leistung ?? ''))
-    )
-  )
-
-  let created = 0
-  for (const row of pending) {
-    const key = normLeistungKey(row.gewerk_id, row.leistung)
-    if (known.has(key)) continue
-
-    const preis_min = preisFromVkNetto(row.vkNetto)
-    const { error } = await supabase.from('preislisten').insert({
-      gewerk_id: row.gewerk_id.trim(),
-      kategorie: '',
-      leistung: row.leistung.trim(),
-      einheit: (row.einheit || 'Stk.').trim(),
-      preis_min,
-      aktiv: true,
-    })
-
-    if (error) {
-      console.warn('[syncNeueLeistungenToPreisliste]', error.message, row.leistung)
-      continue
-    }
-
-    known.add(key)
-    created += 1
-  }
-
-  if (created > 0) {
-    revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-    revalidatePath('/einstellungen/gewerke')
-    revalidatePath('/angebote/neu')
-  }
-
-  return { ok: true, created }
+  void inputs
+  return { ok: true, created: 0 }
 }
 
 export async function updatePreisliste(
