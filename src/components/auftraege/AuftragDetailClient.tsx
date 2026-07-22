@@ -35,6 +35,7 @@ import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
   AngebotDetail,
@@ -461,13 +462,22 @@ export function AuftragDetailClient({
   }, [])
 
   const kunde = detail.kunden
-  const name = kunde?.name ?? 'Auftrag'
+  const name =
+    (_leadDetail && leadKontaktAnzeigeName(_leadDetail, '')) ||
+    kunde?.name ||
+    'Auftrag'
   const posCount = detail.auftrag_positionen?.length ?? 0
   const kundeAdresse = useMemo(() => {
+    const ag = _leadDetail?.auftraggeber
+    if (ag) {
+      const str = [ag.strasse, ag.hausnummer].filter(Boolean).join(' ').trim()
+      const ort = [ag.plz, ag.ort].filter(Boolean).join(' ').trim()
+      return [str, ort].filter(Boolean).join(', ')
+    }
     const str = [kunde?.strasse, kunde?.hausnummer].filter(Boolean).join(' ').trim()
     const ort = [kunde?.plz, kunde?.ort].filter(Boolean).join(' ').trim()
     return [str, ort].filter(Boolean).join(', ') || kunde?.adresse?.trim() || ''
-  }, [kunde])
+  }, [kunde, _leadDetail])
 
   const istBauprojekt = useMemo(
     () =>
@@ -490,14 +500,21 @@ export function AuftragDetailClient({
     bereiche: lead?.bereiche,
     fallback: detail.titel?.trim() || formatAuftragsNr(detail),
   })
-  const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
+  const kundeTelefon =
+    _leadDetail?.auftraggeber?.telefon?.trim() ||
+    detail.kunden?.telefon?.trim() ||
+    ''
   const headMeta = useMemo(() => {
+    if (_leadDetail) {
+      const hv = leadKontaktAnzeigeName(_leadDetail, '')
+      if (hv) return hv
+    }
     const name =
       detail.kunden?.name?.trim() ||
       [detail.kunden?.vorname, detail.kunden?.nachname].filter(Boolean).join(' ').trim() ||
       null
     return name
-  }, [detail.kunden])
+  }, [detail.kunden, _leadDetail])
 
   const istAbgeschlossen = detail.status === 'abgeschlossen'
   const istStorniert = detail.status === 'storniert'
@@ -652,7 +669,11 @@ export function AuftragDetailClient({
   )
 
   const stammdatenInhalt = (
-    <AuftragStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+    <AuftragStammdatenCard
+      detail={detail}
+      lead={_leadDetail ?? null}
+      onSaved={() => refresh()}
+    />
   )
 
   const leistungInhalt = (

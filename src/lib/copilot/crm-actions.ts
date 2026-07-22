@@ -7,6 +7,7 @@ import { summenAusPositionen, normalizeAngebotPositionen } from '@/lib/angebot-p
 import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
 import { defaultAngebotZahlungsbedingungen } from '@/lib/angebote/angebot-wizard-types'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { copilotAlertAlreadySent, recordCopilotAlert } from '@/lib/copilot/alerts'
 import { sendTelegram } from '@/lib/copilot/telegram'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -419,11 +420,11 @@ export async function createAngebotEntwurfCopilot(input: {
   if (!kundeId && leadId) {
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('kunde_id, kontakt_name, kontakt_email, kontakt_telefon, kundentyp')
+      .select('kunde_id, auftraggeber_kunde_id, kontakt_name, kontakt_email, kontakt_telefon, kundentyp')
       .eq('id', leadId)
       .maybeSingle()
     if (!lead) throw new Error('Lead nicht gefunden')
-    kundeId = lead.kunde_id
+    kundeId = leadVertragsKundeId(lead) ?? lead.kunde_id
     if (!kundeId) {
       const kunde = await createKundeCopilot({
         name: lead.kontakt_name ?? 'Kunde',

@@ -50,6 +50,7 @@ import {
   kundeNameAusAngebot,
   resolveStatusEinfach,
 } from '@/lib/angebot-einfach'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { angebotStatusDisplay } from '@/lib/status/status-display'
 import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
@@ -255,7 +256,9 @@ export function AngebotDetailPageClient({
     }
   }, [acceptOpen, detail.id, aufStart, aufEnde])
 
-  const kundeName = kundeNameAusAngebot(detail)
+  const kundeName =
+    (lead ? leadKontaktAnzeigeName(lead, '') : '') ||
+    kundeNameAusAngebot(detail)
   const summenMail = useMemo(
     () => summenAusPositionen(detail.positionen ?? [], 19),
     [detail.positionen]
@@ -264,7 +267,10 @@ export function AngebotDetailPageClient({
   const kannAngebotVersenden =
     (statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
     darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status) &&
-    Boolean(kunde?.email?.trim())
+    Boolean(
+      lead?.auftraggeber?.email?.trim() ||
+        kunde?.email?.trim()
+    )
 
   const timelineSorted = useMemo(
     () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
@@ -388,9 +394,13 @@ export function AngebotDetailPageClient({
   const headMeta = kundeName
 
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
-  const kundeEmail = kunde?.email?.trim() ?? ''
+  const kundeEmail =
+    lead?.auftraggeber?.email?.trim() || kunde?.email?.trim() || ''
   const kundeTelefon =
-    kunde?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+    lead?.auftraggeber?.telefon?.trim() ||
+    kunde?.telefon?.trim() ||
+    lead?.kontakt_telefon?.trim() ||
+    ''
 
   function openAngebotVersandModal() {
     if (kannAngebotVersenden) {

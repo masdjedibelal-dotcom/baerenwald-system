@@ -1,5 +1,6 @@
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { MailBranding } from '@/lib/mail-branding'
+import { mailTeamGruss } from '@/lib/mail/anrede'
 import type { LeadAnlass } from '@/lib/types'
 
 function esc(s: string): string {
@@ -144,17 +145,20 @@ export function mailOrgNeueMeldung(
     mailDataRow('Referenz', input.referenz),
   ].join('')
 
+  const begr = 'Guten Tag,'
+  const gruss = mailTeamGruss('sie', b.firmenname)
   const body = `
-    <p>Guten Tag,</p>
-    <p>${einleitung}</p>
+    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${einleitung}</p>
     ${mailSummaryTable(rows)}
-    <p style="font-size:14px;color:#374151;line-height:1.55">Bitte prüfen Sie den Vorgang im Auftraggeber-Portal und wählen Sie den nächsten Schritt (z.&nbsp;B. Angebot einfordern oder Kleinreparatur).</p>
-    <p style="font-size:13px;color:#6B7280">Status: Neu · Bereich Meldungen</p>
+    <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.55;">Bitte prüfen Sie den Vorgang im Auftraggeber-Portal und wählen Sie den nächsten Schritt (z.&nbsp;B. Angebot einfordern oder Kleinreparatur).</p>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 20px;">Status: Neu · Bereich Meldungen</p>
+    <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>
   `
 
   return {
     betreff: buildOrgNeueMeldungSubject(input.objektTitel),
-    html: mailHtmlBase(body, 'Neuer Vorgang', b, undefined, {
+    html: mailHtmlBase(body, 'Neuer Vorgang', b, 'Sie erhalten diese Mail, weil für Ihr Objekt ein Vorgang im Auftraggeber-Portal angelegt wurde.', {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: input.portalLink,

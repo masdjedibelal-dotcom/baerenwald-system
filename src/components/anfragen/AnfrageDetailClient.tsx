@@ -12,6 +12,7 @@ import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import {
   leadKontaktAnzeigeName,
+  leadVertragsKundeId,
 } from '@/lib/lead-display-helpers'
 import { Timeline } from '@/components/ui/timeline'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
@@ -336,9 +337,18 @@ export function AnfrageDetailClient({
     [dokumenteRows.length, angeboteListe.length]
   )
 
-  const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
-  const leadTelefon = (lead.kunden?.telefon ?? lead.kontakt_telefon ?? '').trim()
-  const kundeId = lead.kunde_id ?? lead.kunden?.id ?? null
+  const leadEmail =
+    lead.auftraggeber?.email?.trim() ||
+    lead.kunden?.email ||
+    lead.kontakt_email ||
+    null
+  const leadTelefon = (
+    lead.auftraggeber?.telefon?.trim() ||
+    lead.kunden?.telefon ||
+    lead.kontakt_telefon ||
+    ''
+  ).trim()
+  const kundeId = leadVertragsKundeId(lead)
   const auftragId = leadStatusData.auftrag_id as string | undefined
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
 
@@ -544,7 +554,7 @@ export function AnfrageDetailClient({
   )
 
   const detailsInhalt = (
-    <AnfrageDetailsTab lead={lead} gewerke={wizardGewerke} onSaved={() => refresh()} />
+    <AnfrageDetailsTab lead={lead} onSaved={() => refresh()} />
   )
 
   const notizenInhalt = (

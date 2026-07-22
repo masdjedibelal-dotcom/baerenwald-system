@@ -21,7 +21,7 @@ import {
 } from '@/lib/angebote/angebot-wizard-types'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { resolveLeadKunde } from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolveKundeId } from '@/lib/copilot/crm-actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { loadWizardContext } from '@/lib/wizard-context'
@@ -154,7 +154,8 @@ export async function prepareAngebotWizardCopilot(input: PrepareAngebotWizardInp
     .select(
       `
       *,
-      kunden!kunde_id(id, name, email, telefon, typ)
+      kunden!kunde_id(id, name, email, telefon, typ),
+      auftraggeber:kunden!auftraggeber_kunde_id(id, name, email, telefon, typ, org_anzeigename)
     `
     )
     .eq('id', leadId)
@@ -162,11 +163,26 @@ export async function prepareAngebotWizardCopilot(input: PrepareAngebotWizardInp
   if (error) throw error
   if (!leadRow) return { error: 'Lead nicht gefunden' }
 
-  const lead = leadRow as Lead
-  const kunde = resolveLeadKunde(lead.kunden as import('@/lib/types').Kunde | import('@/lib/types').Kunde[] | null)
-  const kundeId = kunde?.id ?? lead.kunde_id ?? null
-  const kundeName = kunde?.name ?? lead.kontakt_name ?? 'Kunde'
-  const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, lead.kundentyp)
+  const lead = leadRow as Lead & {
+    auftraggeber?: {
+      id?: string
+      name?: string | null
+      email?: string | null
+      telefon?: string | null
+      typ?: string | null
+      org_anzeigename?: string | null
+    } | null
+  }
+  const melder = resolveLeadKunde(
+    lead.kunden as import('@/lib/types').Kunde | import('@/lib/types').Kunde[] | null
+  )
+  const kundeId = leadVertragsKundeId(lead) ?? melder?.id ?? lead.kunde_id ?? null
+  const kundeName = leadKontaktAnzeigeName(lead, melder?.name ?? lead.kontakt_name ?? 'Kunde')
+  const ag = lead.auftraggeber
+  const kundeTyp = resolveAngebotKundeTyp(
+    ag?.typ ?? melder?.typ,
+    ag ? 'hausverwaltung' : lead.kundentyp
+  )
 
   const ctx = await loadWizardContext(supabaseAdmin)
 
@@ -280,14 +296,20 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
   const leadId = input.lead_id.trim()
   const { data: leadRow } = await supabaseAdmin
     .from('leads')
-    .select('id, kunde_id, kontakt_name, kundentyp, bereiche, situation, kunden!kunde_id(id, name, typ)')
+    .select(
+      'id, kunde_id, auftraggeber_kunde_id, kontakt_name, kundentyp, bereiche, situation, kunden!kunde_id(id, name, typ), auftraggeber:kunden!auftraggeber_kunde_id(id, name, typ, org_anzeigename)'
+    )
     .eq('id', leadId)
     .maybeSingle()
   if (!leadRow) return { error: 'Lead nicht gefunden' }
 
-  let kundeId = input.kunde_id?.trim() || leadRow.kunde_id
-  const kunde = Array.isArray(leadRow.kunden) ? leadRow.kunden[0] : leadRow.kunden
-  if (!kundeId && kunde?.id) kundeId = kunde.id
+  let kundeId =
+    input.kunde_id?.trim() ||
+    leadVertragsKundeId(leadRow) ||
+    leadRow.kunde_id
+  const melder = Array.isArray(leadRow.kunden) ? leadRow.kunden[0] : leadRow.kunden
+  const ag = Array.isArray(leadRow.auftraggeber) ? leadRow.auftraggeber[0] : leadRow.auftraggeber
+  if (!kundeId && melder?.id) kundeId = melder.id
   if (kundeId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(kundeId)) {
     const resolved = await resolveKundeId({ kunde_id: kundeId })
     if ('error' in resolved) return resolved
@@ -302,8 +324,19 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
   }
 
   const ctx = await loadWizardContext(supabaseAdmin)
-  const kundeName = kunde?.name ?? leadRow.kontakt_name ?? 'Kunde'
-  const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, leadRow.kundentyp)
+  const kundeName = leadKontaktAnzeigeName(
+    {
+      kontakt_name: leadRow.kontakt_name,
+      kunden: melder,
+      auftraggeber: ag,
+      auftraggeber_kunde_id: leadRow.auftraggeber_kunde_id,
+    },
+    melder?.name ?? leadRow.kontakt_name ?? 'Kunde'
+  )
+  const kundeTyp = resolveAngebotKundeTyp(
+    ag?.typ ?? melder?.typ,
+    ag ? 'hausverwaltung' : leadRow.kundentyp
+  )
   const dokumentTyp = input.dokument_typ ?? initialDokumentTypFromLead(leadRow.bereiche, leadRow.situation)
 
   const projektLabel = input.leistungsumfang?.trim() || input.titel?.trim() || 'Projekt'

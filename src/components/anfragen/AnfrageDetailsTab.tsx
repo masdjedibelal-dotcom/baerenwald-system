@@ -5,7 +5,6 @@ import {
   EntityProjektUebersichtCard,
   type ProjektUebersichtExtraRow,
 } from '@/components/crm/EntityProjektUebersichtCard'
-import { PosBoard } from '@/components/posboard/PosBoard'
 import { updateLeadBeschreibung } from '@/app/(dashboard)/anfragen/actions'
 import {
   isEchterFreitext,
@@ -22,19 +21,9 @@ import {
   leadSituationDisplay,
   normalizeFunnelDaten,
 } from '@/lib/lead-funnel-daten'
-import { parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
-import {
-  neueWasZeilenId,
-  parseProjektWasZeilen,
-  type ProjektWasZeile,
-} from '@/lib/lead-projekt-was'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
-import {
-  POS_BOARD_DEFAULT_GEWERK,
-  type PosBoardLine,
-} from '@/lib/posboard/pos-board-line'
-import type { Gewerk, LeadDetail } from '@/lib/types'
+import type { LeadDetail } from '@/lib/types'
 import { BEREICH_LABELS, formatDatum, formatDatumZeit } from '@/lib/utils'
 
 function projektTitel(lead: LeadDetail): string {
@@ -189,65 +178,14 @@ function buildBedarfExtraRows(lead: LeadDetail): {
   return { extraRows, footerRows }
 }
 
-function gewerkLabel(zeile: ProjektWasZeile, gewerke: Gewerk[]): string {
-  if (zeile.gewerk_id) {
-    const g = gewerke.find((x) => x.id === zeile.gewerk_id)
-    if (g?.name?.trim()) return g.name.trim()
-  }
-  if (zeile.bereich_key) return BEREICH_LABELS[zeile.bereich_key] ?? zeile.bereich_key
-  return POS_BOARD_DEFAULT_GEWERK
-}
-
-function wasZeilenToPosBoard(zeilen: ProjektWasZeile[], gewerke: Gewerk[]): PosBoardLine[] {
-  return zeilen.map((z) => ({
-    id: z.id,
-    gewerk: gewerkLabel(z, gewerke),
-    name: z.titel,
-    beschreibung: z.beschreibung ?? '',
-    menge: z.menge,
-    einheit: z.einheit || 'pauschal',
-    preis: 0,
-    ust: 19,
-  }))
-}
-
-function initialWasZeilen(lead: LeadDetail, gewerke: Gewerk[]): ProjektWasZeile[] {
-  const fromWas = parseProjektWasZeilen(lead.funnel_daten, {
-    bereiche: lead.bereiche,
-    situation: lead.situation,
-    gewerke,
-  })
-  if (fromWas.length) return fromWas
-
-  const funnelPos = parseFunnelPositionen(lead.funnel_daten)
-  if (!funnelPos.length) return []
-
-  return funnelPos.map((p) => ({
-    id: neueWasZeilenId(),
-    titel: p.leistung,
-    menge: p.menge > 0 ? p.menge : 1,
-    einheit: p.einheit || 'pauschal',
-    gewerk_id: p.gewerk_id,
-    relevant_fuer_rechnung: p.relevant_fuer_rechnung !== false,
-    ergaenzungen: [],
-  }))
-}
-
-/** Anfrage: Bedarf (Funnel) + Wunschliste nur Anzeige (keine Positionen/Gewerke in Details). */
+/** Anfrage: Bedarf (Funnel) — keine Positionen/Wunschliste in Details. */
 export function AnfrageDetailsTab({
   lead,
-  gewerke = [],
   onSaved,
 }: {
   lead: LeadDetail
-  gewerke?: Gewerk[]
   onSaved?: () => void
 }) {
-  const positionen = useMemo(
-    () => wasZeilenToPosBoard(initialWasZeilen(lead, gewerke), gewerke),
-    [lead, gewerke]
-  )
-
   const preisrahmen = resolveLeadPreisAnzeige(
     lead.kanal,
     lead.budget_ca,
@@ -259,29 +197,25 @@ export function AnfrageDetailsTab({
   const bedarfUi = useMemo(() => buildBedarfExtraRows(lead), [lead])
 
   return (
-    <>
-      <EntityProjektUebersichtCard
-        title="Anfrage"
-        icon="inbox"
-        initial={{
-          titel: projektTitel(lead),
-          beschreibung: beschreibungFromLead(lead) ?? '',
-          startDatum: '',
-          endDatum: '',
-          istBauprojekt: false,
-        }}
-        editableFields={['beschreibung']}
-        onSave={async (draft) => {
-          const r = await updateLeadBeschreibung(lead.id, draft.beschreibung)
-          if (r.ok) onSaved?.()
-          return r
-        }}
-        preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
-        extraRows={bedarfUi.extraRows}
-        footerRows={bedarfUi.footerRows}
-      />
-
-      <PosBoard title="Wunschliste" positionen={positionen} showUst={false} />
-    </>
+    <EntityProjektUebersichtCard
+      title="Anfrage"
+      icon="inbox"
+      initial={{
+        titel: projektTitel(lead),
+        beschreibung: beschreibungFromLead(lead) ?? '',
+        startDatum: '',
+        endDatum: '',
+        istBauprojekt: false,
+      }}
+      editableFields={['beschreibung']}
+      onSave={async (draft) => {
+        const r = await updateLeadBeschreibung(lead.id, draft.beschreibung)
+        if (r.ok) onSaved?.()
+        return r
+      }}
+      preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
+      extraRows={bedarfUi.extraRows}
+      footerRows={bedarfUi.footerRows}
+    />
   )
 }

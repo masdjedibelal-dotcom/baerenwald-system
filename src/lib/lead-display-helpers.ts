@@ -108,17 +108,50 @@ export function isEchterFreitext(s?: string | null): boolean {
   return true
 }
 
-/** Anzeige-Name einer Anfrage: verknüpfter Kunde (Firma vor Ansprechpartner), sonst Lead-Kontakt. */
+type LeadAuftraggeberNamePick = {
+  name?: string | null
+  org_anzeigename?: string | null
+  vorname?: string | null
+  nachname?: string | null
+  typ?: string | null
+}
+
+/** Anzeige-Name der Hausverwaltung (Auftraggeber) bei Mieter-/HV-Meldungen. */
+export function leadAuftraggeberAnzeigeName(
+  auftraggeber: LeadAuftraggeberNamePick | LeadAuftraggeberNamePick[] | null | undefined
+): string | null {
+  const ag = !auftraggeber
+    ? null
+    : Array.isArray(auftraggeber)
+      ? auftraggeber[0] ?? null
+      : auftraggeber
+  if (!ag) return null
+  const org = ag.org_anzeigename?.trim()
+  if (org) return org
+  const display = kundeDisplayName(ag)
+  return display !== '—' ? display : null
+}
+
+/**
+ * Anzeige-Name des Kunden einer Anfrage/Vorgangs.
+ * Bei Mieter-Meldungen: Hausverwaltung (auftraggeber), nicht Meldername.
+ * Sonst: verknüpfter Kunde (Firma vor Ansprechpartner), sonst Lead-Kontakt.
+ */
 export function leadKontaktAnzeigeName(
   lead: {
     kontakt_name?: string | null
+    auftraggeber_kunde_id?: string | null
     kunden?:
       | KundeListenNamePick
       | KundeListenNamePick[]
       | null
+    auftraggeber?: LeadAuftraggeberNamePick | LeadAuftraggeberNamePick[] | null
   },
   fallback = 'Ohne Namen'
 ): string {
+  const hvName = leadAuftraggeberAnzeigeName(lead.auftraggeber)
+  if (hvName) return hvName
+
   const kundeRaw = lead.kunden
   const kunde = !kundeRaw
     ? null
@@ -132,6 +165,22 @@ export function leadKontaktAnzeigeName(
   const kontakt = lead.kontakt_name?.trim()
   if (kontakt) return kontakt
   return fallback
+}
+
+/** Vertrags-/Stammdaten-Kunde: bei HV-Meldung die Hausverwaltung, sonst Melder. */
+export function leadVertragsKundeId(lead: {
+  kunde_id?: string | null
+  auftraggeber_kunde_id?: string | null
+  kunden?: { id?: string | null } | { id?: string | null }[] | null
+  auftraggeber?: { id?: string | null } | { id?: string | null }[] | null
+}): string | null {
+  const agRaw = lead.auftraggeber
+  const ag = !agRaw ? null : Array.isArray(agRaw) ? agRaw[0] ?? null : agRaw
+  const agId = lead.auftraggeber_kunde_id?.trim() || ag?.id?.trim() || null
+  if (agId) return agId
+  const kundeRaw = lead.kunden
+  const kunde = !kundeRaw ? null : Array.isArray(kundeRaw) ? kundeRaw[0] ?? null : kundeRaw
+  return lead.kunde_id?.trim() || kunde?.id?.trim() || null
 }
 
 function numPos(v: unknown): number | null {

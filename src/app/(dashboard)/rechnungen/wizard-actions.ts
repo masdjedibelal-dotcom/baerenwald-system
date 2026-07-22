@@ -24,6 +24,7 @@ import {
   type AbschlagRechnungEntwurf,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
+import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
   abschlagTextKontextFromWizard,
@@ -100,6 +101,7 @@ async function positionenAusAuftrag(
       id,
       created_at,
       kunde_id,
+      lead_id,
       angebot_id,
       titel,
       start_datum,
@@ -116,7 +118,10 @@ async function positionenAusAuftrag(
     console.error('[positionenAusAuftrag]', auftragId, error.message)
     throw new Error(error.message || 'Auftrag konnte nicht geladen werden.')
   }
-  if (!auf?.kunde_id) {
+  if (!auf) {
+    throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
+  }
+  if (!auf.kunde_id && !(auf as { lead_id?: string | null }).lead_id) {
     throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
   }
 
@@ -160,10 +165,21 @@ async function positionenAusAuftrag(
   const summen = auftragSummenAusPositionen(positionen)
   const kontext = zahlungsplan ? berechneZahlungsplan(zahlungsplan, summen.netto) : null
 
+  const kundeId =
+    (await resolveVertragsKundeIdForLead(
+      supabase,
+      (auf as { lead_id?: string | null }).lead_id,
+      auf.kunde_id as string | null
+    )) ?? (auf.kunde_id as string)
+
+  if (!kundeId) {
+    throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
+  }
+
   return {
     positionen,
     angebot_id: (auf.angebot_id as string | null) ?? null,
-    kunde_id: auf.kunde_id as string,
+    kunde_id: kundeId,
     auftragsReferenz,
     projektTitel,
     leistungszeitraum_von: (auf.start_datum as string | null) ?? null,

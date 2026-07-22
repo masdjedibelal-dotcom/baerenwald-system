@@ -59,6 +59,7 @@ import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
 import {
   leadKontaktAnzeigeName,
+  leadVertragsKundeId,
   resolveLeadKunde,
   resolveLeadPreisAnzeige,
 } from '@/lib/lead-display-helpers'
@@ -171,14 +172,23 @@ export function AngebotWizard({
 
   const name = kundenName(leadState)
   const projekt = projektLabel(leadState)
-  const kunde = resolveLeadKunde(leadState.kunden)
-  const kundeId = kunde?.id ?? leadState.kunde_id
-  const email = (kunde?.email ?? leadState.kontakt_email ?? '').trim()
+  const melder = resolveLeadKunde(leadState.kunden)
+  const ag = leadState.auftraggeber
+  const isHv = Boolean(leadState.auftraggeber_kunde_id || ag?.id)
+  const kundeId = leadVertragsKundeId(leadState)
+  const email = (
+    isHv
+      ? ag?.email ?? ''
+      : melder?.email ?? leadState.kontakt_email ?? ''
+  ).trim()
   const leistungsumfangInitial =
     bereicheFuerAnzeige(leadState.bereiche, leadState.situation)
       .map((b) => BEREICH_LABELS[b] ?? b)
       .join(' & ') || projekt
-  const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, leadState.kundentyp)
+  const kundeTyp = resolveAngebotKundeTyp(
+    isHv ? ag?.typ ?? 'hausverwaltung' : melder?.typ,
+    isHv ? 'hausverwaltung' : leadState.kundentyp
+  )
   const budgetAnzeige = resolveLeadPreisAnzeige(
     leadState.kanal,
     leadState.budget_ca,

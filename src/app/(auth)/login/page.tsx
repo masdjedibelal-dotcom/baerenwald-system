@@ -45,6 +45,10 @@ function LoginPageContent() {
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
+        if (urlError === 'session') {
+          setError('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.')
+          return
+        }
         const { data, error: userErr } = await supabase.auth.getUser()
         if (cancelled) return
         if (userErr || !data.user) return

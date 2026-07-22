@@ -1,9 +1,18 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
-import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
+import {
+  leadKontaktAnzeigeName,
+  leadVertragsKundeId,
+} from '@/lib/lead-display-helpers'
+import { createClient } from '@/lib/supabase-server'
+import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { LeadKanal } from '@/lib/types'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
-import { resolveVorgang } from '@/lib/vorgang/resolve-vorgang'
+import {
+  isSatellitenRechnung,
+  resolveSatellitenRechnungVorgang,
+  resolveVorgang,
+} from '@/lib/vorgang/resolve-vorgang'
 import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
@@ -19,6 +28,8 @@ const VORGAENGE_LEAD_SELECT = `
   bereiche,
   plz,
   kontakt_name,
+  kunde_id,
+  auftraggeber_kunde_id,
   org_freigabe_status,
   hv_meldung_status,
   funnel_daten,
@@ -27,13 +38,22 @@ const VORGAENGE_LEAD_SELECT = `
   kontakt_email,
   kontakt_telefon,
   notizen,
-  ${leadKundeEmbed('id, name, vorname, nachname, typ')}
+  ${leadKundeEmbed('id, name, vorname, nachname, typ')},
+  ${leadAuftraggeberEmbed('id, name, vorname, nachname, typ, org_anzeigename')}
 `
 
 export async function loadVorgaengeListe(): Promise<{
   rows: VorgangListeRow[]
   error: string | null
 }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { rows: [], error: 'Sitzung abgelaufen — bitte erneut anmelden.' }
+  }
+
   const [leadsRes, angeboteRes, auftraegeRes, rechnungenRes, positionenRes] = await Promise.all([
     withCrmReadFallback(async (db) =>
       db
@@ -62,7 +82,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('rechnungen')
         .select(
-          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebote(lead_id), auftraege(lead_id)'
+          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, rechnung_art, abschlag_index, rechnungsnummer, angebote(lead_id), auftraege(lead_id)'
         )
         .order('created_at', { ascending: false })
         .limit(500)
@@ -99,6 +119,8 @@ export async function loadVorgaengeListe(): Promise<{
     kontakt_email: string | null
     kontakt_telefon: string | null
     notizen: string | null
+    kunde_id: string | null
+    auftraggeber_kunde_id: string | null
     org_freigabe_status: string | null
     hv_meldung_status: string | null
     funnel_daten: unknown
@@ -109,6 +131,15 @@ export async function loadVorgaengeListe(): Promise<{
       name?: string | null
       vorname?: string | null
       nachname?: string | null
+      typ?: string | null
+    } | null
+    auftraggeber?: {
+      id?: string | null
+      name?: string | null
+      vorname?: string | null
+      nachname?: string | null
+      typ?: string | null
+      org_anzeigename?: string | null
     } | null
   }
 
@@ -141,6 +172,9 @@ export async function loadVorgaengeListe(): Promise<{
     created_at: string
     updated_at: string | null
     auftrag_id: string | null
+    rechnung_art: string | null
+    abschlag_index: number | null
+    rechnungsnummer: string | null
     angebote?: { lead_id: string | null } | { lead_id: string | null }[] | null
     auftraege?: { lead_id: string | null } | { lead_id: string | null }[] | null
   }>
@@ -158,6 +192,9 @@ export async function loadVorgaengeListe(): Promise<{
         brutto: r.brutto,
         created_at: r.created_at,
         updated_at: r.updated_at,
+        rechnung_art: r.rechnung_art,
+        abschlag_index: r.abschlag_index,
+        rechnungsnummer: r.rechnungsnummer,
       }
     })
     .filter(Boolean) as Array<{
@@ -168,6 +205,9 @@ export async function loadVorgaengeListe(): Promise<{
     brutto: number | null
     created_at: string
     updated_at: string | null
+    rechnung_art: string | null
+    abschlag_index: number | null
+    rechnungsnummer: string | null
   }>
 
   const angeboteByLead = groupBy(angebote, (a) => a.lead_id)
@@ -187,15 +227,44 @@ export async function loadVorgaengeListe(): Promise<{
     hwAktionByAuftrag.set(auftragId, auftragBrauchtHandwerkerAktion(pos))
   }
 
-  const rows: VorgangListeRow[] = leads.map((lead) => {
-    const kunde = lead.kunden
-    const kundeName =
-      kunde?.name?.trim() ||
-      [kunde?.vorname, kunde?.nachname].filter(Boolean).join(' ').trim() ||
-      lead.kontakt_name?.trim() ||
-      null
+  const rows: VorgangListeRow[] = []
 
-    const resolved = resolveVorgang({
+  for (const lead of leads) {
+    const kundeName = leadKontaktAnzeigeName(lead, '') || null
+    const kundeId = leadVertragsKundeId(lead)
+
+    const leadAngebote = (angeboteByLead.get(lead.id) ?? []).map((a) => ({
+      id: a.id,
+      status: a.status,
+      status_einfach: a.status_einfach,
+      gesendet_am: a.gesendet_am,
+      gesendet_kunde_at: a.gesendet_kunde_at,
+      created_at: a.created_at,
+      updated_at: a.updated_at,
+      leistungsumfang: a.leistungsumfang,
+      notizen: a.notizen,
+    }))
+    const leadAuftraege = (auftraegeByLead.get(lead.id) ?? []).map((a) => ({
+      id: a.id,
+      status: a.status,
+      titel: a.titel,
+      created_at: a.created_at,
+      updated_at: a.updated_at,
+      handwerkerAktionOffen: hwAktionByAuftrag.get(a.id) ?? false,
+    }))
+    const leadRechnungen = (rechnungenByLead.get(lead.id) ?? []).map((r) => ({
+      id: r.id,
+      status: r.status,
+      faellig: r.faellig,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      rechnung_art: r.rechnung_art,
+      abschlag_index: r.abschlag_index,
+      rechnungsnummer: r.rechnungsnummer,
+      brutto: r.brutto,
+    }))
+
+    const resolveInput = {
       lead: {
         id: lead.id,
         status: lead.status,
@@ -210,39 +279,12 @@ export async function loadVorgaengeListe(): Promise<{
         created_at: lead.created_at,
         updated_at: lead.updated_at,
       },
-      angebote: (angeboteByLead.get(lead.id) ?? []).map((a) => ({
-        id: a.id,
-        status: a.status,
-        status_einfach: a.status_einfach,
-        gesendet_am: a.gesendet_am,
-        gesendet_kunde_at: a.gesendet_kunde_at,
-        created_at: a.created_at,
-        updated_at: a.updated_at,
-        leistungsumfang: a.leistungsumfang,
-        notizen: a.notizen,
-      })),
-      auftraege: (auftraegeByLead.get(lead.id) ?? []).map((a) => ({
-        id: a.id,
-        status: a.status,
-        titel: a.titel,
-        created_at: a.created_at,
-        updated_at: a.updated_at,
-        handwerkerAktionOffen: hwAktionByAuftrag.get(a.id) ?? false,
-      })),
-      rechnungen: (rechnungenByLead.get(lead.id) ?? []).map((r) => ({
-        id: r.id,
-        status: r.status,
-        faellig: r.faellig,
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-      })),
-    })
+      angebote: leadAngebote,
+      auftraege: leadAuftraege,
+      rechnungen: leadRechnungen,
+    }
 
-    const rechnung = (rechnungenByLead.get(lead.id) ?? [])[0]
-    const wertLabel =
-      rechnung?.brutto != null
-        ? `${Math.round(Number(rechnung.brutto)).toLocaleString('de-DE')} €`
-        : null
+    const resolved = resolveVorgang(resolveInput)
 
     const handwerkerIds = Array.from(
       new Set(
@@ -254,16 +296,40 @@ export async function loadVorgaengeListe(): Promise<{
       )
     )
 
-    return {
+    const wertLabelFor = (rechnungId: string | null): string | null => {
+      if (!rechnungId) return null
+      const rechnung = leadRechnungen.find((r) => r.id === rechnungId)
+      if (rechnung?.brutto == null) return null
+      return `${Math.round(Number(rechnung.brutto)).toLocaleString('de-DE')} €`
+    }
+
+    rows.push({
       ...resolved,
       leadId: lead.id,
-      kundeId: kunde?.id?.trim() || null,
+      kundeId,
       kundeName,
-      wertLabel,
+      wertLabel:
+        resolved.phase === 'rechnung' ? wertLabelFor(resolved.entityId) : null,
       detailHref: detailHrefForPhase(resolved.phase, resolved.entityId, lead.id),
       handwerkerIds,
+    })
+
+    // Abschlag/Schluss: eigener Rechnungs-Vorgang; Stamm bleibt Auftrag
+    for (const r of leadRechnungen) {
+      if (!isSatellitenRechnung(r)) continue
+      if (r.status === 'storniert') continue
+      const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
+      rows.push({
+        ...sat,
+        leadId: lead.id,
+        kundeId,
+        kundeName,
+        wertLabel: wertLabelFor(r.id),
+        detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
+        handwerkerIds,
+      })
     }
-  })
+  }
 
   rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 

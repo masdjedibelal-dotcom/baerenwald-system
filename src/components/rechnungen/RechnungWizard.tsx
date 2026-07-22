@@ -328,7 +328,7 @@ export function RechnungWizard({
   const shellStep = showAbschlussPaket ? step : step >= 4 ? 3 : step
   const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
   const selectedAnlagen = ANLAGEN_DEF.filter((a) => anlagen[a.key])
-  const previewNr = rechnungsnummer.trim() || 'RE-Entwurf'
+  const previewNr = rechnungsnummer.trim() || 'Rechnung'
   const activeVersandId = versandRechnungId ?? rechnungId
   const defaultBetreff = `${previewNr} · ${rTitel}`
 

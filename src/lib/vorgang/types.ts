@@ -31,6 +31,14 @@ export type VorgangRechnungInput = {
   faellig?: string | null
   created_at: string
   updated_at?: string | null
+  /**
+   * `abschlag` / `schluss` = Satelliten-Rechnungsvorgang (Auftrag-Vorgang bleibt).
+   * `voll` / fehlend = Phase-Gewinn für denselben Vorgang.
+   */
+  rechnung_art?: string | null
+  abschlag_index?: number | null
+  rechnungsnummer?: string | null
+  brutto?: number | null
 }
 
 export type VorgangLeadInput = {

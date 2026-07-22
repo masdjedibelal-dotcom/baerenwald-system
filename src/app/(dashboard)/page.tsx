@@ -26,7 +26,7 @@ import {
 import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 type SupabaseErr = { message: string } | null
 
@@ -38,6 +38,13 @@ async function safeRows<T>(
     if (error) throw error
     return data ?? []
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    // Abgelaufene Session: nicht still als „0 Einträge“ maskieren
+    if (
+      /jwt expired|invalid jwt|not authenticated|pgrst301|auth session/i.test(msg)
+    ) {
+      throw e
+    }
     console.error(e)
     return []
   }

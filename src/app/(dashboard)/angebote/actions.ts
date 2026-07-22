@@ -76,6 +76,8 @@ import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { resolveStatusEinfach } from '@/lib/angebot-einfach'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { auftragsbestaetigungMailFromEmpfaenger } from '@/lib/mail/auftragsbestaetigung-mail'
+import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
+import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type { LeadStatus } from '@/lib/types'
 import type {
   AngebotDetail,
@@ -329,11 +331,16 @@ export async function createAngebot(
 
   const angebotsnr = await nextAngebotsnummerJahr()
 
+  // Bei HV-/Mieter-Meldungen: Vertragskunde = Hausverwaltung (nicht Melder)
+  const kundeId =
+    (await resolveVertragsKundeIdForLead(supabase, input.lead_id, input.kunde_id)) ??
+    input.kunde_id
+
   const { data: row, error } = await supabase
     .from('angebote')
     .insert({
       lead_id: input.lead_id,
-      kunde_id: input.kunde_id,
+      kunde_id: kundeId,
       status: 'entwurf' as AngebotStatus,
       status_einfach: 'entwurf',
       positionen,
@@ -528,11 +535,17 @@ export async function updateAngebot(
 
   const zahlungsbedingungen = await zahlungsbedingungenFuerSpeichern(supabase, input)
 
+  // Bei HV-/Mieter-Meldungen: Vertragskunde = Hausverwaltung (nicht Melder)
+  const leadIdForKunde = input.lead_id ?? (current.lead_id as string | null)
+  const kundeId =
+    (await resolveVertragsKundeIdForLead(supabase, leadIdForKunde, input.kunde_id)) ??
+    input.kunde_id
+
   const { error } = await supabase
     .from('angebote')
     .update({
       lead_id: input.lead_id,
-      kunde_id: input.kunde_id,
+      kunde_id: kundeId,
       positionen,
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
@@ -1538,6 +1551,17 @@ export async function sendAngebotToKunde(
     revalidatePath(`/anfragen/${detail.lead_id}`)
   }
 
+  if (detail.lead_id && !options?.statusBeibehalten) {
+    try {
+      const { syncPortalLeadStatusAfterAngebotGesendet } = await import(
+        '@/lib/portal/sync-portal-lead-status'
+      )
+      await syncPortalLeadStatusAfterAngebotGesendet({ leadId: detail.lead_id })
+    } catch (e) {
+      console.warn('[sendAngebotToKunde] portal sync', e)
+    }
+  }
+
   return { ok: true as const }
 }
 
@@ -1969,13 +1993,17 @@ export async function createAuftragFromAngebot(
   } = await supabaseAuth.auth.getUser()
 
   let istBauprojekt = false
+  let kundeId = angebot.kunde_id
   if (angebot.lead_id) {
     const { data: leadRow } = await supabaseAdmin
       .from('leads')
-      .select('ist_bauprojekt')
+      .select('ist_bauprojekt, kunde_id, auftraggeber_kunde_id')
       .eq('id', angebot.lead_id)
       .maybeSingle()
     istBauprojekt = leadRow?.ist_bauprojekt === true
+    if (leadRow) {
+      kundeId = leadVertragsKundeId(leadRow) ?? angebot.kunde_id
+    }
   }
 
   const { data: auftrag, error: aErr } = await supabaseAdmin
@@ -1983,7 +2011,7 @@ export async function createAuftragFromAngebot(
     .insert({
       angebot_id: angebotId,
       lead_id: angebot.lead_id,
-      kunde_id: angebot.kunde_id,
+      kunde_id: kundeId,
       status: 'offen',
       titel,
       notizen: notizenAuftrag,

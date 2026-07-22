@@ -7,15 +7,23 @@ export const metadata: Metadata = {
   title: 'Vorgänge',
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 export default async function VorgaengePage() {
   const { rows, error } = await loadVorgaengeListe()
 
   if (error) {
+    const isSession = /sitzung|anmelden|session|auth/i.test(error)
     return (
-      <div className="p-6 text-sm text-red-700">
-        Vorgänge konnten nicht geladen werden: {error}
+      <div className="space-y-3 p-6 text-sm">
+        <p className="text-red-700">
+          Vorgänge konnten nicht geladen werden: {error}
+        </p>
+        {isSession ? (
+          <a href="/login?error=session" className="text-bw-link underline">
+            Zur Anmeldung
+          </a>
+        ) : null}
       </div>
     )
   }

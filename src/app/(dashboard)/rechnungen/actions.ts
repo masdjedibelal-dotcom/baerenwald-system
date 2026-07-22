@@ -663,7 +663,7 @@ export async function previewRechnungKundeMail(input: {
   const rechnungsnummer =
     input.rechnungsnummer?.trim() ||
     (rec.rechnungsnummer as string | null)?.trim() ||
-    'RE-Entwurf'
+    'Rechnung'
 
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw

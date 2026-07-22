@@ -6,8 +6,8 @@ import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { resolveLeadKunde } from '@/lib/lead-display-helpers'
-import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
+import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
+import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
@@ -102,8 +102,12 @@ export default async function AnfrageDetailPage({
   const wizardHandwerker = (hwRows ?? []) as Handwerker[]
 
   const kunde = resolveLeadKunde(lead.kunden)
-  const kundeId = kunde?.id ?? lead.kunde_id
-  const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, lead.kundentyp)
+  const ag = lead.auftraggeber
+  const kundeId = leadVertragsKundeId(lead)
+  const kundeTyp = resolveAngebotKundeTyp(
+    ag?.typ ?? kunde?.typ,
+    ag ? 'hausverwaltung' : lead.kundentyp
+  )
 
   const [{ data: auftragRow }, projektKontext] = await Promise.all([
     supabase
@@ -123,7 +127,10 @@ export default async function AnfrageDetailPage({
 
   const dbAuftragId = (auftragRow as { id: string } | null)?.id ?? null
   let kundenObjekte: KundenObjekt[] = []
-  if (kundeId && istKundeGewerbeTyp(kundeTyp)) {
+  if (
+    kundeId &&
+    (istKundeGewerbeTyp(kundeTyp) || istKundeHausverwaltungTyp(ag?.typ ?? kundeTyp))
+  ) {
     kundenObjekte = await fetchKundenObjekte(kundeId)
   }
 

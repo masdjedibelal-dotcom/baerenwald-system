@@ -235,6 +235,7 @@ export type Lead = {
 
 export type LeadWithAngebote = Lead & {
   angebote?: LeadListAngebot[] | null
+  auftraggeber?: LeadAuftraggeberEmbed | null
 }
 
 export type LeadTimelineRow = {
@@ -263,7 +264,19 @@ export type OrgFreigabeLogRow = {
 
 export type LeadAuftraggeberEmbed = Pick<
   Kunde,
-  'id' | 'name' | 'email' | 'org_anzeigename' | 'org_kennung'
+  | 'id'
+  | 'name'
+  | 'vorname'
+  | 'nachname'
+  | 'email'
+  | 'telefon'
+  | 'plz'
+  | 'ort'
+  | 'strasse'
+  | 'hausnummer'
+  | 'typ'
+  | 'org_anzeigename'
+  | 'org_kennung'
 >
 
 /** Lead inkl. Status-Historie (Detailansicht) */

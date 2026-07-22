@@ -1,6 +1,6 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 
@@ -46,9 +46,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request: { headers: requestHeaders },
           })
@@ -75,6 +73,20 @@ export async function middleware(request: NextRequest) {
     authReachable = false
   }
 
+  // Ein Retry bei transienten Auth-Netzwerkfehlern (Token-Refresh retten)
+  if (!authReachable) {
+    try {
+      await new Promise((r) => setTimeout(r, 150))
+      const { data, error } = await supabase.auth.getUser()
+      if (!error || (error as { status?: number }).status !== 0) {
+        authReachable = true
+        user = data.user
+      }
+    } catch {
+      /* bleibt unreachable */
+    }
+  }
+
   const isPublic =
     path.startsWith('/login') ||
     path.startsWith('/auth/') ||
@@ -98,13 +110,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Auth kurz unerreichbar: Cookies trotzdem zurückgeben (Refresh nicht verwerfen).
+  // Geschützte Routen ohne User → Login, statt „eingeloggt aber Listen = 0“.
   if (!authReachable) {
-    return NextResponse.next({ request: { headers: requestHeaders } })
+    if (!user && !isPublic) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('error', 'session')
+      const redirect = NextResponse.redirect(url)
+      supabaseResponse.cookies.getAll().forEach((c) => {
+        redirect.cookies.set(c.name, c.value)
+      })
+      return redirect
+    }
+    return supabaseResponse
   }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('error', 'session')
     return NextResponse.redirect(url)
   }
 

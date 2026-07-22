@@ -37,9 +37,34 @@ export function rechnungMailBetreff(
   rechnungsnummer: string,
   firmenname: string
 ): string {
+  const nr = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
   return anrede === 'du'
-    ? `Deine Rechnung ${rechnungsnummer} · ${firmenname}`
-    : `Ihre Rechnung ${rechnungsnummer} · ${firmenname}`
+    ? `Deine Rechnung ${nr} · ${firmenname}`
+    : `Ihre Rechnung ${nr} · ${firmenname}`
+}
+
+/** Kein „Entwurf“ im Kunden-Betreff (auch bei Platzhalter ohne echte Nummer). */
+export function sanitizeRechnungNrFuerBetreff(raw: string): string {
+  const s = raw.trim()
+  if (!s) return 'Rechnung'
+  const cleaned = s
+    .replace(/\bRE-Entwurf\b/gi, 'Rechnung')
+    .replace(/\bEntwurf\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*·\s*·/g, ' · ')
+    .replace(/^\s*·\s*|\s*·\s*$/g, '')
+    .trim()
+  return cleaned || 'Rechnung'
+}
+
+export function sanitizeRechnungMailBetreff(betreff: string): string {
+  return betreff
+    .replace(/\bRE-Entwurf\b/gi, 'Rechnung')
+    .replace(/\bEntwurf\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*·\s*·/g, ' · ')
+    .replace(/^\s*·\s*|\s*·\s*$/g, '')
+    .trim()
 }
 
 export function buildRechnungMail(
@@ -94,9 +119,10 @@ export function buildRechnungMail(
     mailKundenStandardOptions(anrede)
   )
 
-  const betreff =
+  const betreff = sanitizeRechnungMailBetreff(
     data.mailBetreff?.trim() ||
-    rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+      rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+  )
 
   return { betreff, html }
 }

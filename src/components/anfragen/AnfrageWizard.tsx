@@ -9,8 +9,8 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
   AnfrageNeuForm,
   ANFRAGE_BEARBEITEN_FORM_ID,
-  ANFRAGE_NEU_FORM_ID,
 } from '@/components/anfragen/AnfrageNeuForm'
+import { StaffFunnelWizard } from '@/components/anfragen/staff-funnel/StaffFunnelWizard'
 import type { LeadDetail } from '@/lib/types'
 
 const STEPS = [
@@ -19,7 +19,7 @@ const STEPS = [
 ]
 
 /**
- * Fullscreen-Wizard für Anfrage erstellen / bearbeiten (wie Angebot/Rechnung).
+ * Fullscreen-Wizard: neu = Staff-Funnel, bearbeiten = klassisches Formular.
  */
 export function AnfrageWizard({
   open,
@@ -40,10 +40,7 @@ export function AnfrageWizard({
   const [meta, setMeta] = useState({ loading: false, isValid: false })
 
   const isBearbeiten = Boolean(bearbeitenLead?.id)
-  const formId = useMemo(
-    () => (isBearbeiten ? ANFRAGE_BEARBEITEN_FORM_ID : ANFRAGE_NEU_FORM_ID),
-    [isBearbeiten]
-  )
+  const formId = useMemo(() => ANFRAGE_BEARBEITEN_FORM_ID, [])
 
   useEffect(() => {
     setMounted(true)
@@ -58,10 +55,24 @@ export function AnfrageWizard({
     }
   }, [open])
 
-  if (!open || !mounted) return null
+  if (!isBearbeiten) {
+    return (
+      <StaffFunnelWizard
+        open={open}
+        onClose={onClose}
+        defaultKundeId={defaultKundeId}
+        onSuccess={(id) => {
+          if (onSuccess) onSuccess(id)
+          else {
+            onClose()
+            router.push(`/anfragen/${id}`)
+          }
+        }}
+      />
+    )
+  }
 
-  const title = isBearbeiten ? 'Anfrage bearbeiten' : 'Anfrage erstellen'
-  const primaryLabel = isBearbeiten ? 'Speichern' : 'Anfrage anlegen'
+  if (!open || !mounted) return null
 
   const desktopActions = (
     <div className="wizard-nav-actions">
@@ -89,7 +100,7 @@ export function AnfrageWizard({
           }}
         >
           <Save className="mr-1.5 h-4 w-4" aria-hidden />
-          {meta.loading ? 'Speichern…' : primaryLabel}
+          {meta.loading ? 'Speichern…' : 'Speichern'}
         </MockBtn>
       )}
     </div>
@@ -112,7 +123,7 @@ export function AnfrageWizard({
             form?.requestSubmit()
           }}
         >
-          {primaryLabel}
+          Speichern
         </MockBtn>
       </>
     )
@@ -120,7 +131,7 @@ export function AnfrageWizard({
   const wizard = (
     <WizardShell
       className="wizard-flow"
-      title={title}
+      title="Anfrage bearbeiten"
       steps={STEPS}
       currentStep={step}
       onClose={onClose}
@@ -132,7 +143,7 @@ export function AnfrageWizard({
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Prüfen</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-              Angaben prüfen und Anfrage {isBearbeiten ? 'speichern' : 'anlegen'}
+              Angaben prüfen und Anfrage speichern
             </div>
           </div>
         ) : null}
@@ -145,8 +156,7 @@ export function AnfrageWizard({
           onSuccess={(id) => {
             onSuccess?.(id)
             onClose()
-            if (!isBearbeiten) router.push(`/anfragen/${id}`)
-            else router.refresh()
+            router.refresh()
           }}
           onCancel={onClose}
         />

@@ -1,7 +1,11 @@
 'use client'
 
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
-import type { AuftragDetail } from '@/lib/types'
+import {
+  leadKontaktAnzeigeName,
+} from '@/lib/lead-display-helpers'
+import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
+import type { AuftragDetail, LeadDetail } from '@/lib/types'
 import { formatLeadListDatum, kanalLabel } from '@/lib/utils'
 
 function eingegangenLabel(iso: string | null | undefined): string {
@@ -19,38 +23,45 @@ export function AuftragStammdatenCard({
   onSaved,
 }: {
   detail: AuftragDetail
-  lead?: {
-    id?: string | null
-    plz?: string | null
-    kontakt_name?: string | null
-    kontakt_email?: string | null
-    kontakt_telefon?: string | null
-    kanal?: string | null
-    created_at?: string | null
-  } | null
+  lead?: LeadDetail | null
   onSaved?: () => void
 }) {
-  const name =
-    detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || '—'
+  const isHv = lead ? resolvePipelineKontext(lead) === 'hv_meldung' : false
+  const ag = lead?.auftraggeber
+
+  const name = isHv && lead
+    ? leadKontaktAnzeigeName(lead)
+    : detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || '—'
+
+  const kundeId = isHv
+    ? lead?.auftraggeber_kunde_id ?? ag?.id ?? detail.kunde_id ?? detail.kunden?.id
+    : detail.kunde_id ?? detail.kunden?.id
 
   return (
     <EntityKundenStammdatenCard
-      kundeId={detail.kunde_id ?? detail.kunden?.id}
-      leadId={detail.lead_id ?? lead?.id}
+      kundeId={kundeId}
+      leadId={isHv ? null : detail.lead_id ?? lead?.id}
       initial={{
         name: name === '—' ? '' : name,
-        telefon:
-          detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || '',
-        email: detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || '',
-        plz: detail.kunden?.plz?.trim() || lead?.plz?.trim() || '',
-        ort: detail.kunden?.ort?.trim() || '',
-        strasse: [detail.kunden?.strasse, detail.kunden?.hausnummer]
-          .filter(Boolean)
-          .join(' ')
-          .trim(),
+        telefon: isHv
+          ? (ag?.telefon ?? '').trim()
+          : detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || '',
+        email: isHv
+          ? (ag?.email ?? '').trim()
+          : detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || '',
+        plz: isHv
+          ? (ag?.plz ?? '').trim()
+          : detail.kunden?.plz?.trim() || lead?.plz?.trim() || '',
+        ort: isHv ? (ag?.ort ?? '').trim() : detail.kunden?.ort?.trim() || '',
+        strasse: isHv
+          ? [ag?.strasse, ag?.hausnummer].filter(Boolean).join(' ').trim()
+          : [detail.kunden?.strasse, detail.kunden?.hausnummer]
+              .filter(Boolean)
+              .join(' ')
+              .trim(),
       }}
-      kundeTyp={detail.kunden?.typ}
-      quelle={lead?.kanal ? kanalLabel(lead.kanal) : null}
+      kundeTyp={isHv ? ag?.typ ?? 'hausverwaltung' : detail.kunden?.typ}
+      quelle={lead?.kanal && !isHv ? kanalLabel(lead.kanal) : null}
       eingegangen={eingegangenLabel(detail.created_at || lead?.created_at)}
       onSaved={onSaved}
     />

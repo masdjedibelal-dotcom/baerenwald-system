@@ -77,6 +77,20 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
   return rechnung.status === 'storniert'
 }
 
+/**
+ * Abschlag/Schluss: eigener Rechnungs-Vorgang in der Liste.
+ * Der Auftrags-Vorgang bleibt in Phase `auftrag` (einziger Fall ohne Phasenwechsel).
+ */
+export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
+  const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
+  return art === 'abschlag' || art === 'schluss'
+}
+
+/** Nur Vollrechnungen (oder ohne Art) verschieben den Stamm-Vorgang auf Phase Rechnung. */
+export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
+  return !isSatellitenRechnung(rechnung)
+}
+
 function pickNewestActive<T>(
   items: T[],
   isStorniert: (x: T) => boolean,
@@ -175,14 +189,16 @@ type PhasePick = {
   updatedAt: string
 }
 
-/** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage). */
+/** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage).
+ * Ausnahme: Abschlag/Schluss gewinnen die Stamm-Phase nicht (eigene Vorgangszeilen). */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []
   const auftraege = input.auftraege ?? []
   const rechnungen = input.rechnungen ?? []
+  const phaseRechnungen = rechnungen.filter(isPhaseWinningRechnung)
 
-  const rechnungAktiv = pickNewestActive(rechnungen, isRechnungStorniert, entityTs)
+  const rechnungAktiv = pickNewestActive(phaseRechnungen, isRechnungStorniert, entityTs)
   if (rechnungAktiv) {
     return {
       phase: 'rechnung',
@@ -212,8 +228,8 @@ function resolvePhase(input: ResolveVorgangInput): PhasePick {
     }
   }
 
-  if (rechnungen.length > 0 && rechnungen.every(isRechnungStorniert)) {
-    const r = pickNewest(rechnungen, entityTs)!
+  if (phaseRechnungen.length > 0 && phaseRechnungen.every(isRechnungStorniert)) {
+    const r = pickNewest(phaseRechnungen, entityTs)!
     return {
       phase: 'rechnung',
       entityId: r.id,
@@ -334,4 +350,41 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
     entityType: pick.phase,
     updatedAt: pick.updatedAt,
   }
+}
+
+/** Eigener Rechnungs-Vorgang für Abschlag/Schluss (Stamm bleibt Auftrag). */
+export function resolveSatellitenRechnungVorgang(
+  input: ResolveVorgangInput,
+  rechnung: VorgangRechnungInput
+): ResolvedVorgang {
+  const forced: VorgangRechnungInput = { ...rechnung, rechnung_art: 'voll' }
+  const resolved = resolveVorgang({
+    lead: input.lead,
+    angebote: input.angebote,
+    auftraege: [],
+    rechnungen: [forced],
+    titel: input.titel,
+  })
+  return {
+    ...resolved,
+    titel: satellitenRechnungTitel(rechnung, resolved.titel),
+  }
+}
+
+export function satellitenRechnungTitel(
+  rechnung: VorgangRechnungInput,
+  fallbackTitel: string
+): string {
+  const art = (rechnung.rechnung_art ?? '').trim().toLowerCase()
+  const nr = rechnung.rechnungsnummer?.trim()
+  if (art === 'schluss') {
+    return nr ? `Schlussrechnung ${nr}` : 'Schlussrechnung'
+  }
+  if (art === 'abschlag') {
+    const idx = rechnung.abschlag_index
+    const base =
+      idx != null && Number.isFinite(Number(idx)) ? `Abschlag ${idx}` : 'Abschlagsrechnung'
+    return nr ? `${base} · ${nr}` : base
+  }
+  return nr || fallbackTitel
 }

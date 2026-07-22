@@ -3,6 +3,7 @@ import { BEREICH_LABELS } from '@/lib/utils'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type {
   ProjektAngebotKurz,
   ProjektKetteKind,
@@ -85,10 +86,10 @@ export async function loadProjektKontext(
   if (leadId && !kundeId) {
     const { data: leadRow } = await supabase
       .from('leads')
-      .select('kunde_id')
+      .select('kunde_id, auftraggeber_kunde_id')
       .eq('id', leadId)
       .maybeSingle()
-    kundeId = (leadRow?.kunde_id as string | null) ?? null
+    kundeId = leadVertragsKundeId(leadRow ?? {}) ?? null
   }
 
   let kunde: ProjektKontext['kunde'] = null
