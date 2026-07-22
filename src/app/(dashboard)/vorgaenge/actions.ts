@@ -123,11 +123,14 @@ export async function deleteVorgang(
     if (err) errors.push(err)
   }
 
-  const { error: leadErr } = await supabase.from('leads').delete().eq('id', id)
-  if (leadErr) errors.push(`leads: ${leadErr.message}`)
-
+  // Lead erst löschen, wenn Kinder weg — sonst SET NULL auf auftraege.lead_id → Portal-Geister.
   if (errors.length) {
     return { ok: false, message: errors.join('\n') }
+  }
+
+  const { error: leadErr } = await supabase.from('leads').delete().eq('id', id)
+  if (leadErr) {
+    return { ok: false, message: `leads: ${leadErr.message}` }
   }
 
   revalidatePath('/vorgaenge')

@@ -25,6 +25,8 @@ import {
   runDuplicateAuftrag,
   runDuplicateRechnung,
 } from '@/lib/list-actions'
+import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
+import { toast } from '@/components/ui/app-toast'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { cn, formatDatum } from '@/lib/utils'
@@ -335,10 +337,34 @@ export function VorgaengeListeClient({
 
   const bulkDelete = useCallback(() => {
     const leadIds = Array.from(new Set(selectedRows.map((v) => v.leadId)))
-    for (const leadId of leadIds) {
-      runDeleteVorgang(leadId, router)
-    }
-    setSelected({})
+    if (!leadIds.length) return
+    void (async () => {
+      const loadingId = toast.loading(
+        leadIds.length === 1
+          ? 'Vorgang wird gelöscht…'
+          : `${leadIds.length} Vorgänge werden gelöscht…`
+      )
+      let ok = 0
+      let fail = 0
+      for (const leadId of leadIds) {
+        const r = await deleteVorgang(leadId)
+        if (r.ok) ok += 1
+        else fail += 1
+      }
+      setSelected({})
+      if (fail === 0) {
+        toast.success(
+          ok === 1 ? 'Vorgang gelöscht' : `${ok} Vorgänge gelöscht`,
+          { id: loadingId }
+        )
+      } else {
+        toast.error(
+          `${ok} gelöscht, ${fail} fehlgeschlagen`,
+          { id: loadingId }
+        )
+      }
+      router.refresh()
+    })()
   }, [router, selectedRows])
 
   const bulkOpen = useCallback(() => {

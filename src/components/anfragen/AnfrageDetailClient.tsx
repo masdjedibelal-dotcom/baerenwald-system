@@ -346,12 +346,6 @@ export function AnfrageDetailClient({
     lead.kunden?.email ||
     lead.kontakt_email ||
     null
-  const leadTelefon = (
-    lead.auftraggeber?.telefon?.trim() ||
-    lead.kunden?.telefon ||
-    lead.kontakt_telefon ||
-    ''
-  ).trim()
   const kundeId = leadVertragsKundeId(lead)
   const auftragId = leadStatusData.auftrag_id as string | undefined
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
@@ -500,13 +494,7 @@ export function AnfrageDetailClient({
             if (hasAngebote) setAngebotAuswahlOpen(true)
             else openAngebotErstellen()
           },
-          tel: leadTelefon || null,
           mail: leadEmail?.trim() || null,
-          onCall: leadTelefon
-            ? () => {
-                window.location.href = `tel:${leadTelefon.replace(/\s/g, '')}`
-              }
-            : undefined,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
           onDelete: () => {
             startTransition(async () => {
@@ -528,7 +516,6 @@ export function AnfrageDetailClient({
   }, [
     lead,
     leadEmail,
-    leadTelefon,
     mailCompose,
     openAngebotErstellen,
     hasAngebote,

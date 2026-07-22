@@ -505,10 +505,6 @@ export function AuftragDetailClient({
     bereiche: lead?.bereiche,
     fallback: detail.titel?.trim() || formatAuftragsNr(detail),
   })
-  const kundeTelefon =
-    _leadDetail?.auftraggeber?.telefon?.trim() ||
-    detail.kunden?.telefon?.trim() ||
-    ''
   const headMeta = useMemo(() => {
     if (_leadDetail) {
       const hv = leadKontaktAnzeigeName(_leadDetail, '')
@@ -587,7 +583,6 @@ export function AuftragDetailClient({
           status: detail.status,
           customer: {
             name: detail.kunden?.name ?? undefined,
-            tel: kundeTelefon || undefined,
             mail: detail.kunden?.email?.trim() || undefined,
           },
         },
@@ -616,13 +611,7 @@ export function AuftragDetailClient({
             }
             setPortalLinkModalOpen(true)
           },
-          tel: kundeTelefon || null,
           mail: detail.kunden?.email?.trim() || null,
-          onCall: kundeTelefon
-            ? () => {
-                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
-              }
-            : undefined,
           onMail: detail.kunden?.email?.trim()
             ? () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))
             : undefined,
@@ -652,7 +641,6 @@ export function AuftragDetailClient({
     detail.status,
     detail.kostentraeger,
     detail.lead_id,
-    kundeTelefon,
     mailCompose,
     hauptvertraegeFuerNachtrag.length,
     openAngebotKorrektur,

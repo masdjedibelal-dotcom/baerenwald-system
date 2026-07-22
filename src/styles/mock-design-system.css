@@ -1633,6 +1633,7 @@ div.input input::placeholder { color: var(--text-4); }
   height: 52px;
   border-bottom: 0.5px solid var(--border);
   flex-shrink: 0;
+  background: #ffffff;
 }
 .sheet-h .title {
   font-size: 15px;
@@ -1651,10 +1652,11 @@ div.input input::placeholder { color: var(--text-4); }
   flex: 1;
   overflow-y: auto;
   padding: 18px 20px;
+  background: #ffffff;
 }
 .sheet-b::-webkit-scrollbar { width: 10px; }
 .sheet-b::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.1); border-radius: 8px; border: 2px solid var(--card);
+  background: rgba(0,0,0,0.1); border-radius: 8px; border: 2px solid #ffffff;
 }
 
 .sheet-f {
@@ -1663,7 +1665,7 @@ div.input input::placeholder { color: var(--text-4); }
   gap: 8px;
   padding: 12px 16px;
   border-top: 0.5px solid var(--border);
-  background: var(--card);
+  background: #ffffff;
   flex-shrink: 0;
 }
 
@@ -1918,6 +1920,7 @@ div.input input::placeholder { color: var(--text-4); }
   display: flex;
   align-items: center;
   gap: 10px;
+  background: #ffffff;
 }
 .modal-h .icon {
   width: 32px;
@@ -1957,6 +1960,7 @@ div.input input::placeholder { color: var(--text-4); }
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #ffffff;
 }
 .modal-f.modal-footer--spread {
   justify-content: space-between;
@@ -5339,18 +5343,22 @@ textarea.input:focus {
 .toast {
     @apply fixed bottom-4 right-4 flex min-w-64 max-w-80 animate-slide-up items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium shadow-lg;
     z-index: 200;
+    background: #ffffff;
   }
 
 .toast-success {
-    @apply toast border border-status-order-bg bg-bw-card text-status-order-text;
+    @apply toast border border-status-order-bg text-status-order-text;
+    background: #ffffff;
   }
 
 .toast-error {
-    @apply toast border border-status-cancel-bg bg-bw-card text-status-cancel-text;
+    @apply toast border border-status-cancel-bg text-status-cancel-text;
+    background: #ffffff;
   }
 
 .toast-info {
-    @apply toast border border-status-new-bg bg-bw-card text-status-new-text;
+    @apply toast border border-status-new-bg text-status-new-text;
+    background: #ffffff;
   }
 
 @media (max-width: 768px) {.toast,
@@ -5722,7 +5730,8 @@ textarea.input:focus {
   }
 
 .modal-compact {
-    @apply flex max-h-[calc(100vh-48px)] w-full max-w-[480px] animate-fade-in flex-col overflow-hidden rounded-xl bg-bw-card shadow-[0_24px_48px_-12px_rgba(20,24,31,0.3)];
+    @apply flex max-h-[calc(100vh-48px)] w-full max-w-[480px] animate-fade-in flex-col overflow-hidden rounded-xl shadow-[0_24px_48px_-12px_rgba(20,24,31,0.3)];
+    background: #ffffff;
   }
 
 .modal-compact-wide {
@@ -5731,6 +5740,7 @@ textarea.input:focus {
 
 .modal-compact-h {
     @apply flex items-center gap-2.5 border-b border-hairline border-bw-border px-[18px] py-3;
+    background: #ffffff;
   }
 
 .modal-compact-icon {
@@ -5757,10 +5767,12 @@ textarea.input:focus {
 
 .modal-compact-b {
     @apply flex-1 space-y-3 overflow-y-auto px-[18px] py-4 text-[13px] leading-snug text-bw-text;
+    background: #ffffff;
   }
 
 .modal-compact-f {
     @apply flex items-center gap-2 border-t border-hairline border-bw-border px-[18px] py-3;
+    background: #ffffff;
   }
 
 .modal .input,

@@ -222,7 +222,6 @@ export function RechnungDetailClient({
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
   const kundeName = detail.kunden?.name?.trim() || 'Rechnung'
-  const kundeTelefon = detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
   const kundeEmail = detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
   const kundeId = detail.kunden?.id ?? detail.kunde_id
 
@@ -405,7 +404,6 @@ export function RechnungDetailClient({
           statusKey: menuStatusKey,
           customer: {
             name: kundeName,
-            tel: kundeTelefon || undefined,
             mail: kundeEmail || undefined,
           },
         },
@@ -447,13 +445,7 @@ export function RechnungDetailClient({
           onToAuftrag: detail.auftrag_id
             ? () => router.push(`/auftraege/${detail.auftrag_id}`)
             : undefined,
-          tel: kundeTelefon || null,
           mail: kundeEmail || null,
-          onCall: kundeTelefon
-            ? () => {
-                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
-              }
-            : undefined,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
           onDelete:
             detail.status === 'entwurf'
@@ -485,7 +477,6 @@ export function RechnungDetailClient({
     detail.id,
     detail.auftrag_id,
     kundeName,
-    kundeTelefon,
     kundeEmail,
     kundeId,
     menuStatusKey,

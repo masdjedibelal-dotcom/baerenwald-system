@@ -13,18 +13,18 @@ import {
 import { duplicateKunde } from '@/app/actions/kunden'
 import { duplicateHandwerker } from '@/app/(dashboard)/handwerker/actions'
 
-export function runDeleteVorgang(
+export async function runDeleteVorgang(
   leadId: string,
   router: AppRouterInstance,
   label = 'Vorgang'
-) {
-  void deleteVorgang(leadId).then((r) => {
-    if (!r.ok) toast.error(r.message)
-    else {
-      toast.success(`${label} gelöscht`)
-      router.refresh()
-    }
-  })
+): Promise<void> {
+  const r = await deleteVorgang(leadId)
+  if (!r.ok) {
+    toast.error(r.message)
+    throw new Error(r.message)
+  }
+  toast.success(`${label} gelöscht`)
+  router.refresh()
 }
 
 export function runDuplicateAnfrage(leadId: string, router: AppRouterInstance) {

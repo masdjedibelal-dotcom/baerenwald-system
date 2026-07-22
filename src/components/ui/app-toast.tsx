@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { CheckCircle, XCircle, Info, X } from 'lucide-react'
+import { CheckCircle, XCircle, Info, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type ToastType = 'success' | 'error' | 'info'
+type ToastType = 'success' | 'error' | 'info' | 'loading'
 
 export interface ToastItem {
   id: string
@@ -12,45 +12,81 @@ export interface ToastItem {
   message: string
 }
 
-let dispatchToast: ((type: ToastType, message: string) => void) | null = null
+type ToastApi = {
+  push: (type: ToastType, message: string, opts?: { id?: string; persist?: boolean }) => string
+  dismiss: (id: string) => void
+}
+
+let toastApi: ToastApi | null = null
 
 function formatMessage(title: string, opts?: { description?: string }): string {
   if (opts?.description) return `${title} — ${opts.description}`
   return title
 }
 
+function pushToast(
+  type: ToastType,
+  message: string,
+  opts?: { id?: string; persist?: boolean }
+): string {
+  if (!toastApi) return ''
+  return toastApi.push(type, message, opts)
+}
+
 export const toast = {
-  success: (msg: string) => dispatchToast?.('success', msg),
-  error: (msg: string) => dispatchToast?.('error', msg),
-  info: (msg: string) => dispatchToast?.('info', msg),
+  success: (msg: string, opts?: { id?: string }) =>
+    pushToast('success', msg, { id: opts?.id }),
+  error: (msg: string, opts?: { id?: string }) =>
+    pushToast('error', msg, { id: opts?.id }),
+  info: (msg: string, opts?: { id?: string }) =>
+    pushToast('info', msg, { id: opts?.id }),
+  /** Bleibt stehen, bis dismiss/success/error mit derselben id. */
+  loading: (msg: string, opts?: { id?: string }) =>
+    pushToast('loading', msg, { id: opts?.id, persist: true }),
+  dismiss: (id: string) => toastApi?.dismiss(id),
   message: (title: string, opts?: { description?: string }) =>
-    dispatchToast?.('info', formatMessage(title, opts)),
+    pushToast('info', formatMessage(title, opts)),
 }
 
 const icons = {
   success: CheckCircle,
   error: XCircle,
   info: Info,
+  loading: Loader2,
 }
 
 export function ToastProvider() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
-  const push = useCallback((type: ToastType, message: string) => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts((prev) => [...prev, { id, type, message }])
-    const ms = type === 'error' ? 5000 : 3000
-    window.setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, ms)
+  const dismiss = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
+  const push = useCallback(
+    (type: ToastType, message: string, opts?: { id?: string; persist?: boolean }) => {
+      const id = opts?.id ?? Math.random().toString(36).slice(2)
+      setToasts((prev) => {
+        const without = prev.filter((t) => t.id !== id)
+        return [...without, { id, type, message }]
+      })
+      const persist = opts?.persist || type === 'loading'
+      if (!persist) {
+        const ms = type === 'error' ? 5000 : 3000
+        window.setTimeout(() => {
+          setToasts((prev) => prev.filter((t) => t.id !== id))
+        }, ms)
+      }
+      return id
+    },
+    []
+  )
+
   useEffect(() => {
-    dispatchToast = push
+    toastApi = { push, dismiss }
     return () => {
-      dispatchToast = null
+      toastApi = null
     }
-  }, [push])
+  }, [push, dismiss])
 
   return (
     <div
@@ -63,22 +99,31 @@ export function ToastProvider() {
           <div
             key={t.id}
             className={cn(
-              'pointer-events-auto flex items-center gap-3 rounded-lg border bg-bw-card px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
+              'pointer-events-auto flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
               t.type === 'success' && 'border-status-order-bg text-status-order-text',
               t.type === 'error' && 'border-status-cancel-bg text-status-cancel-text',
-              t.type === 'info' && 'border-status-new-bg text-status-new-text'
+              (t.type === 'info' || t.type === 'loading') &&
+                'border-status-new-bg text-status-new-text'
             )}
+            style={{ backgroundColor: '#ffffff' }}
+            role="status"
+            aria-live={t.type === 'loading' ? 'polite' : 'assertive'}
           >
-            <Icon className="h-5 w-5 shrink-0" aria-hidden />
+            <Icon
+              className={cn('h-5 w-5 shrink-0', t.type === 'loading' && 'animate-spin')}
+              aria-hidden
+            />
             <span className="min-w-0 flex-1">{t.message}</span>
-            <button
-              type="button"
-              onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-              className="text-current opacity-60 hover:opacity-100"
-              aria-label="Schließen"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            {t.type !== 'loading' ? (
+              <button
+                type="button"
+                onClick={() => dismiss(t.id)}
+                className="text-current opacity-60 hover:opacity-100"
+                aria-label="Schließen"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         )
       })}

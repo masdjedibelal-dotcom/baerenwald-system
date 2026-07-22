@@ -4,10 +4,16 @@ import plugin from 'tailwindcss/plugin'
 
 /** CSS-Var-Farbe mit Tailwind-/Opacity-Support (`bg-bw-border/50`). */
 function withAlpha(cssVar: string) {
-  return ({ opacityValue }: { opacityValue?: string }) =>
-    opacityValue === undefined
-      ? `var(${cssVar})`
-      : `color-mix(in srgb, var(${cssVar}) ${Number(opacityValue) * 100}%, transparent)`
+  return ({ opacityValue }: { opacityValue?: string }) => {
+    if (opacityValue === undefined) return `var(${cssVar})`
+    // Tailwind übergibt oft `var(--tw-*-opacity)` — Number() → NaN → transparenter Hintergrund.
+    if (/var\s*\(/.test(opacityValue)) {
+      return `color-mix(in srgb, var(${cssVar}) calc(${opacityValue} * 100%), transparent)`
+    }
+    const n = Number(opacityValue)
+    if (Number.isNaN(n)) return `var(${cssVar})`
+    return `color-mix(in srgb, var(${cssVar}) ${n * 100}%, transparent)`
+  }
 }
 
 /**

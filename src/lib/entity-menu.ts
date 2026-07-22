@@ -213,7 +213,10 @@ export function buildEntityMenu(
 
   ;(h.extra ?? []).forEach((c) => A.push(c))
 
-  const showCall = Boolean(tel) || Boolean(h.onCall)
+  /** Anrufen nur in Stammdaten (Kunde/Partner) — nicht in Vorgängen. */
+  const isVorgangPhase =
+    type === 'anfrage' || type === 'angebot' || type === 'auftrag' || type === 'rechnung'
+  const showCall = !isVorgangPhase && (Boolean(tel) || Boolean(h.onCall))
   const showMail = Boolean(mail) || Boolean(h.onMail)
   if (showCall || showMail) A.push('sep')
   if (showCall) {

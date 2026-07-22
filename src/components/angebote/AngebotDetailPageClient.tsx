@@ -396,11 +396,6 @@ export function AngebotDetailPageClient({
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail =
     lead?.auftraggeber?.email?.trim() || kunde?.email?.trim() || ''
-  const kundeTelefon =
-    lead?.auftraggeber?.telefon?.trim() ||
-    kunde?.telefon?.trim() ||
-    lead?.kontakt_telefon?.trim() ||
-    ''
 
   function openAngebotVersandModal() {
     if (kannAngebotVersenden) {
@@ -517,13 +512,7 @@ export function AngebotDetailPageClient({
                 ? openAngebotVersandModal
                 : undefined
             : undefined,
-          tel: kundeTelefon || null,
           mail: kundeEmail || null,
-          onCall: kundeTelefon
-            ? () => {
-                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
-              }
-            : undefined,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
           onDelete: () => {
             startTransition(async () => {
@@ -562,7 +551,6 @@ export function AngebotDetailPageClient({
     kannVersenden,
     kannErneutSenden,
     kundeEmail,
-    kundeTelefon,
     kundeName,
     detail.id,
     detail.lead_id,
