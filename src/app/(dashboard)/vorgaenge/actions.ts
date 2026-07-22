@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export type VorgangEntityRef =
   | { kind: 'lead'; id: string }
@@ -18,6 +19,17 @@ async function deleteByIds(
   if (!ids.length) return null
   const { error } = await supabase.from(table).delete().in(column, ids)
   return error ? `${table}: ${error.message}` : null
+}
+
+/** HV-Glocke: Notifs zu diesem Lead entfernen (Link enthält lead-id). */
+async function deleteHvNotificationsForLead(leadId: string): Promise<string | null> {
+  const id = leadId.trim()
+  if (!id) return null
+  const { error } = await supabaseAdmin
+    .from('hv_notifications')
+    .delete()
+    .or(`link.ilike.%id=${id}%,link.ilike.%${id}%`)
+  return error ? `hv_notifications: ${error.message}` : null
 }
 
 /** Lead-ID aus beliebiger Vorgangs-Entität auflösen. */
@@ -119,6 +131,7 @@ export async function deleteVorgang(
     await deleteByIds(supabase, 'angebot_handwerker', 'angebot_id', angebotIds),
     await deleteByIds(supabase, 'angebote', 'id', angebotIds),
     await deleteByIds(supabase, 'auftraege', 'id', auftragIds),
+    await deleteHvNotificationsForLead(id),
   ]) {
     if (err) errors.push(err)
   }
