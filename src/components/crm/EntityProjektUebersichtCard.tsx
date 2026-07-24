@@ -41,6 +41,7 @@ export function EntityProjektUebersichtCard({
   fortschritt,
   extraRows,
   footerRows,
+  belowContent,
 }: {
   title?: string
   icon?: string
@@ -59,6 +60,8 @@ export function EntityProjektUebersichtCard({
   fortschritt?: number | null
   extraRows?: ProjektUebersichtExtraRow[]
   footerRows?: ProjektUebersichtExtraRow[]
+  /** Inhalt unter den Props (z. B. KI-Auskunft inline in Bedarf). */
+  belowContent?: ReactNode
 }) {
   const canEdit = Boolean(onSave) && editableFields.length > 0 && !disabled
   const [editing, setEditing] = useState(false)
@@ -238,6 +241,7 @@ export function EntityProjektUebersichtCard({
           </div>
         ))}
       </div>
+      {belowContent ? <div className="mt-4">{belowContent}</div> : null}
     </InlineEditSection>
   )
 }

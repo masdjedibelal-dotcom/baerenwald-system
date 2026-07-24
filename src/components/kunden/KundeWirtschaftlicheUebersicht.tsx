@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import {
   buildKundeWirtschaft,
   KUNDE_WIRTSCHAFT_ZEITRAUM,
@@ -87,18 +88,12 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
     <div className="kw-uebersicht">
       <div className="kw-head">
         <h2 className="kw-title">Wirtschaftliche Übersicht</h2>
-        <div className="kw-seg" role="group" aria-label="Zeitraum">
-          {KUNDE_WIRTSCHAFT_ZEITRAUM.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={cn('kw-seg-btn', zeitraum === opt.id && 'is-active')}
-              onClick={() => setZeitraum(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <ZeitraumIconPopover
+          value={zeitraum}
+          options={KUNDE_WIRTSCHAFT_ZEITRAUM}
+          onChange={setZeitraum}
+          title="Zeitraum"
+        />
       </div>
 
       <div className="kw-kpi-row">

@@ -8,12 +8,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
 import { runDuplicateAuftrag } from '@/lib/list-actions'
-import { AuftragDetailsTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragAuftragdetailsTab, AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
 import { AuftragZahlungsplanSection, type RechnungErstellenOpts } from '@/components/auftraege/AuftragZahlungsplanSection'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
@@ -186,8 +186,9 @@ type AuftragLeadSnapshot = Pick<
 >
 
 type AuftragDetailTab =
-  | 'stammdaten'
+  | 'auftragdetails'
   | 'leistung'
+  | 'stammdaten'
   | 'fotos'
   | 'ausfuehrung'
   | 'aktivitaet'
@@ -196,8 +197,9 @@ type AuftragDetailTab =
   | 'notizen'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
-  'stammdaten',
+  'auftragdetails',
   'leistung',
+  'stammdaten',
   'fotos',
   'ausfuehrung',
   'aktivitaet',
@@ -243,15 +245,21 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
   if (!tab) return null
   if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') return 'stammdaten'
   if (
-    tab === 'positionen' ||
-    tab === 'details' ||
+    tab === 'auftragdetails' ||
     tab === 'auftrag-details' ||
+    tab === 'auftragsdaten' ||
+    tab === 'projektdetails' ||
+    tab === 'projektinfos' ||
+    tab === 'details' ||
     tab === 'auftrag' ||
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
     tab === 'angebot' ||
     tab === 'angebot-details'
   ) {
+    return 'auftragdetails'
+  }
+  if (tab === 'positionen' || tab === 'leistung' || tab === 'leistungen') {
     return 'leistung'
   }
   if (tab === 'zahlplan') return 'finanzen'
@@ -308,7 +316,7 @@ export function AuftragDetailClient({
   const [detail, setDetail] = useState(initial)
   const [, startTransition] = useTransition()
 
-  const [mainTab, setMainTab] = useState<AuftragDetailTab>('leistung')
+  const [mainTab, setMainTab] = useState<AuftragDetailTab>('auftragdetails')
   const [vorOrtFocus, setVorOrtFocus] = useState<VorOrtAbschnitt | null>(null)
 
   useEffect(() => {
@@ -712,11 +720,20 @@ export function AuftragDetailClient({
     />
   )
 
-  const leistungInhalt = (
-    <AuftragDetailsTab
+  const auftragdetailsInhalt = (
+    <AuftragAuftragdetailsTab
       detail={detail}
       lead={lead}
       team={team}
+      editable={detail.status !== 'storniert'}
+      onSaved={() => refresh()}
+    />
+  )
+
+  const leistungInhalt = (
+    <AuftragLeistungenTab
+      detail={detail}
+      lead={lead}
       gewerke={gewerke}
       angebotDetail={angebotDetail}
       editable={detail.status !== 'storniert'}
@@ -803,6 +820,12 @@ export function AuftragDetailClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
+      id: 'auftragdetails',
+      label: 'Auftragdetails',
+      icon: 'clipboard-list',
+      render: () => auftragdetailsInhalt,
+    },
+    {
       id: 'leistung',
       label: 'Leistungen',
       icon: 'list-details',
@@ -812,7 +835,7 @@ export function AuftragDetailClient({
     {
       id: 'stammdaten',
       label: 'Stammdaten',
-      icon: 'clipboard-list',
+      icon: 'user',
       render: () => stammdatenInhalt,
     },
     {
@@ -893,37 +916,28 @@ export function AuftragDetailClient({
         ),
         meta: headMeta,
         actions: (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {!istStorniert ? (
-              <button
-                type="button"
-                className="btn primary sm inline-flex shrink-0 gap-1.5"
-                onClick={() => openRechnungErstellen()}
-              >
-                <MockIcon ctx="btn" n="file-invoice" size={15} />
-                Rechnung erstellen
-              </button>
-            ) : null}
-            {!istAbgeschlossen && !istStorniert ? (
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5"
-                onClick={openAuftragAbschliessen}
-              >
-                <MockIcon ctx="btn" n="checks" size={15} />
-                Auftrag abschließen
-              </button>
-            ) : null}
-            <ActionsMenu
-              trigger={
-                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
-                  <MockIcon ctx="btn" n="dots" size={18} />
-                </button>
-              }
-              items={aktionenMenuItems}
-              sheetTitle="Auftrag"
-            />
-          </div>
+          <DetailActionsBar
+            sheetTitle="Auftrag"
+            primary={
+              !istStorniert
+                ? {
+                    label: 'Rechnung erstellen',
+                    icon: 'file-invoice',
+                    onClick: () => openRechnungErstellen(),
+                  }
+                : null
+            }
+            secondary={
+              !istAbgeschlossen && !istStorniert
+                ? {
+                    label: 'Auftrag abschließen',
+                    icon: 'checks',
+                    onClick: openAuftragAbschliessen,
+                  }
+                : null
+            }
+            menuItems={aktionenMenuItems}
+          />
         ),
       }}
     >

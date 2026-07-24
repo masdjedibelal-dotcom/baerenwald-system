@@ -1,12 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Camera, Plus } from 'lucide-react'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
 import { WerkzeugPanel } from '@/components/crm/WerkzeugPanel'
 import { VorOrtPortalHinweis } from '@/components/auftraege/AuftragVorOrtPanel'
+import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
 import { toast } from '@/components/ui/app-toast'
 import {
   addAuftragPosition,
@@ -36,6 +39,7 @@ import {
   lebenszyklusLabel,
   type PositionEintrag,
 } from '@/lib/auftraege/position-lebenszyklus'
+import { richTextToPlain } from '@/lib/rich-text'
 import { heuteYmd } from '@/lib/angebot-einfach'
 import { downloadPdfFromBase64 } from '@/lib/download-pdf-base64'
 import type { AuftragPosition, Gewerk } from '@/lib/types'
@@ -43,7 +47,6 @@ import { cn, formatDatumZeit } from '@/lib/utils'
 
 type GewerkOpt = Pick<Gewerk, 'id' | 'name' | 'slug'>
 
-/** Bestehende Abnahme-Status beibehalten, fehlende Leistungen aus Auftrag ergänzen. */
 function syncAbnahmeMitAuftrag(
   existing: AbnahmePunkt[],
   positionen: AuftragPosition[],
@@ -55,7 +58,6 @@ function syncAbnahmeMitAuftrag(
   for (const p of existing) {
     const lid = p.leistung_id?.trim() || p.id
     const prev = statusByKey.get(lid)
-    // Mangel gewinnt vor ok vor offen
     if (!prev || p.status === 'mangel' || (p.status === 'ok' && prev === 'offen')) {
       statusByKey.set(lid, p.status)
     }
@@ -67,19 +69,33 @@ function syncAbnahmeMitAuftrag(
   })
 }
 
-function abnahmeLabelForLeistung(punkte: AbnahmePunkt[]): {
-  label: string
-  kind: string
-} {
+function abnahmeLabelForLeistung(punkte: AbnahmePunkt[]): { label: string; kind: string } {
   if (!punkte.length) return { label: '—', kind: 'fertig' }
   if (punkte.some((p) => p.status === 'mangel')) return { label: 'Mangel', kind: 'cancel' }
   if (leistungFuerAbnahmeAusgewaehlt(punkte)) return { label: 'OK', kind: 'aktiv' }
   return { label: 'Offen', kind: 'warten' }
 }
 
+async function uploadTimelineFoto(auftragId: string, file: File): Promise<string | null> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('filename', file.name)
+  const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+    method: 'POST',
+    body: fd,
+  })
+  const json = (await res.json()) as { url?: string; error?: string }
+  if (!res.ok || !json.url) {
+    toast.error(json.error || 'Upload fehlgeschlagen')
+    return null
+  }
+  return json.url
+}
+
 /**
- * Eine Leistungstabelle = Quelle für Tagebuch + Abnahme.
- * Leistungen hier CRUD — dürfen vom Angebot abweichen.
+ * Vor-Ort: gleiche Leistungstabelle wie bei Leistungen.
+ * Klick → Bottom-Sheet (wegklickbar) mit Tagebuch + Fotos + Abnahme.
+ * Freie Einträge / Projekt-Fotos ohne Positionsbezug.
  */
 export function AuftragLeistungVorOrtTabelle({
   auftragId,
@@ -100,18 +116,18 @@ export function AuftragLeistungVorOrtTabelle({
   const [abnahmeDatum, setAbnahmeDatum] = useState(heuteYmd())
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  const [sheetPos, setSheetPos] = useState<AuftragPosition | null>(null)
+  const [freeOpen, setFreeOpen] = useState(false)
+  const [draftText, setDraftText] = useState('')
+  const [draftFotos, setDraftFotos] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [leistungForm, setLeistungForm] = useState<{
     mode: 'create' | 'edit'
     id?: string
     name: string
     beschreibung: string
     gewerkSlug: string
-  } | null>(null)
-  const [tagebuchForm, setTagebuchForm] = useState<{
-    positionId: string
-    positionName: string
-    text: string
   } | null>(null)
 
   const reload = useCallback(async () => {
@@ -127,7 +143,6 @@ export function AuftragLeistungVorOrtTabelle({
         setAbnahmeDatum(saved.abnahme_datum?.slice(0, 10) || heuteYmd())
         setPdfUrl(saved.pdf_url)
       } else {
-        // Immer Auftragspositionen — nicht Angebot (kann abweichen)
         setPunkte(buildAbnahmePunkteInitial({ positionen, gewerke }))
         setAbnahmeDatum(heuteYmd())
         setPdfUrl(null)
@@ -152,6 +167,11 @@ export function AuftragLeistungVorOrtTabelle({
     return m
   }, [eintraege])
 
+  const freieEintraege = useMemo(
+    () => eintraege.filter((e) => !e.position_id),
+    [eintraege]
+  )
+
   const punkteByLeistung = useMemo(() => {
     const m = new Map<string, AbnahmePunkt[]>()
     for (const p of punkte) {
@@ -174,15 +194,29 @@ export function AuftragLeistungVorOrtTabelle({
   )
 
   const statistik = useMemo(() => abnahmePunkteStatistik(punkte), [punkte])
-  const dokuCount = eintraege.filter((e) => e.position_id).length
+  const dokuCount = eintraege.length
 
-  function toggleOpen(id: string) {
-    setOpenIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function resetDraft() {
+    setDraftText('')
+    setDraftFotos([])
+  }
+
+  function openLeistungSheet(pos: AuftragPosition) {
+    resetDraft()
+    setFreeOpen(false)
+    setSheetPos(pos)
+  }
+
+  function openFreeSheet() {
+    resetDraft()
+    setSheetPos(null)
+    setFreeOpen(true)
+  }
+
+  function closeSheet() {
+    setSheetPos(null)
+    setFreeOpen(false)
+    resetDraft()
   }
 
   function setAbnahmeStatus(leistungId: string, status: AbnahmePunktStatus) {
@@ -276,8 +310,7 @@ export function AuftragLeistungVorOrtTabelle({
             ? {
                 gewerk_slug: leistungForm.gewerkSlug,
                 gewerk_name:
-                  gewerke.find((g) => g.slug === leistungForm.gewerkSlug)?.name ??
-                  undefined,
+                  gewerke.find((g) => g.slug === leistungForm.gewerkSlug)?.name ?? undefined,
               }
             : {}),
         })
@@ -316,42 +349,185 @@ export function AuftragLeistungVorOrtTabelle({
         notizen: null,
       })
       toast.success('Leistung entfernt')
+      closeSheet()
       onChanged?.()
     })
   }
 
-  function saveTagebuch() {
-    if (!tagebuchForm) return
-    const text = tagebuchForm.text.trim()
-    if (!text) {
-      toast.error('Kurzbeschreibung fehlt.')
+  async function onPickFotos(files: FileList | null) {
+    if (!files?.length) return
+    setUploading(true)
+    try {
+      const urls: string[] = []
+      for (const file of Array.from(files).slice(0, 8 - draftFotos.length)) {
+        const url = await uploadTimelineFoto(auftragId, file)
+        if (url) urls.push(url)
+      }
+      if (urls.length) setDraftFotos((prev) => [...prev, ...urls])
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function saveEintrag(opts: { positionId?: string | null }) {
+    const text = draftText.trim()
+    if (!text && draftFotos.length === 0) {
+      toast.error('Text oder Foto fehlt.')
       return
     }
     startTransition(async () => {
+      const fotoPath = draftFotos[0] ?? null
       const r = await createCrmPositionEintrag({
+        positionId: opts.positionId ?? null,
         auftragId,
-        positionId: tagebuchForm.positionId,
-        typ: 'fortschritt',
-        beschreibung: text,
-        quelle: 'vor_ort',
+        typ: opts.positionId ? 'fortschritt' : 'notiz',
+        beschreibung: text || (fotoPath ? 'Foto-Dokumentation' : null),
+        fotoStoragePath: fotoPath,
+        fotoCaptureAt: new Date().toISOString(),
       })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Tagebuch-Eintrag gespeichert')
-      setTagebuchForm(null)
+      // Weitere Fotos: je ein eigener Notiz-Eintrag (einfacher Contract)
+      for (const extra of draftFotos.slice(1)) {
+        await createCrmPositionEintrag({
+          positionId: opts.positionId ?? null,
+          auftragId,
+          typ: 'notiz',
+          beschreibung: 'Foto',
+          fotoStoragePath: extra,
+          fotoCaptureAt: new Date().toISOString(),
+        })
+      }
+      toast.success('Eintrag gespeichert')
+      resetDraft()
       const list = await listAuftragPositionEintraege(auftragId)
       setEintraege(list)
       onChanged?.()
     })
   }
 
+  const sheetEntries = sheetPos ? byPos.get(sheetPos.id) ?? [] : freieEintraege
+  const sheetAbn = sheetPos ? punkteByLeistung.get(sheetPos.id) ?? [] : []
+  const sheetAbnUi = abnahmeLabelForLeistung(sheetAbn)
+
+  function renderEintraegeList(rows: PositionEintrag[]) {
+    if (!rows.length) {
+      return <p className="text-sm text-bw-text-muted py-2">Noch keine Einträge.</p>
+    }
+    return (
+      <ul className="vor-ort-sheet__eintraege">
+        {rows.map((e) => (
+          <li key={e.id}>
+            <div className="vor-ort-sheet__eintrag-meta">
+              <strong>{eintragTypLabel(e.typ)}</strong>
+              <span>
+                {e.ereignis_zeit || e.created_at
+                  ? formatDatumZeit(String(e.ereignis_zeit || e.created_at))
+                  : '—'}
+                {' · '}
+                {e.erfasst_von === 'crm_intern' ? 'CRM' : 'Partner'}
+              </span>
+            </div>
+            {e.beschreibung ? (
+              <p className="whitespace-pre-wrap">{richTextToPlain(e.beschreibung)}</p>
+            ) : null}
+            {e.eintrag_fotos?.length ? (
+              <div className="vor-ort-sheet__fotos">
+                {e.eintrag_fotos.map((f) => (
+                  <a
+                    key={f.id}
+                    href={f.display_url || f.storage_path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vor-ort-sheet__foto"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.display_url || f.storage_path} alt="" />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  function renderCompose(opts: { positionId?: string | null; title: string }) {
+    return (
+      <div className="vor-ort-sheet__compose">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted mb-2">
+          {opts.title}
+        </p>
+        <label className="field full">
+          <span className="field-label">Was ist passiert?</span>
+          <textarea
+            className="txt"
+            rows={3}
+            value={draftText}
+            onChange={(e) => setDraftText(e.target.value)}
+            placeholder="Kurzbeschreibung — wie im Partner-Portal"
+          />
+        </label>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              void onPickFotos(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={pending || uploading || draftFotos.length >= 8}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Camera className="mr-1.5 h-4 w-4" aria-hidden />
+            {uploading ? 'Lädt…' : 'Foto hinzufügen'}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={pending || uploading}
+            onClick={() => saveEintrag({ positionId: opts.positionId })}
+          >
+            Speichern
+          </Button>
+        </div>
+        {draftFotos.length > 0 ? (
+          <div className="vor-ort-sheet__fotos mt-3">
+            {draftFotos.map((url) => (
+              <button
+                key={url}
+                type="button"
+                className="vor-ort-sheet__foto"
+                title="Entfernen"
+                onClick={() => setDraftFotos((prev) => prev.filter((u) => u !== url))}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <WerkzeugPanel
-      title="Leistungen vor Ort"
+      title="Bautagebuch"
       icon="list-details"
-      purpose="Eine Tabelle steuert alles: Leistungen (auch abweichend vom Angebot) → Tagebuch-Einträge → Abnahme-Checkliste. Der Abschlussbericht unten fasst das zusammen."
+      purpose="Gleiche Leistungstabelle wie bei Leistungen — Tippen öffnet das Tagebuch mit Fotos je Leistung. Freie Einträge und Projekt-Fotos ohne Positionsbezug."
       framed
       actions={
         <div className="werkzeug-panel__actions">
@@ -366,7 +542,7 @@ export function AuftragLeistungVorOrtTabelle({
           </MockBtn>
           <MockBtn
             sm
-            kind="primary"
+            kind="ghost"
             icon="plus"
             disabled={pending}
             onClick={() =>
@@ -405,172 +581,199 @@ export function AuftragLeistungVorOrtTabelle({
         ) : null}
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Button type="button" variant="primary" size="sm" onClick={openFreeSheet} disabled={pending}>
+          <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+          Freier Eintrag
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={openFreeSheet}
+          disabled={pending}
+        >
+          <Camera className="mr-1 h-3.5 w-3.5" aria-hidden />
+          Projekt-Fotos
+        </Button>
+      </div>
+
       {loading ? (
         <p className="text-sm text-bw-text-muted py-3">Lädt Leistungen…</p>
       ) : sorted.length === 0 ? (
         <MockEmpty
           icon="list-details"
           title="Noch keine Leistungen"
-          hint="Leistung hinzufügen — unabhängig vom ursprünglichen Angebot."
+          hint="Leistung hinzufügen — oder Freier Eintrag / Projekt-Fotos ohne Positionsbezug."
         />
       ) : (
-        <div className="vor-ort-table">
-          <div className="vor-ort-table__head">
-            <div>Leistung</div>
-            <div>Tagebuch</div>
-            <div>Abnahme</div>
-            <div />
-          </div>
-          {sorted.map((pos) => {
-            const rows = byPos.get(pos.id) ?? []
-            const abn = punkteByLeistung.get(pos.id) ?? []
-            const abnUi = abnahmeLabelForLeistung(abn)
-            const open = openIds.has(pos.id)
-            return (
-              <div key={pos.id} className={cn('vor-ort-table__block', open && 'is-open')}>
+        <div className="pos-v3">
+          <div className="postable2">
+            {sorted.map((pos) => {
+              const rows = byPos.get(pos.id) ?? []
+              const abn = punkteByLeistung.get(pos.id) ?? []
+              const abnUi = abnahmeLabelForLeistung(abn)
+              const desc = richTextToPlain(pos.beschreibung)
+              return (
                 <div
-                  className="vor-ort-table__row"
+                  key={pos.id}
+                  className="pt2-row pt2-row--tap"
                   role="button"
                   tabIndex={0}
-                  aria-expanded={open}
-                  onClick={() => toggleOpen(pos.id)}
+                  onClick={() => openLeistungSheet(pos)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      toggleOpen(pos.id)
+                      openLeistungSheet(pos)
                     }
                   }}
                 >
-                  <div className="vor-ort-table__leistung">
-                    <span className="vor-ort-table__name">{pos.leistung_name}</span>
-                    <span className="vor-ort-table__meta">
-                      {pos.gewerk_name}
-                      {' · '}
+                  <div className="pt2-main" style={{ gridColumn: '1 / -1' }}>
+                    <div className="pt2-status-row">
+                      <HandwerkerAntwortChip pos={pos} />
+                      <MockBadge kind={abnUi.kind}>{abnUi.label}</MockBadge>
                       <MockBadge kind={pos.leistung_status === 'erledigt' ? 'done' : 'order'}>
                         {lebenszyklusLabel(pos.leistung_status)}
                       </MockBadge>
-                    </span>
-                  </div>
-                  <div className="vor-ort-table__tagebuch">
-                    {rows.length === 0 ? 'Keine Einträge' : `${rows.length} Eintrag${rows.length === 1 ? '' : 'e'}`}
-                  </div>
-                  <div className="vor-ort-table__abnahme">
-                    <MockBadge kind={abnUi.kind}>{abnUi.label}</MockBadge>
-                  </div>
-                  <div
-                    className="vor-ort-table__actions"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="pencil"
-                      title="Bearbeiten"
-                      disabled={pending}
-                      onClick={() =>
-                        setLeistungForm({
-                          mode: 'edit',
-                          id: pos.id,
-                          name: pos.leistung_name,
-                          beschreibung: pos.beschreibung ?? '',
-                          gewerkSlug: pos.gewerk_slug ?? gewerke[0]?.slug ?? '',
-                        })
-                      }
-                    />
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="trash"
-                      title="Entfernen"
-                      disabled={pending}
-                      onClick={() => removeLeistung(pos)}
-                    />
-                    <ChevronDown
-                      size={16}
-                      className={cn('vor-ort-table__chev', open && 'is-open')}
-                      aria-hidden
-                    />
+                    </div>
+                    <span className="pt-name">{pos.leistung_name}</span>
+                    {desc ? <div className="pt-desc pt-desc--clamp2">{desc}</div> : null}
+                    <div className="pt2-meta">
+                      <span className="pt2-menge">
+                        {pos.gewerk_name || '—'}
+                        {' · '}
+                        {rows.length === 0
+                          ? 'Keine Einträge'
+                          : `${rows.length} Eintrag${rows.length === 1 ? '' : 'e'}`}
+                      </span>
+                    </div>
                   </div>
                 </div>
-
-                {open ? (
-                  <div className="vor-ort-table__detail">
-                    <div className="vor-ort-table__detail-col">
-                      <div className="vor-ort-table__detail-h">Tagebuch</div>
-                      {rows.length === 0 ? (
-                        <p className="vor-ort-table__empty">Noch keine Einträge (Portal oder CRM).</p>
-                      ) : (
-                        <ul className="vor-ort-table__eintraege">
-                          {rows.map((e) => (
-                            <li key={e.id}>
-                              <strong>{eintragTypLabel(e.typ)}</strong>
-                              <span>
-                                {e.ereignis_zeit || e.created_at
-                                  ? formatDatumZeit(String(e.ereignis_zeit || e.created_at))
-                                  : '—'}
-                                {' · '}
-                                {e.erfasst_von === 'crm_intern' ? 'CRM' : 'Partner'}
-                              </span>
-                              {e.beschreibung ? <p>{e.beschreibung}</p> : null}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <MockBtn
-                        sm
-                        kind="primary"
-                        icon="plus"
-                        disabled={pending}
-                        onClick={() =>
-                          setTagebuchForm({
-                            positionId: pos.id,
-                            positionName: pos.leistung_name,
-                            text: '',
-                          })
-                        }
-                      >
-                        Eintrag
-                      </MockBtn>
-                    </div>
-                    <div className="vor-ort-table__detail-col">
-                      <div className="vor-ort-table__detail-h">Abnahme</div>
-                      <div className="vor-ort-table__abn-btns" role="group" aria-label="Abnahme">
-                        {(
-                          [
-                            ['offen', 'Nicht relevant'],
-                            ['ok', 'OK'],
-                            ['mangel', 'Mangel'],
-                          ] as const
-                        ).map(([st, lbl]) => {
-                          const active =
-                            st === 'offen'
-                              ? !leistungFuerAbnahmeAusgewaehlt(abn) &&
-                                !abn.some((p) => p.status === 'mangel')
-                              : st === 'mangel'
-                                ? abn.some((p) => p.status === 'mangel')
-                                : leistungFuerAbnahmeAusgewaehlt(abn) &&
-                                  !abn.some((p) => p.status === 'mangel')
-                          return (
-                            <button
-                              key={st}
-                              type="button"
-                              className={cn('werkzeug-tile', active && 'is-on')}
-                              disabled={pending}
-                              onClick={() => setAbnahmeStatus(pos.id, st)}
-                            >
-                              <span className="werkzeug-tile__lbl">{lbl}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
+
+      {freieEintraege.length > 0 ? (
+        <section className="mt-5">
+          <div className="section-h mb-2 flex items-baseline justify-between">
+            <span>Freie Einträge / Projekt</span>
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+              {freieEintraege.length}
+            </span>
+          </div>
+          {renderEintraegeList(freieEintraege)}
+        </section>
+      ) : null}
+
+      {/* Leistung: Tagebuch-Sheet */}
+      <Modal
+        open={Boolean(sheetPos)}
+        onClose={closeSheet}
+        title={sheetPos?.leistung_name ?? 'Leistung'}
+        subtitle={sheetPos ? `${sheetPos.gewerk_name || '—'} · Abnahme ${sheetAbnUi.label}` : undefined}
+        size="lg"
+        footer={
+          sheetPos ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button type="button" variant="ghost" onClick={closeSheet}>
+                Schließen
+              </Button>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => {
+                    const pos = sheetPos
+                    setLeistungForm({
+                      mode: 'edit',
+                      id: pos.id,
+                      name: pos.leistung_name,
+                      beschreibung: pos.beschreibung ?? '',
+                      gewerkSlug: pos.gewerk_slug ?? gewerke[0]?.slug ?? '',
+                    })
+                  }}
+                >
+                  Bearbeiten
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={pending}
+                  onClick={() => removeLeistung(sheetPos)}
+                >
+                  Entfernen
+                </Button>
+              </div>
+            </div>
+          ) : null
+        }
+      >
+        {sheetPos ? (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted mb-2">
+                Abnahme
+              </p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Abnahme">
+                {(
+                  [
+                    ['offen', 'Offen'],
+                    ['ok', 'OK'],
+                    ['mangel', 'Mangel'],
+                  ] as const
+                ).map(([st, label]) => {
+                  const current =
+                    sheetAbn.find((p) => (p.leistung_id?.trim() || p.id) === sheetPos.id)?.status ??
+                    'offen'
+                  const active = current === st
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      className={cn('btn sm', active ? 'primary' : 'ghost')}
+                      disabled={pending}
+                      onClick={() => setAbnahmeStatus(sheetPos.id, st)}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted mb-2">
+                Tagebuch
+              </p>
+              {renderEintraegeList(sheetEntries)}
+            </div>
+
+            {renderCompose({ positionId: sheetPos.id, title: 'Neuer Eintrag' })}
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* Freier Eintrag / Projekt-Fotos */}
+      <Modal
+        open={freeOpen}
+        onClose={closeSheet}
+        title="Freier Eintrag"
+        subtitle="Ohne Leistungsbezug — Projekt-Fotos & Notizen"
+        size="lg"
+        footer={
+          <Button type="button" variant="ghost" onClick={closeSheet}>
+            Schließen
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          {renderEintraegeList(freieEintraege)}
+          {renderCompose({ positionId: null, title: 'Neuer freier Eintrag / Foto' })}
+        </div>
+      </Modal>
 
       <MockModal
         open={Boolean(leistungForm)}
@@ -590,14 +793,13 @@ export function AuftragLeistungVorOrtTabelle({
         }
       >
         {leistungForm ? (
-          <div className="form-grid form-grid--sheet">
+          <div className="space-y-3">
             <label className="field full">
               <span className="field-label">Name</span>
               <input
                 className="txt"
                 value={leistungForm.name}
                 onChange={(e) => setLeistungForm({ ...leistungForm, name: e.target.value })}
-                placeholder="z. B. Fliesen Bad"
                 autoFocus
               />
             </label>
@@ -610,14 +812,13 @@ export function AuftragLeistungVorOrtTabelle({
                 onChange={(e) =>
                   setLeistungForm({ ...leistungForm, beschreibung: e.target.value })
                 }
-                placeholder="Optional"
               />
             </label>
-            {gewerke.length ? (
+            {gewerke.length > 0 ? (
               <label className="field full">
                 <span className="field-label">Gewerk</span>
                 <select
-                  className="txt"
+                  className="sel"
                   value={leistungForm.gewerkSlug}
                   onChange={(e) =>
                     setLeistungForm({ ...leistungForm, gewerkSlug: e.target.value })
@@ -632,38 +833,6 @@ export function AuftragLeistungVorOrtTabelle({
               </label>
             ) : null}
           </div>
-        ) : null}
-      </MockModal>
-
-      <MockModal
-        open={Boolean(tagebuchForm)}
-        onClose={() => setTagebuchForm(null)}
-        icon="clipboard-list"
-        title="Tagebuch-Eintrag"
-        sub={tagebuchForm?.positionName}
-        footer={
-          <>
-            <MockBtn kind="ghost" onClick={() => setTagebuchForm(null)} disabled={pending}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary" onClick={saveTagebuch} disabled={pending}>
-              Speichern
-            </MockBtn>
-          </>
-        }
-      >
-        {tagebuchForm ? (
-          <label className="field full">
-            <span className="field-label">Was ist passiert?</span>
-            <textarea
-              className="txt"
-              rows={4}
-              value={tagebuchForm.text}
-              onChange={(e) => setTagebuchForm({ ...tagebuchForm, text: e.target.value })}
-              placeholder="Kurzbeschreibung (Partner macht das meist im Portal)"
-              autoFocus
-            />
-          </label>
         ) : null}
       </MockModal>
     </WerkzeugPanel>

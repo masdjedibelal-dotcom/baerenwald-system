@@ -9,7 +9,6 @@ import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
-import { loadEmpfohleneHandwerker } from '@/lib/empfohlene-handwerker'
 import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
@@ -113,10 +112,6 @@ export default async function AnfrageDetailPage({
     : null
 
   const wizardHandwerker = (hwRows ?? []) as Handwerker[]
-  const empfohleneHandwerker = await loadEmpfohleneHandwerker(supabase, {
-    bereiche: lead.bereiche,
-    situation: lead.situation,
-  })
 
   const kunde = resolveLeadKunde(lead.kunden)
   const ag = lead.auftraggeber
@@ -174,7 +169,6 @@ export default async function AnfrageDetailPage({
         angebotWizardInitial={angebotWizardInitial}
         projektKontext={projektKontext}
         dbAuftragId={dbAuftragId}
-        empfohleneHandwerker={empfohleneHandwerker}
       />
     )
   }
@@ -207,7 +201,6 @@ export default async function AnfrageDetailPage({
       angebotWizardFocus={angebotWizardFocus}
       projektKontext={projektKontext}
       dbAuftragId={dbAuftragId}
-      empfohleneHandwerker={empfohleneHandwerker}
     />
   )
 }

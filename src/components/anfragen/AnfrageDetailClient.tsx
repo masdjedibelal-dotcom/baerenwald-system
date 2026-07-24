@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
@@ -18,7 +19,6 @@ import { Timeline } from '@/components/ui/timeline'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateAnfrage } from '@/lib/list-actions'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
@@ -28,23 +28,16 @@ import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
-import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { naechsterSchrittAnfrage } from '@/lib/crm/naechster-schritt'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
-import { EmpfohleneHandwerkerCard } from '@/components/anfragen/EmpfohleneHandwerkerCard'
-import {
-  LeadGptStudioBlock,
-  leadHatKiVertriebsDaten,
-} from '@/components/anfragen/LeadGptStudioBlock'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
-import type { EmpfohlenerHandwerker } from '@/lib/empfohlene-handwerker'
 import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
@@ -156,7 +149,6 @@ export function AnfrageDetailClient({
   angebotWizardFocus = null,
   projektKontext,
   dbAuftragId = null,
-  empfohleneHandwerker = [],
 }: {
   lead: LeadDetail
   angeboteListe?: AngebotKurz[]
@@ -178,7 +170,6 @@ export function AnfrageDetailClient({
   angebotWizardFocus?: string | null
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
-  empfohleneHandwerker?: EmpfohlenerHandwerker[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -542,10 +533,7 @@ export function AnfrageDetailClient({
   )
 
   const detailsInhalt = (
-    <>
-      <AnfrageDetailsTab lead={lead} onSaved={() => refresh()} />
-      <EmpfohleneHandwerkerCard handwerker={empfohleneHandwerker} />
-    </>
+    <AnfrageDetailsTab lead={lead} onSaved={() => refresh()} />
   )
 
   const notizenInhalt = (
@@ -624,45 +612,30 @@ export function AnfrageDetailClient({
         })(),
         meta: headMeta,
         actions: (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {!auftragId ? (
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5"
-                onClick={() => setNotfallModalOpen(true)}
-                disabled={pending}
-                title={fachbegriff('notfall')}
-              >
-                <MockIcon ctx="btn" n="alert-triangle" size={14} />
-                Notfall melden
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn primary sm inline-flex shrink-0 gap-1.5"
-              onClick={primaryCtaAction}
-              disabled={pending}
-            >
-              <MockIcon ctx="btn" n={primaryCtaIcon} size={14} />
-              {primaryCtaLabel}
-            </button>
-            <ActionsMenu
-              trigger={
-                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
-                  <MockIcon ctx="btn" n="dots" size={18} />
-                </button>
-              }
-              items={detailHeadMenuItems}
-              sheetTitle="Anfrage"
-            />
-          </div>
+          <DetailActionsBar
+            sheetTitle="Anfrage"
+            primary={{
+              label: primaryCtaLabel,
+              icon: primaryCtaIcon,
+              onClick: primaryCtaAction,
+              disabled: pending,
+            }}
+            secondary={
+              !auftragId
+                ? {
+                    label: 'Notfall melden',
+                    icon: 'alert-triangle',
+                    onClick: () => setNotfallModalOpen(true),
+                    disabled: pending,
+                  }
+                : null
+            }
+            menuItems={detailHeadMenuItems}
+          />
         ),
       }}
     >
       <div className="space-y-4">
-      {leadHatKiVertriebsDaten(lead) || lead.ki_zusammenfassung?.trim() ? (
-        <LeadGptStudioBlock lead={lead} />
-      ) : null}
       <DetailShell
         groups={detailShellGroups}
         value={tab}

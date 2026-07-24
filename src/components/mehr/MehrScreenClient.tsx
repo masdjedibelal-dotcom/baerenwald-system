@@ -40,25 +40,14 @@ export function MehrScreenClient({
   }
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '14px 16px',
-          marginBottom: 16,
-          background: 'var(--card)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 'var(--r)',
-        }}
-      >
+    <div className="mehr-screen">
+      <div className="mehr-profile">
         <BrandAvatar size={44} aria-hidden />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{userName}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{userRole}</div>
+        <div className="mehr-profile-meta">
+          <div className="mehr-profile-name">{userName}</div>
+          <div className="mehr-profile-role">{userRole}</div>
         </div>
-        <Link href="/einstellungen/profil">
+        <Link href="/einstellungen/profil" className="mehr-profile-link">
           <MockBtn sm icon="settings" kind="ghost">
             Profil
           </MockBtn>
@@ -77,16 +66,14 @@ export function MehrScreenClient({
         ))}
       </div>
 
-      <div style={{ marginTop: 16, padding: '0 4px' }}>
-        <MockBtn
-          kind="danger"
-          disabled={logoutLoading}
-          onClick={() => void handleLogout()}
-          className="w-full"
-        >
-          {logoutLoading ? 'Abmelden…' : 'Abmelden'}
-        </MockBtn>
-      </div>
+      <button
+        type="button"
+        className="mehr-logout"
+        disabled={logoutLoading}
+        onClick={() => void handleLogout()}
+      >
+        {logoutLoading ? 'Abmelden…' : 'Abmelden'}
+      </button>
     </div>
   )
 }

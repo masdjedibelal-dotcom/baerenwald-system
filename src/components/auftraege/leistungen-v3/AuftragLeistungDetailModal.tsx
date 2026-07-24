@@ -10,6 +10,7 @@ import { PartnerVorgangChip } from '@/components/auftraege/leistungen-v3/Partner
 import { HandwerkerAntwortChip } from '@/components/auftraege/leistungen-v3/HandwerkerAntwortChip'
 import { handwerkerAntwortAnzeige } from '@/lib/auftraege/partner-vorgang-display'
 import { formatZeitraumKurz, rowMarge } from '@/components/auftraege/leistungen-v3/utils'
+import { richTextToPlain } from '@/lib/rich-text'
 
 export function AuftragLeistungDetailModal({
   open,
@@ -40,12 +41,18 @@ export function AuftragLeistungDetailModal({
   const entferntPending = istPartnerEntfernungAusstehend(pos)
   const rowLocked = entferntPending
   const hasHw = Boolean(pos.handwerker_id)
+  const beschreibungPlain = richTextToPlain(pos.beschreibung)
+  const mengeLabel =
+    pos.einheit?.trim()?.toLowerCase() === 'pauschal' || (pos.menge ?? 1) === 1
+      ? pos.einheit?.trim() || 'pauschal'
+      : `${pos.menge ?? 1} ${pos.einheit?.trim() || ''}`.trim()
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={pos.leistung_name}
+      subtitle={`${mengeLabel} · ${formatEurBetrag(vk)}`}
       size="lg"
       footer={
         handwerkerOnly ? (
@@ -89,8 +96,10 @@ export function AuftragLeistungDetailModal({
           danach verschwindet sie aus dem Vorgang.
         </p>
       ) : null}
-      <PartnerVorgangChip pos={pos} className="mb-3" />
-      <HandwerkerAntwortChip pos={pos} className="mb-3" />
+      <div className="mb-3 flex flex-wrap gap-2">
+        <HandwerkerAntwortChip pos={pos} />
+        <PartnerVorgangChip pos={pos} />
+      </div>
       {!pos.handwerker_id ? (
         <p className="mb-3 rounded-lg border border-bw-border bg-bw-green-bg/40 px-3 py-2 text-xs text-bw-text-muted">
           Handwerker über das ⋯-Menü der Zeile anfragen.
@@ -101,10 +110,10 @@ export function AuftragLeistungDetailModal({
           <dt>Bezeichnung</dt>
           <dd>{pos.leistung_name}</dd>
         </div>
-        {pos.beschreibung ? (
+        {beschreibungPlain ? (
           <div className="col-span-full">
             <dt>Beschreibung</dt>
-            <dd className="whitespace-pre-wrap">{pos.beschreibung}</dd>
+            <dd className="whitespace-pre-wrap">{beschreibungPlain}</dd>
           </div>
         ) : null}
         <div>
@@ -112,8 +121,12 @@ export function AuftragLeistungDetailModal({
           <dd>{gewerkName}</dd>
         </div>
         <div>
+          <dt>Menge</dt>
+          <dd>{mengeLabel}</dd>
+        </div>
+        <div>
           <dt>VK netto</dt>
-          <dd className="tabular-nums">{formatEurBetrag(vk)}</dd>
+          <dd className="tabular-nums font-semibold text-[var(--green)]">{formatEurBetrag(vk)}</dd>
         </div>
         <div>
           <dt>EK netto</dt>

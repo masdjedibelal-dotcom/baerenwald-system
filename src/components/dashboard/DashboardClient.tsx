@@ -378,9 +378,9 @@ export function DashboardClient({
   )
 
   return (
-    <div>
+    <div className="dashboard-page min-w-0 overflow-x-hidden">
       <div
-        className="mb-[22px] flex flex-wrap items-end justify-between gap-3"
+        className="mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3"
       >
         <div>
           <div style={{ fontSize: 13.5, color: 'var(--text-3)' }}>{dateStr}</div>
@@ -423,7 +423,7 @@ export function DashboardClient({
 
       <div
         className="mb-[22px] grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))' }}
       >
         <UmsatzBarChart months={umsatzMonate} />
         <VertriebsFunnel
@@ -435,7 +435,7 @@ export function DashboardClient({
 
       <div
         className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))' }}
       >
         <GewerkUmsatzCard zeilen={gewerk.zeilen} gesamt={gewerk.gesamt} />
         <TopRankingCard handwerker={rankingHandwerker} kunden={rankingKunden} />

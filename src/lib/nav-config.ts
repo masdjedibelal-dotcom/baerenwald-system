@@ -5,7 +5,6 @@ import {
   CREATE_ENTRY_LABELS,
   createAnfrageHref,
   createAngebotHref,
-  createPartnerHref,
   createRechnungHref,
 } from '@/lib/crm/create-entry'
 
@@ -117,10 +116,7 @@ export type RouteMetaDef = {
 /** TopBar-Titel und CTAs pro Listen-Route. */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
-  '/vorgaenge': {
-    title: 'Vorgänge',
-    cta: { label: CREATE_ENTRY_LABELS.anfrage, href: createAnfrageHref() },
-  },
+  '/vorgaenge': { title: 'Vorgänge' },
   '/anfragen': {
     title: 'Anfragen',
     cta: { label: CREATE_ENTRY_LABELS.anfrage, href: createAnfrageHref() },
@@ -133,10 +129,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
     title: 'Rechnungen',
     cta: { label: CREATE_ENTRY_LABELS.rechnung, href: createRechnungHref() },
   },
-  '/handwerker': {
-    title: 'Partner',
-    cta: { label: CREATE_ENTRY_LABELS.partner, href: createPartnerHref() },
-  },
+  '/handwerker': { title: 'Partner' },
   '/kunden': { title: 'Kunden' },
   '/partner': { title: 'Netzwerk' },
   '/kalender': { title: 'Kalender' },

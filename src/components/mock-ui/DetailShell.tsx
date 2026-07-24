@@ -22,23 +22,24 @@ export type DetailShellProps = {
 
 /**
  * Mock-DetailShell: linke Section-Nav (210px) + Inhalt.
- * Mobil: horizontale Pill-Tabs (CSS). Nur aktive Gruppe wird gerendert.
+ * Mobil: horizontale Unterstrich-Tabs (CSS). Nur aktive Gruppe wird gerendert.
  */
 export function DetailShell({ groups, value, onChange, className }: DetailShellProps) {
   const active = groups.find((g) => g.id === value) ?? groups[0]
 
   return (
     <div className={cn('dshell', className)}>
-      <nav className="dshell-nav" aria-label="Auftragsbereiche">
+      <nav className="dshell-nav" aria-label="Bereiche" role="tablist">
         {groups.map((gr) => {
           const isActive = (active?.id ?? value) === gr.id
           return (
             <button
               key={gr.id}
               type="button"
+              role="tab"
               className={cn('dshell-navitem', isActive && 'active')}
               onClick={() => onChange(gr.id)}
-              aria-current={isActive ? 'page' : undefined}
+              aria-selected={isActive}
             >
               <MockIcon ctx="nav" n={gr.icon} size={16} />
               <span>{gr.label}</span>

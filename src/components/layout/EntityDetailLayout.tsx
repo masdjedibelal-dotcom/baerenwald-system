@@ -12,6 +12,7 @@ import type { NaechsterSchrittHint } from '@/lib/crm/naechster-schritt'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
 import { getDetailRouteMeta } from '@/lib/detail-route-meta'
+import { cn } from '@/lib/utils'
 
 export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
@@ -49,7 +50,7 @@ export function EntityDetailLayout({
   const backLabel = crumbBackLabel ?? 'Zurück zu den Suchergebnissen'
 
   return (
-    <div className={className ?? 'pb-6'}>
+    <div className={cn('detail-entity-page', className ?? 'pb-6')}>
       <MockDetailBackLink href={backHref} label={backLabel} />
       {resolvedVorgang ? <VorgangResolverBanner resolved={resolvedVorgang} /> : null}
       <DetailHead {...head} />

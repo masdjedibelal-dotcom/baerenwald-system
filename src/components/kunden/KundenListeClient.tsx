@@ -22,6 +22,7 @@ import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -199,46 +200,82 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
             </MockChip>
           ))}
         </div>
-        <div className="listbar-actions">
-          <MockBtn
-            icon="filter"
-            kind={activeFilterCount ? 'primary' : 'ghost'}
-            sm
-            onClick={() => setFilterOpen(true)}
-          >
-            <span className="listbar-btn-label">
-              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
-            </span>
-          </MockBtn>
-          <MockBtn
-            icon="checks"
-            kind={selectMode ? 'primary' : 'ghost'}
-            sm
-            onClick={() => {
-              setSelectMode((m) => !m)
-              setSelected({})
-            }}
-          >
-            <span className="listbar-btn-label">
-              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
-            </span>
-          </MockBtn>
-          <MockBtn
-            icon="download"
-            kind="ghost"
-            sm
-            onClick={() =>
-              runMockListExport(
-                exportToCSV,
-                (filtered.length ? filtered : kunden).map(toExportRow),
-                EXPORT_FIELDS,
-                'kunden'
-              )
-            }
-          >
-            <span className="listbar-btn-label">Export</span>
-          </MockBtn>
-        </div>
+        <ListbarActionsMenu
+          title="Listen-Aktionen"
+          activeHint={activeFilterCount}
+          items={[
+            {
+              icon: 'filter',
+              label: 'Filter & Suchen',
+              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+              active: activeFilterCount > 0,
+              onSelect: () => setFilterOpen(true),
+            },
+            {
+              icon: 'checks',
+              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
+              hint: selectMode ? `${selectedCount} gewählt` : undefined,
+              active: selectMode,
+              onSelect: () => {
+                setSelectMode((m) => !m)
+                setSelected({})
+              },
+            },
+            {
+              icon: 'download',
+              label: 'CSV exportieren',
+              onSelect: () =>
+                runMockListExport(
+                  exportToCSV,
+                  (filtered.length ? filtered : kunden).map(toExportRow),
+                  EXPORT_FIELDS,
+                  'kunden'
+                ),
+            },
+          ]}
+          desktop={
+            <>
+              <MockBtn
+                icon="filter"
+                kind={activeFilterCount ? 'primary' : 'ghost'}
+                sm
+                onClick={() => setFilterOpen(true)}
+              >
+                <span className="listbar-btn-label">
+                  Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+                </span>
+              </MockBtn>
+              <MockBtn
+                icon="checks"
+                kind={selectMode ? 'primary' : 'ghost'}
+                sm
+                onClick={() => {
+                  setSelectMode((m) => !m)
+                  setSelected({})
+                }}
+              >
+                <span className="listbar-btn-label">
+                  {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+                </span>
+              </MockBtn>
+              <MockBtn
+                icon="download"
+                kind="ghost"
+                sm
+                onClick={() =>
+                  runMockListExport(
+                    exportToCSV,
+                    (filtered.length ? filtered : kunden).map(toExportRow),
+                    EXPORT_FIELDS,
+                    'kunden'
+                  )
+                }
+              >
+                <span className="listbar-btn-label">Export</span>
+              </MockBtn>
+            </>
+          }
+        />
       </div>
 
       <MockModal

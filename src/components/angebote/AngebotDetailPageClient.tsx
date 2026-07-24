@@ -2,13 +2,13 @@
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Timeline } from '@/components/ui/timeline'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
 import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
@@ -37,7 +36,7 @@ import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
-import { AngebotDetailsTab } from '@/components/angebote/AngebotDetailsTab'
+import { AngebotLeistungenTab, AngebotProjektinfosTab } from '@/components/angebote/AngebotDetailsTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
@@ -76,16 +75,18 @@ import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 
 type AngebotDetailTab =
-  | 'stammdaten'
+  | 'projektinfos'
   | 'details'
+  | 'stammdaten'
   | 'fotos'
   | 'verlauf'
   | 'dokumente'
   | 'notizen'
 
 const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
-  'stammdaten',
+  'projektinfos',
   'details',
+  'stammdaten',
   'fotos',
   'verlauf',
   'dokumente',
@@ -100,19 +101,23 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
     return 'stammdaten'
   }
   if (
-    tab === 'positionen' ||
-    tab === 'leistung' ||
-    tab === 'angebot-details' ||
+    tab === 'projekt' ||
+    tab === 'projektinfo' ||
+    tab === 'projektinfos' ||
     tab === 'anfrage' ||
-    tab === 'anfrage-details'
+    tab === 'anfrage-details' ||
+    tab === 'angebot-details'
   ) {
+    return 'projektinfos'
+  }
+  if (tab === 'positionen' || tab === 'leistung' || tab === 'leistungen') {
     return 'details'
   }
   if (tab === 'aktivitaet') return 'verlauf'
   if (tab === 'kommunikation') return 'notizen'
   if (tab === 'bilder' || tab === 'photos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
-  if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'details'
+  if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'projektinfos'
   if (ANGEBOT_DETAIL_TAB_IDS.has(tab as AngebotDetailTab)) return tab as AngebotDetailTab
   return null
 }
@@ -144,7 +149,7 @@ export function AngebotDetailPageClient({
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
-  const [mainTab, setMainTab] = useState<AngebotDetailTab>('details')
+  const [mainTab, setMainTab] = useState<AngebotDetailTab>('projektinfos')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -517,80 +522,70 @@ export function AngebotDetailPageClient({
     startTransition,
   ])
 
-  const detailPrimaryBtnClass =
-    'btn primary sm inline-flex shrink-0 justify-center gap-1.5'
-
-  const primaryAction = (() => {
+  const primaryAction = useMemo((): DetailActionDef | null => {
     const hwRows = detail.angebot_handwerker ?? []
     if (statusEinfach === 'entwurf') {
       if (hatAngebotHandwerker(hwRows) && !darfAngebotAnKundeSenden(hwRows, detail.status)) {
-        const label = handwerkerAnfrageErledigt(hwRows)
-          ? 'Partner-Einreichung prüfen'
-          : 'Handwerker anfragen'
-        return (
-          <button
-            type="button"
-            className={detailPrimaryBtnClass}
-            disabled={pending}
-            onClick={openHandwerkerAnfragen}
-          >
-            {label}
-            <MockIcon ctx="btn" n="send" size={14} />
-          </button>
-        )
+        return {
+          label: handwerkerAnfrageErledigt(hwRows)
+            ? 'Partner-Einreichung prüfen'
+            : 'Handwerker anfragen',
+          icon: 'send',
+          onClick: openHandwerkerAnfragen,
+          disabled: pending,
+        }
       }
-      // Entwurf: Annehmen ohne Versand (Auftrag anlegen) — Senden bleibt im Aktionsmenü
       if (!auftragId) {
-        return (
-          <button
-            type="button"
-            className={detailPrimaryBtnClass}
-            disabled={pending}
-            onClick={openAcceptModal}
-          >
-            <MockIcon ctx="btn" n="check" size={14} />
-            Angebot annehmen
-          </button>
-        )
+        return {
+          label: 'Angebot annehmen',
+          icon: 'check',
+          onClick: openAcceptModal,
+          disabled: pending,
+        }
       }
     }
     if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
-      return (
-        <button
-          type="button"
-          className={detailPrimaryBtnClass}
-          disabled={pending}
-          onClick={openAcceptModal}
-        >
-          <MockIcon ctx="btn" n="check" size={14} />
-          Angebot annehmen
-        </button>
-      )
+      return {
+        label: 'Angebot annehmen',
+        icon: 'check',
+        onClick: openAcceptModal,
+        disabled: pending,
+      }
     }
     if (statusEinfach === 'angenommen' && auftragId) {
-      return (
-        <Link href={`/auftraege/${auftragId}`} className={detailPrimaryBtnClass}>
-          <MockIcon ctx="btn" n="briefcase" size={14} />
-          Zum Auftrag
-        </Link>
-      )
+      return {
+        label: 'Zum Auftrag',
+        icon: 'briefcase',
+        onClick: () => router.push(`/auftraege/${auftragId}`),
+        href: `/auftraege/${auftragId}`,
+      }
     }
     return null
-  })()
+  }, [
+    detail.angebot_handwerker,
+    detail.status,
+    statusEinfach,
+    auftragId,
+    openHandwerkerAnfragen,
+    openAcceptModal,
+    pending,
+    router,
+  ])
 
   const stammdatenInhalt = (
     <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
   )
 
-  const detailsInhalt = (
-    <AngebotDetailsTab
+  const projektinfosInhalt = (
+    <AngebotProjektinfosTab
       detail={detail}
       lead={lead}
-      gewerke={gewerke}
       editable={positionenBearbeitbar}
       onSaved={() => refresh()}
     />
   )
+
+  const leistungenInhalt = <AngebotLeistungenTab detail={detail} />
 
   const verlaufInhalt = (
     <>
@@ -632,11 +627,17 @@ export function AngebotDetailPageClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
+      id: 'projektinfos',
+      label: 'Projektinfos',
+      icon: 'file-invoice',
+      render: () => projektinfosInhalt,
+    },
+    {
       id: 'details',
       label: 'Leistungen',
       icon: 'list-details',
       count: positionenAnzeigeCount || undefined,
-      render: () => detailsInhalt,
+      render: () => leistungenInhalt,
     },
     {
       id: 'stammdaten',
@@ -695,18 +696,11 @@ export function AngebotDetailPageClient({
         ),
         meta: headMeta,
         actions: (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {primaryAction}
-            <ActionsMenu
-              trigger={
-                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
-                  <MockIcon ctx="btn" n="dots" size={18} />
-                </button>
-              }
-              items={detailHeadMenuItems}
-              sheetTitle="Angebot"
-            />
-          </div>
+          <DetailActionsBar
+            sheetTitle="Angebot"
+            primary={primaryAction}
+            menuItems={detailHeadMenuItems}
+          />
         ),
       }}
     >

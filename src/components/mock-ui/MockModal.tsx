@@ -17,6 +17,7 @@ export function MockModal({
   children,
   footer,
   className,
+  size = 'md',
 }: {
   open: boolean
   onClose: () => void
@@ -26,6 +27,7 @@ export function MockModal({
   children: ReactNode
   footer?: ReactNode
   className?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }) {
   return (
     <Modal
@@ -36,7 +38,7 @@ export function MockModal({
       leading={icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : undefined}
       footer={footer}
       className={className}
-      size="md"
+      size={size}
     >
       {children}
     </Modal>

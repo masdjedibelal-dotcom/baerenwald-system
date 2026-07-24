@@ -258,27 +258,20 @@ export function AuftragLeistungenV3Tab({
                       </label>
                     </div>
                     <div className="pt2-main">
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <span className="pt-name">{pos.leistung_name}</span>
+                      <div className="pt2-status-row">
                         <HandwerkerAntwortChip pos={pos} />
                         <PartnerVorgangChip pos={pos} />
                       </div>
-                      {desc ? <div className="pt-desc">{desc}</div> : null}
-                      {hwName ? (
-                        <div className="pt-desc" style={{ marginTop: 2 }}>
-                          {hwName}
-                        </div>
-                      ) : null}
+                      <span className="pt-name">{pos.leistung_name}</span>
+                      {desc ? <div className="pt-desc pt-desc--clamp2">{desc}</div> : null}
+                      {hwName ? <div className="pt-hw">{hwName}</div> : null}
+                      <div className="pt2-meta">
+                        <span className="pt2-menge">{mengeLabel}</span>
+                        <span className="pt2-preis">{formatEurBetrag(vk)}</span>
+                      </div>
                     </div>
-                    <div className="pt2-menge">{mengeLabel}</div>
-                    <div className="pt2-preis">{formatEurBetrag(vk)}</div>
+                    <div className="pt2-menge pt2-menge--desk">{mengeLabel}</div>
+                    <div className="pt2-preis pt2-preis--desk">{formatEurBetrag(vk)}</div>
                     <div className="pt2-act" onClick={(e) => e.stopPropagation()}>
                       {menu.length > 0 ? (
                         <MockEntityRowMenu items={menu} title="Leistung" />

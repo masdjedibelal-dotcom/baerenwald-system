@@ -40,10 +40,10 @@ export function AuftragVorOrtPanel({
     <div className="vor-ort-flow space-y-5">
       <div className="vor-ort-flow__intro">
         <p className="vor-ort-flow__lead">
-          <strong>Leistungen</strong> sind die Quelle. Daraus entstehen Tagebuch-Einträge und die
-          Abnahme-Checkliste — der Partner macht das vor Ort im <strong>Portal</strong>. Am Ende
-          fasst der <strong>Abschlussbericht</strong> alles zusammen. Leistungen hier kannst du
-          hinzufügen, bearbeiten oder entfernen (auch abweichend vom Angebot).
+          Tippe eine <strong>Leistung</strong> an — im Sheet dokumentierst du Tagebuch, Fotos und
+          Abnahme (wie der Partner im Portal). <strong>Freie Einträge</strong> und{' '}
+          <strong>Projekt-Fotos</strong> gehen auch ohne Positionsbezug. Der Abschlussbericht fasst
+          alles zusammen.
         </p>
         <ol className="vor-ort-flow__steps" aria-label="Ablauf">
           <li

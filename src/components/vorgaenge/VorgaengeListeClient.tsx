@@ -32,6 +32,7 @@ import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { createAnfrageHref } from '@/lib/crm/create-entry'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { cn, formatDatum } from '@/lib/utils'
@@ -155,6 +156,8 @@ export function VorgaengeListeClient({
   const [fDatumVon, setFDatumVon] = useState('')
   const [fDatumBis, setFDatumBis] = useState('')
   const [lifecycle, setLifecycle] = useState<'offen' | 'erledigt'>('offen')
+  const [lifecycleOpen, setLifecycleOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
@@ -162,6 +165,10 @@ export function VorgaengeListeClient({
   useEffect(() => {
     setSelected({})
   }, [lifecycle])
+
+  useEffect(() => {
+    if (!selectMode) setSelected({})
+  }, [selectMode])
 
   const syncPhaseToUrl = useCallback(
     (phase: (typeof VORGANG_FILTERS)[number]) => {
@@ -493,7 +500,7 @@ export function VorgaengeListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips listbar-phase-tabs" role="tablist" aria-label="Phase">
+        <div className="listbar-chips" role="group" aria-label="Phase">
           {VORGANG_FILTERS.map((p) => (
             <MockChip
               key={p}
@@ -513,55 +520,104 @@ export function VorgaengeListeClient({
             </MockChip>
           ))}
         </div>
-        <div className="listbar-actions">
-          <div className="segment-toggle" role="group" aria-label="Lebenszyklus">
-            <button
-              type="button"
-              className={cn(
-                'segment-toggle-btn',
-                lifecycle === 'offen' && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setLifecycle('offen')}
-            >
-              Offen {lifecycleCounts.offen}
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'segment-toggle-btn',
-                lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setLifecycle('erledigt')}
-            >
-              Erledigt {lifecycleCounts.erledigt}
-            </button>
-          </div>
-          <MockBtn
-            icon="filter"
-            kind={activeFilterCount ? 'primary' : 'ghost'}
-            sm
-            title={
-              activeFilterCount
-                ? `Filter & Suchen (${activeFilterCount})`
-                : 'Filter & Suchen'
-            }
-            onClick={() => setFilterOpen(true)}
-          />
-          <MockBtn
-            icon="download"
-            kind="ghost"
-            sm
-            title="CSV exportieren"
-            onClick={() =>
-              runMockListExport(
-                exportToCSV,
-                (filtered.length ? filtered : baseRows).map(toExportRow),
-                EXPORT_FIELDS,
-                'vorgaenge'
-              )
-            }
-          />
-        </div>
+        <ListbarActionsMenu
+          title="Listen-Aktionen"
+          activeHint={activeFilterCount}
+          items={[
+            {
+              icon: 'filter',
+              label: 'Filter & Suchen',
+              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+              active: activeFilterCount > 0,
+              onSelect: () => setFilterOpen(true),
+            },
+            {
+              icon: 'refresh',
+              label: 'Offen / Erledigt',
+              hint:
+                lifecycle === 'offen'
+                  ? `Offen ${lifecycleCounts.offen}`
+                  : `Erledigt ${lifecycleCounts.erledigt}`,
+              onSelect: () => setLifecycleOpen(true),
+            },
+            {
+              icon: 'checks',
+              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
+              hint: selectMode ? `${selectedCount} gewählt` : undefined,
+              active: selectMode,
+              onSelect: () => setSelectMode((m) => !m),
+            },
+            {
+              icon: 'download',
+              label: 'CSV exportieren',
+              onSelect: () =>
+                runMockListExport(
+                  exportToCSV,
+                  (filtered.length ? filtered : baseRows).map(toExportRow),
+                  EXPORT_FIELDS,
+                  'vorgaenge'
+                ),
+            },
+          ]}
+          desktop={
+            <>
+              <div className="segment-toggle" role="group" aria-label="Lebenszyklus">
+                <button
+                  type="button"
+                  className={cn(
+                    'segment-toggle-btn',
+                    lifecycle === 'offen' && 'segment-toggle-btn--active'
+                  )}
+                  onClick={() => setLifecycle('offen')}
+                >
+                  Offen {lifecycleCounts.offen}
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'segment-toggle-btn',
+                    lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+                  )}
+                  onClick={() => setLifecycle('erledigt')}
+                >
+                  Erledigt {lifecycleCounts.erledigt}
+                </button>
+              </div>
+              <MockBtn
+                icon="filter"
+                kind={activeFilterCount ? 'primary' : 'ghost'}
+                sm
+                title={
+                  activeFilterCount
+                    ? `Filter & Suchen (${activeFilterCount})`
+                    : 'Filter & Suchen'
+                }
+                onClick={() => setFilterOpen(true)}
+              />
+              <MockBtn
+                icon="checks"
+                kind={selectMode ? 'primary' : 'ghost'}
+                sm
+                title={selectMode ? 'Auswahl beenden' : 'Multiauswahl'}
+                onClick={() => setSelectMode((m) => !m)}
+              />
+              <MockBtn
+                icon="download"
+                kind="ghost"
+                sm
+                title="CSV exportieren"
+                onClick={() =>
+                  runMockListExport(
+                    exportToCSV,
+                    (filtered.length ? filtered : baseRows).map(toExportRow),
+                    EXPORT_FIELDS,
+                    'vorgaenge'
+                  )
+                }
+              />
+            </>
+          }
+        />
       </div>
 
       <MockModal
@@ -693,6 +749,43 @@ export function VorgaengeListeClient({
         </div>
       </MockModal>
 
+      <MockModal
+        open={lifecycleOpen}
+        onClose={() => setLifecycleOpen(false)}
+        icon="refresh"
+        title="Offen / Erledigt"
+        sub="Lebenszyklus der Liste"
+        size="sm"
+        footer={
+          <MockBtn kind="primary" onClick={() => setLifecycleOpen(false)}>
+            Fertig
+          </MockBtn>
+        }
+      >
+        <div className="segment-toggle segment-toggle--stack" role="group" aria-label="Lebenszyklus">
+          <button
+            type="button"
+            className={cn(
+              'segment-toggle-btn',
+              lifecycle === 'offen' && 'segment-toggle-btn--active'
+            )}
+            onClick={() => setLifecycle('offen')}
+          >
+            Offen {lifecycleCounts.offen}
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'segment-toggle-btn',
+              lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+            )}
+            onClick={() => setLifecycle('erledigt')}
+          >
+            Erledigt {lifecycleCounts.erledigt}
+          </button>
+        </div>
+      </MockModal>
+
       {selectedCount > 0 ? (
         <div className="bulkbar">
           <span>
@@ -722,7 +815,7 @@ export function VorgaengeListeClient({
       ) : null}
 
       <PullToRefresh onRefresh={() => router.refresh()}>
-      <div className="listcard vg-selectmode">
+      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
         <div className="vg-row head">
           <div
             className="vg-check"
@@ -785,13 +878,13 @@ export function VorgaengeListeClient({
               <div
                 key={key}
                 className={cn('vg-row', selected[key] && 'sel')}
-                onClick={() => openDetail(v.detailHref)}
+                onClick={() => (selectMode ? toggleSel(key) : openDetail(v.detailHref))}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    openDetail(v.detailHref)
+                    selectMode ? toggleSel(key) : openDetail(v.detailHref)
                   }
                 }}
               >
@@ -819,14 +912,6 @@ export function VorgaengeListeClient({
                     <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
                     {PHASE_META[v.phase].label}
                   </span>
-                  {v.standalone ? (
-                    <span
-                      className="mt-0.5 block text-[11px] text-[var(--text-3)]"
-                      title={fachbegriff('ohne_vorgang')}
-                    >
-                      Ohne Vorgang
-                    </span>
-                  ) : null}
                 </div>
                 <div
                   className="vg-wert"

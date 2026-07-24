@@ -8,13 +8,12 @@ import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Timeline } from '@/components/ui/timeline'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
-import { Button } from '@/components/ui/Button'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
@@ -502,42 +501,39 @@ export function RechnungDetailClient({
     impersonating,
   ])
 
-  const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
-
-  const headMeta = kundeName
-
-  const primaryAction = (() => {
+  const primaryAction = useMemo((): DetailActionDef | null => {
     if (detail.status === 'entwurf') {
-      return (
-        <Button type="button" variant="primary" size="sm" loading={pending} onClick={handleSenden}>
-          <MockIcon ctx="btn" n="send" size={14} />
-          Versenden
-        </Button>
-      )
+      return {
+        label: 'Versenden',
+        icon: 'send',
+        onClick: handleSenden,
+        disabled: pending,
+      }
     }
     if (detail.status === 'gesendet' || ueberfaellig) {
-      return (
-        <div className="flex flex-wrap items-center gap-2">
-          {ueberfaellig && belegTyp === 'rechnung' ? (
-            <Button type="button" variant="secondary" size="sm" onClick={() => setErinnerungModalOpen(true)}>
-              <MockIcon ctx="btn" n="alert-triangle" size={14} />
-              Erinnerung
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            loading={pending}
-            onClick={() => void setStatus('bezahlt')}
-          >
-            Bezahlt
-          </Button>
-        </div>
-      )
+      return {
+        label: 'Bezahlt',
+        icon: 'check',
+        onClick: () => void setStatus('bezahlt'),
+        disabled: pending,
+      }
     }
     return null
-  })()
+  }, [detail.status, ueberfaellig, pending, handleSenden, setStatus])
+
+  const secondaryAction = useMemo((): DetailActionDef | null => {
+    if ((detail.status === 'gesendet' || ueberfaellig) && ueberfaellig && belegTyp === 'rechnung') {
+      return {
+        label: 'Erinnerung',
+        icon: 'alert-triangle',
+        onClick: () => setErinnerungModalOpen(true),
+      }
+    }
+    return null
+  }, [detail.status, ueberfaellig, belegTyp])
+
+  const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
+  const headMeta = kundeName
 
   const mahnLabel = mahnstufeListenLabel(detail)
 
@@ -655,19 +651,12 @@ export function RechnungDetailClient({
         badges: rechnungStatusBadge(detail.status, ueberfaellig),
         meta: headMeta,
         actions: (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {primaryAction}
-            <ActionsMenu
-              align="right"
-              sheetTitle="Aktionen"
-              trigger={
-                <button type="button" className="btn ghost sm icon" aria-label="Aktionen">
-                  <MockIcon ctx="btn" n="dots" size={16} />
-                </button>
-              }
-              items={detailHeadMenuItems}
-            />
-          </div>
+          <DetailActionsBar
+            sheetTitle="Rechnung"
+            primary={primaryAction}
+            secondary={secondaryAction}
+            menuItems={detailHeadMenuItems}
+          />
         ),
       }}
     >

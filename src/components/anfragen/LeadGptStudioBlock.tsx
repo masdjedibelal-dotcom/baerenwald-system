@@ -1,9 +1,9 @@
 'use client'
 
-import { ChevronDown, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import { ExternalLink, Loader2, MessageSquare, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/actions'
-import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { gptGalerieUrls, isGptProjektStudio, parseGptProjektStudioFunnel } from '@/lib/gpt-viz/funnel-daten'
 import type { LeadDetail } from '@/lib/types'
@@ -76,6 +76,7 @@ function VertriebBlock({ title, children }: { title: string; children: ReactNode
   )
 }
 
+/** KI-Auskunft inline in Bedarf (kein eigene Card). */
 export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
   const studio = useMemo(() => parseGptProjektStudioFunnel(lead.funnel_daten), [lead.funnel_daten])
   const istGpt = Boolean(studio)
@@ -83,6 +84,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
   const [analyse, setAnalyse] = useState(lead.ki_zusammenfassung?.trim() ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
 
   useEffect(() => {
     setAnalyse(lead.ki_zusammenfassung?.trim() ?? '')
@@ -139,66 +141,60 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             : 'Website-KI'
 
   return (
-    <MockCard
-      icon="sparkles"
-      title="Lead-Auskunft · KI"
-      actions={
-        <MockBtn
-          sm
-          kind="ghost"
-          disabled={loading}
-          onClick={() => void analyseAktualisieren()}
-          title="Analyse neu berechnen"
-        >
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <>
-              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-              Aktualisieren
-            </>
-          )}
-        </MockBtn>
-      }
-    >
-      <div className="space-y-4">
-        {istGpt ? (
-          <p className="text-[13px] leading-relaxed text-bw-text-muted">
-            Quelle: <span className="font-medium text-bw-text">{quelleLabel}</span> — Chat, Eingaben,
-            Klicks/Verhalten und Visualisierung werden für den Vertrieb ausgewertet.
-          </p>
+    <>
+      <div className="ki-bedarf-inline space-y-3 rounded-xl border border-[#2E7D52]/30 bg-[#EAF3DE]/55 p-3.5 md:p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2E7D52]">
+              Lead-Auskunft · KI
+            </p>
+            {istGpt ? (
+              <p className="mt-1 text-[13px] leading-relaxed text-bw-text-muted">
+                Quelle: <span className="font-medium text-bw-text">{quelleLabel}</span> — Chat,
+                Eingaben und Visualisierung für den Vertrieb.
+              </p>
+            ) : (
+              <p className="mt-1 text-[13px] leading-relaxed text-bw-text-muted">
+                Anfrage über den <span className="font-medium text-bw-text">KI-Rechner</span> —
+                Eingaben und Chat fließen in die Analyse ein.
+              </p>
+            )}
+          </div>
+          <MockBtn
+            sm
+            kind="ghost"
+            disabled={loading}
+            onClick={() => void analyseAktualisieren()}
+            title="Analyse neu berechnen"
+          >
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <>
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                <span className="hidden sm:inline">Aktualisieren</span>
+              </>
+            )}
+          </MockBtn>
+        </div>
+
+        {loading && !analyse ? (
+          <div className="flex items-center gap-2 text-sm text-bw-text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Chat und Website-Verhalten werden ausgewertet…
+          </div>
+        ) : analyse ? (
+          <AnalyseAbschnitt text={analyse} />
         ) : (
-          <p className="text-[13px] leading-relaxed text-bw-text-muted">
-            Anfrage über den <span className="font-medium text-bw-text">KI-Rechner</span> auf der
-            Website. Eingaben und Chat-Verlauf fließen in die Analyse ein.
+          <p className="text-[13px] text-bw-text-muted">
+            {error ?? 'Noch keine Analyse — bitte „Aktualisieren“ tippen.'}
           </p>
         )}
 
-        <div className="space-y-3 rounded-lg border border-[#2E7D52]/25 bg-[#EAF3DE]/40 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2E7D52]">
-            Analyse für den Mitarbeiter
-          </p>
-
-          {loading && !analyse ? (
-            <div className="flex items-center gap-2 text-sm text-bw-text-muted">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Chat und Website-Verhalten werden ausgewertet…
-            </div>
-          ) : analyse ? (
-            <AnalyseAbschnitt text={analyse} />
-          ) : (
-            <p className="text-[13px] text-bw-text-muted">
-              {error ?? 'Noch keine Analyse — bitte „Aktualisieren“ klicken.'}
-            </p>
-          )}
-
-          {error && analyse ? (
-            <p className="text-xs text-status-cancel-text">{error}</p>
-          ) : null}
-        </div>
+        {error && analyse ? <p className="text-xs text-status-cancel-text">{error}</p> : null}
 
         {!analyse && erk && !loading ? (
-          <div className="space-y-3 rounded-lg border border-bw-border bg-bw-bg p-3">
+          <div className="space-y-3 rounded-lg border border-[#2E7D52]/15 bg-white/60 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
               Rohdaten (Website)
             </p>
@@ -229,7 +225,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-bw-border"
+                  className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-[#2E7D52]/20"
                   title="Bild öffnen"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -244,33 +240,45 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
         ) : null}
 
         {chat.length > 0 ? (
-          <details className="group rounded-lg border border-bw-border bg-bw-bg">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-bw-text marker:content-none [&::-webkit-details-marker]:hidden">
-              <span>Chat-Verlauf ({chat.length})</span>
-              <ChevronDown
-                className={cn('h-4 w-4 shrink-0 text-bw-text-muted transition group-open:rotate-180')}
-                aria-hidden
-              />
-            </summary>
-            <div className="max-h-64 space-y-2 overflow-y-auto border-t border-bw-border px-3 py-2">
-              {chat.map((m, i) => (
-                <div
-                  key={`${m.role}-${i}`}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-[13px] leading-relaxed',
-                    m.role === 'user' ? 'bg-white text-bw-text' : 'bg-[#EAF3DE] text-[#1A3D2B]'
-                  )}
-                >
-                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-70">
-                    {m.role === 'user' ? 'Kunde' : 'KI'}
-                  </p>
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                </div>
-              ))}
-            </div>
-          </details>
+          <button
+            type="button"
+            className="inline-flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-[#2E7D52]/25 bg-white/70 px-3 py-2 text-left text-[13px] font-semibold text-[#1A3D2B] transition hover:bg-white"
+            onClick={() => setChatOpen(true)}
+          >
+            <span className="inline-flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 shrink-0 text-[#2E7D52]" aria-hidden />
+              Chat-Verlauf ({chat.length})
+            </span>
+            <span className="text-xs font-medium text-bw-text-muted">Öffnen</span>
+          </button>
         ) : null}
       </div>
-    </MockCard>
+
+      <MockModal
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        icon="message"
+        title="Chat-Verlauf"
+        sub={`${chat.length} Nachrichten · Website-KI`}
+        size="lg"
+      >
+        <div className="max-h-[min(70vh,520px)] space-y-2.5 overflow-y-auto overscroll-contain pr-1">
+          {chat.map((m, i) => (
+            <div
+              key={`${m.role}-${i}`}
+              className={cn(
+                'rounded-lg px-3 py-2.5 text-[13px] leading-relaxed',
+                m.role === 'user' ? 'bg-bw-bg text-bw-text' : 'bg-[#EAF3DE] text-[#1A3D2B]'
+              )}
+            >
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                {m.role === 'user' ? 'Kunde' : 'KI'}
+              </p>
+              <p className="whitespace-pre-wrap">{m.content}</p>
+            </div>
+          ))}
+        </div>
+      </MockModal>
+    </>
   )
 }

@@ -24,6 +24,7 @@ import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
+import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 
 export type HandwerkerZeile = {
   id: string
@@ -263,46 +264,82 @@ export function HandwerkerListeClient({
             </MockChip>
           ))}
         </div>
-        <div className="listbar-actions">
-          <MockBtn
-            icon="filter"
-            kind={activeFilterCount ? 'primary' : 'ghost'}
-            sm
-            onClick={() => setFilterOpen(true)}
-          >
-            <span className="listbar-btn-label">
-              Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
-            </span>
-          </MockBtn>
-          <MockBtn
-            icon="checks"
-            kind={selectMode ? 'primary' : 'ghost'}
-            sm
-            onClick={() => {
-              setSelectMode((m) => !m)
-              setSelected({})
-            }}
-          >
-            <span className="listbar-btn-label">
-              {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
-            </span>
-          </MockBtn>
-          <MockBtn
-            icon="download"
-            kind="ghost"
-            sm
-            onClick={() =>
-              runMockListExport(
-                exportToCSV,
-                (filtered.length ? filtered : rows).map(handwerkerExportRow),
-                EXPORT_FIELDS,
-                'handwerker'
-              )
-            }
-          >
-            <span className="listbar-btn-label">Export</span>
-          </MockBtn>
-        </div>
+        <ListbarActionsMenu
+          title="Listen-Aktionen"
+          activeHint={activeFilterCount}
+          items={[
+            {
+              icon: 'filter',
+              label: 'Filter & Suchen',
+              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+              active: activeFilterCount > 0,
+              onSelect: () => setFilterOpen(true),
+            },
+            {
+              icon: 'checks',
+              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
+              hint: selectMode ? `${selectedCount} gewählt` : undefined,
+              active: selectMode,
+              onSelect: () => {
+                setSelectMode((m) => !m)
+                setSelected({})
+              },
+            },
+            {
+              icon: 'download',
+              label: 'CSV exportieren',
+              onSelect: () =>
+                runMockListExport(
+                  exportToCSV,
+                  (filtered.length ? filtered : rows).map(handwerkerExportRow),
+                  EXPORT_FIELDS,
+                  'handwerker'
+                ),
+            },
+          ]}
+          desktop={
+            <>
+              <MockBtn
+                icon="filter"
+                kind={activeFilterCount ? 'primary' : 'ghost'}
+                sm
+                onClick={() => setFilterOpen(true)}
+              >
+                <span className="listbar-btn-label">
+                  Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
+                </span>
+              </MockBtn>
+              <MockBtn
+                icon="checks"
+                kind={selectMode ? 'primary' : 'ghost'}
+                sm
+                onClick={() => {
+                  setSelectMode((m) => !m)
+                  setSelected({})
+                }}
+              >
+                <span className="listbar-btn-label">
+                  {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
+                </span>
+              </MockBtn>
+              <MockBtn
+                icon="download"
+                kind="ghost"
+                sm
+                onClick={() =>
+                  runMockListExport(
+                    exportToCSV,
+                    (filtered.length ? filtered : rows).map(handwerkerExportRow),
+                    EXPORT_FIELDS,
+                    'handwerker'
+                  )
+                }
+              >
+                <span className="listbar-btn-label">Export</span>
+              </MockBtn>
+            </>
+          }
+        />
       </div>
 
       <MockModal

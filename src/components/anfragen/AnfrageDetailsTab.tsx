@@ -2,6 +2,10 @@
 
 import { useMemo } from 'react'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
+import {
+  LeadGptStudioBlock,
+  leadHatKiVertriebsDaten,
+} from '@/components/anfragen/LeadGptStudioBlock'
 import { updateLeadBeschreibung } from '@/app/(dashboard)/anfragen/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { isEchterFreitext, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
@@ -52,6 +56,7 @@ export function AnfrageDetailsTab({
   )
 
   const bedarfUi = useMemo(() => buildFunnelBedarfExtraRows(lead), [lead])
+  const showKi = leadHatKiVertriebsDaten(lead) || Boolean(lead.ki_zusammenfassung?.trim())
 
   return (
     <EntityProjektUebersichtCard
@@ -74,6 +79,7 @@ export function AnfrageDetailsTab({
       preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
       extraRows={bedarfUi.extraRows}
       footerRows={bedarfUi.footerRows}
+      belowContent={showKi ? <LeadGptStudioBlock lead={lead} /> : null}
     />
   )
 }

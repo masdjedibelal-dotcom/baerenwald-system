@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Calendar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
 import {
   buildDashboardZeitraumHref,
   DASHBOARD_ZEITRAUM_OPTIONS,
+  dashboardZeitraumLabel,
   type DashboardZeitraumFilter,
   type DashboardZeitraumPreset,
 } from '@/lib/dashboard/dashboard-analytics'
@@ -16,25 +18,38 @@ type Props = {
   filter: DashboardZeitraumFilter
 }
 
+const PRESETS = DASHBOARD_ZEITRAUM_OPTIONS.filter((o) => o.value !== 'benutzerdefiniert')
+
 export function DashboardZeitraumFilterBar({ filter }: Props) {
   const router = useRouter()
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const panelId = useId()
+  const [open, setOpen] = useState(false)
+  const [customMode, setCustomMode] = useState(filter.preset === 'benutzerdefiniert')
   const [draftVon, setDraftVon] = useState(filter.von)
   const [draftBis, setDraftBis] = useState(filter.bis)
-  const popoverRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     setDraftVon(filter.von)
     setDraftBis(filter.bis)
-  }, [filter.von, filter.bis])
+    setCustomMode(filter.preset === 'benutzerdefiniert')
+  }, [filter.von, filter.bis, filter.preset])
 
   useEffect(() => {
-    if (!pickerOpen) return
+    if (!open) return
     function onDocClick(e: MouseEvent) {
-      if (!popoverRef.current?.contains(e.target as Node)) setPickerOpen(false)
+      const t = e.target as Node
+      if (rootRef.current?.contains(t)) return
+      // Bottom-Sheet liegt im Portal außerhalb von rootRef
+      const sheet = document.getElementById(panelId)
+      if (sheet?.contains(t)) return
+      setOpen(false)
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPickerOpen(false)
+      if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('mousedown', onDocClick)
     document.addEventListener('keydown', onKey)
@@ -42,7 +57,17 @@ export function DashboardZeitraumFilterBar({ filter }: Props) {
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onKey)
     }
-  }, [pickerOpen])
+  }, [open, panelId])
+
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    const mq = window.matchMedia('(max-width: 767px)')
+    if (mq.matches) document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
 
   function navigate(next: DashboardZeitraumFilter) {
     router.replace(buildDashboardZeitraumHref(next))
@@ -50,16 +75,17 @@ export function DashboardZeitraumFilterBar({ filter }: Props) {
 
   function selectPreset(preset: DashboardZeitraumPreset) {
     if (preset === 'benutzerdefiniert') {
-      setPickerOpen(true)
+      setCustomMode(true)
       return
     }
-    setPickerOpen(false)
+    setCustomMode(false)
+    setOpen(false)
     navigate({ preset, von: '', bis: '' })
   }
 
   function applyCustomRange() {
     if (!draftVon.trim() || !draftBis.trim()) return
-    setPickerOpen(false)
+    setOpen(false)
     navigate({
       preset: 'benutzerdefiniert',
       von: draftVon,
@@ -67,70 +93,62 @@ export function DashboardZeitraumFilterBar({ filter }: Props) {
     })
   }
 
-  const individuellActive =
-    filter.preset === 'benutzerdefiniert' && Boolean(filter.von && filter.bis)
+  const label = dashboardZeitraumLabel(filter)
 
-  return (
-    <div className="relative" ref={popoverRef}>
-      <div className="seg" role="group" aria-label="Zeitraum">
-        {DASHBOARD_ZEITRAUM_OPTIONS.filter((o) => o.value !== 'benutzerdefiniert').map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={filter.preset === o.value ? 'on' : undefined}
-            onClick={() => selectPreset(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
+  const panel = (
+    <div className="dash-zeitraum-panel">
+      <p className="dash-zeitraum-panel__title">Zeitraum</p>
+      <div className="dash-zeitraum-panel__list" role="listbox" aria-label="Zeitraum wählen">
+        {PRESETS.map((o) => {
+          const active = !customMode && filter.preset === o.value
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="option"
+              aria-selected={active}
+              className={cn('dash-zeitraum-panel__item', active && 'is-active')}
+              onClick={() => selectPreset(o.value)}
+            >
+              {o.label}
+            </button>
+          )
+        })}
         <button
           type="button"
-          className={cn(
-            individuellActive || pickerOpen ? 'on' : undefined,
-            'inline-flex items-center gap-1.5'
-          )}
-          onClick={() => setPickerOpen((v) => !v)}
-          aria-expanded={pickerOpen}
+          role="option"
+          aria-selected={customMode}
+          className={cn('dash-zeitraum-panel__item', customMode && 'is-active')}
+          onClick={() => setCustomMode(true)}
         >
-          <Calendar className="h-3.5 w-3.5" aria-hidden />
+          <Calendar className="h-4 w-4 shrink-0" aria-hidden />
           Individuell
         </button>
       </div>
 
-      {pickerOpen ? (
-        <div
-          className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(100vw-2rem,320px)] rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 shadow-lg"
-          role="dialog"
-          aria-label="Individueller Zeitraum"
-        >
-          <p className="mb-2 text-[12px] font-semibold text-[var(--text)]">Zeitraum wählen</p>
-          <div className="flex flex-col gap-2">
-            <label className="flex flex-col gap-1 text-[11.5px] text-[var(--text-3)]">
-              Von
-              <input
-                type="date"
-                value={draftVon}
-                onChange={(e) => setDraftVon(e.target.value)}
-                className={LIST_FILTER_SELECT_CLASS}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-[11.5px] text-[var(--text-3)]">
-              Bis
-              <input
-                type="date"
-                value={draftBis}
-                min={draftVon || undefined}
-                onChange={(e) => setDraftBis(e.target.value)}
-                className={LIST_FILTER_SELECT_CLASS}
-              />
-            </label>
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              className="btn ghost sm"
-              onClick={() => setPickerOpen(false)}
-            >
+      {customMode ? (
+        <div className="dash-zeitraum-panel__custom">
+          <label className="dash-zeitraum-panel__field">
+            Von
+            <input
+              type="date"
+              value={draftVon}
+              onChange={(e) => setDraftVon(e.target.value)}
+              className={LIST_FILTER_SELECT_CLASS}
+            />
+          </label>
+          <label className="dash-zeitraum-panel__field">
+            Bis
+            <input
+              type="date"
+              value={draftBis}
+              min={draftVon || undefined}
+              onChange={(e) => setDraftBis(e.target.value)}
+              className={LIST_FILTER_SELECT_CLASS}
+            />
+          </label>
+          <div className="dash-zeitraum-panel__actions">
+            <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
               Abbrechen
             </button>
             <button
@@ -144,6 +162,62 @@ export function DashboardZeitraumFilterBar({ filter }: Props) {
           </div>
         </div>
       ) : null}
+    </div>
+  )
+
+  return (
+    <div className="dash-zeitraum relative min-w-0 shrink-0" ref={rootRef}>
+      <button
+        type="button"
+        className={cn('btn sm icon ghost dash-zeitraum-trigger', open && 'is-open')}
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-haspopup="dialog"
+        aria-label={`Zeitraum: ${label}`}
+        title={`Zeitraum: ${label}`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      </button>
+
+      {/* Desktop: Popover */}
+      {open ? (
+        <div
+          id={`${panelId}-desktop`}
+          className="dash-zeitraum-popover absolute right-0 top-[calc(100%+8px)] z-sidepanel-pop hidden md:block"
+          role="dialog"
+          aria-label="Zeitraum filtern"
+        >
+          {panel}
+        </div>
+      ) : null}
+
+      {/* Mobil: Bottom-Sheet */}
+      {open && mounted
+        ? createPortal(
+            <>
+              <button
+                type="button"
+                className="dash-zeitraum-scrim z-sidepanel md:hidden"
+                aria-label="Filter schließen"
+                onClick={() => setOpen(false)}
+              />
+              <div
+                id={panelId}
+                className="dash-zeitraum-sheet z-modal md:hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Zeitraum filtern"
+              >
+                <div className="dash-zeitraum-sheet__handle" aria-hidden>
+                  <span />
+                </div>
+                {panel}
+              </div>
+            </>,
+            document.body
+          )
+        : null}
     </div>
   )
 }

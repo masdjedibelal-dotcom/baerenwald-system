@@ -348,23 +348,18 @@ export function PosTable({
                     ) : null}
                   </div>
                   <div className="pt2-main">
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <span className="pt-name">{it.name}</span>
-                      {it.badge ? (
+                    {it.badge ? (
+                      <div className="pt2-status-row">
                         <MockBadge kind={it.badge.kind}>
                           {it.badge.icon ? <MockIcon ctx="default" n={it.badge.icon} size={10} /> : null}
                           {it.badge.label}
                         </MockBadge>
-                      ) : null}
-                    </div>
-                    {it.beschreibung ? <div className="pt-desc">{it.beschreibung}</div> : null}
+                      </div>
+                    ) : null}
+                    <span className="pt-name">{it.name}</span>
+                    {it.beschreibung ? (
+                      <div className="pt-desc pt-desc--clamp2">{it.beschreibung}</div>
+                    ) : null}
                     <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel}>
                       {it.mengeLabel ? <span className="pt2-menge">{it.mengeLabel}</span> : null}
                       {it.preisLabel ? <span className="pt2-preis">{it.preisLabel}</span> : null}
