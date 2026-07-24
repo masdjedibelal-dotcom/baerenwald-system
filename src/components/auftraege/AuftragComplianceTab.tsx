@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { Shield } from 'lucide-react'
 import { Accordion } from '@/components/ui/Accordion'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { AuftragPartnerCompliancePanel } from '@/components/auftraege/AuftragPartnerCompliancePanel'
