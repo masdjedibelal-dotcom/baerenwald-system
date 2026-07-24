@@ -1,8 +1,15 @@
+import { createClient } from '@/lib/supabase-server'
+import { loadWizardContext } from '@/lib/wizard-context'
+import { AngebotNeuFromKundeClient } from '@/components/angebote/AngebotNeuFromKundeClient'
+import { AngebotNeuKundeGate } from '@/components/angebote/AngebotNeuKundeGate'
 import { redirect } from 'next/navigation'
+import type { Handwerker, Kunde } from '@/lib/types'
 
 /**
- * FAB / Deep-Link: Angebots-Neu startet über Kundensuche auf /neu?art=angebot
- * bzw. mit lead_id direkt auf der Anfrage.
+ * FAB / Deep-Link „Neues Angebot“:
+ * Ohne kunde_id → Kundenschritt (wie Anfrage-Funnel).
+ * Mit lead_id → Wizard auf Anfrage.
+ * Mit kunde_id → Wizard ohne vorab angelegte Anfrage (Lead erst beim Speichern).
  */
 export default async function AngebotNeuRedirectPage({
   searchParams,
@@ -33,12 +40,36 @@ export default async function AngebotNeuRedirectPage({
   }
 
   if (kundeId) {
-    redirect(`/neu?art=angebot&kunde_id=${encodeURIComponent(kundeId)}`)
+    const supabase = createClient()
+    const [{ data: kunde, error }, wizard, { data: handwerker }] = await Promise.all([
+      supabase.from('kunden').select('*').eq('id', kundeId).maybeSingle(),
+      loadWizardContext(supabase),
+      supabase
+        .from('handwerker')
+        .select('id, name, email, telefon, firma, aktiv')
+        .eq('aktiv', true)
+        .order('name')
+        .limit(200),
+    ])
+
+    if (error || !kunde) {
+      return <AngebotNeuKundeGate />
+    }
+
+    return (
+      <AngebotNeuFromKundeClient
+        kunde={kunde as Kunde}
+        gewerke={wizard.gewerke}
+        preislisten={wizard.preislisten}
+        firm={wizard.firm}
+        handwerker={(handwerker ?? []) as Handwerker[]}
+      />
+    )
   }
 
   if (searchParams.vorlage_id?.trim()) {
     redirect('/einstellungen/vorlagen')
   }
 
-  redirect('/neu?art=angebot')
+  return <AngebotNeuKundeGate />
 }

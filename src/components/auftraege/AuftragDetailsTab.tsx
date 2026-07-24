@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { AuftragPositionenSteuerungTab } from '@/components/auftraege/AuftragPositionenSteuerungTab'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
@@ -11,6 +11,7 @@ import {
   updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
 import type { HandwerkerZuweisenKontext } from '@/components/auftraege/HandwerkerZuweisenModal'
+import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
@@ -92,6 +93,15 @@ export function AuftragDetailsTab({
   )
   const [wiederkehrSaving, setWiederkehrSaving] = useState(false)
 
+  useEffect(() => {
+    setWiederkehr(
+      normalizeVorgangWiederkehr({
+        ist_wiederkehrend: detail.ist_wiederkehrend,
+        wiederkehr_turnus: detail.wiederkehr_turnus,
+      })
+    )
+  }, [detail.id, detail.ist_wiederkehrend, detail.wiederkehr_turnus])
+
   const handwerkerKontext = useMemo((): HandwerkerZuweisenKontext => {
     const k = detail.kunden
     return {
@@ -110,12 +120,70 @@ export function AuftragDetailsTab({
     [angebotDetail]
   )
 
+  const funnelUi = useMemo(
+    () => (lead ? buildFunnelBedarfExtraRows(lead) : { extraRows: [], footerRows: [] }),
+    [lead]
+  )
+
+  function saveWiederkehr(next: VorgangWiederkehr) {
+    if (!editable || wiederkehrSaving) return
+    const prev = wiederkehr
+    setWiederkehr(next)
+    setWiederkehrSaving(true)
+    void updateAuftragProjektFelder(detail.id, {
+      ist_wiederkehrend: next.ist_wiederkehrend,
+      wiederkehr_turnus: next.wiederkehr_turnus,
+    }).then((r) => {
+      setWiederkehrSaving(false)
+      if (!r.ok) {
+        toast.error(r.message)
+        setWiederkehr(prev)
+        return
+      }
+      toast.success(
+        next.ist_wiederkehrend
+          ? 'Als wiederkehrende Leistung gespeichert'
+          : 'Als einmalige Leistung gespeichert'
+      )
+      onSaved?.()
+    })
+  }
+
   return (
     <>
       <AuftragDetailTopCards detail={detail} team={team} />
 
+      <AuftragPositionenSteuerungTab
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        gewerke={gewerke}
+        angebotId={detail.angebot_id}
+        angebotTitel={angebotTitel}
+        angebotHandwerker={angebotHandwerker}
+        handwerkerRows={detail.auftrag_handwerker ?? []}
+        handwerkerKontext={handwerkerKontext}
+        auftragAbgeschlossen={istAbgeschlossen || !editable}
+        onChanged={() => onSaved?.()}
+      />
+
+      <div
+        className="card"
+        style={{
+          marginTop: 16,
+          padding: 16,
+          opacity: wiederkehrSaving ? 0.7 : 1,
+        }}
+      >
+        <VorgangArtWiederkehrField
+          value={wiederkehr}
+          disabled={!editable || wiederkehrSaving}
+          onChange={saveWiederkehr}
+          hint="Auch nach Angebotsannahme hier änderbar — Filter „Bestand“ in Vorgänge"
+        />
+      </div>
+
       <EntityProjektUebersichtCard
-        title="Auftrag"
+        title="Projektinfos"
         icon="tool"
         initial={{
           titel: detail.titel?.trim() || angebotTitel,
@@ -147,55 +215,7 @@ export function AuftragDetailsTab({
         }
         disabled={!editable}
         fortschritt={fortschritt}
-      />
-
-      <div
-        className="card"
-        style={{
-          marginTop: 16,
-          padding: 16,
-          opacity: wiederkehrSaving ? 0.7 : 1,
-        }}
-      >
-        <VorgangArtWiederkehrField
-          value={wiederkehr}
-          onChange={(next) => {
-            if (!editable) return
-            setWiederkehr(next)
-            setWiederkehrSaving(true)
-            void updateAuftragProjektFelder(detail.id, {
-              ist_wiederkehrend: next.ist_wiederkehrend,
-              wiederkehr_turnus: next.wiederkehr_turnus,
-            }).then((r) => {
-              setWiederkehrSaving(false)
-              if (!r.ok) {
-                toast.error(r.message)
-                setWiederkehr(
-                  normalizeVorgangWiederkehr({
-                    ist_wiederkehrend: detail.ist_wiederkehrend,
-                    wiederkehr_turnus: detail.wiederkehr_turnus,
-                  })
-                )
-                return
-              }
-              onSaved?.()
-            })
-          }}
-          hint="Bestand — Winterdienst, Hausmeister, Wartung (Filter in Vorgänge)"
-        />
-      </div>
-
-      <AuftragPositionenSteuerungTab
-        auftragId={detail.id}
-        positionen={detail.auftrag_positionen ?? []}
-        gewerke={gewerke}
-        angebotId={detail.angebot_id}
-        angebotTitel={angebotTitel}
-        angebotHandwerker={angebotHandwerker}
-        handwerkerRows={detail.auftrag_handwerker ?? []}
-        handwerkerKontext={handwerkerKontext}
-        auftragAbgeschlossen={istAbgeschlossen || !editable}
-        onChanged={() => onSaved?.()}
+        extraRows={funnelUi.extraRows}
       />
     </>
   )

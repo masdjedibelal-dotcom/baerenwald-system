@@ -11,7 +11,13 @@ export type PositionVerguetung = (typeof POSITION_VERGUETUNGEN)[number]
 export const POSITION_LEBENSZYKLUS = ['offen', 'in_arbeit', 'erledigt'] as const
 export type PositionLebenszyklus = (typeof POSITION_LEBENSZYKLUS)[number]
 
-export const EINTRAG_TYPEN = ['start', 'fortschritt', 'ergebnis', 'weitere_arbeit'] as const
+export const EINTRAG_TYPEN = [
+  'start',
+  'fortschritt',
+  'ergebnis',
+  'weitere_arbeit',
+  'notiz',
+] as const
 export type EintragTyp = (typeof EINTRAG_TYPEN)[number]
 
 export const EINTRAG_ERFASST_VON = ['partner_app', 'eigenbetrieb_app', 'crm_intern'] as const
@@ -32,7 +38,9 @@ export const DOKU_UEBERFAELLIG_MS = 24 * 60 * 60 * 1000
 
 export type PositionEintrag = {
   id: string
-  position_id: string
+  /** null = freier Eintrag ohne Leistungsbezug */
+  position_id: string | null
+  auftrag_id?: string | null
   typ: EintragTyp | string
   beschreibung?: string | null
   beschreibung_roh?: string | null
@@ -106,6 +114,8 @@ export function eintragTypLabel(typ: string | null | undefined): string {
       return 'Ergebnis'
     case 'weitere_arbeit':
       return 'Weitere Arbeit'
+    case 'notiz':
+      return 'Notiz'
     default:
       return typ?.trim() || 'Eintrag'
   }

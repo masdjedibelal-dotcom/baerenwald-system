@@ -39,7 +39,7 @@ const TYPE_CONFIG: Record<
   anfrage: { icon: resolveMockIcon(TYPE_ICONS.anfrage), label: 'Anfragen', color: 'text-bw-link' },
   angebot: { icon: resolveMockIcon(TYPE_ICONS.angebot), label: 'Angebote', color: 'text-orange-600' },
   auftrag: { icon: resolveMockIcon(TYPE_ICONS.auftrag), label: 'Aufträge', color: 'text-bw-success' },
-  handwerker: { icon: resolveMockIcon(TYPE_ICONS.handwerker), label: 'Handwerker', color: 'text-bw-accent' },
+  handwerker: { icon: resolveMockIcon(TYPE_ICONS.handwerker), label: 'Partner', color: 'text-bw-accent' },
   rechnung: { icon: resolveMockIcon(TYPE_ICONS.rechnung), label: 'Rechnungen', color: 'text-purple-500' },
   kunde: { icon: resolveMockIcon(TYPE_ICONS.kunde), label: 'Kunden', color: 'text-bw-mid' },
 }
@@ -264,7 +264,7 @@ export function GlobalSearch() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Suchen in Anfragen, Angeboten, Aufträgen, Rechnungen, Kunden…"
-            className="flex-1 bg-transparent text-sm text-bw-text outline-none placeholder:text-bw-light"
+            className="flex-1 bg-transparent text-bw-text outline-none placeholder:text-bw-light placeholder:text-[12px] placeholder:font-normal"
             style={{ fontSize: '16px' }}
             autoComplete="off"
           />

@@ -3,7 +3,7 @@ import { PartnerMasterDetailShell } from '@/components/partner/PartnerMasterDeta
 import { loadPartnerListe } from '@/lib/partner/load-partner-liste'
 
 export const metadata: Metadata = {
-  title: 'Partner',
+  title: 'Netzwerk',
 }
 
 export default async function PartnerLayout({ children }: { children: React.ReactNode }) {

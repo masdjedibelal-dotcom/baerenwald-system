@@ -10,6 +10,7 @@ import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helper
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
 import { loadEmpfohleneHandwerker } from '@/lib/empfohlene-handwerker'
+import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
 /** Schwere Client-Bundle (Wizard, PDF) aus Page-Chunk auslagern — verhindert ChunkLoadError bei HMR. */
@@ -19,11 +20,7 @@ const AnfrageDetailClient = dynamic(
       default: mod.AnfrageDetailClient,
     })),
   {
-    loading: () => (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-bw-text-muted">
-        Anfrage wird geladen…
-      </div>
-    ),
+    loading: () => <CrmPageLoading label="Anfrage wird geladen …" />,
   }
 )
 
@@ -32,10 +29,25 @@ export default async function AnfrageDetailPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams?: { angebot_kopie_von?: string; angebote?: string; angebot_wizard?: string }
+  searchParams?: {
+    angebot_kopie_von?: string
+    angebote?: string
+    angebot_wizard?: string
+    wizard_step?: string
+    focus?: string
+    tab?: string
+  }
 }) {
   const angeboteAuswahlInitial = searchParams?.angebote === '1'
   const angebotWizardInitial = searchParams?.angebot_wizard === '1'
+  const wizardStepRaw = Number(searchParams?.wizard_step)
+  const angebotWizardInitialStep =
+    Number.isFinite(wizardStepRaw) && wizardStepRaw >= 1 && wizardStepRaw <= 5
+      ? Math.floor(wizardStepRaw)
+      : searchParams?.focus === 'positionen'
+        ? 2
+        : null
+  const angebotWizardFocus = searchParams?.focus?.trim() || null
   const supabase = createClient()
   const lead = await loadAnfrageDetail(supabase, params.id)
 
@@ -191,6 +203,8 @@ export default async function AnfrageDetailPage({
       angebotFlowSnapshot={angebotFlowSnapshot}
       angeboteAuswahlInitial={angeboteAuswahlInitial}
       angebotWizardInitial={angebotWizardInitial}
+      angebotWizardInitialStep={angebotWizardInitialStep}
+      angebotWizardFocus={angebotWizardFocus}
       projektKontext={projektKontext}
       dbAuftragId={dbAuftragId}
       empfohleneHandwerker={empfohleneHandwerker}

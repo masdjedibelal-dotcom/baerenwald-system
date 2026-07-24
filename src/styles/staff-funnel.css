@@ -1,0 +1,285 @@
+/**
+ * Staff-Funnel — Website-Karten-Look (Icons + Label + Hint) + Preisindikation.
+ * Scope: .staff-funnel
+ */
+
+.staff-funnel.wizard-flow,
+.staff-funnel .wizard-inner-shell,
+.staff-funnel .wizard-body,
+.staff-funnel .wizard-inner,
+.staff-funnel .app-flow-body {
+  background: #ffffff !important;
+}
+
+.staff-funnel .wizard-top,
+.staff-funnel .app-flow-header {
+  background: #ffffff !important;
+  border-bottom-color: rgba(30, 28, 26, 0.08);
+}
+
+.staff-funnel {
+  --sf-accent: #2e7d52;
+  --sf-accent-dark: #1a3d2b;
+  --sf-text: #1e1c1a;
+  --sf-text-2: #524e4a;
+  --sf-border: rgba(30, 28, 26, 0.08);
+  --sf-radius: 16px;
+}
+
+.staff-funnel .sf-step-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--sf-accent-dark);
+  margin: 0;
+}
+
+.staff-funnel .sf-step-sub {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--sf-text-2);
+  margin: 0.5rem 0 1.25rem;
+}
+
+.staff-funnel .sf-tile-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .staff-funnel .sf-tile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.staff-funnel .sf-tile-grid.cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.staff-funnel .sf-tile-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .staff-funnel .sf-tile-grid.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.staff-funnel .funnel-tile {
+  position: relative;
+  border-radius: var(--sf-radius);
+  border: 1px solid rgba(30, 28, 26, 0.06);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(22, 32, 27, 0.04),
+    0 4px 14px rgba(22, 32, 27, 0.06);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+
+.staff-funnel .funnel-tile:hover:not(.selected) {
+  border-color: rgba(46, 125, 82, 0.28);
+  box-shadow:
+    0 2px 4px rgba(22, 32, 27, 0.05),
+    0 8px 20px rgba(22, 32, 27, 0.08);
+  transform: translateY(-1px);
+}
+
+.staff-funnel .funnel-tile.selected {
+  border-color: var(--sf-accent);
+  border-width: 1.5px;
+  background: rgba(46, 125, 82, 0.04);
+  box-shadow:
+    0 1px 2px rgba(46, 125, 82, 0.08),
+    0 6px 16px rgba(46, 125, 82, 0.12);
+}
+
+.staff-funnel .funnel-tile-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 4px;
+}
+
+.staff-funnel .funnel-tile-icon-wrap img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.staff-funnel .funnel-tile-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sf-text);
+  margin: 0;
+  padding-right: 22px;
+}
+
+.staff-funnel .funnel-tile-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sf-text-2);
+  line-height: 1.4;
+  margin: 0;
+  padding-right: 22px;
+}
+
+.staff-funnel .funnel-tile-tag {
+  margin-top: 6px;
+  display: inline-block;
+  border-radius: 6px;
+  background: #eaf3de;
+  color: #1a3d2b;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+}
+
+.staff-funnel .funnel-tile-check {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(30, 28, 26, 0.12);
+  background: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.staff-funnel .funnel-tile.selected .funnel-tile-check {
+  border-color: var(--sf-accent);
+  border-width: 1.5px;
+}
+
+.staff-funnel .funnel-tile.selected .funnel-tile-check::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sf-accent);
+}
+
+.staff-funnel .funnel-tile.multi.selected .funnel-tile-check {
+  border-radius: 4px;
+  background: var(--sf-accent);
+  border-color: var(--sf-accent);
+}
+
+.staff-funnel .funnel-tile.multi.selected .funnel-tile-check::after {
+  content: '';
+  width: 10px;
+  height: 6px;
+  border-radius: 0;
+  background: transparent;
+  border-left: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+/* Preisindikation wie Website */
+.staff-funnel .preis-karte {
+  background: linear-gradient(165deg, #1e4a33 0%, #1a3d2b 42%, #142e1f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--sf-radius);
+  padding: 24px;
+  text-align: center;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 12px 32px -8px rgba(10, 30, 20, 0.45);
+}
+
+.staff-funnel .preis-karte-kicker {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.staff-funnel .preis-karte-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0;
+}
+
+.staff-funnel .preis-karte-zahl {
+  font-size: clamp(1.6rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.staff-funnel .preis-karte-trenner {
+  margin: 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.staff-funnel .preis-karte-hinweis {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.staff-funnel .preis-karte--beratung {
+  background: linear-gradient(165deg, #2a3540 0%, #1c242c 100%);
+}
+
+.staff-funnel .sf-summary-card {
+  border: 1px solid rgba(30, 28, 26, 0.08);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(22, 32, 27, 0.04),
+    0 4px 14px rgba(22, 32, 27, 0.05);
+  overflow: hidden;
+}
+
+.staff-funnel .sf-summary-card .card-b {
+  padding: 14px 16px;
+}
+
+.staff-funnel .sf-intern {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px dashed rgba(30, 28, 26, 0.14);
+  background: #f6f5f3;
+}
+
+.staff-funnel .sf-intern-label {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sf-text-2);
+}
+
+.staff-funnel .sf-intern .sf-tile-grid {
+  margin-bottom: 12px;
+}

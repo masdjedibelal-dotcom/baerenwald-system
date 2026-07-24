@@ -16,6 +16,7 @@ import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { betragAnzeige, kundeNameAusAngebot } from '@/lib/angebot-einfach'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 type TabId = 'positionen' | 'versand' | 'notizen'
 
@@ -134,7 +135,7 @@ export function AngebotSidePanel({
       }
     >
       {loading && !detail ? (
-        <p className="p-4 text-sm text-bw-text-muted">Laden…</p>
+        <CrmInlineLoading label="Angebot wird geladen …" minHeight={120} />
       ) : !display ? (
         <p className="p-4 text-sm text-bw-text-muted">Keine Daten.</p>
       ) : (

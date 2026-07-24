@@ -629,7 +629,8 @@ export async function sendRechnung(
 
 /** Echte Kunden-Mail-HTML wie beim Versand (ohne PDF / Statusänderung). */
 export async function previewRechnungKundeMail(input: {
-  rechnungId: string
+  rechnungId?: string | null
+  kundeId?: string | null
   betreff?: string
   einleitung?: string | null
   brutto?: number
@@ -637,27 +638,43 @@ export async function previewRechnungKundeMail(input: {
   projektTitel?: string | null
   rechnungsnummer?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
-  const rechnungId = input.rechnungId.trim()
-  if (!rechnungId) return { ok: false, message: 'Rechnung fehlt' }
+  const rechnungId = input.rechnungId?.trim() || ''
+  const kundeId = input.kundeId?.trim() || ''
 
-  type RechnungPreviewRow = {
-    rechnungsnummer: string | null
-    status: string | null
-    beleg_typ: string | null
-    faellig_am: string | null
-    brutto: number | null
-    mail_einleitung?: string | null
-    mail_betreff?: string | null
-    kunden: Kunde | Kunde[] | null
-    angebote: unknown
-    auftraege: unknown
-  }
+  type KundeSnap = Pick<Kunde, 'name' | 'email' | 'typ' | 'vorname' | 'nachname'>
 
-  const { data: rec, error: loadErr } = await withCrmReadFallback<RechnungPreviewRow>(async (db) =>
-    db
-      .from('rechnungen')
-      .select(
-        `
+  let kunde: KundeSnap | null = null
+  let rechnungsnummer =
+    input.rechnungsnummer?.trim() || 'Rechnung'
+  let brutto = input.brutto ?? 0
+  let faelligRaw: string | null =
+    input.faelligAm !== undefined ? input.faelligAm : null
+  let projektTitel: string | null =
+    input.projektTitel !== undefined ? input.projektTitel : null
+  let mailEinleitung: string | null =
+    input.einleitung !== undefined ? input.einleitung : null
+  let mailBetreff: string | null =
+    input.betreff !== undefined ? input.betreff?.trim() || null : null
+
+  if (rechnungId) {
+    type RechnungPreviewRow = {
+      rechnungsnummer: string | null
+      status: string | null
+      beleg_typ: string | null
+      faellig_am: string | null
+      brutto: number | null
+      mail_einleitung?: string | null
+      mail_betreff?: string | null
+      kunden: Kunde | Kunde[] | null
+      angebote: unknown
+      auftraege: unknown
+    }
+
+    const { data: rec, error: loadErr } = await withCrmReadFallback<RechnungPreviewRow>(async (db) =>
+      db
+        .from('rechnungen')
+        .select(
+          `
       rechnungsnummer,
       status,
       beleg_typ,
@@ -669,41 +686,69 @@ export async function previewRechnungKundeMail(input: {
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
     `
-      )
-      .eq('id', rechnungId)
-      .maybeSingle()
-  )
+        )
+        .eq('id', rechnungId)
+        .maybeSingle()
+    )
 
-  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
+    if (loadErr || !rec) {
+      // Draft-Vorschau ohne persistierte Rechnung weiter erlauben
+      if (!kundeId && input.brutto === undefined) {
+        return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
+      }
+    } else {
+      rechnungsnummer =
+        input.rechnungsnummer?.trim() ||
+        (rec.rechnungsnummer as string | null)?.trim() ||
+        'Rechnung'
 
-  const rechnungsnummer =
-    input.rechnungsnummer?.trim() ||
-    (rec.rechnungsnummer as string | null)?.trim() ||
-    'Rechnung'
+      const kRaw = rec.kunden as Kunde | Kunde[] | null
+      kunde = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as KundeSnap | null
 
-  const kRaw = rec.kunden as Kunde | Kunde[] | null
-  const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
+      if (input.brutto === undefined) brutto = Number(rec.brutto ?? 0)
+      if (input.faelligAm === undefined) faelligRaw = rec.faellig_am as string | null
+      if (input.einleitung === undefined) {
+        mailEinleitung = (rec.mail_einleitung as string | null)?.trim() || null
+      }
+      if (input.betreff === undefined) {
+        mailBetreff = (rec.mail_betreff as string | null)?.trim() || null
+      }
+
+      if (input.projektTitel === undefined) {
+        const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
+        const aufRaw = rec.auftraege
+        const auftrag = Array.isArray(aufRaw) ? aufRaw[0] : aufRaw
+        const angAuftrag = auftrag?.angebote
+          ? Array.isArray(auftrag.angebote)
+            ? auftrag.angebote[0]
+            : auftrag.angebote
+          : null
+        projektTitel =
+          resolveRechnungProjektTitel({
+            angebot: angRechnung ?? angAuftrag,
+            auftragTitel: (auftrag?.titel as string | null) ?? null,
+            fallback: '',
+          }) || null
+      }
+    }
+  }
+
+  if (!kunde && kundeId) {
+    const { data: k } = await withCrmReadFallback<KundeSnap>(async (db) =>
+      db
+        .from('kunden')
+        .select('name, email, typ, vorname, nachname')
+        .eq('id', kundeId)
+        .maybeSingle()
+    )
+    kunde = k ?? null
+  }
+
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
-  const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
-  const aufRaw = rec.auftraege
-  const auftrag = Array.isArray(aufRaw) ? aufRaw[0] : aufRaw
-  const angAuftrag = auftrag?.angebote
-    ? Array.isArray(auftrag.angebote)
-      ? auftrag.angebote[0]
-      : auftrag.angebote
-    : null
-  const projektTitelDb = resolveRechnungProjektTitel({
-    angebot: angRechnung ?? angAuftrag,
-    auftragTitel: (auftrag?.titel as string | null) ?? null,
-    fallback: '',
-  })
-
-  const faelligRaw =
-    input.faelligAm !== undefined ? input.faelligAm : (rec.faellig_am as string | null)
   const faelligAm =
     faelligRaw && /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(faelligRaw.trim())
       ? faelligRaw.trim()
@@ -714,20 +759,11 @@ export async function previewRechnungKundeMail(input: {
       anrede,
       begruessung,
       rechnungsnummer,
-      brutto: input.brutto !== undefined ? input.brutto : Number(rec.brutto ?? 0),
+      brutto,
       faelligAm,
-      projektTitel:
-        input.projektTitel !== undefined
-          ? input.projektTitel
-          : projektTitelDb || null,
-      mailEinleitung:
-        input.einleitung !== undefined
-          ? input.einleitung
-          : (rec.mail_einleitung as string | null)?.trim() || null,
-      mailBetreff:
-        input.betreff !== undefined
-          ? input.betreff?.trim() || null
-          : (rec.mail_betreff as string | null)?.trim() || null,
+      projektTitel,
+      mailEinleitung: mailEinleitung?.trim() || null,
+      mailBetreff,
     },
     branding
   )

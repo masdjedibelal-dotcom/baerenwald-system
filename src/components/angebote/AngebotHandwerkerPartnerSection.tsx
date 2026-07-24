@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useState, useTransition } from 'react'
-import { ExternalLink, FileUp, UserPlus } from 'lucide-react'
+import { Check, ExternalLink, FileUp, Trash2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
@@ -14,11 +14,14 @@ import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizar
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow } from '@/lib/types'
 import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
+import { handwerkerZuweisungAktiv } from '@/lib/angebote/angebot-handwerker-flow'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import type { AngebotPosition } from '@/lib/types'
 import {
+  crmBestaetigeHandwerkerAnfrage,
   listHandwerkerFuerGewerk,
+  loescheHandwerkerAnfrage,
   openHandwerkerAcceptWizard,
   replaceAngebotHandwerkerUndSenden,
 } from '@/app/(dashboard)/angebote/actions'
@@ -30,6 +33,7 @@ function zuweisungStatusLabel(s: string | null | undefined): string {
   if (v === 'angefragt') return 'Angefragt'
   if (v === 'akzeptiert') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
+  if (v === 'ersetzt') return 'Ersetzt'
   return 'Ausstehend'
 }
 
@@ -56,12 +60,26 @@ function ZuweisungCard({
   const [manuellOpen, setManuellOpen] = useState(false)
   const [replaceOpen, setReplaceOpen] = useState(false)
   const [replacePending, startReplace] = useTransition()
+  const [actionPending, startAction] = useTransition()
   const [hwListe, setHwListe] = useState<HandwerkerGewerkListeEintrag[]>([])
   const abgelehnt = z.status === 'abgelehnt'
   const eingereicht = hasHwEinreichung(z)
   const hwSt = (z.hw_status ?? '').toLowerCase()
   const uebernommen = hwSt === 'uebernommen'
   const kannManuell = !abgelehnt && !eingereicht && !uebernommen
+  const statusLc = (z.status ?? 'ausstehend').toLowerCase()
+  const kannBestaetigen =
+    !abgelehnt &&
+    statusLc !== 'akzeptiert' &&
+    statusLc !== 'ersetzt' &&
+    !z.antwort_at &&
+    !eingereicht &&
+    !uebernommen
+  const kannLoeschen =
+    !eingereicht &&
+    hwSt !== 'bestaetigt' &&
+    hwSt !== 'uebernommen' &&
+    !(statusLc === 'akzeptiert' && hwSt && hwSt !== 'offen')
 
   return (
     <>
@@ -78,6 +96,74 @@ function ZuweisungCard({
             {zuweisungStatusLabel(z.status)}
           </span>
         </div>
+
+        {(kannBestaetigen || kannLoeschen) && (
+          <div className="flex flex-wrap gap-2">
+            {kannBestaetigen ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={actionPending}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Anfrage von ${z.handwerker?.name ?? 'Partner'} im CRM als akzeptiert markieren?`
+                    )
+                  ) {
+                    return
+                  }
+                  startAction(async () => {
+                    const r = await crmBestaetigeHandwerkerAnfrage({
+                      angebotId,
+                      zuweisungId: z.id,
+                    })
+                    if (!r.ok) toast.error(r.message)
+                    else {
+                      toast.success('Anfrage bestätigt')
+                      onRefresh()
+                    }
+                  })
+                }}
+              >
+                <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+                Anfrage bestätigen
+              </Button>
+            ) : null}
+            {kannLoeschen ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={actionPending}
+                className="text-danger"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Handwerker-Anfrage an ${z.handwerker?.name ?? 'Partner'} wirklich löschen?`
+                    )
+                  ) {
+                    return
+                  }
+                  startAction(async () => {
+                    const r = await loescheHandwerkerAnfrage({
+                      angebotId,
+                      zuweisungId: z.id,
+                    })
+                    if (!r.ok) toast.error(r.message)
+                    else {
+                      toast.success('Anfrage gelöscht')
+                      onRefresh()
+                    }
+                  })
+                }}
+              >
+                <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden />
+                Anfrage löschen
+              </Button>
+            ) : null}
+          </div>
+        )}
 
         {z.aufgabe_notiz?.trim() ? (
           <p className="text-xs text-bw-text-muted whitespace-pre-wrap">
@@ -225,7 +311,7 @@ export function AngebotHandwerkerPartnerSection({
   const router = useRouter()
   const [wizardBootstrap, setWizardBootstrap] = useState<ProjektVertragWizardBootstrap | null>(null)
   const [wizardPending, startWizardTransition] = useTransition()
-  const rows = detail.angebot_handwerker ?? []
+  const rows = (detail.angebot_handwerker ?? []).filter(handwerkerZuweisungAktiv)
   const angebotTitel =
     detail.notizen?.trim()?.slice(0, 80) ||
     (detail.angebotsnr ? `Angebot ${detail.angebotsnr}` : 'Projekt')
@@ -252,9 +338,9 @@ export function AngebotHandwerkerPartnerSection({
   return (
     <section id="handwerker-partner" className="space-y-6 scroll-mt-24">
       <Card className="p-4 md:p-5">
-        <h2 className="mb-3 text-sm font-semibold text-bw-text">Handwerker & Partner-Portal</h2>
+        <h2 className="mb-3 text-sm font-semibold text-bw-text">Partner</h2>
         {rows.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Keine Handwerker zugewiesen.</p>
+          <p className="text-sm text-bw-text-muted">Keine Partner zugewiesen — im Wizard zuweisen, dann unten anfragen.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {rows.map((z) => (

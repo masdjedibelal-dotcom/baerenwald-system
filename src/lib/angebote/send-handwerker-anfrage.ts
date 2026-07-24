@@ -1,9 +1,10 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerAnfrage } from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mail-service'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail } from '@/lib/types'
-import { buildPartnerLoginLink } from '@/lib/portal-utils'
+import { buildPartnerAnfragePortalUrl, buildPartnerLoginLink } from '@/lib/portal-utils'
 import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
 import { notifyPartnerHandwerkerAnfrage } from '@/lib/partner/notify-partner-anfrage'
 
@@ -30,8 +31,9 @@ function normalizeZuRow(zu: Record<string, unknown>): ZuRow {
 }
 
 /**
- * Status „angefragt“ + optional Partner-Mail (Website-API, nicht CRM-Resend).
- * Link für WhatsApp: Partner-Portal-Start (`/partner`).
+ * Status „angefragt“ + optional Partner-Mail.
+ * Primär: Website-API (Portal-Mail). Fallback: CRM-Resend, falls Secret/API fehlt.
+ * Link für WhatsApp: Deep-Link zur Anfrage im Partner-Portal.
  */
 export async function sendHandwerkerAnfrageFuerZuweisung(
   detail: AngebotDetail,
@@ -52,11 +54,12 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
       betreff?: string
       defaultTo?: string[]
       defaultCc?: string[]
+      via?: 'partner-api' | 'crm-resend'
     }
   | { ok: false; message: string; link?: string }
 > {
   const row = normalizeZuRow(zuRaw)
-  const link = buildPartnerLoginLink()
+  const link = row.id ? buildPartnerAnfragePortalUrl(row.id) : buildPartnerLoginLink()
 
   const lead = detail.leads
   const orgStatus = (lead as { org_freigabe_status?: string } | null | undefined)?.org_freigabe_status
@@ -98,6 +101,7 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   )
   const defaultTo = hwEmail ? [hwEmail] : []
   const defaultCc: string[] = []
+  const betreff = options?.betreff?.trim() || tpl.betreff
 
   if (options?.previewOnly) {
     return {
@@ -105,26 +109,50 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
       link,
       gesendet: false,
       html: tpl.html,
-      betreff: options.betreff?.trim() || tpl.betreff,
+      betreff,
       defaultTo,
       defaultCc,
     }
   }
 
   let gesendet = false
+  let via: 'partner-api' | 'crm-resend' | undefined
   if (sendEmail) {
     const toList = options?.to?.map((v) => v.trim()).filter(Boolean) ?? defaultTo
     if (!toList.length) {
       return { ok: false, message: 'Handwerker hat keine E-Mail-Adresse.', link }
     }
-    void options?.cc
-    void options?.betreff
 
     const notify = await notifyPartnerHandwerkerAnfrage(row.id)
-    if (!notify.ok) {
-      return { ok: false, message: notify.error, link }
+    if (notify.ok) {
+      gesendet = true
+      via = 'partner-api'
+    } else {
+      const mail = await sendMail({
+        typ: 'handwerker_anfrage',
+        an: toList.length === 1 ? toList[0]! : toList,
+        anName: hwName,
+        cc: options?.cc?.map((v) => v.trim()).filter(Boolean),
+        betreff,
+        html: tpl.html,
+        kundeId: detail.kunde_id ?? undefined,
+        leadId: detail.lead_id ?? undefined,
+        angebotId: detail.id,
+      })
+      if (!mail.success) {
+        return {
+          ok: false,
+          message: `${notify.error} · CRM-Fallback fehlgeschlagen: ${mail.error ?? 'unbekannt'}`,
+          link,
+        }
+      }
+      gesendet = true
+      via = 'crm-resend'
+      console.warn(
+        '[sendHandwerkerAnfrage] Partner-API fehlgeschlagen, CRM-Resend genutzt:',
+        notify.error
+      )
     }
-    gesendet = true
   }
 
   const now = new Date().toISOString()
@@ -140,5 +168,5 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
     return { ok: false, message: upHw.message, link }
   }
 
-  return { ok: true, link, gesendet }
+  return { ok: true, link, gesendet, via }
 }

@@ -163,6 +163,10 @@ export function AuftragLeistungZuweisungModal({
     const primaryHw = ids[0]
     const vkNum = parseNum(vk)
     const ekNum = parseNum(partnerNetto)
+    if (ekNum == null || ekNum <= 0) {
+      toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+      return
+    }
     const vonYmd = von.trim() ? displayToYmd(von) : null
     const bisYmd =
       zeitModus === 'tag'
@@ -220,6 +224,12 @@ export function AuftragLeistungZuweisungModal({
     })
   }
 
+  const ekOk = (() => {
+    const n = parseNum(partnerNetto)
+    return n != null && n > 0
+  })()
+  const canSend = !pending && !loading && selectedHwIds.size > 0 && ekOk
+
   return (
     <MockModal
       open={open}
@@ -237,7 +247,7 @@ export function AuftragLeistungZuweisungModal({
           <MockBtn
             kind="primary"
             icon="send"
-            disabled={pending || loading || selectedHwIds.size === 0}
+            disabled={!canSend}
             onClick={confirm}
           >
             {pending ? 'Senden…' : 'Anfrage senden'}
@@ -288,7 +298,7 @@ export function AuftragLeistungZuweisungModal({
                 </div>
               </label>
               <label className="hw-anfrage-field">
-                <span className="hw-anfrage-label">Partner Netto (Richtwert)</span>
+                <span className="hw-anfrage-label">Partner-EK netto *</span>
                 <div className="txt-prefix">
                   <span className="prefix" aria-hidden>
                     €
@@ -297,12 +307,19 @@ export function AuftragLeistungZuweisungModal({
                     type="number"
                     className="input"
                     step="0.01"
-                    min="0"
+                    min="0.01"
+                    required
                     value={partnerNetto}
                     onChange={(e) => setPartnerNetto(e.target.value)}
                     disabled={pending}
+                    aria-invalid={!ekOk && partnerNetto.trim() !== ''}
                   />
                 </div>
+                {!ekOk ? (
+                  <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+                    Pflicht — größer als 0 €
+                  </span>
+                ) : null}
               </label>
             </div>
 
@@ -373,7 +390,7 @@ export function AuftragLeistungZuweisungModal({
 
         {!isSingle ? (
           <label className="hw-anfrage-field">
-            <span className="hw-anfrage-label">Partner Netto (Richtwert)</span>
+            <span className="hw-anfrage-label">Partner-EK netto *</span>
             <div className="txt-prefix">
               <span className="prefix" aria-hidden>
                 €
@@ -382,12 +399,19 @@ export function AuftragLeistungZuweisungModal({
                 type="number"
                 className="input"
                 step="0.01"
-                min="0"
+                min="0.01"
+                required
                 value={partnerNetto}
                 onChange={(e) => setPartnerNetto(e.target.value)}
                 disabled={pending}
+                aria-invalid={!ekOk && partnerNetto.trim() !== ''}
               />
             </div>
+            {!ekOk ? (
+              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+                Pflicht — größer als 0 €
+              </span>
+            ) : null}
           </label>
         ) : null}
 

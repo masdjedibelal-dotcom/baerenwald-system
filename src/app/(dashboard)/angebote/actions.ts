@@ -1100,6 +1100,206 @@ export async function crmManuelleHandwerkerEinreichung(
 }
 
 /**
+ * CRM: Handwerker-Anfrage löschen (Zuweisung entfernen).
+ * Erlaubt bei ausstehend/angefragt/abgelehnt/ersetzt — nicht bei Einreichung oder Übernahme.
+ */
+export async function loescheHandwerkerAnfrage(input: {
+  angebotId: string
+  zuweisungId: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const angebotId = input.angebotId.trim()
+  const zuweisungId = input.zuweisungId.trim()
+  if (!angebotId || !zuweisungId) {
+    return { ok: false, message: 'Angebot oder Zuweisung fehlt.' }
+  }
+
+  const { data: zu, error: zErr } = await supabase
+    .from('angebot_handwerker')
+    .select(
+      `
+      id,
+      status,
+      hw_eingereicht_at,
+      hw_status,
+      handwerker(name),
+      gewerke(name),
+      angebote(id, lead_id)
+    `
+    )
+    .eq('id', zuweisungId)
+    .eq('angebot_id', angebotId)
+    .maybeSingle()
+
+  if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
+
+  const hwSt = String(zu.hw_status ?? '').toLowerCase()
+  if (zu.hw_eingereicht_at?.trim() || hwSt === 'eingereicht' || hwSt === 'bestaetigt' || hwSt === 'uebernommen') {
+    return {
+      ok: false,
+      message: 'Anfrage mit Einreichung/Übernahme kann nicht gelöscht werden — bitte zuerst ablehnen oder Partner ersetzen.',
+    }
+  }
+
+  const st = String(zu.status ?? '').toLowerCase()
+  if (st === 'akzeptiert' && hwSt && hwSt !== 'offen' && hwSt !== '') {
+    return { ok: false, message: 'Akzeptierte Anfrage mit Partner-Status kann nicht gelöscht werden.' }
+  }
+
+  const { error: delErr } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .delete()
+    .eq('id', zuweisungId)
+    .eq('angebot_id', angebotId)
+
+  if (delErr) return { ok: false, message: delErr.message }
+
+  const angebot = Array.isArray(zu.angebote) ? zu.angebote[0] : zu.angebote
+  const leadId = (angebot as { lead_id?: string | null } | null)?.lead_id
+  const hw = Array.isArray(zu.handwerker) ? zu.handwerker[0] : zu.handwerker
+  const gw = Array.isArray(zu.gewerke) ? zu.gewerke[0] : zu.gewerke
+  if (leadId) {
+    await insertLeadTimelineEvent(supabaseAdmin, {
+      lead_id: leadId,
+      angebot_id: angebotId,
+      typ: 'handwerker',
+      titel: 'Handwerker-Anfrage gelöscht',
+      beschreibung: `${(hw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${(gw as { name?: string } | null)?.name?.trim() || 'Gewerk'}`,
+    })
+  }
+
+  revalidatePath(`/angebote/${angebotId}`)
+  revalidatePath('/angebote')
+  return { ok: true }
+}
+
+/**
+ * CRM: Handwerker-Anfrage im Namen des Partners annehmen (status → akzeptiert).
+ * Parallele Anfragen zum selben Gewerk werden auf „ersetzt“ gesetzt.
+ */
+export async function crmBestaetigeHandwerkerAnfrage(input: {
+  angebotId: string
+  zuweisungId: string
+  notiz?: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const angebotId = input.angebotId.trim()
+  const zuweisungId = input.zuweisungId.trim()
+  if (!angebotId || !zuweisungId) {
+    return { ok: false, message: 'Angebot oder Zuweisung fehlt.' }
+  }
+
+  const { data: zu, error: zErr } = await supabase
+    .from('angebot_handwerker')
+    .select(
+      `
+      id,
+      angebot_id,
+      gewerk_id,
+      handwerker_id,
+      status,
+      antwort_at,
+      handwerker(name),
+      gewerke(name),
+      angebote(id, lead_id)
+    `
+    )
+    .eq('id', zuweisungId)
+    .eq('angebot_id', angebotId)
+    .maybeSingle()
+
+  if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
+
+  const st = String(zu.status ?? '').toLowerCase()
+  if (st === 'akzeptiert') {
+    return { ok: true }
+  }
+  if (st === 'abgelehnt' || st === 'ersetzt') {
+    return { ok: false, message: 'Abgelehnte oder ersetzte Anfragen können nicht bestätigt werden.' }
+  }
+  if (zu.antwort_at) {
+    return { ok: false, message: 'Anfrage wurde bereits beantwortet.' }
+  }
+
+  const now = new Date().toISOString()
+  const notiz =
+    input.notiz?.trim() ||
+    'Vom CRM im Namen des Partners bestätigt.'
+
+  const { error: upErr } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .update({
+      status: 'akzeptiert',
+      antwort_at: now,
+      antwort_notiz: notiz,
+      ablehnung_grund: null,
+    })
+    .eq('id', zuweisungId)
+
+  if (upErr) return { ok: false, message: upErr.message }
+
+  const angebot = Array.isArray(zu.angebote) ? zu.angebote[0] : zu.angebote
+  const leadId = (angebot as { lead_id?: string | null } | null)?.lead_id ?? null
+  const hw = Array.isArray(zu.handwerker) ? zu.handwerker[0] : zu.handwerker
+  const gw = Array.isArray(zu.gewerke) ? zu.gewerke[0] : zu.gewerke
+  const handwerkerName = (hw as { name?: string } | null)?.name?.trim() || 'Handwerker'
+  const gewerkName = (gw as { name?: string } | null)?.name?.trim() || 'Gewerk'
+
+  if (zu.gewerk_id) {
+    const { data: parallel } = await supabaseAdmin
+      .from('angebot_handwerker')
+      .select('id, handwerker_id, status, handwerker(name)')
+      .eq('angebot_id', angebotId)
+      .eq('gewerk_id', zu.gewerk_id)
+      .neq('id', zuweisungId)
+
+    for (const other of parallel ?? []) {
+      const otherSt = String(other.status ?? '').toLowerCase()
+      if (otherSt === 'akzeptiert' || otherSt === 'abgelehnt' || otherSt === 'ersetzt') continue
+      await supabaseAdmin
+        .from('angebot_handwerker')
+        .update({ status: 'ersetzt', antwort_at: now })
+        .eq('id', other.id)
+
+      if (leadId) {
+        const otherHw = Array.isArray(other.handwerker) ? other.handwerker[0] : other.handwerker
+        await insertLeadTimelineEvent(supabaseAdmin, {
+          lead_id: leadId,
+          angebot_id: angebotId,
+          typ: 'handwerker',
+          titel: 'Handwerker nicht gewählt',
+          beschreibung: `${(otherHw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${gewerkName}`,
+        })
+      }
+    }
+  }
+
+  if (leadId) {
+    await insertLeadTimelineEvent(supabaseAdmin, {
+      lead_id: leadId,
+      angebot_id: angebotId,
+      typ: 'handwerker',
+      titel: 'Handwerker-Anfrage CRM-bestätigt',
+      beschreibung: `${handwerkerName} · ${gewerkName}`,
+    })
+  }
+
+  revalidatePath(`/angebote/${angebotId}`)
+  revalidatePath('/angebote')
+  return { ok: true }
+}
+
+/**
  * CRM-Bestätigung: vereinbarten Preis übernehmen (Einkaufspreis + ggf. Auftrag), Mail an Handwerker.
  * Bei vorhandenem Auftrag: Rückgabe für Nachunternehmervertrag-Wizard (Unterlagen + PDF).
  */

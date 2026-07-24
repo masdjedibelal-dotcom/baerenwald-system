@@ -3,7 +3,7 @@ import { HandwerkerMasterDetailShell } from '@/components/handwerker/HandwerkerM
 import { loadHandwerkerListe } from '@/lib/handwerker/load-handwerker-liste'
 
 export const metadata: Metadata = {
-  title: 'Handwerker',
+  title: 'Partner',
 }
 
 export default async function HandwerkerLayout({ children }: { children: React.ReactNode }) {

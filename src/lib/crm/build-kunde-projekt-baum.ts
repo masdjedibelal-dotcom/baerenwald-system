@@ -1,7 +1,6 @@
-import { BEREICH_LABELS } from '@/lib/utils'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { betragAnzeige, resolveStatusEinfach } from '@/lib/angebot-einfach'
+import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { AngebotStatus, AuftragStatus, LeadListAngebot } from '@/lib/types'
 
@@ -44,13 +43,10 @@ function leadLabel(row: {
   situation?: string | null
   bereiche?: string[] | null
 }): string {
-  const bereiche = bereicheFuerAnzeige(row.bereiche, row.situation)
-  if (bereiche.length) {
-    return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-  }
-  const sit = leadSituationDisplay(row.situation)
-  if (sit) return sit
-  return `Anfrage ${row.id.slice(0, 8).toUpperCase()}`
+  return (
+    situationBereichTitel(row.situation, bereicheFuerAnzeige(row.bereiche, row.situation)) ||
+    `Anfrage ${row.id.slice(0, 8).toUpperCase()}`
+  )
 }
 
 type KundeLeadAngebot = NonNullable<

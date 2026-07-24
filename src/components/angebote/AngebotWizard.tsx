@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import {
+  AngebotKiAssistentButton,
+  type AngebotKiApplyPayload,
+} from '@/components/angebote/AngebotKiAssistent'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
 import {
@@ -30,6 +34,7 @@ import {
   saveAngebotWizardDraft,
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
+import { createAnfrageFuerKunde } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import {
   angebotMetaPatchFromZahlfrist,
@@ -55,10 +60,15 @@ import {
   dokumentArtikelToWizardPosition,
   dokumentZeilenToAngebotPositionen,
   formatEurBetrag,
+  neueArtikelZeile,
   wizardPositionToDokumentZeile,
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
+import type {
+  AngebotKiKontextPosition,
+  AngebotKiKontextPreisliste,
+} from '@/lib/angebote/angebot-ki-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
@@ -150,6 +160,9 @@ export function AngebotWizard({
   handwerker: _handwerker = [],
   firm: firmProp,
   bootstrap = null,
+  deferredLeadCreate = false,
+  initialStep,
+  focusField,
   onClose,
   onDone,
   onSaved,
@@ -162,6 +175,15 @@ export function AngebotWizard({
   firm?: FirmenEinstellungen
   kundenObjekte?: KundenObjekt[]
   bootstrap?: AngebotWizardBootstrap | null
+  /**
+   * FAB „Neues Angebot“: Lead-ID ist zunächst leer.
+   * Anfrage wird erst beim ersten Speichern/Fertigstellen angelegt.
+   */
+  deferredLeadCreate?: boolean
+  /** Deep-Link vom Assistenten: 1–5 */
+  initialStep?: number | null
+  /** Deep-Link Fokus: titel | beschreibung | positionen */
+  focusField?: string | null
   onClose: () => void
   onDone?: (angebotId: string) => void
   onSaved?: (angebotId: string) => void
@@ -225,7 +247,12 @@ export function AngebotWizard({
   )
 
   const [mounted, setMounted] = useState(false)
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(() => {
+    const s = Number(initialStep)
+    if (Number.isFinite(s) && s >= 1 && s <= 5) return Math.floor(s)
+    if (focusField === 'positionen') return 2
+    return 1
+  })
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
       .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -408,6 +435,125 @@ export function AngebotWizard({
     [gewerke]
   )
 
+  const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
+    return zeilen
+      .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      .map((z) => ({
+        id: z.id,
+        leistung: z.bezeichnung,
+        beschreibung: z.positionBeschreibung ?? '',
+        menge: z.menge,
+        einheit: z.einheit,
+        preis_netto: z.vkNetto,
+        gewerk_slug: z.gewerk_slug ?? null,
+        gewerk_name: z.gewerkName ?? null,
+        preisliste_id: z.preisliste_id ?? null,
+      }))
+  }, [zeilen])
+
+  const kiKontextPreislisten = useMemo((): AngebotKiKontextPreisliste[] => {
+    return preislisten
+      .filter((p) => p.aktiv !== false)
+      .map((p) => {
+        const g = gewerke.find((x) => x.id === p.gewerk_id) ?? p.gewerke
+        return {
+          id: p.id,
+          leistung: p.leistung,
+          einheit: p.einheit,
+          preis_min: p.preis_min,
+          gewerk_slug: g?.slug ?? null,
+          gewerk_name: g?.name ?? null,
+          kategorie: p.kategorie ?? null,
+        }
+      })
+  }, [preislisten, gewerke])
+
+  const kiGewerke = useMemo(
+    () => gewerke.filter((g) => g.aktiv !== false).map((g) => ({ slug: g.slug, name: g.name })),
+    [gewerke]
+  )
+
+  const kiLeadKurz = useMemo(() => {
+    const parts = [
+      name,
+      projekt,
+      region,
+      budgetAnzeige,
+      leadSituationDisplay(leadState.situation),
+      bereicheFuerAnzeige(leadState.bereiche, leadState.situation)
+        .map((b) => BEREICH_LABELS[b] ?? b)
+        .join(', '),
+    ]
+      .map((s) => String(s ?? '').trim())
+      .filter(Boolean)
+    return parts.join(' · ')
+  }, [name, projekt, region, budgetAnzeige, leadState.situation, leadState.bereiche])
+
+  function applyAngebotKi(payload: AngebotKiApplyPayload) {
+    if (payload.titel != null && payload.titel.trim()) {
+      patchProjektTitel(payload.titel.trim())
+    }
+    if (payload.beschreibung != null) {
+      setProjektbeschreibung(payload.beschreibung)
+    }
+    if (!payload.positionen.length) return
+
+    setZeilen((prev) => {
+      let next = [...prev]
+      for (const p of payload.positionen) {
+        const gewerk =
+          (p.gewerk_slug
+            ? gewerke.find((g) => g.slug === p.gewerk_slug)
+            : undefined) ??
+          (p.gewerk_name
+            ? gewerke.find((g) => g.name.toLowerCase() === p.gewerk_name!.toLowerCase())
+            : undefined)
+        const gewerkPatch = gewerk
+          ? {
+              gewerk_id: gewerk.id,
+              gewerk_slug: gewerk.slug,
+              gewerkName: gewerk.name,
+            }
+          : {}
+
+        if (p.match.kind === 'vorhanden_wizard' && p.match.ref_id) {
+          next = next.map((z) => {
+            if (z.id !== p.match.ref_id || z.typ !== 'artikel') return z
+            return {
+              ...z,
+              bezeichnung: p.leistung || z.bezeichnung,
+              positionBeschreibung: p.beschreibung || z.positionBeschreibung,
+              menge: p.menge,
+              einheit: p.einheit || z.einheit,
+              vkNetto: p.preis_netto,
+              ...gewerkPatch,
+            }
+          })
+          continue
+        }
+
+        next.push(
+          neueArtikelZeile({
+            bezeichnung: p.leistung,
+            positionBeschreibung: p.beschreibung || undefined,
+            menge: p.menge,
+            einheit: p.einheit || 'Stk.',
+            vkNetto: p.preis_netto,
+            preisliste_id: p.match.kind === 'preisliste' ? p.match.ref_id || null : null,
+            position_quelle: p.match.kind === 'preisliste' ? 'katalog' : 'frei',
+            ...gewerkPatch,
+          })
+        )
+      }
+      setPositions(
+        next
+          .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+          .map(dokumentArtikelToWizardPosition)
+      )
+      return next
+    })
+  }
+
   const zahlfristText = useMemo(
     () => zahlfristAnzeigeFromLocal(zahlfristSeg, zahlfristDatum),
     [zahlfristSeg, zahlfristDatum]
@@ -436,10 +582,12 @@ export function AngebotWizard({
     if (!files.length) return
     setProjektUploading(true)
     try {
+      const leadId = await ensureLeadId()
+      if (!leadId) return
       for (const file of files) {
         const fd = new FormData()
         fd.append('file', file)
-        const res = await fetch(`/api/anfragen/${lead.id}/angebot-projekt-foto`, {
+        const res = await fetch(`/api/anfragen/${leadId}/angebot-projekt-foto`, {
           method: 'POST',
           body: fd,
         })
@@ -460,12 +608,35 @@ export function AngebotWizard({
     }
   }
 
+  const ensureLeadId = useCallback(async (): Promise<string | null> => {
+    const existing = leadState.id?.trim()
+    if (existing) return existing
+    if (!deferredLeadCreate) {
+      toast.error('Keine Anfrage verknüpft.')
+      return null
+    }
+    const kid = leadVertragsKundeId(leadState)?.trim()
+    if (!kid) {
+      toast.error('Kein Kunde verknüpft — Anfrage kann nicht angelegt werden.')
+      return null
+    }
+    const r = await createAnfrageFuerKunde(kid)
+    if (!r.ok) {
+      toast.error(r.message)
+      return null
+    }
+    setLeadState((prev) => ({ ...prev, id: r.leadId }))
+    return r.leadId
+  }, [deferredLeadCreate, leadState])
+
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
       }
+      const leadId = await ensureLeadId()
+      if (!leadId) return null
       const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
       if (!titelOk) {
         toast.error('Bitte einen Angebotstitel angeben.')
@@ -493,7 +664,7 @@ export function AngebotWizard({
         const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
         const res = await saveAngebotWizardDraft({
           angebotId,
-          lead_id: lead.id,
+          lead_id: leadId,
           kunde_id: kundeId,
           positionen: dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
           artikelFuerPreislisteSync: artikelA,
@@ -544,7 +715,7 @@ export function AngebotWizard({
       dokumentTyp,
       firm,
       kundeId,
-      lead.id,
+      ensureLeadId,
       meta,
       mitAnfahrt,
       zeilen,
@@ -639,9 +810,11 @@ export function AngebotWizard({
     try {
       const id = await persistDraft({ notify: false })
       if (!id) return
+      const leadId = await ensureLeadId()
+      if (!leadId) return
       const res = await sendAngebotWizard({
         angebotId: id,
-        lead_id: lead.id,
+        lead_id: leadId,
         mailTo: recipients,
         mailCc,
         betreff: mailBetreff.trim() || undefined,
@@ -727,52 +900,59 @@ export function AngebotWizard({
     </div>
   )
 
-  const wizardMobileActions =
+  const wizardMobileActions = null
+
+  const wizardMobileFooter =
     step < WIZARD_TOTAL_STEPS ? (
       <>
         {step > 1 ? (
           <MockBtn
-            sm
             kind="ghost"
             icon="chevron-left"
             disabled={saving}
             onClick={() => setStep((s) => s - 1)}
-            title="Zurück"
-          />
-        ) : null}
+          >
+            Zurück
+          </MockBtn>
+        ) : (
+          <span />
+        )}
         <MockBtn
-          sm
           kind="primary"
+          icon="chevron-right"
+          className="wizard-mobile-footer__primary"
           disabled={saving || previewLoading}
           onClick={() => void handleWeiter()}
         >
-          {saving || previewLoading ? '…' : 'Weiter'}
+          {saving || previewLoading ? 'Speichern…' : 'Weiter'}
         </MockBtn>
       </>
     ) : (
       <>
         <MockBtn
-          sm
           kind="ghost"
           icon="chevron-left"
           disabled={saving}
           onClick={() => setStep((s) => s - 1)}
-          title="Zurück"
-        />
-        {!istAuftragKorrektur ? (
-          <MockBtn sm kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-            Erstellen
-          </MockBtn>
-        ) : null}
-        <MockBtn
-          sm
-          kind="primary"
-          icon="send"
-          disabled={saving}
-          onClick={() => void handleFinishVersenden()}
         >
-          Senden
+          Zurück
         </MockBtn>
+        <div className="wizard-mobile-footer__end">
+          {!istAuftragKorrektur ? (
+            <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+              {saving ? '…' : 'Erstellen'}
+            </MockBtn>
+          ) : null}
+          <MockBtn
+            kind="primary"
+            icon="send"
+            className="wizard-mobile-footer__primary"
+            disabled={saving}
+            onClick={() => void handleFinishVersenden()}
+          >
+            {saving ? '…' : 'Senden'}
+          </MockBtn>
+        </div>
       </>
     )
 
@@ -789,7 +969,9 @@ export function AngebotWizard({
       currentStep={step}
       onClose={handleRequestClose}
       mobileActions={wizardMobileActions}
+      mobileFooter={wizardMobileFooter}
       desktopActions={wizardDesktopActions}
+      saveHint={saving ? 'Speichert…' : previewLoading ? 'Vorschau…' : null}
     >
       {step === 1 ? (
         <>
@@ -856,6 +1038,7 @@ export function AngebotWizard({
                 value={meta.leistungsumfang}
                 onChange={(e) => patchProjektTitel(e.target.value)}
                 placeholder="z.B. Badmodernisierung & Projektkoordination"
+                autoFocus={focusField === 'titel'}
               />
             </MockField>
             <MockField
@@ -868,6 +1051,7 @@ export function AngebotWizard({
                 value={projektbeschreibung}
                 onChange={(e) => setProjektbeschreibung(e.target.value)}
                 placeholder="Beschreibe Umfang, Ausführung, Koordination..."
+                autoFocus={focusField === 'beschreibung'}
               />
             </MockField>
           </div>
@@ -963,24 +1147,8 @@ export function AngebotWizard({
 
       {step === 2 ? (
         <>
-          <div
-            className="section-h"
-            style={{
-              marginBottom: 12,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--text)',
-            }}
-          >
-            <span>Positionen · {positionenKopf}</span>
-            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12 }}>{name}</span>
-          </div>
           <PosBoard
+            title={`Positionen · ${positionenKopf}`}
             positionen={posBoardLines}
             onChange={onPosBoardChange}
             showUst
@@ -988,6 +1156,20 @@ export function AngebotWizard({
             preislisten={preislisten}
             hideAddGewerk={dokumentTyp === 'einfach'}
             suggestContext={posSuggestContext}
+            headerAction={
+              <AngebotKiAssistentButton
+                sm
+                label="Mit KI"
+                dokumentLabel="Angebot"
+                leadKurz={kiLeadKurz}
+                titel={meta.leistungsumfang}
+                beschreibung={projektbeschreibung}
+                positionen={kiKontextPositionen}
+                preislisten={kiKontextPreislisten}
+                gewerke={kiGewerke}
+                onApply={applyAngebotKi}
+              />
+            }
           />
         </>
       ) : null}

@@ -170,7 +170,7 @@ function LoginPageContent() {
           {mode === 'login' ? (
             <>
               <h2 className="crm-login__welcome">Willkommen zurück</h2>
-              <p className="crm-login__welcome-sub">Melden Sie sich mit Ihrem Konto an.</p>
+              <p className="crm-login__welcome-sub">Melde dich mit deinem Konto an.</p>
 
               <div className="crm-login__fields">
                 <div className="crm-login__field">
@@ -267,7 +267,7 @@ function LoginPageContent() {
             <>
               <h2 className="crm-login__welcome">Passwort zurücksetzen</h2>
               <p className="crm-login__welcome-sub">
-                Wir senden einen Link an Ihre CRM-E-Mail.
+                Wir senden einen Link an deine CRM-E-Mail.
               </p>
 
               <div className="crm-login__fields">

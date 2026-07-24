@@ -5,7 +5,7 @@ import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Building2, Copy, Download, ImageIcon, Shield, User } from 'lucide-react'
+import { Building2, Copy, Download, Shield, User } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import {
@@ -45,7 +45,6 @@ function orgFreigabeBadgeStatus(
 
 export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
   const router = useRouter()
-  const [fotoIdx, setFotoIdx] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
   const [notfallModal, setNotfallModal] = useState(false)
   const auftraggeber = lead.auftraggeber
@@ -350,43 +349,6 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
         </Card>
       ) : null}
 
-      {fotos.length > 0 ? (
-        <Card
-          title={
-            <>
-              <ImageIcon className="inline h-4 w-4 text-bw-primary" aria-hidden /> Fotos ({fotos.length})
-            </>
-          }
-        >
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {fotos.map((url, i) => (
-              <button
-                key={url}
-                type="button"
-                className={`h-20 w-20 shrink-0 overflow-hidden rounded-lg border ${
-                  i === fotoIdx ? 'border-bw-primary ring-2 ring-bw-primary/30' : 'border-bw-border'
-                }`}
-                onClick={() => setFotoIdx(i)}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-          {fotos[fotoIdx] ? (
-            <a
-              href={fotos[fotoIdx]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block overflow-hidden rounded-lg border border-bw-border"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fotos[fotoIdx]} alt="Meldungsfoto" className="max-h-72 w-full object-contain" />
-            </a>
-          ) : null}
-        </Card>
-      ) : null}
-
       {zeigtHavarieAktionen ? (
         <Card title="Havarie / Notmaßnahme">
           <p className="mb-3 text-[13px] text-bw-text-muted">
@@ -397,14 +359,6 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
             <Button
               type="button"
               variant="primary"
-              size="sm"
-              onClick={() => setNotfallModal(true)}
-            >
-              Direkt beauftragen
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
               size="sm"
               loading={busy === 'notmassnahme'}
               onClick={() => {
@@ -419,7 +373,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
                 })
               }}
             >
-              Notmaßnahme (schnell)
+              Notmaßnahme disponieren
             </Button>
             <Button
               type="button"
@@ -489,6 +443,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
         open={notfallModal}
         onClose={() => setNotfallModal(false)}
         leadId={lead.id}
+        variant="anfrage"
         gewerkName={
           Array.isArray(lead.bereiche) && lead.bereiche[0]
             ? String(lead.bereiche[0])

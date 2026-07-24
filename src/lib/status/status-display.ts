@@ -4,7 +4,7 @@ import {
   type AngebotStatusEinfach,
   type AngebotStatusEinfachRow,
 } from '@/lib/angebot-einfach'
-import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import type { AuftragStatus, LeadStatus, OrgFreigabeStatus } from '@/lib/types'
 import { AUFTRAG_STATUS_LABELS, STATUS_LABELS } from '@/lib/utils'
 import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
 
@@ -40,13 +40,23 @@ const AUFTRAG_VARIANT: Record<AuftragStatus, StatusDisplayVariant> = {
   storniert: 'danger',
 }
 
+/** Mieter-Meldung wartet auf HV-Freigabe (kein Notfall / über Schwelle) — bleibt unter Offen. */
+export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Warte auf HV'
+
+const ANFRAGE_GESCHLOSSEN = new Set(['abgebrochen', 'abgeschlossen', 'auftrag'])
+
 /** Nutzer-sichtbares Label + semantische Farbe für Anfrage (Lead). */
-export function anfrageStatusDisplay(status: LeadStatus | string): StatusDisplay {
+export function anfrageStatusDisplay(
+  status: LeadStatus | string,
+  opts?: { orgFreigabeStatus?: OrgFreigabeStatus | string | null }
+): StatusDisplay {
   const key = status as LeadStatus
-  const label =
-    key in STATUS_LABELS ? STATUS_LABELS[key] : String(status)
-  const variant =
-    key in ANFRAGE_VARIANT ? ANFRAGE_VARIANT[key] : 'neutral'
+  const freigabe = (opts?.orgFreigabeStatus ?? '').trim()
+  if (freigabe === 'ausstehend' && !ANFRAGE_GESCHLOSSEN.has(key)) {
+    return { label: ANFRAGE_WARTE_AUF_HV_LABEL, variant: 'warning' }
+  }
+  const label = key in STATUS_LABELS ? STATUS_LABELS[key] : String(status)
+  const variant = key in ANFRAGE_VARIANT ? ANFRAGE_VARIANT[key] : 'neutral'
   return { label, variant }
 }
 

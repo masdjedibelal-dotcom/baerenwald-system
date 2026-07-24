@@ -7,6 +7,7 @@ export const ACTIVITY_SECTIONS = {
   verlauf: 'Verlauf',
   notizen: 'Notizen',
   dokumente: 'Dokumente',
+  fotos: 'Fotos',
 } as const
 
 export const CTA = {

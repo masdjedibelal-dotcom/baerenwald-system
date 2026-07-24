@@ -76,12 +76,61 @@ export const STAFF_FUNNEL_STEP_LABELS: Record<StaffFunnelStepId, string> = {
   crm_pruefen: 'Prüfen',
 }
 
-export const STAFF_SITUATIONEN: { value: SituationValue; label: string; hint: string }[] = [
-  { value: 'erneuern', label: 'Umbau & Modernisierung', hint: 'Bad, Heizung, Boden…' },
-  { value: 'kaputt', label: 'Reparatur & Notfall', hint: 'Defekt, Leck, Ausfall…' },
-  { value: 'betreuung', label: 'Betreuung', hint: 'Garten, Reinigung, Hausmeister…' },
-  { value: 'gewerbe', label: 'Gewerbe / Gastro', hint: 'B2B — Beratungspfad' },
+export const STAFF_SITUATIONEN: {
+  value: SituationValue
+  label: string
+  hint: string
+  icon: string
+  tag?: string
+}[] = [
+  {
+    value: 'erneuern',
+    label: 'Umbau & Modernisierung',
+    hint: 'Inkl. Innenausbau, Außenbereich, Terrasse, Keller, DG',
+    icon: '01-haus-erneuern',
+  },
+  {
+    value: 'betreuung',
+    label: 'Betreuung',
+    hint: 'Garten, Reinigung, Hausmeister, Winterdienst',
+    icon: '03-betreuung',
+  },
+  {
+    value: 'kaputt',
+    label: 'Reparatur & Notfall',
+    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählst du, wie schnell wir kommen sollen',
+    icon: '02-reparatur',
+  },
+  {
+    value: 'gewerbe',
+    label: 'Gewerbe',
+    hint: 'Büro, Praxis, Laden, Gastronomie — wir planen individuell',
+    icon: '04-gewerbe',
+    tag: 'B2B',
+  },
 ]
+
+/** Website-Icon-Namen für Bereiche (`/public/icons/{name}.svg`). */
+export const STAFF_BEREICH_ICONS: Record<string, string> = {
+  heizung: '05-heizung',
+  elektrik: '06-elektrik',
+  waende: '07-streichen',
+  bad: '08-bad',
+  boden: '09-boden',
+  trockenbau: '10-trennwand',
+  fenster: '11-fenster',
+  dach: '12-dach',
+  fassade: '13-fassade',
+  garten: '15-gartenpflege',
+  winterdienst: '16-winterdienst',
+  reinigung: '17-gebauedereinigung',
+  hausmeister: '18-hausmeister',
+  sanitaer: '08-bad',
+  schimmel: '02-reparatur',
+  anbau: '10-trennwand',
+  baum_notfall: '14-gartengestaltung',
+  gewerbe: '04-gewerbe',
+}
 
 export const UMFANG_OPTIONS = [
   { value: 'woechentlich', label: 'Wöchentlich' },

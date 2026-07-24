@@ -18,7 +18,7 @@ export { DocCard, type DocType } from './DocCard'
 export { EmptyState } from './EmptyState'
 export { DetailMetaChip, DetailMetaRow } from './DetailMetaChip'
 export { ToastProvider, toast, type ToastItem } from './app-toast'
-export { SkeletonCard, SkeletonRow, SkeletonList } from './Skeleton'
+export { SkeletonCard, SkeletonRow, SkeletonList, SkeletonListPage, SkeletonDetailPage } from './Skeleton'
 
 export { LeadStatusBadge, KanalBadge, Badge } from './Badge'
 export { AngebotStatusBadge } from './AngebotStatusBadge'

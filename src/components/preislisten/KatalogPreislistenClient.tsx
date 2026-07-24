@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockBtn, MockBadge, MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/app-toast'
@@ -56,6 +57,10 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
         .sort((a, b) => a.sortierung - b.sortierung || a.titel.localeCompare(b.titel, 'de')),
     [rows, activeGewerkId]
   )
+
+  if (!loaded) {
+    return <CrmInlineLoading label="Preiskatalog wird geladen …" />
+  }
 
   if (loaded && rows.length === 0) {
     return (

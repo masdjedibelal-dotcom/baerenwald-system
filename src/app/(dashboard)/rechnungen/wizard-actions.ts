@@ -1115,6 +1115,7 @@ export async function deleteRechnungEntwurf(
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/rechnungen')
+  revalidatePath('/vorgaenge')
   if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id}`)
   return { ok: true }
 }

@@ -39,7 +39,8 @@ export function estimateStaffFunnelPrice(state: StaffFunnelState): PriceResult {
       modus: 'komplex',
       min: null,
       max: null,
-      hinweis: 'Zu komplex für Sofort-Preisrahmen — Beratungspfad.',
+      hinweis:
+        'Für diese Auswahl gibt es keinen verlässlichen Online-Preisrahmen — Aufwand und Budget klären wir persönlich.',
     }
   }
 
@@ -105,6 +106,6 @@ export function estimateStaffFunnelPrice(state: StaffFunnelState): PriceResult {
     modus: 'rahmen',
     min,
     max,
-    hinweis: 'Orientierung fürs Gespräch — jederzeit manuell anpassen.',
+    hinweis: 'Unverbindliche Orientierung — wie auf der Website für den Kunden.',
   }
 }

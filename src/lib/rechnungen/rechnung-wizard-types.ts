@@ -8,6 +8,7 @@ import {
   defaultRechnungEinleitung,
   defaultRechnungHinweise,
 } from '@/lib/rechnungen/rechnung-texte'
+import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 export type RechnungWizardZahlungsart = 'standard' | 'abschlaege'
@@ -114,6 +115,7 @@ export function defaultRechnungWizardMeta(
   const bis = opts?.leistungszeitraum_bis?.trim() || heute
   const anrede: AngebotMailAnrede = istPrivatKundeTyp(opts?.kundeTyp) ? 'du' : 'sie'
   const einleitung = defaultRechnungEinleitung(anrede)
+  const mailEinleitung = defaultRechnungMailEinleitung(anrede)
   const hinweise = defaultRechnungHinweise()
   const klein = opts?.firm ? parseKleinunternehmerSetting(opts.firm.kleinunternehmer) : false
   const hinweis_35a = kundeZeigt35a(opts?.kundeTyp) && !klein
@@ -121,7 +123,7 @@ export function defaultRechnungWizardMeta(
   return {
     einleitung,
     hinweise,
-    mail_einleitung: '',
+    mail_einleitung: mailEinleitung,
     mail_betreff: '',
     reverse_charge_13b: false,
     hinweis_35a,

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
+import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
@@ -49,10 +50,17 @@ export function AngebotDetailsTab({
   const angebotNr =
     detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
 
+  const funnelUi = useMemo(
+    () => (lead ? buildFunnelBedarfExtraRows(lead) : { extraRows: [], footerRows: [] }),
+    [lead]
+  )
+
   return (
     <>
+      <PosBoard title="Leistungen" positionen={lines} showUst />
+
       <EntityProjektUebersichtCard
-        title="Angebot"
+        title="Projektinfos"
         icon="file-invoice"
         initial={{
           titel: projektTitel(detail, lead),
@@ -74,6 +82,7 @@ export function AngebotDetailsTab({
             : undefined
         }
         disabled={!editable}
+        extraRows={funnelUi.extraRows}
         footerRows={[
           { label: 'Angebotsnr.', children: angebotNr },
           {
@@ -89,8 +98,6 @@ export function AngebotDetailsTab({
           },
         ]}
       />
-
-      <PosBoard title="Leistungen" positionen={lines} showUst />
     </>
   )
 }

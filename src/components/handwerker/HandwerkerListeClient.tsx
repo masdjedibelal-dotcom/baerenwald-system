@@ -310,7 +310,7 @@ export function HandwerkerListeClient({
         onClose={() => setFilterOpen(false)}
         icon="filter"
         title="Filter & Suchen"
-        sub="Handwerker eingrenzen"
+        sub="Partner eingrenzen"
         footer={
           <>
             <MockBtn kind="ghost" onClick={resetFilters}>
@@ -420,8 +420,8 @@ export function HandwerkerListeClient({
         {pageItems.length === 0 ? (
           <MockEmpty
             icon="tool"
-            title={rows.length === 0 ? 'Keine Handwerker' : 'Keine Treffer'}
-            hint={rows.length === 0 ? 'Handwerker anlegen' : 'Filter zurücksetzen'}
+            title={rows.length === 0 ? 'Keine Partner' : 'Keine Treffer'}
+            hint={rows.length === 0 ? 'Partner anlegen' : 'Filter zurücksetzen'}
           />
         ) : (
           pageItems.map((h) => {
@@ -498,7 +498,7 @@ export function HandwerkerListeClient({
                   onClick={(e) => e.stopPropagation()}
                   style={{ justifyContent: 'flex-end' }}
                 >
-                  <MockEntityRowMenu items={rowMenuItems(h)} title="Handwerker" />
+                  <MockEntityRowMenu items={rowMenuItems(h)} title="Partner" />
                 </div>
               </Link>
             )
@@ -511,7 +511,7 @@ export function HandwerkerListeClient({
         totalPages={totalPages}
         total={total}
         pageSize={pageSize}
-        unit="Handwerker"
+        unit="Partner"
         onPageChange={(p) => setPageIndex(p - 1)}
       />
     </div>

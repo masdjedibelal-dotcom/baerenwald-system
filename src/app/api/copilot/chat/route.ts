@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
+import { emptyAssistentUi } from '@/lib/copilot/assistent-ui'
 import { runCopilotChat, type CopilotChatMessage } from '@/lib/copilot/run-chat'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-/** CRM-Sidepanel-Assistent — gleiche Claude-Tools wie Telegram. */
+/** CRM-Sidepanel-Assistent — gleiche Claude-Tools wie Telegram + UI-Links/Vorschau. */
 export async function POST(req: Request) {
   const supabase = createClient()
   const {
@@ -49,5 +50,9 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 })
   }
-  return NextResponse.json({ ok: true, text: result.text })
+  return NextResponse.json({
+    ok: true,
+    text: result.text,
+    ui: result.ui ?? emptyAssistentUi(),
+  })
 }

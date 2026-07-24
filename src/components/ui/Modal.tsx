@@ -1,9 +1,10 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
 interface ModalProps {
@@ -29,7 +30,7 @@ const SIZE_WIDTH: Record<NonNullable<ModalProps['size']>, string> = {
   xl: 'min(96vw, 56rem)',
 }
 
-/** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. */
+/** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. Kanonisch für CRM. */
 export function Modal({
   open,
   onClose,
@@ -43,24 +44,25 @@ export function Modal({
   footerSpread = false,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
+    if (!open || !mounted) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const dialog = dialogRef.current
+    const release = dialog ? trapFocus(dialog, () => onCloseRef.current()) : undefined
     return () => {
-      document.removeEventListener('keydown', handler)
       document.body.style.overflow = prev
+      release?.()
     }
-  }, [open, onClose])
+  }, [open, mounted])
 
   if (!open || !mounted) return null
 
@@ -73,9 +75,11 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
         className={cn('modal', className)}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         style={{ width: SIZE_WIDTH[size] }}
       >
         <div className="modal-h">

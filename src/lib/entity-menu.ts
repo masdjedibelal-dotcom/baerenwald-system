@@ -28,6 +28,8 @@ export type EntityMenuHandlers = {
   /** Portal-Einladungsmail (Kunden-/Handwerker-/Partner-Link versenden) */
   onPortalLink?: () => void
   onStatus?: (kind: 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren') => void
+  /** Anfrage: Notfall melden → Auftrag mit Regie */
+  onNotfall?: () => void
   onAngebot?: () => void
   /** Kunde / Handwerker: Pipeline anlegen */
   onCreateAnfrage?: () => void
@@ -146,9 +148,15 @@ export function buildEntityMenu(
       onClick: () => h.onStatus!('verloren'),
     })
   }
-  if (type === 'anfrage' && h.onAngebot) {
+  /** Notfall / Angebot erstellen: nur wenn nicht schon Header-CTA (Handlers weglassen). */
+  if (type === 'anfrage' && (h.onNotfall || h.onAngebot)) {
     A.push('sep')
-    A.push({ icon: 'file-invoice', label: 'Angebot erstellen', onClick: h.onAngebot })
+    if (h.onNotfall) {
+      A.push({ icon: 'alert-triangle', label: 'Notfall melden', onClick: h.onNotfall })
+    }
+    if (h.onAngebot) {
+      A.push({ icon: 'file-invoice', label: 'Angebot erstellen', onClick: h.onAngebot })
+    }
   }
 
   if (type === 'angebot') {
@@ -253,6 +261,25 @@ export function buildEntityMenu(
   }
 
   return dedupeSeps(A)
+}
+
+/**
+ * Listen-Row-Menü (UX2-6): nur Öffnen / Kopieren / Löschen (+ PDF wenn gesetzt).
+ * Keine Status-/Pipeline-Aktionen — die gehören ins Detail.
+ */
+export function buildListRowMenu(
+  type: EntityMenuType,
+  entity: EntityLike,
+  h: Pick<EntityMenuHandlers, 'onEdit' | 'onCopy' | 'onPdf' | 'onDelete' | 'deleteLabel' | 'deleteMenuLabel'>
+): EntityMenuItem[] {
+  return buildEntityMenu(type, entity, {
+    onEdit: h.onEdit,
+    onCopy: h.onCopy,
+    onPdf: h.onPdf,
+    onDelete: h.onDelete,
+    deleteLabel: h.deleteLabel,
+    deleteMenuLabel: h.deleteMenuLabel,
+  })
 }
 
 /** entityMenu-Items → ActionsMenu-Items mit MockIcon */

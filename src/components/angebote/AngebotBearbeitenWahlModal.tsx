@@ -48,7 +48,7 @@ export function AngebotBearbeitenWahlModal({
     <Modal open={open} onClose={() => !pending && onClose()} title="Angebot bearbeiten" size="md">
       <p className="text-sm leading-relaxed text-bw-text-muted">
         Dieses Angebot wurde bereits versendet oder liegt nicht mehr als reiner Entwurf vor. Wie
-        möchten Sie fortfahren?
+        möchtest du fortfahren?
       </p>
 
       <div className="mt-4 space-y-3">

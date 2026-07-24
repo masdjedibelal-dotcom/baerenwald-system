@@ -17,8 +17,8 @@ export function VorgangResolverBanner({
 
   const hints: string[] = []
   if (resolved.badges.notfall) hints.push('Notfall')
-  if (resolved.badges.wartet_freigabe) hints.push('Wartet auf Freigabe (HV)')
-  if (resolved.actor) hints.push(ACTOR_LABELS[resolved.actor] ?? resolved.actor)
+  if (resolved.badges.wartet_freigabe) hints.push('Warte auf HV')
+  else if (resolved.actor) hints.push(ACTOR_LABELS[resolved.actor] ?? resolved.actor)
   if (resolved.ueberfaellig) hints.push('Rechnung überfällig')
 
   return (

@@ -38,9 +38,16 @@
     --grn-tx: #1f6a3f;
 
     --r-sm: 8px;
-    --r: 13px;
-    --r-lg: 18px;
+    --r: 12px;
+    --r-lg: 16px;
     --r-pill: 999px;
+
+    /* Typo-Skala (Grundpolish) */
+    --type-display: 20px;
+    --type-title: 15px;
+    --type-body: 14px;
+    --type-meta: 12.5px;
+    --type-caption: 11.5px;
     /* Elevation: nahe + weiche Schicht (ruhig, Mock-grün-getönt) */
     --shadow:
       0 1px 2px rgba(22, 32, 27, 0.05),
@@ -54,6 +61,16 @@
     --sidebar-w: 44px;
     --topbar-h: 44px;
     --sidebar-expanded: 236px;
+
+    /*
+     * Control-Höhen (Listen vs. Formulare)
+     * - Formulare: 40px (--control-h)
+     * - Listen-Suche / Filter-Input: 30px (--list-search-h) — Ausnahme, kompakter in listbar
+     * - Placeholder überall: 12px (siehe input::placeholder unten)
+     */
+    --control-h: 40px;
+    --list-search-h: 30px;
+    --placeholder-size: 12px;
 
     /* Sidebar chrome (Mock) */
     --sidebar-hover: rgba(255, 255, 255, 0.08);
@@ -153,10 +170,28 @@
     text-size-adjust: 100%;
   }
 
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--green) 40%, transparent);
+    outline-offset: 2px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
   input,
   textarea,
   select {
     font-size: 16px !important;
+  }
+
+  /* Placeholder einheitlich kleiner als Input-Wert (iOS bleibt 16px beim Tippen) */
+  input::placeholder,
+  textarea::placeholder {
+    font-size: var(--placeholder-size, 12px) !important;
+    line-height: 1.4;
+    font-weight: 400;
+    opacity: 1;
   }
 
   /*
@@ -196,10 +231,10 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.12);
+    background: color-mix(in srgb, var(--text) 18%, transparent);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, var(--text) 28%, transparent);
   }
 }

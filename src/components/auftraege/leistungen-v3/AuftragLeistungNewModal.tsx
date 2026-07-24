@@ -127,6 +127,10 @@ export function AuftragLeistungNewModal({
       toast.error('Für „Speichern & senden“ bitte einen Handwerker wählen.')
       return
     }
+    if (andSend && (ekNum == null || !Number.isFinite(ekNum) || ekNum <= 0)) {
+      toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+      return
+    }
 
     startTransition(async () => {
       const r = await addAuftragPosition(auftragId, {
@@ -136,7 +140,8 @@ export function AuftragLeistungNewModal({
         gewerk_block_key: block?.key?.trim() || null,
         beschreibung: beschreibung.trim() || null,
         preis_fix: vkNum,
-        preis_partner: ekNum != null && Number.isFinite(ekNum) ? ekNum : null,
+        preis_partner:
+          ekNum != null && Number.isFinite(ekNum) && ekNum > 0 ? ekNum : null,
         start_datum: von || null,
         end_datum: bis || null,
         handwerker_id: hwId,
@@ -191,7 +196,12 @@ export function AuftragLeistungNewModal({
             type="button"
             variant="primary"
             onClick={() => save(true)}
-            disabled={pending || !handwerkerId.trim()}
+            disabled={
+              pending ||
+              !handwerkerId.trim() ||
+              !ek.trim() ||
+              !(Number(ek.replace(',', '.')) > 0)
+            }
           >
             Speichern & senden
           </Button>
@@ -303,11 +313,14 @@ export function AuftragLeistungNewModal({
               type="number"
               className="input"
               step="0.01"
-              min="0"
+              min="0.01"
               value={ek}
               onChange={(e) => setEk(e.target.value)}
             />
           </div>
+          <p className="mt-1 text-xs text-bw-text-muted">
+            Für „Speichern & senden“ Pflicht — größer als 0 €.
+          </p>
         </div>
         <div>
           <label className="input-label">Von</label>

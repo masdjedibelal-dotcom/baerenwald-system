@@ -1,6 +1,23 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+
+export type StaffChoiceOption = {
+  value: string
+  label: string
+  hint?: string
+  /** Dateiname unter `/icons/{icon}.svg` (Website-Funnel) */
+  icon?: string
+  tag?: string
+}
+
+function FunnelIcon({ name }: { name: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- lokale SVG-Icons aus /public/icons
+    <img src={`/icons/${name}.svg`} alt="" width={22} height={22} decoding="async" />
+  )
+}
 
 export function StaffChoiceGrid({
   options,
@@ -11,7 +28,7 @@ export function StaffChoiceGrid({
   onToggle,
   columns = 2,
 }: {
-  options: { value: string; label: string; hint?: string }[]
+  options: StaffChoiceOption[]
   value?: string
   values?: string[]
   multi?: boolean
@@ -21,8 +38,11 @@ export function StaffChoiceGrid({
 }) {
   return (
     <div
-      className="grid gap-2"
-      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      className={cn(
+        'sf-tile-grid',
+        columns === 1 && 'cols-1',
+        columns === 3 && 'cols-3'
+      )}
     >
       {options.map((o) => {
         const selected = multi ? values?.includes(o.value) : value === o.value
@@ -30,18 +50,18 @@ export function StaffChoiceGrid({
           <button
             key={o.value}
             type="button"
-            className={cn(
-              'rounded-[10px] border px-3.5 py-3 text-left transition',
-              selected
-                ? 'border-[var(--green)] bg-[var(--green-10)] shadow-[inset_0_0_0_1px_var(--green)]'
-                : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--bg-soft)]'
-            )}
+            className={cn('funnel-tile', multi && 'multi', selected && 'selected')}
             onClick={() => (multi ? onToggle?.(o.value) : onChange?.(o.value))}
           >
-            <div className="text-[13.5px] font-semibold text-[var(--text)]">{o.label}</div>
-            {o.hint ? (
-              <div className="mt-0.5 text-[12px] text-[var(--text-3)]">{o.hint}</div>
+            <span className="funnel-tile-check" aria-hidden />
+            {o.icon ? (
+              <span className="funnel-tile-icon-wrap" aria-hidden>
+                <FunnelIcon name={o.icon} />
+              </span>
             ) : null}
+            <p className="funnel-tile-label">{o.label}</p>
+            {o.hint ? <p className="funnel-tile-hint">{o.hint}</p> : null}
+            {o.tag ? <span className="funnel-tile-tag">{o.tag}</span> : null}
           </button>
         )
       })}
@@ -69,9 +89,87 @@ export function StaffStepTitle({
   sub?: string
 }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-[18px] font-semibold tracking-tight text-[var(--text)]">{title}</h2>
-      {sub ? <p className="mt-1 text-[13px] text-[var(--text-3)]">{sub}</p> : null}
+    <div className="mb-1">
+      <h2 className="sf-step-title">{title}</h2>
+      {sub ? <p className="sf-step-sub">{sub}</p> : <div className="mb-5" />}
+    </div>
+  )
+}
+
+/** CRM-only Felder — klar vom Website-Funnel getrennt. */
+export function StaffInternBlock({
+  title = 'Nur intern (CRM)',
+  children,
+}: {
+  title?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="sf-intern">
+      <div className="sf-intern-label">{title}</div>
+      {children}
+    </div>
+  )
+}
+
+export function StaffPreisIndikation({
+  min,
+  max,
+  komplex,
+  hinweis,
+}: {
+  min: number | null
+  max: number | null
+  komplex?: boolean
+  hinweis?: string
+}) {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(n)
+
+  if (komplex || (min == null && max == null)) {
+    return (
+      <div className="preis-karte preis-karte--beratung">
+        <p className="preis-karte-kicker">Preisindikation</p>
+        <div className="preis-karte-range">
+          <span className="preis-karte-zahl" style={{ fontSize: '1.35rem' }}>
+            Persönliche Beratung
+          </span>
+        </div>
+        <p className="preis-karte-hinweis">
+          {hinweis?.trim() ||
+            'Für diese Auswahl gibt es keinen verlässlichen Online-Preisrahmen — Aufwand und Budget klären wir im Gespräch.'}
+        </p>
+      </div>
+    )
+  }
+
+  const hasRange = min != null && max != null && min !== max
+  const fixed = min != null && max != null && min === max
+
+  return (
+    <div className="preis-karte">
+      <p className="preis-karte-kicker">
+        {fixed ? 'Unverbindlicher Preis' : 'Unverbindlicher Preisrahmen'}
+      </p>
+      <div className="preis-karte-range">
+        {hasRange ? (
+          <>
+            <span className="preis-karte-zahl">{fmt(min!)}</span>
+            <span className="preis-karte-trenner">–</span>
+            <span className="preis-karte-zahl">{fmt(max!)}</span>
+          </>
+        ) : (
+          <span className="preis-karte-zahl">{fmt(min ?? max ?? 0)}</span>
+        )}
+      </div>
+      <p className="preis-karte-hinweis">
+        {hinweis?.trim() ||
+          'Orientierung fürs Kundengespräch — unverbindlich, wie auf der Website.'}
+      </p>
     </div>
   )
 }

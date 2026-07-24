@@ -543,18 +543,24 @@ export function PosBoard({
 
   return (
     <div className={className}>
-      {title ? (
+      {title || headerAction ? (
         <div
           className="section-h"
           style={{
             margin: '2px 2px 10px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'baseline',
+            alignItems: 'center',
+            gap: 10,
+            textTransform: title ? undefined : 'none',
+            letterSpacing: title ? undefined : 0,
+            fontSize: title ? undefined : 14,
+            fontWeight: title ? undefined : 600,
+            color: title ? undefined : 'var(--text)',
           }}
         >
-          <span>{title}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>{title || null}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
             {headerAction}
             <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
               {positionen.length} {positionen.length === 1 ? 'Position' : 'Positionen'}
@@ -656,6 +662,7 @@ export function PosBoard({
         onReorder={reorder}
         onDropToGroup={dropToGroup}
         onReorderGroup={reorderGroups}
+        onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
         showTotals={showUst !== false}
         netto={netto}
         ust={ust}

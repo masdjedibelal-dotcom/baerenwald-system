@@ -83,8 +83,8 @@ export async function GET(req: Request) {
     hits.push({
       id: `h-${h.id}`,
       icon: 'tool',
-      label: (h.firma as string) || (h.name as string) || 'Handwerker',
-      sub: 'Handwerker',
+      label: (h.firma as string) || (h.name as string) || 'Partner',
+      sub: 'Partner',
       href: `/handwerker/${h.id}`,
     })
   }
@@ -94,7 +94,7 @@ export async function GET(req: Request) {
       id: `p-${p.id}`,
       icon: 'building',
       label: p.name as string,
-      sub: 'Partner',
+      sub: 'Netzwerk',
       href: `/partner/${p.id}`,
     })
   }

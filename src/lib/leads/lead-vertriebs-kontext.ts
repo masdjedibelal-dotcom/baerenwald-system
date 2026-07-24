@@ -80,13 +80,27 @@ export function buildLeadVertriebsKontext(
   kiLogs: KiAnfragenLogRow[]
 ): LeadVertriebsKontext | null {
   const studio = parseGptProjektStudioFunnel(row.funnel_daten)
+  const fd =
+    row.funnel_daten && typeof row.funnel_daten === 'object' && !Array.isArray(row.funnel_daten)
+      ? (row.funnel_daten as Record<string, unknown>)
+      : null
   const kiSessionId = String(row.ki_session_id ?? '').trim()
-  const hatGpt = Boolean(studio)
+  const gptSessionLoose = String(fd?.gpt_session_id ?? '').trim()
+  const chatLoose = Array.isArray(fd?.ki_chat_verlauf)
+    ? (fd!.ki_chat_verlauf as Array<{ role?: string; content?: string }>)
+        .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content)
+        .map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: String(m.content),
+        }))
+    : []
+  const hatGpt = Boolean(studio) || Boolean(gptSessionLoose) || chatLoose.length > 0
   const hatRechner = kiLogs.length > 0 || Boolean(kiSessionId)
+  const hatVertriebMeta = Boolean(fd?.vertriebs_kontext)
 
-  if (!hatGpt && !hatRechner) return null
+  if (!hatGpt && !hatRechner && !hatVertriebMeta) return null
 
-  const chat = studio?.ki_chat_verlauf ?? []
+  const chat = studio?.ki_chat_verlauf?.length ? studio.ki_chat_verlauf : chatLoose
   const chatKunde = chat.filter((m) => m.role === 'user').length
   const chatKi = chat.filter((m) => m.role === 'assistant').length
   const istBilder = studio?.ist_bilder_urls?.length ?? 0
@@ -104,15 +118,13 @@ export function buildLeadVertriebsKontext(
   return {
     lead: formatLeadRow(row),
     quelle: hatGpt && hatRechner ? 'gemischt' : hatGpt ? 'gpt_studio' : 'ki_rechner',
-    funnel_quelle: studio?.funnel_quelle ?? null,
-    wunsch_text: studio?.wunsch_text ?? null,
+    funnel_quelle: studio?.funnel_quelle ?? (typeof fd?.funnel_quelle === 'string' ? fd.funnel_quelle : null),
+    wunsch_text: studio?.wunsch_text ?? (typeof fd?.wunsch_text === 'string' ? fd.wunsch_text : null),
     render_count: studio?.render_count ?? null,
     chat,
     raum_analyse: raumText,
     viz_brief: briefText,
-    vertriebs_kontext: (row.funnel_daten as Record<string, unknown> | null)?.vertriebs_kontext as
-      | Record<string, unknown>
-      | null,
+    vertriebs_kontext: (fd?.vertriebs_kontext as Record<string, unknown> | null) ?? null,
     gpt_erklaerung: (studio?.gpt_erklaerung as Record<string, unknown> | undefined) ?? null,
     ki_logs: kiLogs,
     verhalten: {
@@ -173,7 +185,7 @@ export function leadVertriebsKontextAlsPrompt(kontext: LeadVertriebsKontext): st
     kontext.raum_analyse ? `Raumanalyse: ${kontext.raum_analyse}` : '',
     kontext.viz_brief ? `Visualisierungs-Brief: ${kontext.viz_brief}` : '',
     kontext.vertriebs_kontext
-      ? `Vertriebs-Kontext (Website): ${JSON.stringify(kontext.vertriebs_kontext).slice(0, 600)}`
+      ? `Vertriebs-Kontext / Klick-Verhalten (Website): ${JSON.stringify(kontext.vertriebs_kontext).slice(0, 1200)}`
       : '',
     kontext.gpt_erklaerung
       ? `Bestehende GPT-Erklärung: ${JSON.stringify(kontext.gpt_erklaerung).slice(0, 800)}`

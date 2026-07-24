@@ -1,16 +1,35 @@
 'use client'
 
-import { ChevronDown, ExternalLink, Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { ChevronDown, ExternalLink, Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/actions'
-import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { gptGalerieUrls, isGptProjektStudio, parseGptProjektStudioFunnel } from '@/lib/gpt-viz/funnel-daten'
 import type { LeadDetail } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-export function leadHatKiVertriebsDaten(lead: Pick<LeadDetail, 'funnel_daten' | 'ki_session_id'>): boolean {
-  return isGptProjektStudio(lead.funnel_daten) || Boolean(lead.ki_session_id?.trim())
+export function leadHatKiVertriebsDaten(
+  lead: Pick<LeadDetail, 'funnel_daten' | 'ki_session_id' | 'ki_zusammenfassung' | 'kanal'>
+): boolean {
+  if (lead.ki_zusammenfassung?.trim()) return true
+  if (lead.ki_session_id?.trim()) return true
+  if (isGptProjektStudio(lead.funnel_daten)) return true
+
+  const fd =
+    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
+      ? (lead.funnel_daten as Record<string, unknown>)
+      : null
+  if (!fd) return false
+
+  if (String(fd.gpt_session_id ?? '').trim()) return true
+  if (Array.isArray(fd.ki_chat_verlauf) && fd.ki_chat_verlauf.length > 0) return true
+  if (fd.vertriebs_kontext && typeof fd.vertriebs_kontext === 'object') return true
+  if (fd.projekt_studio === true) return true
+  const quelle = String(fd.funnel_quelle ?? '').toLowerCase()
+  if (quelle.startsWith('gpt_') || quelle.includes('ki')) return true
+
+  return false
 }
 
 function AnalyseAbschnitt({ text }: { text: string }) {
@@ -120,49 +139,44 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             : 'Website-KI'
 
   return (
-    <Card
-      collapsible={false}
-      title={
-        <span className="inline-flex items-center gap-1.5">
-          <Sparkles className="h-4 w-4 text-[#2E7D52]" aria-hidden />
-          {istGpt ? 'KI-Anfrage (Website)' : 'KI-Rechner'}
-        </span>
-      }
-      action={
-        <Button
-          type="button"
-          variant="secondary"
-          className="text-xs"
+    <MockCard
+      icon="sparkles"
+      title="Lead-Auskunft · KI"
+      actions={
+        <MockBtn
+          sm
+          kind="ghost"
           disabled={loading}
           onClick={() => void analyseAktualisieren()}
+          title="Analyse neu berechnen"
         >
           {loading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <>
               <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-              Analyse aktualisieren
+              Aktualisieren
             </>
           )}
-        </Button>
+        </MockBtn>
       }
     >
       <div className="space-y-4">
         {istGpt ? (
           <p className="text-[13px] leading-relaxed text-bw-text-muted">
-            Quelle: <span className="font-medium text-bw-text">{quelleLabel}</span> — Chat, Eingaben und
-            Visualisierung werden für Vertriebstipps ausgewertet.
+            Quelle: <span className="font-medium text-bw-text">{quelleLabel}</span> — Chat, Eingaben,
+            Klicks/Verhalten und Visualisierung werden für den Vertrieb ausgewertet.
           </p>
         ) : (
           <p className="text-[13px] leading-relaxed text-bw-text-muted">
-            Anfrage über den <span className="font-medium text-bw-text">KI-Rechner</span> auf der Website.
-            Eingaben und Chat-Verlauf fließen in die Analyse ein.
+            Anfrage über den <span className="font-medium text-bw-text">KI-Rechner</span> auf der
+            Website. Eingaben und Chat-Verlauf fließen in die Analyse ein.
           </p>
         )}
 
         <div className="space-y-3 rounded-lg border border-[#2E7D52]/25 bg-[#EAF3DE]/40 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2E7D52]">
-            Vertriebs-Analyse
+            Analyse für den Mitarbeiter
           </p>
 
           {loading && !analyse ? (
@@ -174,7 +188,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             <AnalyseAbschnitt text={analyse} />
           ) : (
             <p className="text-[13px] text-bw-text-muted">
-              {error ?? 'Noch keine Analyse — bitte „Analyse aktualisieren“ klicken.'}
+              {error ?? 'Noch keine Analyse — bitte „Aktualisieren“ klicken.'}
             </p>
           )}
 
@@ -257,6 +271,6 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
           </details>
         ) : null}
       </div>
-    </Card>
+    </MockCard>
   )
 }

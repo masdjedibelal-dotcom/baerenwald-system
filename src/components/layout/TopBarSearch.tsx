@@ -27,8 +27,8 @@ function groupLabel(sub?: string): string {
   if (s.startsWith('anfrage')) return 'Anfragen'
   if (s.startsWith('kunde')) return 'Kunden'
   if (s.startsWith('auftrag')) return 'Aufträge'
-  if (s.startsWith('handwerker')) return 'Handwerker'
-  if (s.startsWith('partner')) return 'Partner'
+  if (s.startsWith('handwerker')) return 'Partner'
+  if (s.startsWith('partner')) return 'Netzwerk'
   if (s.startsWith('angebot')) return 'Angebote'
   if (s.startsWith('rechnung')) return 'Rechnungen'
   if (s === 'navigation') return 'Navigation'
@@ -259,7 +259,7 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={onInputKey}
-            placeholder="Suchen nach Kunden, Anfragen, Aufträgen…"
+            placeholder="Suchen…"
             aria-autocomplete="list"
             aria-controls={listId}
             aria-expanded={showPanel}

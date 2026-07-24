@@ -72,12 +72,15 @@ export const UI_PHASES: UiPhase[] = [
   {
     id: 'F',
     title: 'Konsolidierung',
-    status: 'planned',
+    status: 'in_progress',
     todos: [
       'Legacy Positionen-Tab entfernt (v3 aktiv)',
-      'Einstellungen IA (Preise & Listen)',
-      'Empty/Error/Loading überall vereinheitlichen',
-      'Accessibility-Pass (Fokus, Kontrast, Touch)',
+      'RechnungNeuForm entfernt — Wizard ist Create/Edit',
+      'Mock = SoT: Modal/MockModal, MockEmpty/EmptyState, DetailShell vereinheitlicht',
+      'Copy: Staff = Du (Login + Kern-UI); Kunde/Partner = Anrede/Sie',
+      'A11y: Focus-Trap in Modal + WizardShell',
+      'Empty/Error/Loading Skeletons (Listen + Detail via CrmPageLoading)',
+      'Fachbegriffe-Glossar + Tooltips (Bestand, Regie, Abschlag, …)',
     ],
   },
 ]

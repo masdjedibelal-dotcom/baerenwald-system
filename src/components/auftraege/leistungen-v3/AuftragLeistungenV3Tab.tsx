@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { UserPlus, X, ClipboardList } from 'lucide-react'
-import { EmptyState } from '@/components/layout/EmptyState'
+import { UserPlus, X } from 'lucide-react'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { Button } from '@/components/ui/Button'
 import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks'
@@ -127,10 +127,10 @@ export function AuftragLeistungenV3Tab({
   if (!sorted.length) {
     return (
       <div className="pos-v3">
-        <EmptyState
-          icon={ClipboardList}
+        <MockEmpty
+          icon="clipboard-list"
           title="Noch keine Leistungen"
-          description="Leistungen und Gewerke stammen aus dem Angebot. Hier können Sie Handwerker anfragen."
+          hint="Leistungen und Gewerke stammen aus dem Angebot. Hier kannst du Handwerker anfragen."
         />
       </div>
     )

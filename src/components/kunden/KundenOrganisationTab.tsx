@@ -125,7 +125,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   }
 
   return (
-    <div className="space-y-4">
       <MockCard
         title="Organisation & Portal"
         icon="building"
@@ -306,6 +305,5 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
           </p>
         ) : null}
       </MockCard>
-    </div>
   )
 }

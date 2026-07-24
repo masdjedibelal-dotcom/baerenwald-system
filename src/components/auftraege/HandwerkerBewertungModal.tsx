@@ -157,8 +157,8 @@ export function HandwerkerBewertungModal({
     >
       <div className="space-y-4">
         <p className="text-sm text-bw-text-muted">
-          Bewerten Sie jeden beteiligten Handwerker in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
-          werden am Handwerker-Profil gespeichert.
+          Bewerte jeden beteiligten Handwerker in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
+          werden am Partner-Profil gespeichert.
         </p>
 
         {loading ? (

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { PartnerNetzwerkClient } from '@/components/partner/PartnerNetzwerkClient'
 import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { partnerFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { PartnerKategorie, PartnerRow } from '@/components/partner/PartnerNetzwerkClient'
 
@@ -24,13 +25,7 @@ export function PartnerMasterDetailShell({
       basePath="/partner"
       fullBleed={fullBleed}
       list={
-        <Suspense
-          fallback={
-            <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
-              Partner werden geladen…
-            </div>
-          }
-        >
+        <Suspense fallback={<CrmInlineLoading label="Netzwerk wird geladen …" minHeight={120} />}>
           <PartnerNetzwerkClient partners={partners} kategorien={kategorien} />
         </Suspense>
       }

@@ -260,7 +260,7 @@ export function HandwerkerZuweisenModal({
     <>
       <p className="mb-3 text-sm text-bw-text-muted">
         {isReplace
-          ? 'Der vorherige Partner hat abgelehnt. Wählen Sie einen Ersatz — die Anfrage geht direkt ins Partner-Portal.'
+          ? 'Der vorherige Partner hat abgelehnt. Wähle einen Ersatz — die Anfrage geht direkt ins Partner-Portal.'
           : scope?.type === 'position'
             ? 'Handwerker für diese Leistung auswählen. Danach öffnet sich die Partner-Mail-Vorschau.'
             : scopeLeistungenCount > 1

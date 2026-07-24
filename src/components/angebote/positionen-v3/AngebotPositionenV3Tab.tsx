@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { ClipboardList, Plus, Trash2, X } from 'lucide-react'
-import { EmptyState } from '@/components/layout/EmptyState'
+import { Plus, Trash2, X } from 'lucide-react'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
@@ -216,10 +216,10 @@ export function AngebotPositionenV3Tab({
   if (!editable && !anzeigePositionen.length) {
     return (
       <div className="pos-v3">
-        <EmptyState
-          icon={ClipboardList}
+        <MockEmpty
+          icon="clipboard-list"
           title="Noch keine Positionen"
-          description="Dieses Angebot enthält noch keine Leistungen."
+          hint="Dieses Angebot enthält noch keine Leistungen."
         />
       </div>
     )
@@ -228,10 +228,10 @@ export function AngebotPositionenV3Tab({
   if (editable && !anzeigePositionen.length && extraBlocks.length === 0) {
     return (
       <div className="pos-v3">
-        <EmptyState
-          icon={ClipboardList}
+        <MockEmpty
+          icon="clipboard-list"
           title="Noch keine Gewerke"
-          description="Legen Sie zuerst ein Gewerk an und fügen Sie danach Positionen hinzu."
+          hint="Lege zuerst ein Gewerk an und füge danach Positionen hinzu."
           action={
             <AuftragGewerkAddRow
               gewerke={gewerkOpts}

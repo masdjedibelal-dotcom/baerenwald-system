@@ -10,8 +10,8 @@ import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/ac
 import type { PositionVerguetung } from '@/lib/auftraege/position-lebenszyklus'
 
 /**
- * Dialog „Direkt beauftragen“ (§4): Partner + Aufwand/Festpreis, ohne Deckel.
- * DD-10: bewusst kein Betrags-Cap.
+ * Dialog Notfall / Direkt beauftragen (§4): Partner + Stundensatz oder Festpreis.
+ * Stunden werden nicht vorab erfasst — Abrechnung später über Rechnung / Bautagebuch.
  */
 export function NotfallDirektBeauftragenModal({
   open,
@@ -19,6 +19,7 @@ export function NotfallDirektBeauftragenModal({
   auftragId,
   leadId,
   gewerkName,
+  variant = 'auftrag',
   onDone,
 }: {
   open: boolean
@@ -26,6 +27,8 @@ export function NotfallDirektBeauftragenModal({
   auftragId?: string | null
   leadId?: string | null
   gewerkName?: string | null
+  /** anfrage = „Notfall melden“ (legt Auftrag an); auftrag = bestehende Direkt-Beauftragung */
+  variant?: 'auftrag' | 'anfrage'
   onDone?: (auftragId: string) => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -33,10 +36,16 @@ export function NotfallDirektBeauftragenModal({
   const [hwId, setHwId] = useState('')
   const [verguetung, setVerguetung] = useState<PositionVerguetung>('aufwand')
   const [betrag, setBetrag] = useState('')
-  const [std, setStd] = useState('2')
+
+  const fromAnfrage = variant === 'anfrage'
+  const title = fromAnfrage ? 'Notfall melden' : 'Direkt beauftragen'
+  const submitLabel = fromAnfrage ? 'Auftrag anlegen' : 'Direkt beauftragen'
+  const gewerkLabel = gewerkName?.trim() || 'Gewerk'
 
   useEffect(() => {
     if (!open) return
+    setBetrag('')
+    setVerguetung('aufwand')
     void listHandwerkerAuswahlFuerGewerk({}).then((r) => {
       if (!r.ok) {
         toast.error(r.message)
@@ -44,9 +53,8 @@ export function NotfallDirektBeauftragenModal({
       }
       const list = [...r.empfohlen, ...r.alle]
       setHandwerker(list)
-      if (list[0]?.id && !hwId) setHwId(list[0].id)
+      if (list[0]?.id) setHwId((prev) => prev || list[0]!.id)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   if (!open) return null
@@ -56,15 +64,22 @@ export function NotfallDirektBeauftragenModal({
       toast.error('Bitte Partner wählen.')
       return
     }
-    const betragNum = betrag.trim() ? Number(betrag.replace(',', '.')) : null
+    const betragNum = betrag.trim() ? Number(betrag.replace(',', '.')) : NaN
+    if (!Number.isFinite(betragNum) || betragNum <= 0) {
+      toast.error(
+        verguetung === 'aufwand'
+          ? 'Bitte Stundensatz angeben.'
+          : 'Bitte Festpreis angeben.'
+      )
+      return
+    }
     startTransition(async () => {
       const r = await notfallDirektBeauftragen({
         auftragId,
         leadId,
         handwerkerId: hwId,
         verguetung,
-        betragNetto: betragNum != null && Number.isFinite(betragNum) ? betragNum : null,
-        geschaetztStd: std.trim() ? Number(std.replace(',', '.')) : null,
+        betragNetto: betragNum,
         gewerkName: gewerkName ?? 'Allgemein',
         ohneDeckel: true,
       })
@@ -72,18 +87,23 @@ export function NotfallDirektBeauftragenModal({
         toast.error(r.message)
         return
       }
-      toast.success('Notfall direkt beauftragt (ohne Deckel)')
+      toast.success(
+        fromAnfrage
+          ? 'Notfall-Auftrag angelegt'
+          : 'Notfall direkt beauftragt (ohne Deckel)'
+      )
       onClose()
       onDone?.(r.auftragId)
     })
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Direkt beauftragen" size="md">
+    <Modal open={open} onClose={onClose} title={title} size="md">
       <div className="space-y-4 p-1">
         <p className="text-[13px] text-bw-text-muted">
-          Notfall ohne Betragsdeckel. Es wird automatisch eine Regie-Position „Notfalleinsatz
-          [{gewerkName?.trim() || 'Gewerk'}]“ angelegt.
+          {fromAnfrage
+            ? `Aus der Anfrage wird direkt ein Auftrag mit Regie-Leistung „Notfalleinsatz [${gewerkLabel}]“ angelegt. Stunden später über Bautagebuch — daraus entsteht die Rechnung.`
+            : `Notfall ohne Betragsdeckel. Es wird automatisch eine Regie-Position „Notfalleinsatz [${gewerkLabel}]“ angelegt. Stunden nicht vorab — Abrechnung über Rechnung.`}
         </p>
 
         <label className="block text-[12px] font-medium text-bw-text">
@@ -126,27 +146,17 @@ export function NotfallDirektBeauftragenModal({
         </fieldset>
 
         {verguetung === 'aufwand' ? (
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-[12px] font-medium text-bw-text">
-              Stundensatz netto (€)
-              <input
-                className="mt-1 w-full rounded-md border border-bw-border px-3 py-2 text-[13px]"
-                inputMode="decimal"
-                value={betrag}
-                onChange={(e) => setBetrag(e.target.value)}
-                placeholder="z. B. 85"
-              />
-            </label>
-            <label className="block text-[12px] font-medium text-bw-text">
-              Geschätzt (Std)
-              <input
-                className="mt-1 w-full rounded-md border border-bw-border px-3 py-2 text-[13px]"
-                inputMode="decimal"
-                value={std}
-                onChange={(e) => setStd(e.target.value)}
-              />
-            </label>
-          </div>
+          <label className="block text-[12px] font-medium text-bw-text">
+            Stundensatz netto (€)
+            <input
+              className="mt-1 w-full rounded-md border border-bw-border px-3 py-2 text-[13px]"
+              inputMode="decimal"
+              value={betrag}
+              onChange={(e) => setBetrag(e.target.value)}
+              placeholder="z. B. 85"
+              autoFocus
+            />
+          </label>
         ) : (
           <label className="block text-[12px] font-medium text-bw-text">
             Festpreis netto (€)
@@ -156,12 +166,13 @@ export function NotfallDirektBeauftragenModal({
               value={betrag}
               onChange={(e) => setBetrag(e.target.value)}
               placeholder="z. B. 450"
+              autoFocus
             />
           </label>
         )}
 
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
-          Kein Deckel (DD-10). Konditionen werden dem Partner in der Anfrage mitgeliefert.
+          Kein Deckel (DD-10). Keine Stunden im Voraus — Konditionen gehen an den Partner.
         </p>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -169,7 +180,7 @@ export function NotfallDirektBeauftragenModal({
             Abbrechen
           </Button>
           <Button type="button" onClick={submit} loading={pending}>
-            Direkt beauftragen
+            {submitLabel}
           </Button>
         </div>
       </div>

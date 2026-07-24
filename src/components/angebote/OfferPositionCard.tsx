@@ -73,10 +73,7 @@ export function OfferPositionCard({
 
   return (
     <article
-      className={cn(
-        'overflow-hidden rounded-xl border border-bw-border bg-bw-card shadow-sm',
-        'ring-1 ring-black/[0.02]'
-      )}
+      className={cn('overflow-hidden rounded-xl border border-bw-border bg-bw-card')}
     >
       <header className="flex flex-wrap items-center gap-2 border-b border-bw-border bg-bw-hover/40 px-3 py-2.5 sm:px-4">
         <span

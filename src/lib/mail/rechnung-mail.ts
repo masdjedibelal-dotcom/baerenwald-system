@@ -67,6 +67,13 @@ export function sanitizeRechnungMailBetreff(betreff: string): string {
     .trim()
 }
 
+/** Standard-Einleitungstext in der Kunden-Mail (nicht PDF). */
+export function defaultRechnungMailEinleitung(anrede: AngebotMailAnrede = 'sie'): string {
+  return anrede === 'du'
+    ? 'anbei findest du deine Rechnung als PDF — kurz zur Übersicht:'
+    : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:'
+}
+
 export function buildRechnungMail(
   data: RechnungMailInput,
   b: MailBranding
@@ -79,9 +86,7 @@ export function buildRechnungMail(
 
   const introRaw =
     data.mailEinleitung?.trim() ||
-    (anrede === 'du'
-      ? 'anbei findest du deine Rechnung als PDF — kurz zur Übersicht:'
-      : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:')
+    defaultRechnungMailEinleitung(anrede)
   const intro = esc(introRaw)
 
   const pdfHinweis =

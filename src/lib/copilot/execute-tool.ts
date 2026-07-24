@@ -9,6 +9,13 @@ import {
   sendeAngebotCopilot,
 } from '@/lib/copilot/crm-actions'
 import { executeCrmAktion, listCrmAktionen } from '@/lib/copilot/crm-runner'
+import { buildCrmOeffnenLink } from '@/lib/copilot/crm-oeffnen'
+import {
+  formatCrmWissenForTool,
+  listCrmWissenThemen,
+  lookupCrmWissen,
+} from '@/lib/copilot/crm-wissen'
+import { planeArbeitstag } from '@/lib/copilot/plane-arbeitstag'
 import {
   listHandwerkerFuerGewerkCopilot,
   prepareAngebotWizardCopilot,
@@ -33,6 +40,32 @@ export async function executeCopilotTool(
   input: Record<string, unknown>
 ): Promise<unknown> {
   switch (name) {
+    case 'crm_hilfe': {
+      const thema = typeof input.thema === 'string' ? input.thema.trim() : ''
+      if (!thema) {
+        return {
+          themen: listCrmWissenThemen(),
+          hinweis: 'Thema nachreichen für Detail — oder Frage als thema senden.',
+        }
+      }
+      const hits = lookupCrmWissen(thema)
+      return {
+        text: formatCrmWissenForTool(hits),
+        treffer: hits.map((h) => h.id),
+      }
+    }
+    case 'crm_oeffnen':
+      return buildCrmOeffnenLink({
+        ziel: String(input.ziel ?? ''),
+        id: typeof input.id === 'string' ? input.id : undefined,
+        lead_id: typeof input.lead_id === 'string' ? input.lead_id : undefined,
+        kunde_id: typeof input.kunde_id === 'string' ? input.kunde_id : undefined,
+        tab: typeof input.tab === 'string' ? input.tab : undefined,
+        wizard_step: typeof input.wizard_step === 'number' ? input.wizard_step : undefined,
+        focus: typeof input.focus === 'string' ? input.focus : undefined,
+      })
+    case 'plane_arbeitstag':
+      return planeArbeitstag()
     case 'get_neue_anfragen':
       return getNeueAnfragen()
     case 'get_heutige_termine':

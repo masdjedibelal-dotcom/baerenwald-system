@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation'
 import { MapPin } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektBewohnerSection } from '@/components/objektakte/ObjektBewohnerSection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { kundenObjektKurzlabel, kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
 
-type ObjektAkteTab = 'kontakte' | 'bewohner' | 'akte'
+type ObjektAkteTab = 'kontakte' | 'bewohner'
 
 export function ObjektAkteDetailClient({
   kunde,
@@ -34,8 +33,6 @@ export function ObjektAkteDetailClient({
   function refresh() {
     router.refresh()
   }
-
-  const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -67,13 +64,6 @@ export function ObjektAkteDetailClient({
         />
       ),
     },
-    {
-      id: 'akte',
-      label: 'Objektakte',
-      icon: 'file-text',
-      count: akteCount || undefined,
-      render: () => <ObjektAkteReadOnlySection data={akte} />,
-    },
   ]
 
   return (
@@ -96,7 +86,7 @@ export function ObjektAkteDetailClient({
       />
 
       <p className="text-[12px] text-bw-text-muted">
-        Objektakte · {kundenObjektKurzlabel(objekt)} — Kontakte und Bewohner für die Disposition.
+        {kundenObjektKurzlabel(objekt)} — Kontakte und Bewohner für die Disposition.
       </p>
 
       <DetailShell

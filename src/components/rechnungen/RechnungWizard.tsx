@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import {
+  AngebotKiAssistentButton,
+  type AngebotKiApplyPayload,
+} from '@/components/angebote/AngebotKiAssistent'
 import { WizardShell } from '@/components/layout/WizardShell'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -25,9 +29,14 @@ import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positione
 import {
   dokumentZeilenToAngebotPositionen,
   formatEurBetrag,
+  neueArtikelZeile,
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
+import type {
+  AngebotKiKontextPosition,
+  AngebotKiKontextPreisliste,
+} from '@/lib/angebote/angebot-ki-types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
   berechneRechnung,
@@ -36,6 +45,8 @@ import {
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
+import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
+import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
@@ -216,7 +227,7 @@ export function RechnungWizard({
     )
     return {
       rechnung: true,
-      leistungsnachweis: true,
+      leistungsnachweis: false,
       bautagebuch: false,
       abnahme: istSchlussInit,
       fotos: false,
@@ -251,6 +262,7 @@ export function RechnungWizard({
   )
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
+  const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
   const kundeId = bootstrap.kundeId
@@ -263,6 +275,14 @@ export function RechnungWizard({
     return () => {
       document.body.style.overflow = ''
     }
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const sync = () => setHintsOpen(!mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
   }, [])
 
   useEffect(() => {
@@ -299,6 +319,112 @@ export function RechnungWizard({
   const brutto = berechnung.brutto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
+
+  const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
+    return zeilen
+      .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      .map((z) => ({
+        id: z.id,
+        leistung: z.bezeichnung,
+        beschreibung: z.positionBeschreibung ?? '',
+        menge: z.menge,
+        einheit: z.einheit,
+        preis_netto: z.vkNetto,
+        gewerk_slug: z.gewerk_slug ?? null,
+        gewerk_name: z.gewerkName ?? null,
+        preisliste_id: z.preisliste_id ?? null,
+      }))
+  }, [zeilen])
+
+  const kiKontextPreislisten = useMemo((): AngebotKiKontextPreisliste[] => {
+    return preislisten
+      .filter((p) => p.aktiv !== false)
+      .map((p) => {
+        const g = gewerke.find((x) => x.id === p.gewerk_id) ?? p.gewerke
+        return {
+          id: p.id,
+          leistung: p.leistung,
+          einheit: p.einheit,
+          preis_min: p.preis_min,
+          gewerk_slug: g?.slug ?? null,
+          gewerk_name: g?.name ?? null,
+          kategorie: p.kategorie ?? null,
+        }
+      })
+  }, [preislisten, gewerke])
+
+  const kiGewerke = useMemo(
+    () => gewerke.filter((g) => g.aktiv !== false).map((g) => ({ slug: g.slug, name: g.name })),
+    [gewerke]
+  )
+
+  const kiLeadKurz = useMemo(() => {
+    return [kundeName, auftragLabel, bootstrap.projektTitel]
+      .map((s) => String(s ?? '').trim())
+      .filter(Boolean)
+      .join(' · ')
+  }, [kundeName, auftragLabel, bootstrap.projektTitel])
+
+  function applyRechnungKi(payload: AngebotKiApplyPayload) {
+    if (payload.beschreibung != null) {
+      setEinleitung(payload.beschreibung)
+    } else if (payload.titel != null && payload.titel.trim()) {
+      const t = payload.titel.trim()
+      setEinleitung((prev) => (prev.trim() ? prev : t))
+    }
+    if (!payload.positionen.length) return
+
+    setZeilen((prev) => {
+      let next = [...prev]
+      for (const p of payload.positionen) {
+        const gewerk =
+          (p.gewerk_slug
+            ? gewerke.find((g) => g.slug === p.gewerk_slug)
+            : undefined) ??
+          (p.gewerk_name
+            ? gewerke.find((g) => g.name.toLowerCase() === p.gewerk_name!.toLowerCase())
+            : undefined)
+        const gewerkPatch = gewerk
+          ? {
+              gewerk_id: gewerk.id,
+              gewerk_slug: gewerk.slug,
+              gewerkName: gewerk.name,
+            }
+          : {}
+
+        if (p.match.kind === 'vorhanden_wizard' && p.match.ref_id) {
+          next = next.map((z) => {
+            if (z.id !== p.match.ref_id || z.typ !== 'artikel') return z
+            return {
+              ...z,
+              bezeichnung: p.leistung || z.bezeichnung,
+              positionBeschreibung: p.beschreibung || z.positionBeschreibung,
+              menge: p.menge,
+              einheit: p.einheit || z.einheit,
+              vkNetto: p.preis_netto,
+              ...gewerkPatch,
+            }
+          })
+          continue
+        }
+
+        next.push(
+          neueArtikelZeile({
+            bezeichnung: p.leistung,
+            positionBeschreibung: p.beschreibung || undefined,
+            menge: p.menge,
+            einheit: p.einheit || 'Stk.',
+            vkNetto: p.preis_netto,
+            preisliste_id: p.match.kind === 'preisliste' ? p.match.ref_id || null : null,
+            position_quelle: p.match.kind === 'preisliste' ? 'katalog' : 'frei',
+            ...gewerkPatch,
+          })
+        )
+      }
+      return next
+    })
+  }
+
   const planKontext = useMemo(
     () => berechneZahlungsplan(plan, netto, defaultMwst),
     [plan, netto, defaultMwst]
@@ -378,6 +504,13 @@ export function RechnungWizard({
       const id = await persistDraft()
       if (!id) return
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
+      if (!einleitung.trim()) {
+        setEinleitung(
+          defaultRechnungMailEinleitung(
+            istPrivatKundeTyp(bootstrap.kunde?.typ) ? 'du' : 'sie'
+          )
+        )
+      }
       const firstDoc = selectedAnlagen[0]?.key ?? 'rechnung'
       setDocPreviewTab(firstDoc)
     }
@@ -755,50 +888,51 @@ export function RechnungWizard({
     </div>
   )
 
-  const mobileActions =
+  const mobileActions = null
+
+  const mobileFooter =
     step < 4 ? (
       <>
         {step > 1 ? (
-          <MockBtn
-            sm
-            kind="ghost"
-            icon="chevron-left"
-            onClick={goPrevStep}
-            disabled={saving}
-            title="Zurück"
-          />
-        ) : null}
-        <MockBtn sm kind="primary" disabled={saving} onClick={() => void handleWeiter()}>
-          {saving ? '…' : 'Weiter'}
+          <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
+            Zurück
+          </MockBtn>
+        ) : (
+          <span />
+        )}
+        <MockBtn
+          kind="primary"
+          icon="chevron-right"
+          className="wizard-mobile-footer__primary"
+          disabled={saving}
+          onClick={() => void handleWeiter()}
+        >
+          {saving ? 'Speichern…' : 'Weiter'}
         </MockBtn>
       </>
     ) : (
       <>
-        <MockBtn
-          sm
-          kind="ghost"
-          icon="chevron-left"
-          onClick={goPrevStep}
-          disabled={saving}
-          title="Zurück"
-        />
-        <MockBtn
-          sm
-          kind="ghost"
-          disabled={saving || (hasPlan && !planOk)}
-          onClick={() => void handleFinish(false)}
-        >
-          Erstellen
+        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
+          Zurück
         </MockBtn>
-        <MockBtn
-          sm
-          kind="primary"
-          icon="send"
-          disabled={saving || (hasPlan && !planOk)}
-          onClick={() => void handleFinish(true)}
-        >
-          Versenden
-        </MockBtn>
+        <div className="wizard-mobile-footer__end">
+          <MockBtn
+            kind="ghost"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(false)}
+          >
+            Erstellen
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="send"
+            className="wizard-mobile-footer__primary"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(true)}
+          >
+            Versenden
+          </MockBtn>
+        </div>
       </>
     )
 
@@ -884,7 +1018,9 @@ export function RechnungWizard({
       currentStep={shellStep}
       onClose={handleRequestClose}
       mobileActions={mobileActions}
+      mobileFooter={mobileFooter}
       desktopActions={desktopActions}
+      saveHint={saving ? 'Speichert…' : null}
     >
       {step === 1 ? (
         <>
@@ -971,6 +1107,20 @@ export function RechnungWizard({
             showUst
             gewerke={gewerkNamen}
             preislisten={preislisten}
+            headerAction={
+              <AngebotKiAssistentButton
+                sm
+                label="Mit KI"
+                dokumentLabel="Rechnung"
+                leadKurz={kiLeadKurz}
+                titel={bootstrap.projektTitel || rTitel}
+                beschreibung={einleitung}
+                positionen={kiKontextPositionen}
+                preislisten={kiKontextPreislisten}
+                gewerke={kiGewerke}
+                onApply={applyRechnungKi}
+              />
+            }
           />
         </>
       ) : null}
@@ -1347,7 +1497,16 @@ export function RechnungWizard({
             )}
           </div>
 
-          {steuernBlock}
+          {steuernBlock ? (
+            <details
+              className="wizard-optional-block"
+              open={hintsOpen}
+              onToggle={(e) => setHintsOpen((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="wizard-optional-block__sum">Weitere Hinweise (optional)</summary>
+              <div className="wizard-optional-block__body">{steuernBlock}</div>
+            </details>
+          ) : null}
         </>
       ) : null}
 
@@ -1523,6 +1682,7 @@ export function RechnungWizard({
           </div>
           <RechnungWizardMailPreview
             rechnungId={activeVersandId}
+            kundeId={kundeId}
             betreff={mailBetreff.trim() || defaultBetreff}
             einleitung={einleitung}
             brutto={rBrutto}

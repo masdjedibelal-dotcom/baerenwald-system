@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -497,9 +498,8 @@ export function HandwerkerDetailClient({
           }
           void openPortalModal()
         },
-        onCreateAnfrage: () => setVorgangArt('anfrage'),
+        onCreateAnfrage: () => router.push('/anfragen/neu'),
         onCreateAngebot: () => setVorgangArt('angebot'),
-        onCreateAuftrag: () => setVorgangArt('auftrag'),
         onCreateRechnung: () => setVorgangArt('rechnung'),
         tel: hw.telefon,
         mail: hw.email,
@@ -519,7 +519,7 @@ export function HandwerkerDetailClient({
   ])
 
   const uebersichtInhalt = (
-    <div className="space-y-5">
+    <>
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
       <div className="card">
@@ -594,7 +594,7 @@ export function HandwerkerDetailClient({
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 
   const stammdatenInhalt = (
@@ -761,13 +761,7 @@ export function HandwerkerDetailClient({
   )
 
   const vorgaengeInhalt = (
-    <Suspense
-      fallback={
-        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
-          Vorgänge werden geladen…
-        </p>
-      }
-    >
+    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
       <VorgaengeListeClient rows={vorgaengeRows} embedded restrictHandwerkerId={hw.id} />
     </Suspense>
   )
@@ -860,7 +854,7 @@ export function HandwerkerDetailClient({
 
   return (
     <>
-      <MockDetailBackLink href="/handwerker" label="Zurück zu Handwerker" />
+      <MockDetailBackLink href="/handwerker" label="Zurück zu Partner" />
       <DetailHead
         title={handwerkerDisplayName(hw)}
         badges={
@@ -912,7 +906,7 @@ export function HandwerkerDetailClient({
               </button>
             }
             items={handwerkerMenuItems}
-            sheetTitle="Handwerker"
+            sheetTitle="Partner"
           />
         }
       />

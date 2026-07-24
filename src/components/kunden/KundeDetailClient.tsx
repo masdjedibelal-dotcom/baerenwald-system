@@ -6,6 +6,7 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
@@ -639,13 +640,7 @@ export function KundeDetailClient({
   }, [vorgaengeRows, kundeLeadIds, kunde.id])
 
   const tabVorgaenge = (
-    <Suspense
-      fallback={
-        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
-          Vorgänge werden geladen…
-        </p>
-      }
-    >
+    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
       <VorgaengeListeClient
         rows={vorgaengeRows}
         embedded
@@ -760,6 +755,12 @@ export function KundeDetailClient({
       icon: 'layout-dashboard',
       render: () => fixedOverview,
     },
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => tabStammdaten,
+    },
     ...(zeigtObjekteTab
       ? [
           {
@@ -781,12 +782,6 @@ export function KundeDetailClient({
           },
         ]
       : []),
-    {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => tabStammdaten,
-    },
     {
       id: 'vorgaenge',
       label: 'Vorgänge',

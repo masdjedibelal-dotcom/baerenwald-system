@@ -273,7 +273,7 @@ export function PartnerNetzwerkClient({
         onClose={() => setFilterOpen(false)}
         icon="filter"
         title="Filter & Suchen"
-        sub="Partner eingrenzen"
+        sub="Netzwerk eingrenzen"
         footer={
           <>
             <MockBtn kind="ghost" onClick={resetFilters}>
@@ -378,7 +378,7 @@ export function PartnerNetzwerkClient({
           <MockEmpty
             icon="building"
             title={partners.length === 0 ? 'Noch keine Einträge' : 'Keine Treffer'}
-            hint="Filter zurücksetzen oder Partner anlegen"
+            hint="Filter zurücksetzen oder Netzwerk-Eintrag anlegen"
           />
         ) : (
           pageItems.map((p) => (
@@ -438,7 +438,7 @@ export function PartnerNetzwerkClient({
                 onClick={(e) => e.stopPropagation()}
                 style={{ justifyContent: 'flex-end' }}
               >
-                <MockEntityRowMenu items={rowMenuItems(p)} title="Partner" />
+                <MockEntityRowMenu items={rowMenuItems(p)} title="Netzwerk" />
               </div>
             </Link>
           ))
@@ -450,7 +450,7 @@ export function PartnerNetzwerkClient({
         totalPages={totalPages}
         total={total}
         pageSize={pageSize}
-        unit="Partner"
+        unit="Netzwerk"
         onPageChange={(p) => setPageIndex(p - 1)}
       />
     </div>

@@ -83,10 +83,11 @@ export const FUNNEL_SITUATION_LABELS: Record<string, string> = {
 }
 
 export const ZUSTAND_LABELS: Record<string, string> = {
-  gut: 'Gepflegt',
+  gut: 'Gut',
   normale_abnutzung: 'Normale Abnutzung',
   maessig: 'Normale Abnutzung',
-  schlecht: 'Sanierungsbedürftig',
+  mittel: 'Mittel',
+  schlecht: 'Schlecht / stark beansprucht',
   sanierungsbed: 'Sanierungsbedürftig',
   unbekannt: 'Unbekannt',
 }
@@ -158,6 +159,8 @@ export const FUNNEL_ZUGAENGLICH_LABELS: Record<string, string> = {
   einfach: 'Einfach zugänglich',
   mittel: 'Mittel zugänglich',
   schwer: 'Schwer zugänglich',
+  schwierig: 'Schwer zugänglich',
+  geruest: 'Gerüst nötig',
   unknown: 'Unbekannt',
   unbekannt: 'Unbekannt',
   sichtbar_zugaenglich: 'Sichtbar & zugänglich',
@@ -169,10 +172,12 @@ export const FUNNEL_UMFANG_LABELS: Record<string, string> = {
   woechentlich: 'Wöchentlich',
   zweimal_monat: 'Alle 2 Wochen',
   monatlich: 'Monatlich',
+  quartal: 'Vierteljährlich',
   saisonal: 'Saisonal',
   einmalig: 'Einmalig',
   saison: 'Saison-Pauschale',
   nach_bedarf: 'Nach Bedarf',
+  bedarf: 'Nach Bedarf',
   jahresvertrag: 'Jahresvertrag',
 }
 
@@ -181,6 +186,8 @@ export const FUNNEL_QUELLE_LABELS: Record<string, string> = {
   beratung: 'Beratungsanfrage',
   ausserhalb: 'Außerhalb PLZ-Gebiet',
   komplex_rueckruf: 'Komplex / Rückruf',
+  crm_staff_funnel: 'CRM Staff-Funnel',
+  crm_manuell: 'CRM manuell',
 }
 
 export const FUNNEL_BEREICH_LABELS: Record<string, string> = {
@@ -286,6 +293,17 @@ const FUNNEL_META_KEYS = new Set([
   'message',
   'kontakt_nachricht',
   'notizen',
+  'preis_hinweis',
+  'preisHinweis',
+  'beratung_text',
+  'beratungText',
+  'strasse',
+  'hausnummer',
+  'ort',
+  'interne_notiz',
+  'interneNotiz',
+  'ist_bauprojekt',
+  'istBauprojekt',
   'priceMin',
   'priceMax',
   'price_min',

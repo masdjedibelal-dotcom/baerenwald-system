@@ -77,6 +77,7 @@ export function PositionModal({
     <MockModal
       open
       onClose={onClose}
+      className="position-modal"
       icon={kind === 'nachlass' ? 'percent' : kind === 'freitext' ? 'align-left' : 'list-numbers'}
       title={title}
       sub={sub}
@@ -84,7 +85,6 @@ export function PositionModal({
         <>
           {onRemove ? (
             <MockBtn
-              sm
               kind="danger"
               icon="trash"
               onClick={() => {
@@ -96,7 +96,7 @@ export function PositionModal({
             </MockBtn>
           ) : null}
           <div style={{ flex: 1 }} />
-          <MockBtn sm kind="primary" icon="check" onClick={onClose}>
+          <MockBtn kind="primary" icon="check" className="position-modal__save" onClick={onClose}>
             Fertig
           </MockBtn>
         </>

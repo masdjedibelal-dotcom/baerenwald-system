@@ -552,10 +552,13 @@ export function mailAngebotPdfUebersicht(
     gueltig_bis: string
     dokument_typ?: 'einfach' | 'projekt'
     projektbeschreibung_teaser?: string | null
+    anrede?: MailAnrede
+    kundeTyp?: string | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
-  const name = esc(data.name)
+  const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
+  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const tel = esc(b.telefon)
   const telHref = tel.replace(/\s/g, '')
   const adr = esc(b.adresseZeile)
@@ -564,19 +567,35 @@ export function mailAngebotPdfUebersicht(
     data.dokument_typ === 'projekt' && teaserRaw
       ? `<p style="color:#374151;font-size:13px;line-height:1.6;margin-top:8px;">${esc(teaserRaw.length > 280 ? `${teaserRaw.slice(0, 277)}…` : teaserRaw)}</p>`
       : ''
+  const kicker = mailText(anrede, 'Dein persönliches Angebot', 'Ihr persönliches Angebot')
+  const intro = mailText(
+    anrede,
+    'vielen Dank für dein Vertrauen. Im Anhang findest du dein Angebot als PDF.',
+    'vielen Dank für Ihr Vertrauen. Im Anhang finden Sie Ihr Angebot als PDF.'
+  )
+  const fragen = mailText(
+    anrede,
+    'Bei Fragen sind wir gerne für dich da.',
+    'Bei Fragen stehen wir Ihnen gerne zur Verfügung.'
+  )
+  const betreff = mailText(
+    anrede,
+    `Dein Angebot von ${b.firmenname} — ${data.angebotsnr}`,
+    `Ihr Angebot von ${b.firmenname} — ${data.angebotsnr}`
+  )
   return {
-    betreff: `Ihr Angebot von ${b.firmenname} — ${data.angebotsnr}`,
+    betreff,
     html: `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;background:white;">
   <div style="background:#1A3D2B;padding:24px;text-align:center;">
     <h1 style="color:white;font-size:20px;margin:0;">${esc(b.firmenname)}</h1>
-    <p style="color:#A8C5A0;margin:4px 0 0;font-size:13px;">Ihr persönliches Angebot</p>
+    <p style="color:#A8C5A0;margin:4px 0 0;font-size:13px;">${esc(kicker)}</p>
   </div>
   <div style="padding:32px 24px;">
-    <p style="font-size:15px;color:#1A3D2B;">Sehr geehrte/r ${name},</p>
+    <p style="font-size:15px;color:#1A3D2B;">${begruessung}</p>
     <br/>
     <p style="color:#374151;line-height:1.7;">
-      vielen Dank für Ihr Vertrauen. Im Anhang finden Sie Ihr Angebot als PDF.
+      ${intro}
     </p>
     <br/>
     <div style="background:#F9FAFB;border-radius:8px;padding:16px;margin:16px 0;">
@@ -589,16 +608,15 @@ export function mailAngebotPdfUebersicht(
       </p>
       <p style="color:#6B7280;font-size:12px;margin-top:8px;">Gültig bis: ${esc(data.gueltig_bis)}</p>
     </div>
-    <p style="color:#374151;line-height:1.7;">Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
+    <p style="color:#374151;line-height:1.7;">${fragen}</p>
     <br/>
     <div style="text-align:center;margin:24px 0;">
       ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
     </div>
     <p style="color:#374151;line-height:1.7;">
-      Mit freundlichen Grüßen<br/>
-      <strong>Ihr ${esc(b.firmenname)}-Team</strong>
+      ${mailTeamGruss(anrede, b.firmenname)}
     </p>
-    ${mailMeinBaerenwaldPsFooter({ anrede: 'sie' })}
+    ${mailMeinBaerenwaldPsFooter({ anrede })}
   </div>
   <div style="background:#F3F4F6;padding:16px 24px;font-size:11px;color:#6B7280;text-align:center;">
     ${esc(b.firmenname)} · ${adr}<br/>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 export const metadata: Metadata = {
   title: 'Vorgänge',
@@ -29,7 +30,7 @@ export default async function VorgaengePage() {
   }
 
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-bw-text-muted">Laden…</div>}>
+    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
       <VorgaengeListeClient rows={rows} />
     </Suspense>
   )

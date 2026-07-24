@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from 'react'
-import { Camera, ChevronRight, ExternalLink, FileText, ImagePlus, Plus, X } from 'lucide-react'
-import { EmptyState } from '@/components/layout/EmptyState'
+import { Camera, ChevronRight, ExternalLink, ImagePlus, Plus, X } from 'lucide-react'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Note } from '@/components/ui/note'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
@@ -417,10 +417,10 @@ export function AngeboteListeTab({
       </div>
 
       {rows.length === 0 ? (
-        <EmptyState
-          icon={FileText}
+        <MockEmpty
+          icon="file-text"
           title="Noch kein Angebot"
-          description="Erstelle ein Angebot basierend auf den Projektdetails."
+          hint="Erstelle ein Angebot basierend auf den Projektdetails."
           action={
             onAngebotErstellen ? (
               <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>

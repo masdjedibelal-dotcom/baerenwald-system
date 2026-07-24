@@ -7,27 +7,27 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { toast } from '@/components/ui/app-toast'
 import {
-  createAnfrageFuerKunde,
-  createDirektAuftrag,
   listAuftraegeFuerKunde,
   type FabKundeAuftragZeile,
 } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { Kunde } from '@/lib/types'
+import { createKundeHref } from '@/lib/crm/create-entry'
+import { fachbegriff } from '@/lib/crm/fachbegriffe'
 
-export type FabVorgangArt = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
+export type FabVorgangArt = 'anfrage' | 'angebot' | 'rechnung'
 
 const TITEL: Record<FabVorgangArt, string> = {
   anfrage: 'Neue Anfrage',
   angebot: 'Neues Angebot',
-  auftrag: 'Neuer Auftrag',
   rechnung: 'Neue Rechnung',
 }
 
 /**
  * FAB-Zwischenschritt: immer neu erstellen.
- * 1) Kunde wählen → 2) bei Rechnung optional Vorgang → Wizard/Detail.
+ * Anfrage & Angebot: kein Modal — Kunde im Funnel bzw. Gate.
+ * Rechnung: 1) Kunde wählen → 2) optional Vorgang → Wizard/Detail.
  */
 export function FabVorgangStartModal({
   open,
@@ -50,8 +50,26 @@ export function FabVorgangStartModal({
   const [auftragId, setAuftragId] = useState<string | null>(null)
   const [loadingAuftraege, setLoadingAuftraege] = useState(false)
 
+  // Anfrage / Angebot: Kunde nur einmal im Ziel-Flow — Modal überspringen
   useEffect(() => {
-    if (!open || !art) return
+    if (!open || (art !== 'anfrage' && art !== 'angebot')) return
+    const kid = initialKundeId?.trim()
+    const href =
+      art === 'anfrage'
+        ? kid
+          ? `/anfragen/neu?kunde_id=${encodeURIComponent(kid)}`
+          : '/anfragen/neu'
+        : kid
+          ? `/angebote/neu?kunde_id=${encodeURIComponent(kid)}`
+          : '/angebote/neu'
+    router.push(href)
+    onClose()
+    // onClose absichtlich nicht in deps — vermeidet Re-Navigation bei Parent-Rerenders
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei open/art/kunde
+  }, [open, art, initialKundeId, router])
+
+  useEffect(() => {
+    if (!open || !art || art === 'anfrage' || art === 'angebot') return
     const kid = initialKundeId?.trim() || null
     setKundeId(kid)
     setKunde(null)
@@ -59,17 +77,8 @@ export function FabVorgangStartModal({
     setAuftragId(null)
 
     if (art === 'rechnung' && kid) {
-      setStep(2)
-      setLoadingAuftraege(true)
-      void listAuftraegeFuerKunde(kid).then((r) => {
-        setLoadingAuftraege(false)
-        if (!r.ok) {
-          toast.error(r.message)
-          setAuftraege([])
-          return
-        }
-        setAuftraege(r.auftraege)
-      })
+      setStep(1)
+      setLoadingAuftraege(false)
       return
     }
 
@@ -77,54 +86,7 @@ export function FabVorgangStartModal({
     setLoadingAuftraege(false)
   }, [open, art, initialKundeId])
 
-  if (!art) return null
-
-  function startAnfrage() {
-    if (!kundeId) {
-      toast.error('Bitte einen Kunden wählen.')
-      return
-    }
-    onClose()
-    router.push(`/anfragen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
-  }
-
-  function startAngebot() {
-    if (!kundeId) {
-      toast.error('Bitte einen Kunden wählen.')
-      return
-    }
-    startTransition(async () => {
-      try {
-        const r = await createAnfrageFuerKunde(kundeId)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        onClose()
-        toast.success('Anfrage angelegt — Angebot-Wizard öffnet sich…')
-        router.push(`/anfragen/${r.leadId}?angebot_wizard=1`)
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Angebot konnte nicht gestartet werden.')
-      }
-    })
-  }
-
-  function startAuftrag() {
-    if (!kundeId) {
-      toast.error('Bitte einen Kunden wählen.')
-      return
-    }
-    startTransition(async () => {
-      const r = await createDirektAuftrag({ kundeId })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Auftrag angelegt')
-      onClose()
-      router.push(`/auftraege/${r.auftragId}`)
-    })
-  }
+  if (!art || art === 'anfrage' || art === 'angebot') return null
 
   function loadAuftraegeAndGoStep2() {
     if (!kundeId) {
@@ -161,13 +123,17 @@ export function FabVorgangStartModal({
   }
 
   function onWeiter() {
-    if (art === 'anfrage') return startAnfrage()
-    if (art === 'angebot') return startAngebot()
-    if (art === 'auftrag') return startAuftrag()
     if (art === 'rechnung') {
-      if (step === 1) return loadAuftraegeAndGoStep2()
+      if (step === 1) {
+        // Primär: direkt ohne Vorgang (UX2-7) — Verknüpfung ist optional via Step 2
+        return startRechnung(null)
+      }
       return startRechnung(auftragId)
     }
+  }
+
+  function openVorgangSchritt() {
+    loadAuftraegeAndGoStep2()
   }
 
   const weiterDisabled = pending || loadingAuftraege || (step === 1 && !kundeId)
@@ -183,7 +149,7 @@ export function FabVorgangStartModal({
       {step === 1 ? (
         <div className="space-y-4">
           <p className="text-sm text-bw-text-muted">
-            Zuerst den Kunden wählen. Es wird immer ein <strong>neuer</strong> Vorgang erstellt.
+            Kunden wählen — danach startet der Rechnungs-Wizard. Vorgang optional verknüpfen.
           </p>
           <KundeAuswahlFeld
             label="Kunde"
@@ -201,7 +167,7 @@ export function FabVorgangStartModal({
               className="text-bw-link underline"
               onClick={() => {
                 onClose()
-                router.push('/neu?art=kunde')
+                router.push(createKundeHref())
               }}
             >
               Kunden anlegen
@@ -231,7 +197,7 @@ export function FabVorgangStartModal({
                   onClick={() => setAuftragId(null)}
                 >
                   <span className="text-sm font-medium text-bw-text">Ohne Vorgang</span>
-                  <span className="text-[12px] text-bw-text-muted">
+                  <span className="text-[12px] text-bw-text-muted" title={fachbegriff('ohne_vorgang')}>
                     Direktrechnung ohne Verknüpfung
                   </span>
                 </button>
@@ -271,22 +237,27 @@ export function FabVorgangStartModal({
       )}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-        <MockBtn
-          kind="ghost"
-          disabled={pending}
-          onClick={() => {
-            if (step === 2 && !kundeVorausgewaehlt) setStep(1)
-            else onClose()
-          }}
-        >
-          {step === 2 && !kundeVorausgewaehlt ? 'Zurück' : 'Abbrechen'}
-        </MockBtn>
+        <div className="flex flex-wrap gap-2">
+          <MockBtn
+            kind="ghost"
+            disabled={pending}
+            onClick={() => {
+              if (step === 2 && !kundeVorausgewaehlt) setStep(1)
+              else onClose()
+            }}
+          >
+            {step === 2 && !kundeVorausgewaehlt ? 'Zurück' : 'Abbrechen'}
+          </MockBtn>
+          {step === 1 && kundeId ? (
+            <MockBtn kind="ghost" disabled={pending || loadingAuftraege} onClick={openVorgangSchritt}>
+              Vorgang verknüpfen…
+            </MockBtn>
+          ) : null}
+        </div>
         <MockBtn kind="primary" icon="arrow-right" disabled={weiterDisabled} onClick={onWeiter}>
           {pending || loadingAuftraege
             ? 'Bitte warten…'
-            : art === 'rechnung' && step === 1
-              ? 'Weiter'
-              : 'Erstellen'}
+            : 'Rechnung erstellen'}
         </MockBtn>
       </div>
     </Modal>

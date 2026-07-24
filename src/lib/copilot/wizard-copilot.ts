@@ -422,11 +422,14 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
     ok: true,
     angebot_id: saved.angebotId,
     angebotsnr: saved.angebotsnr,
+    lead_id: leadId,
     summe_netto: summen.nettoMin,
     summe_brutto: summen.bruttoMin,
     dokument_typ: dokumentTyp,
+    crm_href: `/anfragen/${leadId}?angebot_wizard=1&wizard_step=2&focus=positionen`,
+    crm_label: 'Positionen prüfen / KI',
     hinweis:
-      'Entwurf gespeichert. Nächste Schritte: Handwerker anfragen (send_angebot_handwerker), dann an Kunde senden (sende_angebot).',
+      'Entwurf gespeichert. Im Sidepanel „Öffnen“ → Positionen. Dann Handwerker/Kunde senden (erst Vorschau).',
   }
 }
 

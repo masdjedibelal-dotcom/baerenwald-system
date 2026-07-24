@@ -122,6 +122,10 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       ? Math.round(input.ekNetto * 100) / 100
       : null
 
+  if (input.ekNetto != null && ek == null) {
+    return { ok: false, message: 'Partner-EK (netto) muss größer als 0 € sein.' }
+  }
+
   const { data: rows, error: loadErr } = await gate.supabase!
     .from('auftrag_positionen')
     .select('id, gewerk_slug, gewerk_name, handwerker_id, preis_partner, handwerker_status, aenderung_typ')
@@ -242,7 +246,7 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
     if (p.preis_partner == null || Number(p.preis_partner) <= 0) {
       return {
         ok: false,
-        message: `„${String(p.leistung_name ?? 'Leistung')}“: preis_partner (Netto-Zeile) fehlt — Handwerker kann nicht annehmen.`,
+        message: `„${String(p.leistung_name ?? 'Leistung')}“: Partner-EK (netto) muss größer als 0 € sein.`,
       }
     }
   }

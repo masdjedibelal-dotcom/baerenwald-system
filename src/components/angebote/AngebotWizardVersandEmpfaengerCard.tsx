@@ -30,7 +30,7 @@ export function AngebotWizardVersandEmpfaengerCard({
       }
     >
       <p className="mb-3 text-[12.5px] leading-relaxed text-bw-text-muted">
-        Prüfen Sie An und CC, bevor Sie das {dokumentLabel} versenden. Weitere Adressen per Eingabe
+        Prüfe An und CC, bevor du das {dokumentLabel} versendest. Weitere Adressen per Eingabe
         und Enter hinzufügen — entfernen per Klick auf das × in der Pille.
       </p>
       <div className="space-y-3">

@@ -15,8 +15,9 @@ export type NotfallDirektInput = {
   leadId?: string | null
   handwerkerId: string
   verguetung: PositionVerguetung
-  /** Festpreis-Netto oder Stundensatz bei Aufwand */
+  /** Festpreis-Netto oder Stundensatz bei Aufwand (Pflicht) */
   betragNetto?: number | null
+  /** @deprecated Stunden werden nicht mehr vorab erfasst — Abrechnung über BT/Rechnung. */
   geschaetztStd?: number | null
   gewerkName?: string | null
   /** Kein Betragsdeckel (DD-10) — bewusst ohne Cap. */
@@ -24,9 +25,9 @@ export type NotfallDirektInput = {
 }
 
 /**
- * Notfall „Direkt beauftragen“ (§4):
- * Partner + Aufwand/Festpreis, ohne Deckel, Auto-Position „Notfalleinsatz [Gewerk]“ (typ=regie),
- * Partner-Notify mit Konditionen-Hinweis, Audit, Banner-Felder am Auftrag.
+ * Notfall „Direkt beauftragen“ / „Notfall melden“ (§4):
+ * Partner + Stundensatz oder Festpreis, ohne Deckel, Auto-Position „Notfalleinsatz [Gewerk]“ (typ=regie).
+ * Keine Stunden vorab — Menge/Zeit kommt später aus dem Bautagebuch für die Rechnung.
  */
 export async function notfallDirektBeauftragen(
   input: NotfallDirektInput
@@ -48,6 +49,15 @@ export async function notfallDirektBeauftragen(
     input.betragNetto != null && Number.isFinite(Number(input.betragNetto))
       ? Math.max(0, Number(input.betragNetto))
       : null
+  if (betrag == null || betrag <= 0) {
+    return {
+      ok: false,
+      message:
+        input.verguetung === 'aufwand'
+          ? 'Stundensatz fehlt.'
+          : 'Festpreis fehlt.',
+    }
+  }
 
   let auftragId = input.auftragId?.trim() || ''
   let leadId = input.leadId?.trim() || null
@@ -183,14 +193,10 @@ export async function notfallDirektBeauftragen(
     .limit(1)
     .maybeSingle()
 
-  const stundensatz =
-    input.verguetung === 'aufwand' && betrag != null ? betrag : null
-  const festpreis =
-    input.verguetung === 'festpreis' && betrag != null ? betrag : null
-  const menge =
-    input.verguetung === 'aufwand'
-      ? Math.max(0.25, Number(input.geschaetztStd) || 1)
-      : 1
+  const stundensatz = input.verguetung === 'aufwand' ? betrag : null
+  const festpreis = input.verguetung === 'festpreis' ? betrag : null
+  // Platzhalter-Menge 1 — tatsächliche Stunden kommen aus dem Bautagebuch / Rechnung.
+  const menge = 1
 
   const insertPayload: Record<string, unknown> = {
     auftrag_id: auftragId,
@@ -199,8 +205,8 @@ export async function notfallDirektBeauftragen(
     leistung_name: leistungName,
     beschreibung:
       input.verguetung === 'aufwand'
-        ? 'Notfall nach Aufwand — ohne Betragsdeckel. Konditionen bei Annahme bestätigen.'
-        : 'Notfall Festpreis — ohne Betragsdeckel. Konditionen bei Annahme bestätigen.',
+        ? 'Notfall nach Aufwand (Regie) — Stundensatz vereinbart, Stunden über Bautagebuch, Abrechnung per Rechnung.'
+        : 'Notfall Festpreis (Regie) — Abrechnung per Rechnung.',
     einheit: input.verguetung === 'aufwand' ? 'Std' : 'Psch',
     menge,
     preis_vk: festpreis,
@@ -208,7 +214,7 @@ export async function notfallDirektBeauftragen(
     lohn_vk: festpreis,
     typ: 'regie',
     verguetung: input.verguetung,
-    geschaetzt_std: input.verguetung === 'aufwand' ? menge : null,
+    geschaetzt_std: null,
     stundensatz,
     leistung_status: 'offen',
     anerkennung_status: 'nicht_noetig',
@@ -264,7 +270,7 @@ export async function notfallDirektBeauftragen(
         mwst_satz: 19,
         geaendert: false,
         stundensatz,
-        geschaetzt_std: input.verguetung === 'aufwand' ? menge : null,
+        geschaetzt_std: null,
       },
     ],
   }

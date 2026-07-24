@@ -3,6 +3,7 @@
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { toast } from '@/components/ui/app-toast'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
+import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
   duplicateAnfrage,
   duplicateAngebotHref,
@@ -19,6 +20,20 @@ export async function runDeleteVorgang(
   label = 'Vorgang'
 ): Promise<void> {
   const r = await deleteVorgang(leadId)
+  if (!r.ok) {
+    toast.error(r.message)
+    throw new Error(r.message)
+  }
+  toast.success(`${label} gelöscht`)
+  router.refresh()
+}
+
+export async function runDeleteStandaloneRechnung(
+  rechnungId: string,
+  router: AppRouterInstance,
+  label = 'Rechnung'
+): Promise<void> {
+  const r = await deleteRechnungEntwurf(rechnungId)
   if (!r.ok) {
     toast.error(r.message)
     throw new Error(r.message)

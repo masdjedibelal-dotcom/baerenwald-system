@@ -22,14 +22,12 @@ import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLin
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
 import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschlussSection'
-import { AuftragLebenszyklusAbschlussCard } from '@/components/auftraege/AuftragLebenszyklusAbschlussCard'
-import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
-import { AuftragPositionLebenszyklusCard } from '@/components/auftraege/AuftragPositionLebenszyklusCard'
+import { AuftragVorOrtPanel, type VorOrtAbschnitt } from '@/components/auftraege/AuftragVorOrtPanel'
+import { AuftragLeistungVorOrtTabelle } from '@/components/auftraege/AuftragLeistungVorOrtTabelle'
 import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
 import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import { AuftragAbnahmeprotokollInline } from '@/components/auftraege/AuftragAbnahmeprotokollInline'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
@@ -37,6 +35,7 @@ import {
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
+import { naechsterSchrittAuftrag } from '@/lib/crm/naechster-schritt'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
@@ -52,8 +51,6 @@ import type {
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
@@ -81,13 +78,19 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
+import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
 import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
+  }
 )
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -185,9 +188,8 @@ type AuftragLeadSnapshot = Pick<
 type AuftragDetailTab =
   | 'stammdaten'
   | 'leistung'
-  | 'baustelle'
-  | 'abnahme'
-  | 'abschluss'
+  | 'fotos'
+  | 'ausfuehrung'
   | 'aktivitaet'
   | 'dokumente'
   | 'finanzen'
@@ -196,14 +198,44 @@ type AuftragDetailTab =
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'stammdaten',
   'leistung',
-  'baustelle',
-  'abnahme',
-  'abschluss',
+  'fotos',
+  'ausfuehrung',
   'aktivitaet',
   'dokumente',
   'finanzen',
   'notizen',
 ])
+
+function vorOrtAbschnittFromQuery(raw: string | null): VorOrtAbschnitt | null {
+  const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
+  if (
+    tab === 'bautagebuch' ||
+    tab === 'baustelle' ||
+    tab === 'vor-ort-bautagebuch'
+  ) {
+    return 'bautagebuch'
+  }
+  if (
+    tab === 'abnahme' ||
+    tab === 'abnahmeprotokoll' ||
+    tab === 'abnahmeprotokolle' ||
+    tab === 'auftrag-abnahmeprotokoll' ||
+    tab === 'vor-ort-abnahme'
+  ) {
+    return 'abnahme'
+  }
+  if (
+    tab === 'abschluss' ||
+    tab === 'abschlussdokumentation' ||
+    tab === 'abschlussdoku' ||
+    tab === 'abschlussbericht' ||
+    tab === 'dokumentation' ||
+    tab === 'vor-ort-abschluss'
+  ) {
+    return 'abschluss'
+  }
+  return null
+}
 
 /** Query-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab | null {
@@ -223,14 +255,13 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
     return 'leistung'
   }
   if (tab === 'zahlplan') return 'finanzen'
-  if (tab === 'bautagebuch') return 'baustelle'
-  if (tab === 'abnahmeprotokoll' || tab === 'abnahmeprotokolle') return 'abnahme'
-  if (tab === 'abschlussdokumentation' || tab === 'abschlussdoku' || tab === 'abschlussbericht') {
-    return 'abschluss'
+  if (vorOrtAbschnittFromQuery(tab) || tab === 'ausfuehrung' || tab === 'vor-ort') {
+    return 'ausfuehrung'
   }
   if (tab === 'verlauf') return 'aktivitaet'
   if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
   if (tab === 'kommunikation') return 'notizen'
+  if (tab === 'bilder' || tab === 'photos') return 'fotos'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
   return null
 }
@@ -277,10 +308,14 @@ export function AuftragDetailClient({
   const [detail, setDetail] = useState(initial)
   const [, startTransition] = useTransition()
 
-  const [mainTab, setMainTab] = useState<AuftragDetailTab>('stammdaten')
+  const [mainTab, setMainTab] = useState<AuftragDetailTab>('leistung')
+  const [vorOrtFocus, setVorOrtFocus] = useState<VorOrtAbschnitt | null>(null)
 
   useEffect(() => {
-    const tab = resolveAuftragDetailTabFromQuery(searchParams.get('tab'))
+    const rawTab = searchParams.get('tab')
+    const tab = resolveAuftragDetailTabFromQuery(rawTab)
+    const focus = vorOrtAbschnittFromQuery(rawTab)
+    if (focus) setVorOrtFocus(focus)
     if (tab === 'notizen' && !initial.notizen?.trim()) {
       setMainTab('stammdaten')
       return
@@ -304,8 +339,6 @@ export function AuftragDetailClient({
     useState<AngebotWizardBootstrap | null>(null)
   const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
-  const isCrmAdmin = useIsCrmAdmin()
-  const [impersonating, setImpersonating] = useState(false)
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   const openAngebotKorrektur = useCallback(() => {
@@ -447,10 +480,22 @@ export function AuftragDetailClient({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const hash = window.location.hash
-    if (hash === '#dokumentation') setMainTab('dokumente')
-    if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('dokumente')
-    if (hash === '#auftrag-abnahmeprotokoll' || hash === '#abnahme') setMainTab('abnahme')
+    const hash = window.location.hash.replace(/^#/, '')
+    if (hash === 'dokumentation') {
+      // Legacy: oft Abschlussbericht gemeint
+      setMainTab('ausfuehrung')
+      setVorOrtFocus('abschluss')
+      return
+    }
+    if (hash === 'compliance' || hash === 'compliance-checkliste') {
+      setMainTab('dokumente')
+      return
+    }
+    const focus = vorOrtAbschnittFromQuery(hash)
+    if (focus) {
+      setMainTab('ausfuehrung')
+      setVorOrtFocus(focus)
+    }
   }, [])
 
   useEffect(() => {
@@ -472,6 +517,16 @@ export function AuftragDetailClient({
     kunde?.name ||
     'Auftrag'
   const posCount = detail.auftrag_positionen?.length ?? 0
+
+  const vorgangFotos = useMemo(
+    () =>
+      collectVorgangFotos({
+        funnelDaten: _leadDetail?.funnel_daten ?? lead?.funnel_daten,
+        angebotFotosRaw: angebotDetail?.fotos_urls,
+      }),
+    [_leadDetail?.funnel_daten, lead?.funnel_daten, angebotDetail?.fotos_urls]
+  )
+
   const kundeAdresse = useMemo(() => {
     const ag = _leadDetail?.auftraggeber
     if (ag) {
@@ -588,22 +643,7 @@ export function AuftragDetailClient({
         },
         {
           onCopy: () => runDuplicateAuftrag(detail.id, router),
-          onPortal: () => {
-            if (!isCrmAdmin || !detail.kunde_id) {
-              toast.error('Admin Login nur für CRM-Admins mit Kundenkonto')
-              return
-            }
-            if (impersonating) return
-            setImpersonating(true)
-            void openPortalAsKunde(detail.kunde_id).then((r) => {
-              setImpersonating(false)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              window.open(r.url, '_blank', 'noopener,noreferrer')
-            })
-          },
+          // Admin Login nur Partner-/Kunden-Detail (UX2-6)
           onPortalLink: () => {
             if (!detail.kunde_id) {
               toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
@@ -650,8 +690,6 @@ export function AuftragDetailClient({
     refresh,
     startTransition,
     istBauprojekt,
-    isCrmAdmin,
-    impersonating,
     projektName,
   ])
 
@@ -686,72 +724,51 @@ export function AuftragDetailClient({
     />
   )
 
-  const angPos = useMemo(() => {
-    const raw =
-      (Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote)?.positionen ??
-      angebotDetail?.positionen ??
-      null
-    return raw ? normalizeAngebotPositionen(raw) : null
-  }, [detail.angebote, angebotDetail?.positionen])
-
-  const abnahmeInhalt = (
-    <AuftragAbnahmeprotokollInline
+  const abschlussInhalt = (
+    <AuftragAbschlussSection
       auftragId={detail.id}
-      positionen={detail.auftrag_positionen ?? []}
-      angebotPositionen={angPos}
-      gewerke={gewerke}
-      kundeName={name}
-      onChanged={() => refresh()}
+      istAbgeschlossen={istAbgeschlossen}
+      abschlussUrl={detail.abschlussdokumentation_url}
+      abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
+      onRefresh={() => refresh()}
+      embedded
     />
   )
 
-  const abschlussInhalt = (
-    <div className="space-y-4">
-      <AuftragLebenszyklusAbschlussCard auftragId={detail.id} />
-      <AuftragAbschlussSection
-        auftragId={detail.id}
-        istAbgeschlossen={istAbgeschlossen}
-        abschlussUrl={detail.abschlussdokumentation_url}
-        abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
-        onRefresh={() => refresh()}
-      />
-    </div>
-  )
-
-  const baustelleInhalt = (
-    <div className="space-y-4">
-      <AuftragPositionLebenszyklusCard
-        auftragId={detail.id}
-        positionen={detail.auftrag_positionen ?? []}
-        onChanged={() => refresh()}
-      />
-      <AuftragBautagebuchCard
-        auftragId={detail.id}
-        eintraege={detail.auftrag_bautagebuch ?? []}
-        kundeName={name}
-        positionen={detail.auftrag_positionen ?? []}
-        gewerke={gewerke}
-        onChanged={() => refresh()}
-      />
-      {istBauprojekt ? (
-        <AuftragBaustelleTab
+  const ausfuehrungInhalt = (
+    <AuftragVorOrtPanel
+      focus={vorOrtFocus}
+      leistungTabelle={
+        <AuftragLeistungVorOrtTabelle
           auftragId={detail.id}
-          team={
-            detail.auftrag_baustelle_team ?? {
-              bau_mannschaft: [],
-            }
-          }
-          bautagesberichte={detail.auftrag_bautagesberichte ?? []}
-          regiearbeiten={detail.auftrag_regiearbeiten ?? []}
-          wochenberichte={detail.auftrag_wochenberichte ?? []}
-          baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
+          positionen={detail.auftrag_positionen ?? []}
+          gewerke={gewerke}
           kundeName={name}
-          kundeAdresse={kundeAdresse}
-          handwerker={detail.auftrag_handwerker ?? []}
           onChanged={() => refresh()}
         />
-      ) : null}
-    </div>
+      }
+      abschluss={abschlussInhalt}
+      baustellenExtras={
+        istBauprojekt ? (
+          <AuftragBaustelleTab
+            auftragId={detail.id}
+            team={
+              detail.auftrag_baustelle_team ?? {
+                bau_mannschaft: [],
+              }
+            }
+            bautagesberichte={detail.auftrag_bautagesberichte ?? []}
+            regiearbeiten={detail.auftrag_regiearbeiten ?? []}
+            wochenberichte={detail.auftrag_wochenberichte ?? []}
+            baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
+            kundeName={name}
+            kundeAdresse={kundeAdresse}
+            handwerker={detail.auftrag_handwerker ?? []}
+            onChanged={() => refresh()}
+          />
+        ) : undefined
+      }
+    />
   )
 
   const auftragNettoSumme = useMemo(() => {
@@ -786,17 +803,24 @@ export function AuftragDetailClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
+      id: 'leistung',
+      label: 'Leistungen',
+      icon: 'list-details',
+      count: posCount || undefined,
+      render: () => leistungInhalt,
+    },
+    {
       id: 'stammdaten',
       label: 'Stammdaten',
       icon: 'clipboard-list',
       render: () => stammdatenInhalt,
     },
     {
-      id: 'leistung',
-      label: 'Leistungen',
-      icon: 'list-details',
-      count: posCount || undefined,
-      render: () => leistungInhalt,
+      id: 'fotos',
+      label: ACTIVITY_SECTIONS.fotos,
+      icon: 'photo',
+      count: vorgangFotos.length || undefined,
+      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
     },
     {
       id: 'finanzen',
@@ -805,22 +829,10 @@ export function AuftragDetailClient({
       render: () => finanzenInhalt,
     },
     {
-      id: 'baustelle',
-      label: 'Bautagebuch',
+      id: 'ausfuehrung',
+      label: 'Vor Ort & Abschluss',
       icon: 'clipboard-list',
-      render: () => baustelleInhalt,
-    },
-    {
-      id: 'abnahme',
-      label: 'Abnahmeprotokoll',
-      icon: 'checklist',
-      render: () => abnahmeInhalt,
-    },
-    {
-      id: 'abschluss',
-      label: 'Abschlussbericht',
-      icon: 'file-text',
-      render: () => abschlussInhalt,
+      render: () => ausfuehrungInhalt,
     },
     {
       id: 'aktivitaet',
@@ -869,6 +881,11 @@ export function AuftragDetailClient({
       crumbBackHref="/vorgaenge?tab=auftrag"
       crumbBackLabel="Zurück zu den Suchergebnissen"
       className="space-y-4 pb-0"
+      nextStep={naechsterSchrittAuftrag({
+        status: detail.status,
+        istStorniert,
+        istAbgeschlossen,
+      })}
       head={{
         title: projektName,
         badges: (

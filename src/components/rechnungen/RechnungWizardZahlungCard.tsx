@@ -12,6 +12,7 @@ import {
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition } from '@/lib/types'
+import { fachbegriff } from '@/lib/crm/fachbegriffe'
 
 export function RechnungWizardZahlungCard({
   meta,
@@ -62,6 +63,12 @@ export function RechnungWizardZahlungCard({
           ]}
         />
       </label>
+
+      {meta.zahlungsart === 'abschlaege' ? (
+        <p className="text-[12px] text-bw-text-muted" title={fachbegriff('satellit')}>
+          {fachbegriff('abschlag')}
+        </p>
+      ) : null}
 
       {meta.zahlungsart === 'abschlaege' ? (
         gesamtNetto > 0 ? (

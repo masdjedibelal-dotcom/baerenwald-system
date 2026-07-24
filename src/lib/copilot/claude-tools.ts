@@ -8,6 +8,57 @@ const emptySchema = {
 
 export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   {
+    name: 'crm_hilfe',
+    description:
+      'Erklärt CRM-Funktionen wie im Dashboard (Kunden, Angebote, Rechnungen, Mahnung, Partner, …). Für „Wie funktioniert X?“ — nicht für Live-Daten (dafür search_crm). Ohne thema: Themenliste.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        thema: {
+          type: 'string',
+          description:
+            'z. B. angebote, rechnungen, mahnung, kunden, anfragen, auftraege, partner, kalender — oder freie Frage',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'crm_oeffnen',
+    description:
+      'Deep-Link ins CRM erzeugen (Anfrage, Angebots-Wizard inkl. Schritt/Positionen, Rechnung, Kunde, …). Sidepanel zeigt Button „Öffnen“. Bei manueller Nacharbeit (Positionen tippen) IMMER anbieten.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ziel: {
+          type: 'string',
+          description:
+            'anfrage | angebot_wizard | angebot_positionen | angebot | rechnung | rechnung_neu | auftrag | kunde | kunde_neu | partner_neu | kalender | vorgaenge | lead_auskunft',
+        },
+        id: { type: 'string', description: 'Entity-UUID wenn nötig' },
+        lead_id: { type: 'string' },
+        kunde_id: { type: 'string' },
+        tab: { type: 'string', description: 'z. B. details, stammdaten, fotos' },
+        wizard_step: {
+          type: 'number',
+          description: '1=Typ/Projekt, 2=Positionen, 3=Finalisieren, 4=Vorschau, 5=Versenden',
+        },
+        focus: {
+          type: 'string',
+          description: 'titel | beschreibung | positionen',
+        },
+      },
+      required: ['ziel'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'plane_arbeitstag',
+    description:
+      'Tagesplan aus Live-CRM: neue Anfragen, Termine, offene/überfällige Rechnungen, Angebote, Aufträge + Deep-Links.',
+    input_schema: emptySchema,
+  },
+  {
     name: 'get_neue_anfragen',
     description: 'Neue Anfragen aus dem CRM laden',
     input_schema: emptySchema,

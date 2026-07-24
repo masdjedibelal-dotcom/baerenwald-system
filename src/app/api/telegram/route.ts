@@ -1,5 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { describeClaudeKeyForDebug, createAnthropicClient, getClaudeApiKey, getClaudeModel } from '@/lib/copilot/claude-api-key'
+import {
+  claudeAuthErrorForClient,
+  createAnthropicClient,
+  describeClaudeKeyForDebug,
+  getClaudeApiKey,
+  getClaudeModel,
+} from '@/lib/copilot/claude-api-key'
 import { COPILOT_CLAUDE_TOOLS } from '@/lib/copilot/claude-tools'
 import { executeCopilotTool } from '@/lib/copilot/execute-tool'
 import { formatUnknownError } from '@/lib/copilot/format-unknown-error'
@@ -16,6 +22,7 @@ import {
 } from '@/lib/copilot/message-limits'
 import { COPILOT_SYSTEM } from '@/lib/copilot/system-prompt'
 import { sendTelegram, sendTelegramLong, sendTelegramTyping } from '@/lib/copilot/telegram'
+import { telegramWebhookAuthorized } from '@/lib/copilot/webhook-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -26,12 +33,13 @@ function anthropicClient(): Anthropic {
 
 function formatCopilotError(e: unknown): string {
   if (e instanceof Anthropic.AuthenticationError) {
-    const hint = describeClaudeKeyForDebug()
-    return `Claude API-Key von Anthropic abgelehnt (401). ${hint}. Neuen Key auf console.anthropic.com erzeugen, in Netlify unter CLAUDE_API_KEY eintragen (Production), alte/leere Variable löschen, redeployen.`
+    console.error('[telegram/copilot] Claude 401', describeClaudeKeyForDebug())
+    return claudeAuthErrorForClient()
   }
   const msg = formatUnknownError(e)
   if (/401.*no body/i.test(msg)) {
-    return `Claude API-Key abgelehnt (401). ${describeClaudeKeyForDebug()}.`
+    console.error('[telegram/copilot] Claude 401 (no body)', describeClaudeKeyForDebug())
+    return claudeAuthErrorForClient()
   }
   return msg
 }
@@ -127,6 +135,10 @@ async function runClaudeChat(userText: string): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  if (!telegramWebhookAuthorized(req)) {
+    return Response.json({ ok: false }, { status: 401 })
+  }
+
   if (!getClaudeApiKey()) {
     return Response.json(
       { ok: false, error: 'CLAUDE_API_KEY oder ANTHROPIC_API_KEY fehlt' },

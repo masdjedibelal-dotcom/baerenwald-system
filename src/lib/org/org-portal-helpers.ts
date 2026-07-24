@@ -49,7 +49,7 @@ export const KOSTENTRAEGER_LABELS: Record<string, string> = {
 
 export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
   nicht_noetig: 'Keine Freigabe nötig',
-  ausstehend: 'Wartet auf Freigabe',
+  ausstehend: 'Warte auf HV',
   freigegeben: 'Freigegeben',
   abgelehnt: 'Abgelehnt',
 }

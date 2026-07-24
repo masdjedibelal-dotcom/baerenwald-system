@@ -3,6 +3,7 @@ import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import {
   createAnthropicClient,
+  claudeAuthErrorForClient,
   describeClaudeKeyForDebug,
   getClaudeApiKey,
   getClaudeModel,
@@ -15,19 +16,33 @@ import {
   COPILOT_MAX_HISTORY_MESSAGE_CHARS,
   truncateCopilotText,
 } from '@/lib/copilot/message-limits'
+import {
+  collectAssistentUiFromToolResult,
+  emptyAssistentUi,
+  mergeAssistentUi,
+  type AssistentUiPayload,
+} from '@/lib/copilot/assistent-ui'
 
 export type CopilotChatMessage = {
   role: 'user' | 'assistant'
   content: string
 }
 
+export type CopilotChatSuccess = {
+  ok: true
+  text: string
+  ui: AssistentUiPayload
+}
+
 function formatCopilotError(e: unknown): string {
   if (e instanceof Anthropic.AuthenticationError) {
-    return `Claude API-Key abgelehnt (401). ${describeClaudeKeyForDebug()}.`
+    console.error('[copilot/chat] Claude 401', describeClaudeKeyForDebug())
+    return claudeAuthErrorForClient()
   }
   const msg = formatUnknownError(e)
   if (/401.*no body/i.test(msg)) {
-    return `Claude API-Key abgelehnt (401). ${describeClaudeKeyForDebug()}.`
+    console.error('[copilot/chat] Claude 401 (no body)', describeClaudeKeyForDebug())
+    return claudeAuthErrorForClient()
   }
   return msg
 }
@@ -37,7 +52,7 @@ export async function runCopilotChat(opts: {
   userText: string
   history?: CopilotChatMessage[]
   contextHint?: string | null
-}): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+}): Promise<CopilotChatSuccess | { ok: false; error: string }> {
   const userText = opts.userText.trim()
   if (!userText) return { ok: false, error: 'Leere Nachricht.' }
 
@@ -56,6 +71,8 @@ export async function runCopilotChat(opts: {
     { role: 'user', content: userText },
   ]
 
+  let ui = emptyAssistentUi()
+
   try {
     const anthropic = createAnthropicClient(getClaudeApiKey())
     let response = await anthropic.messages.create({
@@ -72,10 +89,9 @@ export async function runCopilotChat(opts: {
 
       for (const tool of toolUses) {
         if (tool.type !== 'tool_use') continue
-        const result = await executeCopilotTool(
-          tool.name,
-          tool.input as Record<string, unknown>
-        )
+        const input = tool.input as Record<string, unknown>
+        const result = await executeCopilotTool(tool.name, input)
+        ui = mergeAssistentUi(ui, collectAssistentUiFromToolResult(tool.name, result, input))
         let serialized: string
         try {
           serialized = JSON.stringify(result)
@@ -115,6 +131,7 @@ export async function runCopilotChat(opts: {
     return {
       ok: true,
       text: assistantText || 'Erledigt — keine Textantwort.',
+      ui,
     }
   } catch (e) {
     return { ok: false, error: formatCopilotError(e) }

@@ -236,5 +236,8 @@ export function resolveLeadPreisAnzeige(
     if (typeof hint === 'string' && hint.trim()) return hint.trim()
   }
 
+  const staffHint = fd.preis_hinweis ?? fd.preisHinweis
+  if (typeof staffHint === 'string' && staffHint.trim()) return staffHint.trim()
+
   return '—'
 }

@@ -562,6 +562,8 @@ export type Auftrag = {
   /** Bestand: wiederkehrender Wartungs-/Service-Auftrag */
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** Positions-IDs, die im Bautagebuch ausgeblendet sind */
+  bautagebuch_hidden_position_ids?: string[] | null
   /** Notfall-Direktbeauftragung — CRM-Banner (§4) */
   ist_notfall?: boolean
   /** aufwand | festpreis — Abrechnungshinweis im Notfall-Banner */

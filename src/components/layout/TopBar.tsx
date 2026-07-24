@@ -123,100 +123,112 @@ export function TopBar({ user }: TopBarProps) {
   }
 
   return (
-    <header className="topbar">
-      {parentHref ? (
-        <Link href={parentHref} aria-label="Zurück" className="topbar-back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-      ) : null}
-
-      <div className="topbar-title">
-        {parents.map((p) =>
-          p.href ? (
-            <Link key={p.label} href={p.href} className="topbar-crumb-link">
-              {p.label}
-              <span className="topbar-crumb-sep">›</span>
-            </Link>
-          ) : (
-            <span key={p.label} className="topbar-crumb-link">
-              {p.label}
-              <span className="topbar-crumb-sep">›</span>
-            </span>
-          )
-        )}
-        <span className="truncate">{title}</span>
-      </div>
-
-      <TopBarSearch />
-
-      <div className="topbar-actions">
-        {cta ? (
-          <button type="button" onClick={() => router.push(cta.href)} className="btn primary sm topbar-cta">
-            <MockIcon ctx="btn" n="plus" size={14} />
-            <span className="topbar-cta-label">{cta.label}</span>
-          </button>
-        ) : null}
-
-        <button
-          type="button"
-          className={cn('btn sm btn-assistent', assistentOpen && 'is-open')}
-          aria-label="Assistent öffnen"
-          aria-pressed={assistentOpen}
-          onClick={() => toggleAssistent()}
-        >
-          <MockIcon ctx="btn" n="sparkles" size={14} />
-          <span className="topbar-cta-label">Assistent</span>
-        </button>
-
-        <button
-          ref={avatarRef}
-          type="button"
-          className={cn('topbar-avatar', menuOpen && 'is-open')}
-          aria-label="Profilmenü"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <BrandAvatar size={28} aria-hidden />
-        </button>
-
-        <MockPopover
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          anchorRef={avatarRef}
-          align="right"
-          width={260}
-        >
-          <div className="topbar-user-pop__head">
-            <BrandAvatar size={40} aria-hidden />
-            <div className="topbar-user-pop__meta">
-              <div className="topbar-user-pop__name">{name}</div>
-              {email ? <div className="topbar-user-pop__email">{email}</div> : null}
-            </div>
+      <div className="topbar-stack">
+        <header className="topbar">
+          {/* Desktop: Titel/Breadcrumbs. Mobil: nur Suche + Assistent + Profil. */}
+          <div className="topbar-title">
+            {parentHref ? (
+              <Link href={parentHref} aria-label="Zurück" className="topbar-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            ) : null}
+            {parents.map((p) =>
+              p.href ? (
+                <Link key={p.label} href={p.href} className="topbar-crumb-link">
+                  {p.label}
+                  <span className="topbar-crumb-sep">›</span>
+                </Link>
+              ) : (
+                <span key={p.label} className="topbar-crumb-link">
+                  {p.label}
+                  <span className="topbar-crumb-sep">›</span>
+                </span>
+              )
+            )}
+            <span className="topbar-title-text truncate">{title}</span>
           </div>
-          <div className="pop-sep" />
-          <button type="button" className="pop-item" onClick={goProfil}>
-            <MockIcon ctx="btn" n="user" size={16} />
-            <span>Profil</span>
-          </button>
-          <button type="button" className="pop-item" onClick={goProfil}>
-            <MockIcon ctx="btn" n="settings" size={16} />
-            <span>Einstellungen</span>
-          </button>
-          <div className="pop-sep" />
-          <button
-            type="button"
-            className="pop-item danger"
-            disabled={logoutLoading}
-            onClick={() => {
-              void handleLogout()
-            }}
-          >
-            <LogOut className="h-4 w-4" aria-hidden />
-            <span>{logoutLoading ? 'Abmelden…' : 'Abmelden'}</span>
-          </button>
-        </MockPopover>
+
+          <TopBarSearch />
+
+          <div className="topbar-actions">
+            {cta ? (
+              <button type="button" onClick={() => router.push(cta.href)} className="btn primary sm topbar-cta">
+                <MockIcon ctx="btn" n="plus" size={14} />
+                <span className="topbar-cta-label">{cta.label}</span>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className={cn('btn sm btn-assistent', assistentOpen && 'is-open')}
+              aria-label="Assistent öffnen"
+              aria-pressed={assistentOpen}
+              onClick={() => toggleAssistent()}
+            >
+              <MockIcon ctx="btn" n="sparkles" size={14} />
+              <span className="topbar-cta-label">Assistent</span>
+            </button>
+
+            <button
+              ref={avatarRef}
+              type="button"
+              className={cn('topbar-avatar', menuOpen && 'is-open')}
+              aria-label="Profilmenü"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <BrandAvatar size={28} aria-hidden />
+            </button>
+
+            <MockPopover
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              anchorRef={avatarRef}
+              align="right"
+              width={260}
+            >
+              <div className="topbar-user-pop__head">
+                <BrandAvatar size={40} aria-hidden />
+                <div className="topbar-user-pop__meta">
+                  <div className="topbar-user-pop__name">{name}</div>
+                  {email ? <div className="topbar-user-pop__email">{email}</div> : null}
+                </div>
+              </div>
+              <div className="pop-sep" />
+              <button type="button" className="pop-item" onClick={goProfil}>
+                <MockIcon ctx="btn" n="user" size={16} />
+                <span>Profil</span>
+              </button>
+              <button type="button" className="pop-item" onClick={goProfil}>
+                <MockIcon ctx="btn" n="settings" size={16} />
+                <span>Einstellungen</span>
+              </button>
+              <div className="pop-sep" />
+              <button
+                type="button"
+                className="pop-item danger"
+                disabled={logoutLoading}
+                onClick={() => {
+                  void handleLogout()
+                }}
+              >
+                <LogOut className="h-4 w-4" aria-hidden />
+                <span>{logoutLoading ? 'Abmelden…' : 'Abmelden'}</span>
+              </button>
+            </MockPopover>
+          </div>
+        </header>
+
+        {/* Mobil: Screen-Titel unter der Suchleiste (nicht im Header) */}
+        <div className="mobile-screen-title">
+          {parentHref ? (
+            <Link href={parentHref} aria-label="Zurück" className="mobile-screen-title-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          ) : null}
+          <h1 className="mobile-screen-title-text">{title}</h1>
+        </div>
       </div>
-    </header>
   )
 }

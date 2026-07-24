@@ -60,6 +60,8 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
+import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
 import type {
@@ -78,6 +80,7 @@ import type {
 type RechnungDetailTab =
   | 'stammdaten'
   | 'details'
+  | 'fotos'
   | 'verlauf'
   | 'dokumente'
   | 'notizen'
@@ -85,6 +88,7 @@ type RechnungDetailTab =
 const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
   'stammdaten',
   'details',
+  'fotos',
   'verlauf',
   'dokumente',
   'notizen',
@@ -111,6 +115,7 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
   if (tab === 'aktivitaet' || tab === 'verlauf') return 'verlauf'
   if (tab === 'kommunikation' || tab === 'notizen') return 'notizen'
   if (tab === 'dokumente') return 'dokumente'
+  if (tab === 'bilder' || tab === 'photos' || tab === 'fotos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (
     cumulative === 'anfrage-details' ||
@@ -248,6 +253,15 @@ export function RechnungDetailClient({
   const positionenCount = useMemo(
     () => pos.filter((p) => !istGewerkBeschreibungPosition(p)).length,
     [pos]
+  )
+
+  const vorgangFotos = useMemo(
+    () =>
+      collectVorgangFotos({
+        funnelDaten: lead?.funnel_daten,
+        angebotFotosRaw: angebotDetail?.fotos_urls,
+      }),
+    [lead?.funnel_daten, angebotDetail?.fotos_urls]
   )
 
   const leadId = lead?.id ?? projektKontext?.lead?.id ?? null
@@ -596,6 +610,13 @@ export function RechnungDetailClient({
       icon: 'list-details',
       count: positionenCount || undefined,
       render: () => detailsInhalt,
+    },
+    {
+      id: 'fotos',
+      label: ACTIVITY_SECTIONS.fotos,
+      icon: 'photo',
+      count: vorgangFotos.length || undefined,
+      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
     },
     {
       id: 'verlauf',

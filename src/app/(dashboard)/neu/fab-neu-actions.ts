@@ -14,30 +14,83 @@ export type FabKundeAuftragZeile = {
   created_at: string
 }
 
-/** Aufträge eines Kunden für optionale Verknüpfung (z. B. Rechnung). */
+/** Aufträge eines Kunden für optionale Verknüpfung (z. B. Rechnung).
+ * Keine stornierten/abgeschlossenen und keine Geister ohne bestehenden Lead. */
 export async function listAuftraegeFuerKunde(
   kundeId: string
 ): Promise<{ ok: true; auftraege: FabKundeAuftragZeile[] } | { ok: false; message: string }> {
   const id = kundeId.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
   const supabase = createClient()
+
+  // Nur offene Vorgänge mit existierendem Lead (keine gelöschten / abgeschlossenen Geister).
   const { data, error } = await supabase
     .from('auftraege')
-    .select('id, titel, status, created_at')
+    .select('id, titel, status, created_at, lead_id, leads!inner(id)')
     .eq('kunde_id', id)
+    .neq('status', 'abgeschlossen')
     .neq('status', 'storniert')
+    .not('lead_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(40)
 
-  if (error) return { ok: false, message: error.message }
+  if (error) {
+    // Fallback ohne Join, falls FK-Embed fehlt — dann manuell filtern.
+    const fallback = await supabase
+      .from('auftraege')
+      .select('id, titel, status, created_at, lead_id')
+      .eq('kunde_id', id)
+      .neq('status', 'abgeschlossen')
+      .neq('status', 'storniert')
+      .not('lead_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(40)
+
+    if (fallback.error) return { ok: false, message: fallback.error.message }
+
+    const leadIds = Array.from(
+      new Set(
+        (fallback.data ?? [])
+          .map((r) => (r.lead_id ? String(r.lead_id) : ''))
+          .filter(Boolean)
+      )
+    )
+    let existingLeadIds = new Set<string>()
+    if (leadIds.length) {
+      const { data: leads } = await supabase.from('leads').select('id').in('id', leadIds)
+      existingLeadIds = new Set((leads ?? []).map((l) => String(l.id)))
+    }
+
+    return {
+      ok: true,
+      auftraege: (fallback.data ?? [])
+        .filter((r) => r.lead_id && existingLeadIds.has(String(r.lead_id)))
+        .filter((r) => {
+          const st = String(r.status ?? '')
+          return st !== 'abgeschlossen' && st !== 'storniert'
+        })
+        .map((r) => ({
+          id: r.id as string,
+          titel: (r.titel as string | null) ?? null,
+          status: String(r.status ?? ''),
+          created_at: String(r.created_at ?? ''),
+        })),
+    }
+  }
+
   return {
     ok: true,
-    auftraege: (data ?? []).map((r) => ({
-      id: r.id as string,
-      titel: (r.titel as string | null) ?? null,
-      status: String(r.status ?? ''),
-      created_at: String(r.created_at ?? ''),
-    })),
+    auftraege: (data ?? [])
+      .filter((r) => {
+        const st = String(r.status ?? '')
+        return st !== 'abgeschlossen' && st !== 'storniert'
+      })
+      .map((r) => ({
+        id: r.id as string,
+        titel: (r.titel as string | null) ?? null,
+        status: String(r.status ?? ''),
+        created_at: String(r.created_at ?? ''),
+      })),
   }
 }
 

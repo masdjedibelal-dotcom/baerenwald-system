@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Partner',
+  title: 'Netzwerk',
 }
 
 /** Listen-Inhalt kommt aus `partner/layout.tsx` (Master-Detail ab 900px). */

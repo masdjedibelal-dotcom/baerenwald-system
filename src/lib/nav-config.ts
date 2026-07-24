@@ -1,6 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
-import { Settings, Sparkles, Users, Wrench } from 'lucide-react'
+import { Building2, Settings, Sparkles, Users, Wrench } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
+import {
+  CREATE_ENTRY_LABELS,
+  createAnfrageHref,
+  createAngebotHref,
+  createPartnerHref,
+  createRechnungHref,
+} from '@/lib/crm/create-entry'
 
 export type NavItemDef = {
   href: string
@@ -37,8 +44,12 @@ function nav(
 }
 
 /**
- * Sidebar: Arbeit (Dashboard, Vorgänge, Kunden, Partner) + Planung (Kalender).
- * Route `/handwerker` bleibt; Label in der Nav ist „Partner“.
+ * Sidebar: Arbeit (Dashboard, Vorgänge, Kunden, Partner, KI Intelligence) + Planung (Kalender).
+ *
+ * Naming (zwei Entitäten):
+ * - Partner = Tabelle `handwerker`, Route `/handwerker` (Ausführungspartner / Partnerbetriebe)
+ * - Netzwerk = Tabelle `partner`, Route `/partner` (Versicherung, Makler, Lieferanten …)
+ * Routen nicht mergen — unterschiedliche Datenmodelle.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -54,15 +65,13 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
       ]),
       nav('/kunden', 'users', 'Kunden'),
       nav('/handwerker', 'tool', 'Partner'),
+      nav('/ki-analytics', 'sparkles', 'KI Intelligence'),
     ],
   },
   {
     id: 'planung',
     label: 'Planung',
-    items: [
-      nav('/kalender', 'calendar', 'Kalender'),
-      nav('/ki-analytics', 'sparkles', 'KI Intelligence'),
-    ],
+    items: [nav('/kalender', 'calendar', 'Kalender')],
   },
 ]
 
@@ -84,7 +93,7 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/kalender', 'calendar', 'Kalender'),
 ]
 
-/** Mobile Mehr-Screen (Kachel-Grid) — ohne Partner. */
+/** Mobile Mehr-Screen (Kachel-Grid). */
 export const MEHR_TILE_NAV: Array<{
   href: string
   icon: LucideIcon
@@ -92,7 +101,8 @@ export const MEHR_TILE_NAV: Array<{
   desc: string
 }> = [
   { href: '/kunden', icon: Users, label: 'Kunden', desc: 'Kundenstamm' },
-  { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Partnerbetriebe' },
+  { href: '/handwerker', icon: Wrench, label: 'Partner', desc: 'Partnerbetriebe' },
+  { href: '/partner', icon: Building2, label: 'Netzwerk', desc: 'Lieferanten & Kontakte' },
   { href: '/ki-analytics', icon: Sparkles, label: 'KI Intelligence', desc: 'Empfehlungen & Funnel' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
@@ -107,15 +117,33 @@ export type RouteMetaDef = {
 /** TopBar-Titel und CTAs pro Listen-Route. */
 export const ROUTE_META: Record<string, RouteMetaDef> = {
   '/': { title: 'Dashboard' },
-  '/vorgaenge': { title: 'Vorgänge' },
-  '/anfragen': { title: 'Anfragen', cta: { label: 'Neue Anfrage', href: '/neu?art=anfrage' } },
-  '/auftraege': { title: 'Aufträge', cta: { label: 'Neuer Auftrag', href: '/neu?art=auftrag' } },
-  '/rechnungen': { title: 'Rechnungen', cta: { label: 'Neue Rechnung', href: '/neu?art=rechnung' } },
-  '/handwerker': { title: 'Handwerker' },
+  '/vorgaenge': {
+    title: 'Vorgänge',
+    cta: { label: CREATE_ENTRY_LABELS.anfrage, href: createAnfrageHref() },
+  },
+  '/anfragen': {
+    title: 'Anfragen',
+    cta: { label: CREATE_ENTRY_LABELS.anfrage, href: createAnfrageHref() },
+  },
+  '/auftraege': {
+    title: 'Aufträge',
+    cta: { label: CREATE_ENTRY_LABELS.anfrage, href: createAnfrageHref() },
+  },
+  '/rechnungen': {
+    title: 'Rechnungen',
+    cta: { label: CREATE_ENTRY_LABELS.rechnung, href: createRechnungHref() },
+  },
+  '/handwerker': {
+    title: 'Partner',
+    cta: { label: CREATE_ENTRY_LABELS.partner, href: createPartnerHref() },
+  },
   '/kunden': { title: 'Kunden' },
-  '/partner': { title: 'Partner' },
+  '/partner': { title: 'Netzwerk' },
   '/kalender': { title: 'Kalender' },
-  '/angebote': { title: 'Angebote', cta: { label: 'Neues Angebot', href: '/neu?art=angebot' } },
+  '/angebote': {
+    title: 'Angebote',
+    cta: { label: CREATE_ENTRY_LABELS.angebot, href: createAngebotHref() },
+  },
   '/einstellungen': { title: 'Einstellungen' },
   '/mehr': { title: 'Mehr' },
   '/ki-analytics': { title: 'KI Intelligence' },
@@ -126,9 +154,9 @@ export const SECTION_LABELS: Record<string, string> = {
   anfragen: 'Anfragen',
   auftraege: 'Aufträge',
   rechnungen: 'Rechnungen',
-  handwerker: 'Handwerker',
+  handwerker: 'Partner',
   kunden: 'Kunden',
-  partner: 'Partner',
+  partner: 'Netzwerk',
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',

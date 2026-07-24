@@ -75,7 +75,7 @@ export function kanalMetaFromLead(kanal: string | null | undefined): string | nu
 }
 
 export const ACTOR_LABELS: Record<string, string> = {
-  freigabe: 'Wartet auf Freigabe (HV)',
+  freigabe: 'Warte auf HV',
   handwerker: 'Handwerker',
   kunde: 'Kunde',
   bw: 'Bärenwald',

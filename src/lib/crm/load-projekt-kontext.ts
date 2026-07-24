@@ -1,9 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { BEREICH_LABELS } from '@/lib/utils'
-import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
+import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
   ProjektAngebotKurz,
   ProjektKetteKind,
@@ -26,13 +25,10 @@ function leadLabel(row: {
   bereiche?: string[] | null
   id: string
 }): string {
-  const bereiche = bereicheFuerAnzeige(row.bereiche, row.situation)
-  if (bereiche.length) {
-    return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-  }
-  const sit = leadSituationDisplay(row.situation)
-  if (sit) return sit
-  return `Anfrage ${row.id.slice(0, 8).toUpperCase()}`
+  return (
+    situationBereichTitel(row.situation, bereicheFuerAnzeige(row.bereiche, row.situation)) ||
+    `Anfrage ${row.id.slice(0, 8).toUpperCase()}`
+  )
 }
 
 export async function loadProjektKontext(

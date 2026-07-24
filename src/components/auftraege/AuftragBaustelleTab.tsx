@@ -14,6 +14,7 @@ import type {
   AuftragRegiearbeit,
   AuftragWochenbericht } from '@/lib/auftraege/baustelle-types'
 import type { AuftragHandwerkerRow } from '@/lib/types'
+import { fachbegriff } from '@/lib/crm/fachbegriffe'
 
 
 const ToolIcon = resolveMockIcon('tool')
@@ -41,7 +42,7 @@ export function AuftragBaustelleTab({
   onChanged: () => void
 }) {
   return (
-    <div className="space-y-3">
+    <>
       <Card
         title="Baustellen-Team"
         bodyClassName="p-4"
@@ -69,6 +70,9 @@ export function AuftragBaustelleTab({
       </Card>
 
       <Card title="Regiearbeiten" bodyClassName="p-4">
+        <p className="mb-3 text-[12px] text-bw-text-muted" title={fachbegriff('regie')}>
+          Aufwand nach Stunden/Material — nicht Festpreis-LV.
+        </p>
         <BaustelleRegiearbeitenCard
           auftragId={auftragId}
           regiearbeiten={regiearbeiten}
@@ -91,6 +95,6 @@ export function AuftragBaustelleTab({
           onChanged={onChanged}
         />
       </Card>
-    </div>
+    </>
   )
 }

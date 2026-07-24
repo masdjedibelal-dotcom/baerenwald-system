@@ -75,6 +75,7 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
   const eintraege = await listAuftragPositionEintraege(auftragId)
   const zeitByPos = new Map<string, number>()
   for (const e of eintraege) {
+    if (!e.position_id) continue
     zeitByPos.set(
       e.position_id,
       (zeitByPos.get(e.position_id) ?? 0) + (Number(e.zeit_minuten) || 0)
@@ -171,6 +172,7 @@ export async function createPartnerGutschriftEntwurfFromLebenszyklus(
   const eintraege = await listAuftragPositionEintraege(auftragId)
   const zeitByPos = new Map<string, number>()
   for (const e of eintraege) {
+    if (!e.position_id) continue
     zeitByPos.set(
       e.position_id,
       (zeitByPos.get(e.position_id) ?? 0) + (Number(e.zeit_minuten) || 0)

@@ -10,15 +10,23 @@ export function MockChip({
   onClick,
   children,
   icon,
+  title,
 }: {
   active?: boolean
   count?: number
   onClick?: () => void
   children: ReactNode
   icon?: string
+  /** Native Tooltip — z. B. Fachbegriff */
+  title?: string
 }) {
   return (
-    <button type="button" className={cn('chip', active && 'active')} onClick={onClick}>
+    <button
+      type="button"
+      className={cn('chip', active && 'active')}
+      onClick={onClick}
+      title={title}
+    >
       {icon ? <MockIcon ctx="btn" n={icon} size={14} /> : null}
       {children}
       {count != null ? <span className="chip-count">{count}</span> : null}

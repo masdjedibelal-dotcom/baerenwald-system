@@ -28,6 +28,7 @@ type EditableKeys = keyof ProjektInlineDraft
 export function EntityProjektUebersichtCard({
   title = 'Projekt-Übersicht',
   icon = 'clipboard-list',
+  titelLabel = 'Projekt',
   initial,
   editableFields = [],
   onSave,
@@ -43,6 +44,8 @@ export function EntityProjektUebersichtCard({
 }: {
   title?: string
   icon?: string
+  /** Label für das Titel-Feld (Anfrage: Vorhaben). */
+  titelLabel?: string
   initial: ProjektInlineDraft
   /** Welche Felder im Bearbeitungsmodus editierbar sind */
   editableFields?: EditableKeys[]
@@ -122,7 +125,7 @@ export function EntityProjektUebersichtCard({
       ) : null}
       <div className="props">
         <InlineEditField
-          label="Projekt"
+          label={titelLabel}
           editing={can('titel')}
           value={draft.titel.trim() || '—'}
         >

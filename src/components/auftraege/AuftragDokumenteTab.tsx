@@ -213,8 +213,8 @@ export function AuftragDokumenteTab({
         }
       >
         <p className="mb-3 text-[12.5px] text-bw-text-muted">
-          Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise finden
-          Sie im Tab <span className="font-medium text-bw-text">Compliance</span>.
+          Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise findest
+          du im Tab <span className="font-medium text-bw-text">Compliance</span>.
         </p>
 
         <input

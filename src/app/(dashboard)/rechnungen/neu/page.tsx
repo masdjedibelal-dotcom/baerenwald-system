@@ -12,10 +12,10 @@ import type { Gewerk, Preisliste } from '@/lib/types'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 
 /**
- * Neue Rechnung:
- * - auftrag_id + neu=1 → immer neue Rechnung zum Auftrag (kein Auswahl-Modal)
+ * Neue Rechnung — nur noch RechnungWizard (kein Legacy-Form).
+ * - auftrag_id + neu=1 → immer neue Rechnung zum Auftrag
  * - kunde_id → Direktrechnung für diesen Kunden
- * - auftrag_id ohne neu → Legacy-Auswahl
+ * - auftrag_id ohne neu → Auswahl bestehender Entwürfe
  */
 export default async function RechnungNeuPage({
   searchParams,

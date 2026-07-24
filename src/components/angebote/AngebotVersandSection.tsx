@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
-import { Link2, Mail } from 'lucide-react'
+import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -15,7 +15,9 @@ import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerE
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
+  handwerkerZuweisungAktiv,
 } from '@/lib/angebote/angebot-handwerker-flow'
+import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import {
   normalizeAngebotPositionen,
@@ -27,6 +29,10 @@ import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
 import { mailAngebot } from '@/lib/mail-templates'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { kundeBegruessungsVorname } from '@/lib/kunde-rechnungsempfaenger'
+import {
+  crmBestaetigeHandwerkerAnfrage,
+  loescheHandwerkerAnfrage,
+} from '@/app/(dashboard)/angebote/actions'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
@@ -34,6 +40,7 @@ function hwStatusLabel(s: string | null | undefined): string {
   if (v === 'akzeptiert') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'zugewiesen') return 'Zugewiesen'
+  if (v === 'ersetzt') return 'Ersetzt'
   return 'Ausstehend'
 }
 
@@ -111,7 +118,10 @@ export function AngebotVersandSection({
       typ: kunde?.typ,
     }) ?? (kundeName.split(/\s+/)[0] || kundeName)
 
-  const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
+  const rows = useMemo(
+    () => (detail.angebot_handwerker ?? []).filter(handwerkerZuweisungAktiv),
+    [detail.angebot_handwerker]
+  )
   const orgFreigabeStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
     ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
   const titel =
@@ -274,18 +284,23 @@ export function AngebotVersandSection({
   return (
     <section className={showKundeModalOnly ? undefined : 'mb-6'}>
       {!showKundeModalOnly ? (
-        <h2 className="mb-3 text-lg font-semibold text-ink">Versand</h2>
+        <div className="mb-3">
+          <h2 className="mb-1 text-lg font-semibold text-ink">Versand</h2>
+          <p className="m-0 text-sm text-muted">
+            Zuerst Partner anfragen (falls nötig), danach Angebot an den Kunden senden.
+          </p>
+        </div>
       ) : null}
 
       {allHandwerkerAngefragt && rows.length > 0 && showHandwerkerBlock ? (
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
-          Alle Handwerker wurden angefragt.
+          Alle Partner wurden angefragt.
         </div>
       ) : null}
 
       {showKundeBlock && !showKundeModalOnly ? (
-      <Card id="angebot-versand-kunde" className="mb-6 space-y-4 p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Kunden senden</h3>
+      <Card id="angebot-versand-kunde" className="mb-4 space-y-4 p-4">
+        <h3 className="text-sm font-semibold text-bw-text">An Kunden</h3>
         {kannAnKunde ? (
           <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
             Angebot an Kunden senden
@@ -304,15 +319,32 @@ export function AngebotVersandSection({
 
       {showHandwerkerBlock ? (
       <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Handwerker senden</h3>
+        <h3 className="text-sm font-semibold text-bw-text">Partner anfragen</h3>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted">Keine Handwerker zugewiesen.</p>
+          <p className="text-sm text-muted">Keine Partner zugewiesen.</p>
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((z) => {
               const hwEmail = z.handwerker?.email?.trim()
               const name = z.handwerker?.name ?? '—'
               const gw = z.gewerke?.name ?? 'Gewerk'
+              const statusLc = (z.status ?? 'ausstehend').toLowerCase()
+              const eingereicht = hasHwEinreichung(z)
+              const hwSt = (z.hw_status ?? '').toLowerCase()
+              const kannBestaetigen =
+                statusLc !== 'akzeptiert' &&
+                statusLc !== 'abgelehnt' &&
+                statusLc !== 'ersetzt' &&
+                !z.antwort_at &&
+                !eingereicht &&
+                hwSt !== 'uebernommen'
+              const kannLoeschen =
+                !eingereicht &&
+                hwSt !== 'bestaetigt' &&
+                hwSt !== 'uebernommen' &&
+                !(statusLc === 'akzeptiert' && hwSt && hwSt !== 'offen')
+              const schonAngefragt =
+                statusLc === 'angefragt' || statusLc === 'akzeptiert' || statusLc === 'zugewiesen'
               return (
                 <li key={z.id} className="flex flex-col gap-3 py-4 first:pt-0">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -332,14 +364,14 @@ export function AngebotVersandSection({
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="primary"
                         size="sm"
                         disabled={pending}
                         title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
                         onClick={() => openHandwerkerModal(z)}
                       >
                         <Mail className="mr-1 inline h-4 w-4" aria-hidden />
-                        Partner-Mail
+                        {schonAngefragt ? 'Erneut anfragen' : 'Partner anfragen'}
                       </Button>
                       <Button
                         type="button"
@@ -352,6 +384,69 @@ export function AngebotVersandSection({
                         <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
                         WhatsApp-Link
                       </Button>
+                      {kannBestaetigen ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Anfrage von ${name} im CRM als akzeptiert markieren?`
+                              )
+                            ) {
+                              return
+                            }
+                            startTransition(async () => {
+                              const r = await crmBestaetigeHandwerkerAnfrage({
+                                angebotId: detail.id,
+                                zuweisungId: z.id,
+                              })
+                              if (!r.ok) toast.error(r.message)
+                              else {
+                                toast.success('Anfrage bestätigt')
+                                router.refresh()
+                              }
+                            })
+                          }}
+                        >
+                          <Check className="mr-1 inline h-4 w-4" aria-hidden />
+                          Bestätigen
+                        </Button>
+                      ) : null}
+                      {kannLoeschen ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={pending}
+                          className="text-danger"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Partner-Anfrage an ${name} wirklich löschen?`
+                              )
+                            ) {
+                              return
+                            }
+                            startTransition(async () => {
+                              const r = await loescheHandwerkerAnfrage({
+                                angebotId: detail.id,
+                                zuweisungId: z.id,
+                              })
+                              if (!r.ok) toast.error(r.message)
+                              else {
+                                toast.success('Anfrage gelöscht')
+                                router.refresh()
+                              }
+                            })
+                          }}
+                        >
+                          <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />
+                          Löschen
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                   <HandwerkerEinreichungPruefung
@@ -446,7 +541,7 @@ export function AngebotVersandSection({
             />
             <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
             <p className="text-xs text-bw-text-muted">
-              Versand über die Website (Partner-Portal), nicht über CRM-Resend.
+              Versand über Partner-Portal (Website); bei Fehler automatisch per CRM-Resend.
             </p>
             <iframe
               title="Partner-Mail Vorschau"

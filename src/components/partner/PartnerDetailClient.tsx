@@ -5,11 +5,11 @@ import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { DetailTabBar } from '@/components/ui/detail-tab-bar'
-import { AppDetailScreen } from '@/components/layout/app'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockEmpty } from '@/components/mock-ui'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { DetailHead } from '@/components/layout/DetailHead'
+import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
@@ -200,19 +200,48 @@ export function PartnerDetailClient({
     </Card>
   )
 
-  const detailTabs = [
-    { id: 'uebersicht', label: 'Übersicht', iconName: 'layout-dashboard' },
-    { id: 'stammdaten', label: 'Stammdaten', iconName: 'clipboard-list' },
-    { id: 'vorgaenge', label: 'Vorgänge', iconName: 'folders' },
-    { id: 'dokumente', label: 'Dokumente', iconName: 'files' },
-    { id: 'notizen', label: 'Notizen', iconName: 'messages' },
+  const detailShellGroups: DetailShellGroup[] = [
+    {
+      id: 'uebersicht',
+      label: 'Übersicht',
+      icon: 'layout-dashboard',
+      render: () => kontaktCard,
+    },
+    {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenCard,
+    },
+    {
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      render: () => (
+        <MockEmpty icon="folders" title="Keine Vorgänge" hint="Vermittelte Vorgänge erscheinen hier" />
+      ),
+    },
+    {
+      id: 'dokumente',
+      label: 'Dokumente',
+      icon: 'files',
+      render: () => (
+        <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien zum Netzwerk-Kontakt erscheinen hier" />
+      ),
+    },
+    {
+      id: 'notizen',
+      label: 'Notizen',
+      icon: 'messages',
+      count: partner.notizen?.trim() ? 1 : undefined,
+      render: () => notizenCard,
+    },
   ]
 
   return (
-    <div className="space-y-4 pb-6">
+    <>
+      <MockDetailBackLink href="/partner" label="Zurück zu Netzwerk" />
       <DetailHead
-        backHref="/partner"
-        backLabel="Zurück zu Partner"
         title={
           <div className="detail-head-title-row">
             <span>{partner.name}</span>
@@ -245,28 +274,16 @@ export function PartnerDetailClient({
               </button>
             }
             items={partnerMenuItems}
-            sheetTitle="Partner"
+            sheetTitle="Netzwerk"
           />
         }
       />
 
-      <AppDetailScreen
-        tabs={
-          <DetailTabBar tabs={detailTabs} value={tab} onChange={(id) => setTab(id as PartnerDetailTab)} />
-        }
-      >
-        <div className="min-w-0 space-y-3">
-          {tab === 'uebersicht' ? kontaktCard : null}
-          {tab === 'stammdaten' ? stammdatenCard : null}
-          {tab === 'vorgaenge' ? (
-            <MockEmpty icon="folders" title="Keine Vorgänge" hint="Vermittelte Vorgänge erscheinen hier" />
-          ) : null}
-          {tab === 'dokumente' ? (
-            <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien zum Partner erscheinen hier" />
-          ) : null}
-          {tab === 'notizen' ? notizenCard : null}
-        </div>
-      </AppDetailScreen>
+      <DetailShell
+        groups={detailShellGroups}
+        value={tab}
+        onChange={(id) => setTab(id as PartnerDetailTab)}
+      />
 
       {edit && editOpen
         ? (() => {
@@ -368,7 +385,7 @@ export function PartnerDetailClient({
                 <FormSheet
                   open={editOpen}
                   onClose={closeEdit}
-                  breadcrumb="Partner"
+                  breadcrumb="Netzwerk"
                   title="Eintrag bearbeiten"
                   footer={formFooter}
                 >
@@ -383,6 +400,6 @@ export function PartnerDetailClient({
             )
           })()
         : null}
-    </div>
+    </>
   )
 }

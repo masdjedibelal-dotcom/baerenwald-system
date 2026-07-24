@@ -530,7 +530,7 @@ export function AngebotWizardPositionenByGewerk({
               Unten ein Gewerk hinzufügen und Positionen erfassen.
             </p>
             <p className="mt-2 text-[11px] text-bw-text-muted">
-              Pro Gewerk-Abschnitt können Sie unten eigene Anfahrtskosten aktivieren.
+              Pro Gewerk-Abschnitt kannst du unten eigene Anfahrtskosten aktivieren.
             </p>
           </div>
         ) : (

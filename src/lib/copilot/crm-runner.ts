@@ -10,7 +10,20 @@ export async function executeCrmAktion(
   params: Record<string, unknown> = {},
   bestaetigt?: boolean
 ): Promise<unknown> {
-  const key = aktion.trim()
+  let key = aktion.trim()
+  // Aliase aus Alltagssprache
+  const aliases: Record<string, string> = {
+    mahnung: 'send_zahlungserinnerung',
+    mahnung_senden: 'send_zahlungserinnerung',
+    zahlungserinnerung: 'send_zahlungserinnerung',
+    angebot_senden: 'send_angebot_kunde',
+    rechnung_senden: 'send_rechnung',
+    rechnung_erstellen: 'create_rechnung_entwurf',
+    angebot_erstellen: 'prepare_angebot_wizard',
+  }
+  const aliasKey = aliases[key.toLowerCase()]
+  if (aliasKey) key = aliasKey
+
   const entry = CRM_ACTION_REGISTRY[key]
   if (!entry) {
     return {

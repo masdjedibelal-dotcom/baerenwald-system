@@ -34,8 +34,6 @@ import {
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
 import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
-import { openMieterStatusPreview, openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
@@ -70,14 +68,17 @@ import {
   darfAngebotAnKundeSenden,
   hatAngebotHandwerker,
   handwerkerAnfrageErledigt,
-  handwerkerSendenBlockierHinweis,
 } from '@/lib/angebote/angebot-handwerker-flow'
+import { naechsterSchrittAngebot } from '@/lib/crm/naechster-schritt'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
+import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 
 type AngebotDetailTab =
   | 'stammdaten'
   | 'details'
+  | 'fotos'
   | 'verlauf'
   | 'dokumente'
   | 'notizen'
@@ -85,6 +86,7 @@ type AngebotDetailTab =
 const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'stammdaten',
   'details',
+  'fotos',
   'verlauf',
   'dokumente',
   'notizen',
@@ -108,6 +110,7 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
   }
   if (tab === 'aktivitaet') return 'verlauf'
   if (tab === 'kommunikation') return 'notizen'
+  if (tab === 'bilder' || tab === 'photos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'details'
   if (ANGEBOT_DETAIL_TAB_IDS.has(tab as AngebotDetailTab)) return tab as AngebotDetailTab
@@ -141,7 +144,7 @@ export function AngebotDetailPageClient({
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
-  const [mainTab, setMainTab] = useState<AngebotDetailTab>('stammdaten')
+  const [mainTab, setMainTab] = useState<AngebotDetailTab>('details')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -155,9 +158,7 @@ export function AngebotDetailPageClient({
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
   const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
-  const [impersonating, setImpersonating] = useState(false)
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
-  const isCrmAdmin = useIsCrmAdmin()
 
   useEffect(() => {
     const raw = searchParams.get('tab')
@@ -178,14 +179,21 @@ export function AngebotDetailPageClient({
     return () => window.clearTimeout(t)
   }, [detail.id, detail.angebot_handwerker])
 
-  const orgFreigabeStatus = lead?.org_freigabe_status ?? null
-
   const statusEinfach = resolveStatusEinfach(detail)
   const angebotStatus = useMemo(() => angebotStatusDisplay(detail), [detail])
 
   const positionenAnzeigeCount = useMemo(
     () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)).length,
     [detail.positionen]
+  )
+
+  const vorgangFotos = useMemo(
+    () =>
+      collectVorgangFotos({
+        funnelDaten: lead?.funnel_daten,
+        angebotFotosRaw: detail.fotos_urls,
+      }),
+    [lead?.funnel_daten, detail.fotos_urls]
   )
 
   const kannBearbeiten =
@@ -264,13 +272,6 @@ export function AngebotDetailPageClient({
     [detail.positionen]
   )
   const gueltigBisYmd = detail.gueltig_bis?.slice(0, 10) ?? addDaysYmd(heuteYmd(), 30)
-  const kannAngebotVersenden =
-    (statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
-    darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status) &&
-    Boolean(
-      lead?.auftraggeber?.email?.trim() ||
-        kunde?.email?.trim()
-    )
 
   const timelineSorted = useMemo(
     () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
@@ -397,21 +398,6 @@ export function AngebotDetailPageClient({
   const kundeEmail =
     lead?.auftraggeber?.email?.trim() || kunde?.email?.trim() || ''
 
-  function openAngebotVersandModal() {
-    if (kannAngebotVersenden) {
-      setKundeVersandOpen(true)
-      return
-    }
-    if (!kundeEmail) {
-      toast.error('Kunden-E-Mail fehlt — Versand nicht möglich.')
-      return
-    }
-    toast.error(
-      handwerkerSendenBlockierHinweis(detail.angebot_handwerker ?? [], orgFreigabeStatus) ||
-        'Angebot kann derzeit nicht an den Kunden gesendet werden.'
-    )
-  }
-
   function openHandwerkerAnfragen() {
     const rows = detail.angebot_handwerker ?? []
     if (!hatAngebotHandwerker(rows)) {
@@ -449,8 +435,6 @@ export function AngebotDetailPageClient({
     })
   }
 
-  const kannVersenden =
-    statusEinfach === 'entwurf' || detail.status === 'handwerker_akzeptiert'
   const kannErneutSenden = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
 
   const detailHeadMenuItems = useMemo(() => {
@@ -458,11 +442,6 @@ export function AngebotDetailPageClient({
       statusEinfach === 'angenommen' ||
       statusEinfach === 'abgelehnt' ||
       Boolean(auftragId)
-    const kannAnnehmen =
-      !auftragId &&
-      (statusEinfach === 'entwurf' ||
-        statusEinfach === 'gesendet' ||
-        statusEinfach === 'abgelaufen')
 
     const baseItems = entityMenuToActionItems(
       buildEntityMenu(
@@ -475,27 +454,7 @@ export function AngebotDetailPageClient({
         {
           onEdit: kannBearbeiten ? openWizardBearbeiten : undefined,
           onCopy: () => runDuplicateAngebot(detail.id, router),
-          onPortal: () => {
-            if (!isCrmAdmin) {
-              toast.error('Admin Login nur für CRM-Admins')
-              return
-            }
-            if (impersonating) return
-            setImpersonating(true)
-            const run = detail.lead_id
-              ? openMieterStatusPreview(detail.lead_id)
-              : detail.kunde_id
-                ? openPortalAsKunde(detail.kunde_id)
-                : Promise.resolve({ ok: false as const, message: 'Kein Portal-Zugang verknüpft' })
-            void run.then((r) => {
-              setImpersonating(false)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              window.open(r.url, '_blank', 'noopener,noreferrer')
-            })
-          },
+          // Admin Login nur Partner-/Kunden-Detail (UX2-6)
           onPortalLink: () => {
             if (!detail.kunde_id) {
               toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
@@ -503,15 +462,12 @@ export function AngebotDetailPageClient({
             }
             setPortalLinkModalOpen(true)
           },
-          onAccept: kannAnnehmen ? openAcceptModal : undefined,
+          // Annehmen / Versenden: Header-Primary — Menü nur PDF + Sekundäres
           onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
-          onSend: !erledigt
-            ? kannErneutSenden
+          onSend:
+            !erledigt && kannErneutSenden
               ? () => run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet')
-              : kannVersenden
-                ? openAngebotVersandModal
-                : undefined
-            : undefined,
+              : undefined,
           mail: kundeEmail || null,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
           onDelete: () => {
@@ -548,7 +504,6 @@ export function AngebotDetailPageClient({
     return out
   }, [
     kannBearbeiten,
-    kannVersenden,
     kannErneutSenden,
     kundeEmail,
     kundeName,
@@ -559,8 +514,6 @@ export function AngebotDetailPageClient({
     mailCompose,
     auftragId,
     router,
-    isCrmAdmin,
-    impersonating,
     startTransition,
   ])
 
@@ -679,17 +632,24 @@ export function AngebotDetailPageClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
+      id: 'details',
+      label: 'Leistungen',
+      icon: 'list-details',
+      count: positionenAnzeigeCount || undefined,
+      render: () => detailsInhalt,
+    },
+    {
       id: 'stammdaten',
       label: 'Stammdaten',
       icon: 'clipboard-list',
       render: () => stammdatenInhalt,
     },
     {
-      id: 'details',
-      label: 'Details',
-      icon: 'list-details',
-      count: positionenAnzeigeCount || undefined,
-      render: () => detailsInhalt,
+      id: 'fotos',
+      label: ACTIVITY_SECTIONS.fotos,
+      icon: 'photo',
+      count: vorgangFotos.length || undefined,
+      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
     },
     {
       id: 'verlauf',
@@ -721,6 +681,13 @@ export function AngebotDetailPageClient({
       crumbBackHref="/vorgaenge?tab=angebot"
       crumbBackLabel="Zurück zu den Suchergebnissen"
       className="space-y-4 pb-0"
+      nextStep={naechsterSchrittAngebot({
+        statusEinfach,
+        hasAuftrag: Boolean(auftragId),
+        needsPartnerFirst:
+          hatAngebotHandwerker(detail.angebot_handwerker) &&
+          !darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status),
+      })}
       head={{
         title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
         badges: (

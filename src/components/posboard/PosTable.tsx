@@ -74,6 +74,7 @@ export function PosTable({
   onReorder,
   onDropToGroup,
   onReorderGroup,
+  onItemOpen,
   showTotals,
   netto,
   ust,
@@ -97,6 +98,8 @@ export function PosTable({
   onDropToGroup?: (draggedId: string, gewerk: string) => void
   /** Gewerk-Abschnitte per Drag umsortieren */
   onReorderGroup?: (draggedGewerk: string, targetGewerk: string) => void
+  /** Tip auf Zeile (mobil: Karte öffnen) */
+  onItemOpen?: (item: PosTableItem, group: PosTableGroup) => void
   showTotals?: boolean
   netto?: number
   ust?: number
@@ -258,7 +261,30 @@ export function PosTable({
               return (
                 <div
                   key={it.id}
-                  className={`pt2-row${sel[it.id] ? ' sel' : ''}`}
+                  className={`pt2-row${sel[it.id] ? ' sel' : ''}${onItemOpen ? ' pt2-row--tap' : ''}`}
+                  role={onItemOpen ? 'button' : undefined}
+                  tabIndex={onItemOpen ? 0 : undefined}
+                  onClick={
+                    onItemOpen
+                      ? (e) => {
+                          const t = e.target as HTMLElement
+                          if (t.closest('button, a, .pt2-ctrl, .pt2-act, .row-actions, input, select')) {
+                            return
+                          }
+                          onItemOpen(it, g)
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    onItemOpen
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onItemOpen(it, g)
+                          }
+                        }
+                      : undefined
+                  }
                   draggable={dnd || undefined}
                   onDragStart={
                     dnd
@@ -339,9 +365,13 @@ export function PosTable({
                       ) : null}
                     </div>
                     {it.beschreibung ? <div className="pt-desc">{it.beschreibung}</div> : null}
+                    <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel}>
+                      {it.mengeLabel ? <span className="pt2-menge">{it.mengeLabel}</span> : null}
+                      {it.preisLabel ? <span className="pt2-preis">{it.preisLabel}</span> : null}
+                    </div>
                   </div>
-                  <div className="pt2-menge">{it.mengeLabel ?? ''}</div>
-                  <div className="pt2-preis">{it.preisLabel ?? ''}</div>
+                  <div className="pt2-menge pt2-menge--desk">{it.mengeLabel ?? ''}</div>
+                  <div className="pt2-preis pt2-preis--desk">{it.preisLabel ?? ''}</div>
                   <div className="pt2-act">
                     {itemActions ? <PosTableMenu items={itemActions(g, it)} /> : null}
                   </div>

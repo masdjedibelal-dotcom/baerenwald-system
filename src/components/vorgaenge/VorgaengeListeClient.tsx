@@ -15,10 +15,11 @@ import {
 } from '@/components/mock-ui'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
-import { buildEntityMenu } from '@/lib/entity-menu'
+import { buildListRowMenu } from '@/lib/entity-menu'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
+  runDeleteStandaloneRechnung,
   runDeleteVorgang,
   runDuplicateAnfrage,
   runDuplicateAngebot,
@@ -26,10 +27,13 @@ import {
   runDuplicateRechnung,
 } from '@/lib/list-actions'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
+import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { fachbegriff } from '@/lib/crm/fachbegriffe'
+import { createAnfrageHref } from '@/lib/crm/create-entry'
 import { toast } from '@/components/ui/app-toast'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
-import { bestandPillLabel } from '@/lib/vorgang/wiederkehrend'
 import { cn, formatDatum } from '@/lib/utils'
 
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'bestand', 'rechnung'] as const
@@ -75,7 +79,7 @@ function statusKind(row: VorgangListeRow): string {
 }
 
 function statusLabel(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return 'Wartet auf Freigabe (HV)'
+  if (row.badges.wartet_freigabe) return 'Warte auf HV'
   return row.unterstatusLabel
 }
 
@@ -384,18 +388,27 @@ export function VorgaengeListeClient({
   }, [exportToCSV, selectedRows])
 
   const bulkDelete = useCallback(() => {
-    const leadIds = Array.from(new Set(selectedRows.map((v) => v.leadId)))
-    if (!leadIds.length) return
+    const leadIds = Array.from(
+      new Set(selectedRows.filter((v) => !v.standalone && v.leadId).map((v) => v.leadId))
+    )
+    const standaloneIds = selectedRows
+      .filter((v) => v.standalone && v.phase === 'rechnung')
+      .map((v) => v.entityId)
+    if (!leadIds.length && !standaloneIds.length) return
     void (async () => {
+      const total = leadIds.length + standaloneIds.length
       const loadingId = toast.loading(
-        leadIds.length === 1
-          ? 'Vorgang wird gelöscht…'
-          : `${leadIds.length} Vorgänge werden gelöscht…`
+        total === 1 ? 'Vorgang wird gelöscht…' : `${total} Vorgänge werden gelöscht…`
       )
       let ok = 0
       let fail = 0
       for (const leadId of leadIds) {
         const r = await deleteVorgang(leadId)
+        if (r.ok) ok += 1
+        else fail += 1
+      }
+      for (const rechnungId of standaloneIds) {
+        const r = await deleteRechnungEntwurf(rechnungId)
         if (r.ok) ok += 1
         else fail += 1
       }
@@ -454,7 +467,7 @@ export function VorgaengeListeClient({
       const isAngebot = v.phase === 'angebot'
       const isAuftrag = v.phase === 'auftrag'
       const isRechnung = v.phase === 'rechnung'
-      return buildEntityMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
+      return buildListRowMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
         onEdit: () => openDetail(v.detailHref),
         onCopy: () => {
           if (isAnfrage) runDuplicateAnfrage(v.leadId, router)
@@ -467,7 +480,10 @@ export function VorgaengeListeClient({
           : isRechnung
             ? () => window.open(`/api/rechnungen/${v.entityId}/pdf`, '_blank')
             : undefined,
-        onDelete: () => runDeleteVorgang(v.leadId, router),
+        onDelete: () =>
+          v.standalone
+            ? runDeleteStandaloneRechnung(v.entityId, router, v.titel)
+            : runDeleteVorgang(v.leadId, router),
         deleteLabel: v.titel,
       })
     },
@@ -477,13 +493,14 @@ export function VorgaengeListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips">
+        <div className="listbar-chips listbar-phase-tabs" role="tablist" aria-label="Phase">
           {VORGANG_FILTERS.map((p) => (
             <MockChip
               key={p}
               active={filter === p}
               onClick={() => setPhaseFilter(p)}
               count={counts[p]}
+              title={p === 'bestand' ? fachbegriff('bestand') : undefined}
               icon={
                 p === 'bestand'
                   ? 'refresh'
@@ -603,6 +620,7 @@ export function VorgaengeListeClient({
               key={p}
               active={filter === p}
               onClick={() => setPhaseFilter(p)}
+              title={p === 'bestand' ? fachbegriff('bestand') : undefined}
               icon={
                 p === 'bestand'
                   ? 'refresh'
@@ -703,6 +721,7 @@ export function VorgaengeListeClient({
         </div>
       ) : null}
 
+      <PullToRefresh onRefresh={() => router.refresh()}>
       <div className="listcard vg-selectmode">
         <div className="vg-row head">
           <div
@@ -744,7 +763,18 @@ export function VorgaengeListeClient({
           <MockEmpty
             icon="folder-open"
             title={lifecycle === 'erledigt' ? 'Keine erledigten Vorgänge' : 'Keine offenen Vorgänge'}
-            hint="Filter zurücksetzen oder Bucket wechseln"
+            hint={
+              lifecycle === 'erledigt'
+                ? 'Filter zurücksetzen oder zu „Offen“ wechseln'
+                : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
+            }
+            action={
+              lifecycle === 'offen' ? (
+                <MockBtn kind="primary" icon="plus" onClick={() => router.push(createAnfrageHref())}>
+                  Neue Anfrage
+                </MockBtn>
+              ) : undefined
+            }
           />
         ) : (
           pageItems.map((v) => {
@@ -783,15 +813,20 @@ export function VorgaengeListeClient({
                   <div className="t" title={v.titel}>
                     {v.titel}
                   </div>
-                  {bestandPillLabel(v) ? (
-                    <MockBadge kind="fertig">{bestandPillLabel(v)}</MockBadge>
-                  ) : null}
                 </div>
                 <div className="vg-phase">
                   <span className="ph-neutral">
                     <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
                     {PHASE_META[v.phase].label}
                   </span>
+                  {v.standalone ? (
+                    <span
+                      className="mt-0.5 block text-[11px] text-[var(--text-3)]"
+                      title={fachbegriff('ohne_vorgang')}
+                    >
+                      Ohne Vorgang
+                    </span>
+                  ) : null}
                 </div>
                 <div
                   className="vg-wert"
@@ -818,6 +853,7 @@ export function VorgaengeListeClient({
           })
         )}
       </div>
+      </PullToRefresh>
 
       <MockPager
         pageIndex={pageIndex}

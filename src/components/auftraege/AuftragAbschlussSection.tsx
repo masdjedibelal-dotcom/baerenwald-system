@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { WerkzeugPanel } from '@/components/crm/WerkzeugPanel'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAbschlussberichtPdf,
@@ -24,16 +24,16 @@ type Vorschau = {
 }
 
 /**
- * Abschlussbericht-Tab — Bericht erstellen (nach Abnahme-PDF),
- * danach Neu erstellen + PDF. Versand läuft über „Auftrag abschließen“.
+ * Abschlussbericht — Checkliste + eine Primäraktion (kein Mini-CRM).
  */
 export function AuftragAbschlussSection({
   auftragId,
   istAbgeschlossen,
   abschlussUrl,
   abschlussGesendetAt,
-  onCreate,
+  onCreate: _onCreate,
   onRefresh,
+  embedded,
 }: {
   auftragId: string
   istAbgeschlossen: boolean
@@ -42,6 +42,8 @@ export function AuftragAbschlussSection({
   /** @deprecated — Erstellen läuft lokal; optional Fallback */
   onCreate?: () => void
   onRefresh?: () => void
+  /** Im Vor-Ort-Flow: Nummerierung im Titel */
+  embedded?: boolean
 }) {
   const [vorschau, setVorschau] = useState<Vorschau | null>(null)
   const [pending, startTransition] = useTransition()
@@ -83,29 +85,57 @@ export function AuftragAbschlussSection({
     })
   }
 
-  return (
-    <MockCard title="Abschlussbericht" icon="file-text">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
-        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.45, maxWidth: 520 }}>
-          Automatisch zusammengestellt aus Leistungen, Bautagebuch und Abnahmeprotokoll. Versand an
-          den Kunden läuft über „Auftrag abschließen“.
-        </p>
-        <MockBadge kind={hatBericht ? (istAbgeschlossen ? 'aktiv' : 'fertig') : 'fertig'}>
-          {hatBericht ? (abschlussGesendetAt ? 'Versendet' : 'Entwurf') : 'Offen'}
-        </MockBadge>
-      </div>
+  const badge = (
+    <MockBadge kind={hatBericht ? (istAbgeschlossen ? 'aktiv' : 'fertig') : 'fertig'}>
+      {hatBericht ? (abschlussGesendetAt ? 'Versendet' : 'Entwurf') : 'Offen'}
+    </MockBadge>
+  )
 
+  return (
+    <WerkzeugPanel
+      title={embedded ? '3 · Abschlussbericht' : 'Abschlussbericht'}
+      icon="file-text"
+      purpose="Aus den Leistungen oben, dem Tagebuch und der Abnahme zusammensetzen. Versand an den Kunden über „Auftrag abschließen“."
+      actions={badge}
+    >
       {!vorschau ? (
         <p className="text-sm text-bw-text-muted py-2">Lädt Übersicht…</p>
-      ) : null}
+      ) : (
+        <ul className="werkzeug-check">
+          <li>
+            <span
+              className={vorschau.positionenCount > 0 ? 'werkzeug-check__ok' : 'werkzeug-check__open'}
+              aria-hidden
+            >
+              {vorschau.positionenCount > 0 ? '✓' : '○'}
+            </span>
+            Leistungen ({vorschau.positionenCount})
+          </li>
+          <li>
+            <span
+              className={
+                vorschau.bautagebuchCount > 0 ? 'werkzeug-check__ok' : 'werkzeug-check__open'
+              }
+              aria-hidden
+            >
+              {vorschau.bautagebuchCount > 0 ? '✓' : '○'}
+            </span>
+            Bautagebuch ({vorschau.bautagebuchCount})
+          </li>
+          <li>
+            <span className={hasAbnahme ? 'werkzeug-check__ok' : 'werkzeug-check__open'} aria-hidden>
+              {hasAbnahme ? '✓' : '○'}
+            </span>
+            Abnahmeprotokoll {hasAbnahme ? 'vorhanden' : 'fehlt'}
+          </li>
+          <li>
+            <span className={hatBericht ? 'werkzeug-check__ok' : 'werkzeug-check__open'} aria-hidden>
+              {hatBericht ? '✓' : '○'}
+            </span>
+            Abschlussbericht {hatBericht ? 'erstellt' : 'offen'}
+          </li>
+        </ul>
+      )}
 
       {!hasAbnahme && vorschau ? (
         <div
@@ -123,9 +153,7 @@ export function AuftragAbschlussSection({
           }}
         >
           <MockIcon ctx="default" n="alert-triangle" size={15} />
-          <span>
-            Abnahmeprotokoll noch ohne PDF — im Tab „Abnahmeprotokoll“ als PDF erstellen.
-          </span>
+          <span>Zuerst in der Leistungstabelle Abnahme setzen und als PDF speichern.</span>
         </div>
       ) : null}
 
@@ -141,7 +169,12 @@ export function AuftragAbschlussSection({
           </MockBtn>
         ) : (
           <>
-            <MockBtn kind="primary" icon="plus" onClick={berichtErstellen} disabled={pending || !hasAbnahme}>
+            <MockBtn
+              kind="primary"
+              icon="plus"
+              onClick={berichtErstellen}
+              disabled={pending || !hasAbnahme}
+            >
               Neu erstellen
             </MockBtn>
             <a
@@ -157,37 +190,11 @@ export function AuftragAbschlussSection({
         )}
       </div>
 
-      {!hasAbnahme ? (
-        <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--text-3)' }}>
-          Der Bericht kann erstellt werden, sobald das Abnahmeprotokoll als PDF vorliegt.
-        </p>
-      ) : hatBericht && abschlussGesendetAt ? (
+      {hatBericht && abschlussGesendetAt ? (
         <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--text-3)' }}>
           Versendet am {formatDatum(abschlussGesendetAt)}
         </p>
       ) : null}
-
-      {vorschau ? (
-        <div
-          style={{
-            marginTop: 16,
-            display: 'grid',
-            gap: 6,
-            fontSize: 12.5,
-            color: 'var(--text-3)',
-          }}
-        >
-          <span>
-            Leistungen: <b style={{ color: 'var(--text)' }}>{vorschau.positionenCount}</b>
-          </span>
-          <span>
-            Bautagebuch: <b style={{ color: 'var(--text)' }}>{vorschau.bautagebuchCount}</b> Einträge
-          </span>
-          <span>
-            Abnahme: <b style={{ color: 'var(--text)' }}>{hasAbnahme ? 'Vorhanden' : 'Offen'}</b>
-          </span>
-        </div>
-      ) : null}
-    </MockCard>
+    </WerkzeugPanel>
   )
 }

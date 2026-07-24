@@ -99,13 +99,11 @@ export function ToastProvider() {
           <div
             key={t.id}
             className={cn(
-              'pointer-events-auto flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
-              t.type === 'success' && 'border-status-order-bg text-status-order-text',
-              t.type === 'error' && 'border-status-cancel-bg text-status-cancel-text',
-              (t.type === 'info' || t.type === 'loading') &&
-                'border-status-new-bg text-status-new-text'
+              'app-toast pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
+              t.type === 'success' && 'app-toast--success',
+              t.type === 'error' && 'app-toast--error',
+              (t.type === 'info' || t.type === 'loading') && 'app-toast--info'
             )}
-            style={{ backgroundColor: '#ffffff' }}
             role="status"
             aria-live={t.type === 'loading' ? 'polite' : 'assertive'}
           >

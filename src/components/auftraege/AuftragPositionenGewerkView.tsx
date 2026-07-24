@@ -12,7 +12,7 @@ import {
   Trash2,
   UserPlus } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
-import { EmptyState } from '@/components/layout/EmptyState'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
 import {
   HandwerkerZuweisenModal,
@@ -190,10 +190,10 @@ export function AuftragPositionenGewerkView({
 
   if (sorted.length === 0) {
     return (
-      <EmptyState
-        icon={ToolIcon}
+      <MockEmpty
+        icon="tool"
         title="Keine Leistungen"
-        description="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
+        hint="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
         action={
           <button type="button" className="btn primary sm" onClick={() => onAddLeistung('')}>
             + Leistung

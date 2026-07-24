@@ -23,6 +23,7 @@ import type { Kunde, LeadKanal } from '@/lib/types'
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import {
   DRINGLICHKEIT_OPTIONS,
+  STAFF_BEREICH_ICONS,
   STAFF_SITUATIONEN,
   UMFANG_OPTIONS,
   ZEITRAUM_ERNEUERN_OPTIONS,
@@ -39,8 +40,11 @@ import {
 } from '@/lib/anfragen/staff-funnel-steps'
 import { estimateStaffFunnelPrice } from '@/lib/anfragen/staff-funnel-price'
 import { staffFunnelToPayload } from '@/lib/anfragen/staff-funnel-payload'
+import { buildStaffFunnelSummaryRows } from '@/lib/anfragen/staff-funnel-summary'
 import {
   StaffChoiceGrid,
+  StaffInternBlock,
+  StaffPreisIndikation,
   StaffSkipHint,
   StaffStepTitle,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
@@ -99,6 +103,39 @@ export function StaffFunnelWizard({
     if (stepIndex >= steps.length) setStepIndex(Math.max(0, steps.length - 1))
   }, [steps.length, stepIndex])
 
+  // Preisindikation immer aktuell halten (wie Website-Rechner)
+  useEffect(() => {
+    if (currentId !== 'preis') return
+    const est = estimateStaffFunnelPrice(state)
+    setState((s) => {
+      if (
+        s.preisModus === est.modus &&
+        s.preisMin === est.min &&
+        s.preisMax === est.max &&
+        s.preisHinweis === est.hinweis
+      ) {
+        return s
+      }
+      return {
+        ...s,
+        preisModus: est.modus,
+        preisMin: est.min,
+        preisMax: est.max,
+        preisHinweis: est.hinweis,
+      }
+    })
+    // nur bei Step-Wechsel / relevanten Funnel-Feldern
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- gezielt
+  }, [
+    currentId,
+    state.situation,
+    state.bereiche,
+    state.groessen,
+    state.dringlichkeit,
+    state.plz,
+    state.badAusstattung,
+  ])
+
   const patch = useCallback((p: Partial<StaffFunnelState>) => {
     setState((s) => ({ ...s, ...p }))
   }, [])
@@ -155,9 +192,9 @@ export function StaffFunnelWizard({
     if (nextId === 'preis') {
       const est = estimateStaffFunnelPrice(state)
       patch({
-        preisModus: est.modus === 'komplex' ? 'komplex' : state.preisMin != null ? 'manual' : 'rahmen',
-        preisMin: state.preisMin ?? est.min,
-        preisMax: state.preisMax ?? est.max,
+        preisModus: est.modus,
+        preisMin: est.min,
+        preisMax: est.max,
         preisHinweis: est.hinweis,
       })
     }
@@ -221,6 +258,7 @@ export function StaffFunnelWizard({
   const bereichOptions = bereicheForStaffSituation(state.situation).map((b) => ({
     value: b.value,
     label: b.label,
+    icon: STAFF_BEREICH_ICONS[b.value],
   }))
 
   const fachKeys = useMemo(() => {
@@ -250,8 +288,8 @@ export function StaffFunnelWizard({
         return (
           <>
             <StaffStepTitle
-              title="Kontext"
-              sub="Kunde, Kanal und interne Notiz — vor dem Funnel."
+              title="Kunde"
+              sub="Wie auf der Website — bestehenden Kunden wählen oder Kontaktdaten eintragen."
             />
             <MockFormSection>
               <MockField label="Bestehender Kunde" full>
@@ -261,19 +299,6 @@ export function StaffFunnelWizard({
                   onKundeIdChange={(id) => patch({ kundeId: id })}
                   onKundeGewaehlt={applyKunde}
                 />
-              </MockField>
-              <MockField label="Kanal" required>
-                <select
-                  className="input"
-                  value={state.kanal}
-                  onChange={(e) => patch({ kanal: e.target.value as LeadKanal })}
-                >
-                  {STAFF_KANAL.map((k) => (
-                    <option key={k} value={k}>
-                      {KANAL_LABELS[k] ?? k}
-                    </option>
-                  ))}
-                </select>
               </MockField>
               <MockField label="Firma" hint="Bei HV / Gewerbe">
                 <input
@@ -312,6 +337,22 @@ export function StaffFunnelWizard({
                   onChange={(e) => patch({ telefon: e.target.value })}
                 />
               </MockField>
+            </MockFormSection>
+            <StaffInternBlock>
+              <p className="mb-3 text-[12.5px] text-[var(--text-3)]">
+                Kanal und Notiz erscheinen nicht im Kunden-Funnel.
+              </p>
+              <MockField label="Kanal" required full>
+                <StaffChoiceGrid
+                  columns={2}
+                  options={STAFF_KANAL.map((k) => ({
+                    value: k,
+                    label: KANAL_LABELS[k] ?? k,
+                  }))}
+                  value={state.kanal}
+                  onChange={(v) => patch({ kanal: v as LeadKanal })}
+                />
+              </MockField>
               <MockField label="Interne Notiz" full>
                 <textarea
                   className="input ta"
@@ -321,20 +362,25 @@ export function StaffFunnelWizard({
                   placeholder="Was am Telefon gesagt wurde…"
                 />
               </MockField>
-            </MockFormSection>
+            </StaffInternBlock>
           </>
         )
 
       case 'situation':
         return (
           <>
-            <StaffStepTitle title="Situation" sub="Was ist der Anlass der Anfrage?" />
+            <StaffStepTitle
+              title="Worum geht’s?"
+              sub="Wie auf der Website — Situation wählen."
+            />
             <StaffChoiceGrid
               columns={2}
               options={STAFF_SITUATIONEN.map((s) => ({
                 value: s.value,
                 label: s.label,
                 hint: s.hint,
+                icon: s.icon,
+                tag: s.tag,
               }))}
               value={state.situation}
               onChange={(v) =>
@@ -352,7 +398,10 @@ export function StaffFunnelWizard({
       case 'bereiche':
         return (
           <>
-            <StaffStepTitle title="Bereiche" sub="Mehrfachauswahl möglich." />
+            <StaffStepTitle
+              title="Welche Bereiche?"
+              sub="Mehrfachauswahl möglich — wie im Kunden-Rechner."
+            />
             <StaffChoiceGrid
               multi
               columns={2}
@@ -604,80 +653,27 @@ export function StaffFunnelWizard({
 
       case 'preis': {
         const est = estimateStaffFunnelPrice(state)
+        const showMin = state.preisMin ?? est.min
+        const showMax = state.preisMax ?? est.max
+        const isKomplex = est.modus === 'komplex' || state.preisModus === 'komplex'
         return (
           <>
             <StaffStepTitle
-              title="Preisrahmen"
-              sub={state.preisHinweis || est.hinweis}
+              title="Preisindikation"
+              sub="Automatisch berechnet — wie für den Kunden auf der Website."
             />
-            <div className="mb-4 flex flex-wrap gap-2">
-              <MockBtn
-                sm
-                kind={state.preisModus !== 'komplex' ? 'primary' : 'ghost'}
-                onClick={() => {
-                  const e = estimateStaffFunnelPrice(state)
-                  patch({
-                    preisModus: 'rahmen',
-                    preisMin: e.min,
-                    preisMax: e.max,
-                    preisHinweis: e.hinweis,
-                  })
-                }}
-              >
-                Schätzung übernehmen
-              </MockBtn>
-              <MockBtn
-                sm
-                kind={state.preisModus === 'komplex' ? 'primary' : 'ghost'}
-                onClick={() =>
-                  patch({
-                    preisModus: 'komplex',
-                    preisMin: null,
-                    preisMax: null,
-                    preisHinweis: 'Beratung / komplex — kein Sofortpreis.',
-                  })
-                }
-              >
-                Zu komplex / Beratung
-              </MockBtn>
-            </div>
-            {state.preisModus !== 'komplex' ? (
-              <MockFormSection>
-                <MockField label="Von (€)">
-                  <input
-                    className="input"
-                    type="number"
-                    min={0}
-                    value={state.preisMin ?? ''}
-                    onChange={(e) =>
-                      patch({
-                        preisModus: 'manual',
-                        preisMin: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                  />
-                </MockField>
-                <MockField label="Bis (€)">
-                  <input
-                    className="input"
-                    type="number"
-                    min={0}
-                    value={state.preisMax ?? ''}
-                    onChange={(e) =>
-                      patch({
-                        preisModus: 'manual',
-                        preisMax: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                  />
-                </MockField>
-              </MockFormSection>
-            ) : (
-              <p className="text-[13px] text-[var(--text-3)]">
-                Kein Preisrahmen — Anfrage wird als Beratung erfasst.
+            <StaffPreisIndikation
+              min={isKomplex ? null : showMin}
+              max={isKomplex ? null : showMax}
+              komplex={isKomplex}
+              hinweis={state.preisHinweis || est.hinweis}
+            />
+            {!isKomplex && (showMin != null || showMax != null) ? (
+              <p className="mt-4 text-[12.5px] text-[var(--text-3)]">
+                Der Rahmen wird mit der Anfrage gespeichert. Keine manuelle
+                Umschaltung nötig.
               </p>
-            )}
-            <StaffSkipHint onSkip={skip} />
+            ) : null}
           </>
         )
       }
@@ -704,41 +700,37 @@ export function StaffFunnelWizard({
         )
 
       case 'crm_pruefen': {
-        const sit = STAFF_SITUATIONEN.find((s) => s.value === state.situation)
+        const summaryRows = buildStaffFunnelSummaryRows(state)
+        const est = estimateStaffFunnelPrice(state)
+        const showMin = state.preisMin ?? est.min
+        const showMax = state.preisMax ?? est.max
+        const isKomplex = est.modus === 'komplex' || state.preisModus === 'komplex'
         return (
           <>
-            <StaffStepTitle title="Prüfen & anlegen" sub="Kurzcheck vor dem Speichern." />
-            <div className="card">
+            <StaffStepTitle
+              title="Prüfen & anlegen"
+              sub="Alle Angaben aus dem Funnel — bitte kurz prüfen."
+            />
+            <div className="mb-4">
+              <StaffPreisIndikation
+                min={isKomplex ? null : showMin}
+                max={isKomplex ? null : showMax}
+                komplex={isKomplex}
+                hinweis={state.preisHinweis || est.hinweis}
+              />
+            </div>
+            <div className="sf-summary-card">
               <div className="card-b space-y-2 text-[13px]">
-                <Row k="Kunde" v={staffFunnelKontaktName(state) || '—'} />
-                <Row k="Kanal" v={KANAL_LABELS[state.kanal] ?? state.kanal} />
-                <Row k="Situation" v={sit?.label ?? '—'} />
-                <Row
-                  k="Bereiche"
-                  v={
-                    state.bereiche.length
-                      ? state.bereiche.join(', ')
-                      : state.situation === 'gewerbe'
-                        ? 'Gewerbe'
-                        : '—'
-                  }
-                />
-                <Row
-                  k="Preis"
-                  v={
-                    state.preisModus === 'komplex'
-                      ? 'Beratung / komplex'
-                      : state.preisMin != null || state.preisMax != null
-                        ? `${state.preisMin ?? '—'} – ${state.preisMax ?? '—'} €`
-                        : '—'
-                  }
-                />
-                {state.plz || state.ort ? (
-                  <Row k="Ort" v={[state.plz, state.ort].filter(Boolean).join(' ')} />
-                ) : null}
+                {summaryRows.length ? (
+                  summaryRows.map((row, i) => (
+                    <Row key={`${i}-${row.label}`} k={row.label} v={row.value} />
+                  ))
+                ) : (
+                  <p className="text-[var(--text-3)]">Noch keine Angaben.</p>
+                )}
               </div>
             </div>
-            <MockFormSection className="mt-4">
+            <StaffInternBlock title="Abschluss (intern)">
               <MockField label="Freitext an Kundenakte" full>
                 <textarea
                   className="input ta"
@@ -747,7 +739,7 @@ export function StaffFunnelWizard({
                   onChange={(e) => patch({ freitext: e.target.value })}
                 />
               </MockField>
-              <label className="flex items-center gap-2 text-[13px] text-[var(--text-2)]">
+              <label className="mt-3 flex items-center gap-2 text-[13px] text-[var(--text-2)]">
                 <input
                   type="checkbox"
                   checked={state.istBauprojekt}
@@ -755,7 +747,7 @@ export function StaffFunnelWizard({
                 />
                 Bauprojekt (Bautagebuch / Compliance)
               </label>
-            </MockFormSection>
+            </StaffInternBlock>
           </>
         )
       }
@@ -786,28 +778,55 @@ export function StaffFunnelWizard({
     </div>
   )
 
-  const mobileActions = !isLast ? (
-    <MockBtn sm kind="primary" disabled={!canContinue} onClick={goNext}>
-      Weiter
-    </MockBtn>
+  const mobileActions = null
+
+  const mobileFooter = !isLast ? (
+    <>
+      {stepIndex > 0 ? (
+        <MockBtn kind="ghost" icon="chevron-left" onClick={goBack}>
+          Zurück
+        </MockBtn>
+      ) : (
+        <span />
+      )}
+      <MockBtn
+        kind="primary"
+        icon="chevron-right"
+        className="wizard-mobile-footer__primary"
+        disabled={!canContinue}
+        onClick={goNext}
+      >
+        Weiter
+      </MockBtn>
+    </>
   ) : (
     <>
-      <MockBtn sm kind="ghost" icon="chevron-left" onClick={goBack} title="Zurück" />
-      <MockBtn sm kind="primary" disabled={loading} onClick={() => void submit()}>
-        Anlegen
+      <MockBtn kind="ghost" icon="chevron-left" onClick={goBack}>
+        Zurück
+      </MockBtn>
+      <MockBtn
+        kind="primary"
+        className="wizard-mobile-footer__primary"
+        disabled={loading}
+        onClick={() => void submit()}
+      >
+        {loading ? 'Speichern…' : 'Anfrage anlegen'}
       </MockBtn>
     </>
   )
 
   const wizard = (
     <WizardShell
+      className="staff-funnel"
       title="Anfrage erstellen"
-      subtitle="Staff-Funnel · wie Website-Rechner, fürs CRM"
+      subtitle="Wie der Kunden-Rechner — fürs CRM"
       steps={shellSteps}
       currentStep={stepIndex + 1}
       onClose={onClose}
       desktopActions={desktopActions}
       mobileActions={mobileActions}
+      mobileFooter={mobileFooter}
+      saveHint={loading ? 'Speichert…' : null}
     >
       <div className={cn('mx-auto w-full max-w-2xl px-1 py-2')}>
         {error ? (
@@ -823,17 +842,11 @@ export function StaffFunnelWizard({
   return createPortal(wizard, document.body)
 }
 
-function staffFunnelKontaktName(state: StaffFunnelState): string {
-  const firma = state.firmaName.trim()
-  if (firma) return firma
-  return [state.vorname.trim(), state.nachname.trim()].filter(Boolean).join(' ')
-}
-
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex gap-3 border-b border-[var(--border)] py-2 last:border-0">
-      <span className="w-28 shrink-0 text-[var(--text-3)]">{k}</span>
-      <span className="min-w-0 font-medium text-[var(--text)]">{v}</span>
+      <span className="w-36 shrink-0 text-[var(--text-3)]">{k}</span>
+      <span className="min-w-0 whitespace-pre-wrap font-medium text-[var(--text)]">{v}</span>
     </div>
   )
 }

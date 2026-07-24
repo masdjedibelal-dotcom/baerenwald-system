@@ -105,6 +105,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   /** Bestand: wiederkehrende Leistung (Phase-Entity oder Lead). */
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** FAB-/Direktrechnung ohne Anfrage-/Auftrags-Verknüpfung. */
+  standalone?: boolean
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

@@ -561,8 +561,8 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'send_zahlungserinnerung',
       kategorie: 'rechnungen',
-      beschreibung: 'Zahlungserinnerung senden',
-      params: ['rechnung_id'],
+      beschreibung: 'Mahnung / Zahlungserinnerung senden (Stufe 1 oder 2)',
+      params: ['rechnung_id', 'stufe?'],
       bestaetigung: true,
     },
     handler: async (p) => {

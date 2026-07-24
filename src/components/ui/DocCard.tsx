@@ -37,7 +37,7 @@ const DOC_CONFIG = {
   other: {
     icon: File,
     bg: 'doc-icon-other',
-    color: 'text-gray-500',
+    color: 'text-bw-text-muted',
   },
 }
 

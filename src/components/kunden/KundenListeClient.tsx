@@ -21,6 +21,7 @@ import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -298,6 +299,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         </div>
       </MockModal>
 
+      <PullToRefresh onRefresh={() => router.refresh()}>
       <div className={cn('listcard', selectMode && 'vg-selectmode')}>
         <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
           {selectMode ? (
@@ -402,6 +404,7 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
           ))
         )}
       </div>
+      </PullToRefresh>
 
       <MockPager
         pageIndex={pageIndex}

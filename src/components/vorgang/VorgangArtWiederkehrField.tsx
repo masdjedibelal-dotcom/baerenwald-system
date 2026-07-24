@@ -7,6 +7,7 @@ import {
   type WiederkehrTurnus,
   type VorgangWiederkehr,
 } from '@/lib/vorgang/wiederkehrend'
+import { cn } from '@/lib/utils'
 
 type Props = {
   value: VorgangWiederkehr
@@ -14,6 +15,7 @@ type Props = {
   /** Kurzer Kontext-Hinweis unter der Überschrift */
   hint?: string
   className?: string
+  disabled?: boolean
 }
 
 /**
@@ -25,6 +27,7 @@ export function VorgangArtWiederkehrField({
   onChange,
   hint = 'Einmalig oder wiederkehrend (Wartung, Winterdienst, Hausmeisterservice)',
   className,
+  disabled = false,
 }: Props) {
   const ist = value.ist_wiederkehrend
   const turnus = value.wiederkehr_turnus ?? 'monatlich'
@@ -33,24 +36,26 @@ export function VorgangArtWiederkehrField({
     <div className={className} style={{ marginBottom: 16 }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>
-          Art des Vorgangs
+          Art der Leistung
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>{hint}</div>
       </div>
       <div className="doctype-row">
-        <label
-          className={`doctype-radio-opt${!ist ? ' on' : ''}`}
-          onClick={() =>
-            onChange({ ist_wiederkehrend: false, wiederkehr_turnus: null })
-          }
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn('doctype-radio-opt', !ist && 'on')}
+          onClick={() => onChange({ ist_wiederkehrend: false, wiederkehr_turnus: null })}
         >
-          <span className="dot" />
+          <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="file-text" size={16} />
           <span className="lbl">Einmalig</span>
           <span className="hint">Klassischer Auftrag mit Abschluss</span>
-        </label>
-        <label
-          className={`doctype-radio-opt${ist ? ' on' : ''}`}
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn('doctype-radio-opt', ist && 'on')}
           onClick={() =>
             onChange({
               ist_wiederkehrend: true,
@@ -58,11 +63,11 @@ export function VorgangArtWiederkehrField({
             })
           }
         >
-          <span className="dot" />
+          <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="refresh" size={16} />
-          <span className="lbl">Wiederkehrend</span>
-          <span className="hint">Bestand — erzeugt regelmäßige Einsätze</span>
-        </label>
+          <span className="lbl">Monatlich / wiederkehrend</span>
+          <span className="hint">Bestand — regelmäßige Einsätze</span>
+        </button>
       </div>
       {ist ? (
         <div style={{ marginTop: 12, maxWidth: 360 }}>
@@ -71,6 +76,7 @@ export function VorgangArtWiederkehrField({
             <select
               className="sel"
               value={turnus}
+              disabled={disabled}
               onChange={(e) =>
                 onChange({
                   ist_wiederkehrend: true,
