@@ -11,7 +11,6 @@ import type { LeadKanal } from '@/lib/types'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
-  isSatellitenRechnung,
   resolveSatellitenRechnungVorgang,
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
@@ -424,30 +423,33 @@ export async function loadVorgaengeListe(): Promise<{
       wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     })
 
-    // Abschlag/Schluss: eigener Rechnungs-Vorgang; Stamm bleibt Auftrag
-    for (const r of leadRechnungen) {
-      if (!isSatellitenRechnung(r)) continue
-      if (r.status === 'storniert') continue
-      const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
-      const satWieder = resolveListeWiederkehr({
-        phase: 'rechnung',
-        entityId: r.id,
-        lead: resolveInput.lead,
-        angebote: leadAngebote,
-        auftraege: leadAuftraege,
-        rechnungen: leadRechnungen,
-      })
-      rows.push({
-        ...sat,
-        leadId: lead.id,
-        kundeId,
-        kundeName,
-        wertLabel: wertLabelForRechnung(r.id),
-        detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
-        handwerkerIds,
-        ist_wiederkehrend: satWieder.ist_wiederkehrend,
-        wiederkehr_turnus: satWieder.wiederkehr_turnus,
-      })
+    // Weitere Rechnungen als eigene Zeilen — erst wenn Stamm bereits in Rechnungsphase
+    // (nach erstem Versand). Auftrag-Tab bleibt frei von Abschlag-Satelliten.
+    if (resolved.phase === 'rechnung') {
+      for (const r of leadRechnungen) {
+        if (r.status === 'storniert') continue
+        if (resolved.entityId === r.id) continue
+        const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
+        const satWieder = resolveListeWiederkehr({
+          phase: 'rechnung',
+          entityId: r.id,
+          lead: resolveInput.lead,
+          angebote: leadAngebote,
+          auftraege: leadAuftraege,
+          rechnungen: leadRechnungen,
+        })
+        rows.push({
+          ...sat,
+          leadId: lead.id,
+          kundeId,
+          kundeName,
+          wertLabel: wertLabelForRechnung(r.id),
+          detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
+          handwerkerIds,
+          ist_wiederkehrend: satWieder.ist_wiederkehrend,
+          wiederkehr_turnus: satWieder.wiederkehr_turnus,
+        })
+      }
     }
   }
 

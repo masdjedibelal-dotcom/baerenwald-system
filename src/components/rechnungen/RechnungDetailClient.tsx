@@ -6,19 +6,20 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { Timeline } from '@/components/ui/timeline'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
   createGutschriftFromRechnung,
+  korrigiereRechnung,
+  nehmeRechnungStornoZurueck,
   sendRechnung,
+  storniereRechnungOhneErsatz,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
@@ -34,6 +35,10 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungDetailsTab } from '@/components/rechnungen/RechnungDetailsTab'
+import {
+  RechnungAuftragdetailsTab,
+  RechnungZahlplanTab,
+} from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -41,16 +46,22 @@ import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateRechnung } from '@/lib/list-actions'
-import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
-import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
+import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
+import { buildLeadVerlaufItems } from '@/lib/crm/verlauf'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
-import { formatDatum, formatTimelineStamp } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
-  rechnungDarfImWizardBearbeitetWerden,
+  type RechnungAuswahlZeile,
   type RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
+import {
+  rechnungDarfHardGeloeschtWerden,
+  rechnungDarfOhneErsatzStorniertWerden,
+  rechnungKorrekturModus,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import {
   mahnstufeListenLabel,
   rechnungHatMahnverlauf,
@@ -79,16 +90,22 @@ import type {
 type RechnungDetailTab =
   | 'stammdaten'
   | 'details'
+  | 'auftragdetails'
+  | 'zahlplan'
   | 'fotos'
   | 'verlauf'
+  | 'historie'
   | 'dokumente'
   | 'notizen'
 
 const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
   'stammdaten',
   'details',
+  'auftragdetails',
+  'zahlplan',
   'fotos',
   'verlauf',
+  'historie',
   'dokumente',
   'notizen',
 ])
@@ -97,6 +114,10 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
   const tab = (raw ?? '').trim().toLowerCase()
   if (!tab) return null
   if (tab === 'uebersicht' || tab === 'stammdaten') return 'stammdaten'
+  if (tab === 'auftrag' || tab === 'auftrag-details' || tab === 'auftragdetails') {
+    return 'auftragdetails'
+  }
+  if (tab === 'zahlplan' || tab === 'zahlung' || tab === 'finanzen') return 'zahlplan'
   if (
     tab === 'positionen' ||
     tab === 'leistung' ||
@@ -104,22 +125,21 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
     tab === 'angebot' ||
-    tab === 'angebot-details' ||
-    tab === 'auftrag' ||
-    tab === 'auftrag-details'
+    tab === 'angebot-details'
   ) {
     return 'details'
   }
   if (tab === 'mahnung' || tab === 'mahnungen' || tab === 'mahnverlauf') return 'verlauf'
   if (tab === 'aktivitaet' || tab === 'verlauf') return 'verlauf'
+  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
   if (tab === 'kommunikation' || tab === 'notizen') return 'notizen'
   if (tab === 'dokumente') return 'dokumente'
   if (tab === 'bilder' || tab === 'photos' || tab === 'fotos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
+  if (cumulative === 'auftrag-details') return 'auftragdetails'
   if (
     cumulative === 'anfrage-details' ||
     cumulative === 'angebot-details' ||
-    cumulative === 'auftrag-details' ||
     cumulative === 'rechnung-details'
   ) {
     return 'details'
@@ -181,6 +201,9 @@ export function RechnungDetailClient({
   lead = null,
   angebotDetail = null,
   auftragDetail = null,
+  auftragRechnungen = [],
+  nachfolgerRechnungId = null,
+  darfStornoZuruecknehmen = false,
   timeline: timelineInitial = [],
 }: {
   detail: Rechnung
@@ -194,6 +217,12 @@ export function RechnungDetailClient({
   lead?: LeadDetail | null
   angebotDetail?: AngebotDetail | null
   auftragDetail?: AuftragDetail | null
+  /** Weitere Rechnungen desselben Auftrags (für Zahlplan-Tab) */
+  auftragRechnungen?: RechnungAuswahlZeile[]
+  /** Nachfolger-RE nach Korrektur (Original ist storniert) */
+  nachfolgerRechnungId?: string | null
+  /** Soft-Storno ohne Gutschrift → zurücknehmbar */
+  darfStornoZuruecknehmen?: boolean
   timeline?: LeadTimelineRow[]
 }) {
   const router = useRouter()
@@ -267,62 +296,31 @@ export function RechnungDetailClient({
   const notizenRows: LeadNotizRow[] = lead?.lead_notizen ?? []
   const dokumenteRows = lead?.lead_dokumente ?? []
 
-  const timelineSorted = useMemo(
-    () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
-    [timelineInitial]
-  )
-
   const timelineItems = useMemo(() => {
-    type Row = {
-      id: string
-      text: string
-      time: string
-      state: 'done' | 'open' | 'active'
-      ts: number
-    }
+    const base = buildLeadVerlaufItems(timelineInitial ?? [], {
+      fallbackCreatedAt: detail.created_at,
+      fallbackCreatedLabel: `Rechnung angelegt${detail.rechnungsnummer?.trim() ? ` — ${detail.rechnungsnummer.trim()}` : ''}`,
+    })
 
-    const fromEvents: Row[] = timelineSorted.map((ev) => ({
-      id: ev.id,
-      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
-      time: formatTimelineStamp(ev.created_at),
-      state: 'done' as const,
-      ts: new Date(ev.created_at).getTime(),
-    }))
-
-    let basis: Row[] = fromEvents
-    if (basis.length === 0 && detail.created_at) {
-      basis = [
-        {
-          id: `rechnung-created-${detail.id}`,
-          text: `Rechnung angelegt${detail.rechnungsnummer?.trim() ? ` — ${detail.rechnungsnummer.trim()}` : ''}`,
-          time: formatTimelineStamp(detail.created_at),
-          state: 'done',
-          ts: new Date(detail.created_at).getTime(),
-        },
-      ]
-    }
-
-    if (!projektKontext) return basis
-
-    const enriched = ergaenzeTimelineMitProjektKontext(
-      basis.map((b) => ({
-        id: b.id,
-        ts: b.ts,
-        text: b.text,
-        time: b.time,
-        state: b.state === 'active' ? 'active' : 'done',
-      })),
-      projektKontext
-    )
-
-    return enriched.map((item) => ({
-      id: item.id,
-      text: item.text,
-      time: item.time,
-      state: item.state,
-      ts: item.ts,
-    }))
-  }, [timelineSorted, detail.created_at, detail.id, detail.rechnungsnummer, projektKontext])
+    return base.map((item) => {
+      if (item.inspect?.kind === 'rechnung' || item.source === 'fallback') {
+        return {
+          ...item,
+          inspect: {
+            kind: 'rechnung' as const,
+            title: item.inspect?.title ?? item.text,
+            description: item.inspect?.description,
+            createdAt: item.inspect?.createdAt ?? detail.created_at,
+            typ: item.inspect?.typ,
+            rechnungId: detail.id,
+            href: `/rechnungen/${detail.id}`,
+            hrefLabel: 'Zur Rechnung',
+          },
+        }
+      }
+      return item
+    })
+  }, [timelineInitial, detail.created_at, detail.rechnungsnummer, detail.id])
 
   async function setStatus(s: RechnungStatus) {
     startTransition(async () => {
@@ -353,6 +351,41 @@ export function RechnungDetailClient({
       }
       toast.success('Gutschrift erstellt')
       router.push(`/rechnungen/${r.id}`)
+      refresh()
+    })
+  }
+
+  function handleKorrigieren() {
+    const modus = rechnungKorrekturModus(detail.status)
+    if (modus === 'gesperrt') {
+      toast.error('Diese Rechnung kann nicht korrigiert werden.')
+      return
+    }
+    if (modus === 'direkt') {
+      openWizard()
+      return
+    }
+    if (
+      !window.confirm(
+        'Diese Rechnung wurde bereits versendet oder bezahlt.\n\n' +
+          'Es wird ein Storno-Beleg (Gutschrift mit Bezug) erstellt und eine neue Rechnung mit neuer Nummer als Entwurf angelegt.\n\n' +
+          'Fortfahren?'
+      )
+    ) {
+      return
+    }
+    startTransition(async () => {
+      const r = await korrigiereRechnung(detail.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      if (r.mode === 'direkt') {
+        openWizard()
+        return
+      }
+      toast.success('Storno angelegt — neue Rechnung als Entwurf')
+      router.push(`/rechnungen/${r.neuId}`)
       refresh()
     })
   }
@@ -393,11 +426,37 @@ export function RechnungDetailClient({
 
   const detailHeadMenuItems = useMemo(() => {
     const extras = []
-    if (belegTyp === 'rechnung' && detail.status !== 'storniert' && detail.status !== 'bezahlt') {
+    if (belegTyp === 'rechnung' && detail.status !== 'storniert') {
       extras.push({
         icon: 'file-off',
-        label: 'Gutschrift erstellen',
+        label: 'Gutschrift (Teil/Kulanz)',
         onClick: handleGutschrift,
+      })
+    }
+    if (rechnungDarfOhneErsatzStorniertWerden(detail.status) && belegTyp === 'rechnung') {
+      extras.push({
+        icon: 'ban',
+        label: 'Ohne Ersatz stornieren',
+        danger: true,
+        onClick: () => {
+          if (
+            !window.confirm(
+              'Rechnung ohne neuen Ersatzbeleg stornieren? Für Korrekturen besser „Rechnung korrigieren“ nutzen.'
+            )
+          ) {
+            return
+          }
+          startTransition(async () => {
+            const r = await storniereRechnungOhneErsatz(detail.id)
+            if (!r.ok) {
+              toast.error(r.message)
+              return
+            }
+            toast.success('Rechnung storniert')
+            setDetail((d) => ({ ...d, status: 'storniert' }))
+            refresh()
+          })
+        },
       })
     }
     if (detail.status === 'gesendet' && belegTyp === 'rechnung') {
@@ -405,6 +464,34 @@ export function RechnungDetailClient({
         icon: 'alert-triangle',
         label: 'Zahlungserinnerung senden',
         onClick: () => setErinnerungModalOpen(true),
+      })
+    }
+    if (detail.status === 'storniert' && nachfolgerRechnungId) {
+      extras.push({
+        icon: 'arrow-right',
+        label: 'Zur Nachfolger-Rechnung',
+        onClick: () => router.push(`/rechnungen/${nachfolgerRechnungId}`),
+      })
+    }
+    if (darfStornoZuruecknehmen && belegTyp === 'rechnung') {
+      extras.push({
+        icon: 'history',
+        label: 'Storno zurücknehmen',
+        onClick: () => {
+          if (!window.confirm('Soft-Storno zurücknehmen und Status wieder auf „Gesendet“ setzen?')) {
+            return
+          }
+          startTransition(async () => {
+            const r = await nehmeRechnungStornoZurueck(detail.id)
+            if (!r.ok) {
+              toast.error(r.message)
+              return
+            }
+            toast.success('Storno zurückgenommen')
+            setDetail((d) => ({ ...d, status: 'gesendet' }))
+            refresh()
+          })
+        },
       })
     }
 
@@ -445,7 +532,8 @@ export function RechnungDetailClient({
             }
             setPortalLinkModalOpen(true)
           },
-          onEdit2: rechnungDarfImWizardBearbeitetWerden(detail.status) ? openWizard : undefined,
+          onEdit2:
+            rechnungKorrekturModus(detail.status) !== 'gesperrt' ? handleKorrigieren : undefined,
           onMarkPaid:
             detail.status === 'gesendet' || ueberfaellig
               ? () => void setStatus('bezahlt')
@@ -460,23 +548,20 @@ export function RechnungDetailClient({
             : undefined,
           mail: kundeEmail || null,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
-          onDelete:
-            detail.status === 'entwurf'
-              ? () => {
-                  startTransition(async () => {
-                    const r = await deleteRechnungEntwurf(detail.id)
-                    if (!r.ok) {
-                      toast.error(r.message)
-                      return
-                    }
-                    toast.success('Entwurf gelöscht')
-                    router.push('/vorgaenge?tab=rechnung')
-                  })
-                }
-              : detail.status !== 'bezahlt'
-                ? () => void setStatus('storniert')
-                : undefined,
-          deleteMenuLabel: detail.status === 'entwurf' ? 'Löschen' : 'Stornieren',
+          onDelete: rechnungDarfHardGeloeschtWerden(detail.status)
+            ? () => {
+                startTransition(async () => {
+                  const r = await deleteRechnungEntwurf(detail.id)
+                  if (!r.ok) {
+                    toast.error(r.message)
+                    return
+                  }
+                  toast.success('Entwurf gelöscht')
+                  router.push('/vorgaenge?tab=rechnung')
+                })
+              }
+            : undefined,
+          deleteMenuLabel: 'Löschen',
           deleteLabel: kundeName,
           extra: extras,
         }
@@ -499,6 +584,8 @@ export function RechnungDetailClient({
     router,
     isCrmAdmin,
     impersonating,
+    nachfolgerRechnungId,
+    darfStornoZuruecknehmen,
   ])
 
   const primaryAction = useMemo((): DetailActionDef | null => {
@@ -555,9 +642,7 @@ export function RechnungDetailClient({
 
   const verlaufInhalt = (
     <>
-      <MockVerlaufCard empty={timelineItems.length === 0}>
-        <Timeline items={timelineItems} />
-      </MockVerlaufCard>
+      <VerlaufPanel items={timelineItems} />
       {belegTyp === 'rechnung' ? (
         <RechnungMahnverlaufCard
           rechnung={detail}
@@ -608,6 +693,26 @@ export function RechnungDetailClient({
       render: () => detailsInhalt,
     },
     {
+      id: 'auftragdetails',
+      label: 'Auftragdetails',
+      icon: 'briefcase',
+      render: () => (
+        <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
+      ),
+    },
+    {
+      id: 'zahlplan',
+      label: 'Zahlplan',
+      icon: 'calculator',
+      render: () => (
+        <RechnungZahlplanTab
+          auftragDetail={auftragDetail}
+          rechnungen={auftragRechnungen}
+          aktuelleRechnungId={detail.id}
+        />
+      ),
+    },
+    {
       id: 'fotos',
       label: ACTIVITY_SECTIONS.fotos,
       icon: 'photo',
@@ -620,6 +725,12 @@ export function RechnungDetailClient({
       icon: 'history',
       count: timelineItems.length || undefined,
       render: () => verlaufInhalt,
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'list-details',
+      render: () => <ProjektHistorieTab kontext={projektKontext} />,
     },
     {
       id: 'dokumente',

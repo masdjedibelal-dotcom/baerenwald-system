@@ -104,7 +104,7 @@ export async function loadProjektKontext(
   if (leadId) {
     const { data: lRow } = await supabase
       .from('leads')
-      .select('id, status, situation, bereiche')
+      .select('id, status, situation, bereiche, created_at')
       .eq('id', leadId)
       .maybeSingle()
     if (lRow) {
@@ -112,6 +112,7 @@ export async function loadProjektKontext(
         id: lRow.id as string,
         label: leadLabel(lRow as { situation?: string | null; bereiche?: string[] | null; id: string }),
         status: String(lRow.status ?? ''),
+        created_at: (lRow.created_at as string | null) ?? null,
       }
     }
   }
@@ -142,7 +143,7 @@ export async function loadProjektKontext(
   if (auftragId) {
     const { data: aRow } = await supabase
       .from('auftraege')
-      .select('id, titel, status')
+      .select('id, titel, status, created_at')
       .eq('id', auftragId)
       .maybeSingle()
     if (aRow) {
@@ -150,12 +151,13 @@ export async function loadProjektKontext(
         id: aRow.id as string,
         titel: (aRow.titel as string | null) ?? null,
         status: String(aRow.status ?? ''),
+        created_at: (aRow.created_at as string | null) ?? null,
       }
     }
   } else if (leadId) {
     const { data: aRow } = await supabase
       .from('auftraege')
-      .select('id, titel, status')
+      .select('id, titel, status, created_at')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -166,12 +168,13 @@ export async function loadProjektKontext(
         id: aRow.id as string,
         titel: (aRow.titel as string | null) ?? null,
         status: String(aRow.status ?? ''),
+        created_at: (aRow.created_at as string | null) ?? null,
       }
     }
   } else if (angebotId) {
     const { data: aRow } = await supabase
       .from('auftraege')
-      .select('id, titel, status')
+      .select('id, titel, status, created_at')
       .eq('angebot_id', angebotId)
       .maybeSingle()
     if (aRow) {
@@ -180,6 +183,7 @@ export async function loadProjektKontext(
         id: aRow.id as string,
         titel: (aRow.titel as string | null) ?? null,
         status: String(aRow.status ?? ''),
+        created_at: (aRow.created_at as string | null) ?? null,
       }
     }
   }
@@ -188,14 +192,14 @@ export async function loadProjektKontext(
   if (auftragId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id')
+      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, created_at')
       .eq('auftrag_id', auftragId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   } else if (angebotId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id')
+      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, created_at')
       .eq('angebot_id', angebotId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]

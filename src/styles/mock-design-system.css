@@ -540,6 +540,13 @@
 }
 .page-inner.wide { max-width: none; }
 
+/* Desktop-FAB (+): zusätzlicher Scrollraum, damit Pagination nicht unter dem Button liegt */
+@media (min-width: 761px) {
+  .page-inner {
+    padding-bottom: 120px;
+  }
+}
+
 /* ============ Components ============ */
 .btn {
   height: 32px;
@@ -879,6 +886,48 @@ div.input input::placeholder {
   border-radius: var(--r);
   overflow: hidden;
   box-shadow: var(--shadow);
+}
+@media (min-width: 761px) {
+  .listcard.listcard--scroll {
+    overflow-x: auto;
+  }
+  .listcard.listcard--scroll .vg-row,
+  .listcard.listcard--scroll .list-row {
+    min-width: max-content;
+  }
+}
+
+/* Spalten per Drag breiter/schmaler */
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.col-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.col-head:hover .col-resize-handle::after,
+.col-resize-handle:hover::after {
+  background: var(--border-strong);
+}
+.col-resize-handle:active::after {
+  background: var(--green);
+}
+@media (max-width: 760px) {
+  .col-resize-handle { display: none; }
 }
 @media (max-width: 760px) {
   .listcard {
@@ -1845,6 +1894,33 @@ div.input input::placeholder {
   position: relative;
   padding: 6px 0;
   font-size: 13px;
+}
+.tl-item.tl-clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  margin-left: -6px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.tl-item.tl-clickable:hover {
+  background: color-mix(in srgb, var(--green-50) 55%, transparent);
+}
+.tl-item.tl-clickable:hover .tl-text {
+  color: var(--text);
+}
+.tl-item.tl-clickable:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.tl-inspect-hint {
+  margin-left: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--green);
+  opacity: 0.85;
+}
+.tl-item.tl-clickable:hover .tl-inspect-hint {
+  text-decoration: underline;
 }
 .tl-item::before {
   content: "";
@@ -4154,13 +4230,76 @@ div.input input::placeholder {
 .pt2-preis { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
 .pt2-meta { display: none; }
 .pt2-act { display: flex; justify-content: flex-end; }
-.pt2-foot { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px; background: var(--bg-soft); }
+.projekt-historie__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.projekt-historie__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 0.5px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: background 120ms ease;
+  border-radius: 8px;
+  margin: 0 -4px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.projekt-historie__row:last-child {
+  border-bottom: none;
+}
+.projekt-historie__row:hover {
+  background: var(--bg-soft);
+}
+.projekt-historie__row--active {
+  background: color-mix(in srgb, var(--green-50) 55%, transparent);
+}
+.projekt-historie__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.projekt-historie__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.projekt-historie__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.projekt-historie__date {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.projekt-historie__now {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--green);
+  flex-shrink: 0;
+}
 .pt2-foot .r { display: flex; justify-content: space-between; font-size: 13px; }
 .pt2-foot .r span { color: var(--text-3); }
 .pt2-foot .r b { font-variant-numeric: tabular-nums; }
 .pt2-foot .r.grand { font-size: 15px; font-weight: 600; padding-top: 7px; margin-top: 2px; border-top: 0.5px solid var(--border); }
 .pt2-foot .r.grand span { color: var(--text); }
 .pt2-foot .r.grand b { color: var(--green); }
+.pt2-foot-hint {
+  margin: -2px 0 0;
+  font-size: 11.5px;
+  color: var(--text-4);
+  text-align: right;
+  line-height: 1.35;
+}
 
 /* Bautagebuch — Leistungen-Tabelle + Accordion */
 .pt2-row.bt-pos-row {
@@ -4629,7 +4768,8 @@ div.input input::placeholder {
 
 .vg-row {
   display: grid;
-  grid-template-columns: 36px minmax(80px,1.4fr) minmax(110px,1.8fr) 168px 96px 84px 92px 96px 32px;
+  /* Fallback; Desktop: --list-cols von useResizableColumns */
+  grid-template-columns: 36px minmax(160px,1.8fr) minmax(140px,1.6fr) 140px 96px 100px 100px 40px;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
@@ -4637,7 +4777,15 @@ div.input input::placeholder {
   cursor: pointer;
   transition: background 120ms ease;
 }
-.vg-selectmode .vg-row { grid-template-columns: 36px minmax(80px,1.4fr) minmax(110px,1.8fr) 168px 96px 84px 92px 96px 32px; }
+.vg-selectmode .vg-row {
+  grid-template-columns: 36px minmax(160px,1.8fr) minmax(140px,1.6fr) 140px 96px 100px 100px 40px;
+}
+@media (min-width: 761px) {
+  .listcard--cols .vg-row,
+  .listcard--cols .list-row {
+    grid-template-columns: var(--list-cols);
+  }
+}
 .vg-check { display: none; align-items: center; justify-content: center; cursor: pointer; }
 .vg-selectmode .vg-check { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .vg-box {
@@ -5095,6 +5243,60 @@ div.input input::placeholder {
  
 }
 .fab-wrap { position: fixed; right: 26px; bottom: 26px; z-index: 80; }
+
+/* Listen-Fuß: Abstand, damit Seite X/Y nicht unter dem FAB (+) liegt */
+.list-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+@media (min-width: 761px) {
+  .list-pagination {
+    margin-bottom: 8px;
+  }
+}
+.list-pagination__meta {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.list-pagination__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.list-pagination__page {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  min-width: 7.5rem;
+  text-align: center;
+}
+.list-pagination__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+.list-pagination__btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  border-color: var(--border-strong);
+}
+.list-pagination__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 /* Neu-erstellen-Popover */
 .neu-pop-overlay { position: fixed; inset: 0; z-index: 300; background: rgba(20,24,31,0.28); animation: fadein 120ms ease; }
 .neu-pop {
@@ -11564,6 +11766,13 @@ textarea.input:focus {
 .zahlplan-row__menu {
   display: flex;
   justify-content: flex-end;
+}
+.zahlplan-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 .zahlplan-empty {
   padding: 26px 16px;

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
@@ -159,6 +159,8 @@ export function MockSortHead({
   onSort,
   right,
   children,
+  resizable,
+  onResizePointerDown,
 }: {
   col: string
   sortCol: string | null
@@ -166,10 +168,14 @@ export function MockSortHead({
   onSort: (col: string) => void
   right?: boolean
   children: ReactNode
+  /** Desktop: Spaltenbreite per Ziehen anpassen */
+  resizable?: boolean
+  onResizePointerDown?: (e: PointerEvent) => void
 }) {
   return (
     <div
       role="columnheader"
+      className="col-head"
       onClick={() => onSort(col)}
       style={{
         cursor: 'pointer',
@@ -178,14 +184,32 @@ export function MockSortHead({
         gap: 4,
         justifyContent: right ? 'flex-end' : 'flex-start',
         userSelect: 'none',
+        position: 'relative',
+        minWidth: 0,
       }}
     >
-      {children}
+      <span className="col-head__label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {children}
+      </span>
       <MockIcon ctx="default"
         n={sortCol === col ? (sortDir === 1 ? 'arrow-up' : 'arrow-down') : 'arrows-exchange'}
         size={12}
-        style={{ opacity: sortCol === col ? 1 : 0.35 }}
+        style={{ opacity: sortCol === col ? 1 : 0.35, flexShrink: 0 }}
       />
+      {resizable ? (
+        <span
+          className="col-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Spaltenbreite anpassen"
+          title="Breite ziehen"
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            onResizePointerDown?.(e)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : null}
     </div>
   )
 }

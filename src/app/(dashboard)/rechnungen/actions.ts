@@ -312,6 +312,179 @@ export async function createGutschriftFromRechnung(
   return { ok: true, id: row.id as string }
 }
 
+/**
+ * Rechnung korrigieren:
+ * - Entwurf → Client öffnet Wizard (mode: direkt)
+ * - Gesendet/Bezahlt → Storno-Gutschrift + neue RE als Entwurf (mode: storno_neu)
+ */
+export async function korrigiereRechnung(rechnungId: string): Promise<
+  | { ok: true; mode: 'direkt' }
+  | { ok: true; mode: 'storno_neu'; stornoId: string; neuId: string }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+
+  const { data: orig, error: loadErr } = await supabase
+    .from('rechnungen')
+    .select('*')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (loadErr || !orig) {
+    if (isRechnungComplianceSchemaError(loadErr?.message)) {
+      return { ok: false, message: rechnungComplianceMigrationHinweis() }
+    }
+    return { ok: false, message: 'Rechnung nicht gefunden.' }
+  }
+
+  const status = String(orig.status ?? 'entwurf')
+  const belegTyp = ('beleg_typ' in orig && orig.beleg_typ) || 'rechnung'
+
+  if (belegTyp === 'gutschrift') {
+    return { ok: false, message: 'Gutschriften werden nicht über „Korrigieren“ geändert.' }
+  }
+  if (status === 'storniert') {
+    return { ok: false, message: 'Stornierte Rechnung — keine Korrektur möglich.' }
+  }
+  if (status === 'entwurf') {
+    return { ok: true, mode: 'direkt' }
+  }
+  if (status !== 'gesendet' && status !== 'bezahlt') {
+    return { ok: false, message: 'Status erlaubt keine Korrektur.' }
+  }
+
+  // 1) Storno-Beleg (Gutschrift, negativ, mit Bezug)
+  const gutschrift = await createGutschriftFromRechnung(rechnungId)
+  if (!gutschrift.ok) return gutschrift
+
+  // 2) Neue Rechnung als Entwurf (gleiche Positionen, neue Nummer)
+  const positionenRaw = (orig.positionen as AngebotPosition[]) ?? []
+  const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(supabase, {
+    positionen: positionenRaw,
+    reverse_charge_13b: Boolean(orig.reverse_charge_13b),
+  })
+
+  const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
+  if (!numRes.ok) return { ok: false, message: numRes.message }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: neu, error: neuErr } = await rechnungInsertMitSchemaFallback(
+    supabase,
+    {
+      angebot_id: orig.angebot_id,
+      auftrag_id: orig.auftrag_id,
+      kunde_id: orig.kunde_id,
+      rechnungsnummer: numRes.nummer,
+      status: 'entwurf' as RechnungStatus,
+      positionen,
+      leistungszeitraum_von: orig.leistungszeitraum_von,
+      leistungszeitraum_bis: orig.leistungszeitraum_bis,
+      faellig_am: null,
+      rechnungsdatum: new Date().toISOString().slice(0, 10),
+      pdf_url: null,
+      erstellt_von: user?.id ?? null,
+      einleitung: orig.einleitung ?? null,
+      hinweise: orig.hinweise ?? null,
+      zahlungsbedingungen: orig.zahlungsbedingungen ?? null,
+      reverse_charge_13b: Boolean(orig.reverse_charge_13b),
+      hinweis_35a: orig.hinweis_35a ?? null,
+      rechnung_art: orig.rechnung_art ?? 'voll',
+      abschlag_index: orig.abschlag_index ?? null,
+      zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
+    },
+    berechnung,
+    {
+      reverse_charge_13b: Boolean(orig.reverse_charge_13b),
+      beleg_typ: 'rechnung',
+      bezug_rechnung_id: null,
+    }
+  )
+
+  if (neuErr || !neu) {
+    return { ok: false, message: neuErr?.message ?? 'Neue Rechnung konnte nicht angelegt werden.' }
+  }
+
+  // Storno-Gutschrift: Bezug bleibt auf Original; optional Hinweis auf Nachfolger in Notizen weglassen
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath(`/rechnungen/${gutschrift.id}`)
+  revalidatePath(`/rechnungen/${neu.id}`)
+  if (orig.auftrag_id) revalidatePath(`/auftraege/${orig.auftrag_id}`)
+
+  return {
+    ok: true,
+    mode: 'storno_neu',
+    stornoId: gutschrift.id,
+    neuId: neu.id as string,
+  }
+}
+
+/**
+ * Soft-Storno ohne Ersatzbeleg — nur bei gesendet (nicht bezahlt).
+ * Für den seltenen Fall „ohne neue Rechnung“.
+ */
+export async function storniereRechnungOhneErsatz(
+  rechnungId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: orig, error } = await supabase
+    .from('rechnungen')
+    .select('status, beleg_typ')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (error || !orig) return { ok: false, message: 'Rechnung nicht gefunden.' }
+  if (String(orig.status) !== 'gesendet') {
+    return {
+      ok: false,
+      message: 'Ohne Ersatz nur bei gesendeten, noch nicht bezahlten Rechnungen.',
+    }
+  }
+  return updateRechnungStatus(rechnungId, 'storniert')
+}
+
+/**
+ * Soft-Storno zurücknehmen (nur wenn keine Storno-Gutschrift mit Bezug existiert).
+ */
+export async function nehmeRechnungStornoZurueck(
+  rechnungId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: orig, error } = await supabase
+    .from('rechnungen')
+    .select('id, status, beleg_typ')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (error || !orig) return { ok: false, message: 'Rechnung nicht gefunden.' }
+  if (String(orig.status) !== 'storniert') {
+    return { ok: false, message: 'Nur stornierte Rechnungen können zurückgenommen werden.' }
+  }
+  if (String(orig.beleg_typ ?? 'rechnung') === 'gutschrift') {
+    return { ok: false, message: 'Gutschriften werden so nicht zurückgenommen.' }
+  }
+
+  const { data: gutschriften } = await supabase
+    .from('rechnungen')
+    .select('id')
+    .eq('bezug_rechnung_id', rechnungId)
+    .eq('beleg_typ', 'gutschrift')
+    .limit(1)
+
+  if ((gutschriften ?? []).length > 0) {
+    return {
+      ok: false,
+      message:
+        'Es existiert bereits eine Storno-Gutschrift. Bitte die Nachfolger-Rechnung nutzen — Soft-Storno ist nicht rückgängig.',
+    }
+  }
+
+  return updateRechnungStatus(rechnungId, 'gesendet')
+}
+
 export type UpdateRechnungStatusResult =
   | { ok: true; zahlungsbestaetigungGesendet?: boolean }
   | { ok: false; message: string }

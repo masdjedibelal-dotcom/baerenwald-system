@@ -246,6 +246,69 @@ export function berechneZahlungsplan(
   return { gesamtNetto, gesamtBrutto, zeilen }
 }
 
+/**
+ * Prüft, ob Abschläge die Auftragssumme (VK netto) überschreiten können.
+ * Typisch: mehrere %- oder Betragszeilen ohne Deckel (z. B. 60 %+60 %+Rest → 120 %).
+ */
+export function validateZahlungsplanGegenGesamt(
+  plan: Zahlungsplan,
+  gesamtNetto: number
+): { ok: true } | { ok: false; message: string } {
+  if (!plan.zeilen.length) {
+    return { ok: false, message: 'Mindestens eine Abschlagszeile erforderlich.' }
+  }
+
+  const restIdx = plan.zeilen.findIndex((z) => z.typ === 'rest')
+  let verteiltNetto = 0
+  let verteiltProzent = 0
+
+  for (let i = 0; i < plan.zeilen.length; i++) {
+    const z = plan.zeilen[i]!
+    const istRestZeile = z.typ === 'rest' || (restIdx === -1 && i === plan.zeilen.length - 1)
+    if (istRestZeile) continue
+
+    if (z.typ === 'prozent') {
+      const p = Math.max(0, Number(z.wert) || 0)
+      verteiltProzent += p
+      verteiltNetto += Math.round(gesamtNetto * (p / 100) * 100) / 100
+    } else {
+      verteiltNetto += Math.max(0, Math.round((Number(z.wert) || 0) * 100) / 100)
+    }
+  }
+
+  if (verteiltProzent > 100.05) {
+    return {
+      ok: false,
+      message: `Die Abschläge addieren sich auf ${round1(verteiltProzent)} % — mehr als 100 % der Auftragssumme (VK).`,
+    }
+  }
+
+  if (gesamtNetto > 0 && verteiltNetto > gesamtNetto + 0.02) {
+    return {
+      ok: false,
+      message: `Die Abschläge (${formatEur(verteiltNetto)} netto) übersteigen die Auftragssumme (${formatEur(gesamtNetto)} netto).`,
+    }
+  }
+
+  // Alle Zeilen als Prozent (Auftrag-Modal): Summe der Anteile muss 100 % sein
+  const alleProzent = plan.zeilen.every((z) => z.typ === 'prozent')
+  if (alleProzent && restIdx === -1) {
+    const sumPct = plan.zeilen.reduce((s, z) => s + Math.max(0, Number(z.wert) || 0), 0)
+    if (Math.abs(sumPct - 100) > 0.05) {
+      return {
+        ok: false,
+        message: `Summe der Anteile ist ${round1(sumPct)} % — muss genau 100 % sein.`,
+      }
+    }
+  }
+
+  return { ok: true }
+}
+
+function round1(n: number): string {
+  return (Math.round(n * 10) / 10).toLocaleString('de-DE')
+}
+
 /** Planzeile → Rechnungspositionen: zugeordnete Leistungen, sonst Pauschale aus Planbetrag. */
 export function positionenFuerAbschlagRechnung(input: {
   zeile: ZahlungsplanZeileBerechnet

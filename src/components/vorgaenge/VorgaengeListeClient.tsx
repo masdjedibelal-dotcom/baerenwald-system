@@ -33,11 +33,23 @@ import { createAnfrageHref } from '@/lib/crm/create-entry'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { cn, formatDatum } from '@/lib/utils'
 
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'bestand', 'rechnung'] as const
+
+const VORGAENGE_COLS: ResizableColDef[] = [
+  { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
+  { id: 'kunde', defaultWidth: 200, minWidth: 140, maxWidth: 420 },
+  { id: 'titel', defaultWidth: 200, minWidth: 120, maxWidth: 480 },
+  { id: 'phase', defaultWidth: 140, minWidth: 100, maxWidth: 220 },
+  { id: 'wert', defaultWidth: 100, minWidth: 72, maxWidth: 160 },
+  { id: 'datum', defaultWidth: 110, minWidth: 88, maxWidth: 160 },
+  { id: 'status', defaultWidth: 110, minWidth: 88, maxWidth: 180 },
+  { id: 'actions', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
+]
 
 const PHASE_META: Record<
   VorgangPhase,
@@ -161,6 +173,10 @@ export function VorgaengeListeClient({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
+  const { gridTemplateColumns, startResize } = useResizableColumns(
+    'crm.cols.vorgaenge.v1',
+    VORGAENGE_COLS
+  )
 
   useEffect(() => {
     setSelected({})
@@ -815,7 +831,10 @@ export function VorgaengeListeClient({
       ) : null}
 
       <PullToRefresh onRefresh={() => router.refresh()}>
-      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
+      <div
+        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        style={{ ['--list-cols' as string]: gridTemplateColumns }}
+      >
         <div className="vg-row head">
           <div
             className="vg-check"
@@ -831,22 +850,65 @@ export function VorgaengeListeClient({
               ) : null}
             </span>
           </div>
-          <MockSortHead col="kunde" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="kunde"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(1, e)}
+          >
             Kunde
           </MockSortHead>
-          <MockSortHead col="titel" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="titel"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(2, e)}
+          >
             Vorgang
           </MockSortHead>
-          <MockSortHead col="phase" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="phase"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(3, e)}
+          >
             Phase
           </MockSortHead>
-          <MockSortHead col="wert" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)} right>
+          <MockSortHead
+            col="wert"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            right
+            resizable
+            onResizePointerDown={(e) => startResize(4, e)}
+          >
             Wert
           </MockSortHead>
-          <MockSortHead col="datum" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="datum"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(5, e)}
+          >
             Datum
           </MockSortHead>
-          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="status"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(6, e)}
+          >
             Status
           </MockSortHead>
           <div />

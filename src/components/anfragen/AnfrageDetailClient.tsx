@@ -15,15 +15,12 @@ import {
   leadKontaktAnzeigeName,
   leadVertragsKundeId,
 } from '@/lib/lead-display-helpers'
-import { Timeline } from '@/components/ui/timeline'
-import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
-import { anfrageStatusDisplay } from '@/lib/status/status-display'
-import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateAnfrage } from '@/lib/list-actions'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { AnfrageDetailsTab } from '@/components/anfragen/AnfrageDetailsTab'
+import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateAnfrage } from '@/lib/list-actions'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -36,6 +33,9 @@ import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCa
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
+import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
+import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
+import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
@@ -53,11 +53,9 @@ const AngebotWizard = dynamic(
 )
 import { toast } from '@/components/ui/app-toast'
 import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
-import { MockVerlaufCard } from '@/components/mock-ui'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
-import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
@@ -69,20 +67,24 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import {
-  STATUS_LABELS,
-  formatDatum,
-  formatTimelineStamp,
-  kanalLabel,
-} from '@/lib/utils'
+import { formatDatum, kanalLabel } from '@/lib/utils'
+import { anfrageStatusDisplay } from '@/lib/status/status-display'
 
-type AnfrageDetailTab = 'stammdaten' | 'details' | 'fotos' | 'verlauf' | 'dokumente' | 'notizen'
+type AnfrageDetailTab =
+  | 'stammdaten'
+  | 'details'
+  | 'fotos'
+  | 'verlauf'
+  | 'historie'
+  | 'dokumente'
+  | 'notizen'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'stammdaten',
   'details',
   'fotos',
   'verlauf',
+  'historie',
   'dokumente',
   'notizen',
 ])
@@ -96,6 +98,7 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
   }
   if (tab === 'projekt' || tab === 'anfrage-details' || tab === 'anfragedetails') return 'details'
   if (tab === 'timeline') return 'verlauf'
+  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
   if (tab === 'bilder' || tab === 'photos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'details'
@@ -205,8 +208,6 @@ export function AnfrageDetailClient({
     setLead(initial)
   }, [initial.id])
 
-  const history = sortTimelineByCreatedAtAsc(lead.leads_status_history ?? [])
-
   const leadStatusData = useMemo(() => {
     const fd = lead.funnel_daten
     const rec = typeof fd === 'object' && fd !== null ? (fd as Record<string, unknown>) : {}
@@ -228,82 +229,16 @@ export function AnfrageDetailClient({
     }
   }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote, angeboteListe, dbAuftragId])
 
-  const timelineSorted = useMemo(
-    () => sortTimelineByCreatedAtAsc(lead.lead_timeline ?? []),
-    [lead.lead_timeline]
-  )
-
-  const notizenRows = useMemo(() => {
-    const raw = lead.lead_notizen
-    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
-    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [lead.lead_notizen])
-
   const timelineItems = useMemo(() => {
-    type Row = {
-      id: string
-      text: string
-      time: string
-      state: 'done' | 'open' | 'active'
-      ts: number
-    }
-
-    const fromEvents: Row[] = timelineSorted.map((ev) => ({
-      id: ev.id,
-      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
-      time: formatTimelineStamp(ev.created_at),
-      state: 'done',
-      ts: new Date(ev.created_at).getTime(),
-    }))
-    const fromHistory: Row[] = history.map((h) => ({
-      id: h.id,
-      text:
-        h.status_alt != null
-          ? `Status: ${STATUS_LABELS[h.status_alt]} → ${STATUS_LABELS[h.status_neu]}`
-          : `Status: ${STATUS_LABELS[h.status_neu]}`,
-      time: formatTimelineStamp(h.created_at),
-      state: 'done',
-      ts: new Date(h.created_at).getTime(),
-    }))
-    let basis: Row[] = [...fromEvents, ...fromHistory].sort((a, b) => a.ts - b.ts)
-
-    if (basis.length === 0 && lead.created_at) {
-      basis = [
-        {
-          id: 'lead-eingang',
-          text: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
-          time: formatTimelineStamp(lead.created_at),
-          state: 'done',
-          ts: new Date(lead.created_at).getTime(),
-        },
-      ]
-    }
-
-    let merged: Row[] = basis
-    if (projektKontext) {
-      const enriched = ergaenzeTimelineMitProjektKontext(
-        basis.map((b) => ({
-          id: b.id,
-          ts: b.ts,
-          text: b.text,
-          time: b.time,
-          state: b.state === 'active' ? 'active' : 'done',
-        })),
-        projektKontext
-      )
-      merged = enriched.map((item) => ({
-        id: item.id,
-        text: item.text,
-        time: item.time,
-        state: item.state,
-        ts: item.ts,
-      }))
-    }
+    const base = buildLeadVerlaufItems(lead.lead_timeline ?? [], {
+      fallbackCreatedAt: lead.created_at,
+      fallbackCreatedLabel: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
+    })
 
     const hasAngebote = angeboteListe.length > 0
     const anKundeGesendet = Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet)
     const hatAuftrag = Boolean(leadStatusData.auftrag_id)
-    const openSteps: Row[] = []
+    const openSteps: VerlaufBuiltItem[] = []
     if (!hatAuftrag) {
       if (!hasAngebote || !anKundeGesendet) {
         openSteps.push({
@@ -311,7 +246,9 @@ export function AnfrageDetailClient({
           text: 'Angebot erstellen',
           time: 'offen',
           state: 'open',
+          inspect: null,
           ts: Number.MAX_SAFE_INTEGER - 1,
+          source: 'open',
         })
       }
       openSteps.push({
@@ -319,21 +256,27 @@ export function AnfrageDetailClient({
         text: 'Auftragsbestätigung',
         time: 'offen',
         state: 'open',
+        inspect: null,
         ts: Number.MAX_SAFE_INTEGER,
+        source: 'open',
       })
     }
 
-    return [...merged, ...openSteps].map(({ ts: _ts, ...rest }) => rest)
+    return [...base, ...openSteps]
   }, [
-    timelineSorted,
-    history,
-    projektKontext,
+    lead.lead_timeline,
     lead.created_at,
     lead.kanal,
     angeboteListe.length,
     angebotFlowSnapshot?.angebotAnKundeGesendet,
     leadStatusData.auftrag_id,
   ])
+
+  const notizenRows = useMemo(() => {
+    const raw = lead.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_notizen])
 
   const dokumenteRows = useMemo(() => {
     const raw = lead.lead_dokumente
@@ -519,11 +462,7 @@ export function AnfrageDetailClient({
 
   const headMeta = kundenName(lead)
 
-  const timelineTab = (
-    <MockVerlaufCard empty={timelineItems.length === 0}>
-      <Timeline items={timelineItems} />
-    </MockVerlaufCard>
-  )
+  const timelineTab = <VerlaufPanel items={timelineItems} />
 
   const stammdatenInhalt = (
     <>
@@ -566,6 +505,12 @@ export function AnfrageDetailClient({
       icon: 'history',
       count: timelineItems.length || undefined,
       render: () => timelineTab,
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'list-details',
+      render: () => <ProjektHistorieTab kontext={projektKontext} />,
     },
     {
       id: 'dokumente',

@@ -205,7 +205,7 @@ export function buildEntityMenu(
     const erledigt = st === 'bezahlt' || st === 'storniert'
     const before = A.length
     A.push('sep')
-    if (h.onEdit2 && !erledigt) A.push({ icon: 'file-pencil', label: 'Rechnung korrigieren', onClick: h.onEdit2 })
+    if (h.onEdit2) A.push({ icon: 'file-pencil', label: 'Rechnung korrigieren', onClick: h.onEdit2 })
     if (h.onMarkPaid && offen) A.push({ icon: 'check', label: 'Als bezahlt markieren', onClick: h.onMarkPaid })
     if (h.onPdf) A.push({ icon: 'download', label: 'Rechnung herunterladen', onClick: h.onPdf })
     if (h.onSend && !erledigt) {

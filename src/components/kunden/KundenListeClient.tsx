@@ -23,6 +23,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -34,7 +35,18 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'ort', label: 'Ort' },
 ]
 
-const COLS = '1.4fr 1fr 1.2fr 1.6fr 60px'
+const KUNDEN_COLS: ResizableColDef[] = [
+  { id: 'name', defaultWidth: 220, minWidth: 140, maxWidth: 420 },
+  { id: 'typ', defaultWidth: 130, minWidth: 90, maxWidth: 200 },
+  { id: 'telefon', defaultWidth: 150, minWidth: 110, maxWidth: 220 },
+  { id: 'email', defaultWidth: 220, minWidth: 140, maxWidth: 360 },
+  { id: 'actions', defaultWidth: 48, minWidth: 48, maxWidth: 48, fixed: true },
+]
+
+const KUNDEN_COLS_SELECT: ResizableColDef[] = [
+  { id: 'check', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
+  ...KUNDEN_COLS,
+]
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
 type SortCol = 'name' | 'typ' | 'telefon' | 'email'
@@ -152,7 +164,12 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
   const allSelected = filtered.length > 0 && filtered.every((k) => selected[k.id])
 
-  const gridCols = (selectMode ? '40px ' : '') + COLS
+  const colDefs = selectMode ? KUNDEN_COLS_SELECT : KUNDEN_COLS
+  const { gridTemplateColumns, startResize } = useResizableColumns(
+    selectMode ? 'crm.cols.kunden.select.v1' : 'crm.cols.kunden.v1',
+    colDefs
+  )
+  const resizeOffset = selectMode ? 1 : 0
 
   const paginationResetKey = `${typFilter}|${query}|${fName}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
@@ -337,8 +354,11 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
       </MockModal>
 
       <PullToRefresh onRefresh={() => router.refresh()}>
-      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
-        <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
+      <div
+        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        style={{ ['--list-cols' as string]: gridTemplateColumns }}
+      >
+        <div className="list-row head">
           {selectMode ? (
             <div
               className="vg-check"
@@ -359,16 +379,44 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
               </span>
             </div>
           ) : null}
-          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="name"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 0, e)}
+          >
             Kunde
           </MockSortHead>
-          <MockSortHead col="typ" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="typ"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 1, e)}
+          >
             Typ
           </MockSortHead>
-          <MockSortHead col="telefon" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="telefon"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 2, e)}
+          >
             Telefon
           </MockSortHead>
-          <MockSortHead col="email" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="email"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 3, e)}
+          >
             Email
           </MockSortHead>
           <div aria-hidden />
@@ -391,7 +439,6 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
               role="button"
               tabIndex={0}
               className={cn('list-row', selected[k.id] && 'sel')}
-              style={{ gridTemplateColumns: gridCols }}
               onClick={() => (selectMode ? toggleSel(k.id) : openDetail(k.id))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {

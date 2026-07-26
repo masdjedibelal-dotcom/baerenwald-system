@@ -24,6 +24,7 @@ export function AuftragPositionenSteuerungTab({
   handwerkerRows = [],
   handwerkerKontext,
   auftragAbgeschlossen = false,
+  mwstSatz,
   onChanged,
 }: {
   auftragId: string
@@ -45,6 +46,7 @@ export function AuftragPositionenSteuerungTab({
   eigenregie?: boolean
   /** @deprecated */
   onBewerteHandwerker?: (ziel: HandwerkerBewertungZiel) => void
+  mwstSatz?: number
   onChanged: () => void
 }) {
   return (
@@ -58,6 +60,7 @@ export function AuftragPositionenSteuerungTab({
       handwerkerRows={handwerkerRows}
       handwerkerKontext={handwerkerKontext}
       auftragAbgeschlossen={auftragAbgeschlossen}
+      mwstSatz={mwstSatz}
       onChanged={onChanged}
     />
   )

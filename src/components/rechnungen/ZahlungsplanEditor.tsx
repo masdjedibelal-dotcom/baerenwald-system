@@ -13,6 +13,7 @@ import {
   positionAnzeigeLabel,
   positionIdsBelegt,
   positionenFuerZahlungsplanZeile,
+  validateZahlungsplanGegenGesamt,
   zahlungsplanVorlage30_70,
   zahlungsplanVorlage3x,
   zahlungsplanVorlage50_50,
@@ -127,6 +128,7 @@ export function ZahlungsplanEditor({
   positionen?: AngebotPosition[]
 }) {
   const kontext = berechneZahlungsplan(plan, gesamtNetto, mwstSatz)
+  const sumGate = validateZahlungsplanGegenGesamt(plan, gesamtNetto)
 
   function patchZeile(id: string, patch: Partial<ZahlungsplanZeile>) {
     onChange({
@@ -287,6 +289,11 @@ export function ZahlungsplanEditor({
           Auftragssumme netto {formatEurBetrag(gesamtNetto)} · brutto {formatEurBetrag(kontext.gesamtBrutto)}
         </p>
       </div>
+      {!sumGate.ok ? (
+        <p className="m-0 text-xs font-medium text-bw-danger" role="alert">
+          {sumGate.message}
+        </p>
+      ) : null}
     </div>
   )
 }

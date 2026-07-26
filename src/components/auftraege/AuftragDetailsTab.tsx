@@ -129,6 +129,7 @@ export function AuftragLeistungenTab({
   gewerke = [],
   angebotDetail = null,
   editable = true,
+  mwstSatz,
   onSaved,
 }: {
   detail: AuftragDetail
@@ -137,6 +138,7 @@ export function AuftragLeistungenTab({
   gewerke?: { id: string; name: string; slug: string }[]
   angebotDetail?: AngebotDetail | null
   editable?: boolean
+  mwstSatz?: number
   onSaved?: () => void
 }) {
   const angebotTitel = projektTitel(detail, lead)
@@ -171,6 +173,7 @@ export function AuftragLeistungenTab({
       handwerkerRows={detail.auftrag_handwerker ?? []}
       handwerkerKontext={handwerkerKontext}
       auftragAbgeschlossen={istAbgeschlossen || !editable}
+      mwstSatz={mwstSatz}
       onChanged={() => onSaved?.()}
     />
   )

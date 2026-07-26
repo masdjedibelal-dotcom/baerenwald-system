@@ -36,8 +36,9 @@ export type VorgangRechnungInput = {
   created_at: string
   updated_at?: string | null
   /**
-   * `abschlag` / `schluss` = Satelliten-Rechnungsvorgang (Auftrag-Vorgang bleibt).
-   * `voll` / fehlend = Phase-Gewinn für denselben Vorgang.
+   * `abschlag` / `schluss` = eigene Listen-Zeile (Titel), Phase gewinnt trotzdem
+   * sobald Status ≠ Entwurf/Storno — Stamm wandert in Rechnungsphase.
+   * `voll` / fehlend = gleiche Phasen-Regel.
    */
   rechnung_art?: string | null
   abschlag_index?: number | null

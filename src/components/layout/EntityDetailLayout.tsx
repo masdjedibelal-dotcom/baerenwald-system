@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
-import { VorgangPhasenDiagramm } from '@/components/crm/VorgangPhasenDiagramm'
 import { NaechsterSchrittBanner } from '@/components/crm/NaechsterSchrittBanner'
 import { VorgangResolverBanner } from '@/components/vorgang/VorgangResolverBanner'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
@@ -16,7 +15,9 @@ import { cn } from '@/lib/utils'
 
 export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
+  /** @deprecated Phasen-Breadcrumb entfernt — Prop bleibt für Aufrufer */
   phase?: VorgangPhase | null
+  /** @deprecated Phasen-Breadcrumb entfernt — Prop bleibt für Aufrufer */
   projektKontext?: ProjektKontext | null
   head: DetailHeadProps
   /** Status→Aktion-Hinweis unter dem Kopf */
@@ -31,11 +32,9 @@ export type EntityDetailLayoutProps = {
   className?: string
 }
 
-/** Vorgangs-Detail: Zurück-Link · Kopf (Titel/Status/Kunde) · Phasen-Diagramm · Inhalt. */
+/** Vorgangs-Detail: Zurück-Link · Kopf (Titel/Status/Kunde) · Inhalt. */
 export function EntityDetailLayout({
   resolvedVorgang,
-  phase,
-  projektKontext,
   head,
   nextStep,
   crumbBackHref,
@@ -55,13 +54,6 @@ export function EntityDetailLayout({
       {resolvedVorgang ? <VorgangResolverBanner resolved={resolvedVorgang} /> : null}
       <DetailHead {...head} />
       <NaechsterSchrittBanner step={nextStep ?? null} />
-      {phase ? (
-        <VorgangPhasenDiagramm
-          className="hidden md:block"
-          activePhase={phase}
-          projektKontext={projektKontext}
-        />
-      ) : null}
       {children}
     </div>
   )

@@ -11,7 +11,7 @@ import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
-import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
+import { saveAuftragZahlungsplan, clearAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -24,6 +24,10 @@ import {
   type ZahlplanRateStatus,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
+import {
+  zahlplanDarfGeloeschtWerden,
+  zahlplanZeileIstEingefroren,
+} from '@/lib/rechnungen/zahlplan-gates'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatDatum } from '@/lib/utils'
@@ -135,6 +139,11 @@ export function AuftragZahlungsplanSection({
       kontext.zeilen.find((z) => zahlplanRateStatus(z.id, abschlagLinks) === 'geplant') ?? null,
     [kontext.zeilen, abschlagLinks]
   )
+  const frozenIds = useMemo(
+    () => plan.zeilen.filter((z) => zahlplanZeileIstEingefroren(z.id, abschlagLinks)).map((z) => z.id),
+    [plan.zeilen, abschlagLinks]
+  )
+  const planLoeschGate = zahlplanDarfGeloeschtWerden(plan, abschlagLinks)
 
   function speichern(next: Zahlungsplan) {
     if (!next.zeilen.length) {
@@ -149,7 +158,26 @@ export function AuftragZahlungsplanSection({
       }
       setPlan(next)
       setEditorOpen(false)
-      toast.success('Zahlungsplan gespeichert')
+      toast.success('Abschlagsplan gespeichert')
+      onRefresh?.()
+      router.refresh()
+    })
+  }
+
+  function loeschenPlan() {
+    if (!planLoeschGate.ok) {
+      toast.error(planLoeschGate.message)
+      return
+    }
+    if (!window.confirm('Abschlagsplan wirklich löschen? Offene Raten entfallen.')) return
+    startTransition(async () => {
+      const res = await clearAuftragZahlungsplan(auftragId)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      setPlan(emptyZahlungsplan())
+      toast.success('Abschlagsplan gelöscht')
       onRefresh?.()
       router.refresh()
     })
@@ -327,20 +355,19 @@ export function AuftragZahlungsplanSection({
           icon="calculator"
           purpose={`Eine Vollrechnung über ${formatEurBetrag(gesamtNetto)} netto — oder die Summe in Abschläge aufteilen.`}
           actions={
-            <MockBtn kind="primary" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
-              Rechnung erstellen
-            </MockBtn>
+            <div className="zahlplan-head-actions">
+              <MockBtn kind="primary" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
+                Rechnung erstellen
+              </MockBtn>
+              <MockBtn kind="ghost" icon="plus" onClick={() => setEditorOpen(true)}>
+                Abschlagsplan
+              </MockBtn>
+            </div>
           }
-          advanced={
-            <MockBtn kind="ghost" icon="plus" onClick={() => setEditorOpen(true)}>
-              Abschlagsplan anlegen
-            </MockBtn>
-          }
-          advancedTitle="Abschläge statt Vollrechnung"
         >
           <div className="zahlplan-empty" style={{ paddingTop: 4 }}>
             <div className="zahlplan-empty__text" style={{ margin: 0 }}>
-              Primäraktion: eine Rechnung stellen. Abschlagsplan nur wenn du in Raten abrechnest.
+              Primäraktion: eine Rechnung stellen. Abschlagsplan, wenn du in Raten abrechnest.
             </div>
           </div>
         </WerkzeugPanel>
@@ -363,31 +390,51 @@ export function AuftragZahlungsplanSection({
       <WerkzeugPanel
         title="Abschlagsplan"
         icon="calculator"
-        purpose="Ratenliste — eine Primäraktion für die nächste offene Rate."
+        purpose="Ratenliste — nächste offene Rate stellen oder den Plan anpassen."
         framed
         actions={
-          naechsteOffeneZeile ? (
-            <MockBtn
-              sm
-              kind="primary"
-              icon="file-invoice"
-              onClick={() => onCreateInvoice({ zeileId: naechsteOffeneZeile.id })}
-            >
-              Nächste Rechnung
-            </MockBtn>
-          ) : null
-        }
-        advanced={
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditorOpen(true)}>
-              Plan bearbeiten
-            </MockBtn>
+          <div className="zahlplan-head-actions">
+            {naechsteOffeneZeile ? (
+              <MockBtn
+                sm
+                kind="primary"
+                icon="file-invoice"
+                onClick={() => onCreateInvoice({ zeileId: naechsteOffeneZeile.id })}
+              >
+                Nächste Rechnung
+              </MockBtn>
+            ) : null}
             <MockBtn sm kind="ghost" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
               Vollrechnung
             </MockBtn>
+            <MockEntityRowMenu
+              title="Plan-Aktionen"
+              items={[
+                {
+                  label: 'Plan korrigieren',
+                  icon: 'pencil',
+                  onClick: () => setEditorOpen(true),
+                },
+                ...(planLoeschGate.ok
+                  ? [
+                      {
+                        label: 'Plan löschen',
+                        icon: 'trash',
+                        danger: true as const,
+                        onClick: () => loeschenPlan(),
+                      },
+                    ]
+                  : [
+                      {
+                        label: 'Löschen gesperrt',
+                        icon: 'lock',
+                        onClick: () => toast.error(planLoeschGate.message),
+                      },
+                    ]),
+              ]}
+            />
           </div>
         }
-        advancedTitle="Plan & Vollrechnung"
       >
         <div className="zahlplan-summary">
           <span className="zahlplan-summary__left">
@@ -473,6 +520,7 @@ export function AuftragZahlungsplanSection({
         initial={plan}
         onSave={speichern}
         saving={pending}
+        frozenIds={frozenIds}
       />
       {vorschauModal}
     </>

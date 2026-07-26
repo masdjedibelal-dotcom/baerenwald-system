@@ -67,6 +67,7 @@ export function AbschlagsplanEditorModal({
   initial,
   onSave,
   saving,
+  frozenIds = [],
 }: {
   open: boolean
   onClose: () => void
@@ -74,7 +75,10 @@ export function AbschlagsplanEditorModal({
   initial: Zahlungsplan | null
   onSave: (plan: Zahlungsplan) => void
   saving?: boolean
+  /** Rate-IDs die gestellt/bezahlt sind — nicht änderbar/löschbar */
+  frozenIds?: string[]
 }) {
+  const frozen = new Set(frozenIds)
   const [rates, setRates] = useState<EditorRate[]>(() =>
     initial?.zeilen?.length
       ? planToRates(initial, gesamtNetto)
@@ -94,10 +98,12 @@ export function AbschlagsplanEditorModal({
   const ok = summe === 100 && rates.length > 0
 
   function upd(id: string, patch: Partial<EditorRate>) {
+    if (frozen.has(id)) return
     setRates((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   }
 
   function applyPreset(build: () => Zahlungsplan) {
+    if (frozen.size > 0) return
     setRates(planToRates(build(), gesamtNetto))
   }
 
@@ -114,6 +120,7 @@ export function AbschlagsplanEditorModal({
   }
 
   function remove(id: string) {
+    if (frozen.has(id)) return
     setRates((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== id)))
   }
 
@@ -142,7 +149,14 @@ export function AbschlagsplanEditorModal({
       <div className="zahlplan-editor-presets">
         <span className="zahlplan-editor-presets__label">Vorlage:</span>
         {PRESETS.map((p) => (
-          <button key={p.name} type="button" className="zahlplan-preset-chip" onClick={() => applyPreset(p.build)}>
+          <button
+            key={p.name}
+            type="button"
+            className="zahlplan-preset-chip"
+            disabled={frozen.size > 0}
+            title={frozen.size > 0 ? 'Vorlagen gesperrt — es gibt gestellte/bezahlte Raten' : undefined}
+            onClick={() => applyPreset(p.build)}
+          >
             {p.name}
           </button>
         ))}
@@ -152,6 +166,13 @@ export function AbschlagsplanEditorModal({
           <span className="text-bw-text-muted"> netto</span>
         </span>
       </div>
+
+      {frozen.size > 0 ? (
+        <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.45 }}>
+          Eingefrorene Raten (gestellt/bezahlt) bleiben unverändert. Du kannst nur offene Raten anpassen
+          oder ergänzen.
+        </p>
+      ) : null}
 
       <div className="zahlplan-editor-table">
         <div className="zahlplan-editor-head">
@@ -163,11 +184,13 @@ export function AbschlagsplanEditorModal({
         </div>
         {rates.map((r) => {
           const betrag = Math.round(((gesamtNetto || 0) * (Number(r.prozent) || 0)) / 100)
+          const isFrozen = frozen.has(r.id)
           return (
-            <div key={r.id} className="zahlplan-editor-row">
+            <div key={r.id} className={cn('zahlplan-editor-row', isFrozen && 'is-frozen')}>
               <input
                 className="txt"
                 value={r.label}
+                disabled={isFrozen}
                 onChange={(e) => upd(r.id, { label: e.target.value })}
                 style={{ height: 32 }}
               />
@@ -178,6 +201,7 @@ export function AbschlagsplanEditorModal({
                   min={0}
                   max={100}
                   value={r.prozent}
+                  disabled={isFrozen}
                   onChange={(e) => upd(r.id, { prozent: Number(e.target.value) || 0 })}
                   style={{ textAlign: 'right' }}
                 />
@@ -190,10 +214,17 @@ export function AbschlagsplanEditorModal({
                 className="txt"
                 type="date"
                 value={r.faellig_am}
+                disabled={isFrozen}
                 onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
                 style={{ height: 32, fontSize: 12 }}
               />
-              <MockBtn sm kind="ghost" icon="trash" onClick={() => remove(r.id)} title="Entfernen" />
+              {isFrozen ? (
+                <span title="Eingefroren" style={{ fontSize: 11, color: 'var(--text-3)', padding: '0 4px' }}>
+                  fest
+                </span>
+              ) : (
+                <MockBtn sm kind="ghost" icon="trash" onClick={() => remove(r.id)} title="Entfernen" />
+              )}
             </div>
           )
         })}

@@ -76,9 +76,12 @@ import {
   type RechnungAuswahlZeile,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
+import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
@@ -192,6 +195,7 @@ type AuftragDetailTab =
   | 'fotos'
   | 'ausfuehrung'
   | 'aktivitaet'
+  | 'historie'
   | 'dokumente'
   | 'finanzen'
   | 'notizen'
@@ -203,6 +207,7 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'fotos',
   'ausfuehrung',
   'aktivitaet',
+  'historie',
   'dokumente',
   'finanzen',
   'notizen',
@@ -267,6 +272,7 @@ function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab 
     return 'ausfuehrung'
   }
   if (tab === 'verlauf') return 'aktivitaet'
+  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
   if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
   if (tab === 'kommunikation') return 'notizen'
   if (tab === 'bilder' || tab === 'photos') return 'fotos'
@@ -385,6 +391,11 @@ export function AuftragDetailClient({
       ),
     [firm?.zahlungsziel_tage, initial.kunden?.typ]
   )
+
+  const leistungenMwstSatz = useMemo(() => {
+    if (parseKleinunternehmerSetting(firm?.kleinunternehmer)) return 0
+    return Math.max(0, parseInt(firm?.mwst_satz ?? '', 10) || DEFAULT_MWST_SATZ)
+  }, [firm?.kleinunternehmer, firm?.mwst_satz])
 
   const openRechnungWizard = useCallback((bootstrap: RechnungWizardBootstrap) => {
     setRechnungWizardBootstrap(bootstrap)
@@ -737,6 +748,7 @@ export function AuftragDetailClient({
       gewerke={gewerke}
       angebotDetail={angebotDetail}
       editable={detail.status !== 'storniert'}
+      mwstSatz={leistungenMwstSatz}
       onSaved={() => refresh()}
     />
   )
@@ -863,6 +875,12 @@ export function AuftragDetailClient({
       icon: 'history',
       count: timelineCount || undefined,
       render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'list-details',
+      render: () => <ProjektHistorieTab kontext={projektKontext} />,
     },
     {
       id: 'dokumente',

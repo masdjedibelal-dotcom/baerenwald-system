@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
@@ -17,9 +16,9 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
-import { Timeline } from '@/components/ui/timeline'
-import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
-import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
+import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
+import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateAngebot } from '@/lib/list-actions'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
@@ -62,7 +61,7 @@ import type {
   LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum, formatTimelineStamp } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import {
   darfAngebotAnKundeSenden,
   hatAngebotHandwerker,
@@ -80,6 +79,7 @@ type AngebotDetailTab =
   | 'stammdaten'
   | 'fotos'
   | 'verlauf'
+  | 'historie'
   | 'dokumente'
   | 'notizen'
 
@@ -89,6 +89,7 @@ const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'stammdaten',
   'fotos',
   'verlauf',
+  'historie',
   'dokumente',
   'notizen',
 ])
@@ -114,6 +115,7 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
     return 'details'
   }
   if (tab === 'aktivitaet') return 'verlauf'
+  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
   if (tab === 'kommunikation') return 'notizen'
   if (tab === 'bilder' || tab === 'photos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
@@ -278,11 +280,6 @@ export function AngebotDetailPageClient({
   )
   const gueltigBisYmd = detail.gueltig_bis?.slice(0, 10) ?? addDaysYmd(heuteYmd(), 30)
 
-  const timelineSorted = useMemo(
-    () => sortTimelineByCreatedAtAsc(timelineInitial ?? []),
-    [timelineInitial]
-  )
-
   const notizenRows = useMemo(() => {
     const raw = lead?.lead_notizen
     if (!Array.isArray(raw)) return [] as LeadNotizRow[]
@@ -300,57 +297,28 @@ export function AngebotDetailPageClient({
   }, [lead?.lead_dokumente])
 
   const timelineItems = useMemo(() => {
-    type Row = {
-      id: string
-      text: string
-      time: string
-      state: 'done' | 'open' | 'active'
-      ts: number
-    }
+    const base = buildLeadVerlaufItems(timelineInitial ?? [], {
+      fallbackCreatedAt: detail.created_at,
+      fallbackCreatedLabel: `Angebot erstellt${detail.angebotsnr?.trim() ? ` — ${detail.angebotsnr.trim()}` : ''}`,
+    })
 
-    const fromEvents: Row[] = timelineSorted.map((ev) => ({
-      id: ev.id,
-      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
-      time: formatTimelineStamp(ev.created_at),
-      state: 'done' as const,
-      ts: new Date(ev.created_at).getTime(),
-    }))
+    const withAngebotLink: VerlaufBuiltItem[] = base.map((item) => {
+      if (item.inspect && !item.inspect.angebotId && !item.inspect.href) {
+        return {
+          ...item,
+          inspect: {
+            ...item.inspect,
+            kind: item.inspect.kind === 'email' ? ('email' as const) : ('angebot' as const),
+            angebotId: detail.id,
+            href: `/angebote/${detail.id}`,
+            hrefLabel: 'Zum Angebot',
+          },
+        }
+      }
+      return item
+    })
 
-    let basis: Row[] = fromEvents
-    if (basis.length === 0 && detail.created_at) {
-      basis = [
-        {
-          id: 'angebot-erstellt',
-          text: `Angebot erstellt${detail.angebotsnr?.trim() ? ` — ${detail.angebotsnr.trim()}` : ''}`,
-          time: formatTimelineStamp(detail.created_at),
-          state: 'done',
-          ts: new Date(detail.created_at).getTime(),
-        },
-      ]
-    }
-
-    let merged: Row[] = basis
-    if (projektKontext) {
-      const enriched = ergaenzeTimelineMitProjektKontext(
-        basis.map((b) => ({
-          id: b.id,
-          ts: b.ts,
-          text: b.text,
-          time: b.time,
-          state: b.state === 'active' ? 'active' : 'done',
-        })),
-        projektKontext
-      )
-      merged = enriched.map((item) => ({
-        id: item.id,
-        text: item.text,
-        time: item.time,
-        state: item.state,
-        ts: item.ts,
-      }))
-    }
-
-    const openSteps: Row[] = []
+    const openSteps: VerlaufBuiltItem[] = []
     if (!auftragId && statusEinfach !== 'angenommen') {
       if (statusEinfach === 'entwurf') {
         openSteps.push({
@@ -358,7 +326,9 @@ export function AngebotDetailPageClient({
           text: 'Angebot an Kunden senden',
           time: 'offen',
           state: 'open',
+          inspect: null,
           ts: Number.MAX_SAFE_INTEGER - 1,
+          source: 'open',
         })
       }
       openSteps.push({
@@ -366,16 +336,18 @@ export function AngebotDetailPageClient({
         text: 'Auftragsbestätigung',
         time: 'offen',
         state: 'open',
+        inspect: null,
         ts: Number.MAX_SAFE_INTEGER,
+        source: 'open',
       })
     }
 
-    return [...merged, ...openSteps].map(({ ts: _ts, ...rest }) => rest)
+    return [...withAngebotLink, ...openSteps]
   }, [
-    timelineSorted,
-    projektKontext,
+    timelineInitial,
     detail.created_at,
     detail.angebotsnr,
+    detail.id,
     auftragId,
     statusEinfach,
   ])
@@ -589,9 +561,7 @@ export function AngebotDetailPageClient({
 
   const verlaufInhalt = (
     <>
-      <MockVerlaufCard empty={timelineItems.length === 0}>
-        <Timeline items={timelineItems} />
-      </MockVerlaufCard>
+      <VerlaufPanel items={timelineItems} />
       <KundenportalLinkVersendenModal
         open={portalLinkModalOpen}
         onClose={() => setPortalLinkModalOpen(false)}
@@ -658,6 +628,12 @@ export function AngebotDetailPageClient({
       icon: 'history',
       count: timelineItems.length || undefined,
       render: () => verlaufInhalt,
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'list-details',
+      render: () => <ProjektHistorieTab kontext={projektKontext} />,
     },
     {
       id: 'dokumente',

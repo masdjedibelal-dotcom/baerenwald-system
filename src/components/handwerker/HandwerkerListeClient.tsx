@@ -25,6 +25,7 @@ import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 
 export type HandwerkerZeile = {
   id: string
@@ -54,7 +55,21 @@ const EXPORT_FIELDS: ExportField[] = [
 ]
 
 const MOCK_GEWERK_NAMES = ['Sanitär', 'Elektrik', 'Fliesen', 'Maler', 'Boden'] as const
-const COLS = 'minmax(120px,1.6fr) minmax(90px,1fr) 118px minmax(120px,1.6fr) 72px 96px 40px'
+
+const HW_COLS: ResizableColDef[] = [
+  { id: 'name', defaultWidth: 200, minWidth: 130, maxWidth: 400 },
+  { id: 'gewerk', defaultWidth: 140, minWidth: 100, maxWidth: 260 },
+  { id: 'telefon', defaultWidth: 130, minWidth: 100, maxWidth: 200 },
+  { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
+  { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
+  { id: 'status', defaultWidth: 110, minWidth: 88, maxWidth: 160 },
+  { id: 'actions', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
+]
+
+const HW_COLS_SELECT: ResizableColDef[] = [
+  { id: 'check', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
+  ...HW_COLS,
+]
 
 type SortCol = 'name' | 'gewerk' | 'telefon' | 'email' | 'bewertung' | 'status'
 
@@ -226,7 +241,12 @@ export function HandwerkerListeClient({
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
   const allSelected = filtered.length > 0 && filtered.every((h) => selected[h.id])
-  const gridCols = (selectMode ? '40px ' : '') + COLS
+  const colDefs = selectMode ? HW_COLS_SELECT : HW_COLS
+  const { gridTemplateColumns, startResize } = useResizableColumns(
+    selectMode ? 'crm.cols.handwerker.select.v1' : 'crm.cols.handwerker.v1',
+    colDefs
+  )
+  const resizeOffset = selectMode ? 1 : 0
 
   const paginationResetKey = `${gewerkChip}|${query}|${fName}|${nurZuPruefen}|${sortCol}|${sortDir}`
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
@@ -405,8 +425,11 @@ export function HandwerkerListeClient({
         </div>
       </MockModal>
 
-      <div className={cn('listcard', selectMode && 'vg-selectmode')}>
-        <div className="list-row head" style={{ gridTemplateColumns: gridCols }}>
+      <div
+        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        style={{ ['--list-cols' as string]: gridTemplateColumns }}
+      >
+        <div className="list-row head">
           {selectMode ? (
             <div
               className="vg-check"
@@ -427,16 +450,44 @@ export function HandwerkerListeClient({
               </span>
             </div>
           ) : null}
-          <MockSortHead col="name" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="name"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 0, e)}
+          >
             Name
           </MockSortHead>
-          <MockSortHead col="gewerk" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="gewerk"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 1, e)}
+          >
             Gewerk
           </MockSortHead>
-          <MockSortHead col="telefon" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="telefon"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 2, e)}
+          >
             Telefon
           </MockSortHead>
-          <MockSortHead col="email" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="email"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 3, e)}
+          >
             Email
           </MockSortHead>
           <MockSortHead
@@ -445,10 +496,19 @@ export function HandwerkerListeClient({
             sortDir={sortDirNum}
             onSort={(c) => toggleSort(c as SortCol)}
             right
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 4, e)}
           >
             Bewertung
           </MockSortHead>
-          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDirNum} onSort={(c) => toggleSort(c as SortCol)}>
+          <MockSortHead
+            col="status"
+            sortCol={sortCol}
+            sortDir={sortDirNum}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startResize(resizeOffset + 5, e)}
+          >
             Status
           </MockSortHead>
           <div aria-hidden />
@@ -475,7 +535,6 @@ export function HandwerkerListeClient({
                 key={h.id}
                 href={`/handwerker/${h.id}`}
                 className={cn('list-row', selected[h.id] && 'sel')}
-                style={{ gridTemplateColumns: gridCols }}
                 onClick={(e) => {
                   if (selectMode) {
                     e.preventDefault()

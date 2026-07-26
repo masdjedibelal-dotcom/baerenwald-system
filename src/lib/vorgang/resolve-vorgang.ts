@@ -78,17 +78,23 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
 }
 
 /**
- * Abschlag/Schluss: eigener Rechnungs-Vorgang in der Liste.
- * Der Auftrags-Vorgang bleibt in Phase `auftrag` (einziger Fall ohne Phasenwechsel).
+ * Weitere Rechnungszeilen in der Liste (nicht der Stamm-Vorgang).
+ * Früher: nur Abschlag/Schluss, während Stamm Auftrag blieb.
+ * Jetzt: jede weitere nicht-stornierte Rechnung neben dem Phasen-Gewinner.
  */
 export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
   const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
   return art === 'abschlag' || art === 'schluss'
 }
 
-/** Nur Vollrechnungen (oder ohne Art) verschieben den Stamm-Vorgang auf Phase Rechnung. */
+/**
+ * Versendete/bezahlte Rechnungen (Voll, Abschlag, Schluss) ziehen den Stamm
+ * in die Rechnungsphase — Auftrag-Tab zeigt dann nur noch aktive Aufträge.
+ */
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
-  return !isSatellitenRechnung(rechnung)
+  const st = (rechnung.status ?? '').trim().toLowerCase()
+  if (!st || st === 'storniert' || st === 'entwurf') return false
+  return true
 }
 
 function pickNewestActive<T>(
@@ -190,7 +196,7 @@ type PhasePick = {
 }
 
 /** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage).
- * Ausnahme: Abschlag/Schluss gewinnen die Stamm-Phase nicht (eigene Vorgangszeilen). */
+ * Versendete Rechnungen aller Arten (Voll/Abschlag/Schluss) gewinnen die Stamm-Phase. */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []
@@ -352,7 +358,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
   }
 }
 
-/** Eigener Rechnungs-Vorgang für Abschlag/Schluss (Stamm bleibt Auftrag). */
+/** Eigener Rechnungs-Vorgang für eine weitere Rechnung (neben dem Stamm). */
 export function resolveSatellitenRechnungVorgang(
   input: ResolveVorgangInput,
   rechnung: VorgangRechnungInput

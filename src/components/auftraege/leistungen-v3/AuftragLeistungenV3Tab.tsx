@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import type { AuftragGewerkBlock } from '@/lib/auftraege/auftrag-position-blocks'
 import { summenPositionen } from '@/lib/auftraege/auftrag-leistung-phasen'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import { PartnerAbgelehntBanner } from '@/components/auftraege/PartnerAbgelehntBanner'
@@ -36,6 +37,7 @@ export function AuftragLeistungenV3Tab({
   handwerkerRows = [],
   handwerkerKontext,
   auftragAbgeschlossen = false,
+  mwstSatz = DEFAULT_MWST_SATZ,
   onChanged,
 }: {
   auftragId: string
@@ -47,6 +49,8 @@ export function AuftragLeistungenV3Tab({
   handwerkerRows?: AuftragHandwerkerRow[]
   handwerkerKontext?: HandwerkerZuweisenKontext
   auftragAbgeschlossen?: boolean
+  /** Firmensatz für Brutto/MwSt-Anzeige (VK-Preise sind netto). */
+  mwstSatz?: number
   onChanged: () => void
 }) {
   const [, startTransition] = useTransition()
@@ -65,8 +69,14 @@ export function AuftragLeistungenV3Tab({
     () => handwerkerRows.filter((z) => (z.status ?? '').toLowerCase() === 'abgelehnt'),
     [handwerkerRows]
   )
+
+  const vkNetto = totals.verkauf
+  const ekNetto = totals.partner + totals.eigen
+  const satz = Math.max(0, mwstSatz)
+  const mwstBetrag = Math.round(vkNetto * (satz / 100) * 100) / 100
+  const vkBrutto = Math.round((vkNetto + mwstBetrag) * 100) / 100
   const margePct =
-    totals.verkauf > 0 ? Math.round((totals.marge / totals.verkauf) * 1000) / 10 : null
+    vkNetto > 0 ? Math.round((totals.marge / vkNetto) * 1000) / 10 : null
 
   function refresh() {
     onChanged()
@@ -286,12 +296,20 @@ export function AuftragLeistungenV3Tab({
 
         <div className="pt2-foot">
           <div className="r">
-            <span>VK gesamt</span>
-            <b>{formatEurBetrag(totals.verkauf)}</b>
+            <span>VK Brutto</span>
+            <b>{formatEurBetrag(vkBrutto)}</b>
           </div>
           <div className="r">
-            <span>EK gesamt</span>
-            <b>{formatEurBetrag(totals.partner + totals.eigen)}</b>
+            <span>{mwstSatz > 0 ? `MwSt ${mwstSatz} %` : 'MwSt'}</span>
+            <b>{formatEurBetrag(mwstBetrag)}</b>
+          </div>
+          <div className="r">
+            <span>VK Netto</span>
+            <b>{formatEurBetrag(vkNetto)}</b>
+          </div>
+          <div className="r">
+            <span>EK Netto</span>
+            <b>{formatEurBetrag(ekNetto)}</b>
           </div>
           <div className="r grand">
             <span>
@@ -300,6 +318,7 @@ export function AuftragLeistungenV3Tab({
             </span>
             <b>{formatEurBetrag(totals.marge)}</b>
           </div>
+          <div className="pt2-foot-hint">Marge = VK Netto − EK Netto</div>
         </div>
       </div>
 
