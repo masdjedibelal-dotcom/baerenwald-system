@@ -181,16 +181,12 @@ export function VorgaengeListeClient({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
-  /** Bei konkreter Phase-Filter ist die Phase-Spalte redundant (Tab sagt es schon). */
-  const showPhaseCol = filter === 'alle'
-  const colDefs = useMemo(() => {
-    const data = showPhaseCol
-      ? VORGAENGE_DATA_COLS
-      : VORGAENGE_DATA_COLS.filter((c) => c.id !== 'phase')
-    return selectMode ? [VORGAENGE_CHECK_COL, ...data] : data
-  }, [showPhaseCol, selectMode])
+  const colDefs = useMemo(
+    () => (selectMode ? [VORGAENGE_CHECK_COL, ...VORGAENGE_DATA_COLS] : VORGAENGE_DATA_COLS),
+    [selectMode]
+  )
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v2.${selectMode ? 'sel' : 'base'}.${showPhaseCol ? 'ph' : 'noph'}`,
+    `crm.cols.vorgaenge.v3.${selectMode ? 'sel' : 'base'}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -897,18 +893,16 @@ export function VorgaengeListeClient({
           >
             Vorgang
           </MockSortHead>
-          {showPhaseCol ? (
-            <MockSortHead
-              col="phase"
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={(c) => toggleSort(c as SortCol)}
-              resizable
-              onResizePointerDown={(e) => startColResize('phase', e)}
-            >
-              Phase
-            </MockSortHead>
-          ) : null}
+          <MockSortHead
+            col="phase"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startColResize('phase', e)}
+          >
+            Phase
+          </MockSortHead>
           <MockSortHead
             col="wert"
             sortCol={sortCol}
@@ -1002,14 +996,12 @@ export function VorgaengeListeClient({
                     {v.titel}
                   </div>
                 </div>
-                {showPhaseCol ? (
-                  <div className="vg-phase">
-                    <span className="ph-neutral">
-                      <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
-                      {PHASE_META[v.phase].label}
-                    </span>
-                  </div>
-                ) : null}
+                <div className="vg-phase">
+                  <span className="ph-neutral">
+                    <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
+                    {PHASE_META[v.phase].label}
+                  </span>
+                </div>
                 <div
                   className="vg-wert"
                   style={{
