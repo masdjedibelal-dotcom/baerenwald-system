@@ -1181,7 +1181,7 @@ export function RechnungWizard({
                 Individualisieren
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-                Zahlungsziel, optionaler Zahlplan und steuerliche Hinweise
+                Zahlungsziel, Leistungszeitraum und steuerliche Hinweise
               </div>
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
@@ -1212,6 +1212,46 @@ export function RechnungWizard({
               ) : null}
             </div>
           </MockField>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: 14,
+              marginTop: 16,
+            }}
+          >
+            <MockField label="Rechnungsdatum">
+              <input
+                type="date"
+                className="input"
+                value={meta.rechnungsdatum}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))
+                }
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum von" hint="Auf der Rechnung sichtbar">
+              <input
+                type="date"
+                className="input"
+                value={meta.leistungszeitraum_von}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+                }
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum bis">
+              <input
+                type="date"
+                className="input"
+                value={meta.leistungszeitraum_bis}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+                }
+              />
+            </MockField>
+          </div>
 
           <div style={{ marginTop: 18 }}>
             {!hatAuftrag ? (

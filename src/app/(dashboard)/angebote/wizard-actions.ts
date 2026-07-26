@@ -252,6 +252,8 @@ export async function saveAngebotWizardDraft(
       const sync = await syncAuftragAusAngebotKorrektur({
         auftragId: input.auftragKorrekturId.trim(),
         angebotId: input.angebotId,
+        leistungszeitraum_von: input.meta.leistungszeitraum_von ?? null,
+        leistungszeitraum_bis: input.meta.leistungszeitraum_bis ?? null,
       })
       if (!sync.ok) return sync
     }

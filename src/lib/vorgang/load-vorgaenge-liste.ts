@@ -8,7 +8,7 @@ import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { LeadKanal } from '@/lib/types'
-import { betragAnzeige } from '@/lib/angebot-einfach'
+import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
   resolveSatellitenRechnungVorgang,
@@ -384,7 +384,7 @@ export async function loadVorgaengeListe(): Promise<{
         | undefined
     ): string | null => {
       if (!ang) return null
-      const label = betragAnzeige(ang.gesamt_fix, ang.gesamt_min, ang.gesamt_max)
+      const label = betragAnzeigeBrutto(ang.gesamt_fix, ang.gesamt_min, ang.gesamt_max)
       return label === '—' ? null : label
     }
 

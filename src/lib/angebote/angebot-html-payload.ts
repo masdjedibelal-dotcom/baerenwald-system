@@ -81,6 +81,19 @@ function firmKontaktZeile(f: FirmenEinstellungen): string {
   return t.join(' · ')
 }
 
+/** Angebotsdatum im PDF: nach Versand/Korrektur das aktuelle Änderungsdatum. */
+function angebotPdfDatumDe(detail: {
+  created_at: string
+  updated_at?: string | null
+  gesendet_kunde_at?: string | null
+}): string {
+  if (detail.gesendet_kunde_at) {
+    const src = detail.updated_at?.trim() || new Date().toISOString()
+    return new Date(src).toLocaleDateString('de-DE')
+  }
+  return new Date(detail.created_at).toLocaleDateString('de-DE')
+}
+
 function resolveLeistungsumfang(detail: AngebotDetail): string {
   return resolveAngebotLeistungsumfang(
     { leistungsumfang: detail.leistungsumfang, notizen: detail.notizen },
@@ -135,7 +148,7 @@ export function buildAngebotHtmlInputAusDetail(
       firmen_impressum: fuss.impressum,
       angebotsnr: detail.angebotsnr?.trim() || `AG${detail.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
       kundennr: '—',
-      datum: new Date(detail.created_at).toLocaleDateString('de-DE'),
+      datum: angebotPdfDatumDe(detail),
       gueltig_bis: parseGueltigDe(detail, firm),
       kunde_name: '',
       kunde_adresse: '',
@@ -236,7 +249,7 @@ export function buildAngebotHtmlInputAusDetail(
     firmen_impressum: fuss.impressum,
     angebotsnr: detail.angebotsnr?.trim() || `AG${detail.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
     kundennr: kunde.id ? formatKundennr(kunde.id) : '—',
-    datum: new Date(detail.created_at).toLocaleDateString('de-DE'),
+    datum: angebotPdfDatumDe(detail),
     gueltig_bis: parseGueltigDe(detail, firm),
     kunde_name: empfaenger.name,
     kunde_adresse: empfaenger.adresse,

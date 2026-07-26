@@ -35,6 +35,8 @@ import {
   auftragHwStatusLabel,
   type AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { nettoZuBrutto } from '@/lib/angebot-einfach'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { AuftragHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
 
@@ -115,10 +117,10 @@ export function AuftragPositionenGewerkView({
     [positionen, gewerke]
   )
 
-  const gesamt = useMemo(
-    () => sorted.reduce((s, p) => s + (p.preis_fix ?? 0), 0),
-    [sorted]
-  )
+  const gesamt = useMemo(() => {
+    const netto = sorted.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
+    return nettoZuBrutto(netto, DEFAULT_MWST_SATZ)
+  }, [sorted])
 
   const indexByPosId = useMemo(() => {
     const m = new Map<string, number>()

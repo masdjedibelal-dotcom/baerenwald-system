@@ -1279,7 +1279,29 @@ export function AngebotWizard({
               onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
             />
           </MockField>
-          <div />
+          <MockField
+            label="Leistungszeitraum von"
+            hint={istAuftragKorrektur ? 'Ausführungszeitraum am Auftrag' : undefined}
+          >
+            <input
+              type="date"
+              className="input"
+              value={meta.leistungszeitraum_von ?? ''}
+              onChange={(e) =>
+                setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+              }
+            />
+          </MockField>
+          <MockField label="Leistungszeitraum bis">
+            <input
+              type="date"
+              className="input"
+              value={meta.leistungszeitraum_bis ?? ''}
+              onChange={(e) =>
+                setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+              }
+            />
+          </MockField>
           <MockField label="Zahlfrist" full hint="Zahlungsziel nach Rechnungsstellung">
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <MockZahlfristSeg value={zahlfristSeg} onChange={(v) => applyZahlfrist(v)} />

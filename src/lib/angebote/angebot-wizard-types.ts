@@ -193,6 +193,9 @@ export type AngebotWizardMeta = {
   zahlungsbedingungen: AngebotWizardZahlungsbedingung
   /** Freies Zahlungsziel-Datum wenn Segment „Datum“ (Mock-Zahlfrist) */
   zahlfrist_datum?: string
+  /** Ausführungszeitraum (wird bei Auftragskorrektur auf Auftrag start/end geschrieben) */
+  leistungszeitraum_von?: string
+  leistungszeitraum_bis?: string
   /** Legacy in wizard_meta — Standard du, keine eigene DB-Spalte */
   anrede?: 'du' | 'sie'
   /** Anfahrtskosten-Pauschale als Position */
@@ -319,6 +322,10 @@ export function parseAngebotWizardMetaFromNotizen(
     hinweise: wm?.hinweise?.trim() || spalten?.hinweise?.trim() || fallback.hinweise,
     zahlungsbedingungen,
     zahlfrist_datum: wm?.zahlfrist_datum?.trim() || fallback.zahlfrist_datum,
+    leistungszeitraum_von:
+      wm?.leistungszeitraum_von?.trim() || fallback.leistungszeitraum_von,
+    leistungszeitraum_bis:
+      wm?.leistungszeitraum_bis?.trim() || fallback.leistungszeitraum_bis,
     anrede,
     mit_anfahrt: wm?.mit_anfahrt ?? fallback.mit_anfahrt,
     hinweis_35a: wm?.hinweis_35a ?? fallback.hinweis_35a,
