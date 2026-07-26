@@ -106,6 +106,12 @@ export function normalizeAngebotPosition(
 
   if (!gewerk_id && !gewerk_slug && !leistung) return null
 
+  const slugLower = (gewerk_slug ?? '').toLowerCase()
+  const leistungLower = leistung.toLowerCase()
+  /** Negativzeilen z. B. „Abzüglich Abschlag …“ in der Schlussrechnung */
+  const erlaubtNegativ =
+    slugLower === 'abschlag_abzug' || leistungLower.startsWith('abzüglich')
+
   let lohn_netto = num(r.lohn_netto)
   if (lohn_netto <= 0 && (r.lohn_netto == null || r.lohn_netto === '')) {
     const lmin = num(r.lohn_min)
@@ -135,7 +141,7 @@ export function normalizeAngebotPosition(
       }
     }
   }
-  if (lohn_netto < 0) lohn_netto = 0
+  if (lohn_netto < 0 && !erlaubtNegativ) lohn_netto = 0
 
   let material_netto = num(r.material_netto)
   if (material_netto <= 0 && (r.material_netto == null || r.material_netto === '')) {
@@ -152,7 +158,7 @@ export function normalizeAngebotPosition(
       else material_netto = 0
     }
   }
-  if (material_netto < 0) material_netto = 0
+  if (material_netto < 0 && !erlaubtNegativ) material_netto = 0
 
   let einkaufspreis: number | undefined
   const ekSingle = r.einkaufspreis
@@ -487,7 +493,10 @@ export function positionVkNettoStueck(p: AngebotPosition): number {
 /** Korrigiert vk_netto, Zeilensumme und ggf. Lohn/Material nach dem Laden oder vor dem Speichern. */
 export function repairAngebotPositionPreise(p: AngebotPosition): AngebotPosition {
   const slug = p.gewerk_slug ?? ''
-  if (slug === '__freitext__' || slug === '__gesamtrabatt__') return p
+  if (slug === '__freitext__' || slug === '__gesamtrabatt__' || slug === 'abschlag_abzug') {
+    return p
+  }
+  if ((p.leistung ?? '').toLowerCase().startsWith('abzüglich')) return p
 
   const m = Math.max(p.menge || 1, 0.0001)
   const vk = positionVkNettoStueck(p)

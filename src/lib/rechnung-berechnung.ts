@@ -35,6 +35,12 @@ function istSonderzeile(p: AngebotPosition): boolean {
   return slug === ZEILE_SLUG_FREITEXT || slug === ZEILE_SLUG_GESAMTRABATT
 }
 
+function istAbschlagAbzugZeile(p: AngebotPosition): boolean {
+  const slug = (p.gewerk_slug ?? '').toLowerCase()
+  if (slug === 'abschlag_abzug') return true
+  return (p.leistung ?? '').toLowerCase().startsWith('abzüglich')
+}
+
 export function positionNettoZeile(p: AngebotPosition): number {
   const m = p.menge || 1
   return round2((p.lohn_netto + p.material_netto) * m)
@@ -69,7 +75,8 @@ export function berechneRechnung(
     const m = p.menge || 1
     const l = round2(p.lohn_netto * m)
     const mat = round2(p.material_netto * m)
-    if (!istSonderzeile(p)) {
+    // Abzugszeilen (bereits gestellte Abschläge) nicht in Lohn/Material-Aufstellung
+    if (!istSonderzeile(p) && !istAbschlagAbzugZeile(p)) {
       lohn_netto += l
       material_netto += mat
     }

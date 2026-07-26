@@ -41,6 +41,7 @@ import {
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
+  istAbschlagPauschalPosition,
   positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
@@ -207,7 +208,9 @@ async function rechnungenAbschlagLinks(
 ) {
   const { data } = await supabase
     .from('rechnungen')
-    .select('id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto')
+    .select(
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, rechnungsnummer'
+    )
     .eq('auftrag_id', auftragId)
   return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
 }
@@ -774,13 +777,14 @@ export async function saveRechnungWizardDraft(
   let positionenFuerBeleg = positionen
   if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId && input.auftrag_id?.trim()) {
     const links = await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id)
-    // Auftragssumme aus Auftrag laden — nicht aus Pauschalzeile ableiten
-    let gesamtNetto = 0
+    let gesamtNetto = auftragSummenAusPositionen(positionen).netto
+    let auftragPositionen = positionen
     try {
       const basis = await positionenAusAuftrag(supabaseForBerechnung, input.auftrag_id)
       gesamtNetto = basis.gesamtNetto
+      auftragPositionen = basis.positionen
     } catch {
-      gesamtNetto = auftragSummenAusPositionen(positionen).netto
+      /* Wizard-Positionen / Summe behalten */
     }
     const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, links)
     const zeile = kontext.zeilen.find((z) => z.id === abschlagZeileId) ?? null
@@ -791,16 +795,25 @@ export async function saveRechnungWizardDraft(
       }
     }
     if (zeile) {
+      const wizardHatLeistungen =
+        positionen.length > 1 && !positionen.every((p) => istAbschlagPauschalPosition(p))
+      const leistungenQuelle = zeile.istSchluss
+        ? wizardHatLeistungen
+          ? positionen
+          : auftragPositionen
+        : wizardHatLeistungen
+          ? positionen
+          : auftragPositionen
       positionenFuerBeleg = positionenFuerAbschlagRechnung({
         zeile,
-        allePositionen: positionen.length > 1 ? positionen : (
-          await positionenAusAuftrag(supabaseForBerechnung, input.auftrag_id).catch(() => null)
-        )?.positionen ?? positionen,
+        allePositionen: leistungenQuelle,
         plan: input.zahlungsplan,
         gesamtNetto,
         auftragsReferenz: '',
         projektTitel: '',
         bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
+        vorherigeAbschlaege: links,
+        ausserRechnungId: input.rechnungId ?? null,
       })
       liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
         berechnungVoll,
@@ -966,6 +979,8 @@ export async function createAllAbschlagRechnungenFromWizard(
       auftragsReferenz: '',
       projektTitel: '',
       bereitsGestelltBrutto: bereits.brutto,
+      vorherigeAbschlaege: bestehend,
+      ausserRechnungId: bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)?.id ?? null,
     })
     const liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
       berechnungVoll,

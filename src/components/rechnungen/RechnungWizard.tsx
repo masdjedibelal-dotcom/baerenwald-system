@@ -1069,10 +1069,19 @@ export function RechnungWizard({
                 {selBerechnet.titel}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.45 }}>
-                Auf der Rechnung steht der Planbetrag als Pauschale (
-                {formatEurBetrag(selBerechnet.brutto)} brutto). Die Positionen unten sind die
-                Auftragsleistungen — als Leistungsnachweis-Anhang sinnvoll, auf der Abschlagsrechnung
-                selbst nicht zeilenweise nötig.
+                {selBerechnet.istSchluss ? (
+                  <>
+                    Die Schlussrechnung enthält alle Auftragsleistungen und zieht bereits gestellte
+                    Abschläge ab. Rest laut Plan:{' '}
+                    <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto.
+                  </>
+                ) : (
+                  <>
+                    Auf der Abschlagsrechnung steht der Planbetrag als Pauschale (
+                    {formatEurBetrag(selBerechnet.brutto)} brutto). Eine volle Leistungsaufstellung
+                    gehört in die Schlussrechnung.
+                  </>
+                )}
               </div>
             </div>
           ) : hatAuftrag ? (
@@ -1253,9 +1262,18 @@ export function RechnungWizard({
                         {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                        Vorgewählt aus dem Zahlplan — Betrag{' '}
-                        <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto (Pauschale laut Plan).
-                        Die volle Leistungsaufstellung kannst du als Leistungsnachweis mitsenden.
+                        {selBerechnet.istSchluss ? (
+                          <>
+                            Vorgewählt aus dem Zahlplan — Schlussrechnung mit allen Leistungen und
+                            Abzug der Abschläge. Rest{' '}
+                            <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto.
+                          </>
+                        ) : (
+                          <>
+                            Vorgewählt aus dem Zahlplan — Betrag{' '}
+                            <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto als Pauschale.
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
