@@ -1,4 +1,5 @@
 import { buildAbnahmeProtokollHtmlInput } from '@/lib/auftraege/abnahme-protokoll-html-payload'
+import type { AbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import {
@@ -16,6 +17,7 @@ export async function renderAbnahmeProtokollPdfBuffer(
     punkte: AbnahmePunkt[]
     maengel: AbnahmeMangel[]
     notizen: string | null
+    meta?: AbnahmeProtokollMeta | null
   }
 ): Promise<Buffer> {
   const htmlInput = buildAbnahmeProtokollHtmlInput(detail, firm, input)

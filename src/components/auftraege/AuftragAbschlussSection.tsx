@@ -95,7 +95,7 @@ export function AuftragAbschlussSection({
     <WerkzeugPanel
       title={embedded ? '3 · Abschlussbericht' : 'Abschlussbericht'}
       icon="file-text"
-      purpose="Aus den Leistungen oben, dem Tagebuch und der Abnahme zusammensetzen. Versand an den Kunden über „Auftrag abschließen“."
+      purpose="Optional: aus Leistungen, Tagebuch und Abnahme zusammensetzen. Versand über „Auftrag abschließen“. Nicht nötig, wenn nur das Abnahmeprotokoll an den Kunden geht."
       actions={badge}
     >
       {!vorschau ? (

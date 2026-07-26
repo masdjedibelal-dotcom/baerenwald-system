@@ -1,13 +1,18 @@
 /**
- * HTML für Abnahmeprotokoll-PDF (A4, Bärenwald-Layout wie Angebot).
+ * HTML für Abnahmeprotokoll-PDF — Layout angelehnt an Kunden-Muster
+ * (ohne technische Schnittzeichnung).
  */
 
 import type { AbnahmeGewerkBlock, AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import { notizenFuerLeistung } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
+  ABNAHME_ERGEBNIS_LABEL,
+  type AbnahmeErgebnis,
+  type AbnahmeProtokollMeta,
+} from '@/lib/auftraege/abnahme-protokoll-meta'
+import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   angebotLogoKopfHtml,
-  briefkopfZeileHtml,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
@@ -16,6 +21,9 @@ const ACCENT = '#1A3D2B'
 const TEXT = '#111111'
 const MUTED = '#6B7280'
 const BORDER = '#D1D5DB'
+const SOFT = '#F3F4F6'
+const GREEN_SOFT = '#E8F5EE'
+const WARN_SOFT = '#FEF9C3'
 
 export type AbnahmeProtokollHtmlInput = {
   firmen_logo_url?: string | null
@@ -23,6 +31,9 @@ export type AbnahmeProtokollHtmlInput = {
   firmen_rechtsform?: string | null
   firmen_adresse: string
   firmen_kontakt: string
+  firmen_telefon?: string | null
+  firmen_email?: string | null
+  firmen_website?: string | null
   firmen_steuer_footer?: string | null
   auftragsNr: string
   projektTitel: string
@@ -32,6 +43,7 @@ export type AbnahmeProtokollHtmlInput = {
   gewerke: AbnahmeGewerkBlock[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  meta: AbnahmeProtokollMeta
 }
 
 function esc(s: string): string {
@@ -57,7 +69,7 @@ function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput 
     angebotsnr: p.auftragsNr,
     datum: p.abnahmeDatum,
     gueltig_bis: '',
-    leistungsumfang: p.projektTitel,
+    leistungsumfang: p.meta.projektbezeichnung || p.projektTitel,
     begruessung: '',
     einleitung: '',
     zahlungsbedingungen: '',
@@ -68,95 +80,170 @@ function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput 
   }
 }
 
-function abnahmeBriefMetaHtml(p: AbnahmeProtokollHtmlInput): string {
-  const zeile = (label: string, value: string) =>
-    `<div style="text-align:right;font-size:8.5pt;line-height:1.55;white-space:nowrap;">
-      <span style="color:${TEXT};">${label}</span>
-      <span style="font-weight:400;margin-left:8px;">${esc(value)}</span>
+function sectionHeading(n: string, title: string): string {
+  return `<h2 style="font-size:10.5pt;font-weight:700;color:${ACCENT};margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid ${ACCENT};page-break-after:avoid;">
+    <span style="margin-right:6px;">${esc(n)}.</span>${esc(title)}
+  </h2>`
+}
+
+function metaBarHtml(p: AbnahmeProtokollHtmlInput): string {
+  const uhr = p.meta.uebergabe_uhrzeit?.trim()
+    ? (p.meta.uebergabe_uhrzeit.includes('Uhr')
+        ? p.meta.uebergabe_uhrzeit
+        : `${p.meta.uebergabe_uhrzeit} Uhr`)
+    : '—'
+  const ort = p.meta.uebergabe_ort?.trim() || '—'
+  const cell = (label: string, value: string) =>
+    `<div style="flex:1;min-width:0;padding:8px 10px;">
+      <div style="font-size:7.5pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">${esc(label)}</div>
+      <div style="font-size:9.5pt;font-weight:600;color:${TEXT};">${esc(value)}</div>
     </div>`
-  return `<div style="text-align:right;min-width:200px;">
-    ${zeile('Auftrag:', p.auftragsNr)}
-    ${zeile('Abnahme:', p.abnahmeDatum)}
-    ${zeile('Projekt:', p.projektTitel)}
+  return `<div style="display:flex;background:${SOFT};border-radius:4px;margin:0 0 14px;border:1px solid ${BORDER};page-break-inside:avoid;">
+    ${cell('Übergabedatum', p.abnahmeDatum)}
+    <div style="width:1px;background:${BORDER};"></div>
+    ${cell('Übergabe Uhrzeit', uhr)}
+    <div style="width:1px;background:${BORDER};"></div>
+    ${cell('Übergabe Ort', ort)}
   </div>`
 }
 
-function sectionHeading(title: string): string {
-  return `<h2 style="font-size:11pt;font-weight:700;color:${ACCENT};margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid ${ACCENT};page-break-after:avoid;">${esc(title)}</h2>`
+function partyBox(
+  title: string,
+  rows: { label: string; value: string }[]
+): string {
+  const body = rows
+    .filter((r) => r.value.trim())
+    .map(
+      (r) =>
+        `<tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:${MUTED};vertical-align:top;white-space:nowrap;">${esc(r.label)}</td>
+          <td style="padding:2px 0;font-size:9pt;color:${TEXT};vertical-align:top;">${esc(r.value)}</td>
+        </tr>`
+    )
+    .join('')
+  return `<div style="border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;page-break-inside:avoid;">
+    <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">${esc(title)}</div>
+    <table style="width:100%;border-collapse:collapse;">${body || `<tr><td style="font-size:9pt;color:${MUTED};">—</td></tr>`}</table>
+  </div>`
 }
 
-function checklistCircleHtml(): string {
-  return `<span style="display:inline-block;width:13px;height:13px;border:1.5pt solid ${TEXT};border-radius:50%;flex-shrink:0;margin-top:2px;"></span>`
+function fotosHtml(urls: string[]): string {
+  if (!urls.length) return ''
+  const imgs = urls
+    .slice(0, 4)
+    .map(
+      (u) =>
+        `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
+          <img src="${esc(u)}" alt="" style="display:block;width:100%;height:72px;object-fit:cover;" />
+        </div>`
+    )
+    .join('')
+  return `<div style="border:1px solid ${BORDER};border-radius:4px;padding:8px;page-break-inside:avoid;">
+    <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Örtliche Situation</div>
+    ${imgs}
+  </div>`
 }
 
-function checklistBulletHtml(p: AbnahmePunkt): string {
-  return `<li style="display:flex;align-items:flex-start;gap:8px;margin:0 0 8px;padding:0;font-size:9pt;line-height:1.45;color:${TEXT};list-style:none;">
-    ${checklistCircleHtml()}
-    <span style="flex:1;min-width:0;">
-      ${esc(p.beschreibung?.trim() || '—')}
-    </span>
-  </li>`
-}
-
-function leistungNotizenHtml(notizen: string[]): string {
-  const clean = notizen.map((n) => n.trim()).filter(Boolean)
-  if (!clean.length) return ''
-  return `<ul style="margin:6px 0 0;padding:0 0 0 14px;">
-    ${clean
-      .map(
-        (n) =>
-          `<li style="margin:0 0 3px;font-size:8pt;line-height:1.4;color:${MUTED};">${esc(n)}</li>`
-      )
-      .join('')}
-  </ul>`
-}
-
-function gewerkeChecklisteHtml(gewerke: AbnahmeGewerkBlock[]): string {
-  if (!gewerke.length) {
-    return `<p style="font-size:9pt;color:${MUTED};">Keine Abnahmepunkte.</p>`
+function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
+  const an = partyBox('Auftragnehmer', [
+    { label: 'Firma', value: p.firmenname },
+    { label: 'Adresse', value: p.firmen_adresse.replace(/\n/g, ', ') },
+    { label: 'Vertreten durch', value: p.meta.vertreter_an },
+    { label: 'Telefon', value: p.firmen_telefon ?? '' },
+    { label: 'E-Mail', value: p.firmen_email ?? '' },
+  ])
+  const ag = partyBox('Auftraggeber / Kunde', [
+    { label: 'Name', value: p.kunde_name },
+    { label: 'Adresse', value: p.kunde_adresse.replace(/\n/g, ', ') },
+    { label: 'Ansprechpartner', value: p.meta.ansprechpartner_kunde },
+    { label: 'Anwesend bei Übergabe', value: p.meta.anwesend_uebergabe },
+  ])
+  const fotos = fotosHtml(p.meta.uebergabe_foto_urls)
+  if (fotos) {
+    return `<div style="display:flex;gap:10px;margin:0 0 14px;align-items:stretch;">
+      <div style="flex:1.1;min-width:0;">${an}<div style="height:8px;"></div>${ag}</div>
+      <div style="flex:0.7;min-width:0;">${fotos}</div>
+    </div>`
   }
-  return gewerke
-    .map((g, gi) => {
-      const leistungen = g.leistungen
-        .map((l, li) => {
-          const bullets = l.punkte.map((p) => checklistBulletHtml(p)).join('')
-          const notizen = leistungNotizenHtml(notizenFuerLeistung(l.punkte))
-          const topBorder =
-            li === 0
-              ? 'padding-top:4px;border-top:none;'
-              : 'padding:10px 0 0;border-top:1px solid ' + BORDER + ';'
-          return `<div style="margin:0 0 14px;${topBorder}page-break-inside:avoid;">
-            <p style="margin:0 0 8px;font-size:9.5pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>
-            <ul style="margin:0;padding:0;">${bullets}</ul>
-            ${notizen}
-          </div>`
+  return `<div style="display:flex;gap:10px;margin:0 0 14px;">
+    <div style="flex:1;">${an}</div>
+    <div style="flex:1;">${ag}</div>
+  </div>`
+}
+
+function bauvorhabenHtml(p: AbnahmeProtokollHtmlInput): string {
+  const bez = p.meta.projektbezeichnung?.trim() || p.projektTitel
+  const adr = p.meta.projektadresse?.trim() || p.kunde_adresse.replace(/\n/g, ', ')
+  const umfang = p.meta.leistungsumfang_kurz?.trim() || '—'
+  const row = (l: string, v: string) =>
+    `<tr>
+      <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:${MUTED};vertical-align:top;width:28%;">${esc(l)}</td>
+      <td style="padding:3px 0;font-size:9pt;color:${TEXT};vertical-align:top;white-space:pre-wrap;">${esc(v)}</td>
+    </tr>`
+  return `${sectionHeading('1', 'Bauvorhaben')}
+    <table style="width:100%;border-collapse:collapse;margin:0 0 4px;">
+      ${row('Projektbezeichnung', bez)}
+      ${row('Projektadresse', adr)}
+      ${row('Leistungsumfang', umfang)}
+      ${row('Auftrag', p.auftragsNr)}
+    </table>`
+}
+
+function checkOkHtml(): string {
+  return `<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:${ACCENT};color:#fff;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px;">✓</span>`
+}
+
+function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
+  if (!gewerke.length) {
+    return `${sectionHeading('2', 'Ausgeführte Leistungen')}<p style="font-size:9pt;color:${MUTED};">Keine Leistungen ausgewählt.</p>`
+  }
+  const blocks = gewerke
+    .map((g) => {
+      const items = g.leistungen
+        .flatMap((l) => {
+          const notes = notizenFuerLeistung(l.punkte)
+            .map((n) => n.trim())
+            .filter(Boolean)
+          const bullets = l.punkte.map((p: AbnahmePunkt) => {
+            const text = p.beschreibung?.trim() || l.leistung_name
+            return `<li style="display:flex;align-items:flex-start;gap:8px;margin:0 0 6px;list-style:none;font-size:9pt;line-height:1.4;color:${TEXT};">
+              ${checkOkHtml()}
+              <span style="flex:1;">${esc(text)}</span>
+            </li>`
+          })
+          const noteHtml = notes.length
+            ? `<p style="margin:0 0 8px 22px;font-size:8pt;color:${MUTED};">${notes.map(esc).join(' · ')}</p>`
+            : ''
+          return [
+            `<p style="margin:8px 0 4px;font-size:9pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>`,
+            `<ul style="margin:0;padding:0;">${bullets.join('')}</ul>`,
+            noteHtml,
+          ]
         })
         .join('')
-      const gewerkTop =
-        gi === 0
-          ? 'margin-bottom:8px;padding-top:0;border-top:none;'
-          : `margin-bottom:8px;padding-top:12px;border-top:2px solid ${ACCENT};`
-      return `<div style="${gewerkTop}page-break-inside:avoid;">
-        <h3 style="margin:0 0 4px;font-size:10.5pt;font-weight:700;color:${ACCENT};">${esc(g.gewerk)}</h3>
-        ${leistungen}
+      return `<div style="margin:0 0 10px;page-break-inside:avoid;">
+        <p style="margin:0 0 4px;font-size:9.5pt;font-weight:700;color:${TEXT};">${esc(g.gewerk)}</p>
+        ${items}
       </div>`
     })
     .join('')
+  return `${sectionHeading('2', 'Ausgeführte Leistungen')}
+    <p style="margin:0 0 8px;font-size:8pt;color:${MUTED};">Alle unten genannten Leistungen wurden nach den anerkannten Regeln der Technik ausgeführt.</p>
+    ${blocks}`
 }
 
-function formatTsDe(iso: string | null | undefined): string {
-  if (!iso?.trim()) return '—'
-  try {
-    return new Date(iso).toLocaleString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso.slice(0, 16)
-  }
+function ergebnisHtml(ergebnis: AbnahmeErgebnis, datum: string): string {
+  const label = ABNAHME_ERGEBNIS_LABEL[ergebnis]
+  const bg = ergebnis === 'verweigert' ? '#FEE2E2' : ergebnis === 'mit_vorbehalt' ? WARN_SOFT : GREEN_SOFT
+  const border = ergebnis === 'verweigert' ? '#DC2626' : ACCENT
+  return `${sectionHeading('3', 'Abnahmeergebnis')}
+    <p style="margin:0 0 10px;font-size:9pt;line-height:1.5;color:${TEXT};">
+      Die Leistungen wurden am ${esc(datum)} gemeinsam vor Ort besichtigt und geprüft.
+    </p>
+    <div style="display:flex;align-items:center;gap:12px;background:${bg};border:1.5px solid ${border};border-radius:6px;padding:12px 14px;page-break-inside:avoid;">
+      <span style="font-size:18pt;color:${border};line-height:1;">✓</span>
+      <span style="font-size:11pt;font-weight:700;color:${ACCENT};">${esc(label)}</span>
+    </div>`
 }
 
 function isMangelOffenPdf(m: AbnahmeMangel): boolean {
@@ -164,111 +251,112 @@ function isMangelOffenPdf(m: AbnahmeMangel): boolean {
   return s === 'offen' || s === 'in_bearbeitung'
 }
 
-function maengelListeHtml(maengel: AbnahmeMangel[], nurOffen: boolean): string {
-  const list = maengel.filter((m) => (nurOffen ? isMangelOffenPdf(m) : !isMangelOffenPdf(m)))
-  if (!list.length) return ''
-  return `<ul style="margin:0;padding-left:18px;font-size:9pt;line-height:1.5;color:${TEXT};">
-    ${list
-      .map((m) => {
-        const verlauf = (m.verlauf ?? [])
-          .slice(-3)
-          .map((v) => `${formatTsDe(v.at)}: ${esc(v.typ)}${v.notiz ? ` — ${esc(v.notiz)}` : ''}`)
-          .join('<br/>')
-        return `<li style="margin:0 0 8px;page-break-inside:avoid;">
-          <strong>${esc(m.beschreibung)}</strong>
-          ${m.frist ? `<span style="display:block;font-size:8pt;color:#991B1B;">Frist: ${esc(m.frist.slice(0, 10))}</span>` : ''}
-          ${m.erfasst_at ? `<span style="display:block;font-size:8pt;color:${MUTED};">Erfasst: ${formatTsDe(m.erfasst_at)}</span>` : ''}
-          ${m.behoben_at ? `<span style="display:block;font-size:8pt;color:#166534;">Behoben: ${formatTsDe(m.behoben_at)}</span>` : ''}
-          ${m.abgenommen_at ? `<span style="display:block;font-size:8pt;color:#166534;">Abgenommen: ${formatTsDe(m.abgenommen_at)}</span>` : ''}
-          ${verlauf ? `<span style="display:block;font-size:7.5pt;color:${MUTED};margin-top:2px;">${verlauf}</span>` : ''}
-        </li>`
-      })
-      .join('')}
-  </ul>`
+function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
+  const offen = p.maengel.filter(isMangelOffenPdf)
+  const sonst = p.meta.hinweis_sonstiges?.trim()
+  const notiz = p.notizen?.trim()
+  let body = ''
+  if (!offen.length && !sonst && !notiz) {
+    body = `<p style="margin:0;font-size:9pt;color:${TEXT};">Es wurden keine Mängel festgestellt.</p>`
+  } else {
+    if (offen.length) {
+      body += `<ul style="margin:0 0 8px;padding-left:18px;font-size:9pt;line-height:1.45;">
+        ${offen
+          .map(
+            (m) =>
+              `<li style="margin:0 0 4px;"><strong>${esc(m.beschreibung)}</strong>${
+                m.frist
+                  ? ` <span style="color:#991B1B;">(Frist: ${esc(m.frist.slice(0, 10))})</span>`
+                  : ''
+              }</li>`
+          )
+          .join('')}
+      </ul>`
+    } else {
+      body += `<p style="margin:0 0 8px;font-size:9pt;color:${TEXT};">Es wurden keine Mängel festgestellt.</p>`
+    }
+    if (sonst) {
+      body += `<div style="background:${SOFT};border-left:3px solid ${ACCENT};padding:8px 10px;margin:8px 0 0;font-size:8.5pt;line-height:1.45;color:${TEXT};white-space:pre-wrap;">${esc(sonst)}</div>`
+    }
+    if (notiz) {
+      body += `<p style="margin:8px 0 0;font-size:8.5pt;color:${MUTED};white-space:pre-wrap;">${esc(notiz)}</p>`
+    }
+  }
+  return `${sectionHeading('4', 'Festgestellte Hinweise')}
+    <div style="border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;page-break-inside:avoid;">${body}</div>`
 }
 
-function offenePunkteHtml(maengel: AbnahmeMangel[]): string {
-  const inner = maengelListeHtml(maengel, true)
-  return `${sectionHeading('Offene Punkte / Mängel')}
-    <div style="min-height:80px;border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;margin-top:4px;page-break-inside:avoid;">
-      ${inner || `<p style="margin:0;font-size:9pt;color:${MUTED};">Keine offenen Mängel.</p>`}
+function rechtHtml(text: string): string {
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.replace(/^[\s•\-\*]+/, '').trim())
+    .filter(Boolean)
+  const lis = lines
+    .map((l) => `<li style="margin:0 0 4px;">${esc(l)}</li>`)
+    .join('')
+  return `${sectionHeading('5', 'Weitere Hinweise')}
+    <ul style="margin:0;padding-left:18px;font-size:8.5pt;line-height:1.45;color:${TEXT};">${lis}</ul>`
+}
+
+function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
+  const block = (title: string, name: string) =>
+    `<div style="flex:1;min-width:0;page-break-inside:avoid;">
+      <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">${esc(title)}</div>
+      <div style="border-bottom:1px solid ${TEXT};height:28px;margin-bottom:4px;"></div>
+      <div style="font-size:7.5pt;color:${MUTED};">Ort, Datum</div>
+      <div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>
+      <div style="font-size:7.5pt;color:${MUTED};">Unterschrift${name ? ` · ${esc(name)}` : ''}</div>
+    </div>`
+  return `${sectionHeading('6', 'Unterschriften')}
+    <div style="display:flex;gap:16px;margin-top:8px;">
+      ${block('Auftragnehmer', p.meta.vertreter_an)}
+      ${block('Auftraggeber', p.meta.ansprechpartner_kunde || p.kunde_name)}
+      ${block('Anwesend bei Übergabe', p.meta.anwesend_uebergabe)}
     </div>`
 }
 
-function behobeneMaengelHtml(maengel: AbnahmeMangel[]): string {
-  const inner = maengelListeHtml(maengel, false)
-  if (!inner) return ''
-  return `${sectionHeading('Behobene / abgenommene Mängel')}
-    <div style="border:1px solid #BBF7D0;border-radius:4px;padding:10px 12px;margin-top:4px;background:#F0FDF4;page-break-inside:avoid;">
-      ${inner}
-    </div>`
-}
-
-function unterschriftBlock(abnahmeDatum: string): string {
-  return `<div style="margin-top:28px;padding-top:16px;border-top:1px solid ${BORDER};page-break-inside:avoid;">
-    <table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
-      <tr>
-        <td style="width:50%;padding:8px 12px 0 0;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Datum der Abnahme</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;margin-bottom:4px;"></div>
-          <p style="margin:0;font-size:8pt;color:${TEXT};">${esc(abnahmeDatum)}</p>
-        </td>
-        <td style="width:50%;padding:8px 0 0 12px;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift Kunde</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:16px 0 0;vertical-align:top;">
-          <p style="margin:0 0 28px;color:${MUTED};">Unterschrift Auftragnehmer</p>
-          <div style="border-bottom:1px solid ${TEXT};height:1px;"></div>
-        </td>
-      </tr>
-    </table>
-  </div>`
-}
-
-function briefEmpfaengerAbnahme(p: AbnahmeProtokollHtmlInput): string {
-  return `<div style="margin:0 0 20px;font-size:10pt;line-height:1.5;color:${TEXT};">
-    <p style="margin:0 0 4px;font-size:8pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;">Kunde / Objekt</p>
-    <p style="margin:0;font-weight:700;">${esc(p.kunde_name)}</p>
-    <p style="margin:4px 0 0;white-space:pre-line;">${esc(p.kunde_adresse)}</p>
+function firmKontaktKopf(p: AbnahmeProtokollHtmlInput): string {
+  const lines = [
+    p.firmenname,
+    p.firmen_adresse.replace(/\n/g, ', '),
+    [p.firmen_telefon, p.firmen_email, p.firmen_website].filter(Boolean).join(' · '),
+  ].filter(Boolean)
+  return `<div style="text-align:right;font-size:8pt;line-height:1.45;color:${MUTED};max-width:240px;">
+    ${lines.map((l) => `<div>${esc(l)}</div>`).join('')}
   </div>`
 }
 
 export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string {
   const footerProps = footerInputFromAbnahme(p)
-  const notizen = p.notizen
-    ? `${sectionHeading('Anmerkungen')}<p style="margin:0;font-size:9pt;line-height:1.5;color:${TEXT};white-space:pre-wrap;">${esc(p.notizen)}</p>`
-    : ''
-
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
   <title>Abnahmeprotokoll</title>
   <style>
-    @page { size: A4; margin: 14mm 14mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 14mm; }
+    @page { size: A4; margin: 12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm; }
     body { margin: 0; font-family: Helvetica, Arial, sans-serif; color: ${TEXT}; }
   </style>
 </head>
 <body>
   <div style="max-width:100%;">
-    ${angebotLogoKopfHtml(footerProps)}
-    ${briefkopfZeileHtml(
-      footerProps,
-      'Abnahmeprotokoll',
-      `font-size:18pt;font-weight:700;margin:0 0 8px;color:${TEXT};`,
-      abnahmeBriefMetaHtml(p)
-    )}
-    <p style="margin:0 0 14px;font-size:9pt;color:${MUTED};line-height:1.5;">Checkliste der erbrachten Leistungen zur Abnahme vor Ort.</p>
-    ${briefEmpfaengerAbnahme(p)}
-    ${sectionHeading('Abnahmecheckliste')}
-    ${gewerkeChecklisteHtml(p.gewerke)}
-    ${offenePunkteHtml(p.maengel)}
-    ${behobeneMaengelHtml(p.maengel)}
-    ${notizen}
-    ${unterschriftBlock(p.abnahmeDatum)}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px;">
+      <div style="flex:1;min-width:0;">
+        ${angebotLogoKopfHtml(footerProps)}
+        <h1 style="font-size:16pt;font-weight:700;color:${ACCENT};margin:8px 0 2px;letter-spacing:0.02em;">ABNAHMEPROTOKOLL</h1>
+        <p style="margin:0;font-size:8.5pt;color:${MUTED};letter-spacing:0.06em;text-transform:uppercase;">Garten- und Landschaftsbau</p>
+      </div>
+      ${firmKontaktKopf(p)}
+    </div>
+    ${metaBarHtml(p)}
+    ${partiesRowHtml(p)}
+    ${bauvorhabenHtml(p)}
+    ${leistungenHtml(p.gewerke)}
+    ${ergebnisHtml(p.meta.abnahme_ergebnis, p.abnahmeDatum)}
+    ${hinweiseHtml(p)}
+    ${rechtHtml(p.meta.rechtshinweise)}
+    ${unterschriftenHtml(p)}
+    <p style="margin:20px 0 0;font-size:8pt;color:${MUTED};text-align:center;">Qualität. Verlässlichkeit. Natur. — Vielen Dank für Ihr Vertrauen!</p>
   </div>
 </body>
 </html>`

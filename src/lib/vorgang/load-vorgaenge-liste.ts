@@ -423,12 +423,19 @@ export async function loadVorgaengeListe(): Promise<{
       wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     })
 
-    // Weitere Rechnungen als eigene Zeilen — erst wenn Stamm bereits in Rechnungsphase
-    // (nach erstem Versand). Auftrag-Tab bleibt frei von Abschlag-Satelliten.
-    if (resolved.phase === 'rechnung') {
+    // Abschlag/Schluss als eigene Zeilen — auch wenn Stamm in Phase Auftrag bleibt
+    // (Abschläge dürfen den offenen Auftrag nicht aus dem Auftrag-Tab nehmen).
+    const showSatelliten =
+      resolved.phase === 'rechnung' || resolved.phase === 'auftrag'
+    if (showSatelliten) {
       for (const r of leadRechnungen) {
-        if (r.status === 'storniert') continue
+        if (r.status === 'storniert' || r.status === 'entwurf') continue
         if (resolved.entityId === r.id) continue
+        // Bei Auftrag-Stamm nur Abschlag/Schluss als Satelliten
+        if (resolved.phase === 'auftrag') {
+          const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
+          if (art !== 'abschlag' && art !== 'schluss') continue
+        }
         const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
         const satWieder = resolveListeWiederkehr({
           phase: 'rechnung',

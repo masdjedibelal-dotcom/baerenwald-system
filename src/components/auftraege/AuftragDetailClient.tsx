@@ -775,7 +775,10 @@ export function AuftragDetailClient({
 
   const ausfuehrungInhalt = (
     <AuftragVorOrtPanel
+      auftragId={detail.id}
       focus={vorOrtFocus}
+      hasAbnahmePdf={Boolean(detail.abnahme_protokoll_url)}
+      abnahmePdfUrl={detail.abnahme_protokoll_url}
       leistungTabelle={
         <AuftragLeistungVorOrtTabelle
           auftragId={detail.id}

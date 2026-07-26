@@ -79,8 +79,8 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
 
 /**
  * Weitere Rechnungszeilen in der Liste (nicht der Stamm-Vorgang).
- * Früher: nur Abschlag/Schluss, während Stamm Auftrag blieb.
- * Jetzt: jede weitere nicht-stornierte Rechnung neben dem Phasen-Gewinner.
+ * Abschlag/Schluss bleiben Satelliten — der Auftrag-Stamm bleibt in Phase Auftrag,
+ * solange der Auftrag offen/aktiv ist.
  */
 export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
   const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
@@ -88,12 +88,13 @@ export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
 }
 
 /**
- * Versendete/bezahlte Rechnungen (Voll, Abschlag, Schluss) ziehen den Stamm
- * in die Rechnungsphase — Auftrag-Tab zeigt dann nur noch aktive Aufträge.
+ * Nur Vollrechnungen (versendet/bezahlt) ziehen den Stamm in die Rechnungsphase.
+ * Abschlag/Schluss allein lassen den offenen Auftrag unter „Aufträge“ sichtbar.
  */
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
   const st = (rechnung.status ?? '').trim().toLowerCase()
   if (!st || st === 'storniert' || st === 'entwurf') return false
+  if (isSatellitenRechnung(rechnung)) return false
   return true
 }
 

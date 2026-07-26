@@ -4,6 +4,7 @@
 
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { buildAbnahmeProtokollHtml } from '@/lib/templates/abnahme-protokoll-template'
+import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import { buildAbschlussdokumentationHtml } from '@/lib/templates/abschlussdokumentation-template'
 import {
   buildAngebotHtml,
@@ -226,6 +227,18 @@ function musterAbnahmeHtml(firm: FirmenEinstellungen): string {
       },
     ],
     notizen: 'Abnahme unter Vorbehalt der genannten Nacharbeit.',
+    meta: emptyAbnahmeProtokollMeta({
+      uebergabe_uhrzeit: '11:00',
+      uebergabe_ort: '80331 München',
+      vertreter_an: 'Max Mustermann (Bärenwald)',
+      ansprechpartner_kunde: 'Max Mustermann',
+      anwesend_uebergabe: 'Erika Mustermann',
+      projektbezeichnung: 'Malerarbeiten Wohnräume',
+      projektadresse: 'Musterstraße 12, 80331 München',
+      leistungsumfang_kurz: 'Streichen der Wohnräume inkl. Decken.',
+      abnahme_ergebnis: 'mit_vorbehalt',
+      hinweis_sonstiges: 'Nacharbeit Decke Wohnzimmer bis 19.07.2026.',
+    }),
   })
 }
 

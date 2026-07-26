@@ -78,6 +78,7 @@ import {
 import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
+  patchZahlungsbedingungenMitZahlfrist,
   type ZahlfristSeg,
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
@@ -532,7 +533,35 @@ export function RechnungWizard({
     const nextDatum = seg === 'datum' ? datum : faelligAmFromZahlfrist(seg, datum)
     if (seg === 'datum') setZahlfristDatum(nextDatum)
     else setZahlfristDatum(nextDatum)
-    setMeta((m) => ({ ...m, faellig_am: faelligAmFromZahlfrist(seg, nextDatum) }))
+    const faellig = faelligAmFromZahlfrist(seg, nextDatum)
+    setMeta((m) => ({
+      ...m,
+      faellig_am: faellig,
+      zahlungsbedingungen: patchZahlungsbedingungenMitZahlfrist(
+        m.zahlungsbedingungen,
+        seg,
+        nextDatum
+      ),
+    }))
+  }
+
+  function buildMetaForSave(): RechnungWizardMeta {
+    const planAktiv = hatAuftrag && hasPlan
+    const zb = patchZahlungsbedingungenMitZahlfrist(
+      meta.zahlungsbedingungen,
+      zahlfrist,
+      zahlfrist === 'datum' ? zahlfristDatum : rFaellig
+    )
+    return {
+      ...meta,
+      einleitung,
+      mail_einleitung: einleitung,
+      mail_betreff: mailBetreff.trim() || defaultBetreff,
+      zahlungsart: planAktiv ? 'abschlaege' : 'standard',
+      abschlag_zeile_id: planAktiv ? aktivRate : null,
+      faellig_am: rFaellig,
+      zahlungsbedingungen: zb,
+    }
   }
 
   const draftSnapshot = useMemo(
@@ -607,19 +636,6 @@ export function RechnungWizard({
 
   function toggleAnlage(k: AnlagenKey) {
     setAnlagen((a) => ({ ...a, [k]: !a[k] }))
-  }
-
-  function buildMetaForSave(): RechnungWizardMeta {
-    const planAktiv = hatAuftrag && hasPlan
-    return {
-      ...meta,
-      einleitung,
-      mail_einleitung: einleitung,
-      mail_betreff: mailBetreff.trim() || defaultBetreff,
-      zahlungsart: planAktiv ? 'abschlaege' : 'standard',
-      abschlag_zeile_id: planAktiv ? aktivRate : null,
-      faellig_am: rFaellig,
-    }
   }
 
   const persistEinzel = useCallback(

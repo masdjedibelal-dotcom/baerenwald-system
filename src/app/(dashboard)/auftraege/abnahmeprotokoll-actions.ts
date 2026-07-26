@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
 import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import {
+  normalizeAbnahmeProtokollMeta,
+  type AbnahmeProtokollMeta,
+} from '@/lib/auftraege/abnahme-protokoll-meta'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
@@ -91,15 +95,18 @@ async function persistProtokollPdfForRow(
     punkte: AbnahmePunkt[]
     maengel: AbnahmeMangel[]
     notizen: string | null
+    meta?: AbnahmeProtokollMeta | null
     protokollTyp?: string
   }
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
+  const meta = input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : undefined
   const built = await buildPdfBuffer({
     auftragId,
     abnahmeDatum: input.abnahmeDatum,
     punkte: input.punkte,
     maengel: input.maengel,
     notizen: input.notizen,
+    meta,
   })
   if (!built.ok) return built
 
@@ -113,6 +120,7 @@ async function persistProtokollPdfForRow(
       notizen: input.notizen?.trim() || null,
       punkte: input.punkte,
       maengel: input.maengel,
+      ...(meta ? { meta } : {}),
       pdf_url: stored.publicUrl,
       protokoll_typ: input.protokollTyp ?? 'nachabnahme',
       updated_at: new Date().toISOString(),
@@ -147,6 +155,7 @@ async function buildPdfBuffer(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
 }) {
   const detail = await loadAuftragDetail(input.auftragId)
   if (!detail?.kunden) return { ok: false as const, message: 'Auftrag/Kunde nicht gefunden' }
@@ -157,6 +166,7 @@ async function buildPdfBuffer(input: {
     punkte: input.punkte,
     maengel: input.maengel,
     notizen: input.notizen,
+    meta: input.meta ?? null,
   })
   return { ok: true as const, buffer, detail }
 }
@@ -180,11 +190,15 @@ export async function downloadAbnahmeprotokollPdf(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
 }): Promise<
   | { ok: true; pdfBase64: string; filename: string }
   | { ok: false; message: string }
 > {
-  const built = await buildPdfBuffer(input)
+  const built = await buildPdfBuffer({
+    ...input,
+    meta: input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null,
+  })
   if (!built.ok) return built
   const filename = `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`
   return {
@@ -301,12 +315,14 @@ export async function saveAndSendAbnahmeprotokoll(input: {
   if (!mailBuilt.ok) return mailBuilt
 
   const prepared = prepareAbnahmePayload(input)
+  const existing = await loadAbnahmeprotokollSummary(input.auftragId)
   const built = await buildPdfBuffer({
     auftragId: input.auftragId,
     abnahmeDatum: input.abnahmeDatum,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
     notizen: input.notizen,
+    meta: existing?.meta ?? null,
   })
   if (!built.ok) return built
 
@@ -315,13 +331,13 @@ export async function saveAndSendAbnahmeprotokoll(input: {
 
   const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
 
-  const existing = await loadAbnahmeprotokollSummary(input.auftragId)
   const prevOffene = existing ? countOffeneMaengel(existing.maengel) : 0
   const row = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
+    ...(existing?.meta ? { meta: existing.meta } : {}),
     pdf_url: stored.publicUrl,
     an_kunde_gesendet_at: new Date().toISOString(),
   }
@@ -412,12 +428,14 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
 }): Promise<
   | { ok: true; pdfBase64: string; filename: string; publicUrl: string }
   | { ok: false; message: string }
 > {
   const prepared = prepareAbnahmePayload(input)
-  const built = await buildPdfBuffer({ ...input, ...prepared })
+  const meta = input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null
+  const built = await buildPdfBuffer({ ...input, ...prepared, meta })
   if (!built.ok) return built
 
   const stored = await persistPdf(input.auftragId, built.buffer)
@@ -428,6 +446,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     notizen: input.notizen?.trim() || null,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
+    ...(meta ? { meta } : {}),
     pdf_url: stored.publicUrl,
     protokoll_typ: 'erstabnahme',
   }
@@ -571,19 +590,46 @@ export async function loadAbnahmeprotokollSummary(auftragId: string): Promise<{
   notizen: string | null
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
+  meta: AbnahmeProtokollMeta
   pdf_url: string | null
   an_kunde_gesendet_at: string | null
   statistik: ReturnType<typeof abnahmePunkteStatistik>
 } | null> {
   const { data, error } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
-    .select('id, abnahme_datum, notizen, punkte, maengel, pdf_url, an_kunde_gesendet_at')
+    .select('id, abnahme_datum, notizen, punkte, maengel, meta, pdf_url, an_kunde_gesendet_at')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (error || !data) return null
+  if (error || !data) {
+    // Fallback ohne meta-Spalte (Migration noch nicht applied)
+    if (error && (error.message?.includes('meta') || error.code === '42703')) {
+      const { data: legacy } = await supabaseAdmin
+        .from('auftrag_abnahmeprotokolle')
+        .select('id, abnahme_datum, notizen, punkte, maengel, pdf_url, an_kunde_gesendet_at')
+        .eq('auftrag_id', auftragId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!legacy) return null
+      const punkteL = (legacy.punkte ?? []) as AbnahmePunkt[]
+      const maengelL = normalizeMaengel((legacy.maengel ?? []) as AbnahmeMangel[])
+      return {
+        id: legacy.id as string,
+        abnahme_datum: legacy.abnahme_datum as string,
+        notizen: (legacy.notizen as string | null) ?? null,
+        punkte: applyPunktStatusFromMaengel(punkteL, maengelL),
+        maengel: maengelL,
+        meta: normalizeAbnahmeProtokollMeta({}),
+        pdf_url: (legacy.pdf_url as string | null) ?? null,
+        an_kunde_gesendet_at: (legacy.an_kunde_gesendet_at as string | null) ?? null,
+        statistik: abnahmePunkteStatistik(punkteL),
+      }
+    }
+    return null
+  }
   const punkte = (data.punkte ?? []) as AbnahmePunkt[]
   const maengel = normalizeMaengel((data.maengel ?? []) as AbnahmeMangel[])
   return {
@@ -592,6 +638,7 @@ export async function loadAbnahmeprotokollSummary(auftragId: string): Promise<{
     notizen: (data.notizen as string | null) ?? null,
     punkte: applyPunktStatusFromMaengel(punkte, maengel),
     maengel,
+    meta: normalizeAbnahmeProtokollMeta((data as { meta?: unknown }).meta),
     pdf_url: (data.pdf_url as string | null) ?? null,
     an_kunde_gesendet_at: (data.an_kunde_gesendet_at as string | null) ?? null,
     statistik: abnahmePunkteStatistik(punkte),
@@ -605,6 +652,7 @@ export async function saveAbnahmeprotokollDraft(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
   notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
   regeneratePdf?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const existing = await loadAbnahmeprotokollSummary(input.auftragId)
@@ -616,6 +664,9 @@ export async function saveAbnahmeprotokollDraft(input: {
         ? input.maengel
         : mergeMaengelFromPunkte(input.punkte, existing?.maengel ?? []),
   })
+  const meta = input.meta
+    ? normalizeAbnahmeProtokollMeta(input.meta)
+    : existing?.meta
   const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
   let protokollId = existing?.id ?? ''
 
@@ -627,6 +678,7 @@ export async function saveAbnahmeprotokollDraft(input: {
         notizen: input.notizen?.trim() || null,
         punkte: prepared.punkte,
         maengel: prepared.maengel,
+        ...(meta ? { meta } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
@@ -640,6 +692,7 @@ export async function saveAbnahmeprotokollDraft(input: {
         notizen: input.notizen?.trim() || null,
         punkte: prepared.punkte,
         maengel: prepared.maengel,
+        ...(meta ? { meta } : {}),
         pdf_url: null,
         protokoll_typ: 'erstabnahme',
       })
@@ -679,6 +732,7 @@ export async function saveAbnahmeprotokollDraft(input: {
       punkte: prepared.punkte,
       maengel: prepared.maengel,
       notizen: input.notizen,
+      meta: meta ?? null,
       protokollTyp: hatMaengel ? 'nachabnahme' : 'erstabnahme',
     })
     if (!pdf.ok) return pdf
