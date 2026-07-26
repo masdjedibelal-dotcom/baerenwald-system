@@ -185,7 +185,10 @@ export function AngebotWizard({
   /** Deep-Link Fokus: titel | beschreibung | positionen */
   focusField?: string | null
   onClose: () => void
-  onDone?: (angebotId: string) => void
+  onDone?: (
+    angebotId: string,
+    meta?: { mode: 'saved' | 'sent'; auftragKorrektur?: boolean }
+  ) => void
   onSaved?: (angebotId: string) => void
 }) {
   void _handwerker
@@ -785,11 +788,35 @@ export function AngebotWizard({
           ? `Angebot ${res.angebotsnr.trim()} erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
           : `Angebot erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
-      onDone?.(id)
+      onDone?.(id, { mode: 'saved' })
       onClose()
       router.refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Korrektur: speichern + Auftrag synchronisieren, ohne Kunden-Mail (mündliche Zusage). */
+  async function handleFinishKorrekturSpeichern() {
+    setSaving(true)
+    try {
+      const id = await persistDraft({ notify: false })
+      if (!id) return
+      const res = await finalizeAngebotWizardWithoutMail(id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        'Korrektur übernommen — ohne Mail an den Kunden. Als Nächstes Abschlagsplan / Schlussrechnung prüfen.'
+      )
+      onDone?.(id, { mode: 'saved', auftragKorrektur: true })
+      onClose()
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
     } finally {
       setSaving(false)
     }
@@ -803,7 +830,11 @@ export function AngebotWizard({
           ? [email]
           : []
     if (!recipients.length) {
-      toast.error('Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Nutze „Erstellen“ ohne Mail.')
+      toast.error(
+        istAuftragKorrektur
+          ? 'Keine Kunden-E-Mail — nutze „Speichern & übernehmen“ ohne Versand.'
+          : 'Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Nutze „Erstellen“ ohne Mail.'
+      )
       return
     }
     setSaving(true)
@@ -829,7 +860,10 @@ export function AngebotWizard({
           ? 'Korrektur gespeichert und an den Kunden versendet'
           : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
-      onDone?.(id)
+      onDone?.(id, {
+        mode: 'sent',
+        auftragKorrektur: istAuftragKorrektur || undefined,
+      })
       onClose()
       router.refresh()
     } catch (e) {
@@ -867,7 +901,6 @@ export function AngebotWizard({
   if (!mounted) return null
 
   const wizardSteps = WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
-  const finishLabel = istAuftragKorrektur ? 'Korrektur an Kunden senden' : 'Angebot versenden'
 
   const wizardDesktopActions = (
     <div className="wizard-nav-actions">
@@ -885,15 +918,32 @@ export function AngebotWizard({
         >
           {saving || previewLoading ? 'Speichern…' : 'Weiter'}
         </MockBtn>
+      ) : istAuftragKorrektur ? (
+        <>
+          <MockBtn
+            kind="ghost"
+            icon="send"
+            disabled={saving}
+            onClick={() => void handleFinishVersenden()}
+          >
+            An Kunden senden
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="check"
+            disabled={saving}
+            onClick={() => void handleFinishKorrekturSpeichern()}
+          >
+            {saving ? 'Speichern…' : 'Speichern & übernehmen'}
+          </MockBtn>
+        </>
       ) : (
         <>
-          {!istAuftragKorrektur ? (
-            <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-              {saving ? 'Erstellen…' : 'Erstellen'}
-            </MockBtn>
-          ) : null}
+          <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+            {saving ? 'Erstellen…' : 'Erstellen'}
+          </MockBtn>
           <MockBtn kind="primary" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
-            {finishLabel}
+            Angebot versenden
           </MockBtn>
         </>
       )}
@@ -938,20 +988,37 @@ export function AngebotWizard({
           Zurück
         </MockBtn>
         <div className="wizard-mobile-footer__end">
-          {!istAuftragKorrektur ? (
-            <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-              {saving ? '…' : 'Erstellen'}
-            </MockBtn>
-          ) : null}
-          <MockBtn
-            kind="primary"
-            icon="send"
-            className="wizard-mobile-footer__primary"
-            disabled={saving}
-            onClick={() => void handleFinishVersenden()}
-          >
-            {saving ? '…' : 'Senden'}
-          </MockBtn>
+          {istAuftragKorrektur ? (
+            <>
+              <MockBtn kind="ghost" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
+                {saving ? '…' : 'Senden'}
+              </MockBtn>
+              <MockBtn
+                kind="primary"
+                icon="check"
+                className="wizard-mobile-footer__primary"
+                disabled={saving}
+                onClick={() => void handleFinishKorrekturSpeichern()}
+              >
+                {saving ? '…' : 'Übernehmen'}
+              </MockBtn>
+            </>
+          ) : (
+            <>
+              <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+                {saving ? '…' : 'Erstellen'}
+              </MockBtn>
+              <MockBtn
+                kind="primary"
+                icon="send"
+                className="wizard-mobile-footer__primary"
+                disabled={saving}
+                onClick={() => void handleFinishVersenden()}
+              >
+                {saving ? '…' : 'Senden'}
+              </MockBtn>
+            </>
+          )}
         </div>
       </>
     )
@@ -1321,12 +1388,22 @@ export function AngebotWizard({
               fontSize: 12.5,
               color: 'var(--text-3)',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-start',
               gap: 6,
             }}
           >
-            <MockIcon ctx="default" n="info-circle" size={14} />
-            Mit „Angebot versenden“ wird das Angebot als PDF per E-Mail zugestellt.
+            <MockIcon ctx="default" n="info-circle" size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+            <span>
+              {istAuftragKorrektur ? (
+                <>
+                  <strong>Speichern &amp; übernehmen</strong> = mündlich zugesagt, ohne Kunden-Mail —
+                  Auftrag &amp; Positionen werden aktualisiert; danach Abschlagsplan / Schlussrechnung
+                  anpassen. <strong>An Kunden senden</strong> = korrigiertes Angebot per Mail.
+                </>
+              ) : (
+                <>Mit „Angebot versenden“ wird das Angebot als PDF per E-Mail zugestellt.</>
+              )}
+            </span>
           </div>
         </div>
       ) : null}

@@ -353,6 +353,7 @@ export function AuftragDetailClient({
     useState<AngebotWizardBootstrap | null>(null)
   const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
+  const [zahlplanEditorAutoOpen, setZahlplanEditorAutoOpen] = useState(false)
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   const openAngebotKorrektur = useCallback(() => {
@@ -819,6 +820,8 @@ export function AuftragDetailClient({
       rechnungen={rechnungenListe}
       onCreateInvoice={openRechnungErstellen}
       onRefresh={() => refresh()}
+      autoOpenEditor={zahlplanEditorAutoOpen}
+      onAutoOpenEditorConsumed={() => setZahlplanEditorAutoOpen(false)}
     />
   )
 
@@ -1082,10 +1085,14 @@ export function AuftragDetailClient({
             setAngebotKorrekturBootstrap(null)
             setAngebotKorrekturLead(null)
           }}
-          onDone={() => {
+          onDone={(_id, meta) => {
             setAngebotKorrekturOpen(false)
             setAngebotKorrekturBootstrap(null)
             setAngebotKorrekturLead(null)
+            if (meta?.auftragKorrektur) {
+              setMainTab('finanzen')
+              setZahlplanEditorAutoOpen(true)
+            }
             refresh()
           }}
           onSaved={() => refresh()}

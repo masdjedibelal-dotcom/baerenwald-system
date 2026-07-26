@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -79,6 +79,8 @@ export function AuftragZahlungsplanSection({
   rechnungen,
   onCreateInvoice,
   onRefresh,
+  autoOpenEditor = false,
+  onAutoOpenEditorConsumed,
 }: {
   auftragId: string
   zahlungsplanRaw: unknown
@@ -86,6 +88,9 @@ export function AuftragZahlungsplanSection({
   rechnungen: RechnungAuswahlZeile[]
   onCreateInvoice: (opts?: RechnungErstellenOpts) => void
   onRefresh?: () => void
+  /** Nach Angebot-Korrektur: Editor für Abschlagsplan / Schluss öffnen */
+  autoOpenEditor?: boolean
+  onAutoOpenEditorConsumed?: () => void
 }) {
   const router = useRouter()
   const initial = useMemo(
@@ -96,6 +101,16 @@ export function AuftragZahlungsplanSection({
   const [editorOpen, setEditorOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [vorschau, setVorschau] = useState<RechnungAuswahlZeile | null>(null)
+
+  useEffect(() => {
+    if (!autoOpenEditor) return
+    setEditorOpen(true)
+  }, [autoOpenEditor])
+
+  function closeEditor() {
+    setEditorOpen(false)
+    if (autoOpenEditor) onAutoOpenEditorConsumed?.()
+  }
 
   const abschlagLinks = useMemo(
     () =>
@@ -157,7 +172,7 @@ export function AuftragZahlungsplanSection({
         return
       }
       setPlan(next)
-      setEditorOpen(false)
+      closeEditor()
       toast.success('Abschlagsplan gespeichert')
       onRefresh?.()
       router.refresh()
@@ -374,7 +389,7 @@ export function AuftragZahlungsplanSection({
         {rechnungenOhnePlanUi}
         <AbschlagsplanEditorModal
           open={editorOpen}
-          onClose={() => setEditorOpen(false)}
+          onClose={closeEditor}
           gesamtNetto={gesamtNetto}
           initial={null}
           onSave={speichern}
@@ -515,7 +530,7 @@ export function AuftragZahlungsplanSection({
 
       <AbschlagsplanEditorModal
         open={editorOpen}
-        onClose={() => setEditorOpen(false)}
+        onClose={closeEditor}
         gesamtNetto={gesamtNetto}
         initial={plan}
         onSave={speichern}
