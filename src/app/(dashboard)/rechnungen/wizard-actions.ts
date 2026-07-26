@@ -47,6 +47,7 @@ import {
   rechnungPositionenMitAuftrag,
   resolveAnredeKey,
   standardRechnungZahlungstext,
+  zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
   type ZahlungsplanZeileBerechnet,
@@ -211,6 +212,20 @@ async function rechnungenAbschlagLinks(
   return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
 }
 
+function berechneZahlungsplanMitIst(
+  plan: Zahlungsplan,
+  gesamtNetto: number,
+  rechnungen: import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[],
+  mwstSatz = 19
+) {
+  return berechneZahlungsplan(
+    plan,
+    gesamtNetto,
+    mwstSatz,
+    zahlplanAbgerechnetAusLinks(rechnungen)
+  )
+}
+
 function abschlagMetaDefaults(
   basis: Awaited<ReturnType<typeof positionenAusAuftrag>>,
   zeile: import('@/lib/rechnungen/zahlungsplan').ZahlungsplanZeileBerechnet,
@@ -341,7 +356,11 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           message: 'Kein Abschlagsplan hinterlegt. Bitte zuerst einen Zahlplan anlegen.',
         }
       }
-      const kontext = berechneZahlungsplan(gespeicherterPlan, basis.gesamtNetto)
+      const kontext = berechneZahlungsplanMitIst(
+        gespeicherterPlan,
+        basis.gesamtNetto,
+        rechnungen
+      )
       const zeile = opts?.abschlagZeileId?.trim()
         ? kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
         : naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
@@ -390,7 +409,11 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       modus = 'voll'
     } else if (gespeicherterPlan) {
       // Vorhandenen Abschlagsplan aus dem Auftrag immer übernehmen
-      const kontext = berechneZahlungsplan(gespeicherterPlan, basis.gesamtNetto)
+      const kontext = berechneZahlungsplanMitIst(
+        gespeicherterPlan,
+        basis.gesamtNetto,
+        rechnungen
+      )
       const zeile = naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
       zahlungsplan = gespeicherterPlan
       zahlungsplanBearbeiten = true
@@ -736,17 +759,12 @@ export async function saveRechnungWizardDraft(
   let liste_berechnung = berechnungVoll
   if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId) {
     const gesamtNetto = auftragSummenAusPositionen(positionen).netto
-    const kontext = berechneZahlungsplan(input.zahlungsplan, gesamtNetto)
+    const links = input.auftrag_id?.trim()
+      ? await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id)
+      : []
+    const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, links)
     const zeile = kontext.zeilen.find((z) => z.id === abschlagZeileId) ?? null
-    if (
-      zeile &&
-      input.auftrag_id?.trim() &&
-      abschlagBereitsAbgerechnet(
-        zeile.id,
-        await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id),
-        input.rechnungId ?? null
-      )
-    ) {
+    if (zeile && input.auftrag_id?.trim() && abschlagBereitsAbgerechnet(zeile.id, links, input.rechnungId ?? null)) {
       return {
         ok: false,
         message: 'Für diesen Abschlag existiert bereits eine Rechnung. Bitte andere Rate wählen.',
@@ -760,12 +778,7 @@ export async function saveRechnungWizardDraft(
           gesamtNetto,
           auftragsReferenz: '',
           projektTitel: '',
-          bereitsGestelltBrutto: berechneBereitsGestellt(
-            await rechnungenAbschlagLinks(
-              supabaseForBerechnung,
-              input.auftrag_id as string
-            )
-          ).brutto,
+          bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
         })
       : positionen
     liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
@@ -913,8 +926,8 @@ export async function createAllAbschlagRechnungenFromWizard(
   })
 
   const gesamtNetto = auftragSummenAusPositionen(allePositionen).netto
-  const kontext = berechneZahlungsplan(input.zahlungsplan, gesamtNetto)
   const bestehend = await rechnungenAbschlagLinks(supabase, input.auftrag_id)
+  const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, bestehend)
 
   const erstellt: AbschlagRechnungEntwurf[] = []
 

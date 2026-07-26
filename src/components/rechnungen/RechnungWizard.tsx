@@ -62,6 +62,7 @@ import {
   berechneZahlungsplan,
   emptyZahlungsplan,
   neueZahlungsplanZeile,
+  zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
   zahlungsplanVorlage50_50,
@@ -426,8 +427,14 @@ export function RechnungWizard({
   }
 
   const planKontext = useMemo(
-    () => berechneZahlungsplan(plan, netto, defaultMwst),
-    [plan, netto, defaultMwst]
+    () =>
+      berechneZahlungsplan(
+        plan,
+        netto,
+        defaultMwst,
+        zahlplanAbgerechnetAusLinks(bootstrap.rechnungenAbschlag ?? [])
+      ),
+    [plan, netto, defaultMwst, bootstrap.rechnungenAbschlag]
   )
 
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)

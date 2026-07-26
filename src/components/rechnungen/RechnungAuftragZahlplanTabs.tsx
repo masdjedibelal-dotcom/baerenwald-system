@@ -13,6 +13,7 @@ import {
   berechneZahlungsplan,
   parseZahlungsplan,
   rechnungFuerAbschlagZeile,
+  zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
 } from '@/lib/rechnungen/zahlungsplan'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -118,7 +119,12 @@ export function RechnungZahlplanTab({
     faellig_am: r.faellig_am,
   }))
 
-  const kontext = berechneZahlungsplan(plan, gesamtNetto)
+  const kontext = berechneZahlungsplan(
+    plan,
+    gesamtNetto,
+    19,
+    zahlplanAbgerechnetAusLinks(links)
+  )
 
   return (
     <MockCard

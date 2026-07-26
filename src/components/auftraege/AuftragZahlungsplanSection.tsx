@@ -22,6 +22,7 @@ import {
   emptyZahlungsplan,
   parseZahlungsplan,
   rechnungFuerAbschlagZeile,
+  zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
   type RechnungAbschlagLink,
   type ZahlplanRateStatus,
@@ -138,7 +139,10 @@ export function AuftragZahlungsplanSection({
     return m
   }, [rechnungen])
 
-  const kontext = useMemo(() => berechneZahlungsplan(plan, gesamtNetto), [plan, gesamtNetto])
+  const kontext = useMemo(
+    () => berechneZahlungsplan(plan, gesamtNetto, 19, zahlplanAbgerechnetAusLinks(abschlagLinks)),
+    [plan, gesamtNetto, abschlagLinks]
+  )
   const totalBrutto = kontext.gesamtBrutto
 
   const { bezahltBrutto, gestelltBrutto } = useMemo(() => {
@@ -597,11 +601,13 @@ export function AuftragZahlungsplanSection({
               st === 'gestellt' && r != null && Math.abs(planBrutto - rechnungBrutto) >= 0.5
             const betrag = st === 'geplant' || !r ? planBrutto : rechnungBrutto
             const pctLabel =
-              z.typ === 'prozent'
-                ? z.wert
-                : gesamtNetto > 0
-                  ? Math.round((z.netto / gesamtNetto) * 100)
-                  : null
+              st === 'geplant' && z.istSchluss
+                ? null
+                : z.typ === 'prozent'
+                  ? z.wert
+                  : gesamtNetto > 0
+                    ? Math.round((z.netto / gesamtNetto) * 100)
+                    : null
             const faellig =
               z.faellig_am?.slice(0, 10) ||
               (typeof r?.faellig_am === 'string' ? r.faellig_am.slice(0, 10) : null)
@@ -610,7 +616,9 @@ export function AuftragZahlungsplanSection({
               <div key={z.id} className="list-row zahlplan-row zahlplan-row--plan">
                 <div className="zahlplan-row__label">
                   {z.titel}
-                  {pctLabel != null ? (
+                  {st === 'geplant' && z.istSchluss ? (
+                    <span className="zahlplan-row__pct"> · Rest</span>
+                  ) : pctLabel != null ? (
                     <span className="zahlplan-row__pct"> · {pctLabel}%</span>
                   ) : null}
                   {abweichung ? (

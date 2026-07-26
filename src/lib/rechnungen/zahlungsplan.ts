@@ -207,6 +207,22 @@ export function zahlplanRateStatus(
   return 'gestellt'
 }
 
+/** Gestellte/bezahlte Raten → Ist-Brutto für Rest-Berechnung der Schlussrate. */
+export function zahlplanAbgerechnetAusLinks(
+  rechnungen: RechnungAbschlagLink[]
+): Array<{ zeileId: string; brutto: number }> {
+  const out: Array<{ zeileId: string; brutto: number }> = []
+  for (const r of rechnungen) {
+    if (String(r.status) === 'storniert') continue
+    const id = r.zahlungsplan_abschlag_id?.trim()
+    if (!id) continue
+    const b = Number(r.brutto)
+    if (!Number.isFinite(b) || b <= 0) continue
+    out.push({ zeileId: id, brutto: b })
+  }
+  return out
+}
+
 export function auftragSummenAusPositionen(
   positionen: AngebotPosition[],
   mwstSatz = 19
@@ -218,10 +234,24 @@ export function auftragSummenAusPositionen(
 export function berechneZahlungsplan(
   plan: Zahlungsplan,
   gesamtNetto: number,
-  mwstSatz = 19
+  mwstSatz = 19,
+  /**
+   * Bereits gestellte/bezahlte Raten (Ist-Betrag der Rechnung).
+   * Ohne das würde die Schlussrate nach theoretischem %-Anteil der *neuen* Summe
+   * gerechnet — falsch, wenn ein Abschlag schon zu einem anderen Gesamt gestellt wurde.
+   */
+  abgerechnet?: Array<{ zeileId: string; brutto: number }> | null
 ): AuftragAbrechnungKontext {
   const ratio = gesamtNetto > 0 ? mwstSatz / 100 : 0
-  const gesamtBrutto = gesamtNetto * (1 + ratio)
+  const gesamtBrutto = Math.round(gesamtNetto * (1 + ratio) * 100) / 100
+  const abById = new Map<string, number>()
+  for (const a of abgerechnet ?? []) {
+    const id = a.zeileId?.trim()
+    if (!id) continue
+    const b = Number(a.brutto)
+    if (Number.isFinite(b) && b > 0) abById.set(id, b)
+  }
+
   let verteiltNetto = 0
   const restIdx = plan.zeilen.findIndex((z) => z.typ === 'rest')
   const zeilen: ZahlungsplanZeileBerechnet[] = []
@@ -229,17 +259,32 @@ export function berechneZahlungsplan(
   plan.zeilen.forEach((z, i) => {
     const index = i + 1
     const istSchluss = z.typ === 'rest' || (restIdx === -1 && i === plan.zeilen.length - 1)
+    const billedBrutto = abById.get(z.id)
     let netto = 0
-    if (z.typ === 'rest' || (restIdx === -1 && i === plan.zeilen.length - 1)) {
+    let brutto = 0
+
+    if (billedBrutto != null) {
+      // Ist-Rechnung gilt — nicht neu aus % der aktuellen Auftragssumme ableiten
+      brutto = Math.round(billedBrutto * 100) / 100
+      netto =
+        ratio > 0
+          ? Math.round((brutto / (1 + ratio)) * 100) / 100
+          : brutto
+      verteiltNetto += netto
+    } else if (istSchluss) {
+      // Offene Schluss-/letzte Rate = echter Rest nach bereits abgerechneten Raten
       netto = Math.max(0, Math.round((gesamtNetto - verteiltNetto) * 100) / 100)
+      brutto = Math.round(netto * (1 + ratio) * 100) / 100
     } else if (z.typ === 'prozent') {
       netto = Math.round(gesamtNetto * (Math.max(0, z.wert) / 100) * 100) / 100
       verteiltNetto += netto
+      brutto = Math.round(netto * (1 + ratio) * 100) / 100
     } else {
       netto = Math.max(0, Math.round(z.wert * 100) / 100)
       verteiltNetto += netto
+      brutto = Math.round(netto * (1 + ratio) * 100) / 100
     }
-    const brutto = Math.round(netto * (1 + ratio) * 100) / 100
+
     zeilen.push({ ...z, index, netto, brutto, istSchluss })
   })
 
