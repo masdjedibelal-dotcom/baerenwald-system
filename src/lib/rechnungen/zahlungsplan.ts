@@ -500,7 +500,7 @@ export function buildAbschlagPauschalPosition(input: {
   const artLabel = zeile.istSchluss ? 'Schlussrechnung' : `Abschlag ${zeile.index}`
   const leistung = `${artLabel} — ${zeile.titel}`
   const prozentTeil =
-    zeile.typ === 'prozent'
+    zeile.typ === 'prozent' && !zeile.istSchluss
       ? `${zeile.wert} % von ${formatEur(gesamtNetto)} netto`
       : `${formatEur(zeile.netto)} netto`
   const beschreibung = zeile.istSchluss
@@ -508,7 +508,7 @@ export function buildAbschlagPauschalPosition(input: {
         bereitsGestelltBrutto > 0
           ? ` · bereits abgerechnet ${formatEur(bereitsGestelltBrutto)} brutto`
           : ''
-      }`
+      } · Rest ${formatEur(zeile.netto)} netto`
     : `${prozentTeil}, ${auftragsReferenz}`
 
   return {

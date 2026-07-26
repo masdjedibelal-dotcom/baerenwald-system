@@ -478,6 +478,14 @@ export function AuftragDetailClient({
           vollOhnePlan: Boolean(opts?.voll),
         })
         if (!res.ok) {
+          // Kein offener Abschlag → normale Rechnung / Plan im Wizard
+          if (opts?.naechsterAbschlag) {
+            const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {})
+            if (fallback.ok) {
+              openRechnungWizard(fallback.bootstrap)
+              return
+            }
+          }
           toast.error(res.message)
           return
         }
@@ -943,9 +951,9 @@ export function AuftragDetailClient({
             primary={
               !istStorniert
                 ? {
-                    label: 'Rechnung erstellen',
+                    label: 'Nächste Rechnung',
                     icon: 'file-invoice',
-                    onClick: () => openRechnungErstellen(),
+                    onClick: () => openRechnungErstellen({ naechsterAbschlag: true }),
                   }
                 : null
             }

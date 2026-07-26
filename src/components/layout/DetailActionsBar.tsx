@@ -69,6 +69,7 @@ function ActionControl({
       )}
       onClick={action.onClick}
       disabled={action.disabled}
+      aria-label={action.label}
     >
       {inner}
     </button>
@@ -130,7 +131,7 @@ export function DetailActionsBar({
           className="btn ghost sm inline-flex shrink-0 gap-1.5"
           onClick={secondary.onClick}
           disabled={secondary.disabled}
-          title={secondary.label}
+          aria-label={secondary.label}
         >
           {secondary.icon ? <MockIcon ctx="btn" n={secondary.icon} size={14} /> : null}
           {secondary.label}

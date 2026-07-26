@@ -740,10 +740,24 @@ export async function saveRechnungWizardDraft(
 
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(positionen))
 
-  const rechnungArt: 'voll' | 'abschlag' | 'schluss' =
-    abschlagAktiv || input.modus === 'abschlag'
-      ? (input.abschlag?.rechnungArt ?? 'abschlag')
-      : 'voll'
+  const rechnungArt: 'voll' | 'abschlag' | 'schluss' = (() => {
+    if (!abschlagAktiv && input.modus !== 'abschlag') return 'voll'
+    if (input.abschlag?.rechnungArt === 'schluss' || input.abschlag?.rechnungArt === 'abschlag') {
+      return input.abschlag.rechnungArt
+    }
+    const zeileId = input.meta.abschlag_zeile_id?.trim()
+    if (zeileId && input.zahlungsplan?.zeilen.length) {
+      const z = input.zahlungsplan.zeilen.find((x) => x.id === zeileId)
+      if (z) {
+        const restIdx = input.zahlungsplan.zeilen.findIndex((x) => x.typ === 'rest')
+        const idx = input.zahlungsplan.zeilen.findIndex((x) => x.id === zeileId)
+        const istSchluss =
+          z.typ === 'rest' || (restIdx === -1 && idx === input.zahlungsplan!.zeilen.length - 1)
+        return istSchluss ? 'schluss' : 'abschlag'
+      }
+    }
+    return 'abschlag'
+  })()
 
   const abschlagZeileId = input.meta.abschlag_zeile_id?.trim() || null
 
@@ -757,41 +771,49 @@ export async function saveRechnungWizardDraft(
   )
 
   let liste_berechnung = berechnungVoll
-  if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId) {
-    const gesamtNetto = auftragSummenAusPositionen(positionen).netto
-    const links = input.auftrag_id?.trim()
-      ? await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id)
-      : []
+  let positionenFuerBeleg = positionen
+  if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId && input.auftrag_id?.trim()) {
+    const links = await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id)
+    // Auftragssumme aus Auftrag laden — nicht aus Pauschalzeile ableiten
+    let gesamtNetto = 0
+    try {
+      const basis = await positionenAusAuftrag(supabaseForBerechnung, input.auftrag_id)
+      gesamtNetto = basis.gesamtNetto
+    } catch {
+      gesamtNetto = auftragSummenAusPositionen(positionen).netto
+    }
     const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, links)
     const zeile = kontext.zeilen.find((z) => z.id === abschlagZeileId) ?? null
-    if (zeile && input.auftrag_id?.trim() && abschlagBereitsAbgerechnet(zeile.id, links, input.rechnungId ?? null)) {
+    if (zeile && abschlagBereitsAbgerechnet(zeile.id, links, input.rechnungId ?? null)) {
       return {
         ok: false,
         message: 'Für diesen Abschlag existiert bereits eine Rechnung. Bitte andere Rate wählen.',
       }
     }
-    const zeilenPos = zeile
-      ? positionenFuerAbschlagRechnung({
-          zeile,
-          allePositionen: positionen,
-          plan: input.zahlungsplan,
-          gesamtNetto,
-          auftragsReferenz: '',
-          projektTitel: '',
-          bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
-        })
-      : positionen
-    liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
-      berechnungVoll,
-      zeile,
-      rechnungArt,
-      zeilenPos,
-      { reverseCharge13b: input.meta.reverse_charge_13b }
-    )
+    if (zeile) {
+      positionenFuerBeleg = positionenFuerAbschlagRechnung({
+        zeile,
+        allePositionen: positionen.length > 1 ? positionen : (
+          await positionenAusAuftrag(supabaseForBerechnung, input.auftrag_id).catch(() => null)
+        )?.positionen ?? positionen,
+        plan: input.zahlungsplan,
+        gesamtNetto,
+        auftragsReferenz: '',
+        projektTitel: '',
+        bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
+      })
+      liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
+        berechnungVoll,
+        zeile,
+        rechnungArt === 'voll' ? 'abschlag' : rechnungArt,
+        positionenFuerBeleg,
+        { reverseCharge13b: input.meta.reverse_charge_13b }
+      )
+    }
   }
 
   const payload = {
-    positionen,
+    positionen: positionenFuerBeleg,
     leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
     leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
     faellig_am: input.meta.faellig_am || null,
@@ -1028,12 +1050,17 @@ export async function createAllAbschlagRechnungenFromWizard(
 
   const versandZeileId = input.versandZeileId?.trim() || null
   const versand =
-    erstellt.find((r) => r.zeileId === versandZeileId && r.status === 'entwurf') ??
-    erstellt.find((r) => r.status === 'entwurf') ??
-    erstellt[0]
+    (versandZeileId
+      ? erstellt.find((r) => r.zeileId === versandZeileId && r.status === 'entwurf')
+      : undefined) ??
+    erstellt.find((r) => r.status === 'entwurf')
 
   if (!versand) {
-    return { ok: false, message: 'Keine Rechnung zum Versand verfügbar.' }
+    return {
+      ok: false,
+      message:
+        'Keine Entwurfs-Rechnung für die gewählte Rate. Bereits bezahlte/gestellte Rechnungen können hier nicht als Vorschau dienen — offene Rate prüfen.',
+    }
   }
 
   revalidatePath('/rechnungen')

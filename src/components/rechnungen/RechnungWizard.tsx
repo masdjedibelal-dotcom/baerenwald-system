@@ -624,6 +624,7 @@ export function RechnungWizard({
 
   const persistEinzel = useCallback(
     async (): Promise<string | null> => {
+      const planAktiv = hatAuftrag && hasPlan && Boolean(aktivRate)
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
         toast.error('Mindestens eine Position erforderlich.')
@@ -638,6 +639,7 @@ export function RechnungWizard({
         return null
       }
       const nextMeta = buildMetaForSave()
+      const sel = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
       setSaving(true)
       try {
         const res = await saveRechnungWizardDraft({
@@ -647,9 +649,17 @@ export function RechnungWizard({
           kunde_id: kundeId,
           positionen: positionenBerechnet,
           meta: nextMeta,
-          modus: hatAuftrag && rechnungsart === 'abschlag' ? 'abschlag' : 'voll',
-          zahlungsplan: null,
-          zahlungsplanSpeichern: false,
+          modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
+          abschlag:
+            planAktiv && sel
+              ? {
+                  zeileId: sel.id,
+                  zeileIndex: sel.index,
+                  rechnungArt: sel.istSchluss ? 'schluss' : 'abschlag',
+                }
+              : null,
+          zahlungsplan: planAktiv ? plan : null,
+          zahlungsplanSpeichern: planAktiv,
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
@@ -686,6 +696,8 @@ export function RechnungWizard({
       mailBetreff,
       hasPlan,
       aktivRate,
+      plan,
+      planKontext.zeilen,
       rFaellig,
       rechnungsart,
       defaultBetreff,
@@ -766,7 +778,12 @@ export function RechnungWizard({
       toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Zahlplan entfernen.')
       return null
     }
-    return hasPlan ? persistPlan() : persistEinzel()
+    // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
+    if (hasPlan && aktivRate) {
+      return persistEinzel()
+    }
+    if (hasPlan) return persistPlan()
+    return persistEinzel()
   }
 
   async function handleFinish(sendMail: boolean) {
@@ -1020,7 +1037,13 @@ export function RechnungWizard({
   const wizard = (
     <WizardShell
       className="wizard-flow"
-      title="Rechnung erstellen"
+      title={
+        selBerechnet?.istSchluss
+          ? 'Schlussrechnung erstellen'
+          : rateLocked && selBerechnet
+            ? 'Abschlagsrechnung erstellen'
+            : 'Rechnung erstellen'
+      }
       steps={wizardSteps}
       currentStep={shellStep}
       onClose={handleRequestClose}
