@@ -9,7 +9,6 @@ import {
   validateZahlungsplanGegenGesamt,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import type { AuftragPosition } from '@/lib/types'
 import {
@@ -30,7 +29,7 @@ export async function saveAuftragZahlungsplan(
 
   const { data: auftragRow, error: loadErr } = await supabase
     .from('auftraege')
-    .select('zahlungsplan, positionen')
+    .select('zahlungsplan')
     .eq('id', auftragId)
     .maybeSingle()
 
@@ -68,14 +67,15 @@ export async function saveAuftragZahlungsplan(
     normalized = merged.plan
   }
 
-  const rawPos = auftragRow?.positionen
+  const { data: auftragPosRows } = await supabase
+    .from('auftrag_positionen')
+    .select('*')
+    .eq('auftrag_id', auftragId)
+    .order('sort_order', { ascending: true })
+
   let gesamtNetto = 0
-  if (Array.isArray(rawPos) && rawPos.length > 0) {
-    const first = rawPos[0] as Record<string, unknown>
-    const asAngebot =
-      typeof first.gewerk_slug === 'string' || typeof first.leistung_name === 'string'
-        ? normalizeAngebotPositionen(rawPos as Parameters<typeof normalizeAngebotPositionen>[0])
-        : auftragPositionenToAngebotPositionen(rawPos as AuftragPosition[])
+  if (auftragPosRows?.length) {
+    const asAngebot = auftragPositionenToAngebotPositionen(auftragPosRows as AuftragPosition[])
     gesamtNetto = auftragSummenAusPositionen(asAngebot).netto
   }
 

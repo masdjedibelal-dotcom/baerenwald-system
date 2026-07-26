@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   MockBadge,
   MockBtn,
@@ -40,16 +40,24 @@ import { cn, formatDatum } from '@/lib/utils'
 
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'bestand', 'rechnung'] as const
 
-const VORGAENGE_COLS: ResizableColDef[] = [
-  { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
-  { id: 'kunde', defaultWidth: 200, minWidth: 140, maxWidth: 420 },
-  { id: 'titel', defaultWidth: 200, minWidth: 120, maxWidth: 480 },
-  { id: 'phase', defaultWidth: 140, minWidth: 100, maxWidth: 220 },
-  { id: 'wert', defaultWidth: 100, minWidth: 72, maxWidth: 160 },
-  { id: 'datum', defaultWidth: 110, minWidth: 88, maxWidth: 160 },
-  { id: 'status', defaultWidth: 110, minWidth: 88, maxWidth: 180 },
+/** Daten-Spalten — Kunde/Titel bewusst breiter als Phase/Status/Wert/Datum. */
+const VORGAENGE_DATA_COLS: ResizableColDef[] = [
+  { id: 'kunde', defaultWidth: 260, minWidth: 160, maxWidth: 520 },
+  { id: 'titel', defaultWidth: 300, minWidth: 180, maxWidth: 640 },
+  { id: 'phase', defaultWidth: 100, minWidth: 88, maxWidth: 140 },
+  { id: 'wert', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
+  { id: 'datum', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
+  { id: 'status', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
   { id: 'actions', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
+
+const VORGAENGE_CHECK_COL: ResizableColDef = {
+  id: 'check',
+  defaultWidth: 36,
+  minWidth: 36,
+  maxWidth: 36,
+  fixed: true,
+}
 
 const PHASE_META: Record<
   VorgangPhase,
@@ -173,9 +181,26 @@ export function VorgaengeListeClient({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
+  /** Bei konkreter Phase-Filter ist die Phase-Spalte redundant (Tab sagt es schon). */
+  const showPhaseCol = filter === 'alle'
+  const colDefs = useMemo(() => {
+    const data = showPhaseCol
+      ? VORGAENGE_DATA_COLS
+      : VORGAENGE_DATA_COLS.filter((c) => c.id !== 'phase')
+    return selectMode ? [VORGAENGE_CHECK_COL, ...data] : data
+  }, [showPhaseCol, selectMode])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    'crm.cols.vorgaenge.v1',
-    VORGAENGE_COLS
+    `crm.cols.vorgaenge.v2.${selectMode ? 'sel' : 'base'}.${showPhaseCol ? 'ph' : 'noph'}`,
+    colDefs
+  )
+  const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
+  const startColResize = useCallback(
+    (id: string, e: ReactPointerEvent) => {
+      const i = colIndex(id)
+      if (i < 0) return
+      startResize(i, e)
+    },
+    [colIndex, startResize]
   )
 
   useEffect(() => {
@@ -836,27 +861,29 @@ export function VorgaengeListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectAll()
-            }}
-            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          {selectMode ? (
+            <div
+              className="vg-check"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleSelectAll()
+              }}
+              title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
+                {allFilteredSelected || allPageSelected ? (
+                  <MockIcon ctx="default" n="check" size={12} />
+                ) : null}
+              </span>
+            </div>
+          ) : null}
           <MockSortHead
             col="kunde"
             sortCol={sortCol}
             sortDir={sortDir}
             onSort={(c) => toggleSort(c as SortCol)}
             resizable
-            onResizePointerDown={(e) => startResize(1, e)}
+            onResizePointerDown={(e) => startColResize('kunde', e)}
           >
             Kunde
           </MockSortHead>
@@ -866,20 +893,22 @@ export function VorgaengeListeClient({
             sortDir={sortDir}
             onSort={(c) => toggleSort(c as SortCol)}
             resizable
-            onResizePointerDown={(e) => startResize(2, e)}
+            onResizePointerDown={(e) => startColResize('titel', e)}
           >
             Vorgang
           </MockSortHead>
-          <MockSortHead
-            col="phase"
-            sortCol={sortCol}
-            sortDir={sortDir}
-            onSort={(c) => toggleSort(c as SortCol)}
-            resizable
-            onResizePointerDown={(e) => startResize(3, e)}
-          >
-            Phase
-          </MockSortHead>
+          {showPhaseCol ? (
+            <MockSortHead
+              col="phase"
+              sortCol={sortCol}
+              sortDir={sortDir}
+              onSort={(c) => toggleSort(c as SortCol)}
+              resizable
+              onResizePointerDown={(e) => startColResize('phase', e)}
+            >
+              Phase
+            </MockSortHead>
+          ) : null}
           <MockSortHead
             col="wert"
             sortCol={sortCol}
@@ -887,7 +916,7 @@ export function VorgaengeListeClient({
             onSort={(c) => toggleSort(c as SortCol)}
             right
             resizable
-            onResizePointerDown={(e) => startResize(4, e)}
+            onResizePointerDown={(e) => startColResize('wert', e)}
           >
             Wert
           </MockSortHead>
@@ -897,7 +926,7 @@ export function VorgaengeListeClient({
             sortDir={sortDir}
             onSort={(c) => toggleSort(c as SortCol)}
             resizable
-            onResizePointerDown={(e) => startResize(5, e)}
+            onResizePointerDown={(e) => startColResize('datum', e)}
           >
             Datum
           </MockSortHead>
@@ -907,7 +936,7 @@ export function VorgaengeListeClient({
             sortDir={sortDir}
             onSort={(c) => toggleSort(c as SortCol)}
             resizable
-            onResizePointerDown={(e) => startResize(6, e)}
+            onResizePointerDown={(e) => startColResize('status', e)}
           >
             Status
           </MockSortHead>
@@ -950,31 +979,37 @@ export function VorgaengeListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(key)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[key] && 'on')}>
-                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                {selectMode ? (
+                  <div
+                    className="vg-check"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSel(key)
+                    }}
+                  >
+                    <span className={cn('vg-box', selected[key] && 'on')}>
+                      {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="vg-kunde">
-                  <span>{v.kundeName ?? '—'}</span>
+                  <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
+                    {v.kundeName ?? '—'}
+                  </span>
                 </div>
                 <div className="vg-vorgang">
                   <div className="t" title={v.titel}>
                     {v.titel}
                   </div>
                 </div>
-                <div className="vg-phase">
-                  <span className="ph-neutral">
-                    <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
-                    {PHASE_META[v.phase].label}
-                  </span>
-                </div>
+                {showPhaseCol ? (
+                  <div className="vg-phase">
+                    <span className="ph-neutral">
+                      <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
+                      {PHASE_META[v.phase].label}
+                    </span>
+                  </div>
+                ) : null}
                 <div
                   className="vg-wert"
                   style={{

@@ -4768,8 +4768,8 @@ div.input input::placeholder {
 
 .vg-row {
   display: grid;
-  /* Fallback; Desktop: --list-cols von useResizableColumns */
-  grid-template-columns: 36px minmax(160px,1.8fr) minmax(140px,1.6fr) 140px 96px 100px 100px 40px;
+  /* Fallback ohne Checkbox — Desktop setzt --list-cols via useResizableColumns */
+  grid-template-columns: minmax(200px, 2fr) minmax(220px, 2.4fr) 100px 88px 96px 96px 40px;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
@@ -4778,7 +4778,7 @@ div.input input::placeholder {
   transition: background 120ms ease;
 }
 .vg-selectmode .vg-row {
-  grid-template-columns: 36px minmax(160px,1.8fr) minmax(140px,1.6fr) 140px 96px 100px 100px 40px;
+  grid-template-columns: 36px minmax(200px, 2fr) minmax(220px, 2.4fr) 100px 88px 96px 96px 40px;
 }
 @media (min-width: 761px) {
   .listcard--cols .vg-row,
@@ -4842,6 +4842,7 @@ div.input input::placeholder {
 .vg-vorgang .t { font-size: 13px; font-weight: 400; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 3ch; flex: 0 1 auto; }
 .vg-vorgang .m { font-size: 11.5px; color: var(--text-3); font-family: ui-monospace, monospace; }
 .vg-kunde { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.vg-kunde__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vg-row > div { font-size: 13px; color: var(--text-2); }
 .vg-row.head > div { font-size: 11px; color: var(--text-3); }
 .vg-kunde span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
