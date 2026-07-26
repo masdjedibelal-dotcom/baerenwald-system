@@ -423,8 +423,8 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
 }
 
 /**
- * Soft-Storno ohne Ersatzbeleg — nur bei gesendet (nicht bezahlt).
- * Für den seltenen Fall „ohne neue Rechnung“.
+ * Soft-Storno ohne Ersatzbeleg — Entwurf oder gesendet (nicht bezahlt).
+ * Gibt die Planzeile wieder frei für „neu stellen“.
  */
 export async function storniereRechnungOhneErsatz(
   rechnungId: string
@@ -437,10 +437,18 @@ export async function storniereRechnungOhneErsatz(
     .maybeSingle()
 
   if (error || !orig) return { ok: false, message: 'Rechnung nicht gefunden.' }
-  if (String(orig.status) !== 'gesendet') {
+  const status = String(orig.status)
+  if (status === 'bezahlt') {
     return {
       ok: false,
-      message: 'Ohne Ersatz nur bei gesendeten, noch nicht bezahlten Rechnungen.',
+      message:
+        'Bezahlte Rechnung: bitte „Rechnung korrigieren“ (Storno-Gutschrift) auf der Rechnungsseite nutzen.',
+    }
+  }
+  if (status !== 'gesendet' && status !== 'entwurf') {
+    return {
+      ok: false,
+      message: 'Ohne Ersatz nur bei Entwurf oder gesendeten, noch nicht bezahlten Rechnungen.',
     }
   }
   return updateRechnungStatus(rechnungId, 'storniert')

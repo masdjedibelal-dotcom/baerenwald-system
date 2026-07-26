@@ -250,12 +250,19 @@ export function AngebotWizard({
   )
 
   const [mounted, setMounted] = useState(false)
+  const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const [step, setStep] = useState(() => {
     const s = Number(initialStep)
     if (Number.isFinite(s) && s >= 1 && s <= 5) return Math.floor(s)
     if (focusField === 'positionen') return 2
+    // Korrektur = Job „Leistungen anpassen“, nicht Typ-Wizard
+    if (bootstrap?.auftragKorrektur?.auftragId) return 2
     return 1
   })
+
+  useEffect(() => {
+    if (istAuftragKorrektur && step === 1) setStep(2)
+  }, [istAuftragKorrektur, step])
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
       .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -310,7 +317,6 @@ export function AngebotWizard({
   const [wichtigeHinweisePersist] = useState(() => bootstrap?.wichtige_hinweise?.trim() ?? '')
   const [zahlungsplan] = useState<Zahlungsplan | null>(() => bootstrap?.zahlungsplan ?? null)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
-  const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
   const wizardTitel = istAuftragKorrektur ? 'Angebot korrigieren' : 'Angebot erstellen'
   const [saving, setSaving] = useState(false)
@@ -900,11 +906,20 @@ export function AngebotWizard({
 
   if (!mounted) return null
 
-  const wizardSteps = WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
+  const wizardSteps = istAuftragKorrektur
+    ? [
+        { id: 2, label: 'Leistungen' },
+        { id: 3, label: 'Texte' },
+        { id: 4, label: 'Vorschau' },
+        { id: 5, label: 'Fertig' },
+      ]
+    : WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
+
+  const minStep = istAuftragKorrektur ? 2 : 1
 
   const wizardDesktopActions = (
     <div className="wizard-nav-actions">
-      {step > 1 ? (
+      {step > minStep ? (
         <MockBtn kind="ghost" icon="chevron-left" disabled={saving} onClick={() => setStep((s) => s - 1)}>
           Zurück
         </MockBtn>
@@ -922,19 +937,19 @@ export function AngebotWizard({
         <>
           <MockBtn
             kind="ghost"
-            icon="send"
-            disabled={saving}
-            onClick={() => void handleFinishVersenden()}
-          >
-            An Kunden senden
-          </MockBtn>
-          <MockBtn
-            kind="primary"
             icon="check"
             disabled={saving}
             onClick={() => void handleFinishKorrekturSpeichern()}
           >
-            {saving ? 'Speichern…' : 'Speichern & übernehmen'}
+            {saving ? 'Speichern…' : 'Nur übernehmen'}
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="send"
+            disabled={saving}
+            onClick={() => void handleFinishVersenden()}
+          >
+            {saving ? 'Senden…' : 'An Kunden senden'}
           </MockBtn>
         </>
       ) : (
@@ -955,7 +970,7 @@ export function AngebotWizard({
   const wizardMobileFooter =
     step < WIZARD_TOTAL_STEPS ? (
       <>
-        {step > 1 ? (
+        {step > minStep ? (
           <MockBtn
             kind="ghost"
             icon="chevron-left"
@@ -990,17 +1005,21 @@ export function AngebotWizard({
         <div className="wizard-mobile-footer__end">
           {istAuftragKorrektur ? (
             <>
-              <MockBtn kind="ghost" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
-                {saving ? '…' : 'Senden'}
-              </MockBtn>
               <MockBtn
-                kind="primary"
-                icon="check"
-                className="wizard-mobile-footer__primary"
+                kind="ghost"
                 disabled={saving}
                 onClick={() => void handleFinishKorrekturSpeichern()}
               >
-                {saving ? '…' : 'Übernehmen'}
+                {saving ? '…' : 'Nur übernehmen'}
+              </MockBtn>
+              <MockBtn
+                kind="primary"
+                icon="send"
+                className="wizard-mobile-footer__primary"
+                disabled={saving}
+                onClick={() => void handleFinishVersenden()}
+              >
+                {saving ? '…' : 'Senden'}
               </MockBtn>
             </>
           ) : (
@@ -1029,7 +1048,7 @@ export function AngebotWizard({
       title={wizardTitel}
       subtitle={
         istAuftragKorrektur
-          ? `Korrektur für laufenden Auftrag · ${name}`
+          ? `Leistungen & Endabrechnung korrigieren · ${name}`
           : undefined
       }
       steps={wizardSteps}
@@ -1222,8 +1241,9 @@ export function AngebotWizard({
             gewerke={gewerkNamen}
             preislisten={preislisten}
             hideAddGewerk={dokumentTyp === 'einfach'}
-            suggestContext={posSuggestContext}
+            suggestContext={istAuftragKorrektur ? null : posSuggestContext}
             headerAction={
+              istAuftragKorrektur ? undefined : (
               <AngebotKiAssistentButton
                 sm
                 label="Mit KI"
@@ -1236,6 +1256,7 @@ export function AngebotWizard({
                 gewerke={kiGewerke}
                 onApply={applyAngebotKi}
               />
+              )
             }
           />
         </>
@@ -1396,9 +1417,10 @@ export function AngebotWizard({
             <span>
               {istAuftragKorrektur ? (
                 <>
-                  <strong>Speichern &amp; übernehmen</strong> = mündlich zugesagt, ohne Kunden-Mail —
-                  Auftrag &amp; Positionen werden aktualisiert; danach Abschlagsplan / Schlussrechnung
-                  anpassen. <strong>An Kunden senden</strong> = korrigiertes Angebot per Mail.
+                  <strong>An Kunden senden</strong> = korrigiertes Angebot per Mail (Primary).{' '}
+                  <strong>Nur übernehmen</strong> = mündlich / intern, ohne Kunden-Mail — danach
+                  Abschlagsplan und Schlussrechnung prüfen (falsch gestellte Schlussrechnung ggf.
+                  stornieren).
                 </>
               ) : (
                 <>Mit „Angebot versenden“ wird das Angebot als PDF per E-Mail zugestellt.</>

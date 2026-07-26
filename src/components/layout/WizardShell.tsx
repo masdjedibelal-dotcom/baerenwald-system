@@ -47,10 +47,15 @@ export function WizardShell({
   const rootRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
-  const stepMeta = steps.find((s) => s.id === currentStep)
+  const stepIndex = Math.max(
+    0,
+    steps.findIndex((s) => s.id === currentStep)
+  )
+  const stepOrdinal = stepIndex + 1
+  const stepMeta = steps[stepIndex]
   const stepLabel = stepMeta
-    ? `Schritt ${currentStep}: ${stepMeta.label}`
-    : `Schritt ${currentStep}`
+    ? `Schritt ${stepOrdinal}: ${stepMeta.label}`
+    : `Schritt ${stepOrdinal}`
 
   useEffect(() => {
     const root = rootRef.current
@@ -102,7 +107,7 @@ export function WizardShell({
           <WizardMobileToolbar
             onClose={onClose}
             totalSteps={steps.length}
-            currentStep={currentStep}
+            currentStep={stepOrdinal}
             stepLabel={stepLabel}
             actions={mobileActions}
             saveHint={saveHint}
@@ -124,12 +129,12 @@ export function WizardShell({
                   <div
                     className={cn(
                       'step',
-                      s.id === currentStep && 'active',
-                      s.id < currentStep && 'done'
+                      i === stepIndex && 'active',
+                      i < stepIndex && 'done'
                     )}
                   >
                     <div className="step-n">
-                      {s.id < currentStep ? <MockIcon ctx="default" n="check" size={11} /> : s.id}
+                      {i < stepIndex ? <MockIcon ctx="default" n="check" size={11} /> : i + 1}
                     </div>
                     <span>{s.label}</span>
                   </div>

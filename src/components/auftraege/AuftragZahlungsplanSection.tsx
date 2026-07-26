@@ -12,7 +12,10 @@ import { MockModal } from '@/components/mock-ui/MockModal'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { saveAuftragZahlungsplan, clearAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import { updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
+import {
+  storniereRechnungOhneErsatz,
+  updateRechnungStatus,
+} from '@/app/(dashboard)/rechnungen/actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   berechneZahlungsplan,
@@ -103,6 +106,10 @@ export function AuftragZahlungsplanSection({
   const [vorschau, setVorschau] = useState<RechnungAuswahlZeile | null>(null)
 
   useEffect(() => {
+    setPlan(initial)
+  }, [initial])
+
+  useEffect(() => {
     if (!autoOpenEditor) return
     setEditorOpen(true)
   }, [autoOpenEditor])
@@ -160,6 +167,42 @@ export function AuftragZahlungsplanSection({
   )
   const planLoeschGate = zahlplanDarfGeloeschtWerden(plan, abschlagLinks)
 
+  function rechnungFuerZeile(zeileId: string): RechnungAuswahlZeile | null {
+    const link = rechnungFuerAbschlagZeile(zeileId, abschlagLinks)
+    if (!link?.id) return null
+    return rechnungById.get(link.id) ?? null
+  }
+
+  /** Gestellte Rate weicht vom aktuellen Plan (nach Angebotskorrektur) ab. */
+  const abweichendeGestellte = useMemo(() => {
+    const out: Array<{
+      zeileId: string
+      titel: string
+      planBrutto: number
+      rechnungBrutto: number
+      rechnungId: string
+    }> = []
+    for (const z of kontext.zeilen) {
+      const st = zahlplanRateStatus(z.id, abschlagLinks)
+      if (st !== 'gestellt') continue
+      const link = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
+      if (!link?.id) continue
+      const r = rechnungById.get(link.id)
+      if (!r) continue
+      const planBrutto = Number(z.brutto) || 0
+      const rechnungBrutto = Number(r.brutto ?? 0) || 0
+      if (Math.abs(planBrutto - rechnungBrutto) < 0.5) continue
+      out.push({
+        zeileId: z.id,
+        titel: z.titel,
+        planBrutto,
+        rechnungBrutto,
+        rechnungId: r.id,
+      })
+    }
+    return out
+  }, [kontext.zeilen, abschlagLinks, rechnungById])
+
   function speichern(next: Zahlungsplan) {
     if (!next.zeilen.length) {
       toast.error('Mindestens eine Abschlagszeile erforderlich.')
@@ -198,10 +241,36 @@ export function AuftragZahlungsplanSection({
     })
   }
 
-  function rechnungFuerZeile(zeileId: string): RechnungAuswahlZeile | null {
-    const link = rechnungFuerAbschlagZeile(zeileId, abschlagLinks)
-    if (!link?.id) return null
-    return rechnungById.get(link.id) ?? null
+  /** Falsche gestellte Rate freigeben und neue Rechnung aus aktuellem Plan öffnen. */
+  function stornierenUndNeuStellen(zeileId: string) {
+    const r = rechnungFuerZeile(zeileId)
+    if (!r?.id) {
+      toast.error('Keine Rechnung zu dieser Rate gefunden.')
+      return
+    }
+    const z = kontext.zeilen.find((x) => x.id === zeileId)
+    const planBrutto = Number(z?.brutto) || 0
+    const alt = Number(r.brutto ?? 0) || 0
+    if (
+      !window.confirm(
+        `Gestellte Rechnung (${formatEurBetrag(alt)}) stornieren und neue Rechnung` +
+          (planBrutto > 0 ? ` über ${formatEurBetrag(planBrutto)}` : '') +
+          ' aus dem aktuellen Plan anlegen?'
+      )
+    ) {
+      return
+    }
+    startTransition(async () => {
+      const res = await storniereRechnungOhneErsatz(r.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success('Alte Rechnung storniert — jetzt Betrag aus dem korrigierten Plan')
+      onRefresh?.()
+      router.refresh()
+      onCreateInvoice({ zeileId })
+    })
   }
 
   function rowMenu(zeileId: string, st: ZahlplanRateStatus): EntityMenuItem[] {
@@ -213,6 +282,14 @@ export function AuftragZahlungsplanSection({
         icon: 'file-invoice',
         label: 'Rechnung erstellen',
         onClick: () => onCreateInvoice({ zeileId }),
+      })
+    }
+
+    if (st === 'gestellt' && r?.id) {
+      items.push({
+        icon: 'history',
+        label: 'Stornieren & neu stellen',
+        onClick: () => stornierenUndNeuStellen(zeileId),
       })
     }
 
@@ -405,11 +482,25 @@ export function AuftragZahlungsplanSection({
       <WerkzeugPanel
         title="Abschlagsplan"
         icon="calculator"
-        purpose="Ratenliste — nächste offene Rate stellen oder den Plan anpassen."
+        purpose={
+          abweichendeGestellte.length
+            ? 'Gestellte Schlussrechnung weicht von der neuen Auftragssumme ab — stornieren und neu stellen.'
+            : 'Ratenliste — nächste offene Rate stellen oder den Plan anpassen.'
+        }
         framed
         actions={
           <div className="zahlplan-head-actions">
-            {naechsteOffeneZeile ? (
+            {abweichendeGestellte[0] ? (
+              <MockBtn
+                sm
+                kind="primary"
+                icon="history"
+                disabled={pending}
+                onClick={() => stornierenUndNeuStellen(abweichendeGestellte[0]!.zeileId)}
+              >
+                Schluss neu stellen
+              </MockBtn>
+            ) : naechsteOffeneZeile ? (
               <MockBtn
                 sm
                 kind="primary"
@@ -419,17 +510,15 @@ export function AuftragZahlungsplanSection({
                 Nächste Rechnung
               </MockBtn>
             ) : null}
+            <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditorOpen(true)}>
+              Plan anpassen
+            </MockBtn>
             <MockBtn sm kind="ghost" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
               Vollrechnung
             </MockBtn>
             <MockEntityRowMenu
               title="Plan-Aktionen"
               items={[
-                {
-                  label: 'Plan korrigieren',
-                  icon: 'pencil',
-                  onClick: () => setEditorOpen(true),
-                },
                 ...(planLoeschGate.ok
                   ? [
                       {
@@ -451,6 +540,32 @@ export function AuftragZahlungsplanSection({
           </div>
         }
       >
+        {abweichendeGestellte.length > 0 ? (
+          <div
+            role="status"
+            style={{
+              marginBottom: 12,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-2, #f4f5f4)',
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: 'var(--text-2)',
+            }}
+          >
+            <b style={{ color: 'var(--text)' }}>Auftragssumme geändert — gestellte Rechnung passt nicht mehr.</b>
+            <div style={{ marginTop: 4 }}>
+              {abweichendeGestellte.map((a) => (
+                <div key={a.zeileId}>
+                  „{a.titel}“: gestellt {formatEurBetrag(a.rechnungBrutto)} · Plan jetzt{' '}
+                  {formatEurBetrag(a.planBrutto)}. Plan speichern allein ändert die Rechnung nicht — zuerst
+                  stornieren, dann neu stellen.
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="zahlplan-summary">
           <span className="zahlplan-summary__left">
             Bezahlt {formatEurBetrag(bezahltBrutto)}
@@ -476,7 +591,11 @@ export function AuftragZahlungsplanSection({
           {kontext.zeilen.map((z) => {
             const st = zahlplanRateStatus(z.id, abschlagLinks)
             const r = rechnungFuerZeile(z.id)
-            const betrag = Number(r?.brutto ?? z.brutto) || 0
+            const planBrutto = Number(z.brutto) || 0
+            const rechnungBrutto = r ? Number(r.brutto ?? 0) || 0 : 0
+            const abweichung =
+              st === 'gestellt' && r != null && Math.abs(planBrutto - rechnungBrutto) >= 0.5
+            const betrag = st === 'geplant' || !r ? planBrutto : rechnungBrutto
             const pctLabel =
               z.typ === 'prozent'
                 ? z.wert
@@ -494,14 +613,37 @@ export function AuftragZahlungsplanSection({
                   {pctLabel != null ? (
                     <span className="zahlplan-row__pct"> · {pctLabel}%</span>
                   ) : null}
+                  {abweichung ? (
+                    <div className="zahlplan-row__pct" style={{ display: 'block', marginTop: 2 }}>
+                      Plan jetzt {formatEurBetrag(planBrutto)} — Rechnung veraltet
+                    </div>
+                  ) : null}
                 </div>
                 <div className="zahlplan-row__betrag">{formatEurBetrag(betrag)}</div>
                 <div className="zahlplan-row__faellig">{faellig ? formatDatum(faellig) : '—'}</div>
                 <div>{rateBadge(st)}</div>
                 <div className="zahlplan-row__vorschau">
-                  {r ? (
+                  {abweichung ? (
+                    <MockBtn
+                      sm
+                      kind="primary"
+                      disabled={pending}
+                      onClick={() => stornierenUndNeuStellen(z.id)}
+                    >
+                      Neu stellen
+                    </MockBtn>
+                  ) : r ? (
                     <MockBtn sm kind="ghost" icon="eye" onClick={() => setVorschau(r)}>
                       Vorschau
+                    </MockBtn>
+                  ) : st === 'geplant' ? (
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="file-invoice"
+                      onClick={() => onCreateInvoice({ zeileId: z.id })}
+                    >
+                      Erstellen
                     </MockBtn>
                   ) : (
                     <span className="zahlplan-row__pct">—</span>
