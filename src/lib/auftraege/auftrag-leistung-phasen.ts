@@ -1,9 +1,11 @@
 import type { AuftragPosition } from '@/lib/types'
 import {
   groupAuftragPositionenByGewerk,
+  istInterneAuftragGewerkBeschreibung,
   type AuftragGewerkBlock,
   type GewerkOpt,
 } from '@/lib/auftraege/auftrag-position-blocks'
+import { istAuftragPositionEntfernt } from '@/lib/auftraege/auftrag-position-aktiv'
 
 /** Ausführungsphasen im Auftrag (Oberpunkte unter Positionen). Leer = ohne Phase. */
 export const AUFTRAG_LEISTUNG_PHASEN = [
@@ -135,8 +137,9 @@ export function summenPositionen(positionen: AuftragPosition[]): {
   eigen: number
   marge: number
 } {
-  const verkauf = positionen.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
-  const partner = positionen.reduce((s, p) => s + preisPartner(p), 0)
-  const eigen = positionen.reduce((s, p) => s + preisEigenleistung(p), 0)
+  const aktiv = positionen.filter((p) => !istAuftragPositionEntfernt(p) && !istInterneAuftragGewerkBeschreibung(p))
+  const verkauf = aktiv.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
+  const partner = aktiv.reduce((s, p) => s + preisPartner(p), 0)
+  const eigen = aktiv.reduce((s, p) => s + preisEigenleistung(p), 0)
   return { verkauf, partner, eigen, marge: verkauf - partner - eigen }
 }

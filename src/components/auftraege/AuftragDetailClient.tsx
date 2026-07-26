@@ -70,6 +70,7 @@ import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import {
   defaultZahlungszielTage,
@@ -536,7 +537,7 @@ export function AuftragDetailClient({
     (_leadDetail && leadKontaktAnzeigeName(_leadDetail, '')) ||
     kunde?.name ||
     'Auftrag'
-  const posCount = detail.auftrag_positionen?.length ?? 0
+  const posCount = auftragPositionenFuerSumme(detail.auftrag_positionen).length
 
   const vorgangFotos = useMemo(
     () =>
@@ -802,7 +803,7 @@ export function AuftragDetailClient({
   )
 
   const auftragNettoSumme = useMemo(() => {
-    const ap = detail.auftrag_positionen ?? []
+    const ap = auftragPositionenFuerSumme(detail.auftrag_positionen)
     if (ap.length) {
       // Auftrag: lohn_fix/material_fix/preis_fix sind Zeilensummen — erst in Stückpreise wandeln
       return auftragSummenAusPositionen(auftragPositionenToAngebotPositionen(ap)).netto

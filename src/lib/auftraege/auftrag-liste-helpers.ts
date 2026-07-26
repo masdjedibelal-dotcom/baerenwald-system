@@ -1,6 +1,7 @@
-import type { AuftragListeEintrag, AuftragStatus } from '@/lib/types'
+import type { AuftragListeEintrag, AuftragStatus, AuftragDetail } from '@/lib/types'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { formatDatum, formatPreis } from '@/lib/utils'
+import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
 
 export type AuftragListenPhase = '' | 'aktiv' | 'fertig'
 
@@ -33,11 +34,20 @@ export function auftragOrt(a: AuftragListeEintrag): string {
 }
 
 export function auftragWertNum(a: AuftragListeEintrag): number {
+  const pos = (a as AuftragDetail).auftrag_positionen
+  if (Array.isArray(pos) && pos.length) {
+    return auftragPositionenFuerSumme(pos).reduce((s, p) => s + (p.preis_fix ?? 0), 0)
+  }
   if (!a.angebote) return 0
   return a.angebote.gesamt_fix ?? a.angebote.gesamt_max ?? a.angebote.gesamt_min ?? 0
 }
 
 export function auftragWertAnzeige(a: AuftragListeEintrag): string {
+  const pos = (a as AuftragDetail).auftrag_positionen
+  if (Array.isArray(pos) && pos.length) {
+    const netto = auftragPositionenFuerSumme(pos).reduce((s, p) => s + (p.preis_fix ?? 0), 0)
+    return formatPreis(netto, null, null)
+  }
   if (!a.angebote) return '—'
   return formatPreis(
     a.angebote.gesamt_fix ?? null,

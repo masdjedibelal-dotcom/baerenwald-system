@@ -64,7 +64,7 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   auftragId: string
   angebotId: string
 }): Promise<
-  | { ok: true; neu: number; aktualisiert: number }
+  | { ok: true; neu: number; aktualisiert: number; entfernt: number }
   | { ok: false; message: string }
 > {
   const supabase = createClient()
@@ -110,6 +110,7 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   const teile: string[] = []
   if (sync.neu > 0) teile.push(`${sync.neu} neu`)
   if (sync.aktualisiert > 0) teile.push(`${sync.aktualisiert} aktualisiert`)
+  if (sync.entfernt > 0) teile.push(`${sync.entfernt} entfernt`)
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
     typ: 'notiz_intern',

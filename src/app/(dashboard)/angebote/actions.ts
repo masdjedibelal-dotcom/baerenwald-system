@@ -511,6 +511,8 @@ export async function updateAngebot(
 
   const positionen = normalizeAngebotPositionen(input.positionen)
   const summen = summenAusPositionen(positionen, 19)
+  const gesamtFix =
+    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
 
   const preislisteSyncUpd = syncInputsFromAngebotPositionen(positionen)
   if (input.varianten !== undefined) {
@@ -570,6 +572,7 @@ export async function updateAngebot(
       positionen,
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
+      gesamt_fix: gesamtFix,
       notizen: input.notizen,
       preis_typ: input.preis_typ ?? 'fix',
       vorlage_id: input.vorlage_id ?? null,

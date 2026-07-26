@@ -60,7 +60,10 @@ export function AuftragLeistungenV3Tab({
 
   const disabled = auftragAbgeschlossen
   const sorted = useMemo(
-    () => [...positionen].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    () =>
+      [...positionen]
+        .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [positionen]
   )
   const blocks = useMemo(() => groupPositionenByGewerkSlug(sorted, gewerke), [sorted, gewerke])
