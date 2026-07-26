@@ -58,7 +58,8 @@ const FORTSCHRITT_BY_STATUS: Record<AuftragStatus, number> = {
 
 async function setAuftragStatus(
   auftragId: string,
-  status: AuftragStatus
+  status: AuftragStatus,
+  opts?: { timelineBeschreibung?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const fortschritt = FORTSCHRITT_BY_STATUS[status] ?? 0
@@ -122,6 +123,7 @@ async function setAuftragStatus(
     auftrag_id: auftragId,
     typ: 'status_change',
     titel: `Status: ${AUFTRAG_STATUS_LABELS[status] ?? status}`,
+    beschreibung: opts?.timelineBeschreibung,
     erstellt_von: uid,
   })
 
@@ -135,6 +137,51 @@ export async function updateAuftragStatusFromUi(
   status: AuftragStatus
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   return setAuftragStatus(auftragId, status)
+}
+
+/**
+ * Nach aktiver Voll- oder Schlussrechnung Auftrag auf „abgeschlossen“ setzen.
+ * Abschläge und Gutschriften ändern den Auftragsstatus nicht.
+ */
+export async function completeAuftragNachEndabrechnung(input: {
+  auftragId: string | null | undefined
+  rechnungArt: string | null | undefined
+  rechnungsnummer?: string | null
+  belegTyp?: string | null
+}): Promise<{ ok: true; changed: boolean } | { ok: false; message: string }> {
+  const auftragId = input.auftragId?.trim()
+  if (!auftragId) return { ok: true, changed: false }
+
+  const beleg = (input.belegTyp ?? 'rechnung').trim().toLowerCase()
+  if (beleg === 'gutschrift') return { ok: true, changed: false }
+
+  const art = (input.rechnungArt ?? 'voll').trim().toLowerCase()
+  if (art !== 'voll' && art !== 'schluss') return { ok: true, changed: false }
+
+  const supabase = createClient()
+  const { data: row, error } = await supabase
+    .from('auftraege')
+    .select('id, status')
+    .eq('id', auftragId)
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!row) return { ok: true, changed: false }
+
+  const st = String(row.status ?? '').trim().toLowerCase()
+  if (st === 'abgeschlossen' || st === 'storniert') return { ok: true, changed: false }
+
+  const nr = input.rechnungsnummer?.trim()
+  const label = art === 'schluss' ? 'Schlussrechnung' : 'Vollrechnung'
+  const res = await setAuftragStatus(auftragId, 'abgeschlossen', {
+    timelineBeschreibung: nr
+      ? `Automatisch nach ${label} ${nr}.`
+      : `Automatisch nach ${label}.`,
+  })
+  if (!res.ok) return res
+
+  revalidatePath('/vorgaenge')
+  return { ok: true, changed: true }
 }
 
 export async function updateAuftragFortschrittManual(

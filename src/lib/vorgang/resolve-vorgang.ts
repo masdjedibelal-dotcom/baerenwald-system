@@ -79,17 +79,18 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
 
 /**
  * Weitere Rechnungszeilen in der Liste (nicht der Stamm-Vorgang).
- * Abschlag/Schluss bleiben Satelliten — der Auftrag-Stamm bleibt in Phase Auftrag,
- * solange der Auftrag offen/aktiv ist.
+ * Nur laufende Abschläge sind Satelliten — Auftrag bleibt unter „Aufträge“ sichtbar.
+ * Schlussrechnung ist Endabrechnung wie Vollrechnung (kein Satellit).
  */
 export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
   const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
-  return art === 'abschlag' || art === 'schluss'
+  return art === 'abschlag'
 }
 
 /**
- * Nur Vollrechnungen (versendet/bezahlt) ziehen den Stamm in die Rechnungsphase.
- * Abschlag/Schluss allein lassen den offenen Auftrag unter „Aufträge“ sichtbar.
+ * Vollrechnung und Schlussrechnung (versendet/bezahlt) ziehen den Stamm in die
+ * Rechnungsphase — analog Endabrechnung. Abschläge allein lassen den offenen
+ * Auftrag unter „Aufträge“ sichtbar.
  */
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
   const st = (rechnung.status ?? '').trim().toLowerCase()
@@ -197,7 +198,7 @@ type PhasePick = {
 }
 
 /** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage).
- * Versendete Rechnungen aller Arten (Voll/Abschlag/Schluss) gewinnen die Stamm-Phase. */
+ * Versendete Voll- und Schlussrechnung gewinnen die Stamm-Phase; Abschläge bleiben Satelliten. */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []

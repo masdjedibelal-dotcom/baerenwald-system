@@ -1177,7 +1177,8 @@ export async function sendRechnungWizard(input: {
   return { ok: true }
 }
 
-/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation). */
+/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation).
+ * Voll-/Schlussrechnung: Status „gesendet“ + Auftrag abgeschlossen. */
 export async function finalizeRechnungWizardWithoutMail(
   rechnungId: string
 ): Promise<{ ok: true; rechnungsnummer: string } | { ok: false; message: string }> {
@@ -1186,13 +1187,42 @@ export async function finalizeRechnungWizardWithoutMail(
 
   const { data: rec } = await supabaseAdmin
     .from('rechnungen')
-    .select('rechnungsnummer, auftrag_id')
+    .select('rechnungsnummer, auftrag_id, rechnung_art, beleg_typ, status')
     .eq('id', rechnungId)
     .maybeSingle()
+
+  const art = String(rec?.rechnung_art ?? 'voll').trim().toLowerCase()
+  const isEndabrechnung = art === 'voll' || art === 'schluss'
+  const st = String(rec?.status ?? '').trim().toLowerCase()
+
+  if (isEndabrechnung && st === 'entwurf') {
+    const now = new Date().toISOString()
+    await supabaseAdmin
+      .from('rechnungen')
+      .update({
+        status: 'gesendet',
+        gesendet_at: now,
+        updated_at: now,
+      })
+      .eq('id', rechnungId)
+  }
+
+  if (isEndabrechnung && rec?.auftrag_id) {
+    const { completeAuftragNachEndabrechnung } = await import(
+      '@/app/(dashboard)/auftraege/actions'
+    )
+    await completeAuftragNachEndabrechnung({
+      auftragId: rec.auftrag_id as string,
+      rechnungArt: art,
+      rechnungsnummer: String(rec.rechnungsnummer ?? ''),
+      belegTyp: rec.beleg_typ as string | null,
+    })
+  }
 
   if (rec?.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath('/vorgaenge')
 
   return {
     ok: true,

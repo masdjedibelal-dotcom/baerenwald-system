@@ -7,12 +7,15 @@ export function PosTotals({
   ust,
   brutto,
   showUst = true,
+  ustLabel = 'MwSt 19%',
   className,
 }: {
   netto: number
   ust: number
   brutto: number
   showUst?: boolean
+  /** z. B. „MwSt 0% (§13b)“ bei Reverse Charge */
+  ustLabel?: string
   className?: string
 }) {
   const su = showUst !== false
@@ -46,7 +49,7 @@ export function PosTotals({
             <b style={{ fontVariantNumeric: 'tabular-nums' }}>{formatEurBetrag(netto)}</b>
           </div>
           <div style={row}>
-            <span style={{ color: 'var(--text-3)' }}>MwSt 19%</span>
+            <span style={{ color: 'var(--text-3)' }}>{ustLabel}</span>
             <b style={{ fontVariantNumeric: 'tabular-nums' }}>{formatEurBetrag(ust)}</b>
           </div>
         </>

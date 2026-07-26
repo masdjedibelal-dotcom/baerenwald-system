@@ -622,7 +622,11 @@ export async function updateRechnungStatus(
 ): Promise<UpdateRechnungStatusResult> {
   const supabase = createClient()
 
-  const { data: before } = await supabase.from('rechnungen').select('status, beleg_typ').eq('id', id).maybeSingle()
+  const { data: before } = await supabase
+    .from('rechnungen')
+    .select('status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer')
+    .eq('id', id)
+    .maybeSingle()
   if (!before) return { ok: false, message: 'Rechnung nicht gefunden' }
   if (before.status === status) return { ok: true }
 
@@ -647,11 +651,26 @@ export async function updateRechnungStatus(
     }
   }
 
+  if (
+    (status === 'gesendet' || status === 'bezahlt') &&
+    before.status !== 'gesendet' &&
+    before.status !== 'bezahlt'
+  ) {
+    const { completeAuftragNachEndabrechnung } = await import(
+      '@/app/(dashboard)/auftraege/actions'
+    )
+    await completeAuftragNachEndabrechnung({
+      auftragId: before.auftrag_id as string | null,
+      rechnungArt: before.rechnung_art as string | null,
+      rechnungsnummer: before.rechnungsnummer as string | null,
+      belegTyp: before.beleg_typ as string | null,
+    })
+  }
+
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${id}`)
-  const auftragId = (
-    await supabase.from('rechnungen').select('auftrag_id').eq('id', id).maybeSingle()
-  ).data?.auftrag_id as string | null | undefined
+  revalidatePath('/vorgaenge')
+  const auftragId = (before.auftrag_id as string | null | undefined) ?? null
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
 
   return { ok: true, zahlungsbestaetigungGesendet }
@@ -802,8 +821,21 @@ export async function sendRechnung(
 
   if (error) return { ok: false, message: error.message }
 
+  if (auftragId) {
+    const { completeAuftragNachEndabrechnung } = await import(
+      '@/app/(dashboard)/auftraege/actions'
+    )
+    await completeAuftragNachEndabrechnung({
+      auftragId,
+      rechnungArt: rec.rechnung_art,
+      rechnungsnummer,
+      belegTyp: rec.beleg_typ,
+    })
+  }
+
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath('/vorgaenge')
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
 }

@@ -16,6 +16,8 @@ import {
   firmenSteuerFooterZeilen,
   parseRechtshinweiseFromWizardMeta,
 } from '@/lib/angebote/angebot-rechtshinweise'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { buildAngebotHtml, type AngebotHtmlInput, type AngebotTemplatePosition } from '@/lib/templates/angebot-template'
 import {
   angebotPdfBegruessung,
@@ -164,7 +166,13 @@ export function buildAngebotHtmlInputAusDetail(
   }
 
   const pos = normalizeAngebotPositionen(detail.positionen)
-  const summen = summenAusPositionen(pos, 19)
+  const wm = wizardMetaAusNotizen(detail.notizen)
+  const rechtshinweise = parseRechtshinweiseFromWizardMeta(wm, kunde.typ, firm)
+  const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
+  const firmMwst = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ)
+  const mwstSatz =
+    rechtshinweise.hinweis_13b || kleinunternehmer ? 0 : firmMwst
+  const summen = summenAusPositionen(pos, mwstSatz)
 
   const istProjekt = detail.dokument_typ === 'projekt'
   const varianten = parseVariantenPersist(detail.varianten)
@@ -206,13 +214,13 @@ export function buildAngebotHtmlInputAusDetail(
 
   let variant_block: AngebotHtmlInput['variant_block'] = null
   if (hatZweiVarianten) {
-    const summenB = summenAusPositionen(posB, 19)
+    const summenB = summenAusPositionen(posB, mwstSatz)
     variant_block = {
       titel: varianten!.b.name?.trim() || 'Variante B',
       positionen: posBTemplate,
       summen: {
         netto: Math.round(summenB.nettoMin * 100) / 100,
-        mwst_prozent: 19,
+        mwst_prozent: mwstSatz,
         mwst_betrag: Math.round(summenB.mwstBetragMin * 100) / 100,
         brutto: Math.round(summenB.bruttoMin * 100) / 100,
       },
@@ -226,9 +234,6 @@ export function buildAngebotHtmlInputAusDetail(
     : detail.hinweise?.trim() || null
 
   const fuss = firmenFusszeilen(firm)
-  const wm = wizardMetaAusNotizen(detail.notizen)
-  const rechtshinweise = parseRechtshinweiseFromWizardMeta(wm, kunde.typ, firm)
-  const mwstSatz = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || 19)
   const projekt_bloecke = istProjekt
     ? buildProjektPdfBloecke(pos, varianten, gewerke, mwstSatz)
     : null

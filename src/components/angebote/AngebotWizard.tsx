@@ -9,6 +9,7 @@ import {
 } from '@/components/angebote/AngebotKiAssistent'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
+import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
 import {
   buildGewerkHandwerkerZuweisungen,
   gewerkHandwerkerZuweisungenToMaps,
@@ -53,7 +54,16 @@ import {
   type AngebotWizardMeta,
   type WizardPosition,
 } from '@/lib/angebote/angebot-wizard-types'
-import { summenAusPositionen } from '@/lib/angebot-positionen'
+import {
+  summenAusPositionen,
+  summenKostenaufstellungAusPositionen,
+} from '@/lib/angebot-positionen'
+import {
+  kannHinweis13bAngebot,
+  kannHinweis35aAngebot,
+} from '@/lib/angebote/angebot-rechtshinweise'
+import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import { findAnfahrtZeilen } from '@/lib/anfahrt-angebot'
 import {
@@ -388,10 +398,45 @@ export function AngebotWizard({
     setDraftDirty(draftSnapshot !== savedSnapshotRef.current)
   }, [draftSnapshot])
 
-  const mailSummen = useMemo(
-    () => summenAusPositionen(dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke), 19),
+  const positionenFuerSummen = useMemo(
+    () => dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),
     [zeilen, firm, gewerke]
   )
+  const lohnNettoPdf = useMemo(() => {
+    const ka = summenKostenaufstellungAusPositionen(positionenFuerSummen)
+    return ka?.lohn_netto ?? 0
+  }, [positionenFuerSummen])
+  const hinweis13bErlaubt = kannHinweis13bAngebot(kundeTyp, firm)
+  const hinweis35aErlaubt = kannHinweis35aAngebot(kundeTyp, firm, lohnNettoPdf)
+  const reverseChargeAktiv = Boolean(meta.hinweis_13b && hinweis13bErlaubt)
+  const firmMwstSatz = Math.max(
+    0,
+    parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ
+  )
+  const effektiverMwstSatz =
+    reverseChargeAktiv || parseKleinunternehmerSetting(firm.kleinunternehmer)
+      ? 0
+      : firmMwstSatz
+  const mailSummen = useMemo(
+    () => summenAusPositionen(positionenFuerSummen, effektiverMwstSatz),
+    [positionenFuerSummen, effektiverMwstSatz]
+  )
+
+  useEffect(() => {
+    setMeta((m) => {
+      let next = m
+      if (m.hinweis_13b && !hinweis13bErlaubt) {
+        next = { ...next, hinweis_13b: false }
+      }
+      if (
+        m.hinweis_35a &&
+        (!kundeZeigt35a(kundeTyp) || parseKleinunternehmerSetting(firm.kleinunternehmer))
+      ) {
+        next = { ...next, hinweis_35a: false }
+      }
+      return next === m ? m : next
+    })
+  }, [kundeTyp, firm, hinweis13bErlaubt])
 
   useEffect(() => {
     const hat = findAnfahrtZeilen(zeilen).length > 0
@@ -1334,10 +1379,26 @@ export function AngebotWizard({
             />
           </MockField>
           <div className="full">
+            <AngebotWizardRechtlicheHinweiseCard
+              meta={meta}
+              onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+              hinweis35aErlaubt={hinweis35aErlaubt}
+              hinweis13bErlaubt={hinweis13bErlaubt}
+              lohnNettoPdf={lohnNettoPdf}
+            />
+          </div>
+          <div className="full">
             <PosTotals
               netto={mailSummen.nettoMin}
               ust={mailSummen.mwstBetragMin}
               brutto={mailSummen.bruttoMin}
+              ustLabel={
+                reverseChargeAktiv
+                  ? 'MwSt 0% (§13b)'
+                  : effektiverMwstSatz === 0
+                    ? 'MwSt 0%'
+                    : `MwSt ${effektiverMwstSatz}%`
+              }
             />
           </div>
         </div>
