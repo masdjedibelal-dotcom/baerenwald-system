@@ -61,6 +61,8 @@ export type RechnungAbschlagLink = {
   status?: string | null
   brutto?: number | null
   netto?: number | null
+  mwst_satz?: number | null
+  mwst_betrag?: number | null
   rechnungsnummer?: string | null
   faellig_am?: string | null
 }
@@ -357,8 +359,9 @@ function round1(n: number): string {
 }
 
 /**
- * Schlussrechnung: alle Auftragsleistungen + Abzug bereits gestellter Abschläge.
- * Abschlagsrechnung: zugeordnete Leistungen oder eine Pauschalzeile (ohne Leistungsaufstellung).
+ * Schlussrechnung: alle Auftragsleistungen (Übersicht).
+ * Abzüge erscheinen nicht als Positionszeile — im PDF als Summenblock
+ * (Netto → MwSt → Brutto → bereits gezahlt → Restsumme).
  */
 export function positionenFuerAbschlagRechnung(input: {
   zeile: ZahlungsplanZeileBerechnet
@@ -368,17 +371,13 @@ export function positionenFuerAbschlagRechnung(input: {
   auftragsReferenz: string
   projektTitel: string
   bereitsGestelltBrutto: number
-  /** Bereits gestellte Abschläge (für Schluss-Abzugszeilen). */
+  /** @deprecated Abzüge laufen über den Summenblock, nicht als Position. */
   vorherigeAbschlaege?: RechnungAbschlagLink[] | null
   ausserRechnungId?: string | null
 }): AngebotPosition[] {
   if (input.zeile.istSchluss) {
     return buildSchlussrechnungPositionen({
       allePositionen: input.allePositionen,
-      vorherigeAbschlaege: input.vorherigeAbschlaege ?? [],
-      ausserRechnungId: input.ausserRechnungId,
-      ausserZeileId: input.zeile.id,
-      auftragsReferenz: input.auftragsReferenz,
     })
   }
 
@@ -407,19 +406,146 @@ export function abschlagAbzugNetto(r: RechnungAbschlagLink): number {
   }
   const brutto = Number(r.brutto)
   if (!Number.isFinite(brutto) || Math.abs(brutto) < 0.0001) return 0
-  // Ohne Netto: bei Reverse-Charge / 0 % USt ist Brutto = Netto
   return Math.round(Math.abs(brutto) * 100) / 100
 }
 
-/** Schlussrechnung = Leistungsübersicht + Abzüge der vorherigen Abschläge. */
+/** MwSt.-Satz der Abzugszeile = Satz der Original-Abschlagsrechnung. */
+export function abschlagAbzugMwstSatz(r: RechnungAbschlagLink): number | undefined {
+  const s = Number(r.mwst_satz)
+  if (s === 0 || s === 7 || s === 19) return s
+  const mwst = Number(r.mwst_betrag)
+  if (Number.isFinite(mwst) && Math.abs(mwst) < 0.01) return 0
+  const netto = Number(r.netto)
+  const brutto = Number(r.brutto)
+  if (
+    Number.isFinite(netto) &&
+    Number.isFinite(brutto) &&
+    Math.abs(netto) > 0.0001 &&
+    Math.abs(brutto - netto) < 0.02
+  ) {
+    return 0
+  }
+  return undefined
+}
+
+export type SchlussAbrechnungZeile = {
+  label: string
+  brutto: number
+  netto: number
+  mwst_betrag: number
+}
+
+export type SchlussAbrechnung = {
+  /** Summe aller Leistungen (vor Abzug) */
+  netto: number
+  mwst_prozent: number
+  mwst_betrag: number
+  brutto: number
+  bereits_gezahlt: SchlussAbrechnungZeile[]
+  bereits_gezahlt_brutto: number
+  /** Noch zu zahlen */
+  rest_netto: number
+  rest_mwst: number
+  rest_brutto: number
+}
+
+function roundGeld(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/** Klartext-Abrechnung Schluss: Leistungen → bereits gezahlt → Rest. */
+export function berechneSchlussAbrechnung(
+  leistungen: AngebotPosition[],
+  vorherigeAbschlaege: RechnungAbschlagLink[],
+  opts?: {
+    reverseCharge13b?: boolean
+    kleinunternehmer?: boolean
+    defaultMwstSatz?: number
+    ausserRechnungId?: string | null
+    ausserZeileId?: string | null
+  }
+): SchlussAbrechnung {
+  const nurLeistungen = normalizeAngebotPositionen(leistungen).filter((p) => {
+    if (istAbschlagPauschalPosition(p)) return false
+    if ((p.gewerk_slug ?? '').toLowerCase() === 'abschlag_abzug') return false
+    if ((p.leistung ?? '').toLowerCase().startsWith('abzüglich')) return false
+    return true
+  })
+  const voll = berechneRechnung(nurLeistungen, {
+    kleinunternehmer: opts?.kleinunternehmer ?? false,
+    reverseCharge13b: opts?.reverseCharge13b ?? false,
+    defaultMwstSatz: opts?.defaultMwstSatz ?? 19,
+  })
+
+  const bereits_gezahlt: SchlussAbrechnungZeile[] = []
+  const gesehen = new Set<string>()
+  for (const r of vorherigeAbschlaege) {
+    if (r.id === opts?.ausserRechnungId) continue
+    if (r.status === 'storniert') continue
+    if (r.rechnung_art !== 'abschlag' && r.rechnung_art !== 'schluss') continue
+    if (
+      opts?.ausserZeileId &&
+      r.zahlungsplan_abschlag_id &&
+      r.zahlungsplan_abschlag_id === opts.ausserZeileId
+    ) {
+      continue
+    }
+    if (gesehen.has(r.id)) continue
+    gesehen.add(r.id)
+    const netto = abschlagAbzugNetto(r)
+    const bruttoRaw = Number(r.brutto)
+    const brutto =
+      Number.isFinite(bruttoRaw) && Math.abs(bruttoRaw) > 0.0001
+        ? roundGeld(Math.abs(bruttoRaw))
+        : netto
+    if (brutto <= 0 && netto <= 0) continue
+    const mwstRaw = Number(r.mwst_betrag)
+    const mwst_betrag =
+      Number.isFinite(mwstRaw) && Math.abs(mwstRaw) > 0.0001
+        ? roundGeld(Math.abs(mwstRaw))
+        : roundGeld(Math.max(0, brutto - netto))
+    const idx = r.abschlag_index && r.abschlag_index > 0 ? r.abschlag_index : bereits_gezahlt.length + 1
+    const nr = r.rechnungsnummer?.trim()
+    bereits_gezahlt.push({
+      label: `Abschlag ${idx}${nr ? ` (${nr})` : ''}`,
+      brutto: brutto || netto,
+      netto,
+      mwst_betrag,
+    })
+  }
+
+  const bereits_gezahlt_brutto = roundGeld(
+    bereits_gezahlt.reduce((s, z) => s + z.brutto, 0)
+  )
+  const bereitsNetto = roundGeld(bereits_gezahlt.reduce((s, z) => s + z.netto, 0))
+  const bereitsMwst = roundGeld(bereits_gezahlt.reduce((s, z) => s + z.mwst_betrag, 0))
+
+  const rest_netto = roundGeld(Math.max(0, voll.netto - bereitsNetto))
+  const rest_mwst = roundGeld(Math.max(0, voll.mwst_betrag - bereitsMwst))
+  const rest_brutto = roundGeld(Math.max(0, voll.brutto - bereits_gezahlt_brutto))
+
+  return {
+    netto: voll.netto,
+    mwst_prozent: voll.mwst_satz || opts?.defaultMwstSatz || 19,
+    mwst_betrag: voll.mwst_betrag,
+    brutto: voll.brutto,
+    bereits_gezahlt,
+    bereits_gezahlt_brutto,
+    rest_netto,
+    rest_mwst,
+    rest_brutto,
+  }
+}
+
+/** Schlussrechnung = nur Leistungsübersicht (keine Abzugszeilen). */
 export function buildSchlussrechnungPositionen(input: {
   allePositionen: AngebotPosition[]
-  vorherigeAbschlaege: RechnungAbschlagLink[]
+  vorherigeAbschlaege?: RechnungAbschlagLink[]
   ausserRechnungId?: string | null
   ausserZeileId?: string | null
   auftragsReferenz?: string
 }): AngebotPosition[] {
-  const leistungen = normalizeAngebotPositionen(input.allePositionen).filter((p) => {
+  return normalizeAngebotPositionen(input.allePositionen).filter((p) => {
     if (istAbschlagPauschalPosition(p)) return false
     if ((p.gewerk_slug ?? '').toLowerCase() === 'abschlag_abzug') return false
     if ((p.leistung ?? '').toLowerCase().startsWith('abzüglich')) return false
@@ -428,48 +554,6 @@ export function buildSchlussrechnungPositionen(input: {
     }
     return true
   })
-
-  const abzuege: AngebotPosition[] = []
-  const gesehen = new Set<string>()
-  for (const r of input.vorherigeAbschlaege) {
-    if (r.id === input.ausserRechnungId) continue
-    if (r.status === 'storniert') continue
-    if (r.rechnung_art !== 'abschlag' && r.rechnung_art !== 'schluss') continue
-    if (
-      input.ausserZeileId &&
-      r.zahlungsplan_abschlag_id &&
-      r.zahlungsplan_abschlag_id === input.ausserZeileId
-    ) {
-      continue
-    }
-    if (gesehen.has(r.id)) continue
-    gesehen.add(r.id)
-    const betrag = abschlagAbzugNetto(r)
-    if (betrag <= 0) continue
-    const idx = r.abschlag_index && r.abschlag_index > 0 ? r.abschlag_index : abzuege.length + 1
-    const nr = r.rechnungsnummer?.trim()
-    const ref = input.auftragsReferenz?.trim()
-    abzuege.push({
-      id: neueZahlungsplanId(),
-      gewerk_id: '',
-      gewerk_slug: 'abschlag_abzug',
-      gewerk_name: 'Abzug',
-      leistung: `Abzüglich Abschlag ${idx}${nr ? ` (${nr})` : ''}`,
-      beschreibung: ref
-        ? `Bereits abgerechnet · ${ref}`
-        : 'Bereits gestellte Abschlagsrechnung',
-      menge: 1,
-      einheit: 'Pauschale',
-      lohn_netto: -betrag,
-      material_netto: 0,
-      gesamt_min: -betrag,
-      gesamt_max: -betrag,
-      vk_netto: -betrag,
-      preis_typ: 'fix',
-    })
-  }
-
-  return [...leistungen, ...abzuege]
 }
 
 export function rechnungArtFuerZeile(zeile: ZahlungsplanZeileBerechnet): RechnungArt {

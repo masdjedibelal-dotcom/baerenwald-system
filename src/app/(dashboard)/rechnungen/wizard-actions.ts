@@ -42,6 +42,7 @@ import {
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
   istAbschlagPauschalPosition,
+  berechneSchlussAbrechnung,
   positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
@@ -209,7 +210,7 @@ async function rechnungenAbschlagLinks(
   const { data } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, rechnungsnummer'
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer'
     )
     .eq('auftrag_id', auftragId)
   return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
@@ -815,13 +816,34 @@ export async function saveRechnungWizardDraft(
         vorherigeAbschlaege: links,
         ausserRechnungId: input.rechnungId ?? null,
       })
-      liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
-        berechnungVoll,
-        zeile,
-        rechnungArt === 'voll' ? 'abschlag' : rechnungArt,
-        positionenFuerBeleg,
-        { reverseCharge13b: input.meta.reverse_charge_13b }
-      )
+      if (zeile.istSchluss || rechnungArt === 'schluss') {
+        const schluss = berechneSchlussAbrechnung(positionenFuerBeleg, links, {
+          reverseCharge13b: input.meta.reverse_charge_13b,
+          ausserRechnungId: input.rechnungId ?? null,
+          ausserZeileId: zeile.id,
+        })
+        liste_berechnung = {
+          ...berechnungVoll,
+          netto: schluss.rest_netto,
+          mwst_betrag: schluss.rest_mwst,
+          brutto: schluss.rest_brutto,
+          mwst_satz: schluss.mwst_prozent,
+          lohn_netto: berechnungVoll.lohn_netto,
+          material_netto: berechnungVoll.material_netto,
+          mwst_aufschluesselung:
+            schluss.rest_mwst > 0
+              ? [{ satz: schluss.mwst_prozent, netto: schluss.rest_netto, mwst: schluss.rest_mwst }]
+              : [{ satz: 0, netto: schluss.rest_netto, mwst: 0 }],
+        }
+      } else {
+        liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
+          berechnungVoll,
+          zeile,
+          rechnungArt === 'voll' ? 'abschlag' : rechnungArt,
+          positionenFuerBeleg,
+          { reverseCharge13b: input.meta.reverse_charge_13b }
+        )
+      }
     }
   }
 
@@ -982,13 +1004,40 @@ export async function createAllAbschlagRechnungenFromWizard(
       vorherigeAbschlaege: bestehend,
       ausserRechnungId: bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)?.id ?? null,
     })
-    const liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
-      berechnungVoll,
-      zeile,
-      rechnungArt,
-      zeilenPos,
-      { reverseCharge13b: input.meta.reverse_charge_13b }
-    )
+    const liste_berechnung =
+      rechnungArt === 'schluss'
+        ? (() => {
+            const schluss = berechneSchlussAbrechnung(zeilenPos, bestehend, {
+              reverseCharge13b: input.meta.reverse_charge_13b,
+              ausserRechnungId:
+                bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)?.id ?? null,
+              ausserZeileId: zeile.id,
+            })
+            return {
+              ...berechnungVoll,
+              netto: schluss.rest_netto,
+              mwst_betrag: schluss.rest_mwst,
+              brutto: schluss.rest_brutto,
+              mwst_satz: schluss.mwst_prozent,
+              mwst_aufschluesselung:
+                schluss.rest_mwst > 0
+                  ? [
+                      {
+                        satz: schluss.mwst_prozent,
+                        netto: schluss.rest_netto,
+                        mwst: schluss.rest_mwst,
+                      },
+                    ]
+                  : [{ satz: 0, netto: schluss.rest_netto, mwst: 0 }],
+            }
+          })()
+        : rechnungBerechnungFuerAbschlagZeile(
+            berechnungVoll,
+            zeile,
+            rechnungArt,
+            zeilenPos,
+            { reverseCharge13b: input.meta.reverse_charge_13b }
+          )
 
     const existing = bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)
     if (existing && existing.status !== 'entwurf') {

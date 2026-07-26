@@ -45,10 +45,12 @@ export function mapAngebotPositionenToTemplateRows(
       const einzel =
         (() => {
           const unit = Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0)
-          if (unit > 0) return Math.round(unit * 100) / 100
+          if (Math.abs(unit) > 0.0001) return Math.round(unit * 100) / 100
           const a = Number(p.gesamt_min ?? 0)
           const b = Number(p.gesamt_max ?? 0)
-          if (a <= 0 && b <= 0) return 0
+          if (Math.abs(a) < 0.0001 && Math.abs(b) < 0.0001) return 0
+          if (Math.abs(a) > 0.0001 && Math.abs(b) < 0.0001) return Math.round(a * 100) / 100
+          if (Math.abs(b) > 0.0001 && Math.abs(a) < 0.0001) return Math.round(b * 100) / 100
           return a === b ? Math.round(a * 100) / 100 : Math.round(((a + b) / 2) * 100) / 100
         })()
       const gesamt = Math.round(einzel * menge * 100) / 100

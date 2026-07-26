@@ -259,11 +259,12 @@ export function normalizeAngebotPosition(
   } else {
     out.position_quelle = 'frei'
   }
-  const mwstRaw = num(r.mwst_satz)
+  const mwstRaw =
+    r.mwst_satz != null && r.mwst_satz !== '' ? num(r.mwst_satz) : NaN
   if (mwstRaw === 0 || mwstRaw === 7 || mwstRaw === 19) out.mwst_satz = mwstRaw
   const kostenverteilung = parseKostenverteilung(r.kostenverteilung)
   if (kostenverteilung) out.kostenverteilung = kostenverteilung
-  if (vkRaw > 0) out.vk_netto = vkRaw
+  if (vkRaw > 0 || (erlaubtNegativ && vkRaw < 0)) out.vk_netto = vkRaw
   if (r.kostenart === 'anfahrt' || gewerk_slug === GEWERK_SLUG_ANFAHRT) out.kostenart = 'anfahrt'
   if (einkaufspreis != null && einkaufspreis > 0) out.einkaufspreis = einkaufspreis
   if (handwerker_id) out.handwerker_id = handwerker_id

@@ -142,6 +142,19 @@ export type AngebotHtmlInput = {
   /** Rechnung: voll | abschlag | schluss — steuert PDF-Überschrift */
   rechnung_typ?: 'voll' | 'abschlag' | 'schluss' | null
   rechnung_abschlag_index?: number | null
+  /**
+   * Schlussrechnung (v. a. Privatkunde): klarer Summenblock
+   * Netto → MwSt → Brutto → bereits gezahlt → Restsumme
+   */
+  schluss_abrechnung?: {
+    netto: number
+    mwst_prozent: number
+    mwst_betrag: number
+    brutto: number
+    bereits_gezahlt: Array<{ label: string; brutto: number }>
+    bereits_gezahlt_brutto: number
+    rest_brutto: number
+  } | null
 }
 
 function esc(s: string): string {
@@ -374,9 +387,38 @@ function rechtshinweisePlain(
 function summenBlockHtml(
   s: AngebotTemplateSummen,
   ka?: AngebotKostenaufstellung | null,
-  rh?: AngebotPdfRechtshinweise | null
+  rh?: AngebotPdfRechtshinweise | null,
+  schluss?: AngebotHtmlInput['schluss_abrechnung']
 ): string {
   const recht = rechtshinweisePlain(rh, ka)
+
+  if (schluss && schluss.brutto > 0) {
+    const bereitsZeilen = schluss.bereits_gezahlt
+      .map(
+        (z) =>
+          `<tr><td style="padding:3px 4px;">Bereits gezahlt · ${esc(z.label)}</td><td style="padding:3px 4px;text-align:right;">−${euro(z.brutto)}</td></tr>`
+      )
+      .join('')
+    const summenSpalte = `<div style="width:300px;flex-shrink:0;">
+    <table style="width:100%;font-size:10pt;font-weight:400;">
+      <tr><td style="padding:3px 4px;">Gesamtbetrag (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.netto)}</td></tr>
+      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(schluss.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.mwst_betrag)}</td></tr>
+      <tr><td style="padding:3px 4px;font-weight:600;">Gesamtbetrag (brutto)</td><td style="padding:3px 4px;text-align:right;font-weight:600;">${euro(schluss.brutto)}</td></tr>
+      ${bereitsZeilen}
+    </table>
+    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid #111;">
+      <tr><td style="padding:8px 4px 4px;">Restsumme</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${euro(schluss.rest_brutto)}</td></tr>
+    </table>
+  </div>`
+    if (!recht) {
+      return `<div style="margin-top:14px;display:flex;justify-content:flex-end;">${summenSpalte}</div>`
+    }
+    return `<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
+    <div style="flex:1;min-width:0;padding-top:2px;">${recht}</div>
+    ${summenSpalte}
+  </div>`
+  }
+
   const summenSpalte = `<div style="width:300px;flex-shrink:0;">
     ${kostenaufstellungPlain(ka, true)}
     <table style="width:100%;font-size:10pt;font-weight:400;">
@@ -1105,7 +1147,7 @@ export function buildAngebotHtml(
   ${erstePosUeberschrift}
   ${posTables}
   ${fotosBlock}
-  ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise)}
+  ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise, props.schluss_abrechnung)}
   ${variantBlock}
   <div style="margin-top:18px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${plainTextToPdfHtml(props.zahlungsbedingungen)}</div>
   ${istRechnung ? bankBlock : ''}
