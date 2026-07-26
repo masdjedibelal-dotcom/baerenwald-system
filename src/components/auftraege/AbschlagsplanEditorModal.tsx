@@ -47,16 +47,31 @@ function planToRates(plan: Zahlungsplan, gesamtNetto: number): EditorRate[] {
   })
 }
 
-function ratesToPlan(rates: EditorRate[]): Zahlungsplan {
-  const zeilen: ZahlungsplanZeile[] = rates.map((r) =>
-    neueZahlungsplanZeile({
+/**
+ * Editor speichert alles als %-Zeilen. Eingefrorene Raten (gestellt/bezahlt) müssen
+ * 1:1 aus dem bisherigen Plan bleiben — sonst wird z. B. typ „rest“ zu „prozent“
+ * und der Server-Gate blockiert mit „Betrag/Typ nicht änderbar“.
+ */
+function ratesToPlan(
+  rates: EditorRate[],
+  initial: Zahlungsplan | null,
+  frozenIds: string[]
+): Zahlungsplan {
+  const frozen = new Set(frozenIds)
+  const initialById = new Map((initial?.zeilen ?? []).map((z) => [z.id, z]))
+  const zeilen: ZahlungsplanZeile[] = rates.map((r) => {
+    if (frozen.has(r.id)) {
+      const orig = initialById.get(r.id)
+      if (orig) return { ...orig }
+    }
+    return neueZahlungsplanZeile({
       id: r.id,
       titel: r.label.trim() || 'Abschlag',
       typ: 'prozent',
       wert: Number(r.prozent) || 0,
       faellig_am: r.faellig_am.trim() || null,
     })
-  )
+  })
   return { modus: 'abschlagsplan', zeilen }
 }
 
@@ -139,7 +154,7 @@ export function AbschlagsplanEditorModal({
             kind="primary"
             icon="check"
             disabled={!ok || saving}
-            onClick={() => onSave(ratesToPlan(rates))}
+            onClick={() => onSave(ratesToPlan(rates, initial, frozenIds))}
           >
             {saving ? 'Speichere…' : 'Plan speichern'}
           </MockBtn>
@@ -169,8 +184,9 @@ export function AbschlagsplanEditorModal({
 
       {frozen.size > 0 ? (
         <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.45 }}>
-          Eingefrorene Raten (gestellt/bezahlt) bleiben unverändert. Du kannst nur offene Raten anpassen
-          oder ergänzen.
+          Eingefrorene Raten (gestellt/bezahlt) bleiben unverändert — Betrag/Typ sind gesperrt. Offene
+          Raten kannst du anpassen. Soll eine eingefrorene Rate (z.&nbsp;B. Schlussrechnung) neu
+          berechnet werden: zugehörige Rechnung zuerst korrigieren oder stornieren.
         </p>
       ) : null}
 

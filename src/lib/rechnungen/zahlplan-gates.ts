@@ -70,9 +70,13 @@ export function zahlplanMergeMitEinfrieren(
     }
   }
 
-  // Eingefrorene Zeilen aus dem alten Stand behalten, Rest aus dem Editor
-  const editable = naechster.zeilen.filter((z) => !frozenIds.has(z.id))
-  const merged: ZahlungsplanZeile[] = [...frozen, ...editable]
+  // Reihenfolge aus dem Editor behalten; eingefrorene Zeilen inhaltlich aus dem alten Stand
+  const merged: ZahlungsplanZeile[] = naechster.zeilen.map((z) => {
+    if (frozenIds.has(z.id)) {
+      return frozen.find((f) => f.id === z.id) ?? z
+    }
+    return z
+  })
 
   if (!merged.length) {
     return { ok: false, message: 'Mindestens eine Abschlagszeile erforderlich.' }
