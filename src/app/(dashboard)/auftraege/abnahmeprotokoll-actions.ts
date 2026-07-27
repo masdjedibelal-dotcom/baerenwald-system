@@ -429,46 +429,81 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   maengel: AbnahmeMangel[]
   notizen: string | null
   meta?: AbnahmeProtokollMeta | null
+  /** Bestehendes Protokoll gezielt aktualisieren (sonst: letztes oder neu). */
+  protokollId?: string | null
 }): Promise<
-  | { ok: true; pdfBase64: string; filename: string; publicUrl: string }
+  | { ok: true; pdfBase64: string; filename: string; publicUrl: string; updated: boolean }
   | { ok: false; message: string }
 > {
-  const prepared = prepareAbnahmePayload(input)
-  const meta = input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null
-  const built = await buildPdfBuffer({ ...input, ...prepared, meta })
+  const existing = await loadAbnahmeprotokollSummary(
+    input.auftragId,
+    input.protokollId
+  )
+  const prepared = prepareAbnahmePayload({
+    punkte: input.punkte,
+    maengel:
+      input.maengel.length > 0
+        ? input.maengel
+        : mergeMaengelFromPunkte(input.punkte, existing?.maengel ?? []),
+  })
+  const meta = input.meta
+    ? normalizeAbnahmeProtokollMeta(input.meta)
+    : existing?.meta ?? null
+  const built = await buildPdfBuffer({
+    auftragId: input.auftragId,
+    abnahmeDatum: input.abnahmeDatum,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    notizen: input.notizen,
+    meta,
+  })
   if (!built.ok) return built
 
   const stored = await persistPdf(input.auftragId, built.buffer)
   if (!stored.ok) return stored
 
-  const row = {
+  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
+  const protokollTyp: 'erstabnahme' | 'nachabnahme' = hatMaengel
+    ? 'nachabnahme'
+    : existing?.an_kunde_gesendet_at
+      ? 'nachabnahme'
+      : 'erstabnahme'
+  const rowPatch = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
     ...(meta ? { meta } : {}),
     pdf_url: stored.publicUrl,
-    protokoll_typ: 'erstabnahme',
+    protokoll_typ: protokollTyp,
+    updated_at: new Date().toISOString(),
   }
 
-  const { data: inserted, error: insErr } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .insert({
-      auftrag_id: input.auftragId,
-      ...row,
-    })
-    .select('id')
-    .single()
+  let protokollId = existing?.id ?? ''
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from('auftrag_abnahmeprotokolle')
+      .update(rowPatch)
+      .eq('id', existing.id)
+    if (error) return { ok: false, message: error.message }
+  } else {
+    const { data: inserted, error: insErr } = await supabaseAdmin
+      .from('auftrag_abnahmeprotokolle')
+      .insert({
+        auftrag_id: input.auftragId,
+        ...rowPatch,
+      })
+      .select('id')
+      .single()
 
-  if (insErr) {
-    if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
-      return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
+    if (insErr) {
+      if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
+        return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
+      }
+      return { ok: false, message: insErr.message }
     }
-    return { ok: false, message: insErr.message }
+    protokollId = (inserted as { id: string }).id
   }
-
-  const protokollId = (inserted as { id: string }).id
-  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
 
   await supabaseAdmin
     .from('auftraege')
@@ -485,17 +520,21 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     protokollId,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
-    prevOffeneMaengel: 0,
+    prevOffeneMaengel: existing ? countOffeneMaengel(existing.maengel) : 0,
   })
 
   const uid = await getAuthUserId()
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
     typ: 'abnahmeprotokoll_erstellt',
-    titel: 'Abnahmeprotokoll erstellt',
-    beschreibung: hatMaengel
-      ? `Abnahmeprotokoll erstellt — ${countOffeneMaengel(prepared.maengel)} Mängel in der Checkliste.`
-      : 'Abnahmeprotokoll als PDF erstellt.',
+    titel: existing ? 'Abnahmeprotokoll aktualisiert' : 'Abnahmeprotokoll erstellt',
+    beschreibung: existing
+      ? hatMaengel
+        ? `Abnahmeprotokoll korrigiert — ${countOffeneMaengel(prepared.maengel)} offene Mängel.`
+        : 'Abnahmeprotokoll korrigiert und PDF neu erzeugt.'
+      : hatMaengel
+        ? `Abnahmeprotokoll erstellt — ${countOffeneMaengel(prepared.maengel)} Mängel in der Checkliste.`
+        : 'Abnahmeprotokoll als PDF erstellt.',
     erstellt_von: uid,
     sichtbar_fuer_kunde: false,
   })
@@ -507,6 +546,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     pdfBase64: built.buffer.toString('base64'),
     filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
     publicUrl: stored.publicUrl,
+    updated: Boolean(existing),
   }
 }
 
@@ -584,7 +624,10 @@ export async function loadLetztesAbnahmeprotokoll(auftragId: string): Promise<{
   return { punkte: summary.punkte, maengel: summary.maengel }
 }
 
-export async function loadAbnahmeprotokollSummary(auftragId: string): Promise<{
+export async function loadAbnahmeprotokollSummary(
+  auftragId: string,
+  protokollId?: string | null
+): Promise<{
   id: string
   abnahme_datum: string
   notizen: string | null
@@ -595,24 +638,39 @@ export async function loadAbnahmeprotokollSummary(auftragId: string): Promise<{
   an_kunde_gesendet_at: string | null
   statistik: ReturnType<typeof abnahmePunkteStatistik>
 } | null> {
-  const { data, error } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .select('id, abnahme_datum, notizen, punkte, maengel, meta, pdf_url, an_kunde_gesendet_at')
-    .eq('auftrag_id', auftragId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error || !data) {
-    // Fallback ohne meta-Spalte (Migration noch nicht applied)
-    if (error && (error.message?.includes('meta') || error.code === '42703')) {
-      const { data: legacy } = await supabaseAdmin
+  const id = protokollId?.trim() || null
+  const { data, error } = id
+    ? await supabaseAdmin
         .from('auftrag_abnahmeprotokolle')
-        .select('id, abnahme_datum, notizen, punkte, maengel, pdf_url, an_kunde_gesendet_at')
+        .select('id, abnahme_datum, notizen, punkte, maengel, meta, pdf_url, an_kunde_gesendet_at')
+        .eq('auftrag_id', auftragId)
+        .eq('id', id)
+        .maybeSingle()
+    : await supabaseAdmin
+        .from('auftrag_abnahmeprotokolle')
+        .select('id, abnahme_datum, notizen, punkte, maengel, meta, pdf_url, an_kunde_gesendet_at')
         .eq('auftrag_id', auftragId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
+
+  if (error || !data) {
+    // Fallback ohne meta-Spalte (Migration noch nicht applied)
+    if (error && (error.message?.includes('meta') || error.code === '42703')) {
+      const { data: legacy } = id
+        ? await supabaseAdmin
+            .from('auftrag_abnahmeprotokolle')
+            .select('id, abnahme_datum, notizen, punkte, maengel, pdf_url, an_kunde_gesendet_at')
+            .eq('auftrag_id', auftragId)
+            .eq('id', id)
+            .maybeSingle()
+        : await supabaseAdmin
+            .from('auftrag_abnahmeprotokolle')
+            .select('id, abnahme_datum, notizen, punkte, maengel, pdf_url, an_kunde_gesendet_at')
+            .eq('auftrag_id', auftragId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
       if (!legacy) return null
       const punkteL = (legacy.punkte ?? []) as AbnahmePunkt[]
       const maengelL = normalizeMaengel((legacy.maengel ?? []) as AbnahmeMangel[])

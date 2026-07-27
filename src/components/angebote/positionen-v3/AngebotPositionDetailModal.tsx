@@ -1,6 +1,6 @@
 'use client'
 
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { positionNettoZeile } from '@/lib/angebot-positionen'
@@ -34,31 +34,17 @@ export function AngebotPositionDetailModal({
   const { ek, marge, pct } = angebotRowMarge(pos)
   const besch = pos.beschreibung?.trim()
   const hwName = pos.handwerker_name?.trim()
+  const canEdit = Boolean(editable && onEdit)
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={titel}
+      context="detail"
       size="lg"
-      footer={
-        editable && onEdit && onRemove ? (
-          <>
-            <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
-              Entfernen
-            </Button>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <Button type="button" variant="primary" onClick={onEdit} disabled={disabled}>
-                Bearbeiten
-              </Button>
-            </div>
-          </>
-        ) : (
-          <Button type="button" variant="primary" onClick={onClose}>
-            Schließen
-          </Button>
-        )
-      }
+      confirmDisabled={disabled || !canEdit}
+      onConfirm={canEdit ? onEdit : undefined}
     >
       <dl className="pos-v3-detail-grid">
         <div>
@@ -117,6 +103,13 @@ export function AngebotPositionDetailModal({
           </div>
         ) : null}
       </dl>
-    </Modal>
+      {editable && onRemove ? (
+        <div className="mt-4">
+          <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
+            Entfernen
+          </Button>
+        </div>
+      ) : null}
+    </EditorSheet>
   )
 }

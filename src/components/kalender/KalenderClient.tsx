@@ -8,12 +8,16 @@ import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
 import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { cn } from '@/lib/utils'
 import {
   deleteKalenderTermin,
   saveKalenderTermin,
 } from '@/app/(dashboard)/kalender/actions'
 import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
+import {
+  kalenderTerminEndeVergangen,
+} from '@/lib/kalender/termin-no-show-hint'
 
 type UiView = 'tag' | 'woche' | 'monat'
 
@@ -246,8 +250,7 @@ export function KalenderClient() {
     setCursor(new Date())
   }
 
-  function submitForm(e: React.FormEvent) {
-    e.preventDefault()
+  function saveTermin() {
     startTransition(async () => {
       const res = await saveKalenderTermin({
         id: editing?.id,
@@ -272,6 +275,11 @@ export function KalenderClient() {
       setEditing(null)
       await load()
     })
+  }
+
+  function submitForm(e: React.FormEvent) {
+    e.preventDefault()
+    saveTermin()
   }
 
   async function onDelete() {
@@ -475,6 +483,11 @@ export function KalenderClient() {
     editing && (editing.uhrzeit_von || editing.uhrzeit_bis)
       ? `${formatHm(editing.uhrzeit_von)}${editing.uhrzeit_bis ? `–${formatHm(editing.uhrzeit_bis)}` : ''} Uhr`
       : ''
+  const detailNoShowHinweis =
+    editing &&
+    !editing.erledigt &&
+    kalenderTerminEndeVergangen(editing) &&
+    (editing.typ === 'besichtigung' || editing.lead_id)
 
   return (
     <div>
@@ -566,40 +579,27 @@ export function KalenderClient() {
                 <div className="prop-v">{editing.beschreibung}</div>
               </div>
             ) : null}
+            {detailNoShowHinweis ? (
+              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted">
+                Kunde nicht erschienen? In der Anfrage{' '}
+                <strong className="font-medium text-ink">Aktionen → Nicht erreichbar</strong> setzen.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Modal>
 
-      <Modal
+      <EditorSheet
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
+        context="detail"
         size="md"
-        footer={
-          <div className="flex w-full items-center gap-2">
-            <MockBtn sm kind="ghost" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            {editing ? (
-              <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
-                Löschen
-              </MockBtn>
-            ) : null}
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              sm
-              kind="primary"
-              icon="check"
-              disabled={pending}
-              onClick={() => {
-                const form = document.getElementById('kalender-termin-form') as HTMLFormElement | null
-                form?.requestSubmit()
-              }}
-            >
-              {editing ? 'Speichern' : 'Termin anlegen'}
-            </MockBtn>
-          </div>
-        }
+        confirmBusy={pending}
+        onConfirm={() => {
+          const form = document.getElementById('kalender-termin-form') as HTMLFormElement | null
+          if (form?.reportValidity()) saveTermin()
+        }}
       >
         <form id="kalender-termin-form" onSubmit={submitForm} className="form-grid">
           <div className="full">
@@ -643,8 +643,15 @@ export function KalenderClient() {
               <Textarea label="Beschreibung" value={fDesc} onChange={(e) => setFDesc(e.target.value)} rows={2} />
             </div>
           ) : null}
+          {editing ? (
+            <div className="full pt-2">
+              <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
+                Termin löschen
+              </MockBtn>
+            </div>
+          ) : null}
         </form>
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }

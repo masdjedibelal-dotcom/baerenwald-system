@@ -5,7 +5,8 @@ import {
   type AngebotStatusEinfachRow,
 } from '@/lib/angebot-einfach'
 import type { AuftragStatus, LeadStatus, OrgFreigabeStatus } from '@/lib/types'
-import { AUFTRAG_STATUS_LABELS, STATUS_LABELS } from '@/lib/utils'
+import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
+import { AUFTRAG_STATUS_LABELS, STATUS_LABELS, formatDatum } from '@/lib/utils'
 import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
 
 export type StatusDisplay = {
@@ -40,8 +41,15 @@ const AUFTRAG_VARIANT: Record<AuftragStatus, StatusDisplayVariant> = {
   storniert: 'danger',
 }
 
+const RECHNUNG_VARIANT: Record<RechnungStatus, StatusDisplayVariant> = {
+  entwurf: 'neutral',
+  gesendet: 'active',
+  bezahlt: 'success',
+  storniert: 'danger',
+}
+
 /** Mieter-Meldung wartet auf HV-Freigabe (kein Notfall / über Schwelle) — bleibt unter Offen. */
-export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Warte auf HV'
+export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Warte auf Hausverwaltung'
 
 const ANFRAGE_GESCHLOSSEN = new Set(['abgebrochen', 'abgeschlossen', 'auftrag'])
 
@@ -77,6 +85,31 @@ export function auftragStatusDisplay(status: AuftragStatus | string): StatusDisp
   const variant =
     key in AUFTRAG_VARIANT ? AUFTRAG_VARIANT[key] : 'neutral'
   return { label, variant }
+}
+
+/** Nutzer-sichtbares Label + semantische Farbe für Rechnung. */
+export function rechnungStatusDisplay(
+  status: RechnungStatus | string,
+  opts?: { ueberfaellig?: boolean }
+): StatusDisplay {
+  if (opts?.ueberfaellig) {
+    return { label: 'Überfällig', variant: 'warning' }
+  }
+  const key = status as RechnungStatus
+  const label =
+    key in RECHNUNG_STATUS_LABELS ? RECHNUNG_STATUS_LABELS[key] : String(status)
+  const variant = key in RECHNUNG_VARIANT ? RECHNUNG_VARIANT[key] : 'neutral'
+  return { label, variant }
+}
+
+/** Dezente Kopf-Zeile unter Titel bei Versand (gesendet_am / versendet_am / Fallback). */
+export function gesendetDetailSubline(
+  sentAt: string | null | undefined,
+  fallbackAt?: string | null | undefined
+): string {
+  const raw = (sentAt ?? fallbackAt ?? '').trim()
+  if (!raw) return 'Gesendet'
+  return `Gesendet · ${formatDatum(raw)}`
 }
 
 /** Sekundär-Badge: Bauprojekt vs. Standardauftrag (nur Typ-Hinweis, kein Workflow-Status). */

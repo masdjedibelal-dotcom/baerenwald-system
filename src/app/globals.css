@@ -140,6 +140,56 @@
 
     /* Mock Bottom-Nav: 60px + Safe Area */
     --mobile-bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
+
+    /*
+     * Vorgang-Detail Apple Spec §0 — semantische Materials.
+     * Kontrastpflicht: canvas ≠ paper (nie verschwimmen).
+     * Blur sparsam: --bw-material-blur max 12px + Alpha-Fallback.
+     */
+    --bw-bg-canvas: #eef0ee;
+    --bw-bg-paper: #ffffff;
+    --bw-material-blur: 12px;
+    --bw-material-sidebar: rgba(246, 247, 246, 0.82);
+    --bw-material-sheet: rgba(255, 255, 255, 0.92);
+    --bw-material-bar: rgba(255, 255, 255, 0.88);
+    --bw-paper-shadow:
+      0 1px 2px rgba(22, 32, 27, 0.04),
+      0 12px 40px -16px rgba(22, 32, 27, 0.14);
+    --bw-motion-fast: 150ms;
+    --bw-motion-micro: 180ms;
+
+    /* Semantic type (Dynamic Type via --app-font-scale) */
+    --type-title2: calc(1.25rem * var(--app-font-scale, 1));
+    --type-headline: calc(1.0625rem * var(--app-font-scale, 1));
+    --type-body-semantic: calc(0.9375rem * var(--app-font-scale, 1));
+    --type-callout: calc(0.875rem * var(--app-font-scale, 1));
+    --type-subhead: calc(0.8125rem * var(--app-font-scale, 1));
+    --type-footnote: calc(0.8125rem * var(--app-font-scale, 1));
+    --type-caption1: calc(0.75rem * var(--app-font-scale, 1));
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bw-bg-canvas: #0f1411;
+      --bw-bg-paper: #1a211c;
+      --bw-material-sidebar: rgba(26, 33, 28, 0.82);
+      --bw-material-sheet: rgba(26, 33, 28, 0.94);
+      --bw-material-bar: rgba(26, 33, 28, 0.9);
+      --bw-paper-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.35),
+        0 12px 40px -12px rgba(0, 0, 0, 0.55);
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    :root {
+      --bw-bg-canvas: #d8dcd8;
+      --bw-bg-paper: #ffffff;
+      --bw-material-sidebar: #f6f7f6;
+      --bw-material-sheet: #ffffff;
+      --bw-material-bar: #ffffff;
+      --bw-material-blur: 0px;
+    }
   }
 
   * {

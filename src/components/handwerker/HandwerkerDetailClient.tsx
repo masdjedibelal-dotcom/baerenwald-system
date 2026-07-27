@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-import { ActionsMenu } from '@/components/ui/actions-menu'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -894,19 +894,17 @@ export function HandwerkerDetailClient({
           ) : undefined
         }
         actions={
-          <ActionsMenu
-            trigger={
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
-                aria-label="Weitere Aktionen"
-              >
-                <MockIcon ctx="btn" n="dots" size={16} />
-                <span className="sr-only">Mehr</span>
-              </button>
-            }
-            items={handwerkerMenuItems}
+          <DetailActionsBar
             sheetTitle="Partner"
+            primary={{
+              label: 'Bearbeiten',
+              icon: 'pencil',
+              onClick: () => {
+                setTab('stammdaten')
+                beginEditKontakt()
+              },
+            }}
+            menuItems={handwerkerMenuItems}
           />
         }
       />

@@ -3,6 +3,9 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover, MockPopoverMenu, type MockPopoverItem } from '@/components/mock-ui/MockPopover'
+import { ActionSheet } from '@/components/ui/ActionSheet'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 export type ListbarActionItem = {
@@ -16,7 +19,7 @@ export type ListbarActionItem = {
 }
 
 /**
- * Mobil: ein Filter-Icon → Popover mit Aktionen.
+ * Mobil: ein Filter-Icon → ActionSheet mit Aktionen.
  * Desktop: `desktop` unverändert (Segment, Filter, Export, …).
  */
 export function ListbarActionsMenu({
@@ -31,19 +34,29 @@ export function ListbarActionsMenu({
   desktop: ReactNode
   title?: string
 }) {
+  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement>(null)
   const hasActive = (activeHint ?? 0) > 0 || items.some((i) => i.active)
+
+  const runSelect = (it: ListbarActionItem) => {
+    setOpen(false)
+    queueMicrotask(() => it.onSelect())
+  }
 
   const popItems: MockPopoverItem[] = items.map((it) => ({
     icon: it.icon,
     label: it.hint ? `${it.label} · ${it.hint}` : it.label,
     danger: it.danger,
-    onClick: () => {
-      setOpen(false)
-      // Nach Popover-Close, damit Sheet/Modal zuverlässig öffnet
-      queueMicrotask(() => it.onSelect())
-    },
+    onClick: () => runSelect(it),
+  }))
+
+  const sheetItems: ActionsMenuItem[] = items.map((it) => ({
+    label: it.label,
+    hint: it.hint,
+    danger: it.danger,
+    icon: <MockIcon ctx="btn" n={it.icon} size={16} />,
+    onClick: () => runSelect(it),
   }))
 
   return (
@@ -67,19 +80,28 @@ export function ListbarActionsMenu({
             {activeHint > 9 ? '9+' : activeHint}
           </span>
         ) : null}
-        <MockPopover
-          open={open}
-          onClose={() => setOpen(false)}
-          anchorRef={anchorRef}
-          align="right"
-          width={248}
-        >
-          <div className="pop-h">{title}</div>
-          <MockPopoverMenu
-            items={popItems}
-            iconFn={(n) => <MockIcon ctx="btn" n={n} size={16} />}
+        {isMobile ? (
+          <ActionSheet
+            open={open}
+            onClose={() => setOpen(false)}
+            title={title}
+            items={sheetItems}
           />
-        </MockPopover>
+        ) : (
+          <MockPopover
+            open={open}
+            onClose={() => setOpen(false)}
+            anchorRef={anchorRef}
+            align="right"
+            width={248}
+          >
+            <div className="pop-h">{title}</div>
+            <MockPopoverMenu
+              items={popItems}
+              iconFn={(n) => <MockIcon ctx="btn" n={n} size={16} />}
+            />
+          </MockPopover>
+        )}
       </div>
     </div>
   )

@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Save } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -19,7 +18,7 @@ import {
   sendFreitextKundenMail,
   type KommunikationMailVorlage,
 } from '@/app/(dashboard)/kommunikation/actions'
-import { KOMMUNIKATION_KONTEXT_LABELS, type MailComposeContext } from '@/lib/kommunikation/types'
+import { type MailComposeContext } from '@/lib/kommunikation/types'
 import type { MailAnrede } from '@/lib/mail/anrede'
 import { parseEmailTokens } from '@/lib/email-recipients'
 
@@ -45,8 +44,6 @@ export function KundenMailComposeModal({
   const [vorlageId, setVorlageId] = useState('')
   const [saveVorlageOpen, setSaveVorlageOpen] = useState(false)
   const [vorlageName, setVorlageName] = useState('')
-
-  const kontextLabel = ctx ? KOMMUNIKATION_KONTEXT_LABELS[ctx.kontextTyp] : ''
 
   useEffect(() => {
     if (!open || !ctx) return
@@ -141,24 +138,21 @@ export function KundenMailComposeModal({
 
   return (
     <>
-      <Modal
+      <EditorSheet
         open={open && !!ctx}
         onClose={onClose}
-        title={`Mail schreiben${kontextLabel ? ` · ${kontextLabel}` : ''}`}
+        title="Mail"
+        context="detail"
+        compose
+        composeLabel="Senden"
+        confirmBusy={pending}
+        onConfirm={senden}
         size="lg"
-        footer={
-          <ModalFormFooter
-            onCancel={onClose}
-            onSubmit={senden}
-            submitLabel="Senden"
-            loading={pending}
-          />
-        }
       >
         {ctx ? (
           <div className="space-y-3">
             <EmailPillsField label="An" emails={to} onChange={setTo} placeholder="kunde@beispiel.de" />
-            <EmailPillsField label="CC (optional)" emails={cc} onChange={setCc} placeholder="team@baerenwald.de" />
+            <EmailPillsField label="CC" emails={cc} onChange={setCc} placeholder="optional" />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
                 <Select
@@ -176,7 +170,7 @@ export function KundenMailComposeModal({
                 onClick={() => setSaveVorlageOpen(true)}
               >
                 <Save className="h-3.5 w-3.5" aria-hidden />
-                Als Vorlage speichern
+                Vorlage
               </Button>
             </div>
             <Select
@@ -197,37 +191,26 @@ export function KundenMailComposeModal({
               onChange={(e) => setBodyHtml(e.target.value)}
             />
             <CollapsibleMailPreview previewHtml={previewHtml} />
-            <p className="text-xs text-bw-text-muted">
-              Anrede und Team-Gruß werden automatisch ergänzt. Antworten des Kunden werden dem Thread
-              zugeordnet, sobald Resend-Inbound aktiv ist.
-            </p>
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={saveVorlageOpen}
         onClose={() => setSaveVorlageOpen(false)}
-        title="Vorlage speichern"
-        size="sm"
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setSaveVorlageOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={speichereVorlage}>
-              Speichern
-            </Button>
-          </div>
-        }
+        title="Vorlage"
+        context="detail"
+        confirmBusy={pending}
+        onConfirm={speichereVorlage}
+        size="md"
       >
         <Input
-          label="Name der Vorlage"
+          label="Name"
           value={vorlageName}
           onChange={(e) => setVorlageName(e.target.value)}
           placeholder="z. B. Terminbestätigung"
         />
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

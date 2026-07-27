@@ -2,13 +2,10 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
-import { Modal } from '@/components/ui/Modal'
-import { FormSheet } from '@/components/ui/FormSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Accordion } from '@/components/ui/Accordion'
-import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   assignAuftragHandwerkerGewerk,
   assignAuftragHandwerkerPosition,
@@ -117,7 +114,6 @@ export function HandwerkerZuweisenModal({
   onMailOpen: (mail: HandwerkerZuweisungMailTarget) => void
   projektName?: string
 }) {
-  const isMobile = useIsMobile()
   const [pending, startTransition] = useTransition()
   const [loadingList, setLoadingList] = useState(false)
   const [empfohlen, setEmpfohlen] = useState<HandwerkerGewerkListeEintrag[]>([])
@@ -220,24 +216,7 @@ export function HandwerkerZuweisenModal({
       ? `Handwerker — ${scope.position.leistung_name}`
       : scopeLeistungenCount > 1
         ? `Handwerker — ${scopeLeistungenCount} Leistungen (${gewerkName})`
-        : `Handwerker — ${gewerkName}`
-
-  const footer = (
-    <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="secondary" onClick={onClose}>
-        Abbrechen
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        loading={pending}
-        disabled={!selectedId || loadingList}
-        onClick={zuweisen}
-      >
-        {isReplace ? 'Partner disponieren & anfragen' : 'Zuweisen'}
-      </Button>
-    </div>
-  )
+        : `Partner — ${gewerkName}`
 
   const leistungenPreview =
     scope?.type === 'gewerk' && scope.leistungen.length > 0 ? (
@@ -260,12 +239,12 @@ export function HandwerkerZuweisenModal({
     <>
       <p className="mb-3 text-sm text-bw-text-muted">
         {isReplace
-          ? 'Der vorherige Partner hat abgelehnt. Wähle einen Ersatz — die Anfrage geht direkt ins Partner-Portal.'
+          ? 'Ersatz wählen — Anfrage geht ans Portal.'
           : scope?.type === 'position'
-            ? 'Handwerker für diese Leistung auswählen. Danach öffnet sich die Partner-Mail-Vorschau.'
+            ? 'Partner für diese Leistung wählen.'
             : scopeLeistungenCount > 1
-              ? `${scopeLeistungenCount} Leistungen in „${gewerkName}“ — ein Handwerker, eine Partner-Mail.`
-              : `Handwerker für das Gewerk „${gewerkName}“ auswählen. Danach öffnet sich die Partner-Mail-Vorschau.`}
+              ? `${scopeLeistungenCount} Leistungen · ein Partner.`
+              : `Partner für „${gewerkName}“ wählen.`}
       </p>
       {isReplace ? null : (
         <Select
@@ -351,17 +330,18 @@ export function HandwerkerZuweisenModal({
     </>
   )
 
-  if (isMobile) {
-    return (
-      <FormSheet open={open} onClose={onClose} breadcrumb="Auftrag" title={title} footer={footer} width="lg">
-        {body}
-      </FormSheet>
-    )
-  }
-
   return (
-    <Modal open={open} onClose={onClose} title={title} size="lg" footer={footer}>
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title={isReplace ? 'Partner' : 'Partner'}
+      context="detail"
+      size="lg"
+      onConfirm={selectedId && !loadingList && !pending ? zuweisen : undefined}
+      confirmBusy={pending}
+      confirmDisabled={!selectedId || loadingList}
+    >
       {body}
-    </Modal>
+    </EditorSheet>
   )
 }

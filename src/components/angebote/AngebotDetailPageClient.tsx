@@ -9,10 +9,16 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
+import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
+import { DetailSection } from '@/components/vorgang/DetailSection'
+import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
+import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -27,18 +33,28 @@ import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
   resendAngebotEinfach,
-  sendAngebotEinfach,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
-import { previewAuftragsbestaetigungMail, deleteAngebot } from '@/app/(dashboard)/angebote/actions'
+import {
+  previewAuftragsbestaetigungMail,
+  deleteAngebot,
+  recordKundeAbgelehntMitDetails,
+  schliesseLeadNachAngebotVerlust,
+} from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
 import { AngebotLeistungenTab, AngebotProjektinfosTab } from '@/components/angebote/AngebotDetailsTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
+import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
+import {
+  KUNDE_ABLEHNUNG_GRUND_LABELS,
+  KUNDE_ABLEHNUNG_GRUND_OPTIONS,
+  type KundeAblehnungGrund,
+} from '@/lib/angebote/ablehnung-labels'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import {
   addDaysYmd,
@@ -48,7 +64,8 @@ import {
 } from '@/lib/angebot-einfach'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { angebotStatusDisplay } from '@/lib/status/status-display'
+import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
+import { gesendetAmWert } from '@/lib/angebot-einfach'
 import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
@@ -70,56 +87,59 @@ import {
 import { naechsterSchrittAngebot } from '@/lib/crm/naechster-schritt'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 
-type AngebotDetailTab =
-  | 'projektinfos'
-  | 'details'
-  | 'stammdaten'
-  | 'fotos'
-  | 'verlauf'
-  | 'historie'
-  | 'dokumente'
-  | 'notizen'
+type AngebotDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
 
-const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
-  'projektinfos',
-  'details',
-  'stammdaten',
-  'fotos',
-  'verlauf',
-  'historie',
-  'dokumente',
-  'notizen',
-])
+const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
 
 /** Query-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase()
   if (!tab) return null
-  if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
-    return 'stammdaten'
+  if (
+    tab === 'akte' ||
+    tab === 'stammdaten' ||
+    tab === 'dokumente' ||
+    tab === 'notizen' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte' ||
+    tab === 'kommunikation'
+  ) {
+    return 'akte'
   }
   if (
+    tab === 'uebersicht' ||
     tab === 'projekt' ||
     tab === 'projektinfo' ||
     tab === 'projektinfos' ||
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
-    tab === 'angebot-details'
+    tab === 'angebot-details' ||
+    tab === 'details' ||
+    tab === 'positionen' ||
+    tab === 'leistung' ||
+    tab === 'leistungen' ||
+    tab === 'fotos' ||
+    tab === 'bilder' ||
+    tab === 'photos'
   ) {
-    return 'projektinfos'
+    return 'uebersicht'
   }
-  if (tab === 'positionen' || tab === 'leistung' || tab === 'leistungen') {
-    return 'details'
+  if (
+    tab === 'aktivitaet' ||
+    tab === 'verlauf' ||
+    tab === 'historie' ||
+    tab === 'projekt-historie' ||
+    tab === 'phasen'
+  ) {
+    return 'aktivitaet'
   }
-  if (tab === 'aktivitaet') return 'verlauf'
-  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
-  if (tab === 'kommunikation') return 'notizen'
-  if (tab === 'bilder' || tab === 'photos') return 'fotos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
-  if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'projektinfos'
+  if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'uebersicht'
   if (ANGEBOT_DETAIL_TAB_IDS.has(tab as AngebotDetailTab)) return tab as AngebotDetailTab
   return null
 }
@@ -151,7 +171,8 @@ export function AngebotDetailPageClient({
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
-  const [mainTab, setMainTab] = useState<AngebotDetailTab>('projektinfos')
+  const [mainTab, setMainTab] = useState<AngebotDetailTab>('uebersicht')
+  const [akteSegment, setAkteSegment] = useState<AkteSegment>('dateien')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -166,15 +187,30 @@ export function AngebotDetailPageClient({
   const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
+  const [ablehnenOpen, setAblehnenOpen] = useState(false)
+  const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
+  const [ablehnenNotiz, setAblehnenNotiz] = useState('')
+  const [ablehnenKonkurrenz, setAblehnenKonkurrenz] = useState('')
 
   useEffect(() => {
     const raw = searchParams.get('tab')
     if ((raw ?? '').trim().toLowerCase() === 'visualisierungen') {
-      router.push(`/angebote/${detail.id}/visualisierung`)
+      router.replace(`/angebote/${detail.id}/visualisierung`)
+      return
+    }
+    if (isLegacyDetailTabAlias(raw)) {
+      const resolved = resolveAngebotDetailTabFromQuery(raw) ?? 'uebersicht'
+      const seg = parseAkteSegment(raw, searchParams.get('segment'))
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', resolved)
+      if (resolved === 'akte') q.set('segment', seg)
+      else q.delete('segment')
+      router.replace(`/angebote/${detail.id}?${q.toString()}`, { scroll: false })
       return
     }
     const tab = resolveAngebotDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
+    setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
   }, [searchParams, detail.id, router])
 
   useEffect(() => {
@@ -370,6 +406,10 @@ export function AngebotDetailPageClient({
     [detail, lead?.situation, lead?.bereiche]
   )
   const headMeta = kundeName
+  const headSub =
+    statusEinfach === 'gesendet'
+      ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
+      : undefined
 
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail =
@@ -465,20 +505,48 @@ export function AngebotDetailPageClient({
       (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
     )
 
-    if (erledigt || statusEinfach !== 'entwurf') return baseItems
+    let items: typeof baseItems =
+      erledigt || statusEinfach !== 'entwurf'
+        ? baseItems
+        : (() => {
+            const out: typeof baseItems = []
+            for (const item of baseItems) {
+              out.push(item)
+              if (item !== 'sep' && item.label === 'Bearbeiten') {
+                out.push({
+                  label: 'Partner anfragen',
+                  icon: mockMenuIcon('send', 15),
+                  onClick: openHandwerkerAnfragen,
+                })
+              }
+            }
+            return out
+          })()
 
-    const out: typeof baseItems = []
-    for (const item of baseItems) {
-      out.push(item)
-      if (item !== 'sep' && item.label === 'Bearbeiten') {
-        out.push({
-          label: 'Handwerker anfragen',
-          icon: mockMenuIcon('send', 15),
-          onClick: openHandwerkerAnfragen,
-        })
+    if (
+      (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
+      !auftragId
+    ) {
+      const ablehnenItem = {
+        label: 'Ablehnen',
+        icon: mockMenuIcon('x', 15),
+        danger: true as const,
+        onClick: () => {
+          setAblehnenGrund('')
+          setAblehnenNotiz('')
+          setAblehnenKonkurrenz('')
+          setAblehnenOpen(true)
+        },
+      }
+      const delIdx = items.findIndex((i) => i !== 'sep' && i.label === 'Löschen')
+      if (delIdx >= 0) {
+        items = [...items.slice(0, delIdx), ablehnenItem, ...items.slice(delIdx)]
+      } else {
+        items = [...items, ablehnenItem]
       }
     }
-    return out
+
+    return items
   }, [
     kannBearbeiten,
     kannErneutSenden,
@@ -501,7 +569,7 @@ export function AngebotDetailPageClient({
         return {
           label: handwerkerAnfrageErledigt(hwRows)
             ? 'Partner-Einreichung prüfen'
-            : 'Handwerker anfragen',
+            : 'Partner anfragen',
           icon: 'send',
           onClick: openHandwerkerAnfragen,
           disabled: pending,
@@ -509,16 +577,16 @@ export function AngebotDetailPageClient({
       }
       if (!auftragId) {
         return {
-          label: 'Angebot annehmen',
-          icon: 'check',
-          onClick: openAcceptModal,
+          label: 'Senden',
+          icon: 'send',
+          onClick: () => setKundeVersandOpen(true),
           disabled: pending,
         }
       }
     }
     if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
       return {
-        label: 'Angebot annehmen',
+        label: 'Annehmen',
         icon: 'check',
         onClick: openAcceptModal,
         disabled: pending,
@@ -528,8 +596,9 @@ export function AngebotDetailPageClient({
       return {
         label: 'Zum Auftrag',
         icon: 'briefcase',
-        onClick: () => router.push(`/auftraege/${auftragId}`),
-        href: `/auftraege/${auftragId}`,
+        onClick: () =>
+          router.replace(`/auftraege/${auftragId}?from=angebot:${detail.id}`),
+        href: `/auftraege/${auftragId}?from=angebot:${detail.id}`,
       }
     }
     return null
@@ -588,66 +657,90 @@ export function AngebotDetailPageClient({
         onReload={() => refresh()}
       />
     ) : (
-      <MockCard title="Notizen · 0" icon="messages">
+      <MockCard title="Notizen" icon="messages">
         <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
-          Noch keine Notizen — dieses Angebot ist keiner Anfrage zugeordnet.
+          Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
         </div>
       </MockCard>
     )
 
+  const summenKurz = (
+    <MockCard title="Summen" icon="calculator">
+      <dl className="space-y-2 text-sm">
+        <div className="flex justify-between gap-2">
+          <dt className="text-bw-text-muted">Netto</dt>
+          <dd className="font-medium tabular-nums">{formatEurBetrag(summenMail.nettoMin)}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-bw-text-muted">Brutto</dt>
+          <dd className="font-semibold tabular-nums">{formatEurBetrag(summenMail.bruttoMin)}</dd>
+        </div>
+      </dl>
+    </MockCard>
+  )
+
   const detailShellGroups: DetailShellGroup[] = [
     {
-      id: 'projektinfos',
-      label: 'Projektinfos',
+      id: 'uebersicht',
+      label: entityDetailTabLabel('uebersicht'),
       icon: 'file-invoice',
-      render: () => projektinfosInhalt,
+      render: () => (
+        <div className="space-y-6">
+          <PhaseCardsBlock
+            kontext={projektKontext}
+            fromRef={{ kind: 'angebot', id: detail.id }}
+          />
+          <ZugehoerigListe
+            kontext={projektKontext}
+            fromRef={{ kind: 'angebot', id: detail.id }}
+          />
+          {projektinfosInhalt}
+          <DetailSection title="Leistungen">{leistungenInhalt}</DetailSection>
+          {vorgangFotos.length > 0 ? (
+            <DetailSection title="Fotos">
+              <VorgangFotosTab fotos={vorgangFotos} />
+            </DetailSection>
+          ) : null}
+        </div>
+      ),
     },
     {
-      id: 'details',
-      label: 'Leistungen',
-      icon: 'list-details',
-      count: positionenAnzeigeCount || undefined,
-      render: () => leistungenInhalt,
-    },
-    {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
-      id: 'fotos',
-      label: ACTIVITY_SECTIONS.fotos,
-      icon: 'photo',
-      count: vorgangFotos.length || undefined,
-      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
-    },
-    {
-      id: 'verlauf',
-      label: ACTIVITY_SECTIONS.verlauf,
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => verlaufInhalt,
-    },
-    {
-      id: 'historie',
-      label: 'Historie',
-      icon: 'list-details',
-      render: () => <ProjektHistorieTab kontext={projektKontext} />,
-    },
-    {
-      id: 'dokumente',
-      label: ACTIVITY_SECTIONS.dokumente,
+      id: 'akte',
+      label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: anhaengeCount || undefined,
-      render: () => dokumenteInhalt,
+      render: () => (
+        <VorgangAkteTab
+          initialSegment={akteSegment}
+          onSegmentChange={(s) => {
+            setAkteSegment(s)
+            const q = new URLSearchParams(searchParams.toString())
+            q.set('tab', 'akte')
+            q.set('segment', s)
+            router.replace(`/angebote/${detail.id}?${q.toString()}`, { scroll: false })
+          }}
+          zahlung={summenKurz}
+          dateien={
+            <div className="space-y-4">
+              {dokumenteInhalt}
+              {notizenInhalt}
+            </div>
+          }
+          kunde={stammdatenInhalt}
+        />
+      ),
     },
     {
-      id: 'notizen',
-      label: ACTIVITY_SECTIONS.notizen,
-      icon: 'messages',
-      count: notizenRows.length || undefined,
-      render: () => notizenInhalt,
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
+      icon: 'history',
+      count: timelineItems.length || undefined,
+      render: () => (
+        <div className="space-y-6">
+          {verlaufInhalt}
+          <ProjektHistorieTab kontext={projektKontext} />
+        </div>
+      ),
     },
   ]
 
@@ -655,8 +748,8 @@ export function AngebotDetailPageClient({
     <EntityDetailLayout
       phase="angebot"
       projektKontext={projektKontext}
-      crumbBackHref="/vorgaenge?tab=angebot"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
+      crumbBackLabel="Zurück zu Vorgängen"
       className="space-y-4 pb-0"
       nextStep={naechsterSchrittAngebot({
         statusEinfach,
@@ -667,6 +760,7 @@ export function AngebotDetailPageClient({
       })}
       head={{
         title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
+        sub: headSub,
         badges: (
           <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
         ),
@@ -686,6 +780,17 @@ export function AngebotDetailPageClient({
           {detail.updated_at ? ` am ${formatDatum(detail.updated_at)}` : ''}
           {detail.ablehnung_grund ? ` — ${detail.ablehnung_grund}` : ''}
         </p>
+      ) : null}
+
+      {hatAngebotHandwerker(detail.angebot_handwerker) ? (
+        <AngebotHandwerkerPartnerSection
+          detail={detail}
+          auftragId={auftragId}
+          bruttoMin={summenMail.bruttoMin}
+          bruttoMax={summenMail.bruttoMax}
+          positionen={detail.positionen ?? []}
+          gueltigBis={gueltigBisYmd}
+        />
       ) : null}
 
       <DetailShell
@@ -870,6 +975,89 @@ export function AngebotDetailPageClient({
             }}
           >
             Erstellen & Bestätigung senden
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={ablehnenOpen}
+        onClose={() => setAblehnenOpen(false)}
+        title="Angebot ablehnen"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-bw-text-muted">
+            Markiert das Angebot als abgelehnt und kann den zugehörigen Lead schließen.
+          </p>
+          <Select
+            label="Grund"
+            name="ablehnung_grund"
+            required
+            value={ablehnenGrund}
+            onChange={(e) => setAblehnenGrund(e.target.value as KundeAblehnungGrund | '')}
+            options={[
+              { value: '', label: 'Grund wählen' },
+              ...KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
+                value: v,
+                label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
+              })),
+            ]}
+          />
+          {(ablehnenGrund === 'konkurrenz' || ablehnenGrund === 'zu_teuer') && (
+            <Input
+              label="Konkurrenzpreis (€, optional)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={ablehnenKonkurrenz}
+              onChange={(e) => setAblehnenKonkurrenz(e.target.value)}
+            />
+          )}
+          <Input
+            label="Notiz (optional)"
+            value={ablehnenNotiz}
+            onChange={(e) => setAblehnenNotiz(e.target.value)}
+          />
+        </div>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => setAblehnenOpen(false)}>
+            Abbrechen
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            loading={pending}
+            onClick={() => {
+              if (!ablehnenGrund) {
+                toast.error('Bitte einen Ablehnungsgrund wählen.')
+                return
+              }
+              startTransition(async () => {
+                const kpRaw = ablehnenKonkurrenz.trim().replace(',', '.')
+                const kp =
+                  kpRaw && Number.isFinite(Number(kpRaw)) ? Number(kpRaw) : null
+                const res = await recordKundeAbgelehntMitDetails(detail.id, {
+                  grund: ablehnenGrund,
+                  konkurrenz_preis_eur: kp,
+                  notiz: ablehnenNotiz.trim() || null,
+                })
+                if (!res.ok) {
+                  toast.error(res.message)
+                  return
+                }
+                const leadClose = await schliesseLeadNachAngebotVerlust(detail.id)
+                if (!leadClose.ok) {
+                  toast.success('Angebot abgelehnt')
+                  toast.info(leadClose.message)
+                } else {
+                  toast.success('Angebot abgelehnt — Lead geschlossen')
+                }
+                setAblehnenOpen(false)
+                refresh()
+              })
+            }}
+          >
+            Ablehnen
           </Button>
         </div>
       </Modal>

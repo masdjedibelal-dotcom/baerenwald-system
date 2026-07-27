@@ -32,9 +32,11 @@ Der Happy Path (Anfrage → Wizard → Auftrag → RE) ist *technisch* oft da. D
 2. **Keine Orientierung in der Pipeline** — Phasen-Strip im Detail-Kopf ist entfernt; Historie/Verlauf sind zwei späte Tabs; „Als Nächstes“ ist Text ohne klaren Klick.
 3. **Geld-Logik & Korrektur** (Zahlplan/Schluss, Rate korrigieren) plus Copy-Inkonsistenz (Stammdaten/Details, Handwerker/Partner, Wizard „Individualisieren/Paket“).
 
+**Neu (Juli 2026):** Abnahme / Vor Ort ist *technisch* gewachsen (7-Schritt-Wizard, Bearbeiten, PDF), UX/UI aber **unter dem Rest des CRM** — parallele Surfaces, Formular-Ästhetik, Tab als Kitchen-Sink. Fit: **Blockiert** für Alltag „schnell sauberes Protokoll“. → Situationen **38–42** + [DESIGN_AUDIT §5.7 / §9.3](./DESIGN_AUDIT_CRM_FUNDAMENT.md).
+
 Mobile ist **Desktop-First mit Adaption** (nicht Mobile-First): Doppel-Chrome, Breakpoint-Lücke 760≠767, Listen-Popover vs. Detail-Sheet, zu viele Tabs. Siehe Kapitel **Mobile First vs. Desktop-on-Mobile**.
 
-→ Ausführlich: Kapitel **Phasen, Detail-Orientierung, Copy & Wizards** + Situationen 16–31 (inkl. Orphans).
+→ Ausführlich: Kapitel **Phasen, Detail-Orientierung, Copy & Wizards** + Situationen 16–31 (inkl. Orphans) + **Abnahme-UX**.
 
 ---
 
@@ -79,6 +81,11 @@ Mobile ist **Desktop-First mit Adaption** (nicht Mobile-First): Doppel-Chrome, B
 | 35 | Mobile | 10 Tabs horizontal scrollen | Reibung |
 | 36 | Mobile | Filter inkonsistent | Reibung |
 | 37 | Mobile | Stamm/Partner unter Mehr | Reibung |
+| 38 | Abnahme | Abnahmeprotokoll per Wizard erstellen | **Blockiert** |
+| 39 | Abnahme | Fehler im Protokoll korrigieren | Reibung |
+| 40 | Abnahme | Vor-Ort-Tab: Abnahme vs. Tagebuch vs. Abschluss | **Blockiert** |
+| 41 | Abnahme | Checkliste / Gewerk vor Ort bedienen | Reibung |
+| 42 | Abnahme | PDF prüfen / an Kunden geben | Reibung |
 
 ---
 
@@ -501,8 +508,8 @@ Aus `naechster-schritt.ts`:
 |---|-----------|-----|----------|---------|------|
 | 16 | Partner dem Auftrag zuweisen / wechseln | Reibung | Leistungen / Disposition; Menü „Nachunternehmervertrag“ nur Bauprojekt | Primär RE, nicht Partner | Statusabhängige Primary „Partner zuweisen“; klarer Ort |
 | 17 | Ersten Abschlag stellen | Reibung | Tab Zahlung & Rechnung (nicht Default) | Default = Auftragdetails | Deep-Link / Default nach Status; Primary „Abschlag erstellen“ wenn Plan offen |
-| 18 | Partner vor Ort / Bautagebuch prüfen | Reibung | Tab Vor Ort & Abschluss; Banner sagt Portal | Tab weit rechts | „Vor Ort“ früher wenn Status in_arbeit/abnahme |
-| 19 | Abnahme / Abschluss | Reibung | Secondary „Auftrag abschließen“; Wizard Abnahme 2 Steps | RE bleibt Primary | Bei Status abnahme: Primary Abschluss/Abnahme |
+| 18 | Partner vor Ort / Bautagebuch prüfen | Reibung | Tab Vor Ort & Abschluss; Banner sagt Portal | Tab weit rechts; vermischt | Segment Tagebuch; früher bei Status in_arbeit/abnahme |
+| 19 | Abnahme / Abschluss | **Blockiert** | Secondary; **7-Step**-Wizard; RE Primary | Wizard grauenhaft | Primary Abnahme; ≤3 Steps (W9) |
 | 20 | Nachtrag / Mehrleistung | Reibung | Nur ⋯ + Vertrag-Gate | Unsichtbar | CTA „Nachtrag“ (W5-01) |
 | 21 | Notfall / Direkt beauftragen | Reibung | ⋯ „Direkt beauftragen (Notfall)“ | Ok versteckt | Behalten im ⋯; Banner wenn Notfall-Flag |
 | 22 | Versicherungsakte PDF | Geht* | ⋯ wenn Kostenträger Versicherung | Selten | Ok im ⋯ |
@@ -542,10 +549,52 @@ Komponenten mit Actions, aber **kein Import** in `AuftragDetailClient` (Stand Ex
 | Staff-Funnel / Anfrage | variabel | Funnel | Meist ok |
 | **Angebot** | 5: Typ & Projekt → Positionen → Finalisieren → Vorschau → Versenden | Verständlich | Länger, aber logisch; Partner-Zuweisung leicht versteckt |
 | **Rechnung** | 4: Positionen → **Individualisieren** → **Paket** → Versand | **Unklar** | „Individualisieren“ = Texte/Empfänger?; „Paket“ = Anhänge/Abschlag? — Copy-Fail (W6-04) |
-| Abnahmeprotokoll | 2: Checkliste → Abschluss | Ok | Kurz |
+| Abnahmeprotokoll | **7:** Übergabe → Personen → Bauvorhaben → Leistungen → Ergebnis → Fotos → PDF | PDF-Felder als Steps | **Blockiert / grauenhaft** — siehe Sit. 38–42 |
 | Vertrag / Nachtrag | mehrstufig | Fachlich | Nur Bauprojekt; Einstieg über ⋯ |
 
 **SOLL RE-Wizard:** Labels z. B. „Texte & Empfänger“ / „Anhänge & Abschlag-Typ“ / „Prüfen & Senden“. Optional Step zusammenlegen wenn keine Anhänge.
+
+**SOLL Abnahme-Wizard:** max. **3** Steps — Checkliste & Ergebnis · Übergabe-Meta (ein Screen, kollabierbar) · Prüfen & PDF. Surfaces konsolidieren (Wizard **oder** Inline, nicht beides + FillFlow).
+
+---
+
+### Abnahme / Vor Ort — Alltag (Juli 2026)
+
+> Ergänzung zum Fundament-Audit §5.7: Der Flow ist **neu und wichtig**, aber UI/UX fühlt sich an wie ein zusammengeklebtes Formular — nicht wie ein Werkzeug für die Baustelle.
+
+#### Surfaces (parallel)
+
+| Was | Wo | Problem |
+|-----|-----|---------|
+| Create-Wizard | `/abnahme/erstellen` | 7 Steps, Form-Inputs, kein Preview |
+| VorOrtPanel | Tab Vor Ort | Abnahme + Tagebuch + Abschluss gestapelt |
+| Inline | Legacy unter Vor Ort | Mock-UI + FAB, zweiter Editor |
+| FillFlow | `/abnahme` | Dritter „Ausfüllen“-Pfad |
+| Card | Auftrag-Cards | Liste ok, Einstieg unklar |
+| Mängel-Flow | `/abnahme/maengel` | Isoliert ok |
+
+#### Situations-Detail
+
+| # | Situation | Fit | IST | SOLL |
+|---|-----------|-----|-----|------|
+| 18 | Partner vor Ort / Bautagebuch | Reibung | Tab weit rechts; vermischt mit Abnahme | Segment „Tagebuch“; früher bei `in_arbeit` |
+| 19 | Abnahme / Abschluss | Reibung→**Blockiert** | Secondary + 7-Step-Wizard; RE bleibt Primary | Primary „Abnahme“; Wizard ≤3 Steps |
+| 38 | Protokoll erstellen | **Blockiert** | 7 Klicks Meta vor Checkliste; wirkt administrativ | Checkliste zuerst; Meta später/neben |
+| 39 | Protokoll korrigieren | Reibung | Bearbeiten geht (Prefill), aber wieder 7 Steps | Kurz-Edit oder Step „Prüfen“ öffnen |
+| 40 | Vor-Ort-Tab verstehen | **Blockiert** | Intro + 2 Kacheln + Tagebuch + Abschluss + Extras | Segmented Control, eine Aufgabe |
+| 41 | Checkliste bedienen | Reibung | Gewerk-/Titel-Inputs, kleine Toggles, Default-Labels | Große OK/Mangel; Rename unter „Mehr“ |
+| 42 | PDF Qualität prüfen | Reibung | Download am Ende; Checks/Layout oft Überraschung | Preview-Step oder Inline-Vorschau |
+
+#### Todos (Welle 9 — Abnahme UX)
+
+| ID | Impact | Aufwand | To-do |
+|----|--------|---------|-------|
+| **W9-01** | kritisch | M | Surfaces entscheiden: 1 Wizard + 1 Liste; Inline/FillFlow entfernen oder mergen |
+| **W9-02** | kritisch | M | Wizard auf ≤3 Steps + Checkliste-first |
+| **W9-03** | hoch | M | Vor-Ort Segmented: Abnahme \| Tagebuch \| Abschluss |
+| **W9-04** | hoch | S | Visuell: gleiche Shell wie Angebot; große Status-Controls |
+| **W9-05** | mittel | S | PDF-Preview vor Finalisieren; Mobile Stepper Labels |
+| **W9-06** | mittel | S | Bei Status `abnahme`: Primary = Abnahme (eng W7-02) |
 
 ---
 
@@ -617,7 +666,7 @@ Mapping: W7-03 überlappt W3-02 — W7-03 = Rename-Umsetzung, W3-02 behält Empt
 | F-77 | RE-Wizard Individualisieren/Paket | W7-05 / W6-04 |
 | F-78 | Generische Tab-Namen Stammdaten/Details | W7-06 / W6-02 |
 | F-79 | Partner zuweisen kein klarer Auftrag-Primary | W7-02 / W1-02 |
-| F-80 | Vor-Ort/Abnahme-Alltag unter Secondary/Tab | W7-02 |
+| F-80 | Vor-Ort/Abnahme-Alltag: Kitchen-Sink-Tab + **7-Step-Wizard** (UX kritisch) | W9-01…W9-06 / W7-02 |
 | F-81 | Anrufen am Auftrag-Vorgang fehlt | W2-02 / W4-01 |
 | F-82 | Spec `entity-detail-tabs.ts` kaum von Detail-Clients genutzt | W7-06 |
 | F-83 | Kein `naechsterSchrittRechnung` | W7-02 / W6-01 |
@@ -742,7 +791,7 @@ Heute zu viele Wege für denselben Job:
 | **W8-01** | kritisch | M | Breakpoint-SoT: ein Wert 768 überall (CSS + Hook + Tailwind) |
 | **W8-02** | hoch | M | Interaktions-Kit: ActionSheet/Filter/Modal-Regeln durchziehen |
 | **W8-03** | hoch | L | Flow-Katalog: Versenden / Korrigieren / Partner / Abschluss — je ein kanonischer Flow |
-| **W8-04** | mittel | M | Mobile Detail-IA: max. 4 Kern-Tabs + „Mehr“; `DetailResponsiveTabs` nutzen oder löschen |
+| **W8-04** | mittel | M | Mobile Detail-IA: **5** Kern-Tabs (Übersicht·Leistungen·Zahlung·Vor Ort·Aktivität) + „Mehr“ (#3) |
 | **W8-05** | mittel | S | Desktop ≠ Mobile Jobs dokumentieren (Field vs. Office) in DESIGN-Kurzspec |
 
 Mapping: W8-01 ⊆ W6-06 (konkreter). W8-02 ⊆ W4-01/02. W8-03 verbindet W1/W3/W5/W7. W8-04 ⊆ W7-04.
@@ -1133,8 +1182,43 @@ Früher war Welle 6 fälschlich als `W6-*` zusammengefasst — hier wieder einze
 - **Umsetzung:** Entscheidung nutzen vs. löschen; Auftrag/Angebot/RE angleichen.
 
 ##### `W8-05` — Desktop ≠ Mobile Jobs
+- **IST:** Field vs. Office Jobs vermischt; Features 1:1 auf Mobile gespiegelt.
 - **SOLL:** Eine Seite in DESIGN: Mobile = kurz handeln; Desktop = planen/bauen. Features nicht 1:1 spiegeln.
+- **Umsetzung:** Kurzspec in DESIGN_KONZEPT; Tab-SoT + Default-Resolver (eng W7-02 / W7-06).
 
+#### Welle 9 · Abnahme / Vor-Ort UX (Juli 2026)
+
+##### `W9-01` — Surfaces konsolidieren
+- **IST:** Wizard + Inline + FillFlow + Card + VorOrt-Stack.
+- **SOLL:** Ein Editor (Wizard) + eine Liste; Rest entfernen oder mergen.
+- **Situationen:** 38–40
+
+##### `W9-02` — Wizard ≤3 Steps, Checkliste first
+- **IST:** 7 Steps Meta→…→PDF.
+- **SOLL:** Checkliste & Ergebnis · Angaben · Prüfen & PDF.
+- **Situationen:** 38, 39, 41
+
+##### `W9-03` — Vor-Ort Segmented Control
+- **IST:** Alles auf einer Scrollseite.
+- **SOLL:** Abnahme | Tagebuch | Abschluss.
+- **Situationen:** 18, 40
+
+##### `W9-04` — Visuelle Shell + große Status-Controls
+- **IST:** Form-Inputs + Mock-UI gemischt.
+- **SOLL:** Angebot-Wizard-Shell; daumenfreundliche OK/Mangel.
+- **Situationen:** 38, 41
+
+##### `W9-05` — PDF-Preview
+- **IST:** Überraschungen erst nach Download.
+- **SOLL:** Preview-Step vor Finalisieren.
+- **Situationen:** 42
+
+##### `W9-06` — Primary bei Status Abnahme
+- **IST:** oft „Rechnung erstellen“.
+- **SOLL:** „Abnahme starten / fortsetzen“ (eng W7-02).
+- **Situationen:** 19
+
+---
 
 ### Empfohlene Reihenfolge
 
@@ -1148,7 +1232,8 @@ Früher war Welle 6 fälschlich als `W6-*` zusammengefasst — hier wieder einze
 8. **W8-01** Breakpoints + **W4-01/02** Chrome/Kit (ein PR-Paket Mobile)
 9. **W8-02/04** + **W7-04** Detail-IA mobil
 10. **W7-07** Orphans · **W7-05/06** · **W8-03** Flow-Katalog
-11. **W5** · **W6-*** · **W8-05** Spec
+11. **W9-01 … W9-06** Abnahme / Vor-Ort UX
+12. **W5** · **W6-*** · **W8-05** Spec
 
 ### Anhang: Journey-Fixes (P0–P2, ursprüngliche Liste)
 
@@ -1360,7 +1445,7 @@ Diese Tabelle listet **alle 69 Befunde** einzeln — damit nichts „unter W6-*�
 | `F-77` | RE-Wizard Individualisieren/Paket | `W7-05` / `W6-04` |
 | `F-78` | Generische Tab-Namen Stammdaten/Details | `W7-06` / `W6-02` |
 | `F-79` | Partner zuweisen kein klarer Auftrag-Primary | `W7-02` |
-| `F-80` | Vor-Ort/Abnahme-Alltag unter Secondary/Tab | `W7-02` |
+| `F-80` | Vor-Ort/Abnahme: Kitchen-Sink + 7-Step-Wizard | `W9` / `W7-02` |
 | `F-81` | Anrufen am Auftrag-Vorgang fehlt | `W2-02` / `W4-01` |
 | `F-82` | Spec `entity-detail-tabs.ts` kaum genutzt | `W7-06` |
 | `F-83` | Kein `naechsterSchrittRechnung` | `W7-02` / `W6-01` |

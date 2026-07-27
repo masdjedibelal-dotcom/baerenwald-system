@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Save } from 'lucide-react'
-import { WizardShell } from '@/components/layout/WizardShell'
+import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
@@ -36,7 +35,6 @@ import {
 import {
   bereicheForStaffSituation,
   resolveStaffFunnelSteps,
-  staffFunnelStepsForShell,
 } from '@/lib/anfragen/staff-funnel-steps'
 import { estimateStaffFunnelPrice } from '@/lib/anfragen/staff-funnel-price'
 import { staffFunnelToPayload } from '@/lib/anfragen/staff-funnel-payload'
@@ -58,6 +56,28 @@ const STAFF_KANAL: LeadKanal[] = [
   'hv_manuell',
   'sonstiges',
 ]
+
+/** ≤3 Phasen für DocumentCanvas-Chips */
+const PHASES = [
+  { id: 0, label: 'Kontext' },
+  { id: 1, label: 'Details' },
+  { id: 2, label: 'Fertig' },
+] as const
+
+function phaseForStepId(id: StaffFunnelStepId): number {
+  if (id === 'crm_kontext' || id === 'situation') return 0
+  if (id === 'crm_pruefen') return 2
+  return 1
+}
+
+function firstIndexForPhase(phase: number, steps: StaffFunnelStepId[]): number {
+  if (phase === 0) return 0
+  if (phase === 2) return Math.max(0, steps.length - 1)
+  const idx = steps.findIndex(
+    (s) => s !== 'crm_kontext' && s !== 'situation' && s !== 'crm_pruefen'
+  )
+  return idx >= 0 ? idx : Math.min(1, steps.length - 1)
+}
 
 export function StaffFunnelWizard({
   open,
@@ -81,8 +101,8 @@ export function StaffFunnelWizard({
   const [bekannterKunde, setBekannterKunde] = useState<Kunde | null>(null)
 
   const steps = useMemo(() => resolveStaffFunnelSteps(state), [state])
-  const shellSteps = useMemo(() => staffFunnelStepsForShell(state), [state])
   const currentId: StaffFunnelStepId = steps[Math.min(stepIndex, steps.length - 1)] ?? 'crm_kontext'
+  const currentPhase = phaseForStepId(currentId)
 
   useEffect(() => setMounted(true), [])
 
@@ -92,10 +112,6 @@ export function StaffFunnelWizard({
     setBekannterKunde(null)
     setStepIndex(0)
     setError(null)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = ''
-    }
   }, [open, defaultKundeId])
 
   // Step-Index anpassen wenn Sequenz kürzer wird
@@ -758,76 +774,67 @@ export function StaffFunnelWizard({
   })()
 
   const isLast = currentId === 'crm_pruefen'
-  const desktopActions = (
-    <div className="wizard-nav-actions">
+
+  function handleConfirm() {
+    if (isLast) void submit()
+    else goNext()
+  }
+
+  const navActions = (
+    <div className="flex w-full flex-wrap items-center gap-2">
       {stepIndex > 0 ? (
         <MockBtn kind="ghost" icon="chevron-left" onClick={goBack}>
           Zurück
         </MockBtn>
-      ) : null}
-      {!isLast ? (
-        <MockBtn kind="primary" icon="chevron-right" disabled={!canContinue} onClick={goNext}>
-          Weiter
-        </MockBtn>
       ) : (
-        <MockBtn kind="primary" disabled={loading} onClick={() => void submit()}>
-          <Save className="mr-1.5 h-4 w-4" aria-hidden />
-          {loading ? 'Speichern…' : 'Anfrage anlegen'}
-        </MockBtn>
+        <span className="flex-1" />
       )}
+      <div className="ml-auto">
+        {!isLast ? (
+          <MockBtn kind="primary" icon="chevron-right" disabled={!canContinue} onClick={goNext}>
+            Weiter
+          </MockBtn>
+        ) : (
+          <MockBtn kind="primary" disabled={loading} onClick={() => void submit()}>
+            <Save className="mr-1.5 h-4 w-4" aria-hidden />
+            {loading ? 'Speichern…' : 'Anlegen'}
+          </MockBtn>
+        )}
+      </div>
     </div>
   )
 
-  const mobileActions = null
+  if (!open || !mounted) return null
 
-  const mobileFooter = !isLast ? (
-    <>
-      {stepIndex > 0 ? (
-        <MockBtn kind="ghost" icon="chevron-left" onClick={goBack}>
-          Zurück
-        </MockBtn>
-      ) : (
-        <span />
-      )}
-      <MockBtn
-        kind="primary"
-        icon="chevron-right"
-        className="wizard-mobile-footer__primary"
-        disabled={!canContinue}
-        onClick={goNext}
-      >
-        Weiter
-      </MockBtn>
-    </>
-  ) : (
-    <>
-      <MockBtn kind="ghost" icon="chevron-left" onClick={goBack}>
-        Zurück
-      </MockBtn>
-      <MockBtn
-        kind="primary"
-        className="wizard-mobile-footer__primary"
-        disabled={loading}
-        onClick={() => void submit()}
-      >
-        {loading ? 'Speichern…' : 'Anfrage anlegen'}
-      </MockBtn>
-    </>
-  )
-
-  const wizard = (
-    <WizardShell
-      className="staff-funnel"
-      title="Anfrage erstellen"
-      subtitle="Wie der Kunden-Rechner — fürs CRM"
-      steps={shellSteps}
-      currentStep={stepIndex + 1}
+  return (
+    <DocumentCanvas
+      open={open}
+      title="Anfrage"
       onClose={onClose}
-      desktopActions={desktopActions}
-      mobileActions={mobileActions}
-      mobileFooter={mobileFooter}
-      saveHint={loading ? 'Speichert…' : null}
+      onSave={handleConfirm}
+      saveBusy={loading}
+      className="staff-funnel"
     >
+      <nav className="document-section-nav" aria-label="Phasen">
+        {PHASES.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={cn(
+              'document-section-nav__chip',
+              currentPhase === p.id && 'document-section-nav__chip--active'
+            )}
+            onClick={() => {
+              setError(null)
+              setStepIndex(firstIndexForPhase(p.id, steps))
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+        <div className="ml-auto hidden md:block">{navActions}</div>
+      </nav>
+
       <div className={cn('mx-auto w-full max-w-2xl px-1 py-2')}>
         {error ? (
           <p className="mb-3 rounded-lg bg-[var(--red-bg)] px-3 py-2 text-[13px] text-[var(--red-tx)]">
@@ -836,10 +843,10 @@ export function StaffFunnelWizard({
         ) : null}
         {content}
       </div>
-    </WizardShell>
-  )
 
-  return createPortal(wizard, document.body)
+      <div className="mt-4 md:hidden">{navActions}</div>
+    </DocumentCanvas>
+  )
 }
 
 function Row({ k, v }: { k: string; v: string }) {

@@ -14,7 +14,7 @@ const ICON_MAP: Record<string, string> = {
   Partner: 'tool',
   Netzwerk: 'building',
   Einstellungen: 'settings',
-  'KI Intelligence': 'sparkles',
+  KI: 'sparkles',
 }
 
 export function MehrScreenClient({

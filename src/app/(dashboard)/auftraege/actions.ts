@@ -492,7 +492,10 @@ async function logAuftragTimeline(
   if (!r.ok) console.warn('[auftrag_timeline]', r.message)
 }
 
-export async function startAuftragArbeit(auftragId: string) {
+export async function startAuftragArbeit(
+  auftragId: string,
+  options?: { notifyKunde?: boolean }
+) {
   const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
     await serverRuntime()
   const detail = await fetchAuftragDetail(auftragId)
@@ -505,14 +508,15 @@ export async function startAuftragArbeit(auftragId: string) {
   if (!st.ok) return st
 
   const rows = detail.auftrag_handwerker ?? []
+  const notifyKunde = options?.notifyKunde === true
+  const email = notifyKunde ? detail.kunden.email : null
+  let mailGesendet = false
 
-  const email = detail.kunden.email
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
     const projektLink = token ? projektUrlFromToken(token) : getPublicAppUrl()
     const gewerkNamen = rows.map((r) => r.gewerke?.name).filter(Boolean) as string[]
     const branding = await getMailBranding(supabaseAdmin)
-    const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
     const tpl = mailAuftragsbestaetigung(
       {
         name: detail.kunden.name.trim(),
@@ -533,7 +537,11 @@ export async function startAuftragArbeit(auftragId: string) {
       kundeId: detail.kunde_id,
       auftragId,
     })
-    if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
+    if (!sent.success) {
+      console.warn('[startAuftragArbeit] Mail:', sent.error)
+    } else {
+      mailGesendet = true
+    }
   }
 
   const uid = await getAuthUserId()
@@ -541,17 +549,20 @@ export async function startAuftragArbeit(auftragId: string) {
     auftrag_id: auftragId,
     typ: 'arbeit_gestartet',
     titel: 'Arbeit gestartet',
-    beschreibung: email
+    beschreibung: mailGesendet
       ? 'Status „In Arbeit“, Auftragsbestätigung per E-Mail an die Kundin gesendet.'
-      : 'Status „In Arbeit“ (keine Kunden-E-Mail hinterlegt).',
+      : 'Status „In Arbeit“ (ohne Kunden-Mail).',
     erstellt_von: uid,
-    sichtbar_fuer_kunde: Boolean(email),
+    sichtbar_fuer_kunde: mailGesendet,
   })
 
   return { ok: true as const }
 }
 
-export async function setAuftragZurAbnahme(auftragId: string) {
+export async function setAuftragZurAbnahme(
+  auftragId: string,
+  options?: { notifyKunde?: boolean }
+) {
   const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
     await serverRuntime()
   const detail = await fetchAuftragDetail(auftragId)
@@ -563,11 +574,13 @@ export async function setAuftragZurAbnahme(auftragId: string) {
   const st = await setAuftragStatus(auftragId, 'abnahme')
   if (!st.ok) return st
 
-  const email = detail.kunden.email
+  const notifyKunde = options?.notifyKunde === true
+  const email = notifyKunde ? detail.kunden.email : null
+  let mailGesendet = false
+
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
     if (token) {
-      const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
       const branding = await getMailBranding(supabaseAdmin)
       const tpl = mailUpdateHinweis(
         {
@@ -586,7 +599,11 @@ export async function setAuftragZurAbnahme(auftragId: string) {
         kundeId: detail.kunde_id,
         auftragId,
       })
-      if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
+      if (!sent.success) {
+        console.warn('[setAuftragZurAbnahme] Mail:', sent.error)
+      } else {
+        mailGesendet = true
+      }
     }
   }
 
@@ -595,11 +612,11 @@ export async function setAuftragZurAbnahme(auftragId: string) {
     auftrag_id: auftragId,
     typ: 'zur_abnahme',
     titel: 'Zur Abnahme',
-    beschreibung: email
+    beschreibung: mailGesendet
       ? 'Status „Abnahme“, Kundin per E-Mail informiert.'
-      : 'Status „Abnahme“ (keine Kunden-E-Mail hinterlegt).',
+      : 'Status „Abnahme“ (ohne Kunden-Mail).',
     erstellt_von: uid,
-    sichtbar_fuer_kunde: Boolean(email),
+    sichtbar_fuer_kunde: mailGesendet,
   })
 
   return { ok: true as const }

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { BAUTAGEBUCH_MAX_FOTOS, mergeBautagebuchFotoUrls } from '@/lib/auftraege/bautagebuch-fotos'
 import { toast } from '@/components/ui/app-toast'
 
@@ -49,7 +49,7 @@ export function BautagebuchEintragModal({
     if (!files?.length) return
     const slots = BAUTAGEBUCH_MAX_FOTOS - e!.foto_urls.length
     if (slots <= 0) {
-      toast.error(`Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos pro Eintrag.`)
+      toast.error(`Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos.`)
       return
     }
     const list = Array.from(files).slice(0, slots)
@@ -87,33 +87,18 @@ export function BautagebuchEintragModal({
   }
 
   const isEdit = Boolean(e.id)
+  const dirty = Boolean(e.titel.trim() || e.beschreibung.trim() || e.foto_urls.length)
 
   return (
-    <MockModal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      icon="clipboard-list"
-      title={e.titel.trim() || (isEdit ? 'Eintrag bearbeiten' : 'Neuer Eintrag')}
-      sub="Bautagebuch-Eintrag"
-      footer={
-        <>
-          {isEdit && onRemove ? (
-            <MockBtn sm kind="danger" icon="trash" onClick={onRemove} disabled={saving}>
-              Entfernen
-            </MockBtn>
-          ) : null}
-          <div style={{ flex: 1 }} />
-          <MockBtn
-            sm
-            kind="primary"
-            icon="check"
-            disabled={saving || uploading || !e.titel.trim()}
-            onClick={() => void onSave()}
-          >
-            {saving ? 'Speichern…' : 'Fertig'}
-          </MockBtn>
-        </>
-      }
+      title={e.titel.trim() || (isEdit ? 'Eintrag' : 'Eintrag')}
+      context="detail"
+      dirty={dirty}
+      confirmBusy={saving || uploading}
+      confirmDisabled={saving || uploading || !e.titel.trim()}
+      onConfirm={() => void onSave()}
     >
       <div className="form-grid">
         <div className="fg" style={{ gridColumn: '1 / -1' }}>
@@ -122,7 +107,7 @@ export function BautagebuchEintragModal({
             className="inp"
             value={e.titel}
             onChange={(ev) => onChange({ titel: ev.target.value })}
-            placeholder="z.B. Rohinstallation abgeschlossen"
+            placeholder="z.B. Rohinstallation"
             autoFocus={!e.titel}
           />
         </div>
@@ -133,7 +118,7 @@ export function BautagebuchEintragModal({
             rows={3}
             value={e.beschreibung}
             onChange={(ev) => onChange({ beschreibung: ev.target.value })}
-            placeholder="Was wurde heute gemacht..."
+            placeholder="Was wurde gemacht…"
           />
         </div>
         <div className="fg">
@@ -219,6 +204,14 @@ export function BautagebuchEintragModal({
           <MockIcon ctx="row" n="photo-plus" size={20} />
         </button>
       </div>
-    </MockModal>
+
+      {isEdit && onRemove ? (
+        <div style={{ marginTop: 16 }}>
+          <MockBtn sm kind="danger" icon="trash" onClick={onRemove} disabled={saving}>
+            Entfernen
+          </MockBtn>
+        </div>
+      ) : null}
+    </EditorSheet>
   )
 }

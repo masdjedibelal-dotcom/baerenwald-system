@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { cn } from '@/lib/utils'
 
 function flattenItems(items: ActionsMenuItem[]): Exclude<ActionsMenuItem, 'sep'>[] {
@@ -13,12 +14,20 @@ export function ActionSheet({
   onClose,
   title = 'Aktionen',
   items,
+  swipeDismissBlocked = false,
 }: {
   open: boolean
   onClose: () => void
   title?: string
   items: ActionsMenuItem[]
+  /** Swipe-dismiss unterdrücken (z. B. verschachtelter Flow) */
+  swipeDismissBlocked?: boolean
 }) {
+  const { dragZoneProps, sheetMotionStyle } = useSheetSwipeDismiss({
+    onDismiss: onClose,
+    blocked: swipeDismissBlocked,
+  })
+
   if (!open) return null
 
   const flat = flattenItems(items)
@@ -44,13 +53,23 @@ export function ActionSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        style={{
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          ...sheetMotionStyle,
+        }}
       >
-        <div className="flex justify-center pb-2 pt-3">
-          <div className="h-1 w-10 rounded-full bg-bw-border" aria-hidden />
+        <div
+          className="flex justify-center pb-2 pt-3"
+          {...dragZoneProps}
+          aria-hidden
+        >
+          <div className="h-1 w-10 rounded-full bg-bw-border" />
         </div>
 
-        <div className="flex items-center justify-between border-b border-bw-border px-4 py-2">
+        <div
+          className="flex items-center justify-between border-b border-bw-border px-4 py-2"
+          {...dragZoneProps}
+        >
           <span className="text-[15px] font-semibold text-bw-text">{title}</span>
           <button
             type="button"

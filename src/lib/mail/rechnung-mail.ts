@@ -1,4 +1,5 @@
 import type { MailBranding } from '@/lib/mail-branding'
+import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -30,6 +31,10 @@ export type RechnungMailInput = {
   projektTitel?: string | null
   mailEinleitung?: string | null
   mailBetreff?: string | null
+  /** Reverse Charge (§13b) — Betrag netto, kein „inkl. MwSt.“ */
+  reverseCharge?: boolean
+  /** Storno-Gutschrift + neue RE in einer Mail */
+  mitStornoAnhang?: boolean
 }
 
 export function rechnungMailBetreff(
@@ -89,15 +94,24 @@ export function buildRechnungMail(
     defaultRechnungMailEinleitung(anrede)
   const intro = esc(introRaw)
 
-  const pdfHinweis =
-    anrede === 'du'
+  const pdfHinweis = data.mitStornoAnhang
+    ? anrede === 'du'
+      ? 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
+      : 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
+    : anrede === 'du'
       ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
       : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
 
   const summaryHtml = mailSummaryBlock({
-    label: anrede === 'du' ? `DEINE RECHNUNG · ${nr}` : `IHRE RECHNUNG · ${nr}`,
+    label: data.mitStornoAnhang
+      ? anrede === 'du'
+        ? `STORNO + RECHNUNG · ${nr}`
+        : `STORNO + RECHNUNG · ${nr}`
+      : anrede === 'du'
+        ? `DEINE RECHNUNG · ${nr}`
+        : `IHRE RECHNUNG · ${nr}`,
     title: titel,
-    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(data.brutto)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
+    priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 

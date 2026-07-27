@@ -4,9 +4,8 @@ import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
-import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
@@ -248,20 +247,13 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         )}
       </Sec>
 
-      <Modal
+      <EditorSheet
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         title="Benutzer einladen"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={() => sendInvite()}>
-              Einladen
-            </Button>
-          </div>
-        }
+        context="detail"
+        confirmBusy={pending}
+        onConfirm={() => sendInvite()}
       >
         <div className="space-y-3">
           <Input
@@ -291,22 +283,15 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </select>
           </div>
         </div>
-      </Modal>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={Boolean(edit)}
         onClose={() => setEdit(null)}
         title="Benutzer bearbeiten"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setEdit(null)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={() => saveEdit()}>
-              Speichern
-            </Button>
-          </div>
-        }
+        context="detail"
+        confirmBusy={pending}
+        onConfirm={() => saveEdit()}
       >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -332,7 +317,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </select>
           </div>
         </div>
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

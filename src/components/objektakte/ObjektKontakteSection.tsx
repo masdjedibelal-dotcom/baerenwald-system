@@ -5,8 +5,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -52,6 +51,7 @@ export function ObjektKontakteSection({
   const [email, setEmail] = useState('')
   const [notiz, setNotiz] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     setListe(initial)
@@ -65,6 +65,7 @@ export function ObjektKontakteSection({
     setEmail('')
     setNotiz('')
     setErr(null)
+    setDirty(false)
     setModalOpen(true)
   }
 
@@ -76,6 +77,7 @@ export function ObjektKontakteSection({
     setEmail(k.email ?? '')
     setNotiz(k.notiz ?? '')
     setErr(null)
+    setDirty(false)
     setModalOpen(true)
   }
 
@@ -119,6 +121,7 @@ export function ObjektKontakteSection({
         setListe((prev) => [...prev, r.kontakt])
         toast.success('Kontakt angelegt')
       }
+      setDirty(false)
       setModalOpen(false)
       onChanged()
     })
@@ -233,34 +236,65 @@ export function ObjektKontakteSection({
         )}
       </MockCard>
 
-      <Modal
+      <EditorSheet
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={edit ? 'Kontakt bearbeiten' : 'Kontakt anlegen'}
+        title="Kontakt"
+        context="detail"
+        dirty={dirty}
+        confirmBusy={pending}
+        onConfirm={speichern}
       >
-        <div className="space-y-3 p-1">
+        <div className="space-y-3">
           <Select
             label="Rolle"
             name="rolle"
             value={rolle}
-            onChange={(e) => setRolle(e.target.value as ObjektKontaktRolle)}
+            onChange={(e) => {
+              setDirty(true)
+              setRolle(e.target.value as ObjektKontaktRolle)
+            }}
             options={ROLLE_OPTIONS}
           />
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Input label="Telefon" value={telefon} onChange={(e) => setTelefon(e.target.value)} type="tel" />
-          <Input label="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
-          <Textarea label="Notiz" value={notiz} onChange={(e) => setNotiz(e.target.value)} rows={3} />
+          <Input
+            label="Name"
+            value={name}
+            onChange={(e) => {
+              setDirty(true)
+              setName(e.target.value)
+            }}
+            required
+          />
+          <Input
+            label="Telefon"
+            value={telefon}
+            onChange={(e) => {
+              setDirty(true)
+              setTelefon(e.target.value)
+            }}
+            type="tel"
+          />
+          <Input
+            label="E-Mail"
+            value={email}
+            onChange={(e) => {
+              setDirty(true)
+              setEmail(e.target.value)
+            }}
+            type="email"
+          />
+          <Textarea
+            label="Notiz"
+            value={notiz}
+            onChange={(e) => {
+              setDirty(true)
+              setNotiz(e.target.value)
+            }}
+            rows={3}
+          />
           {err ? <p className="text-sm text-danger">{err}</p> : null}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" onClick={speichern} disabled={pending}>
-              Speichern
-            </Button>
-          </div>
         </div>
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

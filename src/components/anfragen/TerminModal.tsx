@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { FormSheet } from '@/components/ui/FormSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import { Textarea } from '@/components/ui/Textarea'
 import {
   insertKalenderTermin,
@@ -170,7 +168,6 @@ export function TerminModal({
   }
 
   const kontaktNameAnzeige = kontaktName?.trim() || 'Kundin/Kunde'
-  const isMobile = useIsMobile()
 
   const formBody = (
     <>
@@ -245,11 +242,8 @@ export function TerminModal({
 
   const formFooter = (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="secondary" onClick={onClose}>
-        Abbrechen
-      </Button>
       <Button type="button" variant="secondary" loading={saving} onClick={() => void save(false)}>
-        Speichern ohne Mail
+        Ohne Mail
       </Button>
       {istBesichtigung && kontaktEmail?.trim() ? (
         <Button type="button" variant="primary" loading={saving} onClick={() => void save(true)}>
@@ -263,25 +257,10 @@ export function TerminModal({
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <FormSheet
-        open={open}
-        onClose={onClose}
-        breadcrumb="Anfragen"
-        title="Termin vereinbaren"
-        footer={formFooter}
-        width="lg"
-      >
-        {formBody}
-      </FormSheet>
-    )
-  }
-
   return (
-    <Modal open={open} onClose={onClose} title="Termin vereinbaren" size="lg">
+    <EditorSheet open={open} onClose={onClose} title="Termin" context="detail" size="lg">
       {formBody}
-      <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-bw-border pt-4">{formFooter}</div>
-    </Modal>
+      <div className="mt-4 border-t border-[var(--app-separator)] pt-3">{formFooter}</div>
+    </EditorSheet>
   )
 }

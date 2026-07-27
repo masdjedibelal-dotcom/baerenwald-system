@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteKommunikationMailVorlage,
@@ -149,21 +149,14 @@ export function KommunikationVorlagenClient({
         )}
       </Card>
 
-      <Modal
+      <EditorSheet
         open={editOpen && !!edit}
         onClose={() => setEditOpen(false)}
         title={edit?.id ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
+        context="detail"
         size="md"
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={save}>
-              Speichern
-            </Button>
-          </div>
-        }
+        confirmBusy={pending}
+        onConfirm={save}
       >
         {edit ? (
           <div className="space-y-3">
@@ -196,7 +189,7 @@ export function KommunikationVorlagenClient({
             />
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

@@ -41,6 +41,7 @@ export function MockBtn({
   onClick,
   children,
   title,
+  'aria-label': ariaLabel,
   type = 'button',
   disabled,
   className,
@@ -51,6 +52,7 @@ export function MockBtn({
   onClick?: () => void
   children?: ReactNode
   title?: string
+  'aria-label'?: string
   type?: 'button' | 'submit'
   disabled?: boolean
   className?: string
@@ -67,6 +69,7 @@ export function MockBtn({
       )}
       onClick={onClick}
       title={title}
+      aria-label={ariaLabel ?? (icon && !children ? title : undefined)}
       disabled={disabled}
     >
       {icon ? <MockIcon ctx="btn" n={icon} size={sm ? 14 : 15} /> : null}

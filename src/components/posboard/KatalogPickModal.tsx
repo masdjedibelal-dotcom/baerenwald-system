@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { PickerSheet } from '@/components/surfaces/PickerSheet'
 import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
 import {
   katalogPreisLabel,
@@ -20,7 +20,7 @@ export type KatalogPickResult = {
 }
 
 /**
- * Modal „Aus Katalog“: Suche, Gewerk-Chips, Varianten-Auswahl, Menge + Beschreibung.
+ * „Aus Katalog“: PickerSheet · Suche · Gewerk-Chips · Variante · Menge.
  */
 export function KatalogPickModal({
   open,
@@ -126,67 +126,46 @@ export function KatalogPickModal({
     onClose()
   }
 
-  if (!open) return null
-
   return (
-    <MockModal
-      open
+    <PickerSheet
+      open={open}
       onClose={onClose}
-      icon="list-filter"
-      title="Aus Katalog"
-      sub={
-        rows.length
-          ? 'Titel suchen · Variante wählen · Beschreibung projektbezogen anpassen'
-          : 'Katalog noch leer — bitte SQL + CSVs in Supabase importieren'
-      }
-      footer={
-        <>
-          <div style={{ flex: 1 }} />
-          <MockBtn sm kind="ghost" onClick={onClose}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn sm kind="primary" icon="check" disabled={!picked || pending} onClick={confirm}>
-            Übernehmen
-          </MockBtn>
-        </>
-      }
-    >
-      <div className="space-y-3">
+      title="Katalog"
+      context="canvas"
+      search={
         <input
           className="sel w-full"
-          placeholder="Suche über alle Titel…"
+          placeholder="Suchen…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            className={`chip ${!gewerkFilter ? 'active' : ''}`}
-            onClick={() => setGewerkFilter(null)}
-          >
-            Alle
-          </button>
-          {gewerke.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              className={`chip ${gewerkFilter === g.id ? 'active' : ''}`}
-              onClick={() => setGewerkFilter(g.id)}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-
+      }
+      searchPlacement="top"
+      sourceChips={[
+        {
+          id: 'alle',
+          label: 'Alle',
+          active: !gewerkFilter,
+          onClick: () => setGewerkFilter(null),
+        },
+        ...gewerke.map((g) => ({
+          id: g.id,
+          label: g.name,
+          active: gewerkFilter === g.id,
+          onClick: () => setGewerkFilter(g.id),
+        })),
+      ]}
+      empty={
+        pending && !rows.length ? (
+          <p className="picker-sheet__empty">Lädt…</p>
+        ) : !pending && !filtered.length ? (
+          <p className="picker-sheet__empty">Keine Treffer.</p>
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
         <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">
-          {pending && !rows.length ? (
-            <p className="p-3 text-[12px] text-bw-text-muted">Lädt Katalog…</p>
-          ) : null}
-          {!pending && !filtered.length ? (
-            <p className="p-3 text-[12px] text-bw-text-muted">Keine Treffer.</p>
-          ) : null}
           {grouped.map(([gewerkName, items]) => (
             <div key={gewerkName}>
               <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
@@ -258,18 +237,27 @@ export function KatalogPickModal({
               />
             </label>
             <label className="block text-[11px] text-bw-text-muted">
-              Beschreibung (projektspezifisch — Titel bleibt Katalog)
+              Beschreibung
               <textarea
                 className="sel mt-0.5 w-full"
                 rows={3}
                 value={beschreibung}
                 onChange={(e) => setBeschreibung(e.target.value)}
-                placeholder="Was genau wird in diesem Projekt gemacht?"
+                placeholder="Projektspezifisch"
               />
             </label>
+            <MockBtn
+              sm
+              kind="primary"
+              icon="check"
+              disabled={!picked || pending}
+              onClick={confirm}
+            >
+              Übernehmen
+            </MockBtn>
           </div>
         ) : null}
       </div>
-    </MockModal>
+    </PickerSheet>
   )
 }

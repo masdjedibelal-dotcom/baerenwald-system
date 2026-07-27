@@ -19,6 +19,9 @@ export type PosTableItem = {
   name: string
   beschreibung?: string
   mengeLabel?: string
+  /** Rohwert für Inline-Edit */
+  menge?: number
+  einheit?: string
   preisLabel?: string
   badge?: PosTableBadge | null
 }
@@ -75,6 +78,7 @@ export function PosTable({
   onDropToGroup,
   onReorderGroup,
   onItemOpen,
+  onMengeChange,
   showTotals,
   netto,
   ust,
@@ -100,6 +104,8 @@ export function PosTable({
   onReorderGroup?: (draggedGewerk: string, targetGewerk: string) => void
   /** Tip auf Zeile (mobil: Karte öffnen) */
   onItemOpen?: (item: PosTableItem, group: PosTableGroup) => void
+  /** Inline Menge — feste Zellbreite, kein Layout-Shift */
+  onMengeChange?: (id: string, menge: number) => void
   showTotals?: boolean
   netto?: number
   ust?: number
@@ -360,12 +366,50 @@ export function PosTable({
                     {it.beschreibung ? (
                       <div className="pt-desc pt-desc--clamp2">{it.beschreibung}</div>
                     ) : null}
-                    <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel}>
-                      {it.mengeLabel ? <span className="pt2-menge">{it.mengeLabel}</span> : null}
+                    <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !onMengeChange}>
+                      {onMengeChange ? (
+                        <span className="pt2-menge pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            className="pt2-menge-input"
+                            type="number"
+                            step="0.5"
+                            min={0.01}
+                            aria-label="Menge"
+                            value={it.menge ?? ''}
+                            onChange={(e) => {
+                              const n = Number(String(e.target.value).replace(',', '.'))
+                              onMengeChange(it.id, Number.isFinite(n) && n > 0 ? n : 0.01)
+                            }}
+                          />
+                          {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
+                        </span>
+                      ) : it.mengeLabel ? (
+                        <span className="pt2-menge">{it.mengeLabel}</span>
+                      ) : null}
                       {it.preisLabel ? <span className="pt2-preis">{it.preisLabel}</span> : null}
                     </div>
                   </div>
-                  <div className="pt2-menge pt2-menge--desk">{it.mengeLabel ?? ''}</div>
+                  <div className="pt2-menge pt2-menge--desk">
+                    {onMengeChange ? (
+                      <span className="pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          className="pt2-menge-input"
+                          type="number"
+                          step="0.5"
+                          min={0.01}
+                          aria-label="Menge"
+                          value={it.menge ?? ''}
+                          onChange={(e) => {
+                            const n = Number(String(e.target.value).replace(',', '.'))
+                            onMengeChange(it.id, Number.isFinite(n) && n > 0 ? n : 0.01)
+                          }}
+                        />
+                        {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
+                      </span>
+                    ) : (
+                      (it.mengeLabel ?? '')
+                    )}
+                  </div>
                   <div className="pt2-preis pt2-preis--desk">{it.preisLabel ?? ''}</div>
                   <div className="pt2-act">
                     {itemActions ? <PosTableMenu items={itemActions(g, it)} /> : null}

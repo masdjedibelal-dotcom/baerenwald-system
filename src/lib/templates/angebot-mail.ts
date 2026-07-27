@@ -2,6 +2,7 @@ import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
+import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -83,6 +84,8 @@ export type AngebotMailInput = KundeAnredeKontext & {
   portalAudience?: PortalMailAudience
   /** Vorschau-Bild KI-Visualisierung (wenn ins Angebot) */
   visualisierung_vorschau_url?: string | null
+  /** Reverse Charge (§13b) — Betrag netto */
+  reverseCharge?: boolean
 }
 
 /** Platzhalter / Standard, wenn Felder in Schritt 2 leer bleiben */
@@ -339,7 +342,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
   const summaryHtml = mailSummaryBlock({
     label: `${boxLabel} · ${esc(angebotsnr)}`,
     title: esc(leistungsumfang),
-    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(gesamt_brutto)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
+    priceHtml: mailBetragPriceHtml(gesamt_brutto, { reverseCharge: data.reverseCharge }),
     metaHtml: `<p style="font-size:12px;color:#6B7280;margin:8px 0 0;">Gültig bis: <strong style="color:#374151;">${esc(gueltig_bis)}</strong></p>`,
   })
 

@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { loadCrmTeamFuerTermin } from '@/app/(dashboard)/anfragen/actions'
 import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
@@ -77,7 +76,14 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Termin bearbeiten" size="md">
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title="Termin"
+      context="detail"
+      confirmBusy={saving}
+      onConfirm={() => void speichern()}
+    >
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
         <label>
           <span className="input-label">Datum</span>
@@ -104,7 +110,7 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
             className="input"
             value={adresse}
             onChange={(e) => setAdresse(e.target.value)}
-            placeholder="Ort des Termins"
+            placeholder="Ort"
           />
         </label>
         {istBesichtigung ? (
@@ -117,12 +123,6 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
           />
         ) : null}
       </div>
-      <ModalFormFooter
-        onCancel={onClose}
-        onSubmit={() => void speichern()}
-        submitLabel="Speichern"
-        loading={saving}
-      />
-    </Modal>
+    </EditorSheet>
   )
 }

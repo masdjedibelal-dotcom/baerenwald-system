@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-/** Viewport &lt; 768px (Tailwind `md`). */
+/** SoT: Viewport &lt; 768px (Tailwind `md` / max-width 767). */
 export function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(false)
 

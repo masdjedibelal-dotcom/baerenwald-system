@@ -1,17 +1,17 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { GroupedFieldCard, GroupedFieldRow } from '@/components/surfaces/primitives'
 import { toast } from '@/components/ui/app-toast'
 import {
   LEISTUNG_STATUS_OPTIONS,
   type AuftragLeistungStatus,
+  normalizeLeistungStatus,
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { notifyPartnerPositionGeaendertV3 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
 import type { AuftragPosition } from '@/lib/types'
-import { normalizeLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -37,6 +37,7 @@ export function AuftragLeistungEditModal({
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
+  const [showBeschreibung, setShowBeschreibung] = useState(false)
   const [vk, setVk] = useState('')
   const [ek, setEk] = useState('')
   const [von, setVon] = useState('')
@@ -47,6 +48,7 @@ export function AuftragLeistungEditModal({
     if (!open || !pos) return
     setName(pos.leistung_name ?? '')
     setBeschreibung(pos.beschreibung ?? '')
+    setShowBeschreibung(Boolean(pos.beschreibung?.trim()))
     setVk(pos.preis_fix != null ? String(pos.preis_fix) : '')
     setEk(pos.preis_partner != null ? String(pos.preis_partner) : '')
     setVon(pos.start_datum?.slice(0, 10) ?? '')
@@ -54,11 +56,24 @@ export function AuftragLeistungEditModal({
     setStatus(normalizeLeistungStatus(pos.leistung_status))
   }, [open, pos])
 
+  const dirty = useMemo(() => {
+    if (!pos) return false
+    return (
+      name !== (pos.leistung_name ?? '') ||
+      beschreibung !== (pos.beschreibung ?? '') ||
+      vk !== (pos.preis_fix != null ? String(pos.preis_fix) : '') ||
+      ek !== (pos.preis_partner != null ? String(pos.preis_partner) : '') ||
+      von !== (pos.start_datum?.slice(0, 10) ?? '') ||
+      bis !== (pos.end_datum?.slice(0, 10) ?? '') ||
+      status !== normalizeLeistungStatus(pos.leistung_status)
+    )
+  }, [pos, name, beschreibung, vk, ek, von, bis, status])
+
   function save() {
     if (!pos) return
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error('Name ist erforderlich.')
+      toast.error('Name fehlt.')
       return
     }
     const vkNum = vk.trim() ? Number(vk.replace(',', '.')) : null
@@ -90,7 +105,7 @@ export function AuftragLeistungEditModal({
         if (!notify.ok) toast.error(notify.message)
       }
 
-      toast.success('Leistung gespeichert.')
+      toast.success('Gespeichert')
       onSaved()
       onClose()
     })
@@ -99,87 +114,88 @@ export function AuftragLeistungEditModal({
   if (!pos) return null
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title="Leistung bearbeiten"
+      title="Leistung"
+      context="detail"
+      dirty={dirty}
+      confirmBusy={pending}
+      onConfirm={save}
       size="lg"
-      footer={
-        <>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
-          <Button type="button" variant="primary" onClick={save} disabled={pending}>
-            Speichern
-          </Button>
-        </>
-      }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="input-label">Name</label>
-          <input className="input w-full" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="input-label">Beschreibung</label>
-          <textarea
-            className="input w-full min-h-[4.5rem]"
-            value={beschreibung}
-            onChange={(e) => setBeschreibung(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="input-label">VK netto</label>
-          <div className="txt-prefix">
+      <GroupedFieldCard>
+        <GroupedFieldRow label="Bezeichnung">
+          <input className="input w-full text-right" value={name} onChange={(e) => setName(e.target.value)} />
+        </GroupedFieldRow>
+        <GroupedFieldRow label="Preis">
+          <div className="txt-prefix justify-end">
             <span className="prefix">€</span>
             <input
               type="number"
-              className="input"
+              className="input w-28 text-right"
               step="0.01"
               min="0"
               value={vk}
               onChange={(e) => setVk(e.target.value)}
             />
           </div>
-        </div>
-        <div>
-          <label className="input-label">EK netto</label>
-          <div className="txt-prefix">
+        </GroupedFieldRow>
+        <GroupedFieldRow label="EK">
+          <div className="txt-prefix justify-end">
             <span className="prefix">€</span>
             <input
               type="number"
-              className="input"
+              className="input w-28 text-right"
               step="0.01"
               min="0"
               value={ek}
               onChange={(e) => setEk(e.target.value)}
             />
           </div>
-        </div>
-        <div>
-          <label className="input-label">Von</label>
-          <input type="date" className="input w-full" value={von} onChange={(e) => setVon(e.target.value)} />
-        </div>
-        <div>
-          <label className="input-label">Bis</label>
-          <input type="date" className="input w-full" value={bis} onChange={(e) => setBis(e.target.value)} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="input-label">Baufortschritt</label>
-          <div className="pos-v3-segmented">
-            {LEISTUNG_STATUS_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={status === o.value ? 'active' : undefined}
-                onClick={() => setStatus(o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        </GroupedFieldRow>
+        <GroupedFieldRow label="Von">
+          <input type="date" className="input w-auto" value={von} onChange={(e) => setVon(e.target.value)} />
+        </GroupedFieldRow>
+        <GroupedFieldRow label="Bis">
+          <input type="date" className="input w-auto" value={bis} onChange={(e) => setBis(e.target.value)} />
+        </GroupedFieldRow>
+      </GroupedFieldCard>
+
+      <p className="mb-2 mt-4 text-[13px] text-bw-text-muted">Status</p>
+      <div className="pos-v3-segmented mb-3">
+        {LEISTUNG_STATUS_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            className={status === o.value ? 'active' : undefined}
+            onClick={() => setStatus(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
-    </Modal>
+
+      {showBeschreibung ? (
+        <GroupedFieldCard>
+          <div className="px-4 py-3">
+            <label className="input-label">Beschreibung</label>
+            <textarea
+              className="input mt-1 w-full min-h-[4rem]"
+              value={beschreibung}
+              onChange={(e) => setBeschreibung(e.target.value)}
+            />
+          </div>
+        </GroupedFieldCard>
+      ) : (
+        <button
+          type="button"
+          className="text-[14px] font-medium text-bw-primary"
+          onClick={() => setShowBeschreibung(true)}
+        >
+          + Beschreibung
+        </button>
+      )}
+    </EditorSheet>
   )
 }

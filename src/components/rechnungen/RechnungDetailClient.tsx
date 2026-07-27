@@ -1,7 +1,8 @@
 'use client'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
@@ -9,6 +10,11 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
+import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
+import { DetailSection } from '@/components/vorgang/DetailSection'
+import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
+import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
@@ -19,6 +25,7 @@ import {
   korrigiereRechnung,
   nehmeRechnungStornoZurueck,
   sendRechnung,
+  sendZahlungsbestaetigung,
   storniereRechnungOhneErsatz,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
@@ -39,11 +46,12 @@ import {
   RechnungAuftragdetailsTab,
   RechnungZahlplanTab,
 } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
-import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateRechnung } from '@/lib/list-actions'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
@@ -70,8 +78,10 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
 import type {
@@ -87,62 +97,51 @@ import type {
   RechnungStatus,
 } from '@/lib/types'
 
-type RechnungDetailTab =
-  | 'stammdaten'
-  | 'details'
-  | 'auftragdetails'
-  | 'zahlplan'
-  | 'fotos'
-  | 'verlauf'
-  | 'historie'
-  | 'dokumente'
-  | 'notizen'
+type RechnungDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
 
-const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
-  'stammdaten',
-  'details',
-  'auftragdetails',
-  'zahlplan',
-  'fotos',
-  'verlauf',
-  'historie',
-  'dokumente',
-  'notizen',
-])
+const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
 
 function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase()
   if (!tab) return null
-  if (tab === 'uebersicht' || tab === 'stammdaten') return 'stammdaten'
-  if (tab === 'auftrag' || tab === 'auftrag-details' || tab === 'auftragdetails') {
-    return 'auftragdetails'
-  }
-  if (tab === 'zahlplan' || tab === 'zahlung' || tab === 'finanzen') return 'zahlplan'
   if (
+    tab === 'akte' ||
+    tab === 'stammdaten' ||
+    tab === 'zahlplan' ||
+    tab === 'zahlung' ||
+    tab === 'finanzen' ||
+    tab === 'dokumente' ||
+    tab === 'notizen' ||
+    tab === 'auftragdetails' ||
+    tab === 'auftrag' ||
+    tab === 'auftrag-details'
+  ) {
+    return 'akte'
+  }
+  if (
+    tab === 'uebersicht' ||
+    tab === 'details' ||
     tab === 'positionen' ||
     tab === 'leistung' ||
     tab === 'rechnung-details' ||
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
     tab === 'angebot' ||
-    tab === 'angebot-details'
+    tab === 'angebot-details' ||
+    tab === 'fotos' ||
+    tab === 'bilder' ||
+    tab === 'photos'
   ) {
-    return 'details'
+    return 'uebersicht'
   }
-  if (tab === 'mahnung' || tab === 'mahnungen' || tab === 'mahnverlauf') return 'verlauf'
-  if (tab === 'aktivitaet' || tab === 'verlauf') return 'verlauf'
-  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
-  if (tab === 'kommunikation' || tab === 'notizen') return 'notizen'
-  if (tab === 'dokumente') return 'dokumente'
-  if (tab === 'bilder' || tab === 'photos' || tab === 'fotos') return 'fotos'
-  const cumulative = resolveCumulativeDetailTabAlias(tab)
-  if (cumulative === 'auftrag-details') return 'auftragdetails'
   if (
-    cumulative === 'anfrage-details' ||
-    cumulative === 'angebot-details' ||
-    cumulative === 'rechnung-details'
+    tab === 'aktivitaet' ||
+    tab === 'verlauf' ||
+    tab === 'historie' ||
+    tab === 'projekt-historie' ||
+    tab === 'phasen'
   ) {
-    return 'details'
+    return 'aktivitaet'
   }
   if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
   return null
@@ -159,16 +158,6 @@ function tageSeitFaelligkeit(faelligAm: string | null): number {
   due.setHours(0, 0, 0, 0)
   return Math.floor((today.getTime() - due.getTime()) / 86400000)
 }
-
-function rechnungStatusBadge(status: RechnungStatus, ueberfaellig: boolean) {
-  if (ueberfaellig) return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Überfällig</MockBadge>
-  if (status === 'bezahlt') return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Bezahlt</MockBadge>
-  if (status === 'gesendet') return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>Gesendet</MockBadge>
-  if (status === 'storniert') return <MockBadge kind={hubSpotStatusToMockBadgeKind('cancel')}>Storniert</MockBadge>
-  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Entwurf</MockBadge>
-}
-
-import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 function rechnungTitelMeta(
   detail: Rechnung,
@@ -235,20 +224,36 @@ export function RechnungDetailClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [mainTab, setMainTab] = useState<RechnungDetailTab>('stammdaten')
+  const [mainTab, setMainTab] = useState<RechnungDetailTab>('uebersicht')
+  const [akteSegment, setAkteSegment] = useState<AkteSegment>('zahlung')
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
+  const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | 'korrigieren' | null>(
+    null
+  )
 
   useEffect(() => {
     setDetail(initial)
   }, [initial])
 
   useEffect(() => {
-    const tab = resolveRechnungDetailTabFromQuery(searchParams.get('tab'))
+    const raw = searchParams.get('tab')
+    if (isLegacyDetailTabAlias(raw) || raw === 'auftragdetails' || raw === 'zahlplan') {
+      const resolved = resolveRechnungDetailTabFromQuery(raw) ?? 'uebersicht'
+      const seg = parseAkteSegment(raw, searchParams.get('segment'))
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', resolved)
+      if (resolved === 'akte') q.set('segment', seg)
+      else q.delete('segment')
+      router.replace(`/rechnungen/${detail.id}?${q.toString()}`, { scroll: false })
+      return
+    }
+    const tab = resolveRechnungDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
-  }, [searchParams])
+    setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
+  }, [searchParams, detail.id, router])
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
 
@@ -322,9 +327,9 @@ export function RechnungDetailClient({
     })
   }, [timelineInitial, detail.created_at, detail.rechnungsnummer, detail.id])
 
-  async function setStatus(s: RechnungStatus) {
+  async function setStatus(s: RechnungStatus, opts?: { notifyKunde?: boolean }) {
     startTransition(async () => {
-      const r = await updateRechnungStatus(detail.id, s)
+      const r = await updateRechnungStatus(detail.id, s, opts)
       if (!r.ok) {
         toast.error(r.message)
         return
@@ -333,16 +338,24 @@ export function RechnungDetailClient({
         toast.success(
           r.zahlungsbestaetigungGesendet
             ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
-            : 'Als bezahlt markiert'
+            : 'Als bezahlt markiert (ohne Kunden-Mail)'
         )
       }
-      setDetail((d) => ({ ...d, status: s }))
+      setDetail((d) => ({
+        ...d,
+        status: s,
+        ...(s === 'bezahlt' ? { bezahlt_at: new Date().toISOString() } : {}),
+      }))
       refresh()
     })
   }
 
   function handleGutschrift() {
-    if (!window.confirm('Gutschrift anlegen und Originalrechnung als storniert markieren?')) return
+    setRechnungConfirm('gutschrift')
+  }
+
+  function ausfuehrenGutschrift() {
+    setRechnungConfirm(null)
     startTransition(async () => {
       const r = await createGutschriftFromRechnung(detail.id)
       if (!r.ok) {
@@ -365,15 +378,11 @@ export function RechnungDetailClient({
       openWizard()
       return
     }
-    if (
-      !window.confirm(
-        'Diese Rechnung wurde bereits versendet oder bezahlt.\n\n' +
-          'Es wird ein Storno-Beleg (Gutschrift mit Bezug) erstellt und eine neue Rechnung mit neuer Nummer als Entwurf angelegt.\n\n' +
-          'Fortfahren?'
-      )
-    ) {
-      return
-    }
+    setRechnungConfirm('korrigieren')
+  }
+
+  function ausfuehrenKorrigieren() {
+    setRechnungConfirm(null)
     startTransition(async () => {
       const r = await korrigiereRechnung(detail.id)
       if (!r.ok) {
@@ -437,11 +446,12 @@ export function RechnungDetailClient({
       extras.push({
         icon: 'ban',
         label: 'Ohne Ersatz stornieren',
+        hint: 'Nur bei Fehlversand — sonst „Rechnung korrigieren“',
         danger: true,
         onClick: () => {
           if (
             !window.confirm(
-              'Rechnung ohne neuen Ersatzbeleg stornieren? Für Korrekturen besser „Rechnung korrigieren“ nutzen.'
+              'Rechnung endgültig stornieren, ohne Ersatzbeleg?\n\nFür Betrags- oder Positionsänderungen bitte „Rechnung korrigieren“ nutzen.'
             )
           ) {
             return
@@ -464,6 +474,32 @@ export function RechnungDetailClient({
         icon: 'alert-triangle',
         label: 'Zahlungserinnerung senden',
         onClick: () => setErinnerungModalOpen(true),
+      })
+      extras.push({
+        icon: 'mail',
+        label: 'Bezahlt + Bestätigung senden',
+        onClick: () => void setStatus('bezahlt', { notifyKunde: true }),
+      })
+    }
+    if (detail.status === 'bezahlt' && belegTyp === 'rechnung') {
+      extras.push({
+        icon: 'mail',
+        label: 'Zahlungsbestätigung senden',
+        onClick: () => {
+          startTransition(async () => {
+            const r = await sendZahlungsbestaetigung(detail.id)
+            if (!r.ok) {
+              toast.error(r.message)
+              return
+            }
+            toast.success(
+              r.skipped
+                ? 'Keine Kunden-E-Mail — Bestätigung übersprungen'
+                : 'Zahlungsbestätigung gesendet'
+            )
+            refresh()
+          })
+        },
       })
     }
     if (detail.status === 'storniert' && nachfolgerRechnungId) {
@@ -543,9 +579,6 @@ export function RechnungDetailClient({
             detail.status === 'storniert' || detail.status === 'bezahlt'
               ? undefined
               : handleSenden,
-          onToAuftrag: detail.auftrag_id
-            ? () => router.push(`/auftraege/${detail.auftrag_id}`)
-            : undefined,
           mail: kundeEmail || null,
           onMail: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
           onDelete: rechnungDarfHardGeloeschtWerden(detail.status)
@@ -616,11 +649,25 @@ export function RechnungDetailClient({
         onClick: () => setErinnerungModalOpen(true),
       }
     }
+    if (detail.auftrag_id) {
+      return {
+        label: 'Zum Auftrag',
+        icon: 'briefcase',
+        onClick: () =>
+          router.replace(`/auftraege/${detail.auftrag_id}?from=rechnung:${detail.id}`),
+        href: `/auftraege/${detail.auftrag_id}?from=rechnung:${detail.id}`,
+      }
+    }
     return null
-  }, [detail.status, ueberfaellig, belegTyp])
+  }, [detail.status, detail.auftrag_id, detail.id, ueberfaellig, belegTyp, router])
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
+  const rechnungStatus = rechnungStatusDisplay(detail.status, { ueberfaellig })
   const headMeta = kundeName
+  const headSub =
+    detail.status === 'gesendet'
+      ? gesendetDetailSubline(detail.gesendet_at, detail.updated_at)
+      : undefined
 
   const mahnLabel = mahnstufeListenLabel(detail)
 
@@ -671,80 +718,85 @@ export function RechnungDetailClient({
   const notizenInhalt = leadId ? (
     <AnfrageNotizenTab leadId={leadId} notizen={notizenRows} onReload={() => refresh()} />
   ) : (
-    <MockCard title="Notizen · 0" icon="messages">
+    <MockCard title="Notizen" icon="messages">
       <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
-        Noch keine Notizen — diese Rechnung ist keiner Anfrage zugeordnet.
+        Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
       </div>
     </MockCard>
   )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
-      id: 'details',
-      label: 'Details',
+      id: 'uebersicht',
+      label: entityDetailTabLabel('uebersicht'),
       icon: 'list-details',
       count: positionenCount || undefined,
-      render: () => detailsInhalt,
-    },
-    {
-      id: 'auftragdetails',
-      label: 'Auftragdetails',
-      icon: 'briefcase',
       render: () => (
-        <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
+        <div className="space-y-6">
+          <PhaseCardsBlock
+            kontext={projektKontext}
+            fromRef={{ kind: 'rechnung', id: detail.id }}
+          />
+          <ZugehoerigListe
+            kontext={projektKontext}
+            fromRef={{ kind: 'rechnung', id: detail.id }}
+          />
+          {detailsInhalt}
+          {vorgangFotos.length > 0 ? (
+            <DetailSection title="Fotos">
+              <VorgangFotosTab fotos={vorgangFotos} />
+            </DetailSection>
+          ) : null}
+        </div>
       ),
     },
     {
-      id: 'zahlplan',
-      label: 'Zahlplan',
-      icon: 'calculator',
+      id: 'akte',
+      label: entityDetailTabLabel('akte'),
+      icon: 'files',
       render: () => (
-        <RechnungZahlplanTab
-          auftragDetail={auftragDetail}
-          rechnungen={auftragRechnungen}
-          aktuelleRechnungId={detail.id}
+        <VorgangAkteTab
+          initialSegment={akteSegment}
+          onSegmentChange={(s) => {
+            setAkteSegment(s)
+            const q = new URLSearchParams(searchParams.toString())
+            q.set('tab', 'akte')
+            q.set('segment', s)
+            router.replace(`/rechnungen/${detail.id}?${q.toString()}`, { scroll: false })
+          }}
+          zahlung={
+            <RechnungZahlplanTab
+              auftragDetail={auftragDetail}
+              rechnungen={auftragRechnungen}
+              aktuelleRechnungId={detail.id}
+            />
+          }
+          dateien={
+            <div className="space-y-4">
+              {dokumenteInhalt}
+              {notizenInhalt}
+            </div>
+          }
+          kunde={
+            <div className="space-y-4">
+              {stammdatenInhalt}
+              <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
+            </div>
+          }
         />
       ),
     },
     {
-      id: 'fotos',
-      label: ACTIVITY_SECTIONS.fotos,
-      icon: 'photo',
-      count: vorgangFotos.length || undefined,
-      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
-    },
-    {
-      id: 'verlauf',
-      label: ACTIVITY_SECTIONS.verlauf,
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
       icon: 'history',
       count: timelineItems.length || undefined,
-      render: () => verlaufInhalt,
-    },
-    {
-      id: 'historie',
-      label: 'Historie',
-      icon: 'list-details',
-      render: () => <ProjektHistorieTab kontext={projektKontext} />,
-    },
-    {
-      id: 'dokumente',
-      label: ACTIVITY_SECTIONS.dokumente,
-      icon: 'files',
-      count: (dokumenteRows.length || 0) + 1 || undefined,
-      render: () => dokumenteInhalt,
-    },
-    {
-      id: 'notizen',
-      label: ACTIVITY_SECTIONS.notizen,
-      icon: 'messages',
-      count: notizenRows.length || undefined,
-      render: () => notizenInhalt,
+      render: () => (
+        <div className="space-y-6">
+          {verlaufInhalt}
+          <ProjektHistorieTab kontext={projektKontext} />
+        </div>
+      ),
     },
   ]
 
@@ -755,11 +807,16 @@ export function RechnungDetailClient({
       phase="rechnung"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=rechnung"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück zu Vorgängen"
       className="space-y-4 pb-0"
       head={{
         title: crumbTitle && crumbTitle !== '—' ? crumbTitle : kundeName,
-        badges: rechnungStatusBadge(detail.status, ueberfaellig),
+        sub: headSub,
+        badges: (
+          <MockBadge kind={variantToMockBadgeKind(rechnungStatus.variant)}>
+            {rechnungStatus.label}
+          </MockBadge>
+        ),
         meta: headMeta,
         actions: (
           <DetailActionsBar
@@ -826,6 +883,50 @@ export function RechnungDetailClient({
         kundeId={kundeId}
         fallbackEmail={kundeEmail}
       />
+
+      <Modal
+        open={rechnungConfirm === 'gutschrift'}
+        onClose={() => setRechnungConfirm(null)}
+        title="Gutschrift anlegen?"
+        size="sm"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setRechnungConfirm(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
+              Gutschrift erstellen
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[14px] text-bw-text-muted">
+          Es entsteht ein Gutschrift-Beleg (negative Beträge). Die Originalrechnung wird als
+          storniert markiert.
+        </p>
+      </Modal>
+
+      <Modal
+        open={rechnungConfirm === 'korrigieren'}
+        onClose={() => setRechnungConfirm(null)}
+        title="Rechnung korrigieren?"
+        size="sm"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setRechnungConfirm(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" onClick={ausfuehrenKorrigieren} disabled={pending}>
+              Fortfahren
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[14px] text-bw-text-muted">
+          Es wird eine Storno-Gutschrift erstellt und eine neue Rechnung mit neuer Nummer als
+          Entwurf angelegt.
+        </p>
+      </Modal>
     </EntityDetailLayout>
   )
 }

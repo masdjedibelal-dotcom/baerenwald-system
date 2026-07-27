@@ -66,9 +66,14 @@ function seitText(iso: string | null) {
 export function AuftragNachtragBaustoppSection({
   detail,
   onChanged,
+  vertragNachtragVerfuegbar = false,
+  onVertragNachtragErstellen,
 }: {
   detail: AuftragDetail
   onChanged: () => void
+  /** Hauptvertrag vorhanden — Vertrags-Nachtrag-Wizard (gleiche Aktion wie früher im ⋯). */
+  vertragNachtragVerfuegbar?: boolean
+  onVertragNachtragErstellen?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [nachtragOpen, setNachtragOpen] = useState(false)
@@ -167,12 +172,19 @@ export function AuftragNachtragBaustoppSection({
         </div>
       ) : null}
 
-      <section>
+      <section id="auftrag-nachtrag-section">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-ink">Nachträge</h2>
-          <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
-            Nachtrag anlegen
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {vertragNachtragVerfuegbar && onVertragNachtragErstellen ? (
+              <Button type="button" variant="secondary" onClick={onVertragNachtragErstellen}>
+                Vertrags-Nachtrag
+              </Button>
+            ) : null}
+            <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
+              Nachtrag anlegen
+            </Button>
+          </div>
         </div>
 
         {nachtraege.length === 0 ? (
@@ -365,7 +377,7 @@ export function AuftragNachtragBaustoppSection({
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-ink">Baustopps</h2>
-            <Button type="button" variant="secondary" onClick={() => setBaustoppOpen(true)}>
+            <Button type="button" variant="primary" onClick={() => setBaustoppOpen(true)}>
               <IconText icon={CloudRain}>Baustopp melden</IconText>
             </Button>
           </div>
@@ -399,7 +411,16 @@ export function AuftragNachtragBaustoppSection({
             </div>
           ) : null}
           {baustopps.length === 0 ? (
-            <p className="text-sm text-muted">Keine Baustopps erfasst.</p>
+            <p className="text-sm text-muted">
+              Keine Baustopps erfasst.{' '}
+              <button
+                type="button"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                onClick={() => setBaustoppOpen(true)}
+              >
+                Baustopp jetzt melden
+              </button>
+            </p>
           ) : (
             <>
               <ul className="space-y-2 text-sm">

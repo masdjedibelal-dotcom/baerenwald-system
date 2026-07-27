@@ -15,7 +15,8 @@ import {
   gewerkHandwerkerZuweisungenToMaps,
   type GewerkHandwerkerZuweisung,
 } from '@/components/angebote/AngebotWizardHandwerkerStep'
-import { WizardShell } from '@/components/layout/WizardShell'
+import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { DocActionBar } from '@/components/surfaces/primitives'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -111,11 +112,11 @@ function kundenName(lead: LeadDetail) {
 }
 
 const WIZARD_STEP_LABELS = [
-  'Typ & Projekt',
+  'Kopf',
   'Positionen',
-  'Finalisieren',
+  'Fuß',
   'Vorschau',
-  'Versenden',
+  'Senden',
 ] as const
 const WIZARD_TOTAL_STEPS = WIZARD_STEP_LABELS.length
 
@@ -800,28 +801,51 @@ export function AngebotWizard({
     }
   }
 
-  /** Weiter — vor Vorschau Entwurf speichern für PDF */
+  function scrollToSection(sec: number) {
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`section-${sec}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  function goToSection(sec: number) {
+    setStep(sec)
+    scrollToSection(sec)
+  }
+
+  /** Weiter — Entwurf für PDF best-effort; harte Validierung nur bei Erstellen/Senden */
   async function handleWeiter() {
-    if (saving || previewLoading) return
+    if (saving) return
     try {
-      if (step === 3) {
+      const next = Math.min(WIZARD_TOTAL_STEPS, step + 1)
+      if (next === 4) {
         const id = await ensureDraftForPreview()
-        if (!id) return
+        if (!id) {
+          toast.error(
+            'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
+          )
+        }
       }
-      setStep((s) => Math.min(WIZARD_TOTAL_STEPS, s + 1))
+      goToSection(next)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
     }
   }
 
-  function handleRequestClose() {
+  async function handleCanvasClose() {
     if (draftDirty && !saving) {
-      const verwerfen = window.confirm(
-        'Es gibt ungespeicherte Änderungen. Wizard schließen und Änderungen verwerfen?'
-      )
-      if (!verwerfen) return
+      try {
+        await persistDraft({ notify: false })
+      } catch {
+        /* X speichert best-effort (S9) */
+      }
     }
     onClose()
+  }
+
+  function handleRequestClose() {
+    void handleCanvasClose()
   }
 
   async function handleFinishErstellen() {
@@ -953,10 +977,10 @@ export function AngebotWizard({
 
   const wizardSteps = istAuftragKorrektur
     ? [
-        { id: 2, label: 'Leistungen' },
-        { id: 3, label: 'Texte' },
+        { id: 2, label: 'Positionen' },
+        { id: 3, label: 'Fuß' },
         { id: 4, label: 'Vorschau' },
-        { id: 5, label: 'Fertig' },
+        { id: 5, label: 'Senden' },
       ]
     : WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
 
@@ -965,7 +989,7 @@ export function AngebotWizard({
   const wizardDesktopActions = (
     <div className="wizard-nav-actions">
       {step > minStep ? (
-        <MockBtn kind="ghost" icon="chevron-left" disabled={saving} onClick={() => setStep((s) => s - 1)}>
+        <MockBtn kind="ghost" icon="chevron-left" disabled={saving} onClick={() => goToSection(step - 1)}>
           Zurück
         </MockBtn>
       ) : null}
@@ -986,7 +1010,7 @@ export function AngebotWizard({
             disabled={saving}
             onClick={() => void handleFinishKorrekturSpeichern()}
           >
-            {saving ? 'Speichern…' : 'Nur übernehmen'}
+            {saving ? 'Speichern…' : 'Übernehmen'}
           </MockBtn>
           <MockBtn
             kind="primary"
@@ -994,7 +1018,7 @@ export function AngebotWizard({
             disabled={saving}
             onClick={() => void handleFinishVersenden()}
           >
-            {saving ? 'Senden…' : 'An Kunden senden'}
+            {saving ? 'Senden…' : 'Senden'}
           </MockBtn>
         </>
       ) : (
@@ -1003,7 +1027,7 @@ export function AngebotWizard({
             {saving ? 'Erstellen…' : 'Erstellen'}
           </MockBtn>
           <MockBtn kind="primary" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
-            Angebot versenden
+            Senden
           </MockBtn>
         </>
       )}
@@ -1020,7 +1044,7 @@ export function AngebotWizard({
             kind="ghost"
             icon="chevron-left"
             disabled={saving}
-            onClick={() => setStep((s) => s - 1)}
+            onClick={() => goToSection(step - 1)}
           >
             Zurück
           </MockBtn>
@@ -1034,7 +1058,7 @@ export function AngebotWizard({
           disabled={saving || previewLoading}
           onClick={() => void handleWeiter()}
         >
-          {saving || previewLoading ? 'Speichern…' : 'Weiter'}
+          {saving || previewLoading ? '…' : 'Weiter'}
         </MockBtn>
       </>
     ) : (
@@ -1043,7 +1067,7 @@ export function AngebotWizard({
           kind="ghost"
           icon="chevron-left"
           disabled={saving}
-          onClick={() => setStep((s) => s - 1)}
+          onClick={() => goToSection(step - 1)}
         >
           Zurück
         </MockBtn>
@@ -1055,7 +1079,7 @@ export function AngebotWizard({
                 disabled={saving}
                 onClick={() => void handleFinishKorrekturSpeichern()}
               >
-                {saving ? '…' : 'Nur übernehmen'}
+                {saving ? '…' : 'Übernehmen'}
               </MockBtn>
               <MockBtn
                 kind="primary"
@@ -1087,32 +1111,66 @@ export function AngebotWizard({
       </>
     )
 
+  const docActions = (
+    <DocActionBar
+      actions={[
+        {
+          id: 'preview',
+          label: 'Vorschau',
+          onClick: () => goToSection(4),
+          icon: <MockIcon ctx="default" n="file-text" size={20} />,
+        },
+        {
+          id: 'send',
+          label: 'Senden',
+          onClick: () => {
+            if (step < WIZARD_TOTAL_STEPS) goToSection(WIZARD_TOTAL_STEPS)
+            else void handleFinishVersenden()
+          },
+          icon: <MockIcon ctx="default" n="send" size={20} />,
+        },
+      ]}
+    />
+  )
+
   const wizard = (
-    <WizardShell
-      className="wizard-flow"
+    <DocumentCanvas
+      portal={false}
       title={wizardTitel}
-      subtitle={
-        istAuftragKorrektur
-          ? `Leistungen & Endabrechnung korrigieren · ${name}`
-          : undefined
-      }
-      steps={wizardSteps}
-      currentStep={step}
       onClose={handleRequestClose}
-      mobileActions={wizardMobileActions}
-      mobileFooter={wizardMobileFooter}
-      desktopActions={wizardDesktopActions}
-      saveHint={saving ? 'Speichert…' : previewLoading ? 'Vorschau…' : null}
+      onSave={() => void persistDraft({ notify: true })}
+      saveBusy={saving}
+      busy={saving}
+      busyLabel="Wird gesendet…"
+      onDiscard={() => onClose()}
+      docActions={docActions}
+      className="wizard-flow"
     >
-      {step === 1 ? (
+      {/* P5.2: eine Scroll-Seite — Chips = Anker */}
+      <nav className="document-section-nav" aria-label="Abschnitte">
+        {wizardSteps.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={
+              s.id === step
+                ? 'document-section-nav__chip document-section-nav__chip--active'
+                : 'document-section-nav__chip'
+            }
+            onClick={() => goToSection(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+        <div className="ml-auto hidden md:flex">{wizardDesktopActions}</div>
+        <div className="flex w-full gap-2 md:hidden">{wizardMobileFooter}</div>
+      </nav>
+
+      {!istAuftragKorrektur ? (
+      <section id="section-1" className="document-canvas-sec">
         <>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>
-              Welche Art von Angebot?
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-              Bestimmt Aufbau und Inhalt des Dokuments
-            </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 600 }}>Angebotsart</div>
           </div>
           <div className="wz-overview" style={{ marginBottom: 20 }}>
             <div>
@@ -1128,7 +1186,7 @@ export function AngebotWizard({
               <b>{region}</b>
             </div>
             <div>
-              <span className="k">Budget-Rahmen</span>
+              <span className="k">Budget</span>
               <b>{budgetAnzeige}</b>
             </div>
           </div>
@@ -1139,8 +1197,7 @@ export function AngebotWizard({
             >
               <span className="dot" />
               <MockIcon ctx="default" n="file-text" size={16} />
-              <span className="lbl">Einfaches Angebot</span>
-              <span className="hint">Positionen & Preise — direkt zur Kalkulation</span>
+              <span className="lbl">Einfach</span>
             </label>
             <label
               className={`doctype-radio-opt${dokumentTyp === 'projekt' ? ' on' : ''}`}
@@ -1148,19 +1205,13 @@ export function AngebotWizard({
             >
               <span className="dot" />
               <MockIcon ctx="default" n="checklist" size={16} />
-              <span className="lbl">Komplexes Angebot</span>
-              <span className="hint">Projekttitel, Beschreibung, Fotos & Gewerke</span>
+              <span className="lbl">Komplex</span>
             </label>
           </div>
           <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
           <div className="h-sep" />
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>
-              Projekt-Beschreibung
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
-              Titel, Beschreibung und Fotodokumentation für das Angebot
-            </div>
+            <div style={{ fontSize: 17, fontWeight: 600 }}>Projekt</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
             <MockField label="Projekt-Titel" required>
@@ -1274,9 +1325,10 @@ export function AngebotWizard({
             />
           </div>
         </>
+      </section>
       ) : null}
 
-      {step === 2 ? (
+      <section id="section-2" className="document-canvas-sec">
         <>
           <PosBoard
             title={`Positionen · ${positionenKopf}`}
@@ -1305,9 +1357,9 @@ export function AngebotWizard({
             }
           />
         </>
-      ) : null}
+      </section>
 
-      {step === 3 ? (
+      <section id="section-3" className="document-canvas-sec">
         <div className="form-grid form-grid--sheet">
           <MockField label="Angebotstitel" full>
             <input
@@ -1402,17 +1454,17 @@ export function AngebotWizard({
             />
           </div>
         </div>
-      ) : null}
+      </section>
 
-      {step === 4 ? (
+      <section id="section-4" className="document-canvas-sec">
         <AngebotWizardPdfPreview
           angebotId={angebotId}
           loading={previewLoading || saving || !angebotId}
           kundeName={name}
         />
-      ) : null}
+      </section>
 
-      {step === 5 ? (
+      <section id="section-5" className="document-canvas-sec">
         <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
@@ -1506,13 +1558,13 @@ export function AngebotWizard({
                   stornieren).
                 </>
               ) : (
-                <>Mit „Angebot versenden“ wird das Angebot als PDF per E-Mail zugestellt.</>
+                <>Mit „Senden“ geht das Angebot per Mail.</>
               )}
             </span>
           </div>
         </div>
-      ) : null}
-    </WizardShell>
+      </section>
+    </DocumentCanvas>
   )
 
   return createPortal(wizard, document.body)

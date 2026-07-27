@@ -51,7 +51,7 @@ async function downloadFoto(url: string, filename: string) {
 
 export function VorgangFotosTab({
   fotos,
-  emptyHint = 'Fotos aus der Mieter-Meldung oder dem Angebot erscheinen hier.',
+  emptyHint = 'Fotos aus Meldung oder Angebot erscheinen hier, sobald vorhanden.',
 }: {
   fotos: VorgangFoto[]
   emptyHint?: string

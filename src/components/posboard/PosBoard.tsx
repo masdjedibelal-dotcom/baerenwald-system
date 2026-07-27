@@ -430,6 +430,8 @@ export function PosBoard({
           name: namePlain || beschPlain || '(ohne Bezeichnung)',
           beschreibung: namePlain ? beschPlain : '',
           mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
+          menge: typeof p.menge === 'number' ? p.menge : Number(p.menge) || undefined,
+          einheit: p.einheit || undefined,
           preisLabel: preisLabelOf ? preisLabelOf(p) : defaultPreisLabel(p, lineNetto),
           badge: badgeOf ? badgeOf(p) : defaultBadge(p),
         }
@@ -663,6 +665,11 @@ export function PosBoard({
         onDropToGroup={dropToGroup}
         onReorderGroup={reorderGroups}
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
+        onMengeChange={
+          editable
+            ? (id, menge) => update(id, { menge })
+            : undefined
+        }
         showTotals={showUst !== false}
         netto={netto}
         ust={ust}

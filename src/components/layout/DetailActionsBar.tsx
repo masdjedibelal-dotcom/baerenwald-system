@@ -80,7 +80,20 @@ function ActionControl({
  * Desktop: Actions im Detail-Kopf.
  * Mobil: Sticky-Bar über Bottom-Nav — Primär ~¾, ⋯ ~¼.
  * Zweite Action (secondary) nur Desktop als Button, mobil im Menü.
+ * S-4: Primary-Label nie zusätzlich im ⋯ (ebenenklar).
  */
+function withoutPrimaryDuplicate(
+  items: ActionsMenuItem[],
+  primaryLabel?: string | null
+): ActionsMenuItem[] {
+  const p = primaryLabel?.trim().toLowerCase()
+  if (!p) return items
+  return items.filter((it) => {
+    if (it === 'sep') return true
+    return it.label.trim().toLowerCase() !== p
+  })
+}
+
 export function DetailActionsBar({
   primary,
   secondary,
@@ -90,8 +103,13 @@ export function DetailActionsBar({
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
+  const cleanMenuItems = useMemo(
+    () => withoutPrimaryDuplicate(menuItems, primary?.label),
+    [menuItems, primary?.label]
+  )
+
   const mobileMenuItems = useMemo((): ActionsMenuItem[] => {
-    if (!secondary) return menuItems
+    if (!secondary) return cleanMenuItems
     const item: ActionsMenuItem = {
       label: secondary.label,
       icon: secondary.icon ? (
@@ -99,9 +117,9 @@ export function DetailActionsBar({
       ) : undefined,
       onClick: secondary.onClick,
     }
-    if (!menuItems.length) return [item]
-    return [item, 'sep', ...menuItems]
-  }, [secondary, menuItems])
+    if (!cleanMenuItems.length) return [item]
+    return [item, 'sep', ...cleanMenuItems]
+  }, [secondary, cleanMenuItems])
 
   const menuTrigger = (compact: boolean, items: ActionsMenuItem[]) => (
     <ActionsMenu
@@ -138,7 +156,7 @@ export function DetailActionsBar({
         </button>
       ) : null}
       {primary ? <ActionControl action={primary} /> : null}
-      {menuTrigger(false, menuItems)}
+      {menuTrigger(false, cleanMenuItems)}
     </div>
   )
 

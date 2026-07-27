@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -93,8 +94,20 @@ export async function saveKunde(
       db.from('kunden').update(payload).eq('id', kundeId)
     )
     if (error) return { ok: false, message: error.message }
+    // Kundentyp an verknüpfte Anfragen nachziehen (Filter/Angebot-Logik)
+    const typ = String(data.typ ?? '').trim()
+    if (typ) {
+      await withCrmReadFallback(async (db) =>
+        db
+          .from('leads')
+          .update({ kundentyp: typ, updated_at: new Date().toISOString() })
+          .or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
+          .in('status', ['neu', 'kontaktiert', 'termin', 'angebot'])
+      )
+    }
     revalidatePath('/kunden')
     revalidatePath(`/kunden/${kundeId}`)
+    revalidatePath('/vorgaenge')
     for (const lid of options?.revalidateAnfrageIds ?? []) {
       revalidatePath(`/anfragen/${lid}`)
       revalidatePath('/anfragen')
@@ -323,6 +336,221 @@ export async function searchKundenGlobal(
 }
 
 /** Stammdaten-Kopie für Listen-⋯-Menü. */
+function isMissingTableError(message: string | undefined | null): boolean {
+  if (!message) return false
+  const m = message.toLowerCase()
+  return m.includes('does not exist') || m.includes('schema cache')
+}
+
+function strEmpty(v: unknown): boolean {
+  return v == null || (typeof v === 'string' && !v.trim())
+}
+
+async function repointKundeFk(
+  db: SupabaseClient,
+  table: string,
+  column: string,
+  mergeId: string,
+  survivorId: string
+): Promise<string | null> {
+  const { error } = await db.from(table).update({ [column]: survivorId }).eq(column, mergeId)
+  if (!error) return null
+  if (isMissingTableError(error.message)) return null
+  return `${table}.${column}: ${error.message}`
+}
+
+async function repointKundenObjekte(
+  db: SupabaseClient,
+  mergeId: string,
+  survivorId: string
+): Promise<void> {
+  const { data, error } = await db.from('kunden_objekte').select('id').eq('kunde_id', mergeId)
+  if (error) {
+    if (!isMissingTableError(error.message)) {
+      console.warn('[mergeKunden] kunden_objekte laden:', error.message)
+    }
+    return
+  }
+  for (const row of data ?? []) {
+    const id = (row as { id: string }).id
+    const { error: upErr } = await db
+      .from('kunden_objekte')
+      .update({ kunde_id: survivorId })
+      .eq('id', id)
+    if (upErr) {
+      console.warn('[mergeKunden] kunden_objekt übersprungen', id, upErr.message)
+    }
+  }
+}
+
+async function repointKundenMitglieder(
+  db: SupabaseClient,
+  mergeId: string,
+  survivorId: string
+): Promise<void> {
+  const { data, error } = await db.from('kunden_mitglieder').select('id').eq('kunde_id', mergeId)
+  if (error) {
+    if (!isMissingTableError(error.message)) {
+      console.warn('[mergeKunden] kunden_mitglieder laden:', error.message)
+    }
+    return
+  }
+  for (const row of data ?? []) {
+    const id = (row as { id: string }).id
+    const { error: upErr } = await db
+      .from('kunden_mitglieder')
+      .update({ kunde_id: survivorId })
+      .eq('id', id)
+    if (upErr) {
+      console.warn('[mergeKunden] kunden_mitglied übersprungen', id, upErr.message)
+    }
+  }
+}
+
+/**
+ * Kunde mergeId in survivorId überführen (Vorgänge, Objekte, …); mergeId wird gelöscht.
+ */
+export async function mergeKunden(
+  survivorId: string,
+  mergeId: string
+): Promise<
+  { ok: true; message: string; survivorId: string } | { ok: false; message: string }
+> {
+  const survivor = survivorId?.trim()
+  const merge = mergeId?.trim()
+  if (!survivor || !merge) {
+    return { ok: false, message: 'Kunden-IDs fehlen.' }
+  }
+  if (survivor === merge) {
+    return { ok: false, message: 'Derselbe Kunde kann nicht mit sich zusammengeführt werden.' }
+  }
+
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, message: 'Nicht angemeldet.' }
+  }
+
+  const { data: rows, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('*').in('id', [survivor, merge])
+  )
+  if (loadErr) return { ok: false, message: loadErr.message }
+  const list = (rows ?? []) as Record<string, unknown>[]
+  const survRow = list.find((r) => r.id === survivor)
+  const mergeRow = list.find((r) => r.id === merge)
+  if (!survRow || !mergeRow) {
+    return { ok: false, message: 'Ein oder beide Kunden wurden nicht gefunden.' }
+  }
+
+  const fkSteps: Array<{ table: string; column: string }> = [
+    { table: 'leads', column: 'kunde_id' },
+    { table: 'leads', column: 'auftraggeber_kunde_id' },
+    { table: 'angebote', column: 'kunde_id' },
+    { table: 'auftraege', column: 'kunde_id' },
+    { table: 'rechnungen', column: 'kunde_id' },
+  ]
+
+  for (const step of fkSteps) {
+    const { data: fkErr } = await withCrmReadFallback(async (db) => {
+      const msg = await repointKundeFk(db, step.table, step.column, merge, survivor)
+      return { data: msg, error: null }
+    })
+    if (fkErr) return { ok: false, message: fkErr }
+  }
+
+  await withCrmReadFallback(async (db) => {
+    await repointKundenObjekte(db, merge, survivor)
+    return { data: null, error: null }
+  })
+  for (const opt of [
+    { table: 'kunden_notizen', column: 'kunde_id' },
+    { table: 'kunden_dokumente', column: 'kunde_id' },
+    { table: 'email_logs', column: 'kunde_id' },
+  ] as const) {
+    const { data: fkErr } = await withCrmReadFallback(async (db) => {
+      const msg = await repointKundeFk(db, opt.table, opt.column, merge, survivor)
+      return { data: msg, error: null }
+    })
+    if (fkErr) return { ok: false, message: fkErr }
+  }
+  await withCrmReadFallback(async (db) => {
+    await repointKundenMitglieder(db, merge, survivor)
+    return { data: null, error: null }
+  })
+
+  const patch: Record<string, unknown> = {}
+  const fillKeys = [
+    'email',
+    'telefon',
+    'adresse',
+    'strasse',
+    'hausnummer',
+    'plz',
+    'ort',
+    'vorname',
+    'nachname',
+    'name',
+    'webseite',
+    'ansprechpartner',
+    'quelle',
+    'ust_id',
+  ] as const
+  for (const key of fillKeys) {
+    if (strEmpty(survRow[key]) && !strEmpty(mergeRow[key])) {
+      patch[key] = mergeRow[key]
+    }
+  }
+  if (strEmpty(survRow.auth_user_id) && !strEmpty(mergeRow.auth_user_id)) {
+    patch.auth_user_id = mergeRow.auth_user_id
+  }
+  if (strEmpty(survRow.notizen) && !strEmpty(mergeRow.notizen)) {
+    patch.notizen = mergeRow.notizen
+  } else if (!strEmpty(survRow.notizen) && !strEmpty(mergeRow.notizen)) {
+    const a = String(survRow.notizen).trim()
+    const b = String(mergeRow.notizen).trim()
+    if (!a.includes(b)) {
+      patch.notizen = `${a}\n\n--- Zusammengeführt ---\n${b}`
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error: patchErr } = await withCrmReadFallback(async (db) =>
+      db.from('kunden').update(patch).eq('id', survivor)
+    )
+    if (patchErr) return { ok: false, message: patchErr.message }
+  }
+
+  const { error: delErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').delete().eq('id', merge)
+  )
+  if (delErr) {
+    return {
+      ok: false,
+      message:
+        delErr.message +
+        ' — Verknüpfungen wurden ggf. bereits umgehängt; bitte manuell prüfen.',
+    }
+  }
+
+  await updateGesamtUmsatz(survivor)
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${survivor}`)
+  revalidatePath('/vorgaenge')
+  revalidatePath('/anfragen')
+  revalidatePath('/angebote')
+  revalidatePath('/auftraege')
+  revalidatePath('/rechnungen')
+
+  return {
+    ok: true,
+    survivorId: survivor,
+    message: 'Kunden wurden zusammengeführt.',
+  }
+}
+
 export async function duplicateKunde(
   kundeId: string
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {

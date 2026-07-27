@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { saveEmailTemplate, type EmailTemplateRow } from '@/app/(dashboard)/einstellungen/email/actions'
 import { applyEmailTemplateVars, type EmailPreviewVars } from '@/lib/email-template-preview-vars'
@@ -141,37 +141,14 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
         </EinstellungenListBody>
       </Card>
 
-      <Modal
+      <EditorSheet
         open={Boolean(open)}
         onClose={() => setOpen(null)}
         title={open?.name ?? 'Template bearbeiten'}
+        context="detail"
         size="lg"
-        footer={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              <Input
-                label="Test-Mail senden an"
-                type="email"
-                className="min-w-[200px]"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
-              <div className="flex items-end">
-                <Button type="button" variant="secondary" loading={testBusy} onClick={() => void sendTest()}>
-                  Test-Mail senden
-                </Button>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={() => setOpen(null)}>
-                Abbrechen
-              </Button>
-              <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
-                Speichern
-              </Button>
-            </div>
-          </div>
-        }
+        confirmBusy={pending}
+        onConfirm={() => save()}
       >
         {open ? (
           <div className="space-y-4">
@@ -256,9 +233,22 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 />
               </div>
             )}
+
+            <div className="flex flex-wrap items-end gap-3 border-t border-bw-border pt-4">
+              <Input
+                label="Test-Mail an"
+                type="email"
+                className="min-w-[200px] flex-1"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+              />
+              <Button type="button" variant="secondary" loading={testBusy} onClick={() => void sendTest()}>
+                Test senden
+              </Button>
+            </div>
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }

@@ -36,6 +36,11 @@ export function leadInAnfragenPipeline(lead: LeadWithAngebote): boolean {
   return true
 }
 
+/** Für Listen: Anfragen mit bestehendem Angebot aus der offenen Pipeline nehmen. */
+export function filterLeadsInAnfragenPipeline(leads: LeadWithAngebote[]): LeadWithAngebote[] {
+  return leads.filter(leadInAnfragenPipeline)
+}
+
 export function buildAngebotIdsMitAuftrag(rows: { angebot_id: string | null }[]): Set<string> {
   const ids = new Set<string>()
   for (const row of rows) {

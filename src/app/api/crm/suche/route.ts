@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   const supabase = createClient()
   const pattern = `%${q}%`
 
-  const [leads, kunden, auftraege, handwerker, partner] = await Promise.all([
+  const [leads, kunden, auftraege, angebote, rechnungen, handwerker, partner] = await Promise.all([
     supabase
       .from('leads')
       .select('id, kontakt_name, situation, plz')
@@ -25,6 +25,16 @@ export async function GET(req: Request) {
       .from('auftraege')
       .select('id, titel, kunden(name)')
       .or(`titel.ilike.${pattern}`)
+      .limit(5),
+    supabase
+      .from('angebote')
+      .select('id, angebotsnr, leistungsumfang, status_einfach, kunden(name, vorname, nachname)')
+      .or(`angebotsnr.ilike.${pattern},leistungsumfang.ilike.${pattern}`)
+      .limit(5),
+    supabase
+      .from('rechnungen')
+      .select('id, rechnungsnummer, status, kunden(name, vorname, nachname)')
+      .or(`rechnungsnummer.ilike.${pattern}`)
       .limit(5),
     supabase
       .from('handwerker')
@@ -79,6 +89,38 @@ export async function GET(req: Request) {
     })
   }
 
+  for (const ag of angebote.data ?? []) {
+    const k = ag.kunden as { name?: string; vorname?: string; nachname?: string } | null
+    const kundeName =
+      k?.name?.trim() ||
+      [k?.vorname, k?.nachname].filter(Boolean).join(' ').trim() ||
+      ''
+    const nr = (ag.angebotsnr as string | null)?.trim()
+    const lu = (ag.leistungsumfang as string | null)?.trim()
+    hits.push({
+      id: `ag-${ag.id}`,
+      icon: 'file-invoice',
+      label: nr || lu || 'Angebot',
+      sub: `Angebot${kundeName ? ` · ${kundeName}` : ''}`,
+      href: `/angebote/${ag.id}`,
+    })
+  }
+
+  for (const r of rechnungen.data ?? []) {
+    const k = r.kunden as { name?: string; vorname?: string; nachname?: string } | null
+    const kundeName =
+      k?.name?.trim() ||
+      [k?.vorname, k?.nachname].filter(Boolean).join(' ').trim() ||
+      ''
+    hits.push({
+      id: `r-${r.id}`,
+      icon: 'receipt',
+      label: (r.rechnungsnummer as string)?.trim() || 'Rechnung',
+      sub: `Rechnung${kundeName ? ` · ${kundeName}` : (r.status as string) ? ` · ${r.status}` : ''}`,
+      href: `/rechnungen/${r.id}`,
+    })
+  }
+
   for (const h of handwerker.data ?? []) {
     hits.push({
       id: `h-${h.id}`,
@@ -99,5 +141,5 @@ export async function GET(req: Request) {
     })
   }
 
-  return NextResponse.json({ hits: hits.slice(0, 12) })
+  return NextResponse.json({ hits: hits.slice(0, 14) })
 }

@@ -1,4 +1,4 @@
-import { ANFRAGEN_LISTE_STATUS } from '@/lib/crm/pipeline-liste-filter'
+import { ANFRAGEN_LISTE_STATUS, filterLeadsInAnfragenPipeline } from '@/lib/crm/pipeline-liste-filter'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { countLegacyDemoLeads, filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
@@ -59,7 +59,7 @@ export async function loadAnfragenListe(): Promise<{
 
   const allLeads = (data ?? []) as unknown as LeadWithAngebote[]
   return {
-    leads: filterOutLegacyDemoLeads(allLeads),
+    leads: filterLeadsInAnfragenPipeline(filterOutLegacyDemoLeads(allLeads)),
     legacyDemoCount: countLegacyDemoLeads(allLeads),
     error: null,
   }

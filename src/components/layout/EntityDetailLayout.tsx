@@ -5,19 +5,25 @@ import { usePathname } from 'next/navigation'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { NaechsterSchrittBanner } from '@/components/crm/NaechsterSchrittBanner'
-import { VorgangResolverBanner } from '@/components/vorgang/VorgangResolverBanner'
+import {
+  VorgangResolverBanner,
+  vorgangResolverBannerVisible,
+} from '@/components/vorgang/VorgangResolverBanner'
+import { PhaseStrip } from '@/components/vorgang/PhaseStrip'
+import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { NaechsterSchrittHint } from '@/lib/crm/naechster-schritt'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
 import { getDetailRouteMeta } from '@/lib/detail-route-meta'
+import type { AkteFromRef } from '@/lib/vorgang/akte-from'
 import { cn } from '@/lib/utils'
 
 export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
-  /** @deprecated Phasen-Breadcrumb entfernt — Prop bleibt für Aufrufer */
+  /** @deprecated Display-Phase — Prop bleibt für Aufrufer */
   phase?: VorgangPhase | null
-  /** @deprecated Phasen-Breadcrumb entfernt — Prop bleibt für Aufrufer */
+  /** Phasen-Strip AN→AG→AU→RE */
   projektKontext?: ProjektKontext | null
   head: DetailHeadProps
   /** Status→Aktion-Hinweis unter dem Kopf */
@@ -32,9 +38,18 @@ export type EntityDetailLayoutProps = {
   className?: string
 }
 
-/** Vorgangs-Detail: Zurück-Link · Kopf (Titel/Status/Kunde) · Inhalt. */
+function fromRefFromKontext(kontext: ProjektKontext): AkteFromRef | null {
+  const kind = kontext.activeKind
+  if (kind === 'anfrage' || kind === 'angebot' || kind === 'auftrag' || kind === 'rechnung') {
+    return { kind, id: kontext.activeId }
+  }
+  return null
+}
+
+/** Vorgangs-Detail: Zurück · Phasen-Strip · Kopf · Nächster Schritt · Inhalt. */
 export function EntityDetailLayout({
   resolvedVorgang,
+  projektKontext,
   head,
   nextStep,
   crumbBackHref,
@@ -46,14 +61,24 @@ export function EntityDetailLayout({
   const routeMeta = getDetailRouteMeta(pathname)
 
   const backHref = crumbBackHref ?? routeMeta.backHref ?? '/vorgaenge'
-  const backLabel = crumbBackLabel ?? 'Zurück zu den Suchergebnissen'
+  const backLabel = crumbBackLabel ?? 'Zurück zu Vorgängen'
+  const showResolver =
+    resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
   return (
     <div className={cn('detail-entity-page', className ?? 'pb-6')}>
       <MockDetailBackLink href={backHref} label={backLabel} />
-      {resolvedVorgang ? <VorgangResolverBanner resolved={resolvedVorgang} /> : null}
+      <AkteRueckwegChip />
+      {projektKontext ? (
+        <PhaseStrip
+          kontext={projektKontext}
+          fromRef={fromRefFromKontext(projektKontext)}
+          className="mb-3"
+        />
+      ) : null}
+      {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
       <DetailHead {...head} />
-      <NaechsterSchrittBanner step={nextStep ?? null} />
+      {!showResolver ? <NaechsterSchrittBanner step={nextStep ?? null} /> : null}
       {children}
     </div>
   )

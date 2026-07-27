@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { trapFocus } from '@/lib/a11y/focus-trap'
@@ -44,6 +44,7 @@ export function Modal({
   footerSpread = false,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false)
+  const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -79,16 +80,26 @@ export function Modal({
         className={cn('modal', className)}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         tabIndex={-1}
         style={{ width: SIZE_WIDTH[size] }}
       >
         <div className="modal-h">
           {leading ? <div className="icon">{leading}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="title">{title}</div>
+            <div id={titleId} className="title">
+              {title}
+            </div>
             {subtitle ? <div className="sub">{subtitle}</div> : null}
           </div>
-          <MockBtn icon="x" kind="ghost" sm onClick={onClose} title="Schließen" />
+          <MockBtn
+            icon="x"
+            kind="ghost"
+            sm
+            onClick={onClose}
+            title="Schließen"
+            aria-label="Schließen"
+          />
         </div>
         <div className="modal-b">{children}</div>
         {footer ? (

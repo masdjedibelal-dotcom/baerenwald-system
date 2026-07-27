@@ -49,6 +49,7 @@ import {
   rechnungPositionenMitAuftrag,
   resolveAnredeKey,
   standardRechnungZahlungstext,
+  validateGestellteRechnungenGegenVk,
   zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
@@ -448,6 +449,28 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       }
     }
 
+    let positionen = basis.positionen
+    if (abschlag && zahlungsplan) {
+      const kontextPos = berechneZahlungsplanMitIst(
+        zahlungsplan,
+        basis.gesamtNetto,
+        rechnungen
+      )
+      const zeilePos = kontextPos.zeilen.find((z) => z.id === abschlag.zeileId) ?? null
+      if (zeilePos) {
+        positionen = positionenFuerAbschlagRechnung({
+          zeile: zeilePos,
+          allePositionen: basis.positionen,
+          plan: zahlungsplan,
+          gesamtNetto: basis.gesamtNetto,
+          auftragsReferenz: basis.auftragsReferenz,
+          projektTitel: basis.projektTitel ?? '',
+          bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+          vorherigeAbschlaege: rechnungen,
+        })
+      }
+    }
+
     return {
       ok: true,
       bootstrap: {
@@ -457,7 +480,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         angebotId: basis.angebot_id,
         kundeId: basis.kunde_id,
         kunde: kunde ?? null,
-        positionen: basis.positionen,
+        positionen,
         meta,
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
@@ -845,6 +868,26 @@ export async function saveRechnungWizardDraft(
         )
       }
     }
+  }
+
+  if (input.auftrag_id?.trim()) {
+    const auftragId = input.auftrag_id.trim()
+    const links = await rechnungenAbschlagLinks(supabaseForBerechnung, auftragId)
+    let vkNetto = auftragSummenAusPositionen(positionen).netto
+    try {
+      const basis = await positionenAusAuftrag(supabaseForBerechnung, auftragId)
+      vkNetto = basis.gesamtNetto
+    } catch {
+      /* Wizard-Summe */
+    }
+    const vkGate = validateGestellteRechnungenGegenVk({
+      bestehende: links,
+      gesamtNetto: vkNetto,
+      neueNetto: liste_berechnung.netto,
+      ausserRechnungId: input.rechnungId ?? null,
+      mwstSatz: Number(liste_berechnung.mwst_satz) || 19,
+    })
+    if (!vkGate.ok) return vkGate
   }
 
   const payload = {

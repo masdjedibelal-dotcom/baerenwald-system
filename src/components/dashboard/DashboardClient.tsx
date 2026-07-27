@@ -15,6 +15,7 @@ import {
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
+import { MyWorkInbox, type MyWorkItem } from '@/components/dashboard/MyWorkInbox'
 import { cn } from '@/lib/utils'
 
 export type DashboardKpi = {
@@ -345,6 +346,7 @@ export function DashboardClient({
   gewerk,
   rankingHandwerker,
   rankingKunden,
+  myWorkCounts,
 }: {
   vorname: string
   zeitraumFilter: DashboardZeitraumFilter
@@ -359,6 +361,10 @@ export function DashboardClient({
   gewerk: { zeilen: GewerkUmsatzZeile[]; gesamt: number }
   rankingHandwerker: RankingZeile[]
   rankingKunden: RankingZeile[]
+  myWorkCounts?: {
+    reUeberfaellig: number
+    angeboteWarten: number
+  }
 }) {
   const router = useRouter()
 
@@ -376,6 +382,54 @@ export function DashboardClient({
       }),
     []
   )
+
+  const { tagItems, waitingItems } = useMemo(() => {
+    const byLabel = (label: string) => (kpis ?? []).find((k) => k.label === label)
+    const au = byLabel('Aktive Aufträge')
+    const re = byLabel('Offene Rechnungen')
+    const reUeberfaellig = myWorkCounts?.reUeberfaellig ?? 0
+    const angeboteWarten = myWorkCounts?.angeboteWarten ?? byLabel('Offene Angebote')?.value ?? 0
+
+    const tag: MyWorkItem[] = [
+      {
+        id: 'au',
+        label: 'Laufende Aufträge',
+        hint: 'Arbeit & Abnahme',
+        href: au?.href ?? '/vorgaenge?tab=auftrag&lifecycle=offen',
+        icon: 'briefcase',
+        count: au?.value ?? 0,
+      },
+      {
+        id: 're-ueberfaellig',
+        label: 'RE überfällig',
+        hint: 'Zahlung offen · fällig',
+        href: '/vorgaenge?tab=rechnung&lifecycle=offen',
+        icon: 'receipt',
+        count: reUeberfaellig,
+      },
+      {
+        id: 're',
+        label: 'Offene Rechnungen',
+        hint: 'Gesendet · warten',
+        href: re?.href ?? '/vorgaenge?tab=rechnung&lifecycle=offen',
+        icon: 'receipt',
+        count: re?.value ?? 0,
+      },
+    ]
+
+    const waiting: MyWorkItem[] = [
+      {
+        id: 'ag-warten',
+        label: 'Angebote gesendet',
+        hint: 'Antwort ausstehend',
+        href: '/vorgaenge?tab=angebot&lifecycle=offen',
+        icon: 'file-invoice',
+        count: angeboteWarten,
+      },
+    ]
+
+    return { tagItems: tag, waitingItems: waiting }
+  }, [kpis, myWorkCounts])
 
   return (
     <div className="dashboard-page min-w-0 overflow-x-hidden">
@@ -396,6 +450,10 @@ export function DashboardClient({
           </div>
         </div>
         <DashboardZeitraumFilterBar filter={zeitraumFilter} />
+      </div>
+
+      <div className="mb-[22px]">
+        <MyWorkInbox tagItems={tagItems} waitingItems={waitingItems} />
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 22 }}>

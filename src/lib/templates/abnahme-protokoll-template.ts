@@ -127,16 +127,21 @@ function partyBox(
   </div>`
 }
 
-function fotosHtml(urls: string[]): string {
+function fotosHtml(urls: string[], captions: string[] = []): string {
   if (!urls.length) return ''
   const imgs = urls
     .slice(0, 4)
-    .map(
-      (u) =>
-        `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
+    .map((u, i) => {
+      const cap = (captions[i] ?? '').trim()
+      return `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
           <img src="${esc(u)}" alt="" style="display:block;width:100%;height:72px;object-fit:cover;" />
+          ${
+            cap
+              ? `<div style="padding:4px 6px;font-size:7pt;color:${MUTED};line-height:1.3;">${esc(cap)}</div>`
+              : ''
+          }
         </div>`
-    )
+    })
     .join('')
   return `<div style="border:1px solid ${BORDER};border-radius:4px;padding:8px;page-break-inside:avoid;">
     <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Örtliche Situation</div>
@@ -158,7 +163,7 @@ function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
     { label: 'Ansprechpartner', value: p.meta.ansprechpartner_kunde },
     { label: 'Anwesend bei Übergabe', value: p.meta.anwesend_uebergabe },
   ])
-  const fotos = fotosHtml(p.meta.uebergabe_foto_urls)
+  const fotos = fotosHtml(p.meta.uebergabe_foto_urls, p.meta.uebergabe_foto_captions)
   if (fotos) {
     return `<div style="display:flex;gap:10px;margin:0 0 14px;align-items:stretch;">
       <div style="flex:1.1;min-width:0;">${an}<div style="height:8px;"></div>${ag}</div>
@@ -190,7 +195,8 @@ function bauvorhabenHtml(p: AbnahmeProtokollHtmlInput): string {
 }
 
 function checkOkHtml(): string {
-  return `<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:${ACCENT};color:#fff;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px;">✓</span>`
+  // SVG statt Unicode ✓ — Chromium-PDF rendert Häkchen-Glyphen oft nicht.
+  return `<span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${ACCENT}"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
 }
 
 function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
@@ -206,16 +212,20 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
             .filter(Boolean)
           const bullets = l.punkte.map((p: AbnahmePunkt) => {
             const text = p.beschreibung?.trim() || l.leistung_name
-            return `<li style="display:flex;align-items:flex-start;gap:8px;margin:0 0 6px;list-style:none;font-size:9pt;line-height:1.4;color:${TEXT};">
-              ${checkOkHtml()}
-              <span style="flex:1;">${esc(text)}</span>
+            return `<li style="margin:0 0 6px;list-style:none;font-size:9pt;line-height:1.4;color:${TEXT};">
+              <table style="width:100%;border-collapse:collapse;"><tr>
+                <td style="width:18px;vertical-align:top;padding:1px 0 0;line-height:0;">${checkOkHtml()}</td>
+                <td style="vertical-align:top;padding:0 0 0 6px;">${esc(text)}</td>
+              </tr></table>
             </li>`
           })
           const noteHtml = notes.length
             ? `<p style="margin:0 0 8px 22px;font-size:8pt;color:${MUTED};">${notes.map(esc).join(' · ')}</p>`
             : ''
           return [
-            `<p style="margin:8px 0 4px;font-size:9pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>`,
+            l.leistung_name.trim()
+              ? `<p style="margin:8px 0 4px;font-size:9pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>`
+              : '',
             `<ul style="margin:0;padding:0;">${bullets.join('')}</ul>`,
             noteHtml,
           ]
@@ -241,7 +251,7 @@ function ergebnisHtml(ergebnis: AbnahmeErgebnis, datum: string): string {
       Die Leistungen wurden am ${esc(datum)} gemeinsam vor Ort besichtigt und geprüft.
     </p>
     <div style="display:flex;align-items:center;gap:12px;background:${bg};border:1.5px solid ${border};border-radius:6px;padding:12px 14px;page-break-inside:avoid;">
-      <span style="font-size:18pt;color:${border};line-height:1;">✓</span>
+      <span style="display:inline-block;width:22px;height:22px;line-height:0;flex-shrink:0;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6.2" fill="none" stroke="${border}" stroke-width="1.4"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="${border}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <span style="font-size:11pt;font-weight:700;color:${ACCENT};">${esc(label)}</span>
     </div>`
 }
@@ -255,6 +265,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
   const offen = p.maengel.filter(isMangelOffenPdf)
   const sonst = p.meta.hinweis_sonstiges?.trim()
   const notiz = p.notizen?.trim()
+  const fristGlobal = p.meta.maengel_beseitigung_spaetestens?.trim()
   let body = ''
   if (!offen.length && !sonst && !notiz) {
     body = `<p style="margin:0;font-size:9pt;color:${TEXT};">Es wurden keine Mängel festgestellt.</p>`
@@ -266,7 +277,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
             (m) =>
               `<li style="margin:0 0 4px;"><strong>${esc(m.beschreibung)}</strong>${
                 m.frist
-                  ? ` <span style="color:#991B1B;">(Frist: ${esc(m.frist.slice(0, 10))})</span>`
+                  ? ` <span style="color:#991B1B;">(Beseitigung bis: ${esc(m.frist.slice(0, 10))})</span>`
                   : ''
               }</li>`
           )
@@ -274,6 +285,9 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
       </ul>`
     } else {
       body += `<p style="margin:0 0 8px;font-size:9pt;color:${TEXT};">Es wurden keine Mängel festgestellt.</p>`
+    }
+    if (fristGlobal) {
+      body += `<p style="margin:0 0 8px;font-size:9pt;color:#991B1B;"><strong>Mängelbeseitigung:</strong> ${esc(fristGlobal)}</p>`
     }
     if (sonst) {
       body += `<div style="background:${SOFT};border-left:3px solid ${ACCENT};padding:8px 10px;margin:8px 0 0;font-size:8.5pt;line-height:1.45;color:${TEXT};white-space:pre-wrap;">${esc(sonst)}</div>`
@@ -299,19 +313,27 @@ function rechtHtml(text: string): string {
 }
 
 function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
-  const block = (title: string, name: string) =>
+  const block = (title: string, name: string, ortDatum: string) =>
     `<div style="flex:1;min-width:0;page-break-inside:avoid;">
       <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">${esc(title)}</div>
-      <div style="border-bottom:1px solid ${TEXT};height:28px;margin-bottom:4px;"></div>
+      <div style="border-bottom:1px solid ${TEXT};min-height:20px;margin-bottom:4px;font-size:9pt;color:${TEXT};">${esc(ortDatum.trim() || ' ')}</div>
       <div style="font-size:7.5pt;color:${MUTED};">Ort, Datum</div>
       <div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>
       <div style="font-size:7.5pt;color:${MUTED};">Unterschrift${name ? ` · ${esc(name)}` : ''}</div>
     </div>`
   return `${sectionHeading('6', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
-      ${block('Auftragnehmer', p.meta.vertreter_an)}
-      ${block('Auftraggeber', p.meta.ansprechpartner_kunde || p.kunde_name)}
-      ${block('Anwesend bei Übergabe', p.meta.anwesend_uebergabe)}
+      ${block('Auftragnehmer', p.meta.vertreter_an, p.meta.unterschrift_ort_datum_an)}
+      ${block(
+        'Auftraggeber',
+        p.meta.ansprechpartner_kunde || p.kunde_name,
+        p.meta.unterschrift_ort_datum_ag
+      )}
+      ${block(
+        'Anwesend bei Übergabe',
+        p.meta.anwesend_uebergabe,
+        p.meta.unterschrift_ort_datum_anwesend
+      )}
     </div>`
 }
 

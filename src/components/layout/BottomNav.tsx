@@ -7,8 +7,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 /**
- * Mock Bottom-Nav: MOBILE_PRIMARY (Dashboard, Vorgänge, Kalender)
- * → 2 Tabs | FAB | restliche Tabs | Mehr → /mehr
+ * Bottom-Nav (W6-10): Dashboard, Vorgänge | FAB | Kalender, Kunden | Mehr → /mehr
  */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'

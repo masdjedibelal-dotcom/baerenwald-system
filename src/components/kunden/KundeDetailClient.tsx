@@ -28,7 +28,8 @@ import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
-import type { KundenObjekt } from '@/lib/types'
+import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
+import type { Kunde, KundenObjekt } from '@/lib/types'
 import {
   kundeNeueAnfrageHref,
   kundeNeuesAngebotHref,
@@ -37,11 +38,11 @@ import {
 import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { saveKunde, saveKundeCustomFieldValue, setKundeSpam } from '@/app/actions/kunden'
+import { saveKunde, saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
 import {
@@ -164,6 +165,10 @@ export function KundeDetailClient({
   const [impersonating, setImpersonating] = useState(false)
   const [spamPending, setSpamPending] = useState(false)
   const [rechnungModalOpen, setRechnungModalOpen] = useState(false)
+  const [mergePickerOpen, setMergePickerOpen] = useState(false)
+  const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
+    null
+  )
   const istSpam = Boolean(kunde.ist_spam)
 
   useEffect(() => {
@@ -203,6 +208,30 @@ export function KundeDetailClient({
       }))
       toast.success(next ? 'Als Spam markiert' : 'Spam-Markierung aufgehoben')
       refresh()
+    })
+  }
+
+  function confirmMergeIntoCurrent(other: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>) {
+    if (other.id === kunde.id) {
+      toast.error('Derselbe Kunde kann nicht zusammengeführt werden.')
+      return
+    }
+    setMergeOther(other)
+    setMergePickerOpen(false)
+  }
+
+  function executeMerge() {
+    if (!mergeOther) return
+    startTransition(async () => {
+      const res = await mergeKunden(kunde.id, mergeOther.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(res.message)
+      setMergeOther(null)
+      router.push(`/kunden/${kunde.id}`)
+      router.refresh()
     })
   }
 
@@ -660,6 +689,11 @@ export function KundeDetailClient({
       })
     }
     extra.push('sep', {
+      icon: 'users',
+      label: 'Mit anderem zusammenführen',
+      onClick: () => setMergePickerOpen(true),
+    })
+    extra.push('sep', {
       icon: istSpam ? 'check' : 'shield-x',
       label: istSpam ? 'Spam-Markierung aufheben' : 'Als Spam markieren',
       danger: !istSpam,
@@ -835,19 +869,14 @@ export function KundeDetailClient({
           </>
         }
         actions={
-          <ActionsMenu
-            trigger={
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
-                aria-label="Weitere Aktionen"
-              >
-                <MockIcon ctx="btn" n="dots" size={16} />
-                <span className="sr-only">Mehr</span>
-              </button>
-            }
-            items={kundeMenuItems}
+          <DetailActionsBar
             sheetTitle="Kunde"
+            primary={{
+              label: 'Bearbeiten',
+              icon: 'pencil',
+              onClick: beginEditKontakt,
+            }}
+            menuItems={kundeMenuItems}
           />
         }
       />
@@ -940,6 +969,38 @@ export function KundeDetailClient({
         initialKundeId={kunde.id}
         onClose={() => setRechnungModalOpen(false)}
       />
+
+      <KundePickerSheet
+        open={mergePickerOpen}
+        onClose={() => setMergePickerOpen(false)}
+        title="Kunde zum Zusammenführen"
+        onPick={(other) => confirmMergeIntoCurrent(other)}
+      />
+
+      <Modal
+        open={Boolean(mergeOther)}
+        onClose={() => setMergeOther(null)}
+        title="Kunden zusammenführen"
+        size="sm"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" loading={pending} onClick={() => executeMerge()}>
+              Zusammenführen
+            </Button>
+          </div>
+        }
+      >
+        {mergeOther ? (
+          <p className="text-sm text-bw-text">
+            Kunde <strong>{kundeDisplayName(mergeOther)}</strong> in{' '}
+            <strong>{kundeDisplayName(kunde)}</strong> überführen?{' '}
+            <strong>{kundeDisplayName(mergeOther)}</strong> wird entfernt.
+          </p>
+        ) : null}
+      </Modal>
     </div>
   )
 }

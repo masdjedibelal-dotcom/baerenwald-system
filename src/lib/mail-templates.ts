@@ -480,6 +480,7 @@ export function mailAngebot(
     anrede?: MailAnrede
     kundeTyp?: string | null
     visualisierung_vorschau_url?: string | null
+    reverseCharge?: boolean
   },
   b: MailBranding
 ): { betreff: string; html: string } {
@@ -497,7 +498,7 @@ export function mailAngebot(
     'anbei finden Sie Ihr Angebot — Details und Preise im PDF-Anhang:'
   )
   const hint35a =
-    data.lohn_gesamt > 0
+    !data.reverseCharge && data.lohn_gesamt > 0
       ? `<p style="font-size:13px;color:#6B7280;margin:0 0 16px;line-height:1.6;">${mailText(
           anrede,
           `Hinweis: Als Privatperson kannst du den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).`,
@@ -508,10 +509,11 @@ export function mailAngebot(
     data.positionen[0]?.beschreibung?.trim() ||
     data.positionen[0]?.leistung?.trim() ||
     mailText(anrede, 'dein Projekt', 'Ihr Projekt')
+  const mwstHint = data.reverseCharge ? 'netto · §13b UStG' : 'inkl. MwSt.'
   const summaryHtml = mailSummaryBlock({
     label: mailText(anrede, 'DEIN ANGEBOT', 'IHR ANGEBOT'),
     title: esc(titel),
-    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(betragText)} <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
+    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(betragText)} <span style="font-size:12px;font-weight:400;color:#6B7280;">${mwstHint}</span></p>`,
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Gültig bis:</strong> ${esc(data.gueltig_bis)}</p>`,
   })
   const disclaimer = mailText(

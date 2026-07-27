@@ -113,6 +113,8 @@ function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): st
   if (forceStorniert) return 'storniert'
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
+  // Lead schon weiter (Angebot/Auftrag/…) — nicht als offene Anfrage „Neu“ anzeigen
+  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen') return 'abgeschlossen'
   return 'neu'
 }
 

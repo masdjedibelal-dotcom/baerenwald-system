@@ -25,6 +25,8 @@ import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 
 export type HandwerkerZeile = {
@@ -267,6 +269,67 @@ export function HandwerkerListeClient({
   }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
+  const isMobile = useIsMobile()
+
+  const filterFooter = (
+    <>
+      <MockBtn kind="ghost" onClick={resetFilters}>
+        Zurücksetzen
+      </MockBtn>
+      <div style={{ flex: 1 }} />
+      <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+        Anwenden ({filtered.length})
+      </MockBtn>
+    </>
+  )
+
+  const filterFields = (
+    <>
+      <div className="form-section-h">Suche</div>
+      <div className="input" style={{ marginBottom: 16 }}>
+        <MockIcon ctx="default" n="search" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name, Gewerk, Telefon, E-Mail…"
+          autoFocus={!isMobile}
+        />
+      </div>
+      <div className="form-grid" style={{ marginBottom: 16 }}>
+        <MockField label="Name">
+          <div className="input">
+            <input
+              type="text"
+              value={fName}
+              onChange={(e) => setFName(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </div>
+        </MockField>
+      </div>
+      <div className="form-section-h">Gewerk</div>
+      <div className="chiprow" style={{ marginBottom: 16 }}>
+        {(['alle', ...MOCK_GEWERK_NAMES] as const).map((g) => {
+          const value = g === 'alle' ? 'alle' : resolveGewerkChipValue(g, gewerkeOptionen)
+          return (
+            <MockChip key={g} active={gewerkChip === value} onClick={() => setGewerkChip(value)}>
+              {g === 'alle' ? 'Alle' : g}
+            </MockChip>
+          )
+        })}
+      </div>
+      <div className="form-section-h">Compliance</div>
+      <div className="chiprow">
+        <MockChip active={!nurZuPruefen} onClick={() => setNurZuPruefen(false)}>
+          Alle
+        </MockChip>
+        <MockChip active={nurZuPruefen} onClick={() => setNurZuPruefen(true)}>
+          Nur zu prüfen
+        </MockChip>
+      </div>
+    </>
+  )
 
   return (
     <div>
@@ -362,68 +425,41 @@ export function HandwerkerListeClient({
         />
       </div>
 
-      <MockModal
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        icon="filter"
-        title="Filter & Suchen"
-        sub="Partner eingrenzen"
-        footer={
-          <>
-            <MockBtn kind="ghost" onClick={resetFilters}>
+      {isMobile ? (
+        <MobileListFilterSheet
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          title="Filter & Suchen"
+          headerEnd={
+            <button
+              type="button"
+              className="mobile-filter-sheet__reset"
+              onClick={resetFilters}
+              disabled={!activeFilterCount}
+            >
               Zurücksetzen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+            </button>
+          }
+          footer={
+            <button type="button" className="btn primary w-full" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
-            </MockBtn>
-          </>
-        }
-      >
-        <div className="form-section-h">Suche</div>
-        <div className="input" style={{ marginBottom: 16 }}>
-          <MockIcon ctx="default" n="search" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, Gewerk, Telefon, E-Mail…"
-            autoFocus
-          />
-        </div>
-        <div className="form-grid" style={{ marginBottom: 16 }}>
-          <MockField label="Name">
-            <div className="input">
-              <input
-                type="text"
-                value={fName}
-                onChange={(e) => setFName(e.target.value)}
-                placeholder="Name enthält…"
-              />
-            </div>
-          </MockField>
-        </div>
-        <div className="form-section-h">Gewerk</div>
-        <div className="chiprow" style={{ marginBottom: 16 }}>
-          {(['alle', ...MOCK_GEWERK_NAMES] as const).map((g) => {
-            const value = g === 'alle' ? 'alle' : resolveGewerkChipValue(g, gewerkeOptionen)
-            return (
-              <MockChip key={g} active={gewerkChip === value} onClick={() => setGewerkChip(value)}>
-                {g === 'alle' ? 'Alle' : g}
-              </MockChip>
-            )
-          })}
-        </div>
-        <div className="form-section-h">Compliance</div>
-        <div className="chiprow">
-          <MockChip active={!nurZuPruefen} onClick={() => setNurZuPruefen(false)}>
-            Alle
-          </MockChip>
-          <MockChip active={nurZuPruefen} onClick={() => setNurZuPruefen(true)}>
-            Nur zu prüfen
-          </MockChip>
-        </div>
-      </MockModal>
+            </button>
+          }
+        >
+          {filterFields}
+        </MobileListFilterSheet>
+      ) : (
+        <MockModal
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          icon="filter"
+          title="Filter & Suchen"
+          sub="Partner eingrenzen"
+          footer={filterFooter}
+        >
+          {filterFields}
+        </MockModal>
+      )}
 
       <div
         className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}

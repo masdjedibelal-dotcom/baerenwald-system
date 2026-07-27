@@ -4,6 +4,13 @@ import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import { ACTOR_LABELS } from '@/lib/vorgang/vorgang-labels'
 import { cn } from '@/lib/utils'
 
+/** Resolver-Banner nur bei echter Dringlichkeit (W6-01). */
+export function vorgangResolverBannerVisible(resolved: ResolvedVorgang): boolean {
+  return Boolean(
+    resolved.badges.notfall || resolved.ueberfaellig || resolved.needsAction
+  )
+}
+
 export function VorgangResolverBanner({
   resolved,
   className,
@@ -11,13 +18,13 @@ export function VorgangResolverBanner({
   resolved: ResolvedVorgang
   className?: string
 }) {
-  if (!resolved.needsAction && !resolved.ueberfaellig && !resolved.badges.notfall) {
+  if (!vorgangResolverBannerVisible(resolved)) {
     return null
   }
 
   const hints: string[] = []
   if (resolved.badges.notfall) hints.push('Notfall')
-  if (resolved.badges.wartet_freigabe) hints.push('Warte auf HV')
+  if (resolved.badges.wartet_freigabe) hints.push(ACTOR_LABELS.freigabe)
   else if (resolved.actor) hints.push(ACTOR_LABELS[resolved.actor] ?? resolved.actor)
   if (resolved.ueberfaellig) hints.push('Rechnung überfällig')
 

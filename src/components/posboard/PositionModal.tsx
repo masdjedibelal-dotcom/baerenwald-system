@@ -1,7 +1,6 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
@@ -65,43 +64,22 @@ export function PositionModal({
       ? p.name || 'Freitext'
       : kind === 'nachlass'
         ? p.name || 'Nachlass'
-        : p.name || 'Neue Position'
-  const sub =
-    kind === 'freitext'
-      ? 'Hinweis ohne Preis'
-      : kind === 'nachlass'
-        ? 'Rabatt auf Gesamtsumme'
-        : 'Position bearbeiten'
+        : p.name || 'Position'
 
   return (
-    <MockModal
-      open
-      onClose={onClose}
-      className="position-modal"
-      icon={kind === 'nachlass' ? 'percent' : kind === 'freitext' ? 'align-left' : 'list-numbers'}
-      title={title}
-      sub={sub}
-      footer={
-        <>
-          {onRemove ? (
-            <MockBtn
-              kind="danger"
-              icon="trash"
-              onClick={() => {
-                onRemove()
-                onClose()
-              }}
-            >
-              Entfernen
-            </MockBtn>
-          ) : null}
-          <div style={{ flex: 1 }} />
-          <MockBtn kind="primary" icon="check" className="position-modal__save" onClick={onClose}>
-            Fertig
-          </MockBtn>
-        </>
-      }
-    >
+    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose}>
+      {onRemove ? (
+        <button
+          type="button"
+          className="mb-3 text-[14px] font-medium text-status-cancel-text"
+          onClick={() => {
+            onRemove()
+            onClose()
+          }}
+        >
+          Entfernen
+        </button>
+      ) : null}
       {kind === 'freitext' ? (
         <div className="form-grid">
           <Field label="Überschrift" full>
@@ -281,6 +259,6 @@ export function PositionModal({
           </Field>
         </div>
       )}
-    </MockModal>
+    </EditorSheet>
   )
 }

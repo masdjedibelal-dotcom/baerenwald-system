@@ -6,12 +6,18 @@
  * - Partner (Create) = Handwerker-Entity → `/neu?art=handwerker` → Liste `/handwerker`
  * - Netzwerk (Tabelle `partner`) hat eigenen Create-Flow unter `/partner` (nicht FAB)
  *
- * Surface-Regel (UX2-3):
- * - Multi-Step / Dokument-Flow = Fullscreen-Wizard (Anfrage, Angebot, Rechnung-Wizard)
- * - Stammdaten = Modal/Sheet über der Liste (Kunde, Partner/Handwerker)
- * Gleiche Primitives (MockModal, MockField, Buttons) — nicht zwingend gleiche Route-Art.
- * Angebot: Kunde-Gate darf listenähnlich bleiben, danach immer Wizard.
- * Rechnung: Kunde (+ optional Vorgang) im FAB-Modal, danach Wizard.
+ * Surface-Regel (SURFACE-KONSOLIDIERUNG, beschlossen 2026-07-27):
+ * - A DocumentCanvas / WizardShell — Dokument-Flows
+ * - B EditorSheet — Entity create/edit
+ *     mobile: Bottom Sheet
+ *     desktop Detail: Slide-over | desktop aus Canvas: Center-Modal
+ * - C ActionSheet — nur Aktion wählen
+ * - D Inline — leichte Detail-Felder
+ * - Kunde/Partner Create = EditorSheet Host `/neu?art=kunde|handwerker` (keine Fullpage-Form)
+ * - PickerSheet = Kunde/Katalog/Vorgang wählen (+ Header-Neu)
+ * - Overlay: kein Modal-in-Modal
+ * Angebot: Kunde-Gate = PickerSheet, danach Canvas/Wizard.
+ * Rechnung: Kunde (+ optional Vorgang) im FAB-Host als PickerSheet, danach Canvas/Wizard.
  */
 
 export type CrmCreateArt =

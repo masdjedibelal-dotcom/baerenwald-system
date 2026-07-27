@@ -66,6 +66,11 @@ export function AuftragAbnahmeprotokollCard({
     router.push(`/auftraege/${auftragId}/abnahme/erstellen`)
   }
 
+  function bearbeiten(protokollId?: string) {
+    const q = protokollId ? `?protokollId=${encodeURIComponent(protokollId)}` : ''
+    router.push(`/auftraege/${auftragId}/abnahme/erstellen${q}`)
+  }
+
   function loeschen(id: string) {
     if (!window.confirm('Abnahmeprotokoll wirklich löschen?')) return
     startTransition(async () => {
@@ -81,7 +86,13 @@ export function AuftragAbnahmeprotokollCard({
   }
 
   function rowMenu(p: AbnahmeprotokollListeEintrag): EntityMenuItem[] {
-    const items: EntityMenuItem[] = []
+    const items: EntityMenuItem[] = [
+      {
+        icon: 'file-pencil',
+        label: 'Bearbeiten',
+        onClick: () => bearbeiten(p.id),
+      },
+    ]
     if (p.pdf_url) {
       items.push(
         {
@@ -124,7 +135,13 @@ export function AuftragAbnahmeprotokollCard({
               sm
               kind="ghost"
               icon="clipboard-list"
-              onClick={() => router.push(`/auftraege/${auftragId}/abnahme`)}
+              onClick={() =>
+                router.push(
+                  `/auftraege/${auftragId}/abnahme/erstellen${
+                    liste[0] ? `?protokollId=${encodeURIComponent(liste[0].id)}` : ''
+                  }`
+                )
+              }
             >
               Vor Ort
             </MockBtn>
@@ -139,8 +156,14 @@ export function AuftragAbnahmeprotokollCard({
               Mängel ({offeneMaengel})
             </MockBtn>
           ) : null}
-          <MockBtn sm kind="primary" icon="plus" onClick={erstellen} disabled={pending}>
-            Protokoll erstellen
+          <MockBtn
+            sm
+            kind="primary"
+            icon={liste.length ? 'file-pencil' : 'plus'}
+            onClick={() => (liste[0] ? bearbeiten(liste[0].id) : erstellen())}
+            disabled={pending}
+          >
+            {liste.length ? 'Bearbeiten' : 'Protokoll erstellen'}
           </MockBtn>
         </>
       }
@@ -167,8 +190,7 @@ export function AuftragAbnahmeprotokollCard({
           <MockIcon ctx="empty" n="checklist" size={26} />
           <div className="abnahme-empty__title">Noch kein Abnahmeprotokoll</div>
           <div className="abnahme-empty__text">
-            Checkliste aus Gewerken und Leistungen — per Wizard erstellen, PDF speichern oder vor Ort
-            ausfüllen.
+            Checkliste aus Gewerken und Leistungen — Protokoll erstellen und PDF speichern.
           </div>
           <MockBtn kind="primary" icon="plus" onClick={erstellen}>
             Protokoll erstellen

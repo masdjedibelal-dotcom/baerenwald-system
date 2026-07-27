@@ -7,7 +7,7 @@ import { PosTable, type PosTableGroup, type PosTableItem } from '@/components/po
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/app-toast'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
@@ -406,21 +406,14 @@ export function PreislistenClient({
         />
       )}
 
-      <Modal
+      <EditorSheet
         open={modalOpen}
         onClose={closeModal}
         title={editLeistung ? 'Leistung bearbeiten' : 'Neue Leistung'}
+        context="detail"
         size="md"
-        footer={
-          <div className="flex gap-2">
-            <button type="button" onClick={closeModal} className="btn ghost">
-              Abbrechen
-            </button>
-            <button type="button" onClick={handleSave} disabled={pending} className="btn primary">
-              Speichern
-            </button>
-          </div>
-        }
+        confirmBusy={pending}
+        onConfirm={handleSave}
       >
         {editLeistung ? (
           <div className="mb-4 border-b border-bw-border pb-3 text-xs text-bw-text-muted">
@@ -521,7 +514,7 @@ export function PreislistenClient({
 
           <Toggle label="Aktiv" checked={form.aktiv} onChange={(v) => setForm((f) => ({ ...f, aktiv: v }))} />
         </div>
-      </Modal>
+      </EditorSheet>
 
       <PreislistenCsvImportModal open={csvOpen} onClose={() => setCsvOpen(false)} onDone={onImportDone} />
     </div>

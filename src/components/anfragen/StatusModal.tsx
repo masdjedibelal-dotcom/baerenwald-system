@@ -25,8 +25,7 @@ import {
   TerminBestaetigungMailEditor,
   type TerminMailDraft,
 } from '@/components/anfragen/TerminBestaetigungMailEditor'
-import { FormSheet } from '@/components/ui/FormSheet'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail } from '@/lib/types'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -89,7 +88,6 @@ export function StatusModal({
   const [mailToggle, setMailToggle] = useState(true)
   const [mailDraft, setMailDraft] = useState<TerminMailDraft | null>(null)
   const [saving, setSaving] = useState(false)
-  const isMobile = useIsMobile()
 
   const kontaktName = leadKontaktAnzeigeName(lead, 'Kundin/Kunde')
   const kontaktEmail = lead.kontakt_email?.trim() || ''
@@ -149,7 +147,6 @@ export function StatusModal({
   if (!open || !kind) return null
 
   const meta = META[kind]
-  const Icon = meta.icon
 
   async function handleSave() {
     if (!kind) return
@@ -422,45 +419,11 @@ export function StatusModal({
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <FormSheet open={open} onClose={onClose} breadcrumb="Anfragen" title={meta.title} footer={formFooter} width="lg">
-        <p className="mb-4 text-sm text-bw-text-muted">{sub}</p>
-        {formBody}
-      </FormSheet>
-    )
-  }
-
   return (
-    <div
-      className="modal-overlay-center"
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        className={kind === 'termin' ? 'modal-compact modal-compact-wide' : 'modal-compact'}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="status-modal-title"
-      >
-        <header className="modal-compact-h">
-          <div className={meta.danger ? 'modal-compact-icon modal-compact-icon-danger' : 'modal-compact-icon'}>
-            <Icon className="h-[18px] w-[18px]" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h2 id="status-modal-title" className="modal-compact-title">
-              {meta.title}
-            </h2>
-            <p className="modal-compact-sub">{sub}</p>
-          </div>
-        </header>
-
-        {formBody}
-
-        <footer className="modal-compact-f">{formFooter}</footer>
-      </div>
-    </div>
+    <EditorSheet open={open} onClose={onClose} title={meta.title} context="detail" size="lg">
+      <p className="mb-4 text-sm text-bw-text-muted">{sub}</p>
+      {formBody}
+      <div className="mt-4 border-t border-[var(--app-separator)] pt-3">{formFooter}</div>
+    </EditorSheet>
   )
 }

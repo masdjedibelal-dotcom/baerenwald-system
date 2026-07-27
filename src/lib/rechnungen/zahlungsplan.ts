@@ -201,6 +201,20 @@ export function rechnungFuerAbschlagZeile(
   )
 }
 
+/** Letzte stornierte Rechnung zu einer Planzeile (Rate wieder „geplant“). */
+export function stornierteRechnungFuerAbschlagZeile(
+  zeileId: string,
+  rechnungen: RechnungAbschlagLink[]
+): RechnungAbschlagLink | null {
+  let latest: RechnungAbschlagLink | null = null
+  for (const r of rechnungen) {
+    if (r.zahlungsplan_abschlag_id === zeileId && String(r.status) === 'storniert') {
+      latest = r
+    }
+  }
+  return latest
+}
+
 export function zahlplanRateStatus(
   zeileId: string,
   rechnungen: RechnungAbschlagLink[]
@@ -651,6 +665,112 @@ export function berechneBereitsGestellt(
     }
   }
   return { nettoGeschaetzt: 0, brutto }
+}
+
+/** Nicht stornierte Abschlag-/Schluss-/Vollrechnung (ohne Art → trotzdem zählen). */
+function istGestellteAbrechnungRelevant(r: RechnungAbschlagLink): boolean {
+  if (String(r.status ?? '') === 'storniert') return false
+  const art = String(r.rechnung_art ?? '')
+    .trim()
+    .toLowerCase()
+  if (!art) return true
+  return art === 'abschlag' || art === 'schluss' || art === 'voll'
+}
+
+export function summeGestellteRechnungenBrutto(
+  bestehende: RechnungAbschlagLink[],
+  ausserRechnungId?: string | null
+): number {
+  let sum = 0
+  for (const r of bestehende) {
+    if (ausserRechnungId && r.id === ausserRechnungId) continue
+    if (!istGestellteAbrechnungRelevant(r)) continue
+    const b = Number(r.brutto ?? 0)
+    if (Number.isFinite(b) && b > 0) sum += b
+  }
+  return Math.round(sum * 100) / 100
+}
+
+/**
+ * Hard-Gate: Σ bereits gestellter RE-Brutto + neue Rechnung darf VK-Brutto
+ * (gesamtNetto × (1+MwSt)) nicht um mehr als 0,50 € überschreiten.
+ */
+export function validateGestellteRechnungenGegenVk(input: {
+  bestehende: RechnungAbschlagLink[]
+  gesamtNetto: number
+  neueNetto: number
+  ausserRechnungId?: string | null
+  mwstSatz?: number
+}): { ok: true } | { ok: false; message: string } {
+  const mwst = input.mwstSatz ?? 19
+  const ratio = 1 + mwst / 100
+  const vkBrutto = Math.round(Math.max(0, input.gesamtNetto) * ratio * 100) / 100
+  const bereits = summeGestellteRechnungenBrutto(input.bestehende, input.ausserRechnungId)
+  const neueBrutto =
+    Math.round(Math.max(0, input.neueNetto) * ratio * 100) / 100
+  const sum = Math.round((bereits + neueBrutto) * 100) / 100
+  if (sum > vkBrutto + 0.5) {
+    return {
+      ok: false,
+      message: `Die Summe der Rechnungen (${formatEur(sum)} brutto) übersteigt die Auftragssumme (${formatEur(vkBrutto)} brutto). Bitte Beträge prüfen oder eine Rechnung stornieren.`,
+    }
+  }
+  return { ok: true }
+}
+
+/**
+ * Abgeschlossener Auftrag, Zahlung noch nicht vollständig (#5).
+ */
+export function auftragHatZahlungOffen(input: {
+  auftragStatus: string | null | undefined
+  rechnungen: RechnungAbschlagLink[]
+  gesamtNetto: number
+  mwstSatz?: number
+}): boolean {
+  if (String(input.auftragStatus ?? '').toLowerCase() !== 'abgeschlossen') return false
+  const mwst = input.mwstSatz ?? 19
+  const vkBrutto =
+    Math.round(Math.max(0, input.gesamtNetto) * (1 + mwst / 100) * 100) / 100
+  const aktiv = input.rechnungen.filter(
+    (r) => String(r.status ?? '').toLowerCase() !== 'storniert'
+  )
+  if (aktiv.length === 0) return true
+  const unpaid = aktiv.some((r) => String(r.status ?? '').toLowerCase() !== 'bezahlt')
+  if (unpaid) return true
+  const bezahltBrutto = aktiv
+    .filter((r) => String(r.status ?? '').toLowerCase() === 'bezahlt')
+    .reduce((s, r) => s + (Number(r.brutto) || 0), 0)
+  return bezahltBrutto < vkBrutto - 0.5
+}
+
+/**
+ * Soft-Warning für UI: bereits gestellte/bezahlte RE-Brutto vs. VK-Brutto
+ * (ohne neue Rechnung).
+ */
+export function softWarnGestellteRechnungenGegenVk(input: {
+  bestehende: RechnungAbschlagLink[]
+  gesamtNetto: number
+  mwstSatz?: number
+  ausserRechnungId?: string | null
+  toleranzEur?: number
+}):
+  | { warn: false }
+  | { warn: true; message: string; gestelltBrutto: number; vkBrutto: number } {
+  const mwst = input.mwstSatz ?? 19
+  const toleranz = input.toleranzEur ?? 0.5
+  const vkBrutto =
+    Math.round(Math.max(0, input.gesamtNetto) * (1 + mwst / 100) * 100) / 100
+  const gestelltBrutto = summeGestellteRechnungenBrutto(
+    input.bestehende,
+    input.ausserRechnungId
+  )
+  if (gestelltBrutto <= vkBrutto + toleranz) return { warn: false }
+  return {
+    warn: true,
+    gestelltBrutto,
+    vkBrutto,
+    message: `Bereits gestellte Rechnungen (${formatEur(gestelltBrutto)} brutto) übersteigen die Auftragssumme (${formatEur(vkBrutto)} brutto).`,
+  }
 }
 
 export function naechsteOffeneAbschlagZeile(

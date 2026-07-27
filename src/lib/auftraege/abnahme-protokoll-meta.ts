@@ -14,7 +14,15 @@ export type AbnahmeProtokollMeta = {
   abnahme_ergebnis: AbnahmeErgebnis
   hinweis_sonstiges: string
   uebergabe_foto_urls: string[]
+  /** Beschriftung je Foto (gleicher Index wie uebergabe_foto_urls) */
+  uebergabe_foto_captions: string[]
   rechtshinweise: string
+  /** Globale Frist-Zeile unter Mängeln, z. B. „spätestens am …“ */
+  maengel_beseitigung_spaetestens: string
+  /** Unterschriftsblöcke: „Ort, Datum“-Zeile */
+  unterschrift_ort_datum_an: string
+  unterschrift_ort_datum_ag: string
+  unterschrift_ort_datum_anwesend: string
 }
 
 export const ABNAHME_ERGEBNIS_LABEL: Record<AbnahmeErgebnis, string> = {
@@ -46,7 +54,12 @@ export function emptyAbnahmeProtokollMeta(
     abnahme_ergebnis: 'abgenommen',
     hinweis_sonstiges: '',
     uebergabe_foto_urls: [],
+    uebergabe_foto_captions: [],
     rechtshinweise: DEFAULT_ABNAHME_RECHTSHINWEISE,
+    maengel_beseitigung_spaetestens: '',
+    unterschrift_ort_datum_an: '',
+    unterschrift_ort_datum_ag: '',
+    unterschrift_ort_datum_anwesend: '',
     ...partial,
   }
 }
@@ -59,6 +72,10 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
   const fotos = Array.isArray(o.uebergabe_foto_urls)
     ? o.uebergabe_foto_urls.map((u) => String(u ?? '').trim()).filter(Boolean).slice(0, 4)
     : []
+  const captionsRaw = Array.isArray(o.uebergabe_foto_captions)
+    ? o.uebergabe_foto_captions.map((c) => String(c ?? '').trim())
+    : []
+  const captions = fotos.map((_, i) => captionsRaw[i] ?? '')
   return emptyAbnahmeProtokollMeta({
     uebergabe_uhrzeit: String(o.uebergabe_uhrzeit ?? '').trim(),
     uebergabe_ort: String(o.uebergabe_ort ?? '').trim(),
@@ -71,7 +88,12 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
     abnahme_ergebnis,
     hinweis_sonstiges: String(o.hinweis_sonstiges ?? '').trim(),
     uebergabe_foto_urls: fotos,
+    uebergabe_foto_captions: captions,
     rechtshinweise:
       String(o.rechtshinweise ?? '').trim() || DEFAULT_ABNAHME_RECHTSHINWEISE,
+    maengel_beseitigung_spaetestens: String(o.maengel_beseitigung_spaetestens ?? '').trim(),
+    unterschrift_ort_datum_an: String(o.unterschrift_ort_datum_an ?? '').trim(),
+    unterschrift_ort_datum_ag: String(o.unterschrift_ort_datum_ag ?? '').trim(),
+    unterschrift_ort_datum_anwesend: String(o.unterschrift_ort_datum_anwesend ?? '').trim(),
   })
 }

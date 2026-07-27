@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Camera, Plus } from 'lucide-react'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
@@ -111,7 +110,6 @@ export function AuftragLeistungVorOrtTabelle({
   kundeName: string
   onChanged?: () => void
 }) {
-  const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [eintraege, setEintraege] = useState<PositionEintrag[]>([])
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
@@ -533,15 +531,6 @@ export function AuftragLeistungVorOrtTabelle({
       framed
       actions={
         <div className="werkzeug-panel__actions">
-          <MockBtn
-            sm
-            kind="ghost"
-            icon="file-text"
-            disabled={pending}
-            onClick={() => router.push(`/auftraege/${auftragId}/abnahme/erstellen`)}
-          >
-            Abnahme-Wizard
-          </MockBtn>
           <MockBtn
             sm
             kind="ghost"

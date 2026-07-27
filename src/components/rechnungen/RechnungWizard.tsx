@@ -7,7 +7,8 @@ import {
   AngebotKiAssistentButton,
   type AngebotKiApplyPayload,
 } from '@/components/angebote/AngebotKiAssistent'
-import { WizardShell } from '@/components/layout/WizardShell'
+import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { DocActionBar } from '@/components/surfaces/primitives'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -59,9 +60,11 @@ import type {
   RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
+  berechneSchlussAbrechnung,
   berechneZahlungsplan,
   emptyZahlungsplan,
   neueZahlungsplanZeile,
+  softWarnGestellteRechnungenGegenVk,
   zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
@@ -110,9 +113,9 @@ const ANLAGEN_DEF: Array<{
 
 const WIZARD_STEPS = [
   { id: 1, label: 'Positionen' },
-  { id: 2, label: 'Individualisieren' },
-  { id: 3, label: 'Paket' },
-  { id: 4, label: 'Versand' },
+  { id: 2, label: 'Details' },
+  { id: 3, label: 'Anlagen' },
+  { id: 4, label: 'Senden' },
 ]
 
 const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
@@ -141,7 +144,7 @@ function planIstOk(plan: Zahlungsplan): boolean {
 
 /**
  * Rechnungs-Wizard:
- * Positionen → Individualisieren → Paket → Versand
+ * Positionen → Rechnungsdetails → Anlagen & Versand → Versand
  */
 export function RechnungWizard({
   bootstrap,
@@ -427,20 +430,63 @@ export function RechnungWizard({
     })
   }
 
+  const vkNettoPlan = bootstrap.gesamtNetto ?? bootstrap.abschlag?.gesamtNetto ?? netto
+
   const planKontext = useMemo(
     () =>
       berechneZahlungsplan(
         plan,
-        netto,
+        vkNettoPlan,
         defaultMwst,
         zahlplanAbgerechnetAusLinks(bootstrap.rechnungenAbschlag ?? [])
       ),
-    [plan, netto, defaultMwst, bootstrap.rechnungenAbschlag]
+    [plan, vkNettoPlan, defaultMwst, bootstrap.rechnungenAbschlag]
   )
+
+  const vkSoftWarn = useMemo(() => {
+    if (!hatAuftrag) return { warn: false as const }
+    const vkNetto = bootstrap.gesamtNetto ?? bootstrap.abschlag?.gesamtNetto ?? netto
+    return softWarnGestellteRechnungenGegenVk({
+      bestehende: bootstrap.rechnungenAbschlag ?? [],
+      gesamtNetto: vkNetto,
+      mwstSatz: defaultMwst,
+      ausserRechnungId: rechnungId,
+    })
+  }, [
+    hatAuftrag,
+    bootstrap.gesamtNetto,
+    bootstrap.abschlag?.gesamtNetto,
+    bootstrap.rechnungenAbschlag,
+    netto,
+    defaultMwst,
+    rechnungId,
+  ])
 
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
   const selRate = plan.zeilen.find((z) => z.id === aktivRate) ?? null
   const selBerechnet = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
+  const schlussAbrechnung = useMemo(() => {
+    if (!selBerechnet?.istSchluss) return null
+    return berechneSchlussAbrechnung(
+      positionenBerechnet,
+      bootstrap.rechnungenAbschlag ?? [],
+      {
+        reverseCharge13b: meta.reverse_charge_13b,
+        kleinunternehmer,
+        defaultMwstSatz: defaultMwst,
+        ausserRechnungId: rechnungId,
+        ausserZeileId: selBerechnet.id,
+      }
+    )
+  }, [
+    selBerechnet,
+    positionenBerechnet,
+    bootstrap.rechnungenAbschlag,
+    meta.reverse_charge_13b,
+    kleinunternehmer,
+    defaultMwst,
+    rechnungId,
+  ])
   const rTitel =
     hasPlan && selRate
       ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.titel}`
@@ -466,11 +512,9 @@ export function RechnungWizard({
     ? WIZARD_STEPS
     : [
         { id: 1, label: 'Positionen' },
-        { id: 2, label: 'Individualisieren' },
-        { id: 3, label: 'Versand' },
+        { id: 2, label: 'Details' },
+        { id: 4, label: 'Senden' },
       ]
-  /** Anzeige-Schritt für Stepper (bei Abschlag ohne Paket: 1→2→3 statt 1→2→4). */
-  const shellStep = showAbschlussPaket ? step : step >= 4 ? 3 : step
   const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
   const selectedAnlagen = ANLAGEN_DEF.filter((a) => anlagen[a.key])
   const previewNr = rechnungsnummer.trim() || 'Rechnung'
@@ -487,30 +531,44 @@ export function RechnungWizard({
     }))
   }, [showAbschlussPaket])
 
-  function goPrevStep() {
-    setStep((s) => {
-      if (s === 4 && !showAbschlussPaket) return 2
-      return Math.max(1, s - 1)
+  function scrollToSection(sec: number) {
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`section-${sec}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
+  }
+
+  function goToSection(sec: number) {
+    setStep(sec)
+    scrollToSection(sec)
+  }
+
+  function goPrevStep() {
+    const next =
+      step === 4 && !showAbschlussPaket ? 2 : Math.max(1, step - 1)
+    goToSection(next)
   }
 
   async function goNextStep() {
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Mindestens eine Position erforderlich.')
-        return
+        toast.error('Noch keine Position — Erstellen/Senden erst mit mindestens einer Position.')
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
-      return
+      toast.error('Zahlplan noch nicht 100 % — vor Versand anpassen.')
     }
-    const leavingToVersand =
-      step === 3 || (step === 2 && !showAbschlussPaket)
-    if (leavingToVersand) {
+    const next = step === 2 && !showAbschlussPaket ? 4 : Math.min(4, step + 1)
+    const enteringVersand = next === 4
+    if (enteringVersand) {
       const id = await persistDraft()
-      if (!id) return
+      if (!id) {
+        toast.error(
+          'Entwurf noch nicht gespeichert — Mail-Vorschau ggf. unvollständig. Pflichtfelder vor Erstellen prüfen.'
+        )
+      }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
         setEinleitung(
@@ -522,10 +580,7 @@ export function RechnungWizard({
       const firstDoc = selectedAnlagen[0]?.key ?? 'rechnung'
       setDocPreviewTab(firstDoc)
     }
-    setStep((s) => {
-      if (s === 2 && !showAbschlussPaket) return 4
-      return Math.min(4, s + 1)
-    })
+    goToSection(next)
   }
 
   function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
@@ -869,14 +924,15 @@ export function RechnungWizard({
     }
   }
 
-  function handleRequestClose() {
+  async function handleCanvasClose() {
     if (draftDirty && !saving) {
-      const ok = window.confirm(
-        'Es gibt ungespeicherte Änderungen. Wizard schließen und Änderungen verwerfen?'
-      )
-      if (!ok) return
+      /* S9: Auto-Entwurf best-effort — RE speichert oft über goNextStep */
     }
     onClose()
+  }
+
+  function handleRequestClose() {
+    void handleCanvasClose()
   }
 
   async function handleWeiter() {
@@ -1051,25 +1107,82 @@ export function RechnungWizard({
   )
 
   const wizard = (
-    <WizardShell
+    <DocumentCanvas
+      portal={false}
       className="wizard-flow"
       title={
         selBerechnet?.istSchluss
-          ? 'Schlussrechnung erstellen'
+          ? 'Schlussrechnung'
           : rateLocked && selBerechnet
-            ? 'Abschlagsrechnung erstellen'
+            ? 'Abschlagsrechnung'
             : 'Rechnung erstellen'
       }
-      steps={wizardSteps}
-      currentStep={shellStep}
       onClose={handleRequestClose}
-      mobileActions={mobileActions}
-      mobileFooter={mobileFooter}
-      desktopActions={desktopActions}
-      saveHint={saving ? 'Speichert…' : null}
+      onSave={() => void goNextStep().catch(() => undefined)}
+      saveBusy={saving}
+      busy={saving}
+      busyLabel="Wird versendet…"
+      onDiscard={() => onClose()}
+      docActions={
+        <DocActionBar
+          actions={[
+            {
+              id: 'preview',
+              label: 'Vorschau',
+              onClick: () => goToSection(showAbschlussPaket ? 3 : 4),
+              icon: <MockIcon ctx="default" n="file-text" size={20} />,
+            },
+            {
+              id: 'send',
+              label: 'Senden',
+              onClick: () => goToSection(4),
+              icon: <MockIcon ctx="default" n="send" size={20} />,
+            },
+          ]}
+        />
+      }
     >
-      {step === 1 ? (
+      <nav className="document-section-nav" aria-label="Abschnitte">
+        {wizardSteps.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={
+              s.id === step
+                ? 'document-section-nav__chip document-section-nav__chip--active'
+                : 'document-section-nav__chip'
+            }
+            onClick={() => goToSection(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+        <div className="ml-auto hidden md:flex">{desktopActions}</div>
+        <div className="flex w-full gap-2 md:hidden">{mobileFooter}</div>
+      </nav>
+
+      <section id="section-1" className="document-canvas-sec">
         <>
+          {vkSoftWarn.warn ? (
+            <div
+              role="status"
+              style={{
+                marginBottom: 14,
+                padding: '12px 14px',
+                border: '0.5px solid var(--border)',
+                borderRadius: 8,
+                background: 'var(--bg-soft)',
+                fontSize: 13,
+                lineHeight: 1.45,
+                color: 'var(--text-2)',
+              }}
+            >
+              <b style={{ color: 'var(--text)' }}>{vkSoftWarn.message}</b>
+              <div style={{ marginTop: 4 }}>
+                Speichern kann blockiert werden, wenn die Summe die Auftragssumme überschreitet.
+              </div>
+            </div>
+          ) : null}
           {rateLocked && selBerechnet ? (
             <div
               style={{
@@ -1090,6 +1203,14 @@ export function RechnungWizard({
                     Die Schlussrechnung enthält alle Auftragsleistungen und zieht bereits gestellte
                     Abschläge ab. Rest laut Plan:{' '}
                     <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto.
+                    {schlussAbrechnung ? (
+                      <>
+                        {' '}
+                        Bereits gezahlt{' '}
+                        <b>{formatEurBetrag(schlussAbrechnung.bereits_gezahlt_brutto)}</b>, Rest{' '}
+                        <b>{formatEurBetrag(schlussAbrechnung.rest_brutto)}</b> brutto.
+                      </>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -1154,7 +1275,7 @@ export function RechnungWizard({
           <VorgangArtWiederkehrField
             value={wiederkehr}
             onChange={setWiederkehr}
-            hint="Bestand — Abrechnung zu wiederkehrendem Auftrag (Wartung, Winterdienst)"
+            hint="Wiederkehrend — Abrechnung zu wiederkehrendem Auftrag (Wartung, Winterdienst)"
           />
           <PosBoard
             positionen={posBoardLines}
@@ -1178,9 +1299,9 @@ export function RechnungWizard({
             }
           />
         </>
-      ) : null}
+      </section>
 
-      {step === 2 ? (
+      <section id="section-2" className="document-canvas-sec">
         <>
           <div
             style={{
@@ -1194,7 +1315,7 @@ export function RechnungWizard({
           >
             <div>
               <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>
-                Individualisieren
+                Rechnungsdetails
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
                 Zahlungsziel, Leistungszeitraum und steuerliche Hinweise
@@ -1206,6 +1327,20 @@ export function RechnungWizard({
                 {formatEurBetrag(hasPlan && selBerechnet ? selBerechnet.brutto : brutto)}
               </b>{' '}
               brutto
+              {schlussAbrechnung ? (
+                <div style={{ marginTop: 4, lineHeight: 1.45 }}>
+                  Bereits gezahlt{' '}
+                  <b style={{ color: 'var(--text-2)' }}>
+                    {formatEurBetrag(schlussAbrechnung.bereits_gezahlt_brutto)}
+                  </b>
+                  {' · '}
+                  Rest{' '}
+                  <b style={{ color: 'var(--green)' }}>
+                    {formatEurBetrag(schlussAbrechnung.rest_brutto)}
+                  </b>{' '}
+                  brutto
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -1612,12 +1747,13 @@ export function RechnungWizard({
             </details>
           ) : null}
         </>
-      ) : null}
+      </section>
 
-      {step === 3 && showAbschlussPaket ? (
+      {showAbschlussPaket ? (
+      <section id="section-3" className="document-canvas-sec">
         <>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Paket</div>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Anlagen & Versand</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
               Schlussrechnung: optional Abnahme und weitere Unterlagen mitsenden. Abschläge laufen
               ohne dieses Paket — Abschlussbericht und Abnahme gehören zum Auftragsabschluss.
@@ -1699,9 +1835,10 @@ export function RechnungWizard({
             })}
           </div>
         </>
+      </section>
       ) : null}
 
-      {step === 4 ? (
+      <section id="section-4" className="document-canvas-sec">
         <div style={{ display: 'grid', gap: 18, maxWidth: 760, margin: '0 auto' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
@@ -1898,8 +2035,8 @@ export function RechnungWizard({
             ) : null}
           </div>
         </div>
-      ) : null}
-    </WizardShell>
+      </section>
+    </DocumentCanvas>
   )
 
   return createPortal(wizard, document.body)

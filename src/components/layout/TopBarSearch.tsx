@@ -114,7 +114,7 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
     function onKey(e: KeyboardEvent | globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        if (window.matchMedia('(max-width: 760px)').matches) {
+        if (window.matchMedia('(max-width: 767px)').matches) {
           setMobileOpen(true)
         } else {
           setOpen(true)
@@ -124,7 +124,7 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
       }
     }
     function onOpenEvent() {
-      if (window.matchMedia('(max-width: 760px)').matches) setMobileOpen(true)
+      if (window.matchMedia('(max-width: 767px)').matches) setMobileOpen(true)
       else {
         setOpen(true)
         window.setTimeout(() => inputRef.current?.focus(), 0)

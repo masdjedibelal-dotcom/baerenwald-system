@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   MockBtn,
   MockChip,
@@ -21,7 +21,13 @@ import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
+import { mergeKunden } from '@/app/actions/kunden'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 
@@ -74,7 +80,13 @@ function toExportRow(k: KundeListeZeile) {
   }
 }
 
-export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
+export function KundenListeClient({
+  kunden,
+  onMergeRequest,
+}: {
+  kunden: KundeListeZeile[]
+  onMergeRequest?: (idA: string, idB: string) => void
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
@@ -87,6 +99,8 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
+  const [mergeListOpen, setMergeListOpen] = useState(false)
+  const [listMergePending, setListMergePending] = useState(false)
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') {
@@ -161,8 +175,72 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   }
 
   const selectedCount = Object.values(selected).filter(Boolean).length
+  const selectedKunden = useMemo(() => {
+    return kunden.filter((k) => selected[k.id])
+  }, [kunden, selected])
+  const listMergePair =
+    selectedCount === 2 && selectedKunden.length === 2
+      ? [...selectedKunden].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        )
+      : null
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
   const allSelected = filtered.length > 0 && filtered.every((k) => selected[k.id])
+
+  const selectedRows = useMemo(
+    () => filtered.filter((k) => selected[k.id]),
+    [filtered, selected]
+  )
+
+  const bulkOpen = useCallback(() => {
+    const row = selectedRows[0]
+    if (row) router.push(`/kunden/${row.id}`)
+  }, [router, selectedRows])
+
+  const bulkExport = useCallback(() => {
+    runMockListExport(
+      exportToCSV,
+      selectedRows.map(toExportRow),
+      EXPORT_FIELDS,
+      'kunden-auswahl'
+    )
+  }, [exportToCSV, selectedRows])
+
+  const bulkMerge = useCallback(() => {
+    if (selectedRows.length !== 2) return
+    const [a, b] = selectedRows
+    const idA = a.id
+    const idB = b.id
+
+    if (onMergeRequest) {
+      onMergeRequest(idA, idB)
+      return
+    }
+
+    void (async () => {
+      try {
+        const mod = await import('@/app/actions/kunden')
+        const mergeFn = (mod as { mergeKunden?: (a: string, b: string) => Promise<{ ok: boolean }> })
+          .mergeKunden
+        if (typeof mergeFn === 'function') {
+          const loadingId = toast.loading('Zusammenführen…')
+          const r = await mergeFn(idA, idB)
+          if (r.ok) {
+            toast.success('Kunden zusammengeführt', { id: loadingId })
+            setSelected({})
+            router.refresh()
+          } else {
+            toast.error('Zusammenführen fehlgeschlagen', { id: loadingId })
+          }
+          return
+        }
+      } catch {
+        /* mergeKunden noch nicht verfügbar */
+      }
+      toast.info('Merge wird geladen')
+      router.push(`/kunden?merge=${idA},${idB}`)
+    })()
+  }, [onMergeRequest, router, selectedRows])
 
   const colDefs = selectMode ? KUNDEN_COLS_SELECT : KUNDEN_COLS
   const { gridTemplateColumns, startResize } = useResizableColumns(
@@ -194,6 +272,62 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
   }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
+  const isMobile = useIsMobile()
+
+  const filterFooter = (
+    <>
+      <MockBtn kind="ghost" onClick={resetFilters}>
+        Zurücksetzen
+      </MockBtn>
+      <div style={{ flex: 1 }} />
+      <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+        Anwenden ({filtered.length})
+      </MockBtn>
+    </>
+  )
+
+  const filterFields = (
+    <>
+      <div className="form-section-h">Suche</div>
+      <div className="input" style={{ marginBottom: 16 }}>
+        <MockIcon ctx="default" n="search" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name, Telefon, E-Mail…"
+          autoFocus={!isMobile}
+        />
+      </div>
+      <div className="form-grid" style={{ marginBottom: 16 }}>
+        <MockField label="Name">
+          <div className="input">
+            <input
+              type="text"
+              value={fName}
+              onChange={(e) => setFName(e.target.value)}
+              placeholder="Name enthält…"
+            />
+          </div>
+        </MockField>
+      </div>
+      <div className="form-section-h">Typ</div>
+      <div className="chiprow">
+        {(
+          [
+            ['alle', 'Alle'],
+            ['privat', 'Privat'],
+            ['hausverwaltung', 'Hausverwaltung'],
+            ['gewerbe', 'Gewerbe'],
+          ] as const
+        ).map(([value, label]) => (
+          <MockChip key={value} active={typFilter === value} onClick={() => setTypFilter(value)}>
+            {label}
+          </MockChip>
+        ))}
+      </div>
+    </>
+  )
 
   return (
     <div>
@@ -238,6 +372,15 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
                 setSelected({})
               },
             },
+            ...(selectMode && selectedCount === 2
+              ? [
+                  {
+                    icon: 'users' as const,
+                    label: 'Zusammenführen',
+                    onSelect: () => setMergeListOpen(true),
+                  },
+                ]
+              : []),
             {
               icon: 'download',
               label: 'CSV exportieren',
@@ -275,6 +418,11 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
                   {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
                 </span>
               </MockBtn>
+              {selectMode && selectedCount === 2 ? (
+                <MockBtn icon="users" kind="primary" sm onClick={() => setMergeListOpen(true)}>
+                  <span className="listbar-btn-label">Zusammenführen</span>
+                </MockBtn>
+              ) : null}
               <MockBtn
                 icon="download"
                 kind="ghost"
@@ -295,63 +443,71 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         />
       </div>
 
-      <MockModal
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        icon="filter"
-        title="Filter & Suchen"
-        sub="Kunden eingrenzen"
-        footer={
-          <>
-            <MockBtn kind="ghost" onClick={resetFilters}>
+      {isMobile ? (
+        <MobileListFilterSheet
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          title="Filter & Suchen"
+          headerEnd={
+            <button
+              type="button"
+              className="mobile-filter-sheet__reset"
+              onClick={resetFilters}
+              disabled={!activeFilterCount}
+            >
               Zurücksetzen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
+            </button>
+          }
+          footer={
+            <button type="button" className="btn primary w-full" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
+            </button>
+          }
+        >
+          {filterFields}
+        </MobileListFilterSheet>
+      ) : (
+        <MockModal
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          icon="filter"
+          title="Filter & Suchen"
+          sub="Kunden eingrenzen"
+          footer={filterFooter}
+        >
+          {filterFields}
+        </MockModal>
+      )}
+
+      {selectedCount > 0 ? (
+        <div className="bulkbar">
+          <span>
+            <b>{selectedCount}</b> ausgewählt
+          </span>
+          <div style={{ flex: 1 }} />
+          {selectedCount === 1 ? (
+            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
+              Öffnen
             </MockBtn>
-          </>
-        }
-      >
-        <div className="form-section-h">Suche</div>
-        <div className="input" style={{ marginBottom: 16 }}>
-          <MockIcon ctx="default" n="search" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, Telefon, E-Mail…"
-            autoFocus
+          ) : null}
+          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
+            Export
+          </MockBtn>
+          {selectedCount === 2 ? (
+            <MockBtn kind="ghost" sm icon="link" onClick={bulkMerge}>
+              Zusammenführen
+            </MockBtn>
+          ) : null}
+          <MockBtn
+            kind="ghost"
+            sm
+            className="qa-btn"
+            icon="x"
+            onClick={() => setSelected({})}
+            title="Auswahl aufheben"
           />
         </div>
-        <div className="form-grid" style={{ marginBottom: 16 }}>
-          <MockField label="Name">
-            <div className="input">
-              <input
-                type="text"
-                value={fName}
-                onChange={(e) => setFName(e.target.value)}
-                placeholder="Name enthält…"
-              />
-            </div>
-          </MockField>
-        </div>
-        <div className="form-section-h">Typ</div>
-        <div className="chiprow">
-          {(
-            [
-              ['alle', 'Alle'],
-              ['privat', 'Privat'],
-              ['hausverwaltung', 'Hausverwaltung'],
-              ['gewerbe', 'Gewerbe'],
-            ] as const
-          ).map(([value, label]) => (
-            <MockChip key={value} active={typFilter === value} onClick={() => setTypFilter(value)}>
-              {label}
-            </MockChip>
-          ))}
-        </div>
-      </MockModal>
+      ) : null}
 
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
@@ -498,6 +654,53 @@ export function KundenListeClient({ kunden }: { kunden: KundeListeZeile[] }) {
         unit="Kunden"
         onPageChange={(p) => setPageIndex(p - 1)}
       />
+
+      <Modal
+        open={mergeListOpen && Boolean(listMergePair)}
+        onClose={() => setMergeListOpen(false)}
+        title="Kunden zusammenführen"
+        size="sm"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setMergeListOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              loading={listMergePending}
+              onClick={() => {
+                if (!listMergePair) return
+                const [survivor, merge] = listMergePair
+                setListMergePending(true)
+                void mergeKunden(survivor.id, merge.id).then((res) => {
+                  setListMergePending(false)
+                  if (!res.ok) {
+                    toast.error(res.message)
+                    return
+                  }
+                  toast.success(res.message)
+                  setMergeListOpen(false)
+                  setSelectMode(false)
+                  setSelected({})
+                  router.push(`/kunden/${survivor.id}`)
+                  router.refresh()
+                })
+              }}
+            >
+              Zusammenführen
+            </Button>
+          </div>
+        }
+      >
+        {listMergePair ? (
+          <p className="text-sm text-bw-text">
+            Kunde <strong>{kundeListenName(listMergePair[1])}</strong> in{' '}
+            <strong>{kundeListenName(listMergePair[0])}</strong> überführen?{' '}
+            <strong>{kundeListenName(listMergePair[1])}</strong> wird entfernt. (Der ältere Datensatz bleibt
+            erhalten.)
+          </p>
+        ) : null}
+      </Modal>
     </div>
   )
 }

@@ -28,14 +28,17 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 |-------|-------|-----|
 | A | Fundament | W8-01, W8-05 |
 | B | Shell / Kit | W4-01, W4-02, W8-02 |
+| **B2** | **Flow / Create / Wizard SoTA (Sheets)** | **W11-01…05**, W10, W9-02/04 |
 | C | Detail-Rahmen | W7-01, W7-03, W3-02, W7-02 |
 | D | Angebot | W1-01, W1-02, W1-03 |
-| E | Geld | ZP-01, W3-03 |
-| F | Auftrag | W1-04, W7-07, W5-01, W7-04 |
+| E | Geld | ZP-01, W3-03 · **#5 beschlossen:** Auftrag fertig ≠ bezahlt |
+| F | Auftrag | W1-04, W7-07, W5-01, W7-04 · **#3:** 5 Kern-Tabs |
 | G | Arbeitstag | W2-01, W2-02, W2-03 |
 | H | Wiederfinden | W3-01, W6-08 |
 | I | Flows / Copy | W8-03, W8-04, W6-01, W7-05, W7-06, W6-02, W6-04 |
 | J | Optional | W5-02, W6-05…W6-10, W6-09 |
+
+**Produktentscheidungen (2026-07-27):** siehe `ENTSCHEIDUNGSLOG.md` — **#3** (5 Kern-Tabs inkl. Vor Ort), **#5** (Auftrag erledigt = abgeschlossen, Badge Zahlung offen). **PR C** startklar sobald #11/#12 + Tab-SoT (#7/13, inkl. #3) stehen.
 
 ---
 
@@ -108,6 +111,76 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 **Abnahme:** Stichprobe 5 Screens — gleiches Menü-/Filter-Verhalten.
 
 **Danach Block B:** Mobile = App-Chrome; Desktop unverändert CRM-artig.
+
+---
+
+# Block B2 — Flow / Create / Wizard SoTA (Sheets)
+
+> **PO (2026-07-27):** Es reicht nicht, nur Shells zu migrieren. **Nutzung** von Wizards, Erstellungen und Alltags-Flows muss sich ändern: Bottom Sheets, app-artige Komponenten, State of the Art — mobil wie iOS Settings/Field-App, desktop klar und leicht.
+>
+> **Lexware-Soll (2026-07-27):** Angebot/RE = **DocumentCanvas** (eine Scroll-Seite) + Sheets für Kunde/Position/Anlegen — [WIZARD-LEXWARE-KONZEPT.md](./WIZARD-LEXWARE-KONZEPT.md). Stepper-„Weiter“ nur noch wo Phasen nötig.
+
+## W11-01 — Create-Einstiege (Neu …)
+
+| | |
+|--|--|
+| **Markt** | Lexware / Field-Apps: „Neu“ öffnet Dokument-Canvas oder Sheet-Stack; ein Job, große Targets. |
+| **Wir heute** | Gemischt: Routes, Modals, Funnel, teils Desktop-Formulare auf dem Phone. |
+| **Wir wollen** | Jeder Create-Flow startet in **einer** App-Shell (`DocumentCanvas` / `WizardShell`). |
+| **Vergleich** | Markt = App-Create; wir = Desktop-Form in Mobile-Viewport. |
+
+**FE:** Einstiege auf Shell/Canvas vereinheitlichen; FAB → gleicher Flow. **BE:** —.  
+**Abnahme Mobile:** Neu → Canvas/Shell; Desktop: gleicher Flow.
+
+## W11-02 — Aktionen als Bottom Sheet
+
+| | |
+|--|--|
+| **Markt** | Versenden / Ablehnen / Status / Partner = Action Sheet; Kunde/Artikel = Picker-Sheet. |
+| **Wir heute** | Desktop-Menüs, Modals, teils tote Anker. |
+| **Wir wollen** | Kern-Aktionen + Picker mobil immer Sheet; Desktop Modal oder Slide-over — gleiche Steps. |
+| **Vergleich** | Markt lernt 1 Pattern; wir pro Entity anders. |
+
+**FE:** Shared `FlowActionSheet` + `PickerSheet`; W1/W8-03 anbinden. **BE:** bestehende Actions.  
+**Abnahme:** Stichprobe Versenden + Ablehnen + Status mobil = Sheet.
+
+## W11-03 — DocumentCanvas: Picker & Meta per Sheet
+
+| | |
+|--|--|
+| **Markt** | Lexware: eine Dokument-Seite; Kunde/Position tippen → Sheet (wählen oder `+` Neu). |
+| **Wir heute** | Angebot/RE Stepper + teils `MobileEditableBlock`; Abnahme angeglichen. |
+| **Wir wollen** | AG/RE als **DocumentCanvas**; Kunde & Positionen = Picker-Sheet (+ Nested Anlegen); Meta = Overview→Sheet. |
+| **Vergleich** | Markt = Dokument bearbeiten; wir = durch Steps klicken. |
+
+**FE:** `DocumentCanvas` + DashedAdd; Vertrag/Funnel angleichen. **BE:** —.  
+**Abnahme:** Kein Step nur „lange Formularliste“ mobil ohne Overview/Sheet.
+
+## W11-04 — Desktop Create: gleiche mentale Modelle
+
+| | |
+|--|--|
+| **Markt** | Gleiches Dokument; Sheets → Modal/Slide-over; kein Fake-Bottom-Sheet. |
+| **Wir heute** | Desktop oft besser; trotzdem uneven (AppFlow vs WizardShell). |
+| **Wir wollen** | Gleicher Canvas/Jobs wie Mobile; Darstellung = Cards + Modal/Slide-over. |
+| **Vergleich** | Parität der Jobs, nicht der Pixel. |
+
+**FE:** `WIZARD-LEXWARE-KONZEPT` + `WIZARD-UI-MUSTER` als Gate. **BE:** —.  
+**Abnahme:** Angebot/RE/Abnahme Desktop = Canvas + Modal-Picker + eine Primary (✓ Speichern).
+
+## W11-05 — Shared Flow-Kit (Komponenten)
+
+| | |
+|--|--|
+| **Markt** | Design-System: SheetHeader, DashedAdd, DocActionBar, OverviewRow. |
+| **Wir heute** | Pieces verstreut (`MobileEditSheet`, MockBtn, eigene Header). |
+| **Wir wollen** | Kit: `DashedAddCard`, `PickerSheet`, `DocActionBar`, `FlowOverviewRow`, `FlowStickyFooter`. |
+| **Vergleich** | SoTA = wiederverwendbare Bausteine; wir kopieren Markup. |
+
+**FE:** `components/flow/` oder unter `layout/app` + Doc. **BE:** —.  
+**Abnahme:** Neue Flows importieren nur Kit-Bausteine.
+
+**Danach Block B2:** Create und Wizards fühlen sich wie eine App an — nicht wie portierte Desktop-Formulare.
 
 ---
 
@@ -269,11 +342,11 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 |--|--|
 | **Markt** | 3–5 Kern-Tabs, Rest „More“. |
 | **Wir heute** | ~10 Horizontal-Tabs. |
-| **Wir wollen** | Kern + Mehr; `DetailResponsiveTabs` nutzen oder löschen. |
-| **Vergleich** | Markt = App-IA; wir = Desktop-IA auf dem Phone. |
+| **Wir wollen** | **5 Kern-Tabs (beschlossen #3):** Übersicht · Leistungen · Zahlung · Vor Ort · Aktivität — Rest unter „Mehr“. `DetailResponsiveTabs` nutzen oder löschen. |
+| **Vergleich** | Markt = App-IA; wir = Desktop-IA auf dem Phone. Vor Ort bleibt First-Class (VO-01), nicht unter Mehr. |
 
-**FE:** Tab-Gruppen. **BE:** —.  
-**Abnahme Mobile:** ≤5 Haupt-Tabs; Desktop darf dichter sein.
+**FE:** Tab-Gruppen laut #3; Desktop darf dichter sein. **BE:** —.  
+**Abnahme Mobile:** genau diese 5 Kern-Tabs + Mehr; Vor Ort und Zahlung sichtbar ohne Mehr-Öffnen.
 
 **Danach Block F:** Auftrag steuerbar wie Field-Service-CRM.
 
@@ -475,18 +548,19 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 # PR-Schnitt & Abhängigkeit
 
 ```
-A → B → C → (D ∥ E) → F → (G ∥ H) → I → J
+A → B → B2(∥) → C → (D ∥ E) → F → (G ∥ H) → I → J
 ```
 
 | PR | IDs | Merge wenn Abnahmen Desktop+Mobile grün |
 |----|-----|----------------------------------------|
 | A | W8-01, W8-05 | Breakpoint + Spec |
 | B | W4-01, W4-02, W8-02 | App-Chrome |
-| C | W7-01, W7-02, W7-03, W3-02 | Strip + Primary |
+| **B2** | **W11-01…05** (+ W10 parallel) | **Create/Wizard/Flows = Sheets + SoTA** |
+| C | W7-01, W7-02, W7-03, W3-02 | Strip + Primary · Tab-SoT inkl. **#3** |
 | D | W1-01…03 | Angebot-Kette |
-| E | ZP-01, W3-03 | Geld |
-| F | W1-04, W7-07, W5-01, W7-04 | Auftrag |
-| G | W2-01…03 | Inbox |
+| E | ZP-01, W3-03 | Geld · **#5:** fertig ≠ bezahlt |
+| F | W1-04, W7-07, W5-01, W7-04 | Auftrag · 5 Kern-Tabs |
+| G | W2-01…03 | Inbox · RE-überfällig-Zeile |
 | H | W3-01, W6-08 | Suche/Kunde |
 | I | W8-03/04, W6-01, W7-05/06, … | Konsistenz |
 

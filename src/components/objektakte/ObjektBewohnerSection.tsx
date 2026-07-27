@@ -5,8 +5,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import {
@@ -43,6 +42,7 @@ export function ObjektBewohnerSection({
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   const einheitOptions = useMemo(
     () => [
@@ -63,6 +63,7 @@ export function ObjektBewohnerSection({
     setTelefon('')
     setEmail('')
     setErr(null)
+    setDirty(false)
     setModalOpen(true)
   }
 
@@ -73,6 +74,7 @@ export function ObjektBewohnerSection({
     setTelefon(b.telefon ?? '')
     setEmail(b.email ?? '')
     setErr(null)
+    setDirty(false)
     setModalOpen(true)
   }
 
@@ -116,6 +118,7 @@ export function ObjektBewohnerSection({
         setListe((prev) => [...prev, r.bewohner])
         toast.success('Bewohner angelegt')
       }
+      setDirty(false)
       setModalOpen(false)
       onChanged()
     })
@@ -217,18 +220,26 @@ export function ObjektBewohnerSection({
         )}
       </MockCard>
 
-      <Modal
+      <EditorSheet
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={edit ? 'Bewohner bearbeiten' : 'Bewohner anlegen'}
+        title="Bewohner"
+        context="detail"
+        dirty={dirty}
+        confirmBusy={pending}
+        confirmDisabled={pending || (!edit && !einheitId)}
+        onConfirm={speichern}
       >
-        <div className="space-y-3 p-1">
+        <div className="space-y-3">
           {!edit ? (
             <Select
               label="Einheit"
               name="einheit"
               value={einheitId}
-              onChange={(e) => setEinheitId(e.target.value)}
+              onChange={(e) => {
+                setDirty(true)
+                setEinheitId(e.target.value)
+              }}
               options={einheitOptions}
             />
           ) : (
@@ -236,20 +247,36 @@ export function ObjektBewohnerSection({
               Einheit: {edit.objekt_einheiten?.bezeichnung ?? '—'}
             </p>
           )}
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Input label="Telefon" value={telefon} onChange={(e) => setTelefon(e.target.value)} type="tel" />
-          <Input label="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+          <Input
+            label="Name"
+            value={name}
+            onChange={(e) => {
+              setDirty(true)
+              setName(e.target.value)
+            }}
+            required
+          />
+          <Input
+            label="Telefon"
+            value={telefon}
+            onChange={(e) => {
+              setDirty(true)
+              setTelefon(e.target.value)
+            }}
+            type="tel"
+          />
+          <Input
+            label="E-Mail"
+            value={email}
+            onChange={(e) => {
+              setDirty(true)
+              setEmail(e.target.value)
+            }}
+            type="email"
+          />
           {err ? <p className="text-sm text-danger">{err}</p> : null}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </Button>
-            <Button type="button" onClick={speichern} disabled={pending || (!edit && !einheitId)}>
-              Speichern
-            </Button>
-          </div>
         </div>
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

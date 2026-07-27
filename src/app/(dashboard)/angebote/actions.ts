@@ -71,7 +71,7 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
+import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { resolveStatusEinfach } from '@/lib/angebot-einfach'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
@@ -100,6 +100,35 @@ import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfas
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
 import { provisionProjektVertraegeFuerAuftrag, provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
+import { parseRechtshinweiseFromWizardMeta } from '@/lib/angebote/angebot-rechtshinweise'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+
+function angebotMailSummen(
+  positionen: AngebotPosition[],
+  detail: Pick<AngebotDetail, 'notizen'> & { kunden?: { typ?: string | null } | null },
+  firm: FirmenEinstellungen
+) {
+  const rh = parseRechtshinweiseFromWizardMeta(
+    (() => {
+      try {
+        return (JSON.parse(detail.notizen ?? '{}') as { wizard_meta?: unknown }).wizard_meta ?? null
+      } catch {
+        return null
+      }
+    })(),
+    detail.kunden?.typ,
+    firm
+  )
+  const firmMwst = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ)
+  const mwstSatz =
+    rh.hinweis_13b || parseKleinunternehmerSetting(firm.kleinunternehmer) ? 0 : firmMwst
+  return {
+    summen: summenAusPositionen(positionen, mwstSatz),
+    reverseCharge: rh.hinweis_13b,
+  }
+}
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -316,6 +345,48 @@ export async function markLeadAngeboteAbgelehnt(
   }
 }
 
+/**
+ * Weitere offene Anfragen desselben Kunden ohne Angebot schließen —
+ * verhindert Doppel-Einträge unter Anfrage + Angebot in „Offen“.
+ */
+async function schliesseAndereOffeneAnfragenOhneAngebot(
+  supabase: ReturnType<typeof createClient> | typeof supabaseAdmin,
+  keepLeadId: string,
+  kundeId: string | null | undefined
+): Promise<void> {
+  const kid = kundeId?.trim()
+  if (!kid) return
+
+  const { data: siblings } = await supabase
+    .from('leads')
+    .select('id, status, angebote(id)')
+    .or(`kunde_id.eq.${kid},auftraggeber_kunde_id.eq.${kid}`)
+    .in('status', [...LEAD_STATUS_VOR_ANGEBOT])
+    .neq('id', keepLeadId)
+    .limit(30)
+
+  const now = new Date().toISOString()
+  for (const row of siblings ?? []) {
+    const angs = row.angebote
+    const hasAng = Array.isArray(angs) ? angs.length > 0 : Boolean(angs)
+    if (hasAng) continue
+    await supabase
+      .from('leads')
+      .update({
+        status: 'abgebrochen',
+        updated_at: now,
+      })
+      .eq('id', row.id as string)
+    await supabase.from('leads_status_history').insert({
+      lead_id: row.id as string,
+      status_alt: row.status,
+      status_neu: 'abgebrochen',
+      user_id: null,
+      notiz: 'Automatisch geschlossen — Angebot über andere Anfrage desselben Kunden.',
+    })
+  }
+}
+
 export async function createAngebot(
   input: CreateAngebotInput,
   opts?: { asSystem?: boolean }
@@ -449,6 +520,8 @@ export async function createAngebot(
         if (!leadUpd.ok) return leadUpd
       }
     }
+
+    await schliesseAndereOffeneAnfragenOhneAngebot(supabase, input.lead_id, kundeId)
   }
 
   if (!opts?.asSystem) {
@@ -620,6 +693,34 @@ export async function updateAngebot(
       current.status_einfach === 'gesendet'
   )
   const leadId = input.lead_id ?? (current.lead_id as string | null)
+  if (leadId) {
+    const { data: leadRow } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('id', leadId)
+      .maybeSingle()
+    const ls = (leadRow?.status ?? 'neu') as LeadStatus
+    if (leadStatusVorAngebot(ls)) {
+      if (opts?.asSystem) {
+        const now = new Date().toISOString()
+        await supabaseAdmin
+          .from('leads')
+          .update({ status: 'angebot', updated_at: now })
+          .eq('id', leadId)
+        await supabaseAdmin.from('leads_status_history').insert({
+          lead_id: leadId,
+          status_alt: ls,
+          status_neu: 'angebot',
+          user_id: null,
+          notiz: 'Angebot gespeichert',
+        })
+      } else {
+        const leadUpd = await updateLeadStatus(leadId, 'angebot', 'Angebot gespeichert')
+        if (!leadUpd.ok) return leadUpd
+      }
+    }
+    await schliesseAndereOffeneAnfragenOhneAngebot(supabase, leadId, kundeId)
+  }
   if (warBereitsGesendet && leadId) {
     const tl = await insertLeadTimelineEvent(supabase, {
       lead_id: leadId,
@@ -1683,13 +1784,17 @@ export async function sendAngebotToKunde(
   }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
-  const summenMail = summenAusPositionen(posMail, 19)
   const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
     fetchFirmenEinstellungen(supabaseAdmin),
     getMailBranding(supabaseAdmin),
     projektOderStatusLink(detail.lead_id),
     loadKiVizMailPreviewUrl(angebotId),
   ])
+  const { summen: summenMail, reverseCharge: mailReverseCharge } = angebotMailSummen(
+    posMail,
+    detail,
+    firmMail
+  )
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
@@ -1741,6 +1846,7 @@ export async function sendAngebotToKunde(
             portalLink: portalLink ?? undefined,
             portalAudience,
             visualisierung_vorschau_url: vizPreviewUrl,
+            reverseCharge: mailReverseCharge,
           },
           branding
         ),
@@ -1756,6 +1862,7 @@ export async function sendAngebotToKunde(
           statusLink,
           kundeTyp,
           visualisierung_vorschau_url: vizPreviewUrl,
+          reverseCharge: mailReverseCharge,
         },
         branding
       )
@@ -1826,13 +1933,17 @@ export async function previewAngebotKundeMail(input: {
   if (!detail) return { ok: false, message: 'Angebot nicht gefunden' }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
-  const summenMail = summenAusPositionen(posMail, 19)
   const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
     fetchFirmenEinstellungen(supabaseAdmin),
     getMailBranding(supabaseAdmin),
     projektOderStatusLink(detail.lead_id),
     loadKiVizMailPreviewUrl(angebotId),
   ])
+  const { summen: summenMail, reverseCharge: mailReverseCharge } = angebotMailSummen(
+    posMail,
+    detail,
+    firmMail
+  )
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
@@ -1887,6 +1998,7 @@ export async function previewAngebotKundeMail(input: {
         portalLink: portalLink ?? undefined,
         portalAudience,
         visualisierung_vorschau_url: vizPreviewUrl,
+        reverseCharge: mailReverseCharge,
       },
       branding
     )
@@ -1904,6 +2016,7 @@ export async function previewAngebotKundeMail(input: {
       statusLink,
       kundeTyp,
       visualisierung_vorschau_url: vizPreviewUrl,
+      reverseCharge: mailReverseCharge,
     },
     branding
   )
@@ -1929,12 +2042,24 @@ export async function recordKundeAbgelehntMitDetails(
   const supabase = createClient()
   const { data: row } = await supabase
     .from('angebote')
-    .select('id, status')
+    .select('id, status, status_einfach')
     .eq('id', angebotId)
     .maybeSingle()
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
-  if (row.status !== 'gesendet_kunde') {
-    return { ok: false, message: 'Ablehnung nur bei Status „Gesendet Kunde“ möglich.' }
+  const status = String(row.status ?? '').trim().toLowerCase()
+  const statusEinfach = String(row.status_einfach ?? '')
+    .trim()
+    .toLowerCase()
+  const erlaubt =
+    status === 'gesendet_kunde' ||
+    status === 'gesendet' ||
+    statusEinfach === 'gesendet' ||
+    statusEinfach === 'abgelaufen'
+  if (!erlaubt) {
+    return {
+      ok: false,
+      message: 'Ablehnung nur bei gesendetem oder abgelaufenem Angebot möglich.',
+    }
   }
   if (!isKundeAblehnungGrund(input.grund)) {
     return { ok: false, message: 'Ungültiger Ablehnungsgrund.' }
@@ -1947,6 +2072,7 @@ export async function recordKundeAbgelehntMitDetails(
     .from('angebote')
     .update({
       status: 'abgelehnt' as AngebotStatus,
+      status_einfach: 'abgelehnt',
       ablehnung_grund: input.grund,
       ablehnung_konkurrenz_preis: kp,
       ablehnung_notiz: input.notiz?.trim() || null,

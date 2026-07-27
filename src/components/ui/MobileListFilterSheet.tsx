@@ -39,7 +39,12 @@ export function MobileListFilterSheet({
   if (!open) return null
 
   return (
-    <div className={cn('mobile-filter-sheet md:hidden', className)} role="dialog" aria-modal="true">
+    <div
+      className={cn('mobile-filter-sheet md:hidden', className)}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
       <button type="button" className="mobile-filter-sheet__backdrop" aria-label="Schließen" onClick={onClose} />
       <div className="mobile-filter-sheet__panel">
         <header className="mobile-filter-sheet__header">

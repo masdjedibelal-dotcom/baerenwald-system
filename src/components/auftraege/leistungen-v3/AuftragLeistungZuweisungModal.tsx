@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
@@ -70,6 +69,7 @@ export function AuftragLeistungZuweisungModal({
 }) {
   const [pending, startTransition] = useTransition()
   const [loading, setLoading] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [empfohlen, setEmpfohlen] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [alle, setAlle] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
@@ -118,6 +118,7 @@ export function AuftragLeistungZuweisungModal({
   useEffect(() => {
     if (!open) {
       setSelectedHwIds(new Set())
+      setDirty(false)
       return
     }
     if (!sample) return
@@ -132,6 +133,7 @@ export function AuftragLeistungZuweisungModal({
     setZeitModus(start && end && start === end ? 'tag' : 'zeitraum')
     if (sample.handwerker_id) setSelectedHwIds(new Set([sample.handwerker_id]))
     else setSelectedHwIds(new Set())
+    setDirty(false)
   }, [open, sample])
 
   const merged = useMemo(() => {
@@ -146,6 +148,7 @@ export function AuftragLeistungZuweisungModal({
   }, [empfohlen, alle])
 
   function toggleHw(id: string) {
+    setDirty(true)
     setSelectedHwIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -231,247 +234,255 @@ export function AuftragLeistungZuweisungModal({
   const canSend = !pending && !loading && selectedHwIds.size > 0 && ekOk
 
   return (
-    <MockModal
+    <EditorSheet
       open={open}
       onClose={onClose}
+      title="Zuweisung"
+      context="detail"
+      dirty={dirty}
+      size="lg"
+      compose
+      composeLabel={pending ? 'Senden…' : 'Senden'}
+      confirmBusy={pending}
+      confirmDisabled={!canSend}
+      onConfirm={confirm}
       className="hw-anfrage-modal"
-      icon="send"
-      title="Handwerker anfragen"
-      sub={subtitle}
-      footer={
-        <>
-          <button type="button" className="hw-anfrage-cancel" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </button>
-          <div style={{ flex: 1 }} />
-          <MockBtn
-            kind="primary"
-            icon="send"
-            disabled={!canSend}
-            onClick={confirm}
-          >
-            {pending ? 'Senden…' : 'Anfrage senden'}
-          </MockBtn>
-        </>
-      }
+      bodyClassName="hw-anfrage-body"
     >
-      <div className="hw-anfrage-body">
-        {isSingle ? (
-          <>
+      <p className="mb-3 text-[13px] text-bw-text-muted">{subtitle}</p>
+      {isSingle ? (
+        <>
+          <label className="hw-anfrage-field">
+            <span className="hw-anfrage-label">Titel</span>
+            <input
+              className="input"
+              value={titel}
+              onChange={(e) => {
+                setDirty(true)
+                setTitel(e.target.value)
+              }}
+              disabled={pending}
+            />
+          </label>
+
+          <label className="hw-anfrage-field">
+            <span className="hw-anfrage-label">Beschreibung</span>
+            <textarea
+              className="input ta"
+              rows={2}
+              value={beschreibung}
+              onChange={(e) => {
+                setDirty(true)
+                setBeschreibung(e.target.value)
+              }}
+              disabled={pending}
+            />
+          </label>
+
+          <div className="hw-anfrage-price-row">
             <label className="hw-anfrage-field">
-              <span className="hw-anfrage-label">Titel</span>
-              <input
-                className="input"
-                value={titel}
-                onChange={(e) => setTitel(e.target.value)}
-                disabled={pending}
-              />
-            </label>
-
-            <label className="hw-anfrage-field">
-              <span className="hw-anfrage-label">Beschreibung</span>
-              <textarea
-                className="input ta"
-                rows={2}
-                value={beschreibung}
-                onChange={(e) => setBeschreibung(e.target.value)}
-                disabled={pending}
-              />
-            </label>
-
-            <div className="hw-anfrage-price-row">
-              <label className="hw-anfrage-field">
-                <span className="hw-anfrage-label">Verkaufspreis (netto)</span>
-                <div className="txt-prefix">
-                  <span className="prefix" aria-hidden>
-                    €
-                  </span>
-                  <input
-                    type="number"
-                    className="input"
-                    step="0.01"
-                    min="0"
-                    value={vk}
-                    onChange={(e) => setVk(e.target.value)}
-                    disabled={pending}
-                  />
-                </div>
-              </label>
-              <label className="hw-anfrage-field">
-                <span className="hw-anfrage-label">Partner-EK netto *</span>
-                <div className="txt-prefix">
-                  <span className="prefix" aria-hidden>
-                    €
-                  </span>
-                  <input
-                    type="number"
-                    className="input"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    value={partnerNetto}
-                    onChange={(e) => setPartnerNetto(e.target.value)}
-                    disabled={pending}
-                    aria-invalid={!ekOk && partnerNetto.trim() !== ''}
-                  />
-                </div>
-                {!ekOk ? (
-                  <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
-                    Pflicht — größer als 0 €
-                  </span>
-                ) : null}
-              </label>
-            </div>
-
-            <div className="hw-anfrage-section">
-              <div className="hw-anfrage-section-head">
-                <span>Zeitraum</span>
-              </div>
-              <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
-                  onClick={() => setZeitModus('zeitraum')}
-                  disabled={pending}
-                >
-                  Zeitraum
-                </button>
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
-                  onClick={() => {
-                    setZeitModus('tag')
-                    if (von) setBis(von)
+              <span className="hw-anfrage-label">Verkaufspreis (netto)</span>
+              <div className="txt-prefix">
+                <span className="prefix" aria-hidden>
+                  €
+                </span>
+                <input
+                  type="number"
+                  className="input"
+                  step="0.01"
+                  min="0"
+                  value={vk}
+                  onChange={(e) => {
+                    setDirty(true)
+                    setVk(e.target.value)
                   }}
                   disabled={pending}
-                >
-                  Einzelner Tag
-                </button>
+                />
               </div>
-              <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
+            </label>
+            <label className="hw-anfrage-field">
+              <span className="hw-anfrage-label">Partner-EK netto *</span>
+              <div className="txt-prefix">
+                <span className="prefix" aria-hidden>
+                  €
+                </span>
+                <input
+                  type="number"
+                  className="input"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={partnerNetto}
+                  onChange={(e) => {
+                    setDirty(true)
+                    setPartnerNetto(e.target.value)
+                  }}
+                  disabled={pending}
+                  aria-invalid={!ekOk && partnerNetto.trim() !== ''}
+                />
+              </div>
+              {!ekOk ? (
+                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+                  Pflicht — größer als 0 €
+                </span>
+              ) : null}
+            </label>
+          </div>
+
+          <div className="hw-anfrage-section">
+            <div className="hw-anfrage-section-head">
+              <span>Zeitraum</span>
+            </div>
+            <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
+              <button
+                type="button"
+                className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
+                onClick={() => {
+                  setDirty(true)
+                  setZeitModus('zeitraum')
+                }}
+                disabled={pending}
+              >
+                Zeitraum
+              </button>
+              <button
+                type="button"
+                className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
+                onClick={() => {
+                  setDirty(true)
+                  setZeitModus('tag')
+                  if (von) setBis(von)
+                }}
+                disabled={pending}
+              >
+                Einzelner Tag
+              </button>
+            </div>
+            <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
+              <label className="hw-anfrage-field">
+                <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
+                <input
+                  type="date"
+                  className="input"
+                  value={von.trim() ? displayToYmd(von) : ''}
+                  onChange={(e) => {
+                    setDirty(true)
+                    const v = e.target.value
+                    setVon(v ? ymdToDisplay(v) : '')
+                    if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
+                  }}
+                  disabled={pending}
+                />
+              </label>
+              {zeitModus === 'zeitraum' ? (
                 <label className="hw-anfrage-field">
-                  <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
+                  <span className="hw-anfrage-label">Bis</span>
                   <input
                     type="date"
                     className="input"
-                    value={von.trim() ? displayToYmd(von) : ''}
+                    value={bis.trim() ? displayToYmd(bis) : ''}
                     onChange={(e) => {
+                      setDirty(true)
                       const v = e.target.value
-                      setVon(v ? ymdToDisplay(v) : '')
-                      if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
+                      setBis(v ? ymdToDisplay(v) : '')
                     }}
                     disabled={pending}
                   />
                 </label>
-                {zeitModus === 'zeitraum' ? (
-                  <label className="hw-anfrage-field">
-                    <span className="hw-anfrage-label">Bis</span>
-                    <input
-                      type="date"
-                      className="input"
-                      value={bis.trim() ? displayToYmd(bis) : ''}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending}
-                    />
-                  </label>
-                ) : null}
-              </div>
+              ) : null}
             </div>
-          </>
-        ) : (
-          <p className="text-sm text-bw-text-muted">
-            {selectedPositions.length} Leistungen — Partner Netto und Handwerker gelten für alle
-            Ausgewählten.
-          </p>
-        )}
-
-        {!isSingle ? (
-          <label className="hw-anfrage-field">
-            <span className="hw-anfrage-label">Partner-EK netto *</span>
-            <div className="txt-prefix">
-              <span className="prefix" aria-hidden>
-                €
-              </span>
-              <input
-                type="number"
-                className="input"
-                step="0.01"
-                min="0.01"
-                required
-                value={partnerNetto}
-                onChange={(e) => setPartnerNetto(e.target.value)}
-                disabled={pending}
-                aria-invalid={!ekOk && partnerNetto.trim() !== ''}
-              />
-            </div>
-            {!ekOk ? (
-              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
-                Pflicht — größer als 0 €
-              </span>
-            ) : null}
-          </label>
-        ) : null}
-
-        <div className="hw-anfrage-section">
-          <div className="hw-anfrage-section-head">
-            <span>Handwerker anfragen</span>
-            <span>{selectedHwIds.size} ausgewählt</span>
           </div>
+        </>
+      ) : (
+        <p className="text-sm text-bw-text-muted">
+          {selectedPositions.length} Leistungen — Partner Netto und Handwerker gelten für alle
+          Ausgewählten.
+        </p>
+      )}
 
-          {loading ? (
-            <p className="text-sm text-bw-text-muted">Lade Handwerker…</p>
-          ) : merged.length === 0 ? (
-            <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
-          ) : (
-            <ul className="hw-anfrage-list">
-              {merged.map((h) => {
-                const checked = selectedHwIds.has(h.id)
-                const label =
-                  gewerkeLabel(h as HandwerkerGewerkListeEintrag & { gewerke?: string[] | null }) ||
-                  sample?.gewerk_name ||
-                  '—'
-                const rating = h.bewertung ?? null
-                const displayName = h.firma?.trim() || h.name
-                return (
-                  <li key={h.id}>
-                    <button
-                      type="button"
-                      className={cn('hw-anfrage-row', checked && 'is-selected')}
-                      onClick={() => toggleHw(h.id)}
-                      disabled={pending}
-                    >
-                      <span
-                        className={cn('hw-anfrage-check', checked && 'is-checked')}
-                        aria-hidden
-                      >
-                        {checked ? '✓' : ''}
-                      </span>
-                      <span className="hw-anfrage-avatar" aria-hidden>
-                        {handwerkerInitialen(displayName)}
-                      </span>
-                      <span className="hw-anfrage-row-text">
-                        <span className="hw-anfrage-row-name">{displayName}</span>
-                        <span className="hw-anfrage-row-meta">
-                          {label}
-                          {rating != null ? (
-                            <>
-                              {' '}
-                              <span className="hw-anfrage-star">★</span> {rating.toFixed(1)}
-                            </>
-                          ) : null}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+      {!isSingle ? (
+        <label className="hw-anfrage-field">
+          <span className="hw-anfrage-label">Partner-EK netto *</span>
+          <div className="txt-prefix">
+            <span className="prefix" aria-hidden>
+              €
+            </span>
+            <input
+              type="number"
+              className="input"
+              step="0.01"
+              min="0.01"
+              required
+              value={partnerNetto}
+              onChange={(e) => {
+                setDirty(true)
+                setPartnerNetto(e.target.value)
+              }}
+              disabled={pending}
+              aria-invalid={!ekOk && partnerNetto.trim() !== ''}
+            />
+          </div>
+          {!ekOk ? (
+            <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+              Pflicht — größer als 0 €
+            </span>
+          ) : null}
+        </label>
+      ) : null}
+
+      <div className="hw-anfrage-section">
+        <div className="hw-anfrage-section-head">
+          <span>Handwerker anfragen</span>
+          <span>{selectedHwIds.size} ausgewählt</span>
         </div>
+
+        {loading ? (
+          <p className="text-sm text-bw-text-muted">Lade Handwerker…</p>
+        ) : merged.length === 0 ? (
+          <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
+        ) : (
+          <ul className="hw-anfrage-list">
+            {merged.map((h) => {
+              const checked = selectedHwIds.has(h.id)
+              const label =
+                gewerkeLabel(h as HandwerkerGewerkListeEintrag & { gewerke?: string[] | null }) ||
+                sample?.gewerk_name ||
+                '—'
+              const rating = h.bewertung ?? null
+              const displayName = h.firma?.trim() || h.name
+              return (
+                <li key={h.id}>
+                  <button
+                    type="button"
+                    className={cn('hw-anfrage-row', checked && 'is-selected')}
+                    onClick={() => toggleHw(h.id)}
+                    disabled={pending}
+                  >
+                    <span className={cn('hw-anfrage-check', checked && 'is-checked')} aria-hidden>
+                      {checked ? '✓' : ''}
+                    </span>
+                    <span className="hw-anfrage-avatar" aria-hidden>
+                      {handwerkerInitialen(displayName)}
+                    </span>
+                    <span className="hw-anfrage-row-text">
+                      <span className="hw-anfrage-row-name">{displayName}</span>
+                      <span className="hw-anfrage-row-meta">
+                        {label}
+                        {rating != null ? (
+                          <>
+                            {' '}
+                            <span className="hw-anfrage-star">★</span> {rating.toFixed(1)}
+                          </>
+                        ) : null}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
-    </MockModal>
+    </EditorSheet>
   )
 }

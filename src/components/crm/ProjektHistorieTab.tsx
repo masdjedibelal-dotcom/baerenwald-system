@@ -15,6 +15,7 @@ import {
   formatDatum,
 } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { PROJEKT_PHASEN_TAB_LABEL } from '@/lib/crm-labels'
 
 type HistorieItem = {
   id: string
@@ -177,7 +178,7 @@ export function ProjektHistorieTab({
     return (
       <MockEmpty
         icon="history"
-        title="Keine Historie"
+        title={`Keine ${PROJEKT_PHASEN_TAB_LABEL}`}
         hint="Projektphasen erscheinen hier, sobald Anfrage, Angebot, Auftrag oder Rechnung verknüpft sind."
       />
     )
@@ -185,11 +186,15 @@ export function ProjektHistorieTab({
 
   const groups = buildProjektHistorieGroups(kontext)
   if (!groups.length) {
+    const reHint =
+      kontext.activeKind === 'rechnung'
+        ? 'Verknüpfte Phasen fehlen — öffne die Rechnung über Vorgänge (Filter Rechnung) oder aus dem Auftrag unter Finanzen.'
+        : 'Noch keine Phasen in diesem Vorgang.'
     return (
       <MockEmpty
         icon="history"
-        title="Keine Historie"
-        hint="Noch keine Phasen in diesem Vorgang."
+        title={`Keine ${PROJEKT_PHASEN_TAB_LABEL}`}
+        hint={reHint}
       />
     )
   }

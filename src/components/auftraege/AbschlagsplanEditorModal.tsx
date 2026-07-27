@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { useEffect, useMemo, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -75,6 +75,20 @@ function ratesToPlan(
   return { modus: 'abschlagsplan', zeilen }
 }
 
+function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((r, i) => {
+    const o = b[i]
+    return (
+      o != null &&
+      r.id === o.id &&
+      r.label === o.label &&
+      r.prozent === o.prozent &&
+      r.faellig_am === o.faellig_am
+    )
+  })
+}
+
 export function AbschlagsplanEditorModal({
   open,
   onClose,
@@ -94,21 +108,21 @@ export function AbschlagsplanEditorModal({
   frozenIds?: string[]
 }) {
   const frozen = new Set(frozenIds)
-  const [rates, setRates] = useState<EditorRate[]>(() =>
-    initial?.zeilen?.length
-      ? planToRates(initial, gesamtNetto)
-      : planToRates(zahlungsplanVorlage30_40_30(), gesamtNetto)
+  const baseline = useMemo(
+    () =>
+      initial?.zeilen?.length
+        ? planToRates(initial, gesamtNetto)
+        : planToRates(zahlungsplanVorlage30_40_30(), gesamtNetto),
+    [initial, gesamtNetto]
   )
+  const [rates, setRates] = useState<EditorRate[]>(baseline)
 
   useEffect(() => {
     if (!open) return
-    setRates(
-      initial?.zeilen?.length
-        ? planToRates(initial, gesamtNetto)
-        : planToRates(zahlungsplanVorlage30_40_30(), gesamtNetto)
-    )
-  }, [open, initial, gesamtNetto])
+    setRates(baseline)
+  }, [open, baseline])
 
+  const dirty = open && !ratesEqual(rates, baseline)
   const summe = rates.reduce((s, r) => s + (Number(r.prozent) || 0), 0)
   const ok = summe === 100 && rates.length > 0
 
@@ -140,26 +154,16 @@ export function AbschlagsplanEditorModal({
   }
 
   return (
-    <MockModal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      icon="calculator"
       title="Abschlagsplan"
-      footer={
-        <>
-          <MockBtn kind="ghost" onClick={onClose} disabled={saving}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="check"
-            disabled={!ok || saving}
-            onClick={() => onSave(ratesToPlan(rates, initial, frozenIds))}
-          >
-            {saving ? 'Speichere…' : 'Plan speichern'}
-          </MockBtn>
-        </>
-      }
+      context="detail"
+      dirty={dirty}
+      confirmBusy={saving}
+      confirmDisabled={!ok || saving}
+      onConfirm={() => onSave(ratesToPlan(rates, initial, frozenIds))}
+      size="lg"
     >
       <div className="zahlplan-editor-presets">
         <span className="zahlplan-editor-presets__label">Vorlage:</span>
@@ -169,7 +173,7 @@ export function AbschlagsplanEditorModal({
             type="button"
             className="zahlplan-preset-chip"
             disabled={frozen.size > 0}
-            title={frozen.size > 0 ? 'Vorlagen gesperrt — es gibt gestellte/bezahlte Raten' : undefined}
+            title={frozen.size > 0 ? 'Vorlagen gesperrt — gestellte/bezahlte Raten' : undefined}
             onClick={() => applyPreset(p.build)}
           >
             {p.name}
@@ -184,9 +188,7 @@ export function AbschlagsplanEditorModal({
 
       {frozen.size > 0 ? (
         <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.45 }}>
-          Eingefrorene Raten (gestellt/bezahlt) bleiben unverändert — Betrag/Typ sind gesperrt. Offene
-          Raten kannst du anpassen. Soll eine eingefrorene Rate (z.&nbsp;B. Schlussrechnung) neu
-          berechnet werden: zugehörige Rechnung zuerst korrigieren oder stornieren.
+          Gestellte/bezahlte Raten sind fest. Offene Raten kannst du ändern.
         </p>
       ) : null}
 
@@ -246,7 +248,7 @@ export function AbschlagsplanEditorModal({
         })}
         <div className="zahlplan-editor-foot">
           <button type="button" className="pt-add" style={{ border: 'none', padding: 0, width: 'auto' }} onClick={add}>
-            <MockIcon ctx="btn" n="plus" size={13} /> Abschlag hinzufügen
+            <MockIcon ctx="btn" n="plus" size={13} /> Abschlag
           </button>
           <div style={{ flex: 1 }} />
           <span className={cn('zahlplan-editor-summe', summe === 100 ? 'is-ok' : 'is-bad')}>
@@ -254,6 +256,6 @@ export function AbschlagsplanEditorModal({
           </span>
         </div>
       </div>
-    </MockModal>
+    </EditorSheet>
   )
 }

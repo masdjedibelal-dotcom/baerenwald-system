@@ -9,6 +9,11 @@ import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
+import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
+import { DetailSection } from '@/components/vorgang/DetailSection'
+import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
+import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import {
@@ -54,6 +59,7 @@ const AngebotWizard = dynamic(
 import { toast } from '@/components/ui/app-toast'
 import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
@@ -69,39 +75,51 @@ import type {
 } from '@/lib/types'
 import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
+import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab =
-  | 'stammdaten'
-  | 'details'
-  | 'fotos'
-  | 'verlauf'
-  | 'historie'
-  | 'dokumente'
-  | 'notizen'
+type AnfrageDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
 
-const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
-  'stammdaten',
-  'details',
-  'fotos',
-  'verlauf',
-  'historie',
-  'dokumente',
-  'notizen',
-])
+const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
 
 /** Query-/Hash-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
   if (!tab) return null
-  if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
-    return 'stammdaten'
+  if (
+    tab === 'akte' ||
+    tab === 'stammdaten' ||
+    tab === 'dokumente' ||
+    tab === 'notizen' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte'
+  ) {
+    return 'akte'
   }
-  if (tab === 'projekt' || tab === 'anfrage-details' || tab === 'anfragedetails') return 'details'
-  if (tab === 'timeline') return 'verlauf'
-  if (tab === 'historie' || tab === 'projekt-historie' || tab === 'phasen') return 'historie'
-  if (tab === 'bilder' || tab === 'photos') return 'fotos'
+  if (
+    tab === 'uebersicht' ||
+    tab === 'details' ||
+    tab === 'projekt' ||
+    tab === 'anfrage-details' ||
+    tab === 'anfragedetails' ||
+    tab === 'fotos' ||
+    tab === 'bilder' ||
+    tab === 'photos'
+  ) {
+    return 'uebersicht'
+  }
+  if (
+    tab === 'aktivitaet' ||
+    tab === 'verlauf' ||
+    tab === 'timeline' ||
+    tab === 'historie' ||
+    tab === 'projekt-historie' ||
+    tab === 'phasen'
+  ) {
+    return 'aktivitaet'
+  }
   const cumulative = resolveCumulativeDetailTabAlias(tab)
-  if (cumulative === 'anfrage-details') return 'details'
+  if (cumulative === 'anfrage-details') return 'uebersicht'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
   return null
 }
@@ -188,21 +206,34 @@ export function AnfrageDetailClient({
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
 
-  const [tab, setTab] = useState<AnfrageDetailTab>('details')
+  const [tab, setTab] = useState<AnfrageDetailTab>('uebersicht')
+  const [akteSegment, setAkteSegment] = useState<AkteSegment>('dateien')
   const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
   const [notfallModalOpen, setNotfallModalOpen] = useState(false)
 
   useEffect(() => {
-    const fromQuery = resolveAnfrageDetailTabFromQuery(searchParams.get('tab'))
+    const raw = searchParams.get('tab')
+    if (isLegacyDetailTabAlias(raw)) {
+      const resolved = resolveAnfrageDetailTabFromQuery(raw) ?? 'uebersicht'
+      const seg = parseAkteSegment(raw, searchParams.get('segment'))
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', resolved)
+      if (resolved === 'akte') q.set('segment', seg)
+      else q.delete('segment')
+      router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
+      return
+    }
+    const fromQuery = resolveAnfrageDetailTabFromQuery(raw)
     if (fromQuery) {
       setTab(fromQuery)
+      setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
       return
     }
     if (typeof window !== 'undefined') {
       const fromHash = resolveAnfrageDetailTabFromQuery(window.location.hash)
       if (fromHash) setTab(fromHash)
     }
-  }, [searchParams])
+  }, [searchParams, lead.id, router])
 
   useEffect(() => {
     setLead(initial)
@@ -460,6 +491,15 @@ export function AnfrageDetailClient({
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
 
+  const noShowTerminHinweis = useMemo(
+    () =>
+      lead.status === 'termin' &&
+      hatOffenenVergangenenKalenderTermin(
+        (lead.kalender_termine ?? []) as KalenderTermin[]
+      ),
+    [lead.status, lead.kalender_termine]
+  )
+
   const headMeta = kundenName(lead)
 
   const timelineTab = <VerlaufPanel items={timelineItems} />
@@ -481,57 +521,71 @@ export function AnfrageDetailClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
-      id: 'details',
-      label: 'Bedarf',
+      id: 'uebersicht',
+      label: entityDetailTabLabel('uebersicht'),
       icon: 'list-details',
-      render: () => detailsInhalt,
-    },
-    {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
-      id: 'fotos',
-      label: ACTIVITY_SECTIONS.fotos,
-      icon: 'photo',
-      count: vorgangFotos.length || undefined,
-      render: () => <VorgangFotosTab fotos={vorgangFotos} />,
-    },
-    {
-      id: 'verlauf',
-      label: ACTIVITY_SECTIONS.verlauf,
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => timelineTab,
-    },
-    {
-      id: 'historie',
-      label: 'Historie',
-      icon: 'list-details',
-      render: () => <ProjektHistorieTab kontext={projektKontext} />,
-    },
-    {
-      id: 'dokumente',
-      label: ACTIVITY_SECTIONS.dokumente,
-      icon: 'files',
-      count: dokumenteCount || undefined,
       render: () => (
-        <AnfrageDokumenteTab
-          leadId={lead.id}
-          dokumente={dokumenteRows}
-          angebote={angeboteListe}
-          onReload={() => refresh()}
+        <div className="space-y-6">
+          <PhaseCardsBlock
+            kontext={projektKontext}
+            fromRef={{ kind: 'anfrage', id: lead.id }}
+          />
+          <ZugehoerigListe
+            kontext={projektKontext}
+            fromRef={{ kind: 'anfrage', id: lead.id }}
+          />
+          {detailsInhalt}
+          {vorgangFotos.length > 0 ? (
+            <DetailSection title="Fotos">
+              <VorgangFotosTab fotos={vorgangFotos} />
+            </DetailSection>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: 'akte',
+      label: entityDetailTabLabel('akte'),
+      icon: 'files',
+      count: (dokumenteCount || 0) + (notizenRows.length || 0) || undefined,
+      render: () => (
+        <VorgangAkteTab
+          hideZahlung
+          initialSegment={akteSegment === 'zahlung' ? 'dateien' : akteSegment}
+          onSegmentChange={(s) => {
+            setAkteSegment(s)
+            const q = new URLSearchParams(searchParams.toString())
+            q.set('tab', 'akte')
+            q.set('segment', s)
+            router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
+          }}
+          zahlung={null}
+          dateien={
+            <div className="space-y-4">
+              <AnfrageDokumenteTab
+                leadId={lead.id}
+                dokumente={dokumenteRows}
+                angebote={angeboteListe}
+                onReload={() => refresh()}
+              />
+              {notizenInhalt}
+            </div>
+          }
+          kunde={stammdatenInhalt}
         />
       ),
     },
     {
-      id: 'notizen',
-      label: ACTIVITY_SECTIONS.notizen,
-      icon: 'messages',
-      count: notizenRows.length || undefined,
-      render: () => notizenInhalt,
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
+      icon: 'history',
+      count: timelineItems.length || undefined,
+      render: () => (
+        <div className="space-y-6">
+          {timelineTab}
+          <ProjektHistorieTab kontext={projektKontext} />
+        </div>
+      ),
     },
   ]
 
@@ -540,7 +594,7 @@ export function AnfrageDetailClient({
       phase="anfrage"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=anfrage"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück zu Vorgängen"
       nextStep={naechsterSchrittAnfrage({
         status: lead.status,
         hasAngebote,
@@ -581,6 +635,20 @@ export function AnfrageDetailClient({
       }}
     >
       <div className="space-y-4">
+      {noShowTerminHinweis ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+          <p className="text-sm text-muted">
+            Kunde nicht erschienen? Status „Nicht erreichbar“ setzen (Wiedervorlage).
+          </p>
+          <button
+            type="button"
+            className="btn ghost sm shrink-0"
+            onClick={() => setStatusModalKind('nicht_erreichbar')}
+          >
+            Nicht erreichbar
+          </button>
+        </div>
+      ) : null}
       <DetailShell
         groups={detailShellGroups}
         value={tab}

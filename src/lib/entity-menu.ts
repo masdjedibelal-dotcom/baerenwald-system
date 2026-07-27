@@ -44,7 +44,6 @@ export type EntityMenuHandlers = {
   onInvoice?: () => void
   onEdit2?: () => void
   onMarkPaid?: () => void
-  onToAuftrag?: () => void
   onDelete?: () => void
   deleteLabel?: string
   /** Menü-Text statt „Löschen“ (z. B. „Vorgang löschen“) */
@@ -104,7 +103,7 @@ export function buildEntityMenu(
 
   /* Portal-Aktionen ohne Sep davor — Gruppe mit Bearbeiten/Kopieren */
   if (h.onPortal) {
-    A.push({ icon: 'external-link', label: 'Admin Login', onClick: h.onPortal })
+    A.push({ icon: 'external-link', label: 'Als Kunde öffnen', onClick: h.onPortal })
   }
   if (h.onPortalLink) {
     const linkLabel = portalLinkMenuLabel(type)
@@ -215,11 +214,17 @@ export function buildEntityMenu(
         onClick: h.onSend,
       })
     }
-    if (h.onToAuftrag) A.push({ icon: 'briefcase', label: 'Zum Auftrag', onClick: h.onToAuftrag })
     if (A.length === before + 1) A.pop()
   }
 
-  ;(h.extra ?? []).forEach((c) => A.push(c))
+  const extraItems = h.extra ?? []
+  const extraNormal: EntityMenuItem[] = []
+  const extraDanger: EntityMenuItem[] = []
+  for (const c of extraItems) {
+    if (c !== 'sep' && c.danger) extraDanger.push(c)
+    else extraNormal.push(c)
+  }
+  extraNormal.forEach((c) => A.push(c))
 
   /** Anrufen nur in Stammdaten (Kunde/Partner) — nicht in Vorgängen. */
   const isVorgangPhase =
@@ -248,16 +253,22 @@ export function buildEntityMenu(
     })
   }
 
-  if (h.onDelete) {
-    A.push('sep')
-    const label =
-      h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
-    A.push({
-      icon: 'trash',
-      label: h.deleteMenuLabel ?? 'Löschen',
-      danger: true,
-      onClick: () => confirmDelete(String(label), h.onDelete!),
-    })
+  if (h.onDelete || extraDanger.length) {
+    if (extraDanger.length) {
+      A.push('sep')
+      extraDanger.forEach((c) => A.push(c))
+    }
+    if (h.onDelete) {
+      if (!extraDanger.length) A.push('sep')
+      const label =
+        h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
+      A.push({
+        icon: 'trash',
+        label: h.deleteMenuLabel ?? 'Löschen',
+        danger: true,
+        onClick: () => confirmDelete(String(label), h.onDelete!),
+      })
+    }
   }
 
   return dedupeSeps(A)

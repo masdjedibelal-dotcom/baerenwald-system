@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
@@ -34,6 +34,7 @@ export function KundenObjektModal({
   const [einheitenHinweis, setEinheitenHinweis] = useState('')
   const [notizenIntern, setNotizenIntern] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -59,12 +60,18 @@ export function KundenObjektModal({
       setNotizenIntern('')
     }
     setErr(null)
+    setDirty(false)
   }, [open, editObjekt])
+
+  function mark<T>(setter: (v: T) => void, v: T) {
+    setter(v)
+    setDirty(true)
+  }
 
   function vorschlagSlug() {
     const basis = titel.trim() || [strasse, hausnummer, plz].filter(Boolean).join(' ')
     if (!basis) return
-    setMeldeSlug(suggestMeldeSlugFromTitel(basis))
+    mark(setMeldeSlug, suggestMeldeSlugFromTitel(basis))
   }
 
   function speichern() {
@@ -99,7 +106,8 @@ export function KundenObjektModal({
           einheiten_hinweis: einheitenHinweis.trim() || null,
           notizen_intern: notizenIntern.trim() || null,
         })
-        toast.success('Objekt gespeichert')
+        toast.success('Gespeichert')
+        setDirty(false)
         onClose()
         return
       }
@@ -109,45 +117,58 @@ export function KundenObjektModal({
         return
       }
       onSaved(r.objekt)
-      toast.success('Objekt angelegt')
+      toast.success('Gespeichert')
+      setDirty(false)
       onClose()
     })
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title={editObjekt ? 'Objekt bearbeiten' : 'Objekt hinzufügen'}
+      title={editObjekt ? 'Objekt' : 'Objekt'}
+      context="detail"
+      dirty={dirty}
+      confirmBusy={pending}
+      onConfirm={speichern}
       size="md"
     >
       <div className="space-y-3">
         <Input
-          label="Titel / Bezeichnung"
+          label="Titel"
           placeholder="z. B. WEG Musterstraße"
           value={titel}
-          onChange={(e) => setTitel(e.target.value)}
+          onChange={(e) => mark(setTitel, e.target.value)}
           required
         />
         <div className="grid gap-3 sm:grid-cols-[1fr_100px]">
-          <Input label="Straße" value={strasse} onChange={(e) => setStrasse(e.target.value)} required />
-          <Input label="Nr." value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
+          <Input
+            label="Straße"
+            value={strasse}
+            onChange={(e) => mark(setStrasse, e.target.value)}
+            required
+          />
+          <Input
+            label="Nr."
+            value={hausnummer}
+            onChange={(e) => mark(setHausnummer, e.target.value)}
+          />
         </div>
         <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-          <Input label="PLZ" value={plz} onChange={(e) => setPlz(e.target.value)} required />
-          <Input label="Ort" value={ort} onChange={(e) => setOrt(e.target.value)} required />
+          <Input label="PLZ" value={plz} onChange={(e) => mark(setPlz, e.target.value)} required />
+          <Input label="Ort" value={ort} onChange={(e) => mark(setOrt, e.target.value)} required />
         </div>
 
         <div className="border-t border-bw-border pt-3">
-          <p className="mb-2 text-[12px] font-medium text-bw-text">Öffentliches Meldeformular</p>
+          <p className="mb-2 text-[12px] font-medium text-bw-text">Meldeformular</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <Input
                 label="Melde-Slug"
-                placeholder="z. B. weg-musterstrasse"
+                placeholder="weg-musterstrasse"
                 value={meldeSlug}
-                onChange={(e) => setMeldeSlug(e.target.value)}
-                hint="Teil-URL: /melden/{org}/{melde_slug}"
+                onChange={(e) => mark(setMeldeSlug, e.target.value)}
               />
             </div>
             <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={vorschlagSlug}>
@@ -158,37 +179,29 @@ export function KundenObjektModal({
             <input
               type="checkbox"
               checked={meldeAktiv}
-              onChange={(e) => setMeldeAktiv(e.target.checked)}
+              onChange={(e) => mark(setMeldeAktiv, e.target.checked)}
               className="rounded border-bw-border"
             />
-            Meldeformular aktiv
+            Aktiv
           </label>
           <Input
-            label="Einheiten-Hinweis"
-            placeholder="z. B. Wohnung, Etage, Gewerbeeinheit"
+            label="Einheiten"
+            placeholder="Wohnung, Etage…"
             value={einheitenHinweis}
-            onChange={(e) => setEinheitenHinweis(e.target.value)}
+            onChange={(e) => mark(setEinheitenHinweis, e.target.value)}
             className="mt-2"
           />
           <Textarea
-            label="Interne Notizen"
+            label="Notizen"
             rows={2}
             value={notizenIntern}
-            onChange={(e) => setNotizenIntern(e.target.value)}
+            onChange={(e) => mark(setNotizenIntern, e.target.value)}
             className="mt-2"
           />
         </div>
 
         {err ? <p className="text-sm text-danger">{err}</p> : null}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </Button>
-        </div>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

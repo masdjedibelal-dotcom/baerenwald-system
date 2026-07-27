@@ -2,13 +2,15 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
 import { Accordion } from '@/components/ui/Accordion'
-import { findKundenDuplikate, saveKunde } from '@/app/actions/kunden'
+import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { toast } from '@/components/ui/app-toast'
 import {
   initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
@@ -74,6 +76,10 @@ export function KundeModal({
   const [ustId, setUstId] = useState('')
   const [dupes, setDupes] = useState<Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'>[]>([])
   const [err, setErr] = useState<string | null>(null)
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
+  const [mergeTarget, setMergeTarget] = useState<Pick<Kunde, 'id' | 'name' | 'telefon' | 'email'> | null>(
+    null
+  )
 
   const firmaPflicht = istKundeFirmaPflichtTyp(typ)
   const istGewerbe = istKundeNurGewerbeTyp(typ)
@@ -129,18 +135,44 @@ export function KundeModal({
     }
     setDupes([])
     setErr(null)
+    setMergeConfirmOpen(false)
+    setMergeTarget(null)
   }, [open, editKunde, leadFunnelDaten])
 
   useEffect(() => {
-    if (!open || editKunde) return
+    if (!open) return
     const t = setTimeout(() => {
       startTransition(async () => {
-        const d = await findKundenDuplikate(telefon || null, email || null)
+        const d = await findKundenDuplikate(
+          telefon || null,
+          email || null,
+          editKunde?.id
+        )
         setDupes(d)
       })
     }, 400)
     return () => clearTimeout(t)
   }, [open, editKunde, telefon, email])
+
+  function runMerge(survivorId: string, mergeId: string) {
+    setErr(null)
+    startTransition(async () => {
+      const res = await mergeKunden(survivorId, mergeId)
+      if (!res.ok) {
+        setErr(res.message)
+        toast.error(res.message)
+        return
+      }
+      toast.success(res.message)
+      setMergeConfirmOpen(false)
+      onClose()
+      onSaved?.(survivorId)
+      router.push(`/kunden/${survivorId}`)
+      router.refresh()
+    })
+  }
+
+  const singleDupe = dupes.length === 1 ? dupes[0]! : null
 
   function submit() {
     setErr(null)
@@ -184,21 +216,14 @@ export function KundeModal({
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title={editKunde ? 'Stammdaten bearbeiten' : 'Neuer Kunde'}
-      size="md"
-      footer={
-        <div className="flex w-full justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Abbrechen
-          </Button>
-          <Button type="button" onClick={submit} loading={pending}>
-            Speichern
-          </Button>
-        </div>
-      }
+      title={editKunde ? 'Kunde' : 'Kunde anlegen'}
+      context="detail"
+      confirmBusy={pending}
+      onConfirm={submit}
+      size="lg"
     >
       <div className="space-y-4">
         {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
@@ -213,10 +238,55 @@ export function KundeModal({
                 </li>
               ))}
             </ul>
+            {singleDupe ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    onClose()
+                    router.push(`/kunden/${singleDupe.id}`)
+                  }}
+                >
+                  Bestehenden öffnen
+                </Button>
+              </div>
+            ) : null}
             <p className="mt-2 text-xs">
               Nur Hinweis auf bestehende Kunden-Datensätze. Handwerker/Partner mit gleichen Kontaktdaten sind
               erlaubt und bleiben getrennt — trotzdem speichern legt einen neuen Kunden an.
             </p>
+          </div>
+        ) : null}
+
+        {editKunde && singleDupe ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <p className="font-medium">Mögliches Duplikat</p>
+            <p className="mt-1">
+              {kundeDisplayName(singleDupe)} · {singleDupe.telefon ?? '—'} · {singleDupe.email ?? '—'}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push(`/kunden/${singleDupe.id}`)}
+              >
+                Bestehenden öffnen
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setMergeTarget(singleDupe)
+                  setMergeConfirmOpen(true)
+                }}
+              >
+                Zusammenführen
+              </Button>
+            </div>
           </div>
         ) : null}
 
@@ -321,6 +391,38 @@ export function KundeModal({
           />
         </Accordion>
       </div>
-    </Modal>
+
+      <Modal
+        open={mergeConfirmOpen && Boolean(editKunde && mergeTarget)}
+        onClose={() => setMergeConfirmOpen(false)}
+        title="Kunden zusammenführen"
+        size="sm"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              loading={pending}
+              onClick={() => {
+                if (!editKunde || !mergeTarget) return
+                runMerge(mergeTarget.id, editKunde.id)
+              }}
+            >
+              Zusammenführen
+            </Button>
+          </div>
+        }
+      >
+        {editKunde && mergeTarget ? (
+          <p className="text-sm text-bw-text">
+            Kunde <strong>{kundeDisplayName(editKunde)}</strong> in{' '}
+            <strong>{kundeDisplayName(mergeTarget)}</strong> überführen? Der aktuelle Datensatz wird entfernt,
+            Vorgänge und Dokumente werden umgehängt.
+          </p>
+        ) : null}
+      </Modal>
+    </EditorSheet>
   )
 }

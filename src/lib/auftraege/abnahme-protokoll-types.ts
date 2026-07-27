@@ -24,6 +24,8 @@ export type AbnahmePunkt = {
   /** Beliebig viele Notizen zur Leistung (am ersten Punkt der Gruppe gespeichert) */
   notizen?: string[]
   foto_urls?: string[]
+  /** Bei Status „mangel“: Frist zur Beseitigung (YYYY-MM-DD) */
+  mangel_frist?: string | null
 }
 
 export type AbnahmeMangelStatus = 'offen' | 'in_bearbeitung' | 'behoben' | 'abgenommen'
@@ -72,12 +74,28 @@ export type AbnahmeGewerkBlock = {
   leistungen: AbnahmeLeistungGruppe[]
 }
 
+/** Freier Abschnitt ohne Katalog-Gewerk (wie freie Position im Angebot). */
+export const ABNAHME_GEWERK_OHNE = 'Ohne Gewerk'
+
+export function abnahmeGewerkLabel(gewerk: string | null | undefined): string {
+  const t = (gewerk ?? '').trim()
+  if (!t || /^sonstiges$/i.test(t)) return ABNAHME_GEWERK_OHNE
+  return t
+}
+
 function leistungKey(p: AbnahmePunkt): string {
   return p.leistung_id?.trim() || p.id
 }
 
 function leistungName(p: AbnahmePunkt): string {
-  return p.leistung_name?.trim() || p.beschreibung?.trim() || 'Leistung'
+  return bereinigeAbnahmeLeistungName(p.leistung_name)
+}
+
+/** Alte Default-Bezeichnung aus dem Freitext-Block entfernen. */
+export function bereinigeAbnahmeLeistungName(name: string | null | undefined): string {
+  const t = (name ?? '').trim()
+  if (!t || /^zusätzlicher punkt$/i.test(t)) return ''
+  return t
 }
 
 /** Notizen einer Leistungsgruppe (Plural + Legacy `notiz`). */
@@ -151,7 +169,7 @@ export function gruppiereAbnahmePunkte(punkte: AbnahmePunkt[]): AbnahmeGewerkBlo
   const byGewerk = new Map<string, Map<string, AbnahmeLeistungGruppe>>()
 
   for (const p of punkte) {
-    const gewerk = p.gewerk?.trim() || 'Sonstiges'
+    const gewerk = abnahmeGewerkLabel(p.gewerk)
     if (!byGewerk.has(gewerk)) {
       byGewerk.set(gewerk, new Map())
       gewerkOrder.push(gewerk)
@@ -232,28 +250,136 @@ export function neuerBulletUnterLeistung(
 ): AbnahmePunkt {
   return {
     id: neuePositionsId(),
-    gewerk,
+    gewerk: abnahmeGewerkLabel(gewerk),
     leistung_id,
     leistung_name,
     beschreibung: '',
-    status: 'offen',
+    status: 'ok',
     notiz: null,
     foto_urls: [],
   }
 }
 
-export function neuerAbnahmePunktFreitext(): AbnahmePunkt {
+/** Freier Gewerk-/Leistungs-Block — Name und Titel sind editierbar. */
+export function neuerAbnahmePunktFreitext(gewerkName?: string): AbnahmePunkt {
   const id = neuePositionsId()
   return {
     id,
-    gewerk: 'Sonstiges',
+    gewerk: abnahmeGewerkLabel(gewerkName || 'Neues Gewerk'),
     leistung_id: id,
-    leistung_name: 'Zusätzlicher Punkt',
+    leistung_name: '',
     beschreibung: '',
-    status: 'offen',
+    status: 'ok',
     notiz: null,
     foto_urls: [],
   }
+}
+
+/** Neue Position (Leistung) unter einem Gewerk-Abschnitt. */
+export function neueAbnahmeLeistungUnterGewerk(
+  gewerk: string,
+  leistungName = ''
+): AbnahmePunkt {
+  const id = neuePositionsId()
+  return {
+    id,
+    gewerk: abnahmeGewerkLabel(gewerk),
+    leistung_id: id,
+    leistung_name: leistungName,
+    beschreibung: '',
+    status: 'ok',
+    notiz: null,
+    foto_urls: [],
+  }
+}
+
+export function flattenAbnahmeBlocks(blocks: AbnahmeGewerkBlock[]): AbnahmePunkt[] {
+  return blocks.flatMap((b) =>
+    b.leistungen.flatMap((l) =>
+      l.punkte.map((p) => ({
+        ...p,
+        gewerk: b.gewerk,
+        leistung_id: l.leistung_id,
+        leistung_name: l.leistung_name,
+      }))
+    )
+  )
+}
+
+function moveIndex<T>(arr: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+  const next = [...arr]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item!)
+  return next
+}
+
+export function reorderAbnahmeGewerkBlocks(
+  punkte: AbnahmePunkt[],
+  fromIndex: number,
+  toIndex: number
+): AbnahmePunkt[] {
+  const blocks = gruppiereAbnahmePunkte(punkte)
+  return flattenAbnahmeBlocks(moveIndex(blocks, fromIndex, toIndex))
+}
+
+export function reorderAbnahmeLeistungen(
+  punkte: AbnahmePunkt[],
+  gewerk: string,
+  fromIndex: number,
+  toIndex: number
+): AbnahmePunkt[] {
+  const blocks = gruppiereAbnahmePunkte(punkte)
+  const next = blocks.map((b) =>
+    b.gewerk === gewerk
+      ? { ...b, leistungen: moveIndex(b.leistungen, fromIndex, toIndex) }
+      : b
+  )
+  return flattenAbnahmeBlocks(next)
+}
+
+export function reorderAbnahmePunkteInLeistung(
+  punkte: AbnahmePunkt[],
+  leistungId: string,
+  fromIndex: number,
+  toIndex: number
+): AbnahmePunkt[] {
+  const blocks = gruppiereAbnahmePunkte(punkte)
+  const next = blocks.map((b) => ({
+    ...b,
+    leistungen: b.leistungen.map((l) =>
+      l.leistung_id === leistungId
+        ? { ...l, punkte: moveIndex(l.punkte, fromIndex, toIndex) }
+        : l
+    ),
+  }))
+  return flattenAbnahmeBlocks(next)
+}
+
+export function renameAbnahmeGewerk(
+  punkte: AbnahmePunkt[],
+  fromGewerk: string,
+  toGewerk: string
+): AbnahmePunkt[] {
+  const next = abnahmeGewerkLabel(toGewerk)
+  const from = abnahmeGewerkLabel(fromGewerk)
+  if (!next || next === from) return punkte
+  return punkte.map((p) =>
+    abnahmeGewerkLabel(p.gewerk) === from ? { ...p, gewerk: next } : p
+  )
+}
+
+export function renameAbnahmeLeistung(
+  punkte: AbnahmePunkt[],
+  leistungId: string,
+  toName: string
+): AbnahmePunkt[] {
+  const next = bereinigeAbnahmeLeistungName(toName)
+  return punkte.map((p) => {
+    const key = p.leistung_id?.trim() || p.id
+    if (key !== leistungId) return p
+    return { ...p, leistung_name: next }
+  })
 }
 
 export { maengelAusPunkten, mergeMaengelFromPunkte, countOffeneMaengel, isMangelOffen } from '@/lib/auftraege/abnahme-maengel-helpers'

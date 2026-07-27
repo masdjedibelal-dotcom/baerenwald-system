@@ -9,6 +9,8 @@ import {
   isFunnelAuftragStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
+  isUeberfaelligeRechnung,
+  isAngebotWartetAufKundeStatus,
 } from '@/lib/dashboard-mock-mapping'
 import {
   buildGewerkUmsatz,
@@ -128,7 +130,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at')
+          .select('id, status, created_at, faellig_am')
           .order('created_at', { ascending: false })
           .limit(2000)
       )
@@ -164,7 +166,12 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   )
   const angebote = angeboteRaw as Array<Record<string, unknown>>
   const auftraege = auftraegeRaw as Array<Record<string, unknown>>
-  const rechnungen = rechnungenRaw as Array<{ id: string; status: string; created_at: string }>
+  const rechnungen = rechnungenRaw as Array<{
+    id: string
+    status: string
+    created_at: string
+    faellig_am?: string | null
+  }>
 
   const leadsZ = leads.filter((l) => {
     if (!inZeitraum(l.created_at, zeitraumRange)) return false
@@ -188,6 +195,12 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       a.ist_wiederkehrend === true && isAktiverAuftragStatus(a.status as string)
   ).length
   const offeneRechnungenCount = rechnungenZ.filter((r) => isOffeneRechnungStatus(r.status)).length
+  const reUeberfaelligCount = rechnungen.filter((r) =>
+    isUeberfaelligeRechnung({ status: r.status, faellig_am: r.faellig_am })
+  ).length
+  const angeboteWartenCount = angebote.filter((a) =>
+    isAngebotWartetAufKundeStatus(a.status as string, a.status_einfach as string | null)
+  ).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
@@ -196,31 +209,31 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       icon: 'inbox',
       label: 'Neue Anfragen',
       value: neueAnfragenCount,
-      href: '/vorgaenge?tab=anfrage',
+      href: '/vorgaenge?tab=anfrage&lifecycle=offen',
     },
     {
       icon: 'file-invoice',
       label: 'Offene Angebote',
       value: offeneAngeboteCount,
-      href: '/vorgaenge?tab=angebot',
+      href: '/vorgaenge?tab=angebot&lifecycle=offen',
     },
     {
       icon: 'tool',
       label: 'Aktive Aufträge',
       value: aktiveAuftraegeCount,
-      href: '/vorgaenge?tab=auftrag',
+      href: '/vorgaenge?tab=auftrag&lifecycle=offen',
     },
     {
       icon: 'refresh',
       label: 'Bestand aktiv',
       value: bestandAktivCount,
-      href: '/vorgaenge?tab=bestand',
+      href: '/vorgaenge?tab=bestand&lifecycle=offen',
     },
     {
       icon: 'receipt',
       label: 'Offene Rechnungen',
       value: offeneRechnungenCount,
-      href: '/vorgaenge?tab=rechnung',
+      href: '/vorgaenge?tab=rechnung&lifecycle=offen',
     },
   ]
 
@@ -401,6 +414,10 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       gewerk={gewerk}
       rankingHandwerker={rankingHandwerker}
       rankingKunden={rankingKunden}
+      myWorkCounts={{
+        reUeberfaellig: reUeberfaelligCount,
+        angeboteWarten: angeboteWartenCount,
+      }}
     />
   )
 }

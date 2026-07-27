@@ -62,7 +62,7 @@ export function maengelAusPunkten(
       punkt_id: p.id,
       beschreibung: p.notiz?.trim() || p.beschreibung,
       foto_urls: [...(p.foto_urls ?? [])],
-      frist: null,
+      frist: p.mangel_frist?.trim()?.slice(0, 10) || null,
       status: 'offen' as const,
       erfasst_at: erfasstAt,
       foto_nachher_urls: [],
@@ -83,8 +83,8 @@ export function mergeMaengelFromPunkte(
     if (!old) return f
     return {
       ...f,
-      beschreibung: old.beschreibung?.trim() ? old.beschreibung : f.beschreibung,
-      frist: old.frist ?? f.frist,
+      beschreibung: f.beschreibung?.trim() ? f.beschreibung : old.beschreibung,
+      frist: f.frist ?? old.frist,
       foto_urls: old.foto_urls?.length ? old.foto_urls : f.foto_urls,
       status: old.status ?? f.status,
       erfasst_at: old.erfasst_at ?? f.erfasst_at,
@@ -113,9 +113,20 @@ export function applyPunktStatusFromMaengel(
   return punkte.map((p) => {
     const m = byId.get(p.id)
     if (!m) return p
-    if (m.status === 'abgenommen') return { ...p, status: 'ok' as const }
-    if (m.status === 'behoben' && p.status === 'mangel') return { ...p, status: 'mangel' as const }
-    if (isMangelOffen(m)) return { ...p, status: 'mangel' as const }
+    const frist = m.frist?.trim()?.slice(0, 10) || p.mangel_frist || null
+    const mangelNotiz =
+      m.beschreibung?.trim() && m.beschreibung.trim() !== p.beschreibung.trim()
+        ? m.beschreibung
+        : p.notiz
+    if (m.status === 'abgenommen') {
+      return { ...p, status: 'ok' as const, mangel_frist: null }
+    }
+    if (m.status === 'behoben' && p.status === 'mangel') {
+      return { ...p, status: 'mangel' as const, mangel_frist: frist, notiz: mangelNotiz ?? p.notiz }
+    }
+    if (isMangelOffen(m)) {
+      return { ...p, status: 'mangel' as const, mangel_frist: frist, notiz: mangelNotiz ?? p.notiz }
+    }
     return p
   })
 }

@@ -96,6 +96,8 @@ export async function listAuftraegeFuerKunde(
 
 /**
  * Neue Anfrage für bestehenden Kunden — Basis für Angebots-Wizard ohne Vorauswahl.
+ * Nutzt eine bestehende offene Anfrage desselben Kunden, statt eine zweite zu erzeugen
+ * (sonst erscheinen Anfrage + Angebot parallel unter „Offen“).
  */
 export async function createAnfrageFuerKunde(
   kundeId: string,
@@ -123,6 +125,23 @@ export async function createAnfrageFuerKunde(
       ok: false,
       message: 'Kunde braucht E-Mail oder Telefon, damit eine Anfrage angelegt werden kann.',
     }
+  }
+
+  // Bestehende offene Anfrage wiederverwenden (Melder oder Vertragskunde/HV).
+  const { data: bestehende } = await supabase
+    .from('leads')
+    .select('id, status, updated_at, angebote(id)')
+    .or(`kunde_id.eq.${id},auftraggeber_kunde_id.eq.${id}`)
+    .in('status', ['neu', 'kontaktiert', 'termin', 'angebot'])
+    .order('updated_at', { ascending: false })
+    .limit(20)
+
+  const wiederverwendbar = (bestehende ?? []).find((row) => {
+    const st = String(row.status ?? '').toLowerCase()
+    return st === 'neu' || st === 'kontaktiert' || st === 'termin' || st === 'angebot'
+  })
+  if (wiederverwendbar?.id) {
+    return { ok: true, leadId: String(wiederverwendbar.id) }
   }
 
   const r = await createAnfrage({

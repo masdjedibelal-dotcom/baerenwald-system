@@ -13,7 +13,8 @@ import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEd
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { saveAuftragZahlungsplan, clearAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
-  storniereRechnungOhneErsatz,
+  createGutschriftFromRechnung,
+  sendRechnung,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -22,6 +23,8 @@ import {
   emptyZahlungsplan,
   parseZahlungsplan,
   rechnungFuerAbschlagZeile,
+  stornierteRechnungFuerAbschlagZeile,
+  softWarnGestellteRechnungenGegenVk,
   zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
   type RechnungAbschlagLink,
@@ -105,6 +108,14 @@ export function AuftragZahlungsplanSection({
   const [editorOpen, setEditorOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [vorschau, setVorschau] = useState<RechnungAuswahlZeile | null>(null)
+  const [stornoConfirm, setStornoConfirm] = useState<{
+    zeileId: string
+    rechnungId: string
+    planBrutto: number
+    altBrutto: number
+    titel: string
+  } | null>(null)
+  const [stornoBusy, setStornoBusy] = useState(false)
 
   useEffect(() => {
     setPlan(initial)
@@ -171,8 +182,24 @@ export function AuftragZahlungsplanSection({
   )
   const planLoeschGate = zahlplanDarfGeloeschtWerden(plan, abschlagLinks)
 
+  const vkSoftWarn = useMemo(
+    () =>
+      softWarnGestellteRechnungenGegenVk({
+        bestehende: abschlagLinks,
+        gesamtNetto,
+        mwstSatz: 19,
+      }),
+    [abschlagLinks, gesamtNetto]
+  )
+
   function rechnungFuerZeile(zeileId: string): RechnungAuswahlZeile | null {
     const link = rechnungFuerAbschlagZeile(zeileId, abschlagLinks)
+    if (!link?.id) return null
+    return rechnungById.get(link.id) ?? null
+  }
+
+  function stornierteRechnungFuerZeile(zeileId: string): RechnungAuswahlZeile | null {
+    const link = stornierteRechnungFuerAbschlagZeile(zeileId, abschlagLinks)
     if (!link?.id) return null
     return rechnungById.get(link.id) ?? null
   }
@@ -220,7 +247,7 @@ export function AuftragZahlungsplanSection({
       }
       setPlan(next)
       closeEditor()
-      toast.success('Abschlagsplan gespeichert')
+      toast.success('Gespeichert')
       onRefresh?.()
       router.refresh()
     })
@@ -239,7 +266,7 @@ export function AuftragZahlungsplanSection({
         return
       }
       setPlan(emptyZahlungsplan())
-      toast.success('Abschlagsplan gelöscht')
+      toast.success('Gelöscht')
       onRefresh?.()
       router.refresh()
     })
@@ -255,26 +282,38 @@ export function AuftragZahlungsplanSection({
     const z = kontext.zeilen.find((x) => x.id === zeileId)
     const planBrutto = Number(z?.brutto) || 0
     const alt = Number(r.brutto ?? 0) || 0
-    if (
-      !window.confirm(
-        `Gestellte Rechnung (${formatEurBetrag(alt)}) stornieren und neue Rechnung` +
-          (planBrutto > 0 ? ` über ${formatEurBetrag(planBrutto)}` : '') +
-          ' aus dem aktuellen Plan anlegen?'
-      )
-    ) {
-      return
-    }
-    startTransition(async () => {
-      const res = await storniereRechnungOhneErsatz(r.id)
+    setStornoConfirm({
+      zeileId,
+      rechnungId: r.id,
+      planBrutto,
+      altBrutto: alt,
+      titel: z?.titel ?? 'Rate',
+    })
+  }
+
+  async function stornoBestaetigen() {
+    if (!stornoConfirm || stornoBusy) return
+    const { zeileId, rechnungId, planBrutto } = stornoConfirm
+    setStornoBusy(true)
+    try {
+      const res = await createGutschriftFromRechnung(rechnungId)
       if (!res.ok) {
         toast.error(res.message)
         return
       }
-      toast.success('Alte Rechnung storniert — jetzt Betrag aus dem korrigierten Plan')
+      setStornoConfirm(null)
+      toast.success(
+        `Storno-Gutschrift angelegt · beim Versand der neuen RE mit in einer Mail${
+          planBrutto > 0 ? ` · Neu: ${formatEurBetrag(planBrutto)}` : ''
+        }`
+      )
       onRefresh?.()
       router.refresh()
+      await new Promise((resolve) => setTimeout(resolve, 120))
       onCreateInvoice({ zeileId })
-    })
+    } finally {
+      setStornoBusy(false)
+    }
   }
 
   function rowMenu(zeileId: string, st: ZahlplanRateStatus): EntityMenuItem[] {
@@ -290,6 +329,23 @@ export function AuftragZahlungsplanSection({
     }
 
     if (st === 'gestellt' && r?.id) {
+      items.push({
+        icon: 'mail-forward',
+        label: 'Nochmal senden',
+        onClick: () => {
+          const rechnungId = r.id
+          startTransition(async () => {
+            const res = await sendRechnung(rechnungId)
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            toast.success('Rechnung erneut gesendet')
+            onRefresh?.()
+            router.refresh()
+          })
+        },
+      })
       items.push({
         icon: 'history',
         label: 'Stornieren & neu stellen',
@@ -321,7 +377,7 @@ export function AuftragZahlungsplanSection({
               toast.error(res.message)
               return
             }
-            toast.success('Als bezahlt markiert')
+            toast.success('Als bezahlt markiert (ohne Kunden-Mail)')
             onRefresh?.()
             router.refresh()
           })
@@ -428,6 +484,64 @@ export function AuftragZahlungsplanSection({
     </MockModal>
   )
 
+  const stornoModal = (
+    <MockModal
+      open={Boolean(stornoConfirm)}
+      onClose={() => {
+        if (!stornoBusy) setStornoConfirm(null)
+      }}
+      icon="history"
+      title="Stornieren & neu stellen?"
+      sub={
+        stornoConfirm
+          ? `${stornoConfirm.titel} · bisher ${formatEurBetrag(stornoConfirm.altBrutto)}${
+              stornoConfirm.planBrutto > 0
+                ? ` → neu ${formatEurBetrag(stornoConfirm.planBrutto)}`
+                : ''
+            }`
+          : undefined
+      }
+      footer={
+        stornoConfirm ? (
+          <>
+            <MockBtn
+              type="button"
+              kind="ghost"
+              disabled={stornoBusy}
+              onClick={() => setStornoConfirm(null)}
+            >
+              Abbrechen
+            </MockBtn>
+            <MockBtn
+              type="button"
+              kind="primary"
+              disabled={stornoBusy}
+              onClick={() => void stornoBestaetigen()}
+            >
+              {stornoBusy ? 'Storniere…' : 'Storno + neue RE'}
+            </MockBtn>
+          </>
+        ) : null
+      }
+    >
+      {stornoConfirm ? (
+        <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-2)' }}>
+          <p style={{ margin: '0 0 10px' }}>
+            <b style={{ color: 'var(--text)' }}>Storno-Gutschrift</b> zur gestellten Rechnung wird
+            angelegt (alte RE → storniert).
+          </p>
+          <p style={{ margin: '0 0 10px' }}>
+            Danach öffnet der Wizard für die <b>neue Rechnung</b> mit dem aktuellen Planbetrag.
+          </p>
+          <p style={{ margin: 0 }}>
+            Beim <b>Versand</b> gehen Storno-Gutschrift und neue Rechnung <b>in einer Mail</b> an den
+            Kunden (zwei PDF-Anhänge).
+          </p>
+        </div>
+      ) : null}
+    </MockModal>
+  )
+
   if (gesamtNetto <= 0) {
     return (
       <WerkzeugPanel
@@ -463,7 +577,7 @@ export function AuftragZahlungsplanSection({
         >
           <div className="zahlplan-empty" style={{ paddingTop: 4 }}>
             <div className="zahlplan-empty__text" style={{ margin: 0 }}>
-              Primäraktion: eine Rechnung stellen. Abschlagsplan, wenn du in Raten abrechnest.
+              Rechnung stellen — oder Abschläge anlegen.
             </div>
           </div>
         </WerkzeugPanel>
@@ -477,6 +591,7 @@ export function AuftragZahlungsplanSection({
           saving={pending}
         />
         {vorschauModal}
+        {stornoModal}
       </>
     )
   }
@@ -488,8 +603,8 @@ export function AuftragZahlungsplanSection({
         icon="calculator"
         purpose={
           abweichendeGestellte.length
-            ? 'Gestellte Schlussrechnung weicht von der neuen Auftragssumme ab — stornieren und neu stellen.'
-            : 'Ratenliste — nächste offene Rate stellen oder den Plan anpassen.'
+            ? 'Schluss weicht ab — stornieren und neu stellen.'
+            : 'Nächste Rate stellen oder Plan bearbeiten.'
         }
         framed
         actions={
@@ -515,7 +630,7 @@ export function AuftragZahlungsplanSection({
               </MockBtn>
             ) : null}
             <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditorOpen(true)}>
-              Plan anpassen
+              Plan bearbeiten
             </MockBtn>
             <MockBtn sm kind="ghost" icon="file-invoice" onClick={() => onCreateInvoice({ voll: true })}>
               Vollrechnung
@@ -544,6 +659,27 @@ export function AuftragZahlungsplanSection({
           </div>
         }
       >
+        {vkSoftWarn.warn ? (
+          <div
+            role="status"
+            style={{
+              marginBottom: 12,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-2, #f4f5f4)',
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: 'var(--text-2)',
+            }}
+          >
+            <b style={{ color: 'var(--text)' }}>{vkSoftWarn.message}</b>
+            <div style={{ marginTop: 4 }}>
+              Bitte Beträge prüfen oder eine Rechnung stornieren, bevor weitere Rechnungen
+              gestellt werden.
+            </div>
+          </div>
+        ) : null}
         {abweichendeGestellte.length > 0 ? (
           <div
             role="status"
@@ -595,6 +731,7 @@ export function AuftragZahlungsplanSection({
           {kontext.zeilen.map((z) => {
             const st = zahlplanRateStatus(z.id, abschlagLinks)
             const r = rechnungFuerZeile(z.id)
+            const storniert = st === 'geplant' ? stornierteRechnungFuerZeile(z.id) : null
             const planBrutto = Number(z.brutto) || 0
             const rechnungBrutto = r ? Number(r.brutto ?? 0) || 0 : 0
             const abweichung =
@@ -629,7 +766,14 @@ export function AuftragZahlungsplanSection({
                 </div>
                 <div className="zahlplan-row__betrag">{formatEurBetrag(betrag)}</div>
                 <div className="zahlplan-row__faellig">{faellig ? formatDatum(faellig) : '—'}</div>
-                <div>{rateBadge(st)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  {rateBadge(st)}
+                  {storniert ? (
+                    <Link href={`/rechnungen/${storniert.id}`} className="zahlplan-row__pct">
+                      <MockBadge kind="neutral">Storniert</MockBadge>
+                    </Link>
+                  ) : null}
+                </div>
                 <div className="zahlplan-row__vorschau">
                   {abweichung ? (
                     <MockBtn
@@ -688,6 +832,7 @@ export function AuftragZahlungsplanSection({
         frozenIds={frozenIds}
       />
       {vorschauModal}
+      {stornoModal}
     </>
   )
 }

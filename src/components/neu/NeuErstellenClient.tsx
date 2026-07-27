@@ -225,6 +225,14 @@ export function NeuErstellenClient({
                   type="button"
                   className={`neu-vorgang-tile${art === o.v ? ' sel' : ''}`}
                   onClick={() => {
+                    if (o.v === 'kunde') {
+                      router.replace('/neu?art=kunde')
+                      return
+                    }
+                    if (o.v === 'handwerker') {
+                      router.replace('/neu?art=handwerker')
+                      return
+                    }
                     setArt(o.v)
                     setVorgangTyp('')
                   }}

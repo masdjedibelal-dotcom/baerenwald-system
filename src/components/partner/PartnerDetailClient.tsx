@@ -11,7 +11,7 @@ import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { DetailProp } from '@/components/ui/detail-prop'
-import { ActionsMenu } from '@/components/ui/actions-menu'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -262,19 +262,14 @@ export function PartnerDetailClient({
           ) : undefined
         }
         actions={
-          <ActionsMenu
-            trigger={
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
-                aria-label="Weitere Aktionen"
-              >
-                <MockIcon ctx="btn" n="dots" size={16} />
-                <span className="sr-only">Mehr</span>
-              </button>
-            }
-            items={partnerMenuItems}
+          <DetailActionsBar
             sheetTitle="Netzwerk"
+            primary={{
+              label: 'Bearbeiten',
+              icon: 'pencil',
+              onClick: () => setEditOpen(true),
+            }}
+            menuItems={partnerMenuItems}
           />
         }
       />

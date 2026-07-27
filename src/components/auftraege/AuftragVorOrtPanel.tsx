@@ -1,120 +1,102 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
-import Link from 'next/link'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
 import { cn } from '@/lib/utils'
 
 export type VorOrtAbschnitt = 'bautagebuch' | 'abnahme' | 'abschluss'
 
+const SEGMENTS: { id: VorOrtAbschnitt; label: string }[] = [
+  { id: 'abnahme', label: 'Abnahme' },
+  { id: 'bautagebuch', label: 'Tagebuch' },
+  { id: 'abschluss', label: 'Abschluss' },
+]
+
+function defaultSegment(focus?: VorOrtAbschnitt | null): VorOrtAbschnitt {
+  return focus ?? 'abnahme'
+}
+
 /**
- * Einstieg: Abnahmeprotokoll ODER Bautagebuch — dann optional Abschlussbericht.
+ * Vor Ort: ein Segment aktiv — Abnahme | Tagebuch | Abschluss.
  */
 export function AuftragVorOrtPanel({
   auftragId,
   focus,
   leistungTabelle,
   abschluss,
+  abschlussExtras,
   baustellenExtras,
-  hasAbnahmePdf,
-  abnahmePdfUrl,
+  onRefresh,
 }: {
   auftragId: string
   focus?: VorOrtAbschnitt | null
   leistungTabelle: ReactNode
   abschluss: ReactNode
+  abschlussExtras?: ReactNode
   baustellenExtras?: ReactNode
-  hasAbnahmePdf?: boolean
-  abnahmePdfUrl?: string | null
+  onRefresh?: () => void
 }) {
+  const [segment, setSegment] = useState<VorOrtAbschnitt>(() => defaultSegment(focus))
+
   useEffect(() => {
-    if (!focus || typeof window === 'undefined') return
-    const id =
-      focus === 'abschluss'
-        ? 'vor-ort-abschluss'
-        : focus === 'abnahme'
-          ? 'vor-ort-abnahme-einstieg'
-          : focus === 'bautagebuch'
-            ? 'vor-ort-leistungen'
-            : null
-    if (!id) return
-    const t = window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-    return () => window.clearTimeout(t)
+    if (focus) setSegment(focus)
   }, [focus])
 
   return (
-    <div className="vor-ort-flow space-y-5">
-      <div className="vor-ort-flow__intro">
-        <p className="vor-ort-flow__lead">
-          Zwei Wege: <strong>Abnahmeprotokoll</strong> für die Kunden-Übergabe (Wizard → PDF), oder{' '}
-          <strong>Bautagebuch</strong> für laufende Vor-Ort-Dokumentation. Abschlussbericht ist
-          optional.
-        </p>
+    <div className="vor-ort-flow space-y-4">
+      <div
+        className="pos-segmented vor-ort-flow__segmented flex w-full max-w-md"
+        role="tablist"
+        aria-label="Vor Ort"
+      >
+        {SEGMENTS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            role="tab"
+            aria-selected={segment === s.id}
+            className={cn(
+              'pos-segmented__btn flex-1 text-center',
+              segment === s.id && 'pos-segmented__btn--active'
+            )}
+            onClick={() => setSegment(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
-      <section id="vor-ort-abnahme-einstieg" className="scroll-mt-24">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link
-            href={`/auftraege/${auftragId}/abnahme/erstellen`}
-            className={cn(
-              'block rounded-xl border-2 p-4 transition-colors',
-              focus === 'abnahme' || !focus
-                ? 'border-bw-green bg-bw-green/5'
-                : 'border-bw-border hover:border-bw-green/50'
-            )}
-          >
-            <p className="text-sm font-semibold text-bw-text">Abnahmeprotokoll erstellen</p>
-            <p className="mt-1 text-xs text-bw-text-muted">
-              Schritt für Schritt: Übergabe, Personen, Leistungen → PDF wie Kundenmuster
-            </p>
-            {hasAbnahmePdf && abnahmePdfUrl ? (
-              <p className="mt-2 text-xs font-medium text-bw-green">Bereits vorhanden — neu erstellen möglich</p>
-            ) : null}
-          </Link>
-          <a
-            href="#vor-ort-leistungen"
-            className={cn(
-              'block rounded-xl border p-4 transition-colors',
-              focus === 'bautagebuch'
-                ? 'border-bw-green bg-bw-green/5'
-                : 'border-bw-border hover:border-bw-border-strong'
-            )}
-          >
-            <p className="text-sm font-semibold text-bw-text">Bautagebuch / Vor-Ort-Doku</p>
-            <p className="mt-1 text-xs text-bw-text-muted">
-              Einträge und Fotos je Leistung — unabhängig vom Abnahmeprotokoll
-            </p>
-          </a>
-        </div>
-        {hasAbnahmePdf && abnahmePdfUrl ? (
-          <p className="mt-3 text-sm">
-            <a
-              className="link"
-              href={abnahmePdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Letztes Abnahmeprotokoll öffnen
-            </a>
+      {segment === 'abnahme' ? (
+        <section id="vor-ort-abnahme-einstieg" className="space-y-3">
+          <p className="text-[13px] text-bw-text-muted">
+            Abnahmeprotokoll für die Kunden-Übergabe — Wizard erzeugt das PDF.
           </p>
-        ) : null}
-      </section>
-
-      <section id="vor-ort-leistungen" className="scroll-mt-24">
-        {leistungTabelle}
-      </section>
-
-      {baustellenExtras ? (
-        <details className="vor-ort-flow__extras">
-          <summary>Baustellen-Extras (Team, Tagesberichte, Regie)</summary>
-          <div className="vor-ort-flow__extras-body">{baustellenExtras}</div>
-        </details>
+          <AuftragAbnahmeprotokollCard auftragId={auftragId} onChanged={onRefresh} />
+        </section>
       ) : null}
 
-      <section id="vor-ort-abschluss" className="scroll-mt-24">
-        {abschluss}
-      </section>
+      {segment === 'bautagebuch' ? (
+        <section id="vor-ort-leistungen" className="space-y-4">
+          <p className="text-[13px] text-bw-text-muted">
+            Einträge und Fotos je Leistung — unabhängig vom Abnahmeprotokoll.
+          </p>
+          {leistungTabelle}
+          {baustellenExtras ? (
+            <details className="vor-ort-flow__extras">
+              <summary>Baustellen-Extras</summary>
+              <div className="vor-ort-flow__extras-body">{baustellenExtras}</div>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
+
+      {segment === 'abschluss' ? (
+        <section id="vor-ort-abschluss" className="space-y-3">
+          <p className="text-[13px] text-bw-text-muted">Optionaler Abschlussbericht zum Projekt.</p>
+          {abschlussExtras ? <div className="space-y-4">{abschlussExtras}</div> : null}
+          {abschluss}
+        </section>
+      ) : null}
     </div>
   )
 }
@@ -123,8 +105,7 @@ export function VorOrtPortalHinweis({ className }: { className?: string }) {
   return (
     <p className={cn('vor-ort-flow__portal-hint', className)}>
       <span>
-        Primär: Partner erfasst Tagebuch im Handwerker-Portal. Abnahmeprotokoll erstellst du im
-        Wizard oben.
+        Partner erfasst Tagebuch im Handwerker-Portal. Abnahmeprotokoll erstellst du unter Abnahme.
       </span>
     </p>
   )

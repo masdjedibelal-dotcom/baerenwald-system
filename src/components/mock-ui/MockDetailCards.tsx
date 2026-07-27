@@ -4,12 +4,17 @@ import type { ReactNode } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ACTIVITY_TAB_LABEL } from '@/lib/crm-labels'
 
 export function MockVerlaufCard({ children, empty }: { children: ReactNode; empty?: boolean }) {
   return (
-    <MockCard title="Verlauf" icon="history">
+    <MockCard title={ACTIVITY_TAB_LABEL} icon="history">
       {empty ? (
-        <MockEmpty icon="history" title="Kein Verlauf" hint="Aktivitäten erscheinen hier" />
+        <MockEmpty
+          icon="history"
+          title={`Keine ${ACTIVITY_TAB_LABEL}`}
+          hint="Ereignisse und Schritte erscheinen hier."
+        />
       ) : (
         children
       )}
