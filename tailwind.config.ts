@@ -42,6 +42,11 @@ const config: Config = {
         'bw-bg-soft': withAlpha('--bg-soft'),
         'bw-card': withAlpha('--card'),
         'bw-hover': withAlpha('--bg-soft'),
+        /** Surface-Stufen — Alias auf bestehende Tokens (kein zweites Farbsystem) */
+        'bw-surface': withAlpha('--card'),
+        'bw-surface-2': withAlpha('--bg-soft'),
+        'bw-surface-alt': withAlpha('--bg-soft'),
+        'bw-muted': withAlpha('--text-3'),
         'bw-border': withAlpha('--border'),
         'bw-border-strong': withAlpha('--border-strong'),
         'bw-text': withAlpha('--text'),
@@ -119,6 +124,13 @@ const config: Config = {
       },
       borderWidth: {
         hairline: '0.5px',
+      },
+      zIndex: {
+        header: '20',
+        sidepanel: '40',
+        'sidepanel-pop': '45',
+        modal: '500',
+        search: '100',
       },
       boxShadow: {
         sm: '0 1px 2px rgba(0,0,0,0.05)',

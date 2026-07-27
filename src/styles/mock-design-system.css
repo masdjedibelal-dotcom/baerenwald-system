@@ -12882,7 +12882,7 @@ select:focus-visible {
   @apply m-0 list-none divide-y divide-bw-border overflow-hidden rounded-lg border border-bw-border p-0;
 }
 .picker-sheet__row {
-  @apply flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left hover:bg-bw-surface-2;
+  @apply flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left hover:bg-bw-hover;
 }
 .picker-sheet__row-title {
   @apply text-sm font-medium text-bw-text;
