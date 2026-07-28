@@ -15,15 +15,21 @@ import {
   gewerkHandwerkerZuweisungenToMaps,
   type GewerkHandwerkerZuweisung,
 } from '@/components/angebote/AngebotWizardHandwerkerStep'
+import {
+  DcTotalBlock,
+  MetaCrowButton,
+  TotBand,
+} from '@/components/angebote/AngebotWizardCanvasMeta'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { DocActionBar } from '@/components/surfaces/primitives'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
+import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { PosTotals } from '@/components/posboard/PosTotals'
 import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
@@ -103,7 +109,7 @@ import {
   isDefaultAngebotEinleitung,
 } from '@/lib/templates/angebot-mail'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
-import type { AngebotPosition, Gewerk, Handwerker, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
+import type { AngebotPosition, Gewerk, Handwerker, Kunde, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
 import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
 import type { ZahlfristSeg } from '@/lib/zahlfrist'
 
@@ -111,14 +117,14 @@ function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
 }
 
-const WIZARD_STEP_LABELS = [
-  'Kopf',
-  'Positionen',
-  'Fuß',
-  'Vorschau',
-  'Senden',
-] as const
-const WIZARD_TOTAL_STEPS = WIZARD_STEP_LABELS.length
+type WizardSheetId =
+  | 'kunde'
+  | 'dokument'
+  | 'konditionen'
+  | 'anschreiben'
+  | 'vorschau'
+  | 'senden'
+  | null
 
 /** Bestehende HW-Zuweisung aus Bootstrap-Positionen (handwerker_id pro Gewerk). */
 function zuweisungenFromBootstrapPositionen(
@@ -161,8 +167,9 @@ function regionLabel(lead: LeadDetail): string {
 }
 
 /**
- * Angebots-Wizard:
- * Typ & Projekt → Positionen → Finalisieren → Vorschau → Versenden
+ * Angebots-Wizard — DocumentCanvas 1:1 Mock:
+ * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Konditionen/Anschreiben),
+ * DocBar Vorschau · Senden · PDF · Verwerfen, mobil Sticky Speichern.
  */
 export function AngebotWizard({
   lead,
@@ -263,18 +270,14 @@ export function AngebotWizard({
   const [mounted, setMounted] = useState(false)
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
-  const [step, setStep] = useState(() => {
+  const [sheet, setSheet] = useState<WizardSheetId>(() => {
     const s = Number(initialStep)
-    if (Number.isFinite(s) && s >= 1 && s <= 5) return Math.floor(s)
-    if (focusField === 'positionen') return 2
-    // Korrektur / Nachtrag = Job „Leistungen anpassen“, nicht Typ-Wizard
-    if (bootstrap?.auftragKorrektur?.auftragId || bootstrap?.nachtragZu?.auftragId) return 2
-    return 1
+    if (s === 4) return 'vorschau'
+    if (s === 5) return 'senden'
+    if (focusField === 'titel' || focusField === 'beschreibung') return 'dokument'
+    return null
   })
-
-  useEffect(() => {
-    if ((istAuftragKorrektur || istNachtrag) && step === 1) setStep(2)
-  }, [istAuftragKorrektur, istNachtrag, step])
+  const [kundePickerOpen, setKundePickerOpen] = useState(false)
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
       .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -809,36 +812,36 @@ export function AngebotWizard({
     }
   }
 
-  function scrollToSection(sec: number) {
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`section-${sec}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  function goToSection(sec: number) {
-    setStep(sec)
-    scrollToSection(sec)
-  }
-
-  /** Weiter — Entwurf für PDF best-effort; harte Validierung nur bei Erstellen/Senden */
-  async function handleWeiter() {
-    if (saving) return
-    try {
-      const next = Math.min(WIZARD_TOTAL_STEPS, step + 1)
-      if (next === 4) {
-        const id = await ensureDraftForPreview()
-        if (!id) {
-          toast.error(
-            'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
-          )
-        }
-      }
-      goToSection(next)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
+  async function openVorschauSheet() {
+    const id = await ensureDraftForPreview()
+    if (!id) {
+      toast.error(
+        'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
+      )
     }
+    setSheet('vorschau')
+  }
+
+  async function openPdf() {
+    const id = await ensureDraftForPreview()
+    if (!id) {
+      toast.error('Entwurf speichern fehlgeschlagen — PDF nicht verfügbar.')
+      return
+    }
+    window.open(`/api/angebot-pdf?angebotId=${encodeURIComponent(id)}`, '_blank', 'noopener,noreferrer')
+  }
+
+  function onKundePick(k: Kunde) {
+    setLeadState((prev) => ({
+      ...prev,
+      kunde_id: k.id,
+      kunden: k,
+      kontakt_email: k.email?.trim() || prev.kontakt_email,
+      kontakt_telefon: k.telefon?.trim() || prev.kontakt_telefon,
+    }))
+    const mail = k.email?.trim()
+    if (mail && isValidEmail(mail)) setMailTo([mail])
+    setKundePickerOpen(false)
   }
 
   async function handleCanvasClose() {
@@ -981,143 +984,33 @@ export function AngebotWizard({
     })
   }
 
+
   if (!mounted) return null
 
-  const wizardSteps = istAuftragKorrektur || istNachtrag
-    ? [
-        { id: 2, label: 'Positionen' },
-        { id: 3, label: 'Fuß' },
-        { id: 4, label: 'Vorschau' },
-        { id: 5, label: 'Senden' },
-      ]
-    : WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
+  const ustLabel = reverseChargeAktiv
+    ? 'MwSt 0% (§13b)'
+    : effektiverMwstSatz === 0
+      ? 'MwSt 0%'
+      : `MwSt ${effektiverMwstSatz}%`
 
-  const minStep = istAuftragKorrektur || istNachtrag ? 2 : 1
+  const dokumentCrowValue = [
+    meta.titel.trim() || meta.leistungsumfang.trim() || 'Titel offen',
+    dokumentTyp === 'projekt' ? 'Komplex' : 'Einfach',
+  ].join(' · ')
 
-  const wizardDesktopActions = (
-    <div className="wizard-nav-actions">
-      {step > minStep ? (
-        <MockBtn kind="ghost" icon="chevron-left" disabled={saving} onClick={() => goToSection(step - 1)}>
-          Zurück
-        </MockBtn>
-      ) : null}
-      {step < WIZARD_TOTAL_STEPS ? (
-        <MockBtn
-          kind="primary"
-          icon="chevron-right"
-          disabled={saving || previewLoading}
-          onClick={() => void handleWeiter()}
-        >
-          {saving || previewLoading ? 'Speichern…' : 'Weiter'}
-        </MockBtn>
-      ) : istAuftragKorrektur ? (
-        <>
-          <MockBtn
-            kind="ghost"
-            icon="check"
-            disabled={saving}
-            onClick={() => void handleFinishKorrekturSpeichern()}
-          >
-            {saving ? 'Speichern…' : 'Übernehmen'}
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="send"
-            disabled={saving}
-            onClick={() => void handleFinishVersenden()}
-          >
-            {saving ? 'Senden…' : 'Senden'}
-          </MockBtn>
-        </>
-      ) : (
-        <>
-          <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-            {saving ? 'Erstellen…' : 'Erstellen'}
-          </MockBtn>
-          <MockBtn kind="primary" icon="send" disabled={saving} onClick={() => void handleFinishVersenden()}>
-            Senden
-          </MockBtn>
-        </>
-      )}
-    </div>
-  )
+  const konditionenCrowValue = [
+    meta.gueltig_bis ? `bis ${formatDatum(meta.gueltig_bis)}` : 'Gültig offen',
+    zahlfristText,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
-  const wizardMobileActions = null
+  const anschreibenCrowValue =
+    (meta.einleitung || '').trim().slice(0, 42) ||
+    (meta.schluss || '').trim().slice(0, 42) ||
+    'Texte ergänzen'
 
-  const wizardMobileFooter =
-    step < WIZARD_TOTAL_STEPS ? (
-      <>
-        {step > minStep ? (
-          <MockBtn
-            kind="ghost"
-            icon="chevron-left"
-            disabled={saving}
-            onClick={() => goToSection(step - 1)}
-          >
-            Zurück
-          </MockBtn>
-        ) : (
-          <span />
-        )}
-        <MockBtn
-          kind="primary"
-          icon="chevron-right"
-          className="wizard-mobile-footer__primary"
-          disabled={saving || previewLoading}
-          onClick={() => void handleWeiter()}
-        >
-          {saving || previewLoading ? '…' : 'Weiter'}
-        </MockBtn>
-      </>
-    ) : (
-      <>
-        <MockBtn
-          kind="ghost"
-          icon="chevron-left"
-          disabled={saving}
-          onClick={() => goToSection(step - 1)}
-        >
-          Zurück
-        </MockBtn>
-        <div className="wizard-mobile-footer__end">
-          {istAuftragKorrektur ? (
-            <>
-              <MockBtn
-                kind="ghost"
-                disabled={saving}
-                onClick={() => void handleFinishKorrekturSpeichern()}
-              >
-                {saving ? '…' : 'Übernehmen'}
-              </MockBtn>
-              <MockBtn
-                kind="primary"
-                icon="send"
-                className="wizard-mobile-footer__primary"
-                disabled={saving}
-                onClick={() => void handleFinishVersenden()}
-              >
-                {saving ? '…' : 'Senden'}
-              </MockBtn>
-            </>
-          ) : (
-            <>
-              <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-                {saving ? '…' : 'Erstellen'}
-              </MockBtn>
-              <MockBtn
-                kind="primary"
-                icon="send"
-                className="wizard-mobile-footer__primary"
-                disabled={saving}
-                onClick={() => void handleFinishVersenden()}
-              >
-                {saving ? '…' : 'Senden'}
-              </MockBtn>
-            </>
-          )}
-        </div>
-      </>
-    )
+  const subtitle = [name, region].filter((x) => x && x !== '—').join(' · ')
 
   const docActions = (
     <DocActionBar
@@ -1125,265 +1018,307 @@ export function AngebotWizard({
         {
           id: 'preview',
           label: 'Vorschau',
-          onClick: () => goToSection(4),
+          onClick: () => void openVorschauSheet(),
           icon: <MockIcon ctx="default" n="file-text" size={20} />,
         },
         {
           id: 'send',
           label: 'Senden',
-          onClick: () => {
-            if (step < WIZARD_TOTAL_STEPS) goToSection(WIZARD_TOTAL_STEPS)
-            else void handleFinishVersenden()
-          },
+          onClick: () => setSheet('senden'),
           icon: <MockIcon ctx="default" n="send" size={20} />,
+        },
+        {
+          id: 'pdf',
+          label: 'PDF',
+          onClick: () => void openPdf(),
+          icon: <MockIcon ctx="default" n="download" size={20} />,
         },
       ]}
     />
   )
 
-  const wizard = (
-    <DocumentCanvas
-      portal={false}
-      title={wizardTitel}
-      onClose={handleRequestClose}
-      onSave={() => void persistDraft({ notify: true })}
-      saveBusy={saving}
-      busy={saving}
-      busyLabel="Wird gesendet…"
-      onDiscard={() => onClose()}
-      docActions={docActions}
-      className="wizard-flow"
-    >
+  const documentColumn = (
+    <div className="dc-doc flex flex-col gap-4">
       {istNachtrag ? (
-        <div
-          className="mb-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[length:var(--fs-text)] text-sky-950"
-          role="status"
-        >
-          Erweitert den bestehenden Auftrag — ersetzt ihn nicht.
+        <div className="nachtrags-band" role="status">
+          <MockIcon ctx="default" n="info-circle" size={16} />
+          <span>Erweitert den bestehenden Auftrag — ersetzt ihn nicht.</span>
         </div>
       ) : null}
-      {/* P5.2: eine Scroll-Seite — Chips = Anker */}
-      <nav className="document-section-nav" aria-label="Abschnitte">
-        {wizardSteps.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={
-              s.id === step
-                ? 'document-section-nav__chip document-section-nav__chip--active'
-                : 'document-section-nav__chip'
-            }
-            onClick={() => goToSection(s.id)}
-          >
-            {s.label}
-          </button>
-        ))}
-        <div className="ml-auto hidden md:flex">{wizardDesktopActions}</div>
-        <div className="flex w-full gap-2 md:hidden">{wizardMobileFooter}</div>
-      </nav>
 
-      {!istAuftragKorrektur ? (
-      <section id="section-1" className="document-canvas-sec">
-        <>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600 }}>Angebotsart</div>
-          </div>
-          <div className="wz-overview" style={{ marginBottom: 20 }}>
-            <div>
-              <span className="k">Kunde</span>
-              <b>{name}</b>
-            </div>
-            <div>
-              <span className="k">Projekt</span>
-              <b>{projekt}</b>
-            </div>
-            <div>
-              <span className="k">Region</span>
-              <b>{region}</b>
-            </div>
-            <div>
-              <span className="k">Budget</span>
-              <b>{budgetAnzeige}</b>
-            </div>
-          </div>
-          <div className="doctype-row">
-            <label
-              className={`doctype-radio-opt${dokumentTyp === 'einfach' ? ' on' : ''}`}
-              onClick={() => setDokumentTyp('einfach')}
-            >
-              <span className="dot" />
-              <MockIcon ctx="default" n="file-text" size={16} />
-              <span className="lbl">Einfach</span>
-            </label>
-            <label
-              className={`doctype-radio-opt${dokumentTyp === 'projekt' ? ' on' : ''}`}
-              onClick={() => setDokumentTyp('projekt')}
-            >
-              <span className="dot" />
-              <MockIcon ctx="default" n="checklist" size={16} />
-              <span className="lbl">Komplex</span>
-            </label>
-          </div>
-          <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
-          <div className="h-sep" />
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600 }}>Projekt</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
-            <MockField label="Projekt-Titel" required>
-              <input
-                className="input"
-                value={meta.leistungsumfang}
-                onChange={(e) => patchProjektTitel(e.target.value)}
-                placeholder="z.B. Badmodernisierung & Projektkoordination"
-                autoFocus={focusField === 'titel'}
-              />
-            </MockField>
-            <MockField
-              label="Beschreibung"
-              hint="Erscheint als einleitende Projekt-Beschreibung im Angebot"
-            >
-              <textarea
-                className="input ta"
-                rows={5}
-                value={projektbeschreibung}
-                onChange={(e) => setProjektbeschreibung(e.target.value)}
-                placeholder="Beschreibe Umfang, Ausführung, Koordination..."
-                autoFocus={focusField === 'beschreibung'}
-              />
-            </MockField>
-          </div>
-          <div className="h-sep" />
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 10,
-              flexWrap: 'wrap',
-              gap: 8,
-            }}
+      <PosBoard
+        title={`Positionen · ${positionenKopf}`}
+        positionen={posBoardLines}
+        onChange={onPosBoardChange}
+        showUst
+        gewerke={gewerkNamen}
+        preislisten={preislisten}
+        hideAddGewerk={dokumentTyp === 'einfach'}
+        suggestContext={istAuftragKorrektur ? null : posSuggestContext}
+        headerAction={
+          istAuftragKorrektur ? undefined : (
+            <AngebotKiAssistentButton
+              sm
+              label="Mit KI"
+              dokumentLabel="Angebot"
+              leadKurz={kiLeadKurz}
+              titel={meta.leistungsumfang}
+              beschreibung={projektbeschreibung}
+              positionen={kiKontextPositionen}
+              preislisten={kiKontextPreislisten}
+              gewerke={kiGewerke}
+              onApply={applyAngebotKi}
+            />
+          )
+        }
+      />
+
+      <TotBand
+        netto={mailSummen.nettoMin}
+        ust={mailSummen.mwstBetragMin}
+        brutto={mailSummen.bruttoMin}
+        ustLabel={ustLabel}
+      />
+    </div>
+  )
+
+  const metaColumn = (
+    <div className="dc-meta-stack">
+      <MetaCrowButton label="Kunde" value={name} onClick={() => setSheet('kunde')} />
+      <MetaCrowButton
+        label="Dokument"
+        value={dokumentCrowValue}
+        onClick={() => setSheet('dokument')}
+      />
+      <MetaCrowButton
+        label="Konditionen"
+        value={konditionenCrowValue}
+        onClick={() => setSheet('konditionen')}
+      />
+      <MetaCrowButton
+        label="Anschreiben"
+        value={anschreibenCrowValue}
+        onClick={() => setSheet('anschreiben')}
+      />
+    </div>
+  )
+
+  const metaSum = (
+    <DcTotalBlock
+      netto={mailSummen.nettoMin}
+      ust={mailSummen.mwstBetragMin}
+      brutto={mailSummen.bruttoMin}
+      ustLabel={ustLabel}
+      hint={istNachtrag ? 'Nachtrag · Summe der neuen Positionen' : undefined}
+    />
+  )
+
+  const footerCta = (
+    <button
+      type="button"
+      className="btn primary"
+      disabled={saving}
+      onClick={() => void persistDraft({ notify: true })}
+    >
+      {saving ? 'Speichern…' : 'Speichern'}
+    </button>
+  )
+
+  const closeSheet = () => setSheet(null)
+
+  const wizard = (
+    <>
+      <DocumentCanvas
+        portal={false}
+        title={wizardTitel}
+        subtitle={subtitle || undefined}
+        onClose={handleRequestClose}
+        onSave={() => void persistDraft({ notify: true })}
+        saveBusy={saving}
+        busy={saving}
+        busyLabel="Wird gesendet…"
+        onDiscard={() => onClose()}
+        docActions={docActions}
+        document={documentColumn}
+        meta={metaColumn}
+        metaSum={metaSum}
+        footerCta={footerCta}
+        className="wizard-flow"
+      />
+
+      <EditorSheet
+        open={sheet === 'kunde'}
+        onClose={closeSheet}
+        title="Kunde"
+        context="canvas"
+        headerEnd={
+          <button
+            type="button"
+            className="editor-sheet__confirm-text"
+            onClick={() => setKundePickerOpen(true)}
           >
-            <div className="section-h" style={{ marginBottom: 0 }}>
-              Fotodokumentation{' '}
-              <span
-                style={{
-                  color: 'var(--text-4, var(--text-3))',
-                  fontWeight: 400,
-                  textTransform: 'none',
-                  letterSpacing: 0,
-                  marginLeft: 6,
-                }}
-              >
-                {projektFotos.length} Foto{projektFotos.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <MockIcon ctx="default" n="info-circle" size={12} /> Erscheint im Angebot zwischen
-              Beschreibung und Leistungen
-            </span>
+            Wechseln
+          </button>
+        }
+      >
+        <div className="gfc">
+          <div className="gfc-row">
+            <span className="gfc-l">Name</span>
+            <span className="gfc-v">{name}</span>
           </div>
-          <div className="fotos-grid">
-            {projektFotos.map((f) => (
-              <div key={f.url} className="foto-card">
-                <div className="foto-img">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="" />
-                  <div className="foto-img-actions">
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="trash"
-                      title="Entfernen"
-                      onClick={() =>
-                        setProjektFotos((prev) => prev.filter((x) => x.url !== f.url))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="foto-desc">
-                  <textarea
-                    className="input ta"
-                    rows={2}
-                    placeholder="Beschreibung (optional)"
-                    value={f.beschreibung}
-                    onChange={(e) =>
-                      setProjektFotos((prev) =>
-                        prev.map((x) =>
-                          x.url === f.url ? { ...x, beschreibung: e.target.value } : x
-                        )
-                      )
-                    }
-                  />
+          <div className="gfc-row">
+            <span className="gfc-l">Region</span>
+            <span className="gfc-v">{region}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-v">{email || <em>fehlt</em>}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Budget</span>
+            <span className="gfc-v">{budgetAnzeige}</span>
+          </div>
+        </div>
+      </EditorSheet>
+
+      <KundePickerSheet
+        open={kundePickerOpen}
+        onClose={() => setKundePickerOpen(false)}
+        onPick={onKundePick}
+        context="canvas"
+      />
+
+      <EditorSheet
+        open={sheet === 'dokument'}
+        onClose={closeSheet}
+        title="Dokument"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
+          {!istAuftragKorrektur ? (
+            <>
+              <div className="full">
+                <div className="doctype-row">
+                  <label
+                    className={`doctype-radio-opt${dokumentTyp === 'einfach' ? ' on' : ''}`}
+                    onClick={() => setDokumentTyp('einfach')}
+                  >
+                    <span className="dot" />
+                    <MockIcon ctx="default" n="file-text" size={16} />
+                    <span className="lbl">Einfach</span>
+                  </label>
+                  <label
+                    className={`doctype-radio-opt${dokumentTyp === 'projekt' ? ' on' : ''}`}
+                    onClick={() => setDokumentTyp('projekt')}
+                  >
+                    <span className="dot" />
+                    <MockIcon ctx="default" n="checklist" size={16} />
+                    <span className="lbl">Komplex</span>
+                  </label>
                 </div>
               </div>
-            ))}
-            <button
-              type="button"
-              className="foto-upload"
-              disabled={projektUploading || saving}
-              onClick={() => fotoInputRef.current?.click()}
-            >
-              <MockIcon ctx="default" n="plus" size={18} />
-              <div>{projektUploading ? 'Wird hochgeladen…' : 'Fotos hinzufügen'}</div>
-            </button>
-            <input
-              ref={fotoInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                const files = e.target.files ? Array.from(e.target.files) : []
-                e.target.value = ''
-                void uploadProjektFotoFiles(files)
-              }}
-            />
-          </div>
-        </>
-      </section>
-      ) : null}
-
-      <section id="section-2" className="document-canvas-sec">
-        <>
-          <PosBoard
-            title={`Positionen · ${positionenKopf}`}
-            positionen={posBoardLines}
-            onChange={onPosBoardChange}
-            showUst
-            gewerke={gewerkNamen}
-            preislisten={preislisten}
-            hideAddGewerk={dokumentTyp === 'einfach'}
-            suggestContext={istAuftragKorrektur ? null : posSuggestContext}
-            headerAction={
-              istAuftragKorrektur ? undefined : (
-              <AngebotKiAssistentButton
-                sm
-                label="Mit KI"
-                dokumentLabel="Angebot"
-                leadKurz={kiLeadKurz}
-                titel={meta.leistungsumfang}
-                beschreibung={projektbeschreibung}
-                positionen={kiKontextPositionen}
-                preislisten={kiKontextPreislisten}
-                gewerke={kiGewerke}
-                onApply={applyAngebotKi}
-              />
-              )
-            }
-          />
-        </>
-      </section>
-
-      <section id="section-3" className="document-canvas-sec">
-        <div className="form-grid form-grid--sheet">
+              <div className="full">
+                <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
+              </div>
+            </>
+          ) : null}
           <MockField label="Angebotstitel" full>
             <input
               className="input"
               value={meta.titel}
               onChange={(e) => patchTitel(e.target.value)}
+              autoFocus={focusField === 'titel'}
             />
           </MockField>
+          <MockField label="Projekt-Titel" full>
+            <input
+              className="input"
+              value={meta.leistungsumfang}
+              onChange={(e) => patchProjektTitel(e.target.value)}
+              placeholder="z.B. Badmodernisierung"
+            />
+          </MockField>
+          <MockField label="Beschreibung" full>
+            <textarea
+              className="input ta"
+              rows={5}
+              value={projektbeschreibung}
+              onChange={(e) => setProjektbeschreibung(e.target.value)}
+              autoFocus={focusField === 'beschreibung'}
+            />
+          </MockField>
+          <div className="full">
+            <div className="section-h" style={{ marginBottom: 10, textTransform: 'none', letterSpacing: 0 }}>
+              Fotos · {projektFotos.length}
+            </div>
+            <div className="fotos-grid">
+              {projektFotos.map((f) => (
+                <div key={f.url} className="foto-card">
+                  <div className="foto-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt="" />
+                    <div className="foto-img-actions">
+                      <MockBtn
+                        sm
+                        kind="ghost"
+                        icon="trash"
+                        title="Entfernen"
+                        onClick={() =>
+                          setProjektFotos((prev) => prev.filter((x) => x.url !== f.url))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="foto-desc">
+                    <textarea
+                      className="input ta"
+                      rows={2}
+                      placeholder="Beschreibung (optional)"
+                      value={f.beschreibung}
+                      onChange={(e) =>
+                        setProjektFotos((prev) =>
+                          prev.map((x) =>
+                            x.url === f.url ? { ...x, beschreibung: e.target.value } : x
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="foto-upload"
+                disabled={projektUploading || saving}
+                onClick={() => fotoInputRef.current?.click()}
+              >
+                <MockIcon ctx="default" n="plus" size={18} />
+                <div>{projektUploading ? 'Wird hochgeladen…' : 'Fotos hinzufügen'}</div>
+              </button>
+              <input
+                ref={fotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  const files = e.target.files ? Array.from(e.target.files) : []
+                  e.target.value = ''
+                  void uploadProjektFotoFiles(files)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </EditorSheet>
+
+      <EditorSheet
+        open={sheet === 'konditionen'}
+        onClose={closeSheet}
+        title="Konditionen"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
           <MockField label="Gültig bis">
             <input
               type="date"
@@ -1430,22 +1365,6 @@ export function AngebotWizard({
               ) : null}
             </div>
           </MockField>
-          <MockField label="Einleitung" full>
-            <textarea
-              className="input ta"
-              rows={3}
-              value={meta.einleitung}
-              onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
-            />
-          </MockField>
-          <MockField label="Schlusstext" full>
-            <textarea
-              className="input ta"
-              rows={3}
-              value={meta.schluss}
-              onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
-            />
-          </MockField>
           <div className="full">
             <AngebotWizardRechtlicheHinweiseCard
               meta={meta}
@@ -1455,96 +1374,117 @@ export function AngebotWizard({
               lohnNettoPdf={lohnNettoPdf}
             />
           </div>
-          <div className="full">
-            <PosTotals
-              netto={mailSummen.nettoMin}
-              ust={mailSummen.mwstBetragMin}
-              brutto={mailSummen.bruttoMin}
-              ustLabel={
-                reverseChargeAktiv
-                  ? 'MwSt 0% (§13b)'
-                  : effektiverMwstSatz === 0
-                    ? 'MwSt 0%'
-                    : `MwSt ${effektiverMwstSatz}%`
-              }
-            />
-          </div>
         </div>
-      </section>
+      </EditorSheet>
 
-      <section id="section-4" className="document-canvas-sec">
+      <EditorSheet
+        open={sheet === 'anschreiben'}
+        onClose={closeSheet}
+        title="Anschreiben"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
+          <MockField label="Einleitung" full>
+            <textarea
+              className="input ta"
+              rows={5}
+              value={meta.einleitung}
+              onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
+            />
+          </MockField>
+          <MockField label="Schlusstext" full>
+            <textarea
+              className="input ta"
+              rows={4}
+              value={meta.schluss}
+              onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
+            />
+          </MockField>
+        </div>
+      </EditorSheet>
+
+      <EditorSheet
+        open={sheet === 'vorschau'}
+        onClose={closeSheet}
+        title="Vorschau"
+        context="canvas"
+        size="lg"
+      >
         <AngebotWizardPdfPreview
           angebotId={angebotId}
           loading={previewLoading || saving || !angebotId}
           kundeName={name}
         />
-      </section>
+      </EditorSheet>
 
-      <section id="section-5" className="document-canvas-sec">
-        <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
-          <div>
-            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-              Empfänger und Betreff prüfen — Vorschau zeigt die echte Versand-Vorlage
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <EmailPillsField
-                label="An"
-                required
-                emails={mailTo}
-                onChange={setMailTo}
-                placeholder="kunde@beispiel.de"
-                hint="Mindestens eine Empfänger-Adresse"
+      <EditorSheet
+        open={sheet === 'senden'}
+        onClose={closeSheet}
+        title="Senden"
+        context="canvas"
+        compose
+        composeLabel={saving ? '…' : 'Senden'}
+        onConfirm={() => void handleFinishVersenden()}
+        confirmDisabled={saving}
+        confirmBusy={saving}
+        footer={
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            {istAuftragKorrektur ? (
+              <MockBtn
+                kind="ghost"
                 disabled={saving}
-              />
-              <EmailPillsField
-                label="CC"
-                emails={mailCc}
-                onChange={setMailCc}
-                placeholder="weitere@beispiel.de"
-                hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
-                disabled={saving}
-              />
-              <MockField label="Betreff" full required>
-                <input
-                  className="txt"
-                  value={mailBetreff}
-                  onChange={(e) => setMailBetreff(e.target.value)}
-                  disabled={saving}
-                  placeholder={defaultMailBetreff}
-                />
-              </MockField>
-            </div>
-            <div className="wz-overview" style={{ marginTop: 14 }}>
-              <div>
-                <span className="k">Gültig bis</span>
-                <b>{meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}</b>
-              </div>
-              <div>
-                <span className="k">Zahlfrist</span>
-                <b>{zahlfristText}</b>
-              </div>
-              <div>
-                <span className="k">Gesamt</span>
-                <b>{formatEurBetrag(mailSummen.bruttoMin)} brutto</b>
-              </div>
-            </div>
+                onClick={() => void handleFinishKorrekturSpeichern()}
+              >
+                {saving ? '…' : 'Übernehmen'}
+              </MockBtn>
+            ) : (
+              <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
+                {saving ? '…' : 'Erstellen'}
+              </MockBtn>
+            )}
           </div>
-
-          <div
-            className="section-h"
-            style={{
-              marginBottom: 0,
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 'var(--fs-text)',
-              fontWeight: 600,
-            }}
-          >
-            E-Mail-Vorschau
+        }
+      >
+        <div style={{ display: 'grid', gap: 16 }}>
+          <EmailPillsField
+            label="An"
+            required
+            emails={mailTo}
+            onChange={setMailTo}
+            placeholder="kunde@beispiel.de"
+            hint="Mindestens eine Empfänger-Adresse"
+            disabled={saving}
+          />
+          <EmailPillsField
+            label="CC"
+            emails={mailCc}
+            onChange={setMailCc}
+            placeholder="weitere@beispiel.de"
+            hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
+            disabled={saving}
+          />
+          <MockField label="Betreff" full required>
+            <input
+              className="txt"
+              value={mailBetreff}
+              onChange={(e) => setMailBetreff(e.target.value)}
+              disabled={saving}
+              placeholder={defaultMailBetreff}
+            />
+          </MockField>
+          <div className="wz-overview">
+            <div>
+              <span className="k">Gültig bis</span>
+              <b>{meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}</b>
+            </div>
+            <div>
+              <span className="k">Zahlfrist</span>
+              <b>{zahlfristText}</b>
+            </div>
+            <div>
+              <span className="k">Gesamt</span>
+              <b>{formatEurBetrag(mailSummen.bruttoMin)} brutto</b>
+            </div>
           </div>
           <AngebotWizardMailPreview
             angebotId={angebotId}
@@ -1554,37 +1494,36 @@ export function AngebotWizard({
             leistungsumfang={meta.leistungsumfang.trim() || projekt}
             empfaengerHint={mailTo[0] || email || undefined}
           />
-
-          <div
+          <p
             style={{
+              margin: 0,
               fontSize: 'var(--fs-meta)',
               color: 'var(--text-3)',
               display: 'flex',
-              alignItems: 'flex-start',
               gap: 6,
+              alignItems: 'flex-start',
             }}
           >
             <MockIcon ctx="default" n="info-circle" size={14} style={{ marginTop: 2, flexShrink: 0 }} />
             <span>
               {istAuftragKorrektur ? (
                 <>
-                  <strong>An Kunden senden</strong> = korrigiertes Angebot per Mail (Primary).{' '}
-                  <strong>Nur übernehmen</strong> = mündlich / intern, ohne Kunden-Mail — danach
-                  Abschlagsplan und Schlussrechnung prüfen (falsch gestellte Schlussrechnung ggf.
-                  stornieren).
+                  <strong>Senden</strong> = korrigiertes Angebot per Mail.{' '}
+                  <strong>Übernehmen</strong> = ohne Kunden-Mail.
                 </>
               ) : (
-                <>Mit „Senden“ geht das Angebot per Mail.</>
+                <>Mit „Senden“ geht das Angebot per Mail. „Erstellen“ speichert ohne Versand.</>
               )}
             </span>
-          </div>
+          </p>
         </div>
-      </section>
-    </DocumentCanvas>
+      </EditorSheet>
+    </>
   )
 
   return createPortal(wizard, document.body)
 }
+
 
 function zahlfristAnzeigeFromLocal(seg: ZahlfristSeg, datum: string): string {
   return angebotZahlfristText({

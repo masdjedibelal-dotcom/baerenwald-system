@@ -10,9 +10,13 @@ import { cn } from '@/lib/utils'
 export type DocumentCanvasProps = {
   open?: boolean
   title: string
+  /** Untertitel unter dem Titel (Kunde · Region) */
+  subtitle?: ReactNode
   onClose: () => void
   /** Speichern Entwurf (✓) — S9: X speichert implizit via onClose ohne Confirm */
   onSave?: () => void
+  /** Wenn gesetzt: beschrifteter Header-CTA statt nur Check-Icon (Mock „Anfrage anlegen“) */
+  saveLabel?: string
   saveBusy?: boolean
   /** DocBar Verwerfen — einzige destruktive Exit mit Confirm */
   onDiscard?: () => void
@@ -43,8 +47,10 @@ export type DocumentCanvasProps = {
 export function DocumentCanvas({
   open = true,
   title,
+  subtitle,
   onClose,
   onSave,
+  saveLabel,
   saveBusy,
   onDiscard,
   docActions,
@@ -191,18 +197,46 @@ export function DocumentCanvas({
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
-        <h1 className="document-canvas__title">{title}</h1>
+        <div className="document-canvas__title-block min-w-0 flex-1 text-center">
+          <h1 className="document-canvas__title">{title}</h1>
+          {subtitle ? (
+            <p className="document-canvas__subtitle m-0 truncate text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
         {onSave ? (
-          <button
-            type="button"
-            className={cn('editor-sheet__confirm', saveFlash && 'bw-motion-save-ok')}
-            disabled={interactionLocked}
-            onClick={handleSave}
-            aria-label="Speichern"
-            title="Speichern"
-          >
-            <Check className="h-5 w-5" aria-hidden />
-          </button>
+          saveLabel ? (
+            <button
+              type="button"
+              className={cn(
+                'editor-sheet__confirm-text inline-flex items-center gap-1.5',
+                saveFlash && 'bw-motion-save-ok'
+              )}
+              disabled={interactionLocked}
+              onClick={handleSave}
+            >
+              <Check className="h-4 w-4" aria-hidden />
+              {saveBusy ? '…' : saveLabel}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={cn(
+                  'editor-sheet__confirm hidden md:flex',
+                  saveFlash && 'bw-motion-save-ok'
+                )}
+                disabled={interactionLocked}
+                onClick={handleSave}
+                aria-label="Speichern"
+                title="Speichern"
+              >
+                <Check className="h-5 w-5" aria-hidden />
+              </button>
+              <span className="editor-sheet__header-end md:hidden" aria-hidden />
+            </>
+          )
         ) : (
           <span className="editor-sheet__header-end" />
         )}
@@ -212,11 +246,11 @@ export function DocumentCanvas({
         className={cn('document-canvas__body', interactionLocked && 'pointer-events-none')}
       >
         {meta != null || documentSlot != null ? (
-          <div className="document-canvas__split">
-            <div className="document-canvas__paper document-canvas__paper--doc">
+          <div className="document-canvas__split dc-split">
+            <div className="document-canvas__paper document-canvas__paper--doc dc-doc">
               {documentSlot ?? children}
             </div>
-            <aside className="document-canvas__meta">
+            <aside className="document-canvas__meta dc-meta">
               <div className="document-canvas__meta-scroll">{meta}</div>
               {metaSum ? <div className="document-canvas__meta-sum">{metaSum}</div> : null}
             </aside>
@@ -225,8 +259,10 @@ export function DocumentCanvas({
           <div className="document-canvas__paper">{children}</div>
         )}
       </div>
-      {footerCta ? <div className="document-canvas__footer-cta">{footerCta}</div> : null}
-      {docActions ? (
+      {footerCta ? (
+        <div className="document-canvas__footer-cta doccv-foot">{footerCta}</div>
+      ) : null}
+      {docActions || onDiscard ? (
         <footer
           className={cn(
             'document-canvas__docbar',
@@ -245,6 +281,7 @@ export function DocumentCanvas({
               title="Verwerfen"
             >
               <TrashIcon />
+              <span className="doc-action-bar__lbl">Verwerfen</span>
             </button>
           ) : null}
         </footer>

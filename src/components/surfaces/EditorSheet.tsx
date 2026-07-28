@@ -43,6 +43,7 @@ export type EditorSheetProps = {
   onDismissAttempt?: () => void
   className?: string
   bodyClassName?: string
+  overlayClassName?: string
   size?: 'md' | 'lg'
   /** Sticky Footer-CTAs (LeistungDrawer / RateDrawer) — Aktionen nur hier */
   footer?: ReactNode
@@ -69,6 +70,7 @@ export function EditorSheet({
   onDismissAttempt,
   className,
   bodyClassName,
+  overlayClassName,
   size = 'md',
   footer,
 }: EditorSheetProps) {
@@ -243,7 +245,11 @@ export function EditorSheet({
   return createPortal(
     <>
       <div
-        className={cn('editor-sheet-overlay', `editor-sheet-overlay--${layout}`)}
+        className={cn(
+          'editor-sheet-overlay',
+          `editor-sheet-overlay--${layout}`,
+          overlayClassName
+        )}
         role="presentation"
         onClick={(e) => {
           if (e.target === e.currentTarget) requestClose()

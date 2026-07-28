@@ -220,8 +220,12 @@ export type Lead = {
   kostentraeger_vorgeschlagen?: boolean | null
   versicherungs_nr?: string | null
   duplikat_hinweis?: boolean | null
+  /** Nutzer hat Duplikat-Band geschlossen — Zusammenführen bleibt im ⋯ */
+  duplikat_band_dismissed?: boolean | null
   /** Spec zusammengefuehrtIn — Ziel-Lead; duplikat_hinweis bleibt Vorstufe */
   zusammengefuehrt_in?: string | null
+  /** Soft-delete; Listen filtern geloescht_am IS NULL */
+  geloescht_am?: string | null
   /** Spec Wiedervorlage (lokal am Vorgang) */
   wiedervorlage_datum?: string | null
   wiedervorlage_notiz?: string | null
@@ -286,6 +290,7 @@ export type LeadAuftraggeberEmbed = Pick<
   | 'typ'
   | 'org_anzeigename'
   | 'org_kennung'
+  | 'ansprechpartner'
 >
 
 /** Lead inkl. Status-Historie (Detailansicht) */

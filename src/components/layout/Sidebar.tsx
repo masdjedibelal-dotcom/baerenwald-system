@@ -56,12 +56,6 @@ export function Sidebar({
   return (
     <nav className="sidebar" aria-label="Hauptnavigation">
       <div className="sidebar-top">
-        <Link href="/" className="sidebar-brand" title="Bärenwald CRM">
-          <div className="sidebar-logo">
-            <BrandLogo variant="white" height={18} />
-          </div>
-          <span className="sidebar-brandname">Bärenwald</span>
-        </Link>
         <button
           type="button"
           className="sidebar-toggle"
@@ -72,6 +66,12 @@ export function Sidebar({
         >
           <MockIcon ctx="sidebar" n={expanded ? 'chevron-left' : 'chevron-right'} size={18} />
         </button>
+        <Link href="/" className="sidebar-brand" title="Bärenwald CRM">
+          <div className="sidebar-logo">
+            <BrandLogo variant="white" height={18} />
+          </div>
+          <span className="sidebar-brandname">Bärenwald</span>
+        </Link>
       </div>
 
       <div className="sidebar-nav">

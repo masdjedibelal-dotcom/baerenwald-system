@@ -27,10 +27,16 @@ export type EntityMenuHandlers = {
   onPortal?: () => void
   /** Portal-Einladungsmail (Kunden-/Handwerker-/Partner-Link versenden) */
   onPortalLink?: () => void
-  onStatus?: (kind: 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren') => void
+  onStatus?: (kind: 'termin' | 'nicht_erreichbar' | 'verloren') => void
   /** Anfrage: Notfall melden → Auftrag mit Regie */
   onNotfall?: () => void
   onAngebot?: () => void
+  /** Anfrage: Sheet mit allen Angeboten */
+  onAngeboteVerwalten?: () => void
+  /** Anfrage: Wiedervorlage setzen */
+  onWiedervorlage?: () => void
+  /** Anfrage: Duplikat zusammenführen */
+  onZusammenfuehren?: () => void
   /** Kunde / Handwerker: Pipeline anlegen */
   onCreateAnfrage?: () => void
   onCreateAngebot?: () => void
@@ -56,14 +62,8 @@ export type EntityMenuHandlers = {
   extra?: EntityMenuItem[]
 }
 
-/** Kanonische Portal-Link-Labels — überall gleich. */
-export function portalLinkMenuLabel(type: EntityMenuType): string {
-  if (type === 'handwerker') return 'Handwerker-Link versenden'
-  if (type === 'partner') return 'Partner-Link versenden'
-  return 'Kundenportal-Link versenden'
-}
-
-type EntityLike = {
+/** Eine Quelle für alle ⋯-Menüs — 1:1 Mock entityMenu */
+export type EntityLike = {
   status?: string | null
   statusKey?: string | null
   name?: string | null
@@ -72,6 +72,19 @@ type EntityLike = {
   tel?: string | null
   mail?: string | null
   customer?: { tel?: string; mail?: string; name?: string } | null
+  /** Anfrage: Angebote vorhanden */
+  hasAngebote?: boolean
+  /** Anfrage: mind. ein angenommenes Angebot → kein „Verloren“ */
+  hasAngenommenesAngebot?: boolean
+  /** Anfrage: Duplikat erkannt (Band ggf. dismissed) → Menüeintrag */
+  showZusammenfuehren?: boolean
+}
+
+/** Kanonische Portal-Link-Labels — überall gleich. */
+export function portalLinkMenuLabel(type: EntityMenuType): string {
+  if (type === 'handwerker') return 'Handwerker-Link versenden'
+  if (type === 'partner') return 'Partner-Link versenden'
+  return 'Kundenportal-Link versenden'
 }
 
 function dedupeSeps(items: EntityMenuItem[]): EntityMenuItem[] {
@@ -84,6 +97,10 @@ function dedupeSeps(items: EntityMenuItem[]): EntityMenuItem[] {
   })
   while (out.length && out[out.length - 1] === 'sep') out.pop()
   return out
+}
+
+function anfrageStatusEarly(st: string | null): boolean {
+  return st === 'neu' || st === 'kontaktiert'
 }
 
 /** Eine Quelle für alle ⋯-Menüs — 1:1 Mock entityMenu */
@@ -101,12 +118,96 @@ export function buildEntityMenu(
   const isVorgangPhase =
     type === 'anfrage' || type === 'angebot' || type === 'auftrag' || type === 'rechnung'
 
+  /** Anfrage: Status zuerst, dann Kontext, dann Bearbeiten/Kopieren/Admin, Löschen unten */
+  if (type === 'anfrage') {
+    if (h.onStatus && anfrageStatusEarly(st)) {
+      A.push({
+        icon: 'calendar-event',
+        label: 'Termin vereinbart',
+        onClick: () => h.onStatus!('termin'),
+      })
+      A.push({
+        icon: 'phone-off',
+        label: 'Nicht erreichbar',
+        onClick: () => h.onStatus!('nicht_erreichbar'),
+      })
+    }
+    if (h.onStatus && !e.hasAngenommenesAngebot && st !== 'abgebrochen') {
+      A.push({
+        icon: 'circle-x',
+        label: 'Als verloren markieren',
+        onClick: () => h.onStatus!('verloren'),
+      })
+    }
+
+    const kontextBefore = A.length
+    if (e.hasAngebote && h.onAngeboteVerwalten) {
+      A.push('sep')
+      A.push({
+        icon: 'file-invoice',
+        label: 'Angebote verwalten',
+        onClick: h.onAngeboteVerwalten,
+      })
+    }
+    if (h.onWiedervorlage) {
+      if (A.length === kontextBefore) A.push('sep')
+      A.push({ icon: 'clock', label: 'Wiedervorlage', onClick: h.onWiedervorlage })
+    }
+    if (e.showZusammenfuehren && h.onZusammenfuehren) {
+      if (A.length === kontextBefore) A.push('sep')
+      A.push({ icon: 'link', label: 'Zusammenführen', onClick: h.onZusammenfuehren })
+    }
+
+    A.push('sep')
+    if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
+    if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
+    if (h.onPortal) {
+      A.push({ icon: 'external-link', label: 'Admin Login', onClick: h.onPortal })
+    }
+
+    const extraItems = (h.extra ?? []).filter((c) => {
+      if (c === 'sep') return true
+      const label = c.label.toLowerCase()
+      if (label.includes('notfall')) return false
+      if (label.includes('portal')) return false
+      if (label === 'anrufen' || label.includes('mail schreiben') || label === 'kontakt') return false
+      if (label.includes('rückfrage') || label.includes('rueckfrage')) return false
+      return true
+    })
+    const extraNormal: EntityMenuItem[] = []
+    const extraDanger: EntityMenuItem[] = []
+    for (const c of extraItems) {
+      if (c !== 'sep' && c.danger) extraDanger.push(c)
+      else extraNormal.push(c)
+    }
+    if (extraNormal.length) {
+      A.push('sep')
+      extraNormal.forEach((c) => A.push(c))
+    }
+    if (h.onDelete || extraDanger.length) {
+      A.push('sep')
+      extraDanger.forEach((c) => A.push(c))
+      if (h.onDelete) {
+        const label =
+          h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
+        A.push({
+          icon: 'trash',
+          label: h.deleteMenuLabel ?? 'Löschen',
+          danger: true,
+          onClick: () => confirmDelete(String(label), h.onDelete!),
+        })
+      }
+    }
+    return dedupeSeps(A)
+  }
+
   if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
   if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
 
   /**
    * Phase 5c: Vorgang-⋯ nur Statuswechsel · Bearbeiten/Kopieren · Löschen.
    * Kontakt / Portal / Notfall → Stammdaten bzw. QuickBar, nicht Menü.
+   * Ausnahme Anfrage: Admin Login (siehe Zweig oben).
    */
   if (!isVorgangPhase) {
     if (h.onPortal) {
@@ -140,32 +241,10 @@ export function buildEntityMenu(
     if (A.length === before + 1) A.pop()
   }
 
-  if (type === 'anfrage' && h.onStatus) {
-    A.push('sep')
-    A.push({ icon: 'calendar-event', label: 'Termin vereinbart', onClick: () => h.onStatus!('termin') })
-    A.push({ icon: 'help', label: 'Rückfrage', onClick: () => h.onStatus!('rueckfrage') })
-    A.push({
-      icon: 'phone-off',
-      label: 'Nicht erreichbar',
-      onClick: () => h.onStatus!('nicht_erreichbar'),
-    })
-    A.push({
-      icon: 'circle-x',
-      label: 'Als verloren markieren',
-      onClick: () => h.onStatus!('verloren'),
-    })
-  }
-
-  /**
-   * Phase 5c: Prozess-CTAs (Versenden/Annehmen/PDF/…) gehören nicht ins Vorgang-⋯ —
-   * Primary-CTA bzw. Canvas. Für Kunde/Handwerker/Partner existieren diese Typ-Zweige ohnehin nicht.
-   */
-
   const extraItems = (h.extra ?? []).filter((c) => {
     if (c === 'sep') return true
     if (!isVorgangPhase) return true
     const label = c.label.toLowerCase()
-    /* Phase 5c Grep-Ziel: keine Kontakt-/Portal-/Notfall-Einträge im Vorgang-⋯ */
     if (label.includes('notfall')) return false
     if (label.includes('portal')) return false
     if (label === 'anrufen' || label.includes('mail schreiben') || label === 'kontakt') return false

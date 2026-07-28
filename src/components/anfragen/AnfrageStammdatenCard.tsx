@@ -7,16 +7,6 @@ import {
 } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail } from '@/lib/types'
-import { formatLeadListDatum, kanalLabel } from '@/lib/utils'
-
-function eingegangenLabel(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const day = formatLeadListDatum(iso)
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return day
-  const time = t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-  return `${day} · ${time}`
-}
 
 export function AnfrageStammdatenCard({
   lead,
@@ -30,7 +20,6 @@ export function AnfrageStammdatenCard({
   const ag = lead.auftraggeber
   const name = leadKontaktAnzeigeName(lead)
 
-  // Bei Mieter-Meldungen: Stammdaten = Hausverwaltung (Auftraggeber), nicht Melder.
   const kundeId = isHv
     ? lead.auftraggeber_kunde_id ?? ag?.id ?? null
     : lead.kunde_id ?? melder?.id ?? null
@@ -52,17 +41,8 @@ export function AnfrageStammdatenCard({
     <EntityKundenStammdatenCard
       kundeId={kundeId}
       leadId={isHv ? null : lead.id}
-      initial={{
-        name,
-        telefon,
-        email,
-        plz,
-        ort,
-        strasse,
-      }}
+      initial={{ name, telefon, email, plz, ort, strasse }}
       kundeTyp={kundeTyp}
-      quelle={!isHv ? kanalLabel(lead.kanal) : null}
-      eingegangen={!isHv ? eingegangenLabel(lead.created_at) : null}
       onSaved={onSaved}
     />
   )

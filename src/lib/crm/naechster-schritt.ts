@@ -5,7 +5,7 @@
 
 export type NaechsterSchrittHint = {
   label: string
-  hint: string
+  hint?: string
 }
 
 export function naechsterSchrittAnfrage(input: {
@@ -43,30 +43,36 @@ export function naechsterSchrittAngebot(input: {
   statusEinfach: string
   hasAuftrag: boolean
   needsPartnerFirst: boolean
+  /** Für Hint „gültig bis …“ (Mock Statusband) */
+  gueltigBisLabel?: string | null
 }): NaechsterSchrittHint | null {
+  const gueltigHint = input.gueltigBisLabel?.trim()
+    ? `gültig bis ${input.gueltigBisLabel.trim()}`
+    : null
+
   if (input.hasAuftrag || input.statusEinfach === 'angenommen') {
+    const label = input.hasAuftrag ? '→ Auftrag läuft' : '→ Auftrag anlegen'
     return {
-      label: 'Als Nächstes',
-      hint: 'Zum Auftrag wechseln — Leistungen und Rechnung dort.',
+      label: gueltigHint ? `${label} · ${gueltigHint}` : label,
     }
   }
   if (input.statusEinfach === 'abgelehnt' || input.statusEinfach === 'ersetzt') return null
   if (input.statusEinfach === 'entwurf' && input.needsPartnerFirst) {
     return {
-      label: 'Als Nächstes',
-      hint: 'Zuerst Partner anfragen bzw. Einreichung prüfen, dann an den Kunden senden.',
+      label: gueltigHint ? `→ Partner anfragen · ${gueltigHint}` : '→ Partner anfragen',
+      hint: 'Einreichung prüfen, dann an den Kunden senden.',
     }
   }
   if (input.statusEinfach === 'entwurf') {
     return {
-      label: 'Als Nächstes',
+      label: gueltigHint ? `→ Angebot versenden · ${gueltigHint}` : '→ Angebot versenden',
       hint: 'Positionen prüfen — dann versenden oder direkt annehmen.',
     }
   }
   if (input.statusEinfach === 'gesendet' || input.statusEinfach === 'abgelaufen') {
     return {
-      label: 'Als Nächstes',
-      hint: 'Auf Kundenantwort warten — oder Angebot manuell annehmen.',
+      label: gueltigHint ? `→ Auf Antwort warten · ${gueltigHint}` : '→ Auf Antwort warten',
+      hint: 'Oder Angebot manuell annehmen.',
     }
   }
   return null

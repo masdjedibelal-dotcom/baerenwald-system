@@ -109,7 +109,7 @@ const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
   'akte',
   'aktivitaet',
 ])
-const RECHNUNG_DETAIL_DEFAULT_TAB: RechnungDetailTab = 'leistungen'
+const RECHNUNG_DETAIL_DEFAULT_TAB: RechnungDetailTab = 'uebersicht'
 
 function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase()

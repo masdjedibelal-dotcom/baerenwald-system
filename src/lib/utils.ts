@@ -99,9 +99,11 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
 
 export const VERLOREN_GRUND_LABELS: Record<string, string> = {
   zu_teuer: 'Zu teuer',
+  anderer_anbieter: 'Anderer Anbieter',
+  kein_bedarf: 'Kein Bedarf',
+  nicht_erreichbar: 'Nicht erreichbar',
   kein_interesse: 'Kein Interesse mehr',
   konkurrenz: 'Konkurrenz gewählt',
-  nicht_erreichbar: 'Nicht mehr erreichbar',
   sonstiges: 'Sonstiges',
 }
 

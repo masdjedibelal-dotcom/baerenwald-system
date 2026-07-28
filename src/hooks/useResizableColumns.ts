@@ -47,7 +47,7 @@ function saveWidths(key: string, defs: ResizableColDef[], widths: number[]) {
 
 /**
  * Desktop-Listen: Spaltenbreiten speichern + per Drag anpassen.
- * Liefert `gridTemplateColumns` (px) für Head und Rows.
+ * Flexible Spalten als `minmax(0, Nfr)` (füllen die Breite), fixe als px.
  */
 export function useResizableColumns(storageKey: string, defs: ResizableColDef[]) {
   const defsKey = defs.map((d) => d.id).join('|')
@@ -66,8 +66,17 @@ export function useResizableColumns(storageKey: string, defs: ResizableColDef[])
   }, [storageKey, defsKey])
 
   const gridTemplateColumns = useMemo(
-    () => widths.map((w) => `${Math.round(w)}px`).join(' '),
-    [widths]
+    () =>
+      widths
+        .map((w, i) => {
+          const d = defs[i]
+          const rounded = Math.max(1, Math.round(w))
+          if (d?.fixed) return `${rounded}px`
+          /* fr-Gewichte: Zeile füllt die Breite, kein Horizontal-Scroll */
+          return `minmax(0, ${rounded}fr)`
+        })
+        .join(' '),
+    [widths, defs]
   )
 
   const startResize = useCallback(

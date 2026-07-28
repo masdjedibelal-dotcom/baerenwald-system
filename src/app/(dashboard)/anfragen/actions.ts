@@ -246,6 +246,10 @@ export async function insertKalenderTermin(input: {
 export type NeueAnfragePayload = {
   /** Wenn gesetzt, wird dieser Kunde verknüpft (kein neuer Kunde aus E-Mail-Logik). */
   kunde_id?: string | null
+  /** HV: Auftraggeber-Organisation (Pipeline hv_meldung) */
+  auftraggeber_kunde_id?: string | null
+  /** projekt | meldung — HV-Meldung braucht anlass meldung */
+  anlass?: 'projekt' | 'meldung' | null
   /** Anzeigename / Fallback (z. B. „Vorname Nachname“ oder Firma). */
   name: string
   vorname?: string | null
@@ -399,6 +403,8 @@ export async function createAnfrage(
     .from('leads')
     .insert({
       kunde_id: kundeId,
+      auftraggeber_kunde_id: payload.auftraggeber_kunde_id?.trim() || null,
+      anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
       kanal: payload.kanal,
       status: 'neu',
       situation: situationFinal,
@@ -1159,25 +1165,139 @@ export async function saveLeadRueckfrage(input: {
 export async function saveLeadNichtErreichbar(input: {
   leadId: string
   kontaktName: string
-  wiedervorlage: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+  notiz?: string | null
+  /** @deprecated Spec: kein WV-Feld mehr — Zähler über Timeline */
+  wiedervorlage?: string
+}): Promise<
+  | { ok: true; versuche: number; vorschlagVerloren: boolean }
+  | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const stamp = new Date().toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  const name = input.kontaktName.trim() || 'Kunde'
+  const extra = [name ? `Kontakt: ${name}` : null, input.notiz?.trim() || null]
+    .filter(Boolean)
+    .join(' — ')
+
   await insertLeadTimelineEntry(
     input.leadId,
     'kontakt',
-    `Nicht erreichbar — Wiedervorlage: ${input.wiedervorlage}`,
-    null
+    `Nicht erreichbar — Versuch · ${stamp}`,
+    extra || null
   )
 
-  const supabase = createClient()
-  const { data: lead } = await supabase.from('leads').select('status').eq('id', input.leadId).maybeSingle()
-  if (lead?.status === 'neu') {
-    return updateLeadStatus(input.leadId, 'kontaktiert')
+  const { count, error } = await supabase
+    .from('lead_timeline')
+    .select('id', { count: 'exact', head: true })
+    .eq('lead_id', input.leadId)
+    .eq('typ', 'kontakt')
+    .ilike('titel', 'Nicht erreichbar%')
+
+  if (error) {
+    console.warn('kontaktversuche count:', error.message)
   }
+
+  const versuche = typeof count === 'number' ? count : 1
+  const vorschlagVerloren = versuche >= 3
 
   revalidatePath(`/anfragen/${input.leadId}`)
   revalidatePath('/anfragen')
   revalidatePath('/kalender')
+  return { ok: true, versuche, vorschlagVerloren }
+}
+
+/** Soft-delete: geloescht_am setzen (kein Hard-Delete). */
+export async function softDeleteAnfrage(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('leads')
+    .update({ geloescht_am: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', leadId)
+  if (error) return { ok: false, message: error.message }
+  await insertLeadTimelineEntry(leadId, 'system', 'Anfrage als gelöscht markiert', null)
+  revalidatePath(`/anfragen/${leadId}`)
+  revalidatePath('/anfragen')
+  revalidatePath('/vorgaenge')
   return { ok: true }
+}
+
+export async function restoreAnfrage(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('leads')
+    .update({ geloescht_am: null, updated_at: new Date().toISOString() })
+    .eq('id', leadId)
+  if (error) return { ok: false, message: error.message }
+  await insertLeadTimelineEntry(leadId, 'system', 'Löschen rückgängig', null)
+  revalidatePath(`/anfragen/${leadId}`)
+  revalidatePath('/anfragen')
+  revalidatePath('/vorgaenge')
+  return { ok: true }
+}
+
+/** Termin-Status rückgängig (Undo-Toast). */
+export async function undoLeadTerminVereinbart(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { data: hist } = await supabase
+    .from('leads_status_history')
+    .select('status_alt')
+    .eq('lead_id', leadId)
+    .eq('status_neu', 'termin')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const prev = (hist?.status_alt as LeadStatus | null) || 'kontaktiert'
+  const statusRes = await updateLeadStatus(leadId, prev, 'Termin rückgängig')
+  if (!statusRes.ok) return statusRes
+
+  await supabase
+    .from('kalender_termine')
+    .update({ erledigt: true })
+    .eq('lead_id', leadId)
+    .eq('typ', 'besichtigung')
+    .eq('erledigt', false)
+
+  revalidatePath('/kalender')
+  return { ok: true }
+}
+
+export async function dismissDuplikatBand(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('leads')
+    .update({ duplikat_band_dismissed: true, updated_at: new Date().toISOString() })
+    .eq('id', leadId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath(`/anfragen/${leadId}`)
+  return { ok: true }
+}
+
+export async function countNichtErreichbarVersuche(
+  leadId: string
+): Promise<number> {
+  const supabase = createClient()
+  const { count } = await supabase
+    .from('lead_timeline')
+    .select('id', { count: 'exact', head: true })
+    .eq('lead_id', leadId)
+    .eq('typ', 'kontakt')
+    .ilike('titel', 'Nicht erreichbar%')
+  return typeof count === 'number' ? count : 0
 }
 
 export async function saveLeadAlsVerloren(input: {

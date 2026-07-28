@@ -9,11 +9,8 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
-import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
-import { DetailSection } from '@/components/vorgang/DetailSection'
+import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { VorgangZahlungTab } from '@/components/vorgang/VorgangZahlungTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -23,8 +20,8 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateAngebot } from '@/lib/list-actions'
@@ -33,7 +30,6 @@ import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/a
 import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
-  resendAngebotEinfach,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
@@ -46,7 +42,8 @@ import {
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
-import { AngebotLeistungenTab, AngebotProjektinfosTab } from '@/components/angebote/AngebotDetailsTab'
+import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
+import { AngebotZahlungTab } from '@/components/angebote/AngebotZahlungTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
@@ -82,14 +79,10 @@ import { formatDatum } from '@/lib/utils'
 import {
   darfAngebotAnKundeSenden,
   hatAngebotHandwerker,
-  handwerkerAnfrageErledigt,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { naechsterSchrittAngebot } from '@/lib/crm/naechster-schritt'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
-import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 
 type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
@@ -100,7 +93,7 @@ const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'akte',
   'aktivitaet',
 ])
-const ANGEBOT_DETAIL_DEFAULT_TAB: AngebotDetailTab = 'leistungen'
+const ANGEBOT_DETAIL_DEFAULT_TAB: AngebotDetailTab = 'uebersicht'
 
 /** Query-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab | null {
@@ -231,21 +224,9 @@ export function AngebotDetailPageClient({
     [detail.positionen]
   )
 
-  const vorgangFotos = useMemo(
-    () =>
-      collectVorgangFotos({
-        funnelDaten: lead?.funnel_daten,
-        angebotFotosRaw: detail.fotos_urls,
-      }),
-    [lead?.funnel_daten, detail.fotos_urls]
-  )
-
   const kannBearbeiten =
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
-
-  /** Positionen v3: wie Auftrag — solange Wizard-Status es erlaubt (auch nach Kundenannahme). */
-  const positionenBearbeitbar = angebotDarfImWizardBearbeitetWerden(detail.status)
 
   function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap) {
     setWizardBootstrap(bootstrap)
@@ -406,7 +387,16 @@ export function AngebotDetailPageClient({
       }),
     [detail, lead?.situation, lead?.bereiche]
   )
-  const headMeta = kundeName
+  const headMeta = useMemo(() => {
+    const parts = [
+      projektTitel && projektTitel !== '—' ? projektTitel : null,
+      formatEurBetrag(summenMail.bruttoMin),
+      gueltigBisYmd
+        ? `gültig bis ${formatDatum(gueltigBisYmd) || gueltigBisYmd}`
+        : null,
+    ].filter(Boolean)
+    return parts.join(' · ')
+  }, [projektTitel, summenMail.bruttoMin, gueltigBisYmd])
   const headSub =
     statusEinfach === 'gesendet'
       ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
@@ -416,23 +406,6 @@ export function AngebotDetailPageClient({
   const kundeEmail =
     lead?.auftraggeber?.email?.trim() || kunde?.email?.trim() || ''
 
-  function openHandwerkerAnfragen() {
-    const rows = detail.angebot_handwerker ?? []
-    if (!hatAngebotHandwerker(rows)) {
-      if (kannBearbeiten && detail.lead_id && lead) {
-        toast.info('Bitte zuerst Handwerker im Angebots-Wizard zuweisen.')
-        openWizardBearbeiten()
-        return
-      }
-      toast.error('Keine Handwerker zugewiesen — Angebot im Wizard bearbeiten.')
-      return
-    }
-    const el =
-      document.getElementById('angebot-versand-handwerker') ??
-      document.getElementById('handwerker-partner')
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   function openAcceptModal() {
     setAufBetreff('')
     setAufTo([])
@@ -441,27 +414,8 @@ export function AngebotDetailPageClient({
     setAcceptOpen(true)
   }
 
-  function run(action: () => Promise<{ ok: boolean; message?: string }>, okMsg: string) {
-    startTransition(async () => {
-      const res = await action()
-      if (!res.ok) {
-        toast.error(res.message ?? 'Fehler')
-        return
-      }
-      toast.success(okMsg)
-      refresh()
-    })
-  }
-
-  const kannErneutSenden = statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen'
-
   const detailHeadMenuItems = useMemo(() => {
-    const erledigt =
-      statusEinfach === 'angenommen' ||
-      statusEinfach === 'abgelehnt' ||
-      Boolean(auftragId)
-
-    const baseItems = entityMenuToActionItems(
+    const items = entityMenuToActionItems(
       buildEntityMenu(
         'angebot',
         {
@@ -470,7 +424,6 @@ export function AngebotDetailPageClient({
           statusKey: statusEinfach,
         },
         {
-          onEdit: kannBearbeiten ? openWizardBearbeiten : undefined,
           onCopy: () => runDuplicateAngebot(detail.id, router),
           onDelete: () => {
             startTransition(async () => {
@@ -490,24 +443,6 @@ export function AngebotDetailPageClient({
       (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
     )
 
-    let items: typeof baseItems =
-      erledigt || statusEinfach !== 'entwurf'
-        ? baseItems
-        : (() => {
-            const out: typeof baseItems = []
-            for (const item of baseItems) {
-              out.push(item)
-              if (item !== 'sep' && item.label === 'Bearbeiten') {
-                out.push({
-                  label: 'Partner anfragen',
-                  icon: mockMenuIcon('send', 15),
-                  onClick: openHandwerkerAnfragen,
-                })
-              }
-            }
-            return out
-          })()
-
     if (
       (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
       !auftragId
@@ -525,23 +460,13 @@ export function AngebotDetailPageClient({
       }
       const delIdx = items.findIndex((i) => i !== 'sep' && i.label === 'Löschen')
       if (delIdx >= 0) {
-        items = [...items.slice(0, delIdx), ablehnenItem, ...items.slice(delIdx)]
-      } else {
-        items = [...items, ablehnenItem]
+        return [...items.slice(0, delIdx), ablehnenItem, ...items.slice(delIdx)]
       }
+      return [...items, ablehnenItem]
     }
 
     return items
-  }, [
-    kannBearbeiten,
-    kundeName,
-    detail.id,
-    detail.lead_id,
-    statusEinfach,
-    auftragId,
-    router,
-    startTransition,
-  ])
+  }, [kundeName, detail.id, detail.lead_id, statusEinfach, auftragId, router, startTransition])
 
   const primaryAction = useMemo((): DetailActionDef | null => {
     const cta = primaryCta('angebot', statusEinfach || detail.status)
@@ -566,27 +491,17 @@ export function AngebotDetailPageClient({
   }, [statusEinfach, detail.status, pending, openAcceptModal])
 
   const stammdatenInhalt = (
-    <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
-  )
-
-  const projektinfosInhalt = (
-    <AngebotProjektinfosTab
-      detail={detail}
-      lead={lead}
-      editable={positionenBearbeitbar}
-      onSaved={() => refresh()}
-    />
+    <>
+      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
+      <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+    </>
   )
 
   const leistungenInhalt = (
     <AngebotLeistungenTab detail={detail} onOpenDokument={openWizardBearbeiten} />
   )
 
-  const verlaufInhalt = (
-    <>
-      <VerlaufPanel items={timelineItems} />
-    </>
-  )
+  const verlaufInhalt = <VerlaufPanel items={timelineItems} />
 
   const dokumenteInhalt = (
     <AngebotAnhaengeTab
@@ -612,6 +527,8 @@ export function AngebotDetailPageClient({
       </MockCard>
     )
 
+  const akteCount = (anhaengeCount || 0) + (notizenRows.length || 0) || undefined
+
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -619,20 +536,14 @@ export function AngebotDetailPageClient({
       icon: 'file-invoice',
       render: () => (
         <div className="space-y-6">
-          <PhaseCardsBlock
-            kontext={projektKontext}
-            fromRef={{ kind: 'angebot', id: detail.id }}
-          />
           {stammdatenInhalt}
-          <ZugehoerigListe
-            kontext={projektKontext}
-            fromRef={{ kind: 'angebot', id: detail.id }}
-          />
-          {projektinfosInhalt}
-          {vorgangFotos.length > 0 ? (
-            <DetailSection title="Fotos">
-              <VorgangFotosTab fotos={vorgangFotos} />
-            </DetailSection>
+          {lead ? (
+            <VorgangPhasenVerlauf
+              kontext={projektKontext}
+              fromRef={{ kind: 'angebot', id: detail.id }}
+              lead={lead}
+              onSaved={() => refresh()}
+            />
           ) : null}
         </div>
       ),
@@ -641,28 +552,20 @@ export function AngebotDetailPageClient({
       id: 'leistungen',
       label: entityDetailTabLabel('leistungen'),
       icon: 'tool',
+      count: positionenAnzeigeCount || undefined,
       render: () => <div className="space-y-6">{leistungenInhalt}</div>,
     },
     {
       id: 'zahlung',
       label: entityDetailTabLabel('zahlung'),
       icon: 'receipt',
-      render: () => (
-        <VorgangZahlungTab
-          variant="angebot"
-          zahlungsplanRaw={detail.zahlungsplan}
-          gesamtNetto={summenMail.nettoMin}
-          gesamtBruttoHint={summenMail.bruttoMin}
-          rechnungen={[]}
-          readOnly
-        />
-      ),
+      render: () => <AngebotZahlungTab detail={detail} />,
     },
     {
       id: 'akte',
       label: entityDetailTabLabel('akte'),
       icon: 'files',
-      count: anhaengeCount || undefined,
+      count: akteCount,
       render: () => (
         <VorgangAkteTab
           dateien={dokumenteInhalt}
@@ -675,12 +578,7 @@ export function AngebotDetailPageClient({
       label: entityDetailTabLabel('aktivitaet'),
       icon: 'history',
       count: timelineItems.length || undefined,
-      render: () => (
-        <div className="space-y-6">
-          {verlaufInhalt}
-          <ProjektHistorieTab kontext={projektKontext} />
-        </div>
-      ),
+      render: () => <div className="space-y-6">{verlaufInhalt}</div>,
     },
   ]
 
@@ -689,7 +587,9 @@ export function AngebotDetailPageClient({
       phase="angebot"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
-      crumbBackLabel="Zurück zu Vorgängen"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbSectionLabel="Angebote"
+      breadcrumbTitle={kundeName}
       className="space-y-4 pb-0"
       wiedervorlageDatum={detail.wiedervorlage_datum}
       wiedervorlageNotiz={detail.wiedervorlage_notiz}
@@ -698,16 +598,12 @@ export function AngebotDetailPageClient({
       onWiedervorlageSaved={() => refresh()}
       nextStepMetrics={[
         {
-          label: 'Wert',
+          label: 'Angebotssumme',
           value: formatEurBetrag(summenMail.bruttoMin),
         },
         {
           label: 'Positionen',
-          value: String((detail.positionen ?? []).length),
-        },
-        {
-          label: 'Gültig bis',
-          value: formatDatum(gueltigBisYmd) || gueltigBisYmd,
+          value: String(positionenAnzeigeCount),
         },
       ]}
       quickBar={[
@@ -735,7 +631,7 @@ export function AngebotDetailPageClient({
           id: 'foto',
           label: 'Foto',
           icon: 'camera',
-          onClick: () => setMainTab('uebersicht'),
+          onClick: () => setMainTab('akte'),
         },
       ]}
       nextStep={naechsterSchrittAngebot({
@@ -744,9 +640,10 @@ export function AngebotDetailPageClient({
         needsPartnerFirst:
           hatAngebotHandwerker(detail.angebot_handwerker) &&
           !darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status),
+        gueltigBisLabel: formatDatum(gueltigBisYmd) || gueltigBisYmd,
       })}
       head={{
-        title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
+        title: kundeName,
         sub: headSub,
         badges: (
           <StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />

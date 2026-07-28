@@ -64,6 +64,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('leads')
         .select(VORGAENGE_LEAD_SELECT)
+        .is('geloescht_am', null)
         .order('updated_at', { ascending: false })
         .limit(200)
     ),

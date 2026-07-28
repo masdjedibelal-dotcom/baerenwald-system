@@ -6,6 +6,8 @@ import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/lei
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { betragAnzeige } from '@/lib/angebot-einfach'
+import { summenAusPositionen } from '@/lib/angebot-positionen'
+import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { AngebotDetail, Gewerk, LeadDetail } from '@/lib/types'
 import { formatDatum, formatDatumZeit } from '@/lib/utils'
@@ -99,20 +101,29 @@ export function AngebotLeistungenTab({
   onSaved?: () => void
   onOpenDokument?: () => void
 }) {
-  const rows = useMemo(
-    () =>
-      leistungenFromAngebotPositionen(detail.positionen ?? [], {
-        status: 'entwurf',
-        statusLabel: 'Im Angebot',
-      }),
-    [detail.positionen]
-  )
+  const rows = useMemo(() => {
+    const pos = (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p))
+    return leistungenFromAngebotPositionen(pos, {
+      status: 'entwurf',
+      statusLabel: 'Im Angebot',
+    })
+  }, [detail.positionen])
+
+  const summen = useMemo(() => summenAusPositionen(detail.positionen ?? [], 19), [detail.positionen])
 
   return (
     <LeistungenTab
       phase="angebot"
       rows={rows}
       onOpenDokument={onOpenDokument}
+      dokumentHint="Positionen werden im Angebot bearbeitet"
+      dokumentActionLabel="Im Angebot bearbeiten"
+      groupByGewerk
+      footerNettoMwst={{
+        netto: summen.nettoMin,
+        mwstSatz: summen.mwstSatz,
+        mwstBetrag: summen.mwstBetragMin,
+      }}
       emptyHint="Noch keine Positionen — im Angebots-Dokument anlegen."
     />
   )

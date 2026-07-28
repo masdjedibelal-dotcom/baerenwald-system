@@ -79,6 +79,9 @@ export function LeistungenTab({
   maengel = [],
   onOpenDokument,
   dokumentHint,
+  dokumentActionLabel,
+  groupByGewerk = false,
+  footerNettoMwst,
   bulkActions,
   drawerActionsForRow,
   belowTable,
@@ -91,6 +94,12 @@ export function LeistungenTab({
   /** Öffnet Angebots-/Rechnungs-Canvas (read-only Tab schreibt nicht). */
   onOpenDokument?: () => void
   dokumentHint?: string | null
+  /** CTA-Label neben dem Hinweis (Default: „Dokument öffnen“) */
+  dokumentActionLabel?: string
+  /** Positionen nach Gewerk gruppieren (Mock Angebot) */
+  groupByGewerk?: boolean
+  /** Footer: Positionen · Netto · MwSt (statt nur Summe) */
+  footerNettoMwst?: { netto: number; mwstSatz: number; mwstBetrag: number } | null
   /** Sammelaktionen — nur Auftrag (Spec). */
   bulkActions?: LeistungenTabBulkAction[]
   drawerActionsForRow?: (row: LeistungRow) => LeistungDrawerAction[]
@@ -133,10 +142,23 @@ export function LeistungenTab({
     [rows]
   )
 
-  const deskCols = useMemo(
-    () => ALL_COLS.filter((id) => visibleCols[id]),
-    [visibleCols]
-  )
+  const gewerkGroups = useMemo(() => {
+    if (!groupByGewerk) return null
+    const map = new Map<string, LeistungRow[]>()
+    for (const row of rows) {
+      const key = row.gewerkName?.trim() || 'Ohne Gewerk'
+      const list = map.get(key)
+      if (list) list.push(row)
+      else map.set(key, [row])
+    }
+    return Array.from(map.entries()).map(([name, items]) => ({ name, items }))
+  }, [groupByGewerk, rows])
+
+  const deskCols = useMemo(() => {
+    const cols = ALL_COLS.filter((id) => visibleCols[id])
+    if (groupByGewerk) return cols.filter((id) => id !== 'gewerk')
+    return cols
+  }, [visibleCols, groupByGewerk])
 
   const cols = useMemo(() => {
     const parts: string[] = []
@@ -181,6 +203,108 @@ export function LeistungenTab({
   }
 
   const selectedCount = selectedIds.size
+  const openDocLabel = dokumentActionLabel ?? 'Dokument öffnen'
+
+  function renderRow(row: LeistungRow) {
+    const selected = selectedIds.has(row.id)
+    return (
+      <div
+        key={row.id}
+        className={cn('lt-row', selected && 'sel')}
+        role="button"
+        tabIndex={0}
+        onClick={() => setActiveId(row.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setActiveId(row.id)
+          }
+        }}
+      >
+        {allowBulk ? (
+          <div
+            className="lt-chk"
+            onClick={(e) => toggleOne(row.id, e)}
+            role="checkbox"
+            aria-checked={selected}
+          >
+            <span className={cn('lt-box', selected && 'on')}>
+              {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
+            </span>
+          </div>
+        ) : null}
+        {deskCols.map((id) => {
+          if (id === 'bezeichnung') {
+            return (
+              <div key={id} className="lt-main">
+                <div className="lt-name">
+                  <span className="lt-nametext">{row.bezeichnung}</span>
+                  {visibleCols.status ? (
+                    <span className="lt-status-mobile">
+                      <StatusBadge status={row.status} label={row.statusLabel} />
+                    </span>
+                  ) : null}
+                </div>
+                {!groupByGewerk && row.subline ? <div className="lt-sub">{row.subline}</div> : null}
+                <div className="lt-mobile-foot">
+                  {visibleCols.menge ? (
+                    <span>
+                      <span className="lt-mobile-lbl">Menge</span> {row.mengeLabel}
+                    </span>
+                  ) : null}
+                  {visibleCols.preis ? (
+                    <span>
+                      <span className="lt-mobile-lbl">Preis</span> {row.preisLabel}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            )
+          }
+          if (id === 'menge') {
+            return (
+              <div key={id} className="lt-c num lt-desk">
+                {row.mengeLabel}
+              </div>
+            )
+          }
+          if (id === 'preis') {
+            return (
+              <div key={id} className="lt-c num lt-preis lt-desk">
+                {row.preisLabel}
+              </div>
+            )
+          }
+          if (id === 'status') {
+            return (
+              <div key={id} className="lt-c lt-desk">
+                <StatusBadge status={row.status} label={row.statusLabel} />
+              </div>
+            )
+          }
+          if (id === 'gewerk') {
+            return (
+              <div key={id} className="lt-c lt-desk lt-dim">
+                {row.gewerkName?.trim() || '—'}
+              </div>
+            )
+          }
+          if (id === 'handwerker') {
+            return (
+              <div key={id} className="lt-c lt-desk lt-dim">
+                {row.handwerkerName?.trim() || '—'}
+              </div>
+            )
+          }
+          return (
+            <div key={id} className="lt-c num lt-desk lt-dim">
+              {row.ekLabel?.trim() || '—'}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   const toolbar = (
     <div className="lt-toolbar">
@@ -232,7 +356,7 @@ export function LeistungenTab({
           action={
             onOpenDokument ? (
               <Button type="button" variant="secondary" onClick={onOpenDokument}>
-                Dokument öffnen
+                {openDocLabel}
               </Button>
             ) : undefined
           }
@@ -252,7 +376,7 @@ export function LeistungenTab({
           <span>{hint}</span>
           {onOpenDokument ? (
             <Button type="button" variant="ghost" className="!px-2 !py-1 text-[length:var(--fs-meta)]" onClick={onOpenDokument}>
-              Dokument öffnen
+              {dokumentActionLabel ?? (phase === 'angebot' ? 'Im Angebot bearbeiten' : 'Dokument öffnen')}
             </Button>
           ) : null}
           {toolbar}
@@ -304,118 +428,45 @@ export function LeistungenTab({
             ))}
           </div>
 
-          {rows.map((row) => {
-            const selected = selectedIds.has(row.id)
-            return (
-              <div
-                key={row.id}
-                className={cn('lt-row', selected && 'sel')}
-                role="button"
-                tabIndex={0}
-                onClick={() => setActiveId(row.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setActiveId(row.id)
-                  }
-                }}
-              >
-                {allowBulk ? (
-                  <div
-                    className="lt-chk"
-                    onClick={(e) => toggleOne(row.id, e)}
-                    role="checkbox"
-                    aria-checked={selected}
-                  >
-                    <span className={cn('lt-box', selected && 'on')}>
-                      {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
-                    </span>
+          {gewerkGroups
+            ? gewerkGroups.map((g) => (
+                <div key={g.name} className="lt-group">
+                  <div className="lt-grouphead">
+                    <span className="g-name">{g.name.toUpperCase()}</span>
+                    <span className="g-meta">{g.items.length}</span>
                   </div>
-                ) : null}
-                {deskCols.map((id) => {
-                  if (id === 'bezeichnung') {
-                    return (
-                      <div key={id} className="lt-main">
-                        <div className="lt-name">
-                          <span className="lt-nametext">{row.bezeichnung}</span>
-                          {visibleCols.status ? (
-                            <span className="lt-status-mobile">
-                              <StatusBadge status={row.status} label={row.statusLabel} />
-                            </span>
-                          ) : null}
-                        </div>
-                        {row.subline ? <div className="lt-sub">{row.subline}</div> : null}
-                        <div className="lt-mobile-foot">
-                          {visibleCols.menge ? (
-                            <span>
-                              <span className="lt-mobile-lbl">Menge</span> {row.mengeLabel}
-                            </span>
-                          ) : null}
-                          {visibleCols.preis ? (
-                            <span>
-                              <span className="lt-mobile-lbl">Preis</span> {row.preisLabel}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    )
-                  }
-                  if (id === 'menge') {
-                    return (
-                      <div key={id} className="lt-c num lt-desk">
-                        {row.mengeLabel}
-                      </div>
-                    )
-                  }
-                  if (id === 'preis') {
-                    return (
-                      <div key={id} className="lt-c num lt-preis lt-desk">
-                        {row.preisLabel}
-                      </div>
-                    )
-                  }
-                  if (id === 'status') {
-                    return (
-                      <div key={id} className="lt-c lt-desk">
-                        <StatusBadge status={row.status} label={row.statusLabel} />
-                      </div>
-                    )
-                  }
-                  if (id === 'gewerk') {
-                    return (
-                      <div key={id} className="lt-c lt-desk lt-dim">
-                        {row.gewerkName?.trim() || '—'}
-                      </div>
-                    )
-                  }
-                  if (id === 'handwerker') {
-                    return (
-                      <div key={id} className="lt-c lt-desk lt-dim">
-                        {row.handwerkerName?.trim() || '—'}
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={id} className="lt-c num lt-desk lt-dim">
-                      {row.ekLabel?.trim() || '—'}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
+                  {g.items.map(renderRow)}
+                </div>
+              ))
+            : rows.map(renderRow)}
         </div>
       </div>
 
       <div className="lt-foot">
         <div className="lt-foot-n">
           <span>
-            {rows.length} Leistung{rows.length === 1 ? '' : 'en'}
+            {rows.length} Position{rows.length === 1 ? '' : 'en'}
           </span>
-          <span className="sep">·</span>
-          <span>
-            Summe <b>{formatEurBetrag(summe)}</b>
-          </span>
+          {footerNettoMwst ? (
+            <>
+              <span className="sep">·</span>
+              <span>
+                Netto <b>{formatEurBetrag(footerNettoMwst.netto)}</b>
+              </span>
+              <span className="sep">·</span>
+              <span>
+                MwSt. {footerNettoMwst.mwstSatz}%{' '}
+                <b>{formatEurBetrag(footerNettoMwst.mwstBetrag)}</b>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="sep">·</span>
+              <span>
+                Summe <b>{formatEurBetrag(summe)}</b>
+              </span>
+            </>
+          )}
         </div>
       </div>
 

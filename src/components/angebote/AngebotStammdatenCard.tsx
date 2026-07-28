@@ -2,21 +2,9 @@
 
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import { kundeNameAusAngebot } from '@/lib/angebot-einfach'
-import {
-  leadKontaktAnzeigeName,
-} from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { AngebotDetail, LeadDetail } from '@/lib/types'
-import { formatLeadListDatum, kanalLabel } from '@/lib/utils'
-
-function eingegangenLabel(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const day = formatLeadListDatum(iso)
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return day
-  const time = t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-  return `${day} · ${time}`
-}
 
 export function AngebotStammdatenCard({
   detail,
@@ -59,8 +47,6 @@ export function AngebotStammdatenCard({
               .trim(),
       }}
       kundeTyp={isHv ? ag?.typ ?? 'hausverwaltung' : detail.kunden?.typ}
-      quelle={lead && !isHv ? kanalLabel(lead.kanal) : null}
-      eingegangen={eingegangenLabel(detail.created_at || lead?.created_at)}
       onSaved={onSaved}
     />
   )

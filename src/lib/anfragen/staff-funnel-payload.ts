@@ -1,5 +1,6 @@
 import type { NeueAnfragePayload } from '@/app/(dashboard)/anfragen/actions'
 import type { StaffFunnelState } from '@/lib/anfragen/staff-funnel-types'
+import { anliegenToSituation } from '@/lib/anfragen/staff-funnel-types'
 import { needsBeratungPfad } from '@/lib/anfragen/staff-funnel-steps'
 import { normalizeSituation } from '@/lib/vorab-formular-config'
 
@@ -18,15 +19,33 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
   if (!state.email.trim() && !state.telefon.trim()) {
     return { error: 'Bitte mindestens E-Mail oder Telefon angeben.' }
   }
-  if (!state.situation) {
-    return { error: 'Bitte eine Situation wählen.' }
+  if (!state.anliegen && !state.situation) {
+    return { error: 'Bitte ein Anliegen wählen.' }
   }
-  if (state.situation !== 'gewerbe' && state.bereiche.length === 0) {
+  if (!state.vorhaben.trim()) {
+    return { error: 'Bitte Vorhaben angeben.' }
+  }
+
+  const situationRaw =
+    state.situation || anliegenToSituation(state.anliegen) || ''
+  if (!situationRaw) {
+    return { error: 'Bitte ein Anliegen wählen.' }
+  }
+
+  const isGewerbe = state.anliegen === 'gewerbe' || situationRaw === 'gewerbe'
+  const isTermin = state.anliegen === 'termin'
+  const isHv = state.anliegen === 'hausverwaltung'
+
+  if (!isGewerbe && !isTermin && state.bereiche.length === 0) {
     return { error: 'Bitte mindestens einen Bereich wählen.' }
   }
 
-  const situationNorm = normalizeSituation(state.situation) || state.situation
-  const beratung = needsBeratungPfad(state) || state.preisModus === 'komplex'
+  const situationNorm = normalizeSituation(situationRaw) || situationRaw
+  const beratung =
+    isTermin ||
+    isGewerbe ||
+    needsBeratungPfad({ ...state, situation: situationNorm }) ||
+    state.preisModus === 'komplex'
 
   const fachdetails = Object.fromEntries(
     Object.entries(state.fachdetails)
@@ -37,10 +56,16 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     fachdetails.bad_ausstattung = [state.badAusstattung]
   }
 
+  const beschreibung = [state.freitext.trim(), state.beratungText.trim()]
+    .filter(Boolean)
+    .join('\n\n')
+
   const funnel_daten: Record<string, unknown> = {
-    situation: state.situation,
-    bereiche: state.bereiche,
-    kundentyp: state.kundentyp || null,
+    situation: situationNorm,
+    anliegen: state.anliegen || null,
+    vorhaben: state.vorhaben.trim() || null,
+    bereiche: isGewerbe ? ['gewerbe'] : state.bereiche,
+    kundentyp: state.kundentyp || (isHv ? 'verwaltung' : null),
     vorname: state.vorname.trim() || null,
     nachname: state.nachname.trim() || null,
     strasse: state.strasse.trim() || null,
@@ -48,6 +73,7 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     plz: state.plz.trim() || null,
     ort: state.ort.trim() || null,
     zeitraum: state.zeitraum || null,
+    budget_hinweis: state.budgetHinweis.trim() || null,
     zustand: state.zustand || null,
     dringlichkeit: state.dringlichkeit || null,
     zugaenglichkeit: state.zugaenglichkeit || null,
@@ -63,7 +89,11 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     beratung_text: state.beratungText.trim() || null,
   }
 
-  const kundentyp = state.kundentyp.trim() || null
+  const kundentyp =
+    state.kundentyp.trim() ||
+    (isHv ? 'verwaltung' : isGewerbe ? 'gewerbe' : null)
+
+  const kanal = isHv ? 'hv_manuell' : state.kanal
 
   return {
     kunde_id: state.kundeId,
@@ -76,16 +106,20 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     strasse: state.strasse.trim() || null,
     hausnummer: state.hausnummer.trim() || null,
     ort: state.ort.trim() || null,
-    kanal: state.kanal,
+    kanal,
     situation: situationNorm,
-    bereiche: state.situation === 'gewerbe' ? ['gewerbe'] : state.bereiche,
+    bereiche: isGewerbe ? ['gewerbe'] : state.bereiche,
     preis_min: beratung ? null : state.preisMin,
     preis_max: beratung ? null : state.preisMax,
     zeitraum: state.zeitraum || state.dringlichkeit || null,
     kundentyp,
-    kontakt_nachricht: [state.freitext.trim(), state.beratungText.trim()].filter(Boolean).join('\n\n') || null,
+    kontakt_nachricht:
+      [state.vorhaben.trim(), beschreibung].filter(Boolean).join('\n\n') || null,
     funnel_daten,
     notizen: state.interneNotiz.trim(),
     ist_bauprojekt: state.istBauprojekt,
+    anlass: isHv ? 'meldung' : undefined,
+    auftraggeber_kunde_id:
+      isHv && state.kundeId && kundentyp === 'verwaltung' ? state.kundeId : undefined,
   }
 }

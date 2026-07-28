@@ -210,7 +210,7 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'aktivitaet',
 ])
 
-const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'leistungen'
+const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
 
 /** Legacy Deep-Link-Alias (kein eigener Tab mehr) → Leistungen. */
 type VorOrtAbschnitt = 'bautagebuch' | 'abnahme' | 'abschluss'

@@ -41,6 +41,8 @@ export function WiedervorlageChip({
   entityId,
   className,
   onSaved,
+  open: openControlled,
+  onOpenChange,
 }: {
   datum?: string | null
   notiz?: string | null
@@ -48,9 +50,18 @@ export function WiedervorlageChip({
   entityId?: string | null
   className?: string
   onSaved?: () => void
+  /** Menü ⋯ steuert Öffnen */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const editable = Boolean(entity && entityId)
-  const [open, setOpen] = useState(false)
+  const [openUncontrolled, setOpenUncontrolled] = useState(false)
+  const open = openControlled ?? openUncontrolled
+  const setOpen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(open) : v
+    onOpenChange?.(next)
+    if (openControlled === undefined) setOpenUncontrolled(next)
+  }
   const [draftDatum, setDraftDatum] = useState(datum?.slice(0, 10) || '')
   const [draftNotiz, setDraftNotiz] = useState(notiz?.trim() || '')
   const [pending, startTransition] = useTransition()

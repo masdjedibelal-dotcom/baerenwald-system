@@ -31,7 +31,6 @@ import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { createAnfrageHref } from '@/lib/crm/create-entry'
 import { toast } from '@/components/ui/app-toast'
-import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
@@ -50,15 +49,15 @@ const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'b
 const DATA_COL_IDS = ['kunde', 'titel', 'phase', 'wert', 'datum', 'status'] as const
 type DataColId = (typeof DATA_COL_IDS)[number]
 
-/** Daten-Spalten — Kunde/Titel bewusst breiter als Phase/Status/Wert/Datum. */
+/** Daten-Spalten — fr-Gewichte (Hook), Kunde/Titel breiter; feste Spalten in px. */
 const VORGAENGE_DATA_COLS: ResizableColDef[] = [
-  { id: 'kunde', defaultWidth: 260, minWidth: 160, maxWidth: 520 },
-  { id: 'titel', defaultWidth: 300, minWidth: 180, maxWidth: 640 },
-  { id: 'phase', defaultWidth: 100, minWidth: 88, maxWidth: 140 },
-  { id: 'wert', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
-  { id: 'datum', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
-  { id: 'status', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
-  { id: 'actions', defaultWidth: 88, minWidth: 72, maxWidth: 120, fixed: true },
+  { id: 'kunde', defaultWidth: 22, minWidth: 10, maxWidth: 40 },
+  { id: 'titel', defaultWidth: 28, minWidth: 12, maxWidth: 48 },
+  { id: 'phase', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
+  { id: 'wert', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
+  { id: 'datum', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
+  { id: 'status', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
+  { id: 'actions', defaultWidth: 72, minWidth: 40, maxWidth: 120, fixed: true },
 ]
 
 const COL_LABELS: Record<DataColId, string> = {
@@ -78,13 +77,6 @@ function phaseChipLabel(p: (typeof VORGANG_FILTERS)[number]): string {
 
 function isErsetzt(row: VorgangListeRow): boolean {
   return row.unterstatus.toLowerCase() === 'ersetzt' || Boolean(row.ersetzt_durch)
-}
-
-function rowEdgeClass(row: VorgangListeRow): string {
-  if (row.ueberfaellig || row.badges.notfall) return 'vg-row--edge-danger'
-  const u = row.unterstatus.toLowerCase()
-  if (u === 'neu' || u === 'gesendet' || u === 'versendet') return 'vg-row--edge-warn'
-  return ''
 }
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
@@ -222,7 +214,6 @@ export function VorgaengeListeClient({
   const [fDatumBis, setFDatumBis] = useState('')
   const [lifecycle, setLifecycle] = useState<'offen' | 'erledigt'>('offen')
   const [lifecycleOpen, setLifecycleOpen] = useState(false)
-  const [anfrageAusEmailOpen, setAnfrageAusEmailOpen] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
@@ -246,7 +237,7 @@ export function VorgaengeListeClient({
     return [VORGAENGE_CHECK_COL, ...data]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v4.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v5.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -639,11 +630,6 @@ export function VorgaengeListeClient({
     router.push(href)
   }
 
-  function openAnfrageAusEmail() {
-    toast.info('Betreff manuell übernehmen')
-    setAnfrageAusEmailOpen(true)
-  }
-
   const allPageSelected =
     pageItems.length > 0 && pageItems.every((v) => selected[rowKey(v)])
   const allFilteredSelected =
@@ -841,17 +827,6 @@ export function VorgaengeListeClient({
             </MockChip>
           ))}
         </div>
-        {!embedded && (filter === 'alle' || filter === 'anfrage') ? (
-          <MockBtn
-            kind="ghost"
-            sm
-            icon="mail"
-            title="Anfrage aus E-Mail (Betreff manuell)"
-            onClick={openAnfrageAusEmail}
-          >
-            Aus E-Mail
-          </MockBtn>
-        ) : null}
         <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
@@ -1139,7 +1114,7 @@ export function VorgaengeListeClient({
 
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className="listcard listcard--scroll listcard--cols vg-selectmode"
+        className="listcard listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
@@ -1279,7 +1254,6 @@ export function VorgaengeListeClient({
                 className={cn(
                   'vg-row',
                   selected[key] && 'sel',
-                  rowEdgeClass(v),
                   ersetzt && 'vg-row--ersetzt',
                   flashKeys[key] && 'vg-row--flash'
                 )}
@@ -1357,29 +1331,31 @@ export function VorgaengeListeClient({
                 >
                   {!isMobile ? (
                     <>
-                      <button
-                        type="button"
-                        className="qa-btn"
-                        title="Anrufen"
-                        aria-label="Anrufen"
-                        onClick={call}
-                      >
-                        <MockIcon ctx="row" n="phone" size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="qa-btn"
-                        title="Mail"
-                        aria-label="Mail"
-                        onClick={() => {
-                          const mail = v.kontaktEmail?.trim()
-                          if (mail) window.location.href = `mailto:${mail}`
-                          else if (v.kundeId) window.open(`/kunden/${v.kundeId}`, '_blank')
-                          else toast.info('Keine Kunden-E-Mail hinterlegt')
-                        }}
-                      >
-                        <MockIcon ctx="row" n="mail" size={16} />
-                      </button>
+                      {v.kontaktTelefon?.trim() ? (
+                        <button
+                          type="button"
+                          className="qa-btn"
+                          title="Anrufen"
+                          aria-label="Anrufen"
+                          onClick={call}
+                        >
+                          <MockIcon ctx="row" n="phone" size={16} />
+                        </button>
+                      ) : null}
+                      {v.kontaktEmail?.trim() ? (
+                        <button
+                          type="button"
+                          className="qa-btn"
+                          title="Mail"
+                          aria-label="Mail"
+                          onClick={() => {
+                            const mail = v.kontaktEmail?.trim()
+                            if (mail) window.location.href = `mailto:${mail}`
+                          }}
+                        >
+                          <MockIcon ctx="row" n="mail" size={16} />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="qa-btn"
@@ -1434,17 +1410,6 @@ export function VorgaengeListeClient({
         unit="Vorgänge"
         onPageChange={(p) => setPageIndex(p - 1)}
       />
-
-      {!embedded ? (
-        <AnfrageNeuSheet
-          open={anfrageAusEmailOpen}
-          onClose={() => setAnfrageAusEmailOpen(false)}
-          onSuccess={(id) => {
-            setAnfrageAusEmailOpen(false)
-            router.push(`/anfragen/${id}`)
-          }}
-        />
-      ) : null}
     </div>
   )
 }

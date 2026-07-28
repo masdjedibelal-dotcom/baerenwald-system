@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import {
   Calendar,
   CircleX,
-  HelpCircle,
   Info,
   PhoneOff,
   Save,
@@ -17,8 +16,8 @@ import {
   loadCrmTeamFuerTermin,
   saveLeadAlsVerloren,
   saveLeadNichtErreichbar,
-  saveLeadRueckfrage,
   saveLeadTerminVereinbart,
+  undoLeadTerminVereinbart,
 } from '@/app/(dashboard)/anfragen/actions'
 import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
 import {
@@ -33,16 +32,10 @@ import { anfrageAdresseAusPayload, formatAnfrageAdresseZeile } from '@/lib/anfra
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
 
-export type StatusModalKind = 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren'
+export type StatusModalKind = 'termin' | 'nicht_erreichbar' | 'verloren'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function plusDaysISO(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 const META: Record<
@@ -50,11 +43,10 @@ const META: Record<
   { title: string; icon: LucideIcon; saveLabel: string; danger?: boolean }
 > = {
   termin: { title: 'Termin vereinbart', icon: Calendar, saveLabel: 'Termin speichern' },
-  rueckfrage: { title: 'Warte auf Antwort', icon: HelpCircle, saveLabel: 'Speichern' },
   nicht_erreichbar: {
     title: 'Nicht erreichbar',
     icon: PhoneOff,
-    saveLabel: 'Wiedervorlage anlegen',
+    saveLabel: 'Versuch speichern',
   },
   verloren: {
     title: 'Verloren',
@@ -70,16 +62,18 @@ export function StatusModal({
   open,
   onClose,
   onSaved,
+  onSuggestVerloren,
 }: {
   kind: StatusModalKind | null
   lead: LeadDetail
   open: boolean
   onClose: () => void
   onSaved?: () => void
+  /** Nach 3× Nicht erreichbar: Verloren-Sheet öffnen */
+  onSuggestVerloren?: () => void
 }) {
   const [datum, setDatum] = useState(todayISO())
   const [uhrzeit, setUhrzeit] = useState('10:00')
-  const [wiedervorlage, setWiedervorlage] = useState(plusDaysISO(3))
   const [notiz, setNotiz] = useState('')
   const [grund, setGrund] = useState('zu_teuer')
   const [mitarbeiterId, setMitarbeiterId] = useState('')
@@ -117,7 +111,6 @@ export function StatusModal({
     if (!open || !kind) return
     setDatum(todayISO())
     setUhrzeit('10:00')
-    setWiedervorlage(plusDaysISO(3))
     setNotiz('')
     setGrund('zu_teuer')
     setMitarbeiterId('')
@@ -151,7 +144,9 @@ export function StatusModal({
   async function handleSave() {
     if (!kind) return
     setSaving(true)
-    let res: { ok: true } | { ok: false; message: string }
+    let res:
+      | { ok: true; versuche?: number; vorschlagVerloren?: boolean }
+      | { ok: false; message: string }
 
     if (kind === 'termin') {
       if (!datum.trim()) {
@@ -190,23 +185,11 @@ export function StatusModal({
         mailHtml: mailDraft?.html,
         mailBodyText: mailDraft?.bodyText,
       })
-    } else if (kind === 'rueckfrage') {
-      if (!notiz.trim()) {
-        setSaving(false)
-        toast.error('Bitte einen kurzen Text eintragen.')
-        return
-      }
-      res = await saveLeadRueckfrage({ leadId: lead.id, notiz: notiz.trim() })
     } else if (kind === 'nicht_erreichbar') {
-      if (!wiedervorlage.trim()) {
-        setSaving(false)
-        toast.error('Bitte Wiedervorlage-Datum wählen.')
-        return
-      }
       res = await saveLeadNichtErreichbar({
         leadId: lead.id,
         kontaktName,
-        wiedervorlage,
+        notiz: notiz.trim() || null,
       })
     } else {
       res = await saveLeadAlsVerloren({
@@ -221,15 +204,39 @@ export function StatusModal({
       toast.error(res.message)
       return
     }
-    toast.success(
-      kind === 'termin' && mailToggle && mailDraft?.to.length
-        ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
-        : kind === 'verloren'
-          ? 'Anfrage als verloren markiert.'
-          : kind === 'nicht_erreichbar'
-            ? 'Wiedervorlage angelegt.'
-            : 'Gespeichert'
-    )
+
+    if (kind === 'termin') {
+      toast.success(
+        mailToggle && mailDraft?.to.length
+          ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
+          : 'Termin vereinbart',
+        {
+          action: {
+            label: 'Rückgängig',
+            onClick: () => {
+              void undoLeadTerminVereinbart(lead.id).then((r) => {
+                if (!r.ok) toast.error(r.message)
+                else {
+                  toast.success('Termin rückgängig')
+                  onSaved?.()
+                }
+              })
+            },
+          },
+        }
+      )
+    } else if (kind === 'nicht_erreichbar') {
+      const versuche = res.versuche ?? 1
+      const vorschlag = Boolean(res.vorschlagVerloren)
+      toast.success(`Nicht erreichbar · Versuch ${versuche}`)
+      onClose()
+      onSaved?.()
+      if (vorschlag) onSuggestVerloren?.()
+      return
+    } else {
+      toast.success('Anfrage als verloren markiert.')
+    }
+
     onClose()
     onSaved?.()
   }
@@ -319,50 +326,20 @@ export function StatusModal({
             </div>
           ) : null}
 
-          {kind === 'rueckfrage' ? (
+          {kind === 'nicht_erreichbar' ? (
             <div className="space-y-3">
               <Textarea
-                label="Worum wartest du auf eine Antwort? *"
+                label="Notiz (optional)"
                 value={notiz}
                 onChange={(e) => setNotiz(e.target.value)}
-                placeholder="Z. B. noch offene Infos vom Kunden, Rückruf angekündigt, Angebot abwarten…"
-                rows={4}
+                placeholder="Mailbox voll, keine Antwort, …"
+                rows={3}
               />
               <div className="status-hint status-hint-neutral">
                 <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                 <span>
-                  {lead.status === 'neu' ? (
-                    <>
-                      Status wird auf <strong>„Kontaktiert“</strong> gesetzt. Der Eintrag erscheint in der
-                      Timeline.
-                    </>
-                  ) : (
-                    <>
-                      Status bleibt <strong>„Kontaktiert“</strong>, der Eintrag erscheint in der Timeline.
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
-          ) : null}
-
-          {kind === 'nicht_erreichbar' ? (
-            <div className="space-y-3">
-              <label>
-                <span className="input-label">Wiedervorlage am *</span>
-                <input
-                  type="date"
-                  className="input"
-                  value={wiedervorlage}
-                  min={todayISO()}
-                  onChange={(e) => setWiedervorlage(e.target.value)}
-                  required
-                />
-              </label>
-              <div className="status-hint status-hint-neutral">
-                <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
-                <span>
-                  Erinnerung in der Timeline · Status: <strong>„Kontaktiert“</strong>
+                  Status bleibt unverändert. Der Versuch landet in der Timeline. Ab dem dritten
+                  Versuch schlägt das System „Als verloren markieren“ vor.
                 </span>
               </div>
             </div>

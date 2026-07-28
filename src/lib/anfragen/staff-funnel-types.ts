@@ -30,6 +30,10 @@ export type StaffFunnelState = {
   telefon: string
   kanal: LeadKanal
   interneNotiz: string
+  /** Mock-Anliegen (Create-Screen) */
+  anliegen: StaffAnliegenId | ''
+  /** Freititel „Vorhaben“ */
+  vorhaben: string
   // funnel
   situation: SituationValue | ''
   bereiche: string[]
@@ -43,6 +47,8 @@ export type StaffFunnelState = {
   dringlichkeit: string
   kundentyp: string
   zeitraum: string
+  /** Budget-Freitext / Orientierung (Accordion) */
+  budgetHinweis: string
   plz: string
   ort: string
   strasse: string
@@ -55,6 +61,53 @@ export type StaffFunnelState = {
   beratungText: string
   istBauprojekt: boolean
   freitext: string
+}
+
+/** Mock ANLIEGEN-Karten (Create-Screen). */
+export type StaffAnliegenId = 'erneuern' | 'termin' | 'gewerbe' | 'hausverwaltung'
+
+export const STAFF_ANLIEGEN: {
+  id: StaffAnliegenId
+  label: string
+  hint: string
+  icon: string
+  tag?: string
+  situation: SituationValue
+}[] = [
+  {
+    id: 'erneuern',
+    label: 'Umbau & Modernisierung',
+    hint: 'Innenausbau, Außenbereich, Terrasse, Keller, DG',
+    icon: '01-haus-erneuern',
+    situation: 'erneuern',
+  },
+  {
+    id: 'termin',
+    label: 'Termin / Beratung',
+    hint: 'Besichtigung, Beratung vor Ort, Aufmaß',
+    icon: '23-chat',
+    situation: 'erneuern',
+  },
+  {
+    id: 'gewerbe',
+    label: 'Gewerbe',
+    hint: 'Büro, Praxis, Laden, Gastronomie',
+    icon: '04-gewerbe',
+    tag: 'B2B',
+    situation: 'gewerbe',
+  },
+  {
+    id: 'hausverwaltung',
+    label: 'Hausverwaltung',
+    hint: 'Meldung, Freigabe, Objekt & Melder',
+    icon: '18-hausmeister',
+    situation: 'erneuern',
+  },
+]
+
+export function anliegenToSituation(anliegen: StaffAnliegenId | ''): SituationValue | '' {
+  if (!anliegen) return ''
+  return STAFF_ANLIEGEN.find((a) => a.id === anliegen)?.situation ?? ''
 }
 
 export const STAFF_FUNNEL_STEP_LABELS: Record<StaffFunnelStepId, string> = {
@@ -177,6 +230,8 @@ export function createInitialStaffFunnelState(
     telefon: '',
     kanal: 'telefon',
     interneNotiz: '',
+    anliegen: '',
+    vorhaben: '',
     situation: '',
     bereiche: [],
     umfang: '',
@@ -189,6 +244,7 @@ export function createInitialStaffFunnelState(
     dringlichkeit: '',
     kundentyp: '',
     zeitraum: '',
+    budgetHinweis: '',
     plz: '',
     ort: '',
     strasse: '',

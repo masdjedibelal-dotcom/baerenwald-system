@@ -22,7 +22,9 @@ export function NextStepBar({
       {step ? (
         <div className="next-step-bar__main">
           <span className="next-step-bar__label">{step.label}</span>
-          <span className="next-step-bar__hint">{step.hint}</span>
+          {step.hint?.trim() ? (
+            <span className="next-step-bar__hint">{step.hint}</span>
+          ) : null}
         </div>
       ) : null}
       {metrics && metrics.length > 0 ? (

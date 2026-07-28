@@ -83,6 +83,29 @@ function pathToBreadcrumbs(pathname: string): {
                   ? 'Vorschau'
                   : ''
 
+  // Detail-Routen: TopBar zeigt „Vorgänge › Anfrage“ statt „Anfragen › Anfragen“
+  const isUuidLike = /^[0-9a-f-]{8,}$/i.test(segments[1] ?? '')
+  const isVorgangDetail =
+    ['anfragen', 'angebote', 'auftraege', 'rechnungen'].includes(section) &&
+    segments.length >= 2 &&
+    isUuidLike
+
+  if (isVorgangDetail) {
+    const phaseTitle =
+      section === 'anfragen'
+        ? 'Anfrage'
+        : section === 'angebote'
+          ? 'Angebot'
+          : section === 'auftraege'
+            ? 'Auftrag'
+            : 'Rechnung'
+    return {
+      title: tailLabel || phaseTitle,
+      parents: [{ label: 'Vorgänge', href: '/vorgaenge' }],
+      cta: undefined,
+    }
+  }
+
   return {
     title: tailLabel || sectionLabel,
     parents: [{ label: sectionLabel, href: sectionHref }],
