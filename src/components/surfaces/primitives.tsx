@@ -92,9 +92,9 @@ export function CollapseRow({
   className?: string
 }) {
   return (
-    <details className={cn('bw-collapse-row', className)} open={defaultOpen || undefined}>
-      <summary className="bw-collapse-row__summary">{summary}</summary>
-      {children ? <div className="bw-collapse-row__body">{children}</div> : null}
+    <details className={cn('crow bw-collapse-row', className)} open={defaultOpen || undefined}>
+      <summary className="crow-head bw-collapse-row__summary">{summary}</summary>
+      {children ? <div className="crow-body bw-collapse-row__body">{children}</div> : null}
     </details>
   )
 }

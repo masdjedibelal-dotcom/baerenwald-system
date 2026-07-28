@@ -32,7 +32,7 @@ function isFaellig(datum: string): boolean {
 
 /**
  * Phase 10 / Spec §12: Wiedervorlage-Chip mit Schnellwahl · Datum · Notiz.
- * Fällig → gelb hervorgehoben.
+ * Fällig → `.wv-chip.due` (Mock-gelb).
  */
 export function WiedervorlageChip({
   datum,
@@ -109,13 +109,9 @@ export function WiedervorlageChip({
     <button
       type="button"
       className={cn(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
-        faellig
-          ? 'border-amber-500 bg-amber-400/25 text-amber-950'
-          : datum
-            ? 'border-amber-500/40 bg-amber-500/10 text-amber-900'
-            : 'border-dashed border-bw-border bg-transparent text-bw-text-muted',
-        editable && 'cursor-pointer hover:brightness-95',
+        'wv-chip',
+        faellig && 'due',
+        !datum && 'border-dashed bg-transparent',
         className
       )}
       title={notiz?.trim() || (editable ? 'Wiedervorlage setzen' : undefined)}

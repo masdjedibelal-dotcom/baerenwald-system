@@ -104,11 +104,15 @@ export function CrmPositionEintragModal({
       toast.error('Bitte Beschreibung oder Foto angeben.')
       return
     }
+    if (!positionId.trim()) {
+      toast.error('Bitte eine Leistung wählen.')
+      return
+    }
+    const eintragTyp: EintragTyp = typ === 'notiz' ? 'fortschritt' : typ
     startTransition(async () => {
       const r = await createCrmPositionEintrag({
-        positionId: positionId || null,
-        auftragId,
-        typ: ohneLeistung ? 'notiz' : typ,
+        positionId,
+        typ: eintragTyp,
         beschreibung: beschreibung.trim() || null,
         quelle,
         rueckdatiertGrund: rueckgrund.trim() || null,
@@ -121,7 +125,7 @@ export function CrmPositionEintragModal({
         toast.error(r.message)
         return
       }
-      toast.success(`${eintragTypLabel(ohneLeistung ? 'notiz' : typ)} erfasst`)
+      toast.success(`${eintragTypLabel(eintragTyp)} erfasst`)
       onSaved?.()
       onClose()
     })

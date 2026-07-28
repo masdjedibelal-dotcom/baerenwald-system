@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Build-Check: Keine Alt-Primitive (btn-*, DetailCollapsibleCard, StatusBadge-Import).
+ * Build-Check: Keine Alt-Primitive (btn-*, DetailCollapsibleCard).
+ * StatusBadge ist Spec §11 / Phase 1 kanonisch (wrappt MockBadge) — erlaubt.
  */
 import fs from 'fs'
 import path from 'path'
@@ -20,10 +21,6 @@ const FORBIDDEN = [
   { id: 'chip.selected', re: /\bchip(?:\s+|-)selected\b|\.chip\.selected\b/g },
   { id: 'detail-section-card', re: /\bdetail-section-card\b/g },
   { id: 'DetailCollapsibleCard', re: /\bDetailCollapsibleCard\b/g },
-  {
-    id: 'StatusBadge',
-    re: /(?:from\s+['"]@\/components\/ui\/StatusBadge['"]|<(?![A-Za-z]*StatusBadge)StatusBadge\b|\bimport\s*\{[^}]*\bStatusBadge\b[^}]*\}\s*from)/g,
-  },
 ]
 
 function walk(dir, acc = []) {

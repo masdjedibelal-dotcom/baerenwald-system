@@ -18,7 +18,7 @@ export type DetailHeadProps = {
   className?: string
 }
 
-/** Kompakter Detail-Kopf: Titel + Badges/Meta inline (Mock `.detail-head` / `.dh-*`). */
+/** Kompakter Detail-Kopf: Titel + Badges/Meta (Mock `.vgid` / `.detail-head`). */
 export function DetailHead({
   title,
   sub,
@@ -32,12 +32,12 @@ export function DetailHead({
 
   return (
     <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
-      <div className="detail-head-main min-w-0 flex-1">
+      <div className="detail-head-main vgid min-w-0 flex-1">
         <div className="dh-titlerow">
-          <div className="dh-title">{title}</div>
+          <div className="dh-title vgid-name">{title}</div>
         </div>
         {hasMetaRow ? (
-          <div className="dh-meta">
+          <div className="dh-meta vgid-meta">
             {badges}
             {badges && meta ? <span className="sep" aria-hidden>
               ·

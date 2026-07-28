@@ -1058,7 +1058,7 @@ export function RechnungWizard({
           marginTop: 18,
           textTransform: 'none',
           letterSpacing: 0,
-          fontSize: 14,
+          fontSize: 'var(--fs-text)',
           fontWeight: 600,
           color: 'var(--text)',
         }}
@@ -1114,8 +1114,8 @@ export function RechnungWizard({
               {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
             </span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{c.sub}</div>
+              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>{c.label}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{c.sub}</div>
             </div>
           </button>
         ))}
@@ -1189,7 +1189,7 @@ export function RechnungWizard({
                 border: '0.5px solid var(--border)',
                 borderRadius: 8,
                 background: 'var(--bg-soft)',
-                fontSize: 13,
+                fontSize: 'var(--fs-text)',
                 lineHeight: 1.45,
                 color: 'var(--text-2)',
               }}
@@ -1210,11 +1210,11 @@ export function RechnungWizard({
                 background: 'var(--bg-soft)',
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
+              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
                 {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} ·{' '}
                 {selBerechnet.titel}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 4, lineHeight: 1.45 }}>
                 {selBerechnet.istSchluss ? (
                   <>
                     Die Schlussrechnung enthält alle Auftragsleistungen und zieht bereits gestellte
@@ -1268,7 +1268,7 @@ export function RechnungWizard({
                 </button>
               </div>
               <div style={{ flex: 1 }} />
-              <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>
+              <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
                 Auftrag {auftragLabel} · {kundeName}
               </span>
             </div>
@@ -1286,7 +1286,7 @@ export function RechnungWizard({
                 Direktrechnung
               </div>
               <div style={{ flex: 1 }} />
-              <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>{kundeName}</span>
+              <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>{kundeName}</span>
             </div>
           )}
           <VorgangArtWiederkehrField
@@ -1350,14 +1350,14 @@ export function RechnungWizard({
             }}
           >
             <div>
-              <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>
                 Rechnungsdetails
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
                 Zahlungsziel, Leistungszeitraum und steuerliche Hinweise
               </div>
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
               Gesamt{' '}
               <b style={{ color: 'var(--green)' }}>
                 {formatEurBetrag(hasPlan && selBerechnet ? selBerechnet.brutto : brutto)}
@@ -1443,9 +1443,9 @@ export function RechnungWizard({
           <div style={{ marginTop: 18 }}>
             {!hatAuftrag ? (
               <div className="card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Direktrechnung ohne Auftrag</div>
+                <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>Direktrechnung ohne Auftrag</div>
                 <p
-                  className="text-[12.5px] leading-relaxed"
+                  className="text-[length:var(--fs-meta)] leading-relaxed"
                   style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
                 >
                   Abschlagspläne sind nur mit Auftrag möglich. Diese Rechnung wird als einfache
@@ -1484,11 +1484,11 @@ export function RechnungWizard({
                   >
                     <MockIcon ctx="btn" n="check" size={16} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
                         {selBerechnet.titel}
                         {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
                         {selBerechnet.istSchluss ? (
                           <>
                             Vorgewählt aus dem Zahlplan — Schlussrechnung mit allen Leistungen und
@@ -1521,7 +1521,7 @@ export function RechnungWizard({
                       >
                         Zahlplan
                       </div>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
+                      <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', alignSelf: 'center' }}>
                         Vorlage:
                       </span>
                       {PLAN_PRESETS.map((p) => (
@@ -1556,7 +1556,7 @@ export function RechnungWizard({
                           padding: '9px 14px',
                           background: 'var(--bg-soft)',
                           borderBottom: '0.5px solid var(--border)',
-                          fontSize: 11.5,
+                          fontSize: 'var(--fs-meta)',
                           fontWeight: 700,
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
@@ -1598,7 +1598,7 @@ export function RechnungWizard({
                                   typ: e.target.value as ZahlungsplanAbschlagTyp,
                                 })
                               }
-                              style={{ height: 32, fontSize: 12 }}
+                              style={{ height: 32, fontSize: 'var(--fs-meta)' }}
                             >
                               <option value="prozent">Prozent</option>
                               <option value="betrag">Euro netto</option>
@@ -1622,7 +1622,7 @@ export function RechnungWizard({
                                   right: 8,
                                   top: '50%',
                                   transform: 'translateY(-50%)',
-                                  fontSize: 12,
+                                  fontSize: 'var(--fs-meta)',
                                   color: 'var(--text-3)',
                                 }}
                               >
@@ -1634,7 +1634,7 @@ export function RechnungWizard({
                                 textAlign: 'right',
                                 fontWeight: 600,
                                 fontVariantNumeric: 'tabular-nums',
-                                fontSize: 13,
+                                fontSize: 'var(--fs-text)',
                               }}
                             >
                               {formatEurBetrag(berech?.brutto ?? 0)}
@@ -1646,7 +1646,7 @@ export function RechnungWizard({
                               onChange={(e) =>
                                 patchPlanZeile(z.id, { faellig_am: e.target.value || null })
                               }
-                              style={{ height: 32, fontSize: 12 }}
+                              style={{ height: 32, fontSize: 'var(--fs-meta)' }}
                             />
                             <MockBtn
                               sm
@@ -1677,7 +1677,7 @@ export function RechnungWizard({
                         <div style={{ flex: 1 }} />
                         <span
                           style={{
-                            fontSize: 12.5,
+                            fontSize: 'var(--fs-meta)',
                             fontWeight: 600,
                             color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
                           }}
@@ -1701,7 +1701,7 @@ export function RechnungWizard({
                       marginBottom: 8,
                       textTransform: 'none',
                       letterSpacing: 0,
-                      fontSize: 14,
+                      fontSize: 'var(--fs-text)',
                       fontWeight: 600,
                     }}
                   >
@@ -1746,8 +1746,8 @@ export function RechnungWizard({
                             {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{z.titel}</div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                            <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>{z.titel}</div>
+                            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                               {z.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'}
                               {' · '}
                               {z.typ === 'prozent'
@@ -1789,8 +1789,8 @@ export function RechnungWizard({
       <section id="section-3" className="document-canvas-sec">
         <>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Anlagen & Versand</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Anlagen & Versand</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
               Schlussrechnung: optional Abnahme und weitere Unterlagen mitsenden. Abschläge laufen
               ohne dieses Paket — Abschlussbericht und Abnahme gehören zum Auftragsabschluss.
             </div>
@@ -1801,7 +1801,7 @@ export function RechnungWizard({
               marginBottom: 10,
               textTransform: 'none',
               letterSpacing: 0,
-              fontSize: 14,
+              fontSize: 'var(--fs-text)',
               fontWeight: 600,
               color: 'var(--text)',
             }}
@@ -1849,12 +1849,12 @@ export function RechnungWizard({
                     {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
                   </span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                    <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>
                       {a.label}
                       {a.locked ? (
                         <span
                           style={{
-                            fontSize: 11,
+                            fontSize: 'var(--fs-meta)',
                             color: 'var(--text-3)',
                             fontWeight: 400,
                             marginLeft: 6,
@@ -1864,7 +1864,7 @@ export function RechnungWizard({
                         </span>
                       ) : null}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{a.sub}</div>
+                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{a.sub}</div>
                   </div>
                 </button>
               )
@@ -1877,8 +1877,8 @@ export function RechnungWizard({
       <section id="section-4" className="document-canvas-sec">
         <div style={{ display: 'grid', gap: 18, maxWidth: 760, margin: '0 auto' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
               E-Mail prüfen — Vorschau zeigt die echte Versand-Vorlage. Erstellen legt die Rechnung
               an (Portal), Erstellen und versenden schickt zusätzlich die Mail
             </div>
@@ -1951,7 +1951,7 @@ export function RechnungWizard({
               marginBottom: 0,
               textTransform: 'none',
               letterSpacing: 0,
-              fontSize: 14,
+              fontSize: 'var(--fs-text)',
               fontWeight: 600,
             }}
           >
@@ -1991,7 +1991,7 @@ export function RechnungWizard({
                   marginBottom: 0,
                   textTransform: 'none',
                   letterSpacing: 0,
-                  fontSize: 14,
+                  fontSize: 'var(--fs-text)',
                   fontWeight: 600,
                 }}
               >
@@ -2026,7 +2026,7 @@ export function RechnungWizard({
                           borderRadius: 8,
                           border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
                           background: on ? 'var(--green-50)' : 'var(--card)',
-                          fontSize: 12.5,
+                          fontSize: 'var(--fs-meta)',
                           fontWeight: on ? 600 : 500,
                           cursor: 'pointer',
                         }}
@@ -2048,12 +2048,12 @@ export function RechnungWizard({
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                       <MockIcon ctx="default" n="file-text" size={22} />
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                        <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
                           {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.label}
                         </div>
                         <div
                           style={{
-                            fontSize: 12.5,
+                            fontSize: 'var(--fs-meta)',
                             color: 'var(--text-3)',
                             marginTop: 4,
                             lineHeight: 1.45,
