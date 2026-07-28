@@ -22,7 +22,7 @@ export function MockDetailBackLink({
           gap: 4,
           color: 'var(--green)',
           fontWeight: 500,
-          fontSize: 13,
+          fontSize: 'var(--fs-text)',
         }}
       >
         <MockIcon ctx="nav" n="arrow-left" size={15} />

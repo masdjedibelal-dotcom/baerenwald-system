@@ -38,7 +38,7 @@ function Sec({
           borderBottom: '0.5px solid var(--border)',
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <span style={{ fontSize: 'var(--fs-text)', fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
         <div style={{ flex: 1 }} />
         {actions}
       </div>
@@ -151,7 +151,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         }
       >
         {rows.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>Noch keine Benutzer.</p>
+          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>Noch keine Benutzer.</p>
         ) : (
           <div style={{ margin: 0 }}>
             <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
@@ -178,13 +178,13 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                   <div className={`avatar ${color}`.trim()} aria-hidden>
                     {initials}
                   </div>
-                  <div style={{ fontSize: 13.5, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {u.name}
                     {!u.aktiv ? (
                       <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
                     ) : null}
                   </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {u.email || '—'}
                   </div>
                   <div>
@@ -264,7 +264,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             onChange={(e) => setInviteEmail(e.target.value)}
           />
           <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
-          <p className="text-xs text-bw-text-muted">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             Nur CRM-Mitarbeiter. Handwerker-, Partner- und Kunden-Logins werden hier nicht
             verwaltet — bitte eine eigene Mitarbeiter-E-Mail verwenden.
           </p>

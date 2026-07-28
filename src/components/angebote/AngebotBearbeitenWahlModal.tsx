@@ -46,7 +46,7 @@ export function AngebotBearbeitenWahlModal({
 
   return (
     <Modal open={open} onClose={() => !pending && onClose()} title="Angebot bearbeiten" size="md">
-      <p className="text-sm leading-relaxed text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
         Dieses Angebot wurde bereits versendet oder liegt nicht mehr als reiner Entwurf vor. Wie
         möchtest du fortfahren?
       </p>
@@ -63,18 +63,18 @@ export function AngebotBearbeitenWahlModal({
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="block text-sm font-semibold text-bw-text">Bestehendes Angebot bearbeiten</span>
-              <span className="rounded-full bg-bw-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="block text-[length:var(--fs-text)] font-semibold text-bw-text">Bestehendes Angebot bearbeiten</span>
+              <span className="rounded-full bg-bw-primary px-2 py-0.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-white">
                 Empfohlen
               </span>
             </span>
-            <span className="mt-1 block text-[13px] leading-relaxed text-bw-text-muted">
+            <span className="mt-1 block text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
               Änderungen werden in diesem Angebot gespeichert. Beim erneuten Versand wird eine
               korrigierte Fassung verschickt — kein neuer Listeneintrag.
             </span>
           </span>
           {pending && mode === 'bearbeiten' ? (
-            <span className="ml-auto text-xs text-bw-text-muted">Lädt…</span>
+            <span className="ml-auto text-[length:var(--fs-meta)] text-bw-text-muted">Lädt…</span>
           ) : null}
         </button>
 
@@ -88,14 +88,14 @@ export function AngebotBearbeitenWahlModal({
             <Copy className="h-4 w-4" aria-hidden />
           </span>
           <span>
-            <span className="block text-sm font-semibold text-bw-text">Als neues Angebot erstellen</span>
-            <span className="mt-1 block text-[13px] leading-relaxed text-bw-text-muted">
+            <span className="block text-[length:var(--fs-text)] font-semibold text-bw-text">Als neues Angebot erstellen</span>
+            <span className="mt-1 block text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
               Inhalt wird übernommen und als neuer Entwurf angelegt — das bisherige Angebot wird als
               „Ersetzt“ markiert.
             </span>
           </span>
           {pending && mode === 'kopie' ? (
-            <span className="ml-auto text-xs text-bw-text-muted">Lädt…</span>
+            <span className="ml-auto text-[length:var(--fs-meta)] text-bw-text-muted">Lädt…</span>
           ) : null}
         </button>
       </div>

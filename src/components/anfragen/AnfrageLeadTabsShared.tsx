@@ -255,7 +255,7 @@ export function LeadNotizenListeTab({
       </div>
 
       {allgemeineNotizen.length === 0 ? (
-        <div className="py-10 text-center text-sm text-bw-text-muted">Noch keine Notizen</div>
+        <div className="py-10 text-center text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Notizen</div>
       ) : (
         <div className="lead-notiz-liste mt-4 space-y-3">
           {allgemeineNotizen.map((n) => {
@@ -266,7 +266,7 @@ export function LeadNotizenListeTab({
                 variant="plain"
                 meta={
                   <div className="pr-6">
-                    <div className="text-[13px] font-semibold leading-tight text-bw-text">
+                    <div className="text-[length:var(--fs-text)] font-semibold leading-tight text-bw-text">
                       {leadNotizErstellerLabel(n)}
                     </div>
                     <div className="mt-0.5 tabular-nums text-bw-text-muted">{formatDatumZeit(n.created_at)}</div>
@@ -299,7 +299,7 @@ export function LeadNotizenListeTab({
                     href={n.datei_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 flex items-center gap-1.5 text-xs text-bw-link"
+                    className="mt-2 flex items-center gap-1.5 text-[length:var(--fs-meta)] text-bw-link"
                   >
                     Anhang öffnen
                   </a>
@@ -307,7 +307,7 @@ export function LeadNotizenListeTab({
               </Note>
               <button
                 type="button"
-                className="absolute right-2 top-2 text-xs text-bw-text-muted hover:text-status-cancel-text"
+                className="absolute right-2 top-2 text-[length:var(--fs-meta)] text-bw-text-muted hover:text-status-cancel-text"
                 onClick={() => void loeschen(n.id)}
                 aria-label="Notiz löschen"
               >
@@ -358,7 +358,7 @@ export function AngeboteListeTab({
       <div>
         <div>
           {rows.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-bw-text-muted">Noch kein Angebot</div>
+            <div className="px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Noch kein Angebot</div>
           ) : (
             rows.map((a) => (
               <button
@@ -368,14 +368,14 @@ export function AngeboteListeTab({
                 className="list-row-grid w-full border-b border-bw-border text-left last:border-b-0 hover:bg-bw-hover"
                 style={{ gridTemplateColumns: '120px 1fr 100px 110px 44px' }}
               >
-                <span className="font-mono text-xs text-bw-text-muted">AN-{a.id.slice(0, 8).toUpperCase()}</span>
+                <span className="font-mono text-[length:var(--fs-meta)] text-bw-text-muted">AN-{a.id.slice(0, 8).toUpperCase()}</span>
                 <span>
-                  <span className="block text-[13px] font-medium text-bw-text">Angebot</span>
-                  <span className="block text-xs text-bw-text-muted">
+                  <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">Angebot</span>
+                  <span className="block text-[length:var(--fs-meta)] text-bw-text-muted">
                     {a.created_at ? `erstellt ${formatRelativeDate(a.created_at)}` : '—'}
                   </span>
                 </span>
-                <span className="text-right text-[13px] font-medium tabular-nums text-bw-text">
+                <span className="text-right text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
                   {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </span>
                 <AngebotStatusBadge status={a.status} />
@@ -404,7 +404,7 @@ export function AngeboteListeTab({
   return (
     <div className="p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-bw-text">Angebote</h3>
+        <h3 className="text-[length:var(--fs-text)] font-medium text-bw-text">Angebote</h3>
         {onAngebotErstellen ? (
           <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>
             + Angebot erstellen
@@ -443,10 +443,10 @@ export function AngeboteListeTab({
               className="flex w-full items-center justify-between rounded-lg bg-bw-hover p-3 text-left transition-colors hover:bg-bw-border"
             >
               <div>
-                <div className="text-sm font-medium text-bw-text">
+                <div className="text-[length:var(--fs-text)] font-medium text-bw-text">
                   {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </div>
-                <div className="mt-0.5 text-xs text-bw-text-muted">
+                <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
                   {a.created_at ? new Date(a.created_at).toLocaleDateString('de') : '—'}
                 </div>
               </div>

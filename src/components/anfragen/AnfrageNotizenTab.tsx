@@ -85,7 +85,7 @@ export function AnfrageNotizenTab({
           }}
         >
           {allgemeineNotizen.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: "var(--text-4)", padding: "4px 0" }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-4)", padding: "4px 0" }}>
               Noch keine Notizen — schreibe die erste unten.
             </div>
           ) : (
@@ -153,7 +153,7 @@ export function AnfrageNotizenTab({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="link"
-                      style={{ display: "inline-block", marginTop: 6, fontSize: 12 }}
+                      style={{ display: "inline-block", marginTop: 6, fontSize: 'var(--fs-meta)' }}
                     >
                       Anhang öffnen
                     </a>

@@ -73,7 +73,7 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
       >
         <span>HV Meldung</span>
         {meta ? (
-          <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>{meta}</span>
+          <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>{meta}</span>
         ) : null}
       </div>
 

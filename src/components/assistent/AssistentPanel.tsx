@@ -74,7 +74,7 @@ function NavChip({
       type="button"
       disabled={disabled}
       title={link.hint}
-      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#2E7D52]/35 bg-white px-2.5 py-1 text-[11px] font-medium text-[#2E7D52] hover:bg-[#EAF3DE] disabled:opacity-50"
+      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#2E7D52]/35 bg-white px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-[#2E7D52] hover:bg-[#EAF3DE] disabled:opacity-50"
       onClick={() => onNavigate(link.href)}
     >
       <MockIcon ctx="btn" n="external-link" size={12} />
@@ -94,10 +94,10 @@ function PreviewCard({
 }) {
   return (
     <div className="rounded-lg border border-[#2E7D52]/30 bg-white p-2.5 shadow-sm">
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#2E7D52]">
+      <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">
         {preview.title}
       </p>
-      <dl className="space-y-1 text-[12px]">
+      <dl className="space-y-1 text-[length:var(--fs-meta)]">
         {preview.rows.map((r) => (
           <div key={r.label} className="flex gap-2">
             <dt className="w-16 shrink-0 text-bw-text-muted">{r.label}</dt>
@@ -106,7 +106,7 @@ function PreviewCard({
         ))}
       </dl>
       {preview.warning ? (
-        <p className="mt-1.5 text-[11px] text-bw-text-muted">{preview.warning}</p>
+        <p className="mt-1.5 text-[length:var(--fs-meta)] text-bw-text-muted">{preview.warning}</p>
       ) : null}
       <button
         type="button"
@@ -214,8 +214,8 @@ export function AssistentPanel() {
             <MockIcon ctx="btn" n="sparkles" size={16} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold text-bw-text">Assistent</p>
-            <p className="truncate text-[11px] text-bw-text-muted">
+            <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">Assistent</p>
+            <p className="truncate text-[length:var(--fs-meta)] text-bw-text-muted">
               Wissen · Ausführen · Springen · {pathname}
             </p>
           </div>
@@ -234,7 +234,7 @@ export function AssistentPanel() {
             <div key={`${m.role}-${i}`}>
               <div
                 className={cn(
-                  'rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap',
+                  'rounded-lg px-3 py-2 text-[length:var(--fs-text)] leading-relaxed whitespace-pre-wrap',
                   m.role === 'assistant'
                     ? 'bg-bw-surface-2 text-bw-text'
                     : 'ml-6 bg-[#2E7D52] text-white'
@@ -253,7 +253,7 @@ export function AssistentPanel() {
             </div>
           ))}
           {pending ? (
-            <p className="text-[12px] text-bw-text-muted">Denkt nach…</p>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Denkt nach…</p>
           ) : null}
           <div ref={bottomRef} />
         </div>
@@ -264,7 +264,7 @@ export function AssistentPanel() {
               <button
                 key={q.label}
                 type="button"
-                className="rounded-full border border-bw-border bg-white px-2.5 py-1 text-[11px] text-bw-text hover:bg-bw-surface-2 active:scale-[0.97]"
+                className="rounded-full border border-bw-border bg-white px-2.5 py-1 text-[length:var(--fs-meta)] text-bw-text hover:bg-bw-surface-2 active:scale-[0.97]"
                 disabled={pending}
                 onClick={() => send(q.prompt)}
               >
@@ -272,7 +272,7 @@ export function AssistentPanel() {
               </button>
             ))}
           </div>
-          {error ? <p className="text-[11px] text-danger">{error}</p> : null}
+          {error ? <p className="text-[length:var(--fs-meta)] text-danger">{error}</p> : null}
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -291,7 +291,7 @@ export function AssistentPanel() {
               <MockIcon ctx="btn" n="send" size={14} />
             </button>
           </form>
-          <p className="text-[10px] text-bw-text-muted">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             Vorschau im Chat — Versand erst mit „Jetzt ausführen“.
           </p>
         </div>

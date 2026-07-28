@@ -16,6 +16,30 @@ import {
   zahlplanMergeMitEinfrieren,
 } from '@/lib/rechnungen/zahlplan-gates'
 
+/**
+ * Spec Q2: Unverbindlicher Zahlplan-Vorschlag liegt auf `angebote.zahlungsplan`.
+ * `auftraege.zahlungsplan` wird nicht mehr gelesen/geschrieben.
+ */
+async function angebotIdForAuftrag(
+  supabase: ReturnType<typeof createClient>,
+  auftragId: string
+): Promise<{ ok: true; angebotId: string } | { ok: false; message: string }> {
+  const { data, error } = await supabase
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (error) return { ok: false, message: error.message }
+  const angebotId = data?.angebot_id ? String(data.angebot_id) : ''
+  if (!angebotId) {
+    return {
+      ok: false,
+      message: 'Kein verknüpftes Angebot — Zahlplan-Vorschlag nur am Angebot speicherbar.',
+    }
+  }
+  return { ok: true, angebotId }
+}
+
 export async function saveAuftragZahlungsplan(
   auftragId: string,
   plan: Zahlungsplan,
@@ -26,16 +50,18 @@ export async function saveAuftragZahlungsplan(
   }
 
   const supabase = createClient()
+  const angRef = await angebotIdForAuftrag(supabase, auftragId)
+  if (!angRef.ok) return angRef
 
-  const { data: auftragRow, error: loadErr } = await supabase
-    .from('auftraege')
+  const { data: angRow, error: loadErr } = await supabase
+    .from('angebote')
     .select('zahlungsplan')
-    .eq('id', auftragId)
+    .eq('id', angRef.angebotId)
     .maybeSingle()
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
-  const bisher = parseZahlungsplan(auftragRow?.zahlungsplan) ?? emptyZahlungsplan()
+  const bisher = parseZahlungsplan(angRow?.zahlungsplan) ?? emptyZahlungsplan()
 
   const { data: rechnungen } = await supabase
     .from('rechnungen')
@@ -79,14 +105,13 @@ export async function saveAuftragZahlungsplan(
     gesamtNetto = auftragSummenAusPositionen(asAngebot).netto
   }
 
-  // %-Überziehung auch ohne geladene Summe abfangen; Betrags-Überziehung braucht VK
   const sumGate = validateZahlungsplanGegenGesamt(normalized, gesamtNetto)
   if (!sumGate.ok) return sumGate
 
   const { error } = await supabase
-    .from('auftraege')
+    .from('angebote')
     .update({ zahlungsplan: normalized, updated_at: new Date().toISOString() })
-    .eq('id', auftragId)
+    .eq('id', angRef.angebotId)
 
   if (error) {
     if (error.message.includes('zahlungsplan')) {
@@ -99,25 +124,28 @@ export async function saveAuftragZahlungsplan(
   }
 
   revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath(`/angebote/${angRef.angebotId}`)
   revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
-/** Gesamten Abschlagsplan entfernen (nur wenn keine Rate gestellt/bezahlt). */
+/** Gesamten Abschlagsplan-Vorschlag am Angebot entfernen (nur wenn keine Rate gestellt/bezahlt). */
 export async function clearAuftragZahlungsplan(
   auftragId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const angRef = await angebotIdForAuftrag(supabase, auftragId)
+  if (!angRef.ok) return angRef
 
-  const { data: auftragRow, error: loadErr } = await supabase
-    .from('auftraege')
+  const { data: angRow, error: loadErr } = await supabase
+    .from('angebote')
     .select('zahlungsplan')
-    .eq('id', auftragId)
+    .eq('id', angRef.angebotId)
     .maybeSingle()
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
-  const plan = parseZahlungsplan(auftragRow?.zahlungsplan)
+  const plan = parseZahlungsplan(angRow?.zahlungsplan)
   const { data: rechnungen } = await supabase
     .from('rechnungen')
     .select('id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, faellig_am')
@@ -137,22 +165,35 @@ export async function clearAuftragZahlungsplan(
   if (!gate.ok) return gate
 
   const { error } = await supabase
-    .from('auftraege')
+    .from('angebote')
     .update({
       zahlungsplan: emptyZahlungsplan(),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', auftragId)
+    .eq('id', angRef.angebotId)
 
   if (error) return { ok: false, message: error.message }
 
   revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath(`/angebote/${angRef.angebotId}`)
   revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
+/** Liest den unverbindlichen Vorschlag vom verknüpften Angebot (nicht vom Auftrag). */
 export async function loadAuftragZahlungsplan(auftragId: string): Promise<Zahlungsplan | null> {
   const supabase = createClient()
-  const { data } = await supabase.from('auftraege').select('zahlungsplan').eq('id', auftragId).maybeSingle()
+  const { data: auf } = await supabase
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  const angebotId = auf?.angebot_id ? String(auf.angebot_id) : ''
+  if (!angebotId) return null
+  const { data } = await supabase
+    .from('angebote')
+    .select('zahlungsplan')
+    .eq('id', angebotId)
+    .maybeSingle()
   return parseZahlungsplan(data?.zahlungsplan)
 }

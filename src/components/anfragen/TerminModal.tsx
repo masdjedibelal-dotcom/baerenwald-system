@@ -217,7 +217,7 @@ export function TerminModal({
 
       {istBesichtigung ? (
         <div className="mt-4 space-y-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
             <input type="checkbox" checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
             Bestätigungs-Mail an Kunden ({kontaktEmail ?? 'keine E-Mail'})
           </label>

@@ -50,7 +50,7 @@ function ActionControl({
         href={action.href}
         className={cn(
           'btn primary inline-flex items-center justify-center gap-1.5',
-          size === 'md' ? 'h-11 px-4 text-[15px]' : 'sm',
+          size === 'md' ? 'h-11 px-4 text-[length:var(--fs-title)]' : 'sm',
           className
         )}
       >
@@ -64,7 +64,7 @@ function ActionControl({
       type="button"
       className={cn(
         'btn primary inline-flex items-center justify-center gap-1.5',
-        size === 'md' ? 'h-11 px-4 text-[15px] font-semibold' : 'sm',
+        size === 'md' ? 'h-11 px-4 text-[length:var(--fs-title)] font-semibold' : 'sm',
         className
       )}
       onClick={action.onClick}

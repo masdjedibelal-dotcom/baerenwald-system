@@ -255,6 +255,87 @@ export async function createNachtragManuell(input: {
   return { ok: true, id: row.id as string }
 }
 
+const ANGEBOT_NACHTRAG_MARKER = (angebotId: string) => `[crm:angebot:${angebotId}]`
+
+/**
+ * N3: Nachtrags-Angebot aus dem Wizard → nachtraege[] am Auftrag upserten
+ * (Marker in beschreibung, da kein angebot_id-Feld am Schema).
+ */
+export async function upsertNachtragEntwurfFromAngebotWizard(input: {
+  auftragId: string
+  angebotId: string
+  grund: string
+  beschreibung?: string | null
+  positionen: AngebotPosition[]
+}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+
+  const pos = normalizeAngebotPositionen(input.positionen)
+  const summen = summenAusPositionen(pos, DEFAULT_MWST)
+  const marker = ANGEBOT_NACHTRAG_MARKER(input.angebotId.trim())
+  const baseDesc = (input.beschreibung ?? '').trim()
+  const beschreibung = baseDesc.includes(marker)
+    ? baseDesc
+    : [baseDesc, marker].filter(Boolean).join('\n\n')
+
+  const { data: existing } = await supabaseAdmin
+    .from('nachtraege')
+    .select('id, status')
+    .eq('auftrag_id', input.auftragId)
+    .eq('status', 'entwurf')
+    .ilike('beschreibung', `%${marker}%`)
+    .maybeSingle()
+
+  if (existing?.id) {
+    const { error } = await supabaseAdmin
+      .from('nachtraege')
+      .update({
+        grund: input.grund.trim() || 'Nachtrag',
+        beschreibung,
+        positionen: pos,
+        gesamt_min: summen.bruttoMin,
+        gesamt_max: summen.bruttoMax,
+      })
+      .eq('id', existing.id)
+      .eq('auftrag_id', input.auftragId)
+    if (error) return { ok: false, message: error.message }
+    revalidatePath(`/auftraege/${input.auftragId}`)
+    return { ok: true, id: existing.id as string }
+  }
+
+  const { data: row, error } = await supabaseAdmin
+    .from('nachtraege')
+    .insert({
+      auftrag_id: input.auftragId,
+      grund: input.grund.trim() || 'Nachtrag',
+      beschreibung,
+      positionen: pos,
+      gesamt_min: summen.bruttoMin,
+      gesamt_max: summen.bruttoMax,
+      status: 'entwurf',
+      handwercher_bestaetigt: false,
+    })
+    .select('id')
+    .single()
+
+  if (error || !row) return { ok: false, message: error?.message ?? 'Nachtrag speichern fehlgeschlagen' }
+
+  await insertAuftragTimelineEvent({
+    auftrag_id: input.auftragId,
+    typ: 'nachtrag_entwurf',
+    titel: 'Nachtrag aus Angebot',
+    beschreibung: input.grund.slice(0, 500),
+    erstellt_von: user.id,
+  })
+
+  revalidatePath(`/auftraege/${input.auftragId}`)
+  return { ok: true, id: row.id as string }
+}
+
 export async function updateNachtragHandwercherBestaetigt(
   nachtragId: string,
   auftragId: string,

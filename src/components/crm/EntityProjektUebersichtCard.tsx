@@ -217,7 +217,7 @@ export function EntityProjektUebersichtCard({
             editing={can('istBauprojekt')}
             value={draft.istBauprojekt ? 'Ja' : 'Nein'}
           >
-            <label className={cn('flex cursor-pointer items-start gap-2 text-sm')}>
+            <label className={cn('flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]')}>
               <input
                 type="checkbox"
                 className="mt-0.5 h-4 w-4 rounded border-bw-border"
@@ -226,7 +226,7 @@ export function EntityProjektUebersichtCard({
               />
               <span>
                 Bauprojekt / Bauauftrag
-                <span className="mt-0.5 block text-xs text-bw-text-muted">
+                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                   Aktiviert Bautagebuch, Baustellen-Tab und Compliance.
                 </span>
               </span>

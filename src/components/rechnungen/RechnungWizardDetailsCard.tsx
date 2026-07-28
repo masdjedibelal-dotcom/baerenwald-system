@@ -64,7 +64,7 @@ export function RechnungWizardDetailsCard({
       <div className="space-y-2.5">
         <label
           className={cn(
-            'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]',
+            'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[length:var(--fs-text)]',
             hinweis35aErlaubt
               ? 'border-bw-border bg-bw-hover/30'
               : 'cursor-not-allowed border-bw-border/60 opacity-50'
@@ -79,7 +79,7 @@ export function RechnungWizardDetailsCard({
           />
           <span>
             <span className="font-medium">§ 35a EStG</span>
-            <span className="mt-0.5 block text-[11px] text-bw-text-muted">
+            <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
               Lohnkosten-Hinweis neben der Summenaufstellung
               {lohnNettoPdf > 0 ? ` (${formatEurBetrag(lohnNettoPdf)} netto)` : ''}
               {!hinweis35aErlaubt ? ' — nur bei Privatkunden und Lohnanteil > 0' : ''}
@@ -87,7 +87,7 @@ export function RechnungWizardDetailsCard({
           </span>
         </label>
         {zeigt13b ? (
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[13px]">
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -96,7 +96,7 @@ export function RechnungWizardDetailsCard({
             />
             <span>
               <span className="font-medium">§ 13b UStG (Reverse Charge)</span>
-              <span className="mt-0.5 block text-[11px] text-bw-text-muted">
+              <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                 Steuerschuldnerschaft Leistungsempfänger
               </span>
             </span>

@@ -55,6 +55,10 @@ export type DokumentArtikelZeile = {
   position_quelle?: 'katalog' | 'frei' | string | null
   /** Zusatztext unter Leistung (z. B. Fachbetrieb-Hinweis) */
   positionBeschreibung?: string
+  /** Kundennotiz / Regie-Meta aus Auftrag (CRM) */
+  notizExtern?: string
+  /** Regieschein als sichtbare Anlage/Chip auf Rechnung */
+  regieSchein?: boolean
   /** Fachbetrieb-Hinweis im PDF (Standard aus Gewerk-Einstellungen) */
   fachbetriebHinweisAnzeigen?: boolean
   /** Steuerliche Aufteilung + Anfahrt */
@@ -348,11 +352,18 @@ export function angebotPositionenToDokumentZeilen(
     ).trim()
     const kostenart: KostenartZeile =
       p.kostenart === 'anfahrt' || p.gewerk_slug === GEWERK_SLUG_ANFAHRT ? 'anfahrt' : 'leistung'
+    const notizExtern = p.notiz_extern?.trim() || undefined
+    const regieSchein = Boolean(
+      notizExtern &&
+        (/regieschein/i.test(notizExtern) || /nach aufwand/i.test(notizExtern))
+    )
     out.push({
       id: p.id,
       typ: 'artikel',
       bezeichnung: leistung || besch || 'Position',
       positionBeschreibung: besch && besch !== leistung ? besch : undefined,
+      notizExtern,
+      regieSchein,
       menge: m,
       einheit: p.einheit || 'Stk.',
       vkNetto: Math.round(vk * 100) / 100,

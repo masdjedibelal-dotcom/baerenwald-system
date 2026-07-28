@@ -1,4 +1,4 @@
-/** Spec §3 — einheitliche Detail-Tabs (Anzeige-Labels). */
+/** Spec §3/§4 — einheitliche Detail-Tabs (Anzeige-Labels). */
 
 import {
   ACTIVITY_TAB_LABEL,
@@ -21,11 +21,11 @@ export const ENTITY_DETAIL_TAB_LABELS = {
   notizen: 'Notizen',
   uebersicht: 'Übersicht',
   zahlplan: 'Zahlung',
-  vorOrt: 'Vor Ort',
-  bautagebuch: 'Bautagebuch',
+  zahlung: 'Zahlung',
   akte: 'Akte',
   schritte: 'Nächste Schritte',
   leistung: 'Leistungen',
+  leistungen: 'Leistungen',
   positionen: 'Positionen',
   aktivitaet: 'Aktivität',
   [CUMULATIVE_DETAIL_TAB.anfrage]: CUMULATIVE_DETAIL_LABEL.anfrage,
@@ -34,7 +34,7 @@ export const ENTITY_DETAIL_TAB_LABELS = {
   [CUMULATIVE_DETAIL_TAB.rechnung]: CUMULATIVE_DETAIL_LABEL.rechnung,
 } as const
 
-/** Legacy-Tab-ID → Spec-Label (Wave 1: nur Label-Mapping, keine ID-Umbenennung). */
+/** Legacy-Tab-ID → Spec-Label. */
 export function entityDetailTabLabel(tabId: string): string {
   const map: Record<string, string> = {
     stammdaten: ENTITY_DETAIL_TAB_LABELS.stammdaten,
@@ -53,16 +53,19 @@ export function entityDetailTabLabel(tabId: string): string {
     dokumente: ENTITY_DETAIL_TAB_LABELS.dokumente,
     notizen: ENTITY_DETAIL_TAB_LABELS.notizen,
     leistung: ENTITY_DETAIL_TAB_LABELS.leistung,
+    leistungen: ENTITY_DETAIL_TAB_LABELS.leistungen,
     positionen: ENTITY_DETAIL_TAB_LABELS.positionen,
     uebersicht: ENTITY_DETAIL_TAB_LABELS.uebersicht,
     auftragdetails: ENTITY_DETAIL_TAB_LABELS.uebersicht,
-    finanzen: ENTITY_DETAIL_TAB_LABELS.zahlplan,
+    finanzen: ENTITY_DETAIL_TAB_LABELS.zahlung,
     zahlplan: ENTITY_DETAIL_TAB_LABELS.zahlplan,
+    zahlung: ENTITY_DETAIL_TAB_LABELS.zahlung,
     akte: ENTITY_DETAIL_TAB_LABELS.akte,
-    ausfuehrung: ENTITY_DETAIL_TAB_LABELS.vorOrt,
-    vorOrt: ENTITY_DETAIL_TAB_LABELS.vorOrt,
-    'vor-ort': ENTITY_DETAIL_TAB_LABELS.vorOrt,
-    bautagebuch: ENTITY_DETAIL_TAB_LABELS.bautagebuch,
+    /** Spec §15: kein Vor-Ort-/Tagebuch-Tab — Alias → Leistungen */
+    ausfuehrung: ENTITY_DETAIL_TAB_LABELS.leistungen,
+    vorOrt: ENTITY_DETAIL_TAB_LABELS.leistungen,
+    'vor-ort': ENTITY_DETAIL_TAB_LABELS.leistungen,
+    bautagebuch: ENTITY_DETAIL_TAB_LABELS.leistungen,
     [CUMULATIVE_DETAIL_TAB.anfrage]: CUMULATIVE_DETAIL_LABEL.anfrage,
     [CUMULATIVE_DETAIL_TAB.angebot]: CUMULATIVE_DETAIL_LABEL.angebot,
     [CUMULATIVE_DETAIL_TAB.auftrag]: CUMULATIVE_DETAIL_LABEL.auftrag,

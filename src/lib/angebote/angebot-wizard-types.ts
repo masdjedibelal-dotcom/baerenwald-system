@@ -162,6 +162,8 @@ export type AngebotWizardBootstrap = {
   bereitsGesendet?: boolean
   /** Korrektur aus laufendem Auftrag — kein erneutes Annehmen, Auftrag wird mitgespeichert. */
   auftragKorrektur?: { auftragId: string }
+  /** Phase 10: Nachtrag — erweitert Auftrag, ersetzt ihn nicht. */
+  nachtragZu?: { auftragId: string }
   zahlungsplan?: Zahlungsplan | null
   /** Bestand: wiederkehrende Leistung */
   ist_wiederkehrend?: boolean

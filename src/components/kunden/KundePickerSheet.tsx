@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { searchKunden } from '@/app/(dashboard)/angebote/actions'
-import { PickerSheet } from '@/components/surfaces/PickerSheet'
+import { useEffect, useMemo, useState } from 'react'
+import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
+import { Combobox, COMBOBOX_OPTION_THRESHOLD } from '@/components/ui/Combobox'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import type { Kunde } from '@/lib/types'
 
 /**
- * Surface-Picker: Kunde suchen/wählen · Header-+ = Neu (kein zweites Neu in der Liste).
+ * N4 / Spec §14: Kundenwahl als Combobox (kein natives Select, kein Listen-Picker-Sheet).
+ * Lädt bis 200 Kunden; bei >15 greift Combobox-Tipp-Filter (Threshold).
  */
 export function KundePickerSheet({
   open,
@@ -25,73 +27,80 @@ export function KundePickerSheet({
   title?: string
   context?: EditorSheetContext
 }) {
-  const [q, setQ] = useState('')
   const [rows, setRows] = useState<Kunde[]>([])
   const [loading, setLoading] = useState(false)
+  const [value, setValue] = useState('')
 
   useEffect(() => {
     if (!open) return
-    setQ('')
-    setRows([])
+    setValue('')
+    setLoading(true)
+    void listKundenFuerCombobox()
+      .then((r) => setRows(r.kunden))
+      .finally(() => setLoading(false))
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const term = q.trim()
-    if (term.length < 2) {
-      setRows([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    const t = setTimeout(() => {
-      void searchKunden(term)
-        .then((r) => setRows(r.kunden))
-        .finally(() => setLoading(false))
-    }, 280)
-    return () => clearTimeout(t)
-  }, [q, open])
+  const options = useMemo(
+    () =>
+      rows.map((k) => ({
+        value: k.id,
+        label: kundeDisplayName(k),
+        sub:
+          [k.email, k.telefon, [k.plz, k.ort].filter(Boolean).join(' ')].filter(Boolean).join(' · ') ||
+          undefined,
+      })),
+    [rows]
+  )
 
-  const emptyHint =
-    q.trim().length < 2
-      ? 'Name, E-Mail oder Telefon eingeben…'
-      : loading
-        ? 'Suche…'
-        : 'Keine Treffer.'
+  const byId = useMemo(() => new Map(rows.map((k) => [k.id, k])), [rows])
+
+  function pickValue(id: string) {
+    setValue(id)
+    const k = byId.get(id)
+    if (k) {
+      onPick(k)
+      onClose()
+    }
+  }
 
   return (
-    <PickerSheet
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={title}
       context={context}
-      onNeu={onNeu}
-      search={
-        <input
-          className="sel w-full"
-          placeholder="Suchen…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          autoFocus
-        />
+      size="md"
+      headerEnd={
+        onNeu ? (
+          <button type="button" className="editor-sheet__confirm-text" onClick={onNeu}>
+            Neu
+          </button>
+        ) : null
       }
-      searchPlacement="top"
-      empty={rows.length === 0 ? <p className="picker-sheet__empty">{emptyHint}</p> : undefined}
     >
-      <ul className="picker-sheet__rows">
-        {rows.map((k) => (
-          <li key={k.id}>
-            <button type="button" className="picker-sheet__row" onClick={() => onPick(k)}>
-              <span className="picker-sheet__row-title">{kundeDisplayName(k)}</span>
-              <span className="picker-sheet__row-meta">
-                {[k.email, k.telefon, [k.plz, k.ort].filter(Boolean).join(' ')]
-                  .filter(Boolean)
-                  .join(' · ') || '—'}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </PickerSheet>
+      <div className="space-y-3">
+        {loading ? (
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Kunden werden geladen…</p>
+        ) : (
+          <>
+            <Combobox
+              label="Kunde"
+              options={options}
+              value={value}
+              onChange={pickValue}
+              placeholder="Kunde wählen oder tippen…"
+              emptyLabel="Keine Treffer"
+            />
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              {options.length > COMBOBOX_OPTION_THRESHOLD
+                ? `${options.length} Kunden — tippen zum Filtern (Combobox >${COMBOBOX_OPTION_THRESHOLD}).`
+                : options.length === 0
+                  ? 'Noch keine Kunden — „Neu“ anlegen.'
+                  : `${options.length} Kunden.`}
+            </p>
+          </>
+        )}
+      </div>
+    </EditorSheet>
   )
 }

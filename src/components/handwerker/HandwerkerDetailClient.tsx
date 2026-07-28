@@ -532,7 +532,7 @@ export function HandwerkerDetailClient({
         <div className="card-b">
           <div className="mb-4 flex flex-wrap items-baseline gap-3">
             <div
-              className="text-[36px] font-semibold leading-none tabular-nums"
+              className="text-[length:var(--fs-head)] font-semibold leading-none tabular-nums"
               style={{ color: '#D9A800' }}
             >
               {bewertungGesamt != null && bewertungGesamt > 0
@@ -541,7 +541,7 @@ export function HandwerkerDetailClient({
             </div>
             <div>
               <RatingStars value={bewertungGesamt} size={14} />
-              <div className="mt-0.5 text-[12px] text-[var(--text-3)]">
+              <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
                 {bewertungAnzahl > 0
                   ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
                   : 'Noch keine Bewertungen'}
@@ -557,10 +557,10 @@ export function HandwerkerDetailClient({
                   className="border-b border-[var(--border)] py-2.5 last:border-0"
                 >
                   <div className="mb-1 flex items-center justify-between gap-3">
-                    <div className="text-[13px] font-medium text-[var(--text)]">
+                    <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">
                       {b.kundeName || 'Kunde'}
                     </div>
-                    <div className="text-[12px] text-[var(--text-3)]">
+                    <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
                       {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
                     </div>
                   </div>
@@ -568,7 +568,7 @@ export function HandwerkerDetailClient({
                     <RatingStars value={b.note} />
                   </div>
                   {b.notiz?.trim() ? (
-                    <p className="text-[13px] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
+                    <p className="text-[length:var(--fs-text)] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
                   ) : null}
                 </li>
               ))}
@@ -583,8 +583,8 @@ export function HandwerkerDetailClient({
                     className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
                   >
                     <div className="min-w-0">
-                      <div className="text-[13px] font-medium text-[var(--text)]">{k.label}</div>
-                      <div className="text-[11.5px] text-[var(--text-3)]">{k.hint}</div>
+                      <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">{k.label}</div>
+                      <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{k.hint}</div>
                     </div>
                     <RatingStars value={val} />
                   </li>
@@ -614,7 +614,7 @@ export function HandwerkerDetailClient({
             Hervorgehobene Felder sind bearbeitbar.
           </p>
         ) : null}
-        {err && editingKontakt ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
+        {err && editingKontakt ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField
             label="Betrieb"
@@ -722,7 +722,7 @@ export function HandwerkerDetailClient({
             Hervorgehobene Felder sind bearbeitbar.
           </p>
         ) : null}
-        {err && editingBank ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
+        {err && editingBank ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
             <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
@@ -947,7 +947,7 @@ export function HandwerkerDetailClient({
           <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
           <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
           <div>
-            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Partner-Portal Mail Vorschau"
               sandbox="allow-same-origin"

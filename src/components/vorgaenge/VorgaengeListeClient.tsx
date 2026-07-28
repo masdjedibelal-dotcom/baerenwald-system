@@ -34,6 +34,7 @@ import { toast } from '@/components/ui/app-toast'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
+import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
@@ -43,7 +44,11 @@ import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 
-const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'bestand', 'rechnung'] as const
+/** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
+const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
+
+const DATA_COL_IDS = ['kunde', 'titel', 'phase', 'wert', 'datum', 'status'] as const
+type DataColId = (typeof DATA_COL_IDS)[number]
 
 /** Daten-Spalten — Kunde/Titel bewusst breiter als Phase/Status/Wert/Datum. */
 const VORGAENGE_DATA_COLS: ResizableColDef[] = [
@@ -53,8 +58,34 @@ const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'wert', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
   { id: 'datum', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
   { id: 'status', defaultWidth: 96, minWidth: 80, maxWidth: 140 },
-  { id: 'actions', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
+  { id: 'actions', defaultWidth: 88, minWidth: 72, maxWidth: 120, fixed: true },
 ]
+
+const COL_LABELS: Record<DataColId, string> = {
+  kunde: 'Kunde',
+  titel: 'Vorgang',
+  phase: 'Phase',
+  wert: 'Wert',
+  datum: 'Datum',
+  status: 'Status',
+}
+
+function phaseChipLabel(p: (typeof VORGANG_FILTERS)[number]): string {
+  if (p === 'alle') return 'Alle'
+  if (p === 'bestand') return 'Wartung & Pflege'
+  return PHASE_META[p as VorgangPhase].label
+}
+
+function isErsetzt(row: VorgangListeRow): boolean {
+  return row.unterstatus.toLowerCase() === 'ersetzt' || Boolean(row.ersetzt_durch)
+}
+
+function rowEdgeClass(row: VorgangListeRow): string {
+  if (row.ueberfaellig || row.badges.notfall) return 'vg-row--edge-danger'
+  const u = row.unterstatus.toLowerCase()
+  if (u === 'neu' || u === 'gesendet' || u === 'versendet') return 'vg-row--edge-warn'
+  return ''
+}
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
   id: 'check',
@@ -195,16 +226,27 @@ export function VorgaengeListeClient({
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [visibleCols, setVisibleCols] = useState<Record<DataColId, boolean>>({
+    kunde: true,
+    titel: true,
+    phase: true,
+    wert: true,
+    datum: true,
+    status: true,
+  })
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const [flashKeys, setFlashKeys] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
-  const colDefs = useMemo(
-    () => (selectMode ? [VORGAENGE_CHECK_COL, ...VORGAENGE_DATA_COLS] : VORGAENGE_DATA_COLS),
-    [selectMode]
-  )
+  const colDefs = useMemo(() => {
+    const data = VORGAENGE_DATA_COLS.filter(
+      (c) => c.id === 'actions' || visibleCols[c.id as DataColId]
+    )
+    return [VORGAENGE_CHECK_COL, ...data]
+  }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v3.${selectMode ? 'sel' : 'base'}`,
+    `crm.cols.vorgaenge.v4.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -220,10 +262,6 @@ export function VorgaengeListeClient({
   useEffect(() => {
     setSelected({})
   }, [lifecycle])
-
-  useEffect(() => {
-    if (!selectMode) setSelected({})
-  }, [selectMode])
 
   const syncPhaseToUrl = useCallback(
     (phase: (typeof VORGANG_FILTERS)[number], nextLifecycle?: 'offen' | 'erledigt') => {
@@ -510,6 +548,7 @@ export function VorgaengeListeClient({
     }
 
     if (r.failCount === 0) {
+      const snapshot = selectedRows
       setLocalRows((prev) =>
         prev.filter(
           (row) =>
@@ -521,7 +560,20 @@ export function VorgaengeListeClient({
       setSelected({})
       toast.success(
         r.okCount === 1 ? 'Vorgang gelöscht' : `${r.okCount} Vorgänge gelöscht`,
-        { id: loadingId }
+        {
+          id: loadingId,
+          action: {
+            label: 'Rückgängig',
+            onClick: () => {
+              setLocalRows((prev) => {
+                const keys = new Set(prev.map(rowKey))
+                const restored = snapshot.filter((s) => !keys.has(rowKey(s)))
+                return [...restored, ...prev]
+              })
+              toast.success('Löschen rückgängig gemacht')
+            },
+          },
+        }
       )
       router.refresh()
       return
@@ -547,6 +599,20 @@ export function VorgaengeListeClient({
       setBulkErledigtPending(false)
       setSelected({})
       if (fail === 0) {
+        for (const leadId of leadIds) {
+          const row = selectedRows.find((v) => v.leadId === leadId)
+          if (row) {
+            const k = rowKey(row)
+            setFlashKeys((f) => ({ ...f, [k]: true }))
+            window.setTimeout(() => {
+              setFlashKeys((f) => {
+                const n = { ...f }
+                delete n[k]
+                return n
+              })
+            }, 1200)
+          }
+        }
         toast.success(ok === 1 ? 'Als erledigt markiert' : `${ok} als erledigt markiert`, {
           id: loadingId,
         })
@@ -687,7 +753,7 @@ export function VorgaengeListeClient({
                   : undefined
             }
           >
-            {p === 'alle' ? 'Alle' : p === 'bestand' ? 'Wiederkehrend' : PHASE_META[p as VorgangPhase].label}
+            {phaseChipLabel(p)}
           </MockChip>
         ))}
       </div>
@@ -771,7 +837,7 @@ export function VorgaengeListeClient({
                     : undefined
               }
             >
-              {p === 'alle' ? 'Alle' : p === 'bestand' ? 'Wiederkehrend' : PHASE_META[p as VorgangPhase].label}
+              {phaseChipLabel(p)}
             </MockChip>
           ))}
         </div>
@@ -807,11 +873,9 @@ export function VorgaengeListeClient({
               onSelect: () => setLifecycleOpen(true),
             },
             {
-              icon: 'checks',
-              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
-              hint: selectMode ? `${selectedCount} gewählt` : undefined,
-              active: selectMode,
-              onSelect: () => setSelectMode((m) => !m),
+              icon: 'layout',
+              label: 'Spalten',
+              onSelect: () => setColumnsOpen(true),
             },
             {
               icon: 'download',
@@ -861,11 +925,11 @@ export function VorgaengeListeClient({
                 onClick={() => setFilterOpen(true)}
               />
               <MockBtn
-                icon="checks"
-                kind={selectMode ? 'primary' : 'ghost'}
+                icon="layout"
+                kind="ghost"
                 sm
-                title={selectMode ? 'Auswahl beenden' : 'Multiauswahl'}
-                onClick={() => setSelectMode((m) => !m)}
+                title="Spalten"
+                onClick={() => setColumnsOpen(true)}
               />
               <MockBtn
                 icon="download"
@@ -1034,7 +1098,7 @@ export function VorgaengeListeClient({
           </>
         }
       >
-        <div style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
             : selectedCount === 1
@@ -1043,28 +1107,57 @@ export function VorgaengeListeClient({
         </div>
       </MockModal>
 
+      <MockModal
+        open={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        icon="filter"
+        title="Spalten"
+        sub="Sichtbare Spalten wählen"
+        size="sm"
+        footer={
+          <MockBtn kind="primary" onClick={() => setColumnsOpen(false)}>
+            Fertig
+          </MockBtn>
+        }
+      >
+        <div className="space-y-2">
+          {DATA_COL_IDS.map((id) => (
+            <label key={id} className="flex items-center gap-2 text-[length:var(--fs-text)]">
+              <input
+                type="checkbox"
+                checked={visibleCols[id]}
+                disabled={id === 'kunde' || id === 'titel'}
+                onChange={() =>
+                  setVisibleCols((prev) => ({ ...prev, [id]: !prev[id] }))
+                }
+              />
+              {COL_LABELS[id]}
+            </label>
+          ))}
+        </div>
+      </MockModal>
+
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        className="listcard listcard--scroll listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
-          {selectMode ? (
-            <div
-              className="vg-check"
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleSelectAll()
-              }}
-              title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-            >
-              <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-                {allFilteredSelected || allPageSelected ? (
-                  <MockIcon ctx="default" n="check" size={12} />
-                ) : null}
-              </span>
-            </div>
-          ) : null}
+          <div
+            className="vg-check"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleSelectAll()
+            }}
+            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
+              {allFilteredSelected || allPageSelected ? (
+                <MockIcon ctx="default" n="check" size={12} />
+              ) : null}
+            </span>
+          </div>
+          {visibleCols.kunde ? (
           <MockSortHead
             col="kunde"
             sortCol={sortCol}
@@ -1075,6 +1168,8 @@ export function VorgaengeListeClient({
           >
             Kunde
           </MockSortHead>
+          ) : null}
+          {visibleCols.titel ? (
           <MockSortHead
             col="titel"
             sortCol={sortCol}
@@ -1085,6 +1180,8 @@ export function VorgaengeListeClient({
           >
             Vorgang
           </MockSortHead>
+          ) : null}
+          {visibleCols.phase ? (
           <MockSortHead
             col="phase"
             sortCol={sortCol}
@@ -1095,6 +1192,8 @@ export function VorgaengeListeClient({
           >
             Phase
           </MockSortHead>
+          ) : null}
+          {visibleCols.wert ? (
           <MockSortHead
             col="wert"
             sortCol={sortCol}
@@ -1106,6 +1205,8 @@ export function VorgaengeListeClient({
           >
             Wert
           </MockSortHead>
+          ) : null}
+          {visibleCols.datum ? (
           <MockSortHead
             col="datum"
             sortCol={sortCol}
@@ -1116,6 +1217,8 @@ export function VorgaengeListeClient({
           >
             Datum
           </MockSortHead>
+          ) : null}
+          {visibleCols.status ? (
           <MockSortHead
             col="status"
             sortCol={sortCol}
@@ -1126,6 +1229,7 @@ export function VorgaengeListeClient({
           >
             Status
           </MockSortHead>
+          ) : null}
           <div />
         </div>
 
@@ -1147,7 +1251,11 @@ export function VorgaengeListeClient({
                 <MockBtn kind="primary" icon="plus" onClick={() => router.push(createAnfrageHref())}>
                   Neue Anfrage
                 </MockBtn>
-              ) : undefined
+              ) : (
+                <MockBtn kind="ghost" onClick={() => setLifecycleFilter('offen')}>
+                  Zu offenen Vorgängen
+                </MockBtn>
+              )
             }
           />
         ) : (
@@ -1155,108 +1263,166 @@ export function VorgaengeListeClient({
             const key = rowKey(v)
             const kind = statusKind(v)
             const label = statusLabel(v)
-            return (
+            const ersetzt = isErsetzt(v)
+            const call = () => {
+              const tel = v.kontaktTelefon?.replace(/\s/g, '')
+              if (tel) window.location.href = `tel:${tel}`
+              else if (v.kundeId) window.open(`/kunden/${v.kundeId}`, '_blank')
+              else toast.info('Keine Kundentelefonnummer hinterlegt')
+            }
+            const del = () => {
+              if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
+              else runDeleteVorgang(v.leadId, router)
+            }
+            const row = (
               <div
-                key={key}
-                className={cn('vg-row', selected[key] && 'sel')}
-                onClick={() => (selectMode ? toggleSel(key) : openDetail(v.detailHref))}
+                className={cn(
+                  'vg-row',
+                  selected[key] && 'sel',
+                  rowEdgeClass(v),
+                  ersetzt && 'vg-row--ersetzt',
+                  flashKeys[key] && 'vg-row--flash'
+                )}
+                onClick={() => openDetail(v.detailHref)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    selectMode ? toggleSel(key) : openDetail(v.detailHref)
+                    openDetail(v.detailHref)
                   }
                 }}
               >
-                {selectMode ? (
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(key)
-                    }}
-                  >
-                    <span className={cn('vg-box', selected[key] && 'on')}>
-                      {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
-                ) : null}
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(key)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[key] && 'on')}>
+                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
+                {visibleCols.kunde ? (
                 <div className="vg-kunde">
                   <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
                     {v.kundeName ?? '—'}
                   </span>
                 </div>
+                ) : null}
+                {visibleCols.titel ? (
                 <div className="vg-vorgang">
-                  <div className="t" title={v.titel}>
+                  <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
                     {v.titel}
                   </div>
+                  {ersetzt ? <span className="vg-chip-ersetzt">ersetzt</span> : null}
                 </div>
+                ) : null}
+                {visibleCols.phase ? (
                 <div className="vg-phase">
                   <span className="ph-neutral">
                     <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
                     {PHASE_META[v.phase].label}
                   </span>
                 </div>
+                ) : null}
+                {visibleCols.wert ? (
                 <div
                   className="vg-wert"
                   style={{
                     textAlign: 'right',
                     fontWeight: 500,
                     fontVariantNumeric: 'tabular-nums',
-                    fontSize: 13,
+                    fontSize: 'var(--fs-text)',
                   }}
                 >
                   {v.wertLabel ?? '—'}
                 </div>
-                <div className="vg-datum" style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+                ) : null}
+                {visibleCols.datum ? (
+                <div className="vg-datum" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                   {formatDatum(v.updatedAt)}
                 </div>
+                ) : null}
+                {visibleCols.status ? (
                 <div className="vg-status">
                   <MockBadge kind={kind}>{label}</MockBadge>
                 </div>
+                ) : null}
                 <div
                   className="vg-actions"
                   onClick={(e) => e.stopPropagation()}
                   style={{ position: 'relative' }}
                 >
-                  {!isMobile && !selectMode ? (
+                  {!isMobile ? (
                     <>
                       <button
                         type="button"
                         className="qa-btn"
-                        title="Öffnen"
-                        aria-label="Vorgang öffnen"
+                        title="Anrufen"
+                        aria-label="Anrufen"
+                        onClick={call}
+                      >
+                        <MockIcon ctx="row" n="phone" size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="qa-btn"
+                        title="Mail"
+                        aria-label="Mail"
+                        onClick={() => {
+                          const mail = v.kontaktEmail?.trim()
+                          if (mail) window.location.href = `mailto:${mail}`
+                          else if (v.kundeId) window.open(`/kunden/${v.kundeId}`, '_blank')
+                          else toast.info('Keine Kunden-E-Mail hinterlegt')
+                        }}
+                      >
+                        <MockIcon ctx="row" n="mail" size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="qa-btn"
+                        title="Bearbeiten"
+                        aria-label="Bearbeiten"
                         onClick={() => openDetail(v.detailHref)}
                       >
-                        <MockIcon ctx="row" n="external-link" size={16} />
+                        <MockIcon ctx="row" n="pencil" size={16} />
                       </button>
-                      {v.phase === 'angebot' || v.phase === 'rechnung' ? (
-                        <button
-                          type="button"
-                          className="qa-btn"
-                          title="PDF"
-                          aria-label="PDF herunterladen"
-                          onClick={() =>
-                            window.open(
-                              v.phase === 'angebot'
-                                ? `/api/angebote/${v.entityId}/pdf`
-                                : `/api/rechnungen/${v.entityId}/pdf`,
-                              '_blank'
-                            )
-                          }
-                        >
-                          <MockIcon ctx="row" n="download" size={16} />
-                        </button>
-                      ) : null}
                     </>
                   ) : null}
                   <MockEntityRowMenu items={rowMenuItems(v)} title="Vorgang" />
                 </div>
               </div>
             )
+            return (
+              <SwipeRow
+                key={key}
+                disabled={!isMobile}
+                onSwipeLeft={isMobile ? del : undefined}
+                onSwipeRight={isMobile ? call : undefined}
+                leftLabel="Löschen"
+                rightLabel="Anrufen"
+              >
+                {row}
+              </SwipeRow>
+            )
           })
         )}
+        {pageItems.length > 0 ? (
+          <div className="vg-row vg-row--aggregate" aria-label="Aggregat">
+            <div className="vg-check" />
+            <div className="vg-kunde" style={{ gridColumn: '1 / -1' }}>
+              <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                {filtered.length} Vorgänge · offen {lifecycleCounts.offen} · Summe{' '}
+                {filtered
+                  .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
+                  .toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                {selectedCount > 0 ? ` · Auswahl ${selectedCount}` : ''}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
       </PullToRefresh>
 

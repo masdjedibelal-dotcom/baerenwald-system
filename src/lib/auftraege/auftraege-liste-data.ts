@@ -15,7 +15,7 @@ export const AUFTRAEGE_LISTE_SELECT = `
       end_datum,
       abnahme_datum,
       created_at,
-      zahlungsplan,
+      letzte_aktivitaet,
       kunden(id, name, email, telefon, adresse, plz, ort, vorname, nachname, typ),
       angebote(id, gesamt_fix, gesamt_min, gesamt_max, zahlungsplan, zahlungsbedingungen)
     `

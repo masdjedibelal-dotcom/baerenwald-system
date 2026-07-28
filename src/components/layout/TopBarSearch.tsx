@@ -27,8 +27,8 @@ function groupLabel(sub?: string): string {
   if (s.startsWith('anfrage')) return 'Anfragen'
   if (s.startsWith('kunde')) return 'Kunden'
   if (s.startsWith('auftrag')) return 'Aufträge'
-  if (s.startsWith('handwerker')) return 'Partner'
-  if (s.startsWith('partner')) return 'Netzwerk'
+  if (s.startsWith('handwerker')) return 'Handwerker'
+  if (s.startsWith('partner')) return 'Handwerker'
   if (s.startsWith('angebot')) return 'Angebote'
   if (s.startsWith('rechnung')) return 'Rechnungen'
   if (s === 'navigation') return 'Navigation'
@@ -111,18 +111,7 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
   }, [])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent | globalThis.KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        if (window.matchMedia('(max-width: 767px)').matches) {
-          setMobileOpen(true)
-        } else {
-          setOpen(true)
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        }
-      }
-    }
+    /** ⌘K / / laufen über GlobalShortcuts → CommandPalette; TopBar bleibt klickbar + open-search */
     function onOpenEvent() {
       if (window.matchMedia('(max-width: 767px)').matches) setMobileOpen(true)
       else {
@@ -130,10 +119,8 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
         window.setTimeout(() => inputRef.current?.focus(), 0)
       }
     }
-    document.addEventListener('keydown', onKey)
     document.addEventListener('open-search', onOpenEvent)
     return () => {
-      document.removeEventListener('keydown', onKey)
       document.removeEventListener('open-search', onOpenEvent)
     }
   }, [])
@@ -229,7 +216,7 @@ export function TopBarSearch({ alwaysVisible = true }: { alwaysVisible?: boolean
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontWeight: 550 }}>{h.label}</span>
                 {h.sub ? (
-                  <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-3)' }}>
+                  <span style={{ display: 'block', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                     {h.sub}
                   </span>
                 ) : null}

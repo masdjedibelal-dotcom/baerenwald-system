@@ -131,7 +131,7 @@ export function ZugehoerigListe({
 
   return (
     <section className={cn('zugehoerig-liste', className)} aria-label="Zugehörig">
-      <h3 className="text-headline mb-2">Zugehörig</h3>
+      <h3 className="text-[length:var(--fs-head)] mb-2">Zugehörig</h3>
       <ul className="divide-y divide-[var(--app-separator)] rounded-xl border border-[var(--app-separator)] bg-[var(--bw-bg-paper)]">
         {rows.map((row) => (
           <li key={row.key}>
@@ -144,11 +144,11 @@ export function ZugehoerigListe({
             >
               <RowIcon kind={row.icon} />
               <span className="text-body min-w-0 flex-1 truncate font-medium">{row.label}</span>
-              <span className="text-caption shrink-0 truncate max-w-[45%]">{row.meta}</span>
+              <span className="text-[length:var(--fs-meta)] shrink-0 truncate max-w-[45%]">{row.meta}</span>
               {row.active ? (
-                <span className="text-caption shrink-0 font-semibold text-bw-primary">Hier</span>
+                <span className="text-[length:var(--fs-meta)] shrink-0 font-semibold text-bw-primary">Hier</span>
               ) : (
-                <span className="text-caption shrink-0 text-bw-text-muted" aria-hidden>
+                <span className="text-[length:var(--fs-meta)] shrink-0 text-bw-text-muted" aria-hidden>
                   →
                 </span>
               )}

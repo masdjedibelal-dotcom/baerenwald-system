@@ -51,12 +51,12 @@ function WorkList({ rows }: { rows: MyWorkItem[] }) {
           >
             <MockIcon ctx="nav" n={r.icon} size={18} />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-bw-text">{r.label}</span>
-              <span className="block text-[12px] text-bw-text-muted">{r.hint}</span>
+              <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">{r.label}</span>
+              <span className="block text-[length:var(--fs-meta)] text-bw-text-muted">{r.hint}</span>
             </span>
             {typeof r.count === 'number' ? (
               <span
-                className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-bw-surface-2 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-bw-text"
+                className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-bw-surface-2 px-2 py-0.5 text-[length:var(--fs-meta)] font-semibold tabular-nums text-bw-text"
                 aria-label={`${r.count} offen`}
               >
                 {r.count}
@@ -97,13 +97,13 @@ export function MyWorkInbox({
       <div className="card-h">
         <div className="card-title title">
           <MockIcon ctx="emphasis" n="checklist" size={16} />
-          Mein Tag
+          Meine Arbeit
         </div>
       </div>
       {allCountsZero ? (
         <div className="border-b border-bw-border px-4 py-4 text-center">
-          <p className="text-sm font-medium text-bw-text">Alles erledigt — guter Start in den Tag.</p>
-          <p className="mt-1 text-[12px] text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] font-medium text-bw-text">Alles erledigt — guter Start in den Tag.</p>
+          <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
             Unten findest du Sprungmarken zu Vorgängen. Neue Anfrage: + in der Nav.
           </p>
         </div>
@@ -114,7 +114,7 @@ export function MyWorkInbox({
       {waiting.length > 0 ? (
         <>
           <div className="border-t border-bw-border px-4 py-2.5">
-            <div className="flex items-center gap-2 text-[13px] font-medium text-bw-text-muted">
+            <div className="flex items-center gap-2 text-[length:var(--fs-text)] font-medium text-bw-text-muted">
               <MockIcon ctx="nav" n="hourglass" size={14} />
               Warten auf Kunde
             </div>

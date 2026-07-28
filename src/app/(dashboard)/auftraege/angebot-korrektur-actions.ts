@@ -114,10 +114,8 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   })
   if (!sync.ok) return sync
 
+  // Spec Q2: Zahlplan bleibt am Angebot — nicht auf den Auftrag kopieren
   const auftragPatch: Record<string, unknown> = {}
-  if (angebot.zahlungsplan) {
-    auftragPatch.zahlungsplan = angebot.zahlungsplan
-  }
   const von = input.leistungszeitraum_von?.trim().slice(0, 10) || null
   const bis = input.leistungszeitraum_bis?.trim().slice(0, 10) || null
   if (von) auftragPatch.start_datum = von
@@ -145,3 +143,39 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   revalidatePath(`/angebote/${angebotId}`)
   return sync
 }
+
+/** Phase 10: Nachtrag — neues Angebots-Canvas mit nachtragZu (erweitert Auftrag). */
+export async function loadNachtragAngebotBootstrap(auftragId: string): Promise<
+  | {
+      ok: true
+      bootstrap: AngebotWizardBootstrap
+      lead: LeadDetail
+    }
+  | { ok: false; message: string }
+> {
+  const loaded = await loadAngebotKorrekturWizardBootstrap(auftragId)
+  if (!loaded.ok) return loaded
+
+  const { auftragKorrektur: _k, bereitsGesendet: _b, ...rest } = loaded.bootstrap
+  return {
+    ok: true,
+    lead: loaded.lead,
+    bootstrap: {
+      ...rest,
+      angebotId: null,
+      angebotsnr: null,
+      bereitsGesendet: false,
+      nachtragZu: { auftragId: auftragId.trim() },
+      positionen: [],
+      meta: {
+        ...rest.meta,
+        titel: 'Nachtrag',
+        leistungsumfang: rest.meta.leistungsumfang
+          ? `Nachtrag — ${rest.meta.leistungsumfang}`
+          : 'Nachtrag',
+        gueltig_bis: plusDaysYmd(14),
+      },
+    },
+  }
+}
+

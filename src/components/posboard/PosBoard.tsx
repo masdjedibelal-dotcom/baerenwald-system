@@ -564,7 +564,7 @@ export function PosBoard({
           <span>{title || null}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
             {headerAction}
-            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
               {positionen.length} {positionen.length === 1 ? 'Position' : 'Positionen'}
             </span>
           </div>
@@ -588,7 +588,7 @@ export function PosBoard({
           }}
         >
           <MockIcon ctx="default" n="checks" size={16} />
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{selectedIds.length} ausgewählt</span>
+          <span style={{ fontWeight: 600, fontSize: 'var(--fs-text)' }}>{selectedIds.length} ausgewählt</span>
           <div style={{ flex: 1 }} />
           {(bulkActions ? bulkActions(selectedPositions, clearSel) : []).map((a, i) => (
             <button
@@ -604,7 +604,7 @@ export function PosBoard({
                 border: 'none',
                 background: 'rgba(255,255,255,0.16)',
                 color: '#fff',
-                fontSize: 13,
+                fontSize: 'var(--fs-text)',
                 fontWeight: 500,
                 cursor: 'pointer',
               }}
@@ -726,7 +726,7 @@ export function PosBoard({
               autoFocus
             />
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
+          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 8 }}>
             Benennt das Gewerk für alle Positionen dieser Gruppe um.
           </div>
         </MockModal>
@@ -778,7 +778,7 @@ export function PosBoard({
               </select>
             </div>
           ) : (
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginBottom: 10 }}>
               {gewerke.length === 0
                 ? 'Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.'
                 : 'Alle Stammdaten-Gewerke sind bereits als Abschnitt vorhanden.'}

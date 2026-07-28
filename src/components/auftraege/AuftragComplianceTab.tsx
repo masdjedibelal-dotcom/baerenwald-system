@@ -105,8 +105,8 @@ export function AuftragComplianceTab({
       <div className="flex items-start gap-3">
         <Shield className="mt-0.5 h-5 w-5 shrink-0 text-bw-primary" aria-hidden />
         <div>
-          <h2 className="text-base font-semibold text-bw-text">Compliance-Nachweise</h2>
-          <p className="text-sm text-bw-text-muted">
+          <h2 className="text-[length:var(--fs-title)] font-semibold text-bw-text">Compliance-Nachweise</h2>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Pro Partner: Leistungen, erforderliche Unterlagen hochladen, eingereichte Dokumente prüfen
             und mit OK bestätigen. Der Partner sieht den Status im Portal aktualisiert.
           </p>
@@ -143,7 +143,7 @@ export function AuftragComplianceTab({
               action={
                 <span
                   className={cn(
-                    'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                    'rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                     badge.className
                   )}
                 >

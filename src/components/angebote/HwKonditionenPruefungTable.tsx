@@ -44,10 +44,10 @@ export function HwKonditionenPruefungTable({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-bw-text-muted">Konditionen je Leistung</span>
+        <span className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Konditionen je Leistung</span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
+            'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
             hwKonditionenArtBadgeClass(konditionen.art)
           )}
         >
@@ -56,7 +56,7 @@ export function HwKonditionenPruefungTable({
       </div>
 
       <div className="overflow-x-auto rounded-md border border-bw-border">
-        <table className="min-w-full text-xs">
+        <table className="min-w-full text-[length:var(--fs-meta)]">
           <thead>
             <tr className="border-b border-bw-border bg-bw-bg-soft/60 text-left text-bw-text-muted">
               <th className="px-2 py-1.5 font-medium">Leistung</th>
@@ -129,7 +129,7 @@ export function HwKonditionenPruefungTable({
         </table>
       </div>
 
-      <p className="text-xs text-bw-text-muted">
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Nach Übernahme gilt je Leistung ein vereinbarter Netto-Preis (Einkaufspreis = Vergütung).
         Summe brutto: {betragAnzeige(summeBrutto, null, null)}
       </p>

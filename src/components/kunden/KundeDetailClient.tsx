@@ -450,9 +450,9 @@ export function KundeDetailClient({
           Hervorgehobene Felder sind bearbeitbar.
         </p>
       ) : null}
-      {editErr ? <p className="mb-2 text-sm text-status-cancel-text">{editErr}</p> : null}
+      {editErr ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{editErr}</p> : null}
       {kundenStamm.fehlendeRechnungsfelder.length > 0 && !editingKontakt ? (
-        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
           Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
         </p>
       ) : null}
@@ -940,7 +940,7 @@ export function KundeDetailClient({
           <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
           <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
           <div>
-            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Kundenportal Mail Vorschau"
               sandbox="allow-same-origin"
@@ -954,7 +954,7 @@ export function KundeDetailClient({
             readOnly
             className="bg-bw-bg-soft"
           />
-          <p className="text-xs text-bw-text-muted">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             Der Button in der Mail führt immer zu <strong>/portal/login</strong>. Mehrere Adressen in „An“/„CC“
             mit Semikolon trennen.
           </p>
@@ -994,7 +994,7 @@ export function KundeDetailClient({
         }
       >
         {mergeOther ? (
-          <p className="text-sm text-bw-text">
+          <p className="text-[length:var(--fs-text)] text-bw-text">
             Kunde <strong>{kundeDisplayName(mergeOther)}</strong> in{' '}
             <strong>{kundeDisplayName(kunde)}</strong> überführen?{' '}
             <strong>{kundeDisplayName(mergeOther)}</strong> wird entfernt.

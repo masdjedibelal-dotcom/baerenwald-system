@@ -84,15 +84,15 @@ function ZuweisungCard({
   return (
     <>
       <Card
-        className={cn('space-y-2 p-4 text-sm', abgelehnt && 'border-danger/50 bg-danger/5')}
+        className={cn('space-y-2 p-4 text-[length:var(--fs-text)]', abgelehnt && 'border-danger/50 bg-danger/5')}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="font-medium text-bw-text">{z.gewerke?.name ?? 'Gewerk'}</p>
             <p className="text-bw-text">{z.handwerker?.name ?? '—'}</p>
-            <p className="text-xs text-bw-text-muted">{z.handwerker?.email ?? '—'}</p>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">{z.handwerker?.email ?? '—'}</p>
           </div>
-          <span className="inline-block rounded-md bg-bw-bg-soft px-2 py-0.5 text-xs text-bw-text-muted">
+          <span className="inline-block rounded-md bg-bw-bg-soft px-2 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
             {zuweisungStatusLabel(z.status)}
           </span>
         </div>
@@ -166,7 +166,7 @@ function ZuweisungCard({
         )}
 
         {z.aufgabe_notiz?.trim() ? (
-          <p className="text-xs text-bw-text-muted whitespace-pre-wrap">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap">
             <span className="font-medium text-bw-text">Notiz: </span>
             {z.aufgabe_notiz.trim()}
           </p>
@@ -174,7 +174,7 @@ function ZuweisungCard({
 
         {abgelehnt ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-danger">
+            <p className="text-[length:var(--fs-meta)] font-medium text-danger">
               Ablehnung: {labelHandwerkerAblehnung(z.ablehnung_grund ?? null)}
               {z.antwort_notiz?.trim() ? ` — ${z.antwort_notiz.trim()}` : ''}
             </p>
@@ -208,7 +208,7 @@ function ZuweisungCard({
 
         {!eingereicht && kannManuell ? (
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs text-bw-text-muted">
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               {z.status === 'akzeptiert'
                 ? 'Wartet auf Angebots-PDF / Preis im Partner-Portal.'
                 : 'Noch keine Einreichung — Portal oder manuell erfassen.'}
@@ -224,13 +224,13 @@ function ZuweisungCard({
             </Button>
           </div>
         ) : uebernommen && !eingereicht ? (
-          <p className="text-xs font-medium text-bw-primary">Angebot bestätigt und übernommen.</p>
+          <p className="text-[length:var(--fs-meta)] font-medium text-bw-primary">Angebot bestätigt und übernommen.</p>
         ) : null}
 
         {auftragId && uebernommen ? (
           <Link
             href={`/auftraege/${auftragId}`}
-            className="inline-flex items-center gap-1 text-xs text-bw-link hover:underline"
+            className="inline-flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-link hover:underline"
           >
             Auftrag
             <ExternalLink className="h-3 w-3" aria-hidden />
@@ -253,7 +253,7 @@ function ZuweisungCard({
           title={`Anderen Partner — ${z.gewerke?.name ?? 'Gewerk'}`}
           size="md"
         >
-          <p className="mb-3 text-sm text-bw-text-muted">
+          <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
             Ersatzpartner erhält die Anfrage erneut (E-Mail / Partner-Portal).
           </p>
           <ul className="max-h-64 space-y-2 overflow-y-auto">
@@ -338,9 +338,9 @@ export function AngebotHandwerkerPartnerSection({
   return (
     <section id="handwerker-partner" className="space-y-6 scroll-mt-24">
       <Card className="p-4 md:p-5">
-        <h2 className="mb-3 text-sm font-semibold text-bw-text">Partner</h2>
+        <h2 className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">Partner</h2>
         {rows.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Keine Partner zugewiesen — im Wizard zuweisen, dann unten anfragen.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Partner zugewiesen — im Wizard zuweisen, dann unten anfragen.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {rows.map((z) => (

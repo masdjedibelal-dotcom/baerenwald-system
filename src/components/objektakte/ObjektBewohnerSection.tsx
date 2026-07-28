@@ -165,7 +165,7 @@ export function ObjektBewohnerSection({
           </MockBtn>
         }
       >
-        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Bewohner je Einheit — Einheiten werden im HV-Portal gepflegt.
         </p>
         {einheiten.length === 0 ? (
@@ -243,7 +243,7 @@ export function ObjektBewohnerSection({
               options={einheitOptions}
             />
           ) : (
-            <p className="text-sm" style={{ color: 'var(--text-3)' }}>
+            <p className="text-[length:var(--fs-text)]" style={{ color: 'var(--text-3)' }}>
               Einheit: {edit.objekt_einheiten?.bezeichnung ?? '—'}
             </p>
           )}
@@ -274,7 +274,7 @@ export function ObjektBewohnerSection({
             }}
             type="email"
           />
-          {err ? <p className="text-sm text-danger">{err}</p> : null}
+          {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
         </div>
       </EditorSheet>
     </>

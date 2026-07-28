@@ -131,7 +131,7 @@ export function AngebotLeistungNewModal({
         <div className="sm:col-span-2">
           <label className="input-label">Gewerk *</label>
           {block ? (
-            <p className="text-sm font-medium text-bw-text">{block.gewerkName}</p>
+            <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{block.gewerkName}</p>
           ) : (
             <select
               className="input w-full"
@@ -168,7 +168,7 @@ export function AngebotLeistungNewModal({
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-bw-muted">
+          <p className="mt-1 text-[length:var(--fs-meta)] text-bw-muted">
             Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung
           </p>
         </div>

@@ -161,14 +161,14 @@ export function HandwerkerZuweisungMailModal({
       }
     >
       {loading ? (
-        <p className="text-sm text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
       ) : mail && target ? (
         <div className="space-y-3">
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             Leistungsanfrage an den Partner. Bitte Text und Portal-Link prüfen und versenden (An / CC wie
             gewohnt).
           </p>
-          <p className="text-sm text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Gewerk: <span className="font-medium text-bw-text">{target.gewerkName}</span>
             {target.positionIds && target.positionIds.length > 1 ? (
               <span className="text-bw-text-muted">
@@ -196,7 +196,7 @@ export function HandwerkerZuweisungMailModal({
             placeholder="weitere@beispiel.de"
             hint="Optional."
           />
-          <p className="text-xs text-bw-text-muted">Versand über CRM (Resend) — inkl. Button zum Partner-Portal.</p>
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Versand über CRM (Resend) — inkl. Button zum Partner-Portal.</p>
           <CollapsibleMailPreview previewHtml={mail.html} />
         </div>
       ) : null}

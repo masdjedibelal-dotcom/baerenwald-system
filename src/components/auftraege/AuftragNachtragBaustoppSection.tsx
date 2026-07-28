@@ -144,7 +144,7 @@ export function AuftragNachtragBaustoppSection({
   return (
     <div className="space-y-6 border-b border-border pb-8">
       {hwWarn ? (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+        <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-[length:var(--fs-text)] text-amber-950">
           <p className="font-semibold">
             <IconText icon={AlertTriangle}>Kunden-Bestätigung liegt vor</IconText>
           </p>
@@ -154,7 +154,7 @@ export function AuftragNachtragBaustoppSection({
           {ersteHw?.handwerker?.telefon ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-sm font-medium text-white"
+                className="inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-[length:var(--fs-text)] font-medium text-white"
                 href={`https://wa.me/${ersteHw.handwerker.telefon.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -162,7 +162,7 @@ export function AuftragNachtragBaustoppSection({
                 Handwerker kontaktieren (WhatsApp)
               </a>
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary"
+                className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
                 href={`tel:${ersteHw.handwerker.telefon}`}
               >
                 Anrufen
@@ -174,7 +174,7 @@ export function AuftragNachtragBaustoppSection({
 
       <section id="auftrag-nachtrag-section">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-ink">Nachträge</h2>
+          <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Nachträge</h2>
           <div className="flex flex-wrap gap-2">
             {vertragNachtragVerfuegbar && onVertragNachtragErstellen ? (
               <Button type="button" variant="secondary" onClick={onVertragNachtragErstellen}>
@@ -188,7 +188,7 @@ export function AuftragNachtragBaustoppSection({
         </div>
 
         {nachtraege.length === 0 ? (
-          <p className="text-sm text-muted">Keine Nachträge.</p>
+          <p className="text-[length:var(--fs-text)] text-muted">Keine Nachträge.</p>
         ) : (
           <ul className="space-y-3">
             {nachtraege.map((n) => {
@@ -197,14 +197,14 @@ export function AuftragNachtragBaustoppSection({
               const summe = formatPreis(undefined, n.gesamt_min, n.gesamt_max)
 
               return (
-                <Card key={n.id} className="space-y-3 p-4 text-sm">
+                <Card key={n.id} className="space-y-3 p-4 text-[length:var(--fs-text)]">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-ink">{n.grund}</p>
                       {n.beschreibung ? <p className="text-muted">{n.beschreibung}</p> : null}
-                      <p className="mt-1 text-xs text-muted">Summe: {summe}</p>
+                      <p className="mt-1 text-[length:var(--fs-meta)] text-muted">Summe: {summe}</p>
                     </div>
-                    <label className="flex items-center gap-2 text-xs">
+                    <label className="flex items-center gap-2 text-[length:var(--fs-meta)]">
                       <input
                         type="checkbox"
                         checked={Boolean(n.handwercher_bestaetigt)}
@@ -222,7 +222,7 @@ export function AuftragNachtragBaustoppSection({
                   </div>
 
                   {pos.length > 0 ? (
-                    <ul className="divide-y divide-border rounded border border-border text-xs">
+                    <ul className="divide-y divide-border rounded border border-border text-[length:var(--fs-meta)]">
                       {pos.map((p) => (
                         <li key={p.id} className="flex justify-between gap-2 px-2 py-1">
                           <span className="min-w-0 truncate">{p.beschreibung}</span>
@@ -236,14 +236,14 @@ export function AuftragNachtragBaustoppSection({
                   ) : null}
 
                   {n.status === 'abgelehnt' ? (
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[length:var(--fs-meta)] text-red-900">
                       <p className="font-medium">
                         <IconText icon={X}>Abgelehnt</IconText>
                       </p>
                       <p>{n.abgelehnt_grund ?? '—'}</p>
                     </div>
                   ) : n.status === 'akzeptiert' || n.kunde_bestaetigt_at ? (
-                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
+                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-meta)] text-emerald-950">
                       <p className="font-medium">
                         <IconText icon={Check}>Akzeptiert</IconText>
                       </p>
@@ -279,7 +279,7 @@ export function AuftragNachtragBaustoppSection({
                       ) : null}
                     </div>
                   ) : n.status === 'gesendet' ? (
-                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
+                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
                       <p className="font-medium">
                         <IconText icon={Send}>Gesendet</IconText>
                       </p>
@@ -309,7 +309,7 @@ export function AuftragNachtragBaustoppSection({
                               <IconText icon={Mail}>Per Mail senden</IconText>
                             </Button>
                             <a
-                              className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary"
+                              className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
                               href={`https://wa.me/?text=${encodeURIComponent(
                                 `Guten Tag, hier ist Ihr Link zur Bestätigung des Nachtrags (${summe}): ${link}`
                               )}`}
@@ -341,7 +341,7 @@ export function AuftragNachtragBaustoppSection({
                       ) : null}
                     </div>
                   ) : (
-                    <div className="rounded bg-canvas px-2 py-2 text-xs text-muted">
+                    <div className="rounded bg-canvas px-2 py-2 text-[length:var(--fs-meta)] text-muted">
                       <p className="font-medium text-ink">
                         <IconText icon={Clock}>Entwurf</IconText>
                       </p>
@@ -376,17 +376,17 @@ export function AuftragNachtragBaustoppSection({
       {detail.status === 'in_arbeit' ? (
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-ink">Baustopps</h2>
+            <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Baustopps</h2>
             <Button type="button" variant="primary" onClick={() => setBaustoppOpen(true)}>
               <IconText icon={CloudRain}>Baustopp melden</IconText>
             </Button>
           </div>
           {aktiv.length > 0 ? (
-            <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-950">
+            <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-[length:var(--fs-text)] text-orange-950">
               <p className="font-semibold">
                 <IconText icon={CloudRain}>Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</IconText>
               </p>
-              <p className="text-xs">{aktiv[0]!.grund}</p>
+              <p className="text-[length:var(--fs-meta)]">{aktiv[0]!.grund}</p>
               {aktiv.map((b) => (
                 <Button
                   key={b.id}
@@ -411,7 +411,7 @@ export function AuftragNachtragBaustoppSection({
             </div>
           ) : null}
           {baustopps.length === 0 ? (
-            <p className="text-sm text-muted">
+            <p className="text-[length:var(--fs-text)] text-muted">
               Keine Baustopps erfasst.{' '}
               <button
                 type="button"
@@ -423,7 +423,7 @@ export function AuftragNachtragBaustoppSection({
             </p>
           ) : (
             <>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2 text-[length:var(--fs-text)]">
                 {baustopps.map((b) => (
                   <li key={b.id} className="rounded border border-border p-2">
                     <p className="font-medium">
@@ -431,14 +431,14 @@ export function AuftragNachtragBaustoppSection({
                       {b.ende_datum ? ` – ${formatDatum(b.ende_datum)}` : ' (offen)'}
                     </p>
                     <p className="text-muted">{b.grund}</p>
-                    <p className="text-xs text-muted">
+                    <p className="text-[length:var(--fs-meta)] text-muted">
                       Verzögerung: {b.verzoegerung_tage ?? '—'} Tage
                       {b.neues_enddatum ? ` · neues Ende: ${formatDatum(b.neues_enddatum)}` : ''}
                     </p>
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-sm font-medium text-ink">
+              <p className="mt-2 text-[length:var(--fs-text)] font-medium text-ink">
                 Bisher {summeVerzug} Tage Verzögerung durch Baustopps
               </p>
             </>
@@ -447,7 +447,7 @@ export function AuftragNachtragBaustoppSection({
       ) : null}
 
       <Modal open={nachtragOpen} onClose={() => setNachtragOpen(false)} title="Nachtrag erstellen" size="md">
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-[length:var(--fs-text)]">
               <label className="block">
                 <span className="font-medium">Grund</span>
                 <input
@@ -490,7 +490,7 @@ export function AuftragNachtragBaustoppSection({
                   />
                 </label>
               </div>
-              <label className="flex items-start gap-2 text-xs">
+              <label className="flex items-start gap-2 text-[length:var(--fs-meta)]">
                 <input type="checkbox" checked={hwBest} onChange={(e) => setHwBest(e.target.checked)} />
                 <span>
                   Handwerker hat die Mehrkosten bestätigt?{' '}
@@ -544,7 +544,7 @@ export function AuftragNachtragBaustoppSection({
         title="Baustopp melden"
         size="md"
       >
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-[length:var(--fs-text)]">
               <label className="block">
                 <span className="font-medium">Typ</span>
                 <select
@@ -584,10 +584,10 @@ export function AuftragNachtragBaustoppSection({
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 />
               </label>
-              <p className="text-xs text-muted">
+              <p className="text-[length:var(--fs-meta)] text-muted">
                 Aktuelles Enddatum Auftrag: <strong>{detail.end_datum ? formatDatum(detail.end_datum) : '—'}</strong>
               </p>
-              <p className="text-xs text-muted">
+              <p className="text-[length:var(--fs-meta)] text-muted">
                 Neues Enddatum (Vorschau): <strong>{formatDatum(neuesEndPreview)}</strong>
               </p>
               <label className="flex items-center gap-2">

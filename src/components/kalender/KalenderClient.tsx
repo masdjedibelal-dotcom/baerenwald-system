@@ -319,7 +319,7 @@ export function KalenderClient() {
   const nav = (
     <div className="toolbar">
       <MockBtn sm icon="chevron-left" onClick={navPrev} title="Zurück" />
-      <div style={{ fontSize: 16, fontWeight: 600, padding: '0 8px' }}>{titleText}</div>
+      <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, padding: '0 8px' }}>{titleText}</div>
       <MockBtn sm icon="chevron-right" onClick={navNext} title="Weiter" />
       <MockBtn sm onClick={goToday}>
         Heute
@@ -494,7 +494,7 @@ export function KalenderClient() {
       {nav}
 
       {loadErr ? (
-        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-sm text-status-cancel-text">
+        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-[length:var(--fs-text)] text-status-cancel-text">
           {loadErr}
         </p>
       ) : null}
@@ -555,7 +555,7 @@ export function KalenderClient() {
                 />
                 {katLabel(detailKat)}
                 {editing.typ === 'beginn' || editing.typ === 'intern' ? (
-                  <span className="text-[12px] text-[var(--text-3)]">
+                  <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
                     · {KALENDER_TYP_LABEL[editing.typ]}
                   </span>
                 ) : null}
@@ -580,7 +580,7 @@ export function KalenderClient() {
               </div>
             ) : null}
             {detailNoShowHinweis ? (
-              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted">
+              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[length:var(--fs-text)] text-muted">
                 Kunde nicht erschienen? In der Anfrage{' '}
                 <strong className="font-medium text-ink">Aktionen → Nicht erreichbar</strong> setzen.
               </p>
@@ -612,7 +612,7 @@ export function KalenderClient() {
             />
           </div>
           <div className="full">
-            <div className="mb-1 text-[12px] font-medium text-[var(--text-3)]">Kategorie</div>
+            <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">Kategorie</div>
             <div className="seg">
               {KAT_OPTIONS.map((o) => (
                 <button

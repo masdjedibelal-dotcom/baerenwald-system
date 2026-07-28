@@ -24,7 +24,9 @@ export type EditorSheetProps = {
   open: boolean
   onClose: () => void
   title: string
-  /** detail = Slide-over Desktop; canvas = Center-Modal Desktop; mobile immer Bottom Sheet */
+  /** Optional Untertitel (z. B. Rechnungsnummer im RateDrawer) */
+  subtitle?: string | null
+  /** detail | canvas — Desktop immer Slide-over (Spec §6: keine Center-Modals) */
   context?: EditorSheetContext
   children: ReactNode
   /** Dirty → X/Swipe/Backdrop/Back öffnen Confirm (S8) */
@@ -42,18 +44,20 @@ export type EditorSheetProps = {
   className?: string
   bodyClassName?: string
   size?: 'md' | 'lg'
+  /** Sticky Footer-CTAs (LeistungDrawer / RateDrawer) — Aktionen nur hier */
+  footer?: ReactNode
 }
 
 /**
  * Surface B — Create/Edit Entity.
- * Mobile: Bottom Sheet · Desktop Detail: Slide-over · Desktop Canvas: Center-Modal
- * S7 visualViewport · S8 Dirty · S10 History-Back
+ * Mobile: Bottom Sheet · Desktop: Slide-over 560px (auch aus Canvas-Kontext — Spec §6).
  */
 export function EditorSheet({
   open,
   onClose,
   title,
-  context = 'detail',
+  subtitle,
+  context: _context = 'detail',
   children,
   dirty = false,
   compose = false,
@@ -66,6 +70,7 @@ export function EditorSheet({
   className,
   bodyClassName,
   size = 'md',
+  footer,
 }: EditorSheetProps) {
   const isMobile = useIsMobile()
   const [mounted, setMounted] = useState(false)
@@ -83,11 +88,8 @@ export function EditorSheet({
     onClose()
   }, [dirty, onClose, onDismissAttempt])
 
-  const layout: 'bottom' | 'slide' | 'center' = isMobile
-    ? 'bottom'
-    : context === 'canvas'
-      ? 'center'
-      : 'slide'
+  // Spec §6 / Phase 2: nie center — Desktop Slide, Mobil Bottom
+  const layout: 'bottom' | 'slide' = isMobile ? 'bottom' : 'slide'
 
   const { dragZoneProps, sheetMotionStyle } = useSheetSwipeDismiss({
     onDismiss: requestClose,
@@ -225,12 +227,16 @@ export function EditorSheet({
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
-        <h2 id={titleId} className="editor-sheet__title">
-          {title}
-        </h2>
+        <div className="editor-sheet__title-block">
+          <h2 id={titleId} className="editor-sheet__title">
+            {title}
+          </h2>
+          {subtitle ? <p className="editor-sheet__subtitle">{subtitle}</p> : null}
+        </div>
         <div className="editor-sheet__header-end">{end}</div>
       </header>
       <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
+      {footer ? <div className="editor-sheet__footer">{footer}</div> : null}
     </div>
   )
 
@@ -272,7 +278,7 @@ export function EditorSheet({
             </>
           }
         >
-          <p className="text-[14px] text-bw-text-muted">Ungespeicherte Eingaben gehen verloren.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Ungespeicherte Eingaben gehen verloren.</p>
         </Modal>
       )}
     </>,

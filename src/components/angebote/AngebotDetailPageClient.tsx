@@ -1,7 +1,7 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
@@ -12,8 +12,9 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
 import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
 import { DetailSection } from '@/components/vorgang/DetailSection'
-import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
-import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { VorgangZahlungTab } from '@/components/vorgang/VorgangZahlungTab'
+import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { Modal } from '@/components/ui/Modal'
@@ -55,7 +56,6 @@ import {
   KUNDE_ABLEHNUNG_GRUND_OPTIONS,
   type KundeAblehnungGrund,
 } from '@/lib/angebote/ablehnung-labels'
-import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import {
   addDaysYmd,
   heuteYmd,
@@ -91,28 +91,37 @@ import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 
-type AngebotDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
+type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
-const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
+const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
+  'uebersicht',
+  'leistungen',
+  'zahlung',
+  'akte',
+  'aktivitaet',
+])
+const ANGEBOT_DETAIL_DEFAULT_TAB: AngebotDetailTab = 'leistungen'
 
 /** Query-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase()
-  if (!tab) return null
+  if (!tab) return ANGEBOT_DETAIL_DEFAULT_TAB
+  if (tab === 'zahlung' || tab === 'zahlplan' || tab === 'finanzen') return 'zahlung'
+  if (tab === 'leistungen' || tab === 'leistung' || tab === 'positionen') return 'leistungen'
   if (
     tab === 'akte' ||
-    tab === 'stammdaten' ||
     tab === 'dokumente' ||
     tab === 'notizen' ||
-    tab === 'schritte' ||
-    tab === 'naechste-schritte' ||
-    tab === 'naechste_schritte' ||
     tab === 'kommunikation'
   ) {
     return 'akte'
   }
   if (
     tab === 'uebersicht' ||
+    tab === 'stammdaten' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte' ||
     tab === 'projekt' ||
     tab === 'projektinfo' ||
     tab === 'projektinfos' ||
@@ -120,9 +129,6 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
     tab === 'anfrage-details' ||
     tab === 'angebot-details' ||
     tab === 'details' ||
-    tab === 'positionen' ||
-    tab === 'leistung' ||
-    tab === 'leistungen' ||
     tab === 'fotos' ||
     tab === 'bilder' ||
     tab === 'photos'
@@ -141,7 +147,7 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'uebersicht'
   if (ANGEBOT_DETAIL_TAB_IDS.has(tab as AngebotDetailTab)) return tab as AngebotDetailTab
-  return null
+  return ANGEBOT_DETAIL_DEFAULT_TAB
 }
 
 export function AngebotDetailPageClient({
@@ -171,8 +177,7 @@ export function AngebotDetailPageClient({
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [pending, startTransition] = useTransition()
-  const [mainTab, setMainTab] = useState<AngebotDetailTab>('uebersicht')
-  const [akteSegment, setAkteSegment] = useState<AkteSegment>('dateien')
+  const [mainTab, setMainTab] = useState<AngebotDetailTab>(ANGEBOT_DETAIL_DEFAULT_TAB)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
   const [aufEnde, setAufEnde] = useState(() => addDaysYmd(addDaysYmd(heuteYmd(), 7), 14))
@@ -186,7 +191,6 @@ export function AngebotDetailPageClient({
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
   const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
-  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
   const [ablehnenOpen, setAblehnenOpen] = useState(false)
   const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
   const [ablehnenNotiz, setAblehnenNotiz] = useState('')
@@ -199,18 +203,15 @@ export function AngebotDetailPageClient({
       return
     }
     if (isLegacyDetailTabAlias(raw)) {
-      const resolved = resolveAngebotDetailTabFromQuery(raw) ?? 'uebersicht'
-      const seg = parseAkteSegment(raw, searchParams.get('segment'))
+      const resolved = resolveAngebotDetailTabFromQuery(raw) ?? ANGEBOT_DETAIL_DEFAULT_TAB
       const q = new URLSearchParams(searchParams.toString())
       q.set('tab', resolved)
-      if (resolved === 'akte') q.set('segment', seg)
-      else q.delete('segment')
+      q.delete('segment')
       router.replace(`/angebote/${detail.id}?${q.toString()}`, { scroll: false })
       return
     }
     const tab = resolveAngebotDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
-    setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
   }, [searchParams, detail.id, router])
 
   useEffect(() => {
@@ -471,22 +472,6 @@ export function AngebotDetailPageClient({
         {
           onEdit: kannBearbeiten ? openWizardBearbeiten : undefined,
           onCopy: () => runDuplicateAngebot(detail.id, router),
-          // Admin Login nur Partner-/Kunden-Detail (UX2-6)
-          onPortalLink: () => {
-            if (!detail.kunde_id) {
-              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
-              return
-            }
-            setPortalLinkModalOpen(true)
-          },
-          // Annehmen / Versenden: Header-Primary — Menü nur PDF + Sekundäres
-          onPdf: () => window.open(`/api/angebote/${detail.id}/pdf`, '_blank'),
-          onSend:
-            !erledigt && kannErneutSenden
-              ? () => run(() => resendAngebotEinfach(detail.id), 'Angebot erneut gesendet')
-              : undefined,
-          mail: kundeEmail || null,
-          onMail: () => mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
           onDelete: () => {
             startTransition(async () => {
               const r = await deleteAngebot(detail.id)
@@ -549,69 +534,36 @@ export function AngebotDetailPageClient({
     return items
   }, [
     kannBearbeiten,
-    kannErneutSenden,
-    kundeEmail,
     kundeName,
     detail.id,
     detail.lead_id,
-    detail.kunde_id,
     statusEinfach,
-    mailCompose,
     auftragId,
     router,
     startTransition,
   ])
 
   const primaryAction = useMemo((): DetailActionDef | null => {
-    const hwRows = detail.angebot_handwerker ?? []
-    if (statusEinfach === 'entwurf') {
-      if (hatAngebotHandwerker(hwRows) && !darfAngebotAnKundeSenden(hwRows, detail.status)) {
-        return {
-          label: handwerkerAnfrageErledigt(hwRows)
-            ? 'Partner-Einreichung prüfen'
-            : 'Partner anfragen',
-          icon: 'send',
-          onClick: openHandwerkerAnfragen,
-          disabled: pending,
-        }
-      }
-      if (!auftragId) {
-        return {
-          label: 'Senden',
-          icon: 'send',
-          onClick: () => setKundeVersandOpen(true),
-          disabled: pending,
-        }
+    const cta = primaryCta('angebot', statusEinfach || detail.status)
+    if (!cta) return null
+    if (cta.id === 'angebot_versenden') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: () => setKundeVersandOpen(true),
+        disabled: pending,
       }
     }
-    if (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') {
+    if (cta.id === 'angebot_annehmen') {
       return {
-        label: 'Annehmen',
-        icon: 'check',
+        label: cta.label,
+        icon: cta.icon,
         onClick: openAcceptModal,
         disabled: pending,
       }
     }
-    if (statusEinfach === 'angenommen' && auftragId) {
-      return {
-        label: 'Zum Auftrag',
-        icon: 'briefcase',
-        onClick: () =>
-          router.replace(`/auftraege/${auftragId}?from=angebot:${detail.id}`),
-        href: `/auftraege/${auftragId}?from=angebot:${detail.id}`,
-      }
-    }
     return null
-  }, [
-    detail.angebot_handwerker,
-    detail.status,
-    statusEinfach,
-    auftragId,
-    openHandwerkerAnfragen,
-    openAcceptModal,
-    pending,
-    router,
-  ])
+  }, [statusEinfach, detail.status, pending, openAcceptModal])
 
   const stammdatenInhalt = (
     <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
@@ -626,17 +578,13 @@ export function AngebotDetailPageClient({
     />
   )
 
-  const leistungenInhalt = <AngebotLeistungenTab detail={detail} />
+  const leistungenInhalt = (
+    <AngebotLeistungenTab detail={detail} onOpenDokument={openWizardBearbeiten} />
+  )
 
   const verlaufInhalt = (
     <>
       <VerlaufPanel items={timelineItems} />
-      <KundenportalLinkVersendenModal
-        open={portalLinkModalOpen}
-        onClose={() => setPortalLinkModalOpen(false)}
-        kundeId={detail.kunde_id}
-        fallbackEmail={kundeEmail}
-      />
     </>
   )
 
@@ -658,26 +606,11 @@ export function AngebotDetailPageClient({
       />
     ) : (
       <MockCard title="Notizen" icon="messages">
-        <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
           Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
         </div>
       </MockCard>
     )
-
-  const summenKurz = (
-    <MockCard title="Summen" icon="calculator">
-      <dl className="space-y-2 text-sm">
-        <div className="flex justify-between gap-2">
-          <dt className="text-bw-text-muted">Netto</dt>
-          <dd className="font-medium tabular-nums">{formatEurBetrag(summenMail.nettoMin)}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-bw-text-muted">Brutto</dt>
-          <dd className="font-semibold tabular-nums">{formatEurBetrag(summenMail.bruttoMin)}</dd>
-        </div>
-      </dl>
-    </MockCard>
-  )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -690,12 +623,12 @@ export function AngebotDetailPageClient({
             kontext={projektKontext}
             fromRef={{ kind: 'angebot', id: detail.id }}
           />
+          {stammdatenInhalt}
           <ZugehoerigListe
             kontext={projektKontext}
             fromRef={{ kind: 'angebot', id: detail.id }}
           />
           {projektinfosInhalt}
-          <DetailSection title="Leistungen">{leistungenInhalt}</DetailSection>
           {vorgangFotos.length > 0 ? (
             <DetailSection title="Fotos">
               <VorgangFotosTab fotos={vorgangFotos} />
@@ -705,28 +638,35 @@ export function AngebotDetailPageClient({
       ),
     },
     {
+      id: 'leistungen',
+      label: entityDetailTabLabel('leistungen'),
+      icon: 'tool',
+      render: () => <div className="space-y-6">{leistungenInhalt}</div>,
+    },
+    {
+      id: 'zahlung',
+      label: entityDetailTabLabel('zahlung'),
+      icon: 'receipt',
+      render: () => (
+        <VorgangZahlungTab
+          variant="angebot"
+          zahlungsplanRaw={detail.zahlungsplan}
+          gesamtNetto={summenMail.nettoMin}
+          gesamtBruttoHint={summenMail.bruttoMin}
+          rechnungen={[]}
+          readOnly
+        />
+      ),
+    },
+    {
       id: 'akte',
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: anhaengeCount || undefined,
       render: () => (
         <VorgangAkteTab
-          initialSegment={akteSegment}
-          onSegmentChange={(s) => {
-            setAkteSegment(s)
-            const q = new URLSearchParams(searchParams.toString())
-            q.set('tab', 'akte')
-            q.set('segment', s)
-            router.replace(`/angebote/${detail.id}?${q.toString()}`, { scroll: false })
-          }}
-          zahlung={summenKurz}
-          dateien={
-            <div className="space-y-4">
-              {dokumenteInhalt}
-              {notizenInhalt}
-            </div>
-          }
-          kunde={stammdatenInhalt}
+          dateien={dokumenteInhalt}
+          notizen={notizenInhalt}
         />
       ),
     },
@@ -751,6 +691,53 @@ export function AngebotDetailPageClient({
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
       crumbBackLabel="Zurück zu Vorgängen"
       className="space-y-4 pb-0"
+      wiedervorlageDatum={detail.wiedervorlage_datum}
+      wiedervorlageNotiz={detail.wiedervorlage_notiz}
+      wiedervorlageEntity="angebot"
+      wiedervorlageEntityId={detail.id}
+      onWiedervorlageSaved={() => refresh()}
+      nextStepMetrics={[
+        {
+          label: 'Wert',
+          value: formatEurBetrag(summenMail.bruttoMin),
+        },
+        {
+          label: 'Positionen',
+          value: String((detail.positionen ?? []).length),
+        },
+        {
+          label: 'Gültig bis',
+          value: formatDatum(gueltigBisYmd) || gueltigBisYmd,
+        },
+      ]}
+      quickBar={[
+        {
+          id: 'call',
+          label: 'Anrufen',
+          icon: 'phone',
+          disabled: !detail.kunden?.telefon?.trim() && !lead?.kontakt_telefon?.trim(),
+          onClick: () => {
+            const tel =
+              detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
+          },
+        },
+        {
+          id: 'mail',
+          label: 'Mail',
+          icon: 'mail',
+          disabled: !kundeEmail,
+          onClick: () =>
+            mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
+        },
+        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setMainTab('akte') },
+        {
+          id: 'foto',
+          label: 'Foto',
+          icon: 'camera',
+          onClick: () => setMainTab('uebersicht'),
+        },
+      ]}
       nextStep={naechsterSchrittAngebot({
         statusEinfach,
         hasAuftrag: Boolean(auftragId),
@@ -762,7 +749,7 @@ export function AngebotDetailPageClient({
         title: projektTitel && projektTitel !== '—' ? projektTitel : kundeName,
         sub: headSub,
         badges: (
-          <MockBadge kind={variantToMockBadgeKind(angebotStatus.variant)}>{angebotStatus.label}</MockBadge>
+          <StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />
         ),
         meta: headMeta,
         actions: (
@@ -775,7 +762,7 @@ export function AngebotDetailPageClient({
       }}
     >
       {statusEinfach === 'abgelehnt' ? (
-        <p className="rounded-lg border border-bw-border px-3 py-2 text-sm text-bw-text-muted">
+        <p className="rounded-lg border border-bw-border px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Abgelehnt
           {detail.updated_at ? ` am ${formatDatum(detail.updated_at)}` : ''}
           {detail.ablehnung_grund ? ` — ${detail.ablehnung_grund}` : ''}
@@ -841,9 +828,9 @@ export function AngebotDetailPageClient({
 
       <Modal open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
         <div className="space-y-4">
-          <p className="text-sm text-bw-text-muted">
-            Angebot als angenommen markieren und Auftrag anlegen — auch ohne vorherigen Versand an
-            den Kunden. Optional die Auftragsbestätigung per E-Mail senden.
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+            Angebot als angenommen markieren — auch ohne vorherigen Versand an den Kunden. Optional
+            die Auftragsbestätigung per E-Mail senden.
           </p>
           <Input
             label="Start-Datum"
@@ -864,9 +851,9 @@ export function AngebotDetailPageClient({
           />
 
           <div className="border-t border-bw-border pt-4">
-            <p className="mb-3 text-sm font-semibold text-bw-text">Auftragsbestätigung an Kund:in</p>
+            <p className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">Auftragsbestätigung an Kund:in</p>
             {!kunde?.email?.trim() ? (
-              <p className="text-sm text-amber-700">Keine E-Mail-Adresse — Auftrag wird ohne Mail erstellt.</p>
+              <p className="text-[length:var(--fs-text)] text-amber-700">Keine E-Mail-Adresse — Auftrag wird ohne Mail erstellt.</p>
             ) : (
               <>
                 <Input
@@ -890,12 +877,12 @@ export function AngebotDetailPageClient({
                   placeholder="weitere@beispiel.de"
                   hint={KUNDE_MAIL_BCC_HINT}
                 />
-                <p className="mb-1 mt-4 inline-flex items-center gap-1 text-xs font-medium text-bw-text-muted">
+                <p className="mb-1 mt-4 inline-flex items-center gap-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
                   <MockIcon ctx="btn" n="mail" size={14} />
                   Vorschau
                 </p>
                 {aufPreviewLoading ? (
-                  <p className="text-sm text-bw-text-muted">Vorschau wird geladen …</p>
+                  <p className="text-[length:var(--fs-text)] text-bw-text-muted">Vorschau wird geladen …</p>
                 ) : (
                   <iframe
                     title="Auftragsbestätigung Vorschau"
@@ -986,7 +973,7 @@ export function AngebotDetailPageClient({
         size="md"
       >
         <div className="space-y-4">
-          <p className="text-sm text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Markiert das Angebot als abgelehnt und kann den zugehörigen Lead schließen.
           </p>
           <Select

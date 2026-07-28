@@ -44,7 +44,7 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
           <MockIcon ctx="emphasis" n="activity" size={16} />
           Umsatzverlauf
         </div>
-        <div className="flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+        <div className="flex items-center gap-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--green)' }} />
             Abgeschlossen
@@ -57,10 +57,10 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
       </div>
       <div className="card-b">
         <div className="mb-4">
-          <div className="text-[22px] font-semibold tracking-tight tabular-nums">
+          <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
             {formatEurBetrag(total)}
           </div>
-          <div className="text-[12.5px] text-[var(--text-3)]">Netto · Auftragssummen · letzte 12 Monate</div>
+          <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">Netto · Auftragssummen · letzte 12 Monate</div>
         </div>
         <div className="flex h-40 items-end gap-1.5 sm:gap-2">
           {safeMonths.map((m) => {
@@ -84,7 +84,7 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
                     <div style={{ height: doneH, background: 'var(--green)' }} />
                   ) : null}
                 </div>
-                <span className="text-[10px] text-[var(--text-3)]">{m.label}</span>
+                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{m.label}</span>
               </div>
             )
           })}
@@ -118,7 +118,7 @@ function VertriebsFunnel({
           <MockIcon ctx="emphasis" n="filter" size={16} />
           Vertriebs-Funnel
         </div>
-        <div className="text-[13px] text-[var(--text-2)]">
+        <div className="text-[length:var(--fs-text)] text-[var(--text-2)]">
           Gesamt-Conversion{' '}
           <b className="tabular-nums text-[var(--text)]">{conversionGesamt}%</b>
         </div>
@@ -139,15 +139,15 @@ function VertriebsFunnel({
                   background: s.color,
                 }}
               >
-                <span className="text-[13px] font-medium">{s.label}</span>
-                <span className="text-[13px] font-semibold tabular-nums">
+                <span className="text-[length:var(--fs-text)] font-medium">{s.label}</span>
+                <span className="text-[length:var(--fs-text)] font-semibold tabular-nums">
                   {s.count} <span className="font-normal opacity-80">· {s.rate}%</span>
                 </span>
               </div>
               {showDrop ? (
                 <div
                   className={cn(
-                    'mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-medium',
+                    'mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium',
                     isWorst
                       ? 'bg-red-50 text-red-700'
                       : 'bg-[var(--bg-2)] text-[var(--text-3)]'
@@ -179,19 +179,19 @@ function GewerkUmsatzCard({
           <MockIcon ctx="emphasis" n="clock" size={16} />
           Umsatz nach Gewerk
         </div>
-        <div className="text-right text-[12.5px] text-[var(--text-3)]">
+        <div className="text-right text-[length:var(--fs-meta)] text-[var(--text-3)]">
           Auftragsvolumen gesamt
-          <div className="text-[15px] font-semibold tabular-nums text-[var(--text)]">
+          <div className="text-[length:var(--fs-title)] font-semibold tabular-nums text-[var(--text)]">
             {formatEurBetrag(gesamt)}
           </div>
         </div>
       </div>
       <div className="card-b">
-        <p className="mb-3 text-[12px] text-[var(--text-3)]">
+        <p className="mb-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
           Nur abgeschlossene Vorgänge · Netto aus Angebotspositionen
         </p>
         {(zeilen ?? []).length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-[var(--text-3)]">
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
             Noch keine abgeschlossenen Vorgänge mit Gewerken.
           </p>
         ) : (
@@ -199,8 +199,8 @@ function GewerkUmsatzCard({
             {(zeilen ?? []).map((z, i) => (
               <div key={z.name}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <span className="text-[13px] font-medium">{z.name}</span>
-                  <span className="text-[12.5px] tabular-nums text-[var(--text-2)]">
+                  <span className="text-[length:var(--fs-text)] font-medium">{z.name}</span>
+                  <span className="text-[length:var(--fs-meta)] tabular-nums text-[var(--text-2)]">
                     {formatEurBetrag(z.netto)}{' '}
                     <span className="text-[var(--text-3)]">({z.anteil}%)</span>
                   </span>
@@ -265,16 +265,16 @@ function TopRankingCard({
       </div>
       <div className="card-b" style={{ paddingTop: 0 }}>
         {mode === 'handwerker' ? (
-          <p className="mb-2 pt-3 text-[12px] text-[var(--text-3)]">
+          <p className="mb-2 pt-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
             Sortiert nach Einkaufspreis (Zuweisung) · Umsatz = Auftragssumme Netto
           </p>
         ) : (
-          <p className="mb-2 pt-3 text-[12px] text-[var(--text-3)]">
+          <p className="mb-2 pt-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
             Sortiert nach Auftragssumme Netto · Vorgänge einzeln (Anfrage / Angebot / Auftrag)
           </p>
         )}
         {rows.length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-[var(--text-3)]">Keine Daten im Zeitraum.</p>
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">Keine Daten im Zeitraum.</p>
         ) : (
           <div className="overflow-x-auto">
             <div
@@ -299,22 +299,22 @@ function TopRankingCard({
                   alignItems: 'center',
                 }}
               >
-                <div className="text-[12.5px] tabular-nums text-[var(--text-3)]">{i + 1}</div>
+                <div className="text-[length:var(--fs-meta)] tabular-nums text-[var(--text-3)]">{i + 1}</div>
                 <div className="flex min-w-0 items-center gap-2">
                   <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--fs-meta)] font-semibold text-white"
                     style={{ background: gewerkColor(i) }}
                   >
                     {initials(r.name)}
                   </span>
                   <div className="min-w-0">
-                    <div className="truncate text-[13px] font-medium">{r.name}</div>
-                    <div className="truncate text-[11.5px] text-[var(--text-3)]">{r.sub}</div>
+                    <div className="truncate text-[length:var(--fs-text)] font-medium">{r.name}</div>
+                    <div className="truncate text-[length:var(--fs-meta)] text-[var(--text-3)]">{r.sub}</div>
                   </div>
                 </div>
-                <div className="text-[13px] tabular-nums">{r.vorgaenge}</div>
+                <div className="text-[length:var(--fs-text)] tabular-nums">{r.vorgaenge}</div>
                 <div>
-                  <div className="text-[13px] font-medium tabular-nums">
+                  <div className="text-[length:var(--fs-text)] font-medium tabular-nums">
                     {formatEurBetrag(r.umsatz)}
                   </div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
@@ -364,6 +364,8 @@ export function DashboardClient({
   myWorkCounts?: {
     reUeberfaellig: number
     angeboteWarten: number
+    anfragenOhneAntwort?: number
+    auftraegeOhneFortschritt?: number
   }
 }) {
   const router = useRouter()
@@ -384,20 +386,35 @@ export function DashboardClient({
   )
 
   const { tagItems, waitingItems } = useMemo(() => {
-    const byLabel = (label: string) => (kpis ?? []).find((k) => k.label === label)
-    const au = byLabel('Aktive Aufträge')
-    const re = byLabel('Offene Rechnungen')
     const reUeberfaellig = myWorkCounts?.reUeberfaellig ?? 0
-    const angeboteWarten = myWorkCounts?.angeboteWarten ?? byLabel('Offene Angebote')?.value ?? 0
+    const angeboteWarten = myWorkCounts?.angeboteWarten ?? 0
+    const anfragenOhne = myWorkCounts?.anfragenOhneAntwort ?? 0
+    const ohneFortschritt = myWorkCounts?.auftraegeOhneFortschritt ?? 0
 
     const tag: MyWorkItem[] = [
       {
-        id: 'au',
-        label: 'Laufende Aufträge',
-        hint: 'Arbeit & Abnahme',
-        href: au?.href ?? '/vorgaenge?tab=auftrag&lifecycle=offen',
+        id: 'anfragen-ohne',
+        label: 'Anfragen ohne Antwort',
+        hint: 'Neu · wartet auf Reaktion',
+        href: '/vorgaenge?tab=anfrage&lifecycle=offen',
+        icon: 'inbox',
+        count: anfragenOhne,
+      },
+      {
+        id: 'ag-stille',
+        label: 'Stille Angebote',
+        hint: 'Gesendet · keine Antwort',
+        href: '/vorgaenge?tab=angebot&lifecycle=offen',
+        icon: 'file-invoice',
+        count: angeboteWarten,
+      },
+      {
+        id: 'au-stille',
+        label: 'Aufträge ohne Fortschritt',
+        hint: '>10 Tage seit letzter Aktivität',
+        href: '/vorgaenge?tab=auftrag&lifecycle=offen',
         icon: 'briefcase',
-        count: au?.value ?? 0,
+        count: ohneFortschritt,
       },
       {
         id: 're-ueberfaellig',
@@ -407,29 +424,10 @@ export function DashboardClient({
         icon: 'receipt',
         count: reUeberfaellig,
       },
-      {
-        id: 're',
-        label: 'Offene Rechnungen',
-        hint: 'Gesendet · warten',
-        href: re?.href ?? '/vorgaenge?tab=rechnung&lifecycle=offen',
-        icon: 'receipt',
-        count: re?.value ?? 0,
-      },
     ]
 
-    const waiting: MyWorkItem[] = [
-      {
-        id: 'ag-warten',
-        label: 'Angebote gesendet',
-        hint: 'Antwort ausstehend',
-        href: '/vorgaenge?tab=angebot&lifecycle=offen',
-        icon: 'file-invoice',
-        count: angeboteWarten,
-      },
-    ]
-
-    return { tagItems: tag, waitingItems: waiting }
-  }, [kpis, myWorkCounts])
+    return { tagItems: tag, waitingItems: [] as MyWorkItem[] }
+  }, [myWorkCounts])
 
   return (
     <div className="dashboard-page min-w-0 overflow-x-hidden">
@@ -437,10 +435,10 @@ export function DashboardClient({
         className="mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3"
       >
         <div>
-          <div style={{ fontSize: 13.5, color: 'var(--text-3)' }}>{dateStr}</div>
+          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>{dateStr}</div>
           <div
             style={{
-              fontSize: 22,
+              fontSize: 'var(--fs-head)',
               fontWeight: 650,
               letterSpacing: '-0.02em',
               marginTop: 2,

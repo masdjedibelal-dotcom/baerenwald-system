@@ -112,14 +112,14 @@ export function KommunikationVorlagenClient({
         }
       >
         {rows.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Noch keine Vorlagen angelegt.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Vorlagen angelegt.</p>
         ) : (
           <ul className="divide-y divide-bw-border">
             {rows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
                 <div className="min-w-0">
                   <p className="font-medium text-bw-text">{r.name}</p>
-                  <p className="text-xs text-bw-text-muted">
+                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                     {KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS.find((o) => o.value === r.kontext_typ)?.label ??
                       r.kontext_typ}
                     {r.betreff ? ` · ${r.betreff}` : ''}

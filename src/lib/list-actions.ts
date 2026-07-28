@@ -9,7 +9,6 @@ import {
   duplicateAngebotHref,
   duplicateAuftragHref,
   duplicateRechnung,
-  duplicatePartner,
 } from '@/app/(dashboard)/crm/list-copy-actions'
 import { duplicateKunde } from '@/app/actions/kunden'
 import { duplicateHandwerker } from '@/app/(dashboard)/handwerker/actions'
@@ -28,6 +27,7 @@ export async function runDeleteVorgang(
   router.refresh()
 }
 
+/** Standalone-Rechnung (ohne Lead) aus der Vorgänge-Liste löschen. */
 export async function runDeleteStandaloneRechnung(
   rechnungId: string,
   router: AppRouterInstance,
@@ -99,12 +99,3 @@ export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterIn
   })
 }
 
-export function runDuplicatePartner(partnerId: string, router: AppRouterInstance) {
-  void duplicatePartner(partnerId).then((r) => {
-    if (!r.ok) toast.error(r.message)
-    else {
-      toast.success('Partner kopiert')
-      router.push(`/partner/${r.id}`)
-    }
-  })
-}

@@ -196,7 +196,7 @@ function LeistungNotizen({
       ))}
       <button
         type="button"
-        className="inline-flex items-center gap-1 text-[13px] font-medium text-bw-primary hover:underline"
+        className="inline-flex items-center gap-1 text-[length:var(--fs-text)] font-medium text-bw-primary hover:underline"
         onClick={() => onChange([...notizen, ''])}
       >
         <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -543,13 +543,13 @@ function VorortView({
           className="overflow-hidden rounded-lg border border-bw-border bg-bw-card"
         >
           <div className="border-b border-bw-border bg-bw-hover/80 px-3 py-2">
-            <p className="text-[13px] font-semibold text-bw-primary">{block.gewerk}</p>
+            <p className="text-[length:var(--fs-text)] font-semibold text-bw-primary">{block.gewerk}</p>
           </div>
           <div className="divide-y divide-bw-border">
             {block.leistungen.map((leistung) => (
               <div key={leistung.leistung_id} className="px-3 py-3">
                 {bereinigeAbnahmeLeistungName(leistung.leistung_name) ? (
-                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-bw-text-muted">
+                  <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
                     {bereinigeAbnahmeLeistungName(leistung.leistung_name)}
                   </p>
                 ) : null}
@@ -562,7 +562,7 @@ function VorortView({
                         p.status === 'mangel' && 'border-red-200 bg-red-50/50'
                       )}
                     >
-                      <p className="min-w-0 text-[14px] font-medium leading-snug text-bw-text">
+                      <p className="min-w-0 text-[length:var(--fs-text)] font-medium leading-snug text-bw-text">
                         {p.beschreibung?.trim() || '—'}
                       </p>
                       <StatusToggle
@@ -688,7 +688,7 @@ export function AbnahmeprotokollChecklist({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-bw-text-muted">
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         {punkte.length} Position{punkte.length === 1 ? '' : 'en'} · nach Gewerk gruppiert · per Griff
         oder Pfeil sortieren
       </p>
@@ -696,7 +696,7 @@ export function AbnahmeprotokollChecklist({
       {blocks.length === 0 ? (
         <div className="pos-empty rounded-lg border border-bw-border bg-bw-card px-4 py-6 text-center">
           <p className="font-medium text-bw-text-mid">Noch keine Leistungen</p>
-          <p className="mt-1 text-xs text-bw-text-muted">
+          <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
             Unten ein Gewerk hinzufügen oder ohne Gewerk starten.
           </p>
         </div>

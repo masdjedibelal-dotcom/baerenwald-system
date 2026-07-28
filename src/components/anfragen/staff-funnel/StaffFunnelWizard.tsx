@@ -355,7 +355,7 @@ export function StaffFunnelWizard({
               </MockField>
             </MockFormSection>
             <StaffInternBlock>
-              <p className="mb-3 text-[12.5px] text-[var(--text-3)]">
+              <p className="mb-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
                 Kanal und Notiz erscheinen nicht im Kunden-Funnel.
               </p>
               <MockField label="Kanal" required full>
@@ -532,7 +532,7 @@ export function StaffFunnelWizard({
               sub="Kompakt — einzelne Fragen können offen bleiben."
             />
             {fachKeys.length === 0 ? (
-              <p className="text-[13px] text-[var(--text-3)]">
+              <p className="text-[length:var(--fs-text)] text-[var(--text-3)]">
                 Keine Fachfragen für diese Auswahl — weiter oder überspringen.
               </p>
             ) : (
@@ -542,7 +542,7 @@ export function StaffFunnelWizard({
                   if (!cfg) return null
                   return (
                     <div key={key}>
-                      <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                      <div className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
                         {cfg.frage}
                       </div>
                       <StaffChoiceGrid
@@ -623,7 +623,7 @@ export function StaffFunnelWizard({
               </MockField>
             </MockFormSection>
             <div className="mt-5">
-              <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+              <div className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
                 Geplanter Start
               </div>
               <StaffChoiceGrid
@@ -685,7 +685,7 @@ export function StaffFunnelWizard({
               hinweis={state.preisHinweis || est.hinweis}
             />
             {!isKomplex && (showMin != null || showMax != null) ? (
-              <p className="mt-4 text-[12.5px] text-[var(--text-3)]">
+              <p className="mt-4 text-[length:var(--fs-meta)] text-[var(--text-3)]">
                 Der Rahmen wird mit der Anfrage gespeichert. Keine manuelle
                 Umschaltung nötig.
               </p>
@@ -736,7 +736,7 @@ export function StaffFunnelWizard({
               />
             </div>
             <div className="sf-summary-card">
-              <div className="card-b space-y-2 text-[13px]">
+              <div className="card-b space-y-2 text-[length:var(--fs-text)]">
                 {summaryRows.length ? (
                   summaryRows.map((row, i) => (
                     <Row key={`${i}-${row.label}`} k={row.label} v={row.value} />
@@ -755,7 +755,7 @@ export function StaffFunnelWizard({
                   onChange={(e) => patch({ freitext: e.target.value })}
                 />
               </MockField>
-              <label className="mt-3 flex items-center gap-2 text-[13px] text-[var(--text-2)]">
+              <label className="mt-3 flex items-center gap-2 text-[length:var(--fs-text)] text-[var(--text-2)]">
                 <input
                   type="checkbox"
                   checked={state.istBauprojekt}
@@ -837,7 +837,7 @@ export function StaffFunnelWizard({
 
       <div className={cn('mx-auto w-full max-w-2xl px-1 py-2')}>
         {error ? (
-          <p className="mb-3 rounded-lg bg-[var(--red-bg)] px-3 py-2 text-[13px] text-[var(--red-tx)]">
+          <p className="mb-3 rounded-lg bg-[var(--red-bg)] px-3 py-2 text-[length:var(--fs-text)] text-[var(--red-tx)]">
             {error}
           </p>
         ) : null}

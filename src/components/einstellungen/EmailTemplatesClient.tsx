@@ -129,7 +129,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
           {templates.map((t) => (
             <EinstellungenListItem key={t.id}>
               <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-medium text-bw-text">{t.name}</p>
+                <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{t.name}</p>
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
               <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
@@ -156,7 +156,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
               <button
                 type="button"
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium',
+                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   tab === 'edit' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('edit')}
@@ -166,7 +166,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
               <button
                 type="button"
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium',
+                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   tab === 'preview' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('preview')}
@@ -184,13 +184,13 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                     value={betreff}
                     onChange={(e) => setBetreff(e.target.value)}
                   />
-                  <p className="mt-2 text-xs text-bw-text-muted">Variablen:</p>
+                  <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">Variablen:</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {VARIABLES.map((v) => (
                       <button
                         key={v}
                         type="button"
-                        className="chip text-xs"
+                        className="chip text-[length:var(--fs-meta)]"
                         onClick={() => chipBetreff(v)}
                       >
                         {`{{${v}}}`}
@@ -205,7 +205,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                       <button
                         key={v}
                         type="button"
-                        className="chip text-xs"
+                        className="chip text-[length:var(--fs-meta)]"
                         onClick={() => chipBody(v)}
                       >
                         {`{{${v}}}`}
@@ -217,7 +217,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                     rows={14}
                     value={bodyHtml}
                     onChange={(e) => setBodyHtml(e.target.value)}
-                    className="font-mono text-sm"
+                    className="font-mono text-[length:var(--fs-text)]"
                   />
                 </div>
               </>
@@ -228,7 +228,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   {previewSubject}
                 </EinstellungenMeta>
                 <div
-                  className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-sm leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
+                  className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-[length:var(--fs-text)] leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
                   dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
               </div>

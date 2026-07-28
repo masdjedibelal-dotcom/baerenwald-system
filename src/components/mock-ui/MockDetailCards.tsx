@@ -56,7 +56,7 @@ export function MockNotizenCard({
     <MockCard title={`Notizen · ${notes.length}`} icon="messages">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: notes.length ? 14 : 0 }}>
         {notes.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
             Noch keine Notizen — schreibe die erste unten.
           </div>
         ) : (

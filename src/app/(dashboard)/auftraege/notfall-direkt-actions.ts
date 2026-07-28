@@ -8,26 +8,28 @@ import {
   notifyPartnerUnified,
   partnerVorgangLink,
 } from '@/lib/partner/notify-partner-unified'
-import type { PositionVerguetung } from '@/lib/auftraege/position-lebenszyklus'
 
 export type NotfallDirektInput = {
   auftragId?: string | null
   leadId?: string | null
   handwerkerId: string
-  verguetung: PositionVerguetung
-  /** Festpreis-Netto oder Stundensatz bei Aufwand (Pflicht) */
+  /** Spec Q3 / Phase 9: nur Aufwand — Festpreis-Normalweg = Angebot annehmen. */
+  verguetung?: 'aufwand'
+  /** Stundensatz netto (Pflicht) */
   betragNetto?: number | null
+  /** Materialaufschlag in Prozent (optional) */
+  materialaufschlagPct?: number | null
+  /** Stichpunkte Leistungsumfang */
+  leistungsumfang?: string[] | null
   /** @deprecated Stunden werden nicht mehr vorab erfasst — Abrechnung über BT/Rechnung. */
   geschaetztStd?: number | null
   gewerkName?: string | null
-  /** Kein Betragsdeckel (DD-10) — bewusst ohne Cap. */
-  ohneDeckel?: true
 }
 
 /**
- * Notfall „Direkt beauftragen“ / „Notfall melden“ (§4):
- * Partner + Stundensatz oder Festpreis, ohne Deckel, Auto-Position „Notfalleinsatz [Gewerk]“ (typ=regie).
- * Keine Stunden vorab — Menge/Zeit kommt später aus dem Bautagebuch für die Rechnung.
+ * Notfall „Direkt beauftragen“ / „Notfall melden“:
+ * Handwerker + Aufwand-Position ohne Angebot (typ=regie, notfall_verguetung=aufwand).
+ * Kein Festpreis-Zweig in diesem Flow.
  */
 export async function notfallDirektBeauftragen(
   input: NotfallDirektInput
@@ -40,11 +42,11 @@ export async function notfallDirektBeauftragen(
 
   const hwId = input.handwerkerId?.trim()
   if (!hwId) return { ok: false, message: 'Partner fehlt.' }
-  if (input.verguetung !== 'aufwand' && input.verguetung !== 'festpreis') {
-    return { ok: false, message: 'Vergütung: Aufwand oder Festpreis wählen.' }
-  }
 
-  // DD-10: bewusst kein Betragsdeckel / Cap — auch bei hohen Beträgen erlaubt.
+  // Spec Q3: nur Aufwand
+  const verguetung = 'aufwand' as const
+
+  // Spec: nur Aufwand; kein Cap in der Logik
   const betrag =
     input.betragNetto != null && Number.isFinite(Number(input.betragNetto))
       ? Math.max(0, Number(input.betragNetto))
@@ -52,12 +54,17 @@ export async function notfallDirektBeauftragen(
   if (betrag == null || betrag <= 0) {
     return {
       ok: false,
-      message:
-        input.verguetung === 'aufwand'
-          ? 'Stundensatz fehlt.'
-          : 'Festpreis fehlt.',
+      message: 'Stundensatz fehlt.',
     }
   }
+
+  const matPct =
+    input.materialaufschlagPct != null && Number.isFinite(Number(input.materialaufschlagPct))
+      ? Math.max(0, Number(input.materialaufschlagPct))
+      : null
+  const umfangZeilen = (input.leistungsumfang ?? [])
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
 
   let auftragId = input.auftragId?.trim() || ''
   let leadId = input.leadId?.trim() || null
@@ -105,9 +112,9 @@ export async function notfallDirektBeauftragen(
           kunde_id: kundeId,
           titel: neuTitel,
           status: 'in_arbeit',
-          notizen: 'Notfall Direkt beauftragen (ohne Deckel)',
+          notizen: 'Notfall Direktauftrag nach Aufwand',
           ist_notfall: true,
-          notfall_verguetung: input.verguetung,
+          notfall_verguetung: verguetung,
         })
         .select('id, titel')
         .single()
@@ -121,7 +128,7 @@ export async function notfallDirektBeauftragen(
               kunde_id: kundeId,
               titel: neuTitel,
               status: 'in_arbeit',
-              notizen: 'Notfall Direkt beauftragen (ohne Deckel)',
+              notizen: 'Notfall Direktauftrag nach Aufwand',
             })
             .select('id, titel')
             .single()
@@ -147,7 +154,7 @@ export async function notfallDirektBeauftragen(
     .from('auftraege')
     .update({
       ist_notfall: true,
-      notfall_verguetung: input.verguetung,
+      notfall_verguetung: verguetung,
       status: 'in_arbeit',
       updated_at: new Date().toISOString(),
     })
@@ -193,27 +200,32 @@ export async function notfallDirektBeauftragen(
     .limit(1)
     .maybeSingle()
 
-  const stundensatz = input.verguetung === 'aufwand' ? betrag : null
-  const festpreis = input.verguetung === 'festpreis' ? betrag : null
+  const stundensatz = betrag
   // Platzhalter-Menge 1 — tatsächliche Stunden kommen aus dem Bautagebuch / Rechnung.
   const menge = 1
+  const beschreibungTeile = [
+    'Notfall nach Aufwand — Stundensatz vereinbart, Stunden über Bautagebuch, Abrechnung per Rechnung.',
+  ]
+  if (matPct != null && matPct > 0) {
+    beschreibungTeile.push(`Materialaufschlag ${matPct} %.`)
+  }
+  if (umfangZeilen.length) {
+    beschreibungTeile.push(`Leistungsumfang:\n${umfangZeilen.map((z) => `• ${z}`).join('\n')}`)
+  }
 
   const insertPayload: Record<string, unknown> = {
     auftrag_id: auftragId,
     handwerker_id: hwId,
     gewerk_name: gewerk,
     leistung_name: leistungName,
-    beschreibung:
-      input.verguetung === 'aufwand'
-        ? 'Notfall nach Aufwand (Regie) — Stundensatz vereinbart, Stunden über Bautagebuch, Abrechnung per Rechnung.'
-        : 'Notfall Festpreis (Regie) — Abrechnung per Rechnung.',
-    einheit: input.verguetung === 'aufwand' ? 'Std' : 'Psch',
+    beschreibung: beschreibungTeile.join('\n'),
+    einheit: 'Std',
     menge,
-    preis_vk: festpreis,
-    preis_partner: festpreis ?? stundensatz,
-    lohn_vk: festpreis,
+    preis_vk: null,
+    preis_partner: stundensatz,
+    lohn_vk: null,
     typ: 'regie',
-    verguetung: input.verguetung,
+    verguetung,
     geschaetzt_std: null,
     stundensatz,
     leistung_status: 'offen',
@@ -221,6 +233,7 @@ export async function notfallDirektBeauftragen(
     handwerker_status: 'angefragt',
     handwerker_angefragt_at: new Date().toISOString(),
     sort_order: Number(maxSort?.sort_order ?? 0) + 1,
+    ...(matPct != null && matPct > 0 ? { notizen_intern: `Materialaufschlag ${matPct} %` } : {}),
   }
 
   let positionId: string
@@ -255,22 +268,23 @@ export async function notfallDirektBeauftragen(
     positionId = String(inserted.id)
   }
 
-  // Konditionen-Block für Partner-Anzeige (Payload im Audit + Notify)
+  // Konditionen für Partner — Sprache „nach Aufwand“, nie „Regie“
   const konditionenBlock = {
     art: 'notfall' as const,
-    verguetung: input.verguetung,
-    ohne_deckel: true as const,
+    verguetung,
     positionen: [
       {
         position_id: positionId,
         leistung: leistungName,
         beschreibung: String(insertPayload.beschreibung),
         ek_netto: null,
-        hw_netto: festpreis ?? stundensatz ?? 0,
+        hw_netto: stundensatz ?? 0,
         mwst_satz: 19,
         geaendert: false,
         stundensatz,
         geschaetzt_std: null,
+        materialaufschlag_pct: matPct,
+        abrechnung: 'nach Aufwand',
       },
     ],
   }
@@ -285,8 +299,7 @@ export async function notfallDirektBeauftragen(
     payload: {
       handwerker_id: hwId,
       position_id: positionId,
-      verguetung: input.verguetung,
-      ohne_deckel: true,
+      verguetung,
       konditionen: konditionenBlock,
       lead_id: leadId,
     },

@@ -138,8 +138,25 @@ async function positionenAusAuftrag(
   const auftragPos = (auf.auftrag_positionen ?? []) as AuftragPosition[]
   let positionen: AngebotPosition[] = []
   if (auftragPos.length > 0) {
+    const regieIds = auftragPos
+      .filter((p) => String(p.typ ?? '').toLowerCase() === 'regie' || p.verguetung === 'aufwand')
+      .map((p) => p.id)
+    const regieZeitMinutenByPositionId: Record<string, number> = {}
+    if (regieIds.length) {
+      const { data: eintraege } = await supabase
+        .from('position_eintraege')
+        .select('position_id, zeit_minuten')
+        .in('position_id', regieIds)
+      for (const e of eintraege ?? []) {
+        const pid = String((e as { position_id?: string }).position_id ?? '')
+        if (!pid) continue
+        regieZeitMinutenByPositionId[pid] =
+          (regieZeitMinutenByPositionId[pid] ?? 0) +
+          (Number((e as { zeit_minuten?: number | null }).zeit_minuten) || 0)
+      }
+    }
     positionen = sanitizeAngebotPositionenForExport(
-      auftragPositionenToAngebotPositionen(auftragPos),
+      auftragPositionenToAngebotPositionen(auftragPos, { regieZeitMinutenByPositionId }),
       gewerke
     )
   } else {
@@ -167,7 +184,8 @@ async function positionenAusAuftrag(
     }) || null
 
   const angZahlung = angJoin as { zahlungsbedingungen?: string | null; zahlungsplan?: unknown } | null
-  let zahlungsplan = parseZahlungsplan(auf.zahlungsplan) ?? parseZahlungsplan(angZahlung?.zahlungsplan)
+  // Spec Q2: Vorschlag nur vom Angebot; auftraege.zahlungsplan wird nicht gelesen
+  let zahlungsplan = parseZahlungsplan(angZahlung?.zahlungsplan)
   if (!zahlungsplan && angZahlung?.zahlungsbedingungen === 'anzahlung_50') {
     zahlungsplan = zahlungsplanVorlage50_50()
   }

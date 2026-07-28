@@ -587,6 +587,17 @@ export function KundenListeClient({
                 ? 'Neuen Kunden anlegen oder Anfrage erfassen'
                 : 'Filter zurücksetzen'
             }
+            action={
+              kunden.length === 0 ? (
+                <MockBtn kind="primary" icon="plus" onClick={() => router.push('/neu?art=kunde')}>
+                  Neuen Kunden anlegen
+                </MockBtn>
+              ) : (
+                <MockBtn kind="ghost" onClick={resetFilters}>
+                  Filter zurücksetzen
+                </MockBtn>
+              )
+            }
           />
         ) : (
           pageItems.map((k) => (
@@ -693,7 +704,7 @@ export function KundenListeClient({
         }
       >
         {listMergePair ? (
-          <p className="text-sm text-bw-text">
+          <p className="text-[length:var(--fs-text)] text-bw-text">
             Kunde <strong>{kundeListenName(listMergePair[1])}</strong> in{' '}
             <strong>{kundeListenName(listMergePair[0])}</strong> überführen?{' '}
             <strong>{kundeListenName(listMergePair[1])}</strong> wird entfernt. (Der ältere Datensatz bleibt

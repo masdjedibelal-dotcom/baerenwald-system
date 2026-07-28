@@ -35,15 +35,19 @@ export default async function HandwerkerDetailPage({ params }: { params: Promise
   ])
 
   if (!detail.handwerker) {
-    // Falsche Entität: Lieferanten-Partner unter /partner
-    const { data: asPartner } = await supabase.from('partner').select('id').eq('id', id).maybeSingle()
-    if (asPartner?.id) redirect(`/partner/${asPartner.id}`)
+    // Legacy-Partner-ID: Mapping auf Handwerker, sonst Liste
+    const { data: map } = await supabase
+      .from('partner_handwerker_map')
+      .select('handwerker_id')
+      .eq('partner_id', id)
+      .maybeSingle()
+    if (map?.handwerker_id) redirect(`/handwerker/${map.handwerker_id}`)
 
     // Query-Fehler nicht als 404 maskieren
     if (detail.loadError) {
       return (
         <div className="mx-auto max-w-md rounded-lg border border-border bg-surface p-6 text-center shadow-card">
-          <h1 className="text-lg font-semibold text-ink">Partner konnte nicht geladen werden</h1>
+          <h1 className="text-lg font-semibold text-ink">Handwerker konnte nicht geladen werden</h1>
           <p className="mt-2 text-sm text-muted">{detail.loadError}</p>
           <Link
             href="/handwerker"

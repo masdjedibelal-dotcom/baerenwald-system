@@ -1,5 +1,5 @@
 import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
 
 export default function Loading() {
-  return <CrmPageLoading variant="detail" label="Rechnung wird geladen …" />
+  return <CrmPageLoading label="Rechnung wird geladen …" />
 }

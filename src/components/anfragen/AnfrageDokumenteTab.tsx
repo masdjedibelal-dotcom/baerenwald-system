@@ -292,7 +292,7 @@ export function AnfrageDokumenteTab({
                   ) : (
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 'var(--fs-text)',
                         fontWeight: 500,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -319,7 +319,7 @@ export function AnfrageDokumenteTab({
                   ) : (
                     <div
                       style={{
-                        fontSize: 12.5,
+                        fontSize: 'var(--fs-meta)',
                         color: "var(--text-3)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -342,10 +342,10 @@ export function AnfrageDokumenteTab({
                           created_at: new Date(e.target.value).toISOString(),
                         });
                       }}
-                      style={{ height: 30, fontSize: 12 }}
+                      style={{ height: 30, fontSize: 'var(--fs-meta)' }}
                     />
                   ) : (
-                    <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                    <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-3)" }}>
                       {formatDatum(d.created_at)}
                     </div>
                   )}
@@ -355,7 +355,7 @@ export function AnfrageDokumenteTab({
                       alignItems: "center",
                       gap: 6,
                       cursor: "pointer",
-                      fontSize: 11.5,
+                      fontSize: 'var(--fs-meta)',
                     }}
                   >
                     <input
@@ -459,8 +459,8 @@ export function AnfrageDokumenteTab({
                 size={44}
                 style={{ color: "var(--text-4)" }}
               />
-              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 10 }}>{view.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>
+              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500, marginTop: 10 }}>{view.name}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-3)", marginTop: 4 }}>
                 <a
                   href={view.url}
                   target="_blank"
@@ -475,7 +475,7 @@ export function AnfrageDokumenteTab({
           )
         ) : null}
         {view?.beschreibung ? (
-          <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 12 }}>
+          <div style={{ fontSize: 'var(--fs-text)', color: "var(--text-2)", marginTop: 12 }}>
             {view.beschreibung}
           </div>
         ) : null}

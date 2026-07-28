@@ -149,6 +149,12 @@ export type RechnungAuswahlZeile = {
   rechnung_art?: string | null
   abschlag_index?: number | null
   zahlungsplan_abschlag_id?: string | null
+  /** Mahnwesen / RateDrawer */
+  erinnerung_7_sent_at?: string | null
+  erinnerung_21_sent_at?: string | null
+  intern_warnung_30_at?: string | null
+  reklamation_am?: string | null
+  reklamation_grund?: string | null
 }
 
 export type AbschlagRechnungEntwurf = {

@@ -70,7 +70,7 @@ export function BaustelleBerichteDokumenteCard({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg/30 p-4 space-y-3">
-        <p className="text-sm font-medium text-bw-text">Fertiges PDF hochladen</p>
+        <p className="text-[length:var(--fs-text)] font-medium text-bw-text">Fertiges PDF hochladen</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="form-field">
             <label className="form-field-label">Typ</label>
@@ -121,8 +121,8 @@ export function BaustelleBerichteDokumenteCard({
           {dokumente.map((d) => (
             <div key={d.id} className="flex items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-bw-text">{d.titel}</p>
-                <p className="text-xs text-bw-text-muted">
+                <p className="truncate text-[length:var(--fs-text)] font-medium text-bw-text">{d.titel}</p>
+                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   {BAUSTELLEN_DOKUMENT_TYP_LABELS[d.typ]}
                   {d.kalenderwoche ? ` · KW ${d.kalenderwoche}` : ''}
                   {d.quelle === 'generiert' ? ' · generiert' : ' · Upload'}
@@ -146,7 +146,7 @@ export function BaustelleBerichteDokumenteCard({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-bw-text-muted">Noch keine Baustellen-Dokumente.</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Baustellen-Dokumente.</p>
       )}
     </div>
   )

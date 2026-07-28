@@ -7,13 +7,19 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 /**
- * Bottom-Nav (W6-10): Dashboard, Vorgänge | FAB | Kalender, Kunden | Mehr → /mehr
+ * Bottom-Nav Spec §3: Dashboard · Vorgänge | + | Kunden · Mehr
  */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'
   const left = BOTTOM_NAV_ITEMS.slice(0, 2)
   const right = BOTTOM_NAV_ITEMS.slice(2)
-  const mehrActive = pathname === '/mehr' || pathname.startsWith('/mehr/')
+  const mehrActive =
+    pathname === '/mehr' ||
+    pathname.startsWith('/mehr/') ||
+    pathname.startsWith('/kalender') ||
+    pathname.startsWith('/handwerker') ||
+    pathname.startsWith('/ki-analytics') ||
+    pathname.startsWith('/einstellungen')
 
   return (
     <nav className="bottomnav" aria-label="Mobile Navigation">

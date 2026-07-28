@@ -27,11 +27,11 @@ export function PhaseCard({ title, line1, line2, href, className }: PhaseCardPro
   return (
     <Link href={href} className={cn('phase-card', className)}>
       <div className="phase-card__head">
-        <span className="text-headline">{title}</span>
-        <span className="phase-card__open text-footnote">Öffnen →</span>
+        <span className="text-[length:var(--fs-head)]">{title}</span>
+        <span className="phase-card__open text-[length:var(--fs-meta)]">Öffnen →</span>
       </div>
       <p className="text-body phase-card__line1">{line1}</p>
-      {line2 ? <p className="text-footnote phase-card__line2">{line2}</p> : null}
+      {line2 ? <p className="text-[length:var(--fs-meta)] phase-card__line2">{line2}</p> : null}
     </Link>
   )
 }

@@ -249,7 +249,7 @@ export function AuftragLeistungZuweisungModal({
       className="hw-anfrage-modal"
       bodyClassName="hw-anfrage-body"
     >
-      <p className="mb-3 text-[13px] text-bw-text-muted">{subtitle}</p>
+      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
       {isSingle ? (
         <>
           <label className="hw-anfrage-field">
@@ -322,7 +322,7 @@ export function AuftragLeistungZuweisungModal({
                 />
               </div>
               {!ekOk ? (
-                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
                   Pflicht — größer als 0 €
                 </span>
               ) : null}
@@ -394,7 +394,7 @@ export function AuftragLeistungZuweisungModal({
           </div>
         </>
       ) : (
-        <p className="text-sm text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           {selectedPositions.length} Leistungen — Partner Netto und Handwerker gelten für alle
           Ausgewählten.
         </p>
@@ -423,7 +423,7 @@ export function AuftragLeistungZuweisungModal({
             />
           </div>
           {!ekOk ? (
-            <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 12 }}>
+            <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
               Pflicht — größer als 0 €
             </span>
           ) : null}
@@ -437,9 +437,9 @@ export function AuftragLeistungZuweisungModal({
         </div>
 
         {loading ? (
-          <p className="text-sm text-bw-text-muted">Lade Handwerker…</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Lade Handwerker…</p>
         ) : merged.length === 0 ? (
-          <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
         ) : (
           <ul className="hw-anfrage-list">
             {merged.map((h) => {

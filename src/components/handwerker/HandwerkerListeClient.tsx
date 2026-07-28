@@ -555,6 +555,17 @@ export function HandwerkerListeClient({
             icon="tool"
             title={rows.length === 0 ? 'Keine Partner' : 'Keine Treffer'}
             hint={rows.length === 0 ? 'Partner anlegen' : 'Filter zurücksetzen'}
+            action={
+              rows.length === 0 ? (
+                <MockBtn kind="primary" icon="plus" onClick={() => router.push('/neu?art=handwerker')}>
+                  Handwerker anlegen
+                </MockBtn>
+              ) : (
+                <MockBtn kind="ghost" onClick={resetFilters}>
+                  Filter zurücksetzen
+                </MockBtn>
+              )
+            }
           />
         ) : (
           pageItems.map((h) => {

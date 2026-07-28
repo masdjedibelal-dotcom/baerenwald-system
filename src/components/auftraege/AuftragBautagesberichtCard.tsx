@@ -257,13 +257,13 @@ export function AuftragBautagesberichtCard({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         Ausführlicher Bautagesbericht für Bauprojekte — PDF im Bärenwald-Standardlayout (wie
         Abschlussdokumentation).
       </p>
 
       {rows.length === 0 && !formOpen ? (
-        <p className="text-sm text-bw-text-muted">Noch keine Bautagesberichte.</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Bautagesberichte.</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((b) => {
@@ -291,14 +291,14 @@ export function AuftragBautagesberichtCard({
                       Tag {tag} · {formatDatum(b.datum)}
                     </span>
                     {b.personal_namen.length > 0 ? (
-                      <span className="text-xs text-bw-text-muted">
+                      <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
                         {b.personal_namen.length} MA
                       </span>
                     ) : null}
                   </button>
                   <a
                     href={`/api/auftraege/${auftragId}/bautagesbericht/${b.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-bw-primary hover:bg-bw-primary/10"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-primary/10"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -319,7 +319,7 @@ export function AuftragBautagesberichtCard({
                   </Button>
                 </div>
                 {open ? (
-                  <div className="border-t border-bw-border px-3 py-3 text-sm text-bw-text-muted space-y-2">
+                  <div className="border-t border-bw-border px-3 py-3 text-[length:var(--fs-text)] text-bw-text-muted space-y-2">
                     {b.zusammenfassung ? <p>{b.zusammenfassung}</p> : null}
                     {b.leistungen.length > 0 ? (
                       <ul className="list-disc pl-5">
@@ -352,7 +352,7 @@ export function AuftragBautagesberichtCard({
 
       {formOpen ? (
         <div className="rounded-lg border border-bw-border bg-bw-surface p-4 space-y-4">
-          <h3 className="text-sm font-semibold text-bw-text">
+          <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">
             {editId ? 'Bautagesbericht bearbeiten' : `Neuer Bautagesbericht — Tag ${String(naechsterTag).padStart(2, '0')}`}
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">

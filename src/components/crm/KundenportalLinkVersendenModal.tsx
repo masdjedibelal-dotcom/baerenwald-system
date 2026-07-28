@@ -23,12 +23,15 @@ export function KundenportalLinkVersendenModal({
   onClose,
   kundeId,
   fallbackEmail,
+  onSent,
 }: {
   open: boolean
   onClose: () => void
   kundeId: string | null | undefined
   /** Wenn Draft keine Mail hat, z. B. Lead-Kontakt */
   fallbackEmail?: string | null
+  /** Nach erfolgreichem Versand (z. B. Stammdaten-Portal-Zeile → „eingeladen“) */
+  onSent?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -110,6 +113,7 @@ export function KundenportalLinkVersendenModal({
       return
     }
     toast.success('Kundenportal-Link versendet')
+    onSent?.()
     onClose()
   }
 

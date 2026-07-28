@@ -6,14 +6,22 @@ import { cn } from '@/lib/utils'
 
 type ToastType = 'success' | 'error' | 'info' | 'loading'
 
+export type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
 export interface ToastItem {
   id: string
   type: ToastType
   message: string
+  action?: ToastAction
 }
 
+type ToastOpts = { id?: string; persist?: boolean; action?: ToastAction }
+
 type ToastApi = {
-  push: (type: ToastType, message: string, opts?: { id?: string; persist?: boolean }) => string
+  push: (type: ToastType, message: string, opts?: ToastOpts) => string
   dismiss: (id: string) => void
 }
 
@@ -24,22 +32,18 @@ function formatMessage(title: string, opts?: { description?: string }): string {
   return title
 }
 
-function pushToast(
-  type: ToastType,
-  message: string,
-  opts?: { id?: string; persist?: boolean }
-): string {
+function pushToast(type: ToastType, message: string, opts?: ToastOpts): string {
   if (!toastApi) return ''
   return toastApi.push(type, message, opts)
 }
 
 export const toast = {
-  success: (msg: string, opts?: { id?: string }) =>
-    pushToast('success', msg, { id: opts?.id }),
-  error: (msg: string, opts?: { id?: string }) =>
-    pushToast('error', msg, { id: opts?.id }),
-  info: (msg: string, opts?: { id?: string }) =>
-    pushToast('info', msg, { id: opts?.id }),
+  success: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
+    pushToast('success', msg, { id: opts?.id, action: opts?.action, persist: Boolean(opts?.action) }),
+  error: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
+    pushToast('error', msg, { id: opts?.id, action: opts?.action }),
+  info: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
+    pushToast('info', msg, { id: opts?.id, action: opts?.action }),
   /** Bleibt stehen, bis dismiss/success/error mit derselben id. */
   loading: (msg: string, opts?: { id?: string }) =>
     pushToast('loading', msg, { id: opts?.id, persist: true }),
@@ -62,24 +66,25 @@ export function ToastProvider() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const push = useCallback(
-    (type: ToastType, message: string, opts?: { id?: string; persist?: boolean }) => {
-      const id = opts?.id ?? Math.random().toString(36).slice(2)
-      setToasts((prev) => {
-        const without = prev.filter((t) => t.id !== id)
-        return [...without, { id, type, message }]
-      })
-      const persist = opts?.persist || type === 'loading'
-      if (!persist) {
-        const ms = type === 'error' ? 5000 : 3000
-        window.setTimeout(() => {
-          setToasts((prev) => prev.filter((t) => t.id !== id))
-        }, ms)
-      }
-      return id
-    },
-    []
-  )
+  const push = useCallback((type: ToastType, message: string, opts?: ToastOpts) => {
+    const id = opts?.id ?? Math.random().toString(36).slice(2)
+    setToasts((prev) => {
+      const without = prev.filter((t) => t.id !== id)
+      return [...without, { id, type, message, action: opts?.action }]
+    })
+    const persist = opts?.persist || type === 'loading' || Boolean(opts?.action)
+    if (!persist) {
+      const ms = type === 'error' ? 5000 : 3000
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id))
+      }, ms)
+    } else if (opts?.action && type !== 'loading') {
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id))
+      }, 8000)
+    }
+    return id
+  }, [])
 
   useEffect(() => {
     toastApi = { push, dismiss }
@@ -112,6 +117,18 @@ export function ToastProvider() {
               aria-hidden
             />
             <span className="min-w-0 flex-1">{t.message}</span>
+            {t.action ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline"
+                onClick={() => {
+                  t.action?.onClick()
+                  dismiss(t.id)
+                }}
+              >
+                {t.action.label}
+              </button>
+            ) : null}
             {t.type !== 'loading' ? (
               <button
                 type="button"

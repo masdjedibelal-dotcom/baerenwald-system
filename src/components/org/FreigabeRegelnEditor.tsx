@@ -111,10 +111,10 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+            <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600, color: 'var(--text)' }}>
               Kleinreparaturen ohne Angebot
             </div>
-            <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-3)', margin: '4px 0 0' }}>
+            <p className="text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)', margin: '4px 0 0' }}>
               Kleine Reparaturen bis zum Grenzbetrag sofort erledigen — ohne vorheriges Angebot.
             </p>
           </div>
@@ -163,7 +163,7 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
                   right: 10,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  fontSize: 13,
+                  fontSize: 'var(--fs-text)',
                   color: 'var(--text-3)',
                   pointerEvents: 'none',
                 }}
@@ -222,7 +222,7 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
           }}
         >
           <MockIcon ctx="default" n="info-circle" size={14} />
-          <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-2)', margin: 0 }}>
+          <p className="text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-2)', margin: 0 }}>
             {purpose}
           </p>
         </div>

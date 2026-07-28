@@ -187,7 +187,7 @@ export function AbschlagsplanEditorModal({
       </div>
 
       {frozen.size > 0 ? (
-        <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.45 }}>
+        <p style={{ margin: '0 0 10px', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', lineHeight: 1.45 }}>
           Gestellte/bezahlte Raten sind fest. Offene Raten kannst du ändern.
         </p>
       ) : null}
@@ -234,10 +234,10 @@ export function AbschlagsplanEditorModal({
                 value={r.faellig_am}
                 disabled={isFrozen}
                 onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
-                style={{ height: 32, fontSize: 12 }}
+                style={{ height: 32, fontSize: 'var(--fs-meta)' }}
               />
               {isFrozen ? (
-                <span title="Eingefroren" style={{ fontSize: 11, color: 'var(--text-3)', padding: '0 4px' }}>
+                <span title="Eingefroren" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', padding: '0 4px' }}>
                   fest
                 </span>
               ) : (

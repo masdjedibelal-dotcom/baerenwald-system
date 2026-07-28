@@ -118,6 +118,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .select(
             `
             id, status, kunde_id, lead_id, angebot_id, created_at, titel, ist_wiederkehrend,
+            letzte_aktivitaet, fortschritt,
             angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
             kunden(id, name, vorname, nachname)
           `
@@ -201,6 +202,33 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const angeboteWartenCount = angebote.filter((a) =>
     isAngebotWartetAufKundeStatus(a.status as string, a.status_einfach as string | null)
   ).length
+
+  /** Phase 10: Anfragen ohne Antwort — neu / offen ohne verknüpftes Angebot. */
+  const angebotLeadIds = new Set(
+    angebote.map((a) => String((a as { lead_id?: string | null }).lead_id ?? '')).filter(Boolean)
+  )
+  const anfragenOhneAntwortCount = leads.filter((l) => {
+    const st = String(l.status ?? '').toLowerCase()
+    if (st === 'abgeschlossen' || st === 'storniert' || st === 'verloren') return false
+    return !angebotLeadIds.has(String(l.id))
+  }).length
+
+  /** >10 Tage seit letzte_aktivitaet; hoher Fortschritt zählt nicht. */
+  const zehnTageMs = 10 * 24 * 60 * 60 * 1000
+  const nowMs = Date.now()
+  const auftraegeOhneFortschrittCount = auftraege.filter((a) => {
+    const st = String(a.status ?? '').toLowerCase()
+    if (st === 'abgeschlossen' || st === 'storniert') return false
+    const fortschritt = Number((a as { fortschritt?: number | null }).fortschritt) || 0
+    if (fortschritt >= 80) return false
+    const last =
+      String((a as { letzte_aktivitaet?: string | null }).letzte_aktivitaet ?? '').trim() ||
+      String(a.created_at ?? '')
+    if (!last) return false
+    const t = new Date(last).getTime()
+    if (!Number.isFinite(t)) return false
+    return nowMs - t > zehnTageMs
+  }).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
@@ -417,6 +445,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       myWorkCounts={{
         reUeberfaellig: reUeberfaelligCount,
         angeboteWarten: angeboteWartenCount,
+        anfragenOhneAntwort: anfragenOhneAntwortCount,
+        auftraegeOhneFortschritt: auftraegeOhneFortschrittCount,
       }}
     />
   )

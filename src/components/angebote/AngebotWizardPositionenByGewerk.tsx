@@ -132,7 +132,7 @@ function GewerkBlockMeta({
       <label className="block min-w-0">
         <span className="input-label">Gewerk-Titel</span>
         <input
-          className="input h-8 text-[13px] font-semibold"
+          className="input h-8 text-[length:var(--fs-text)] font-semibold"
           value={titleDraft}
           onChange={(e) => setTitleDraft(e.target.value)}
           onBlur={commitTitleDraft}
@@ -150,7 +150,7 @@ function GewerkBlockMeta({
       <label className="block min-w-0">
         <span className="input-label">Beschreibung (optional)</span>
         <textarea
-          className="input min-h-[72px] w-full resize-y text-[12px] leading-relaxed"
+          className="input min-h-[72px] w-full resize-y text-[length:var(--fs-meta)] leading-relaxed"
           value={blockBeschreibung}
           onChange={(e) => onBeschreibungChange(e.target.value)}
           placeholder="z. B. Wände und Decke inkl. Grundierung"
@@ -489,8 +489,8 @@ export function AngebotWizardPositionenByGewerk({
     <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-bw-text">{titel}</h2>
-          <p className="mt-0.5 text-[12.5px] text-bw-text-muted">{caption}</p>
+          <h2 className="text-[length:var(--fs-head)] font-semibold tracking-tight text-bw-text">{titel}</h2>
+          <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">{caption}</p>
         </div>
         <div className="pos-totals min-w-[280px]">
           {rabattAbzugGesamt > 0 ? (
@@ -526,10 +526,10 @@ export function AngebotWizardPositionenByGewerk({
         {displayBlocks.length === 0 ? (
           <div className="pos-empty rounded-lg border border-bw-border">
             <p className="font-medium text-bw-text-mid">Noch kein Gewerk angelegt</p>
-            <p className="mt-1 text-xs text-bw-text-muted">
+            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
               Unten ein Gewerk hinzufügen und Positionen erfassen.
             </p>
-            <p className="mt-2 text-[11px] text-bw-text-muted">
+            <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
               Pro Gewerk-Abschnitt kannst du unten eigene Anfahrtskosten aktivieren.
             </p>
           </div>
@@ -592,7 +592,7 @@ export function AngebotWizardPositionenByGewerk({
                         onRename={(name) => renameBlockTitle(block.key, name)}
                         onBeschreibungChange={(value) => setBlockBeschreibung(block.key, value)}
                       />
-                      <div className="mt-0.5 text-[11px] text-bw-text-muted">
+                      <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
                         {posCount} Position{posCount === 1 ? '' : 'en'}
                         {blockZeilenOhneBeschreibung.some((z) => z.typ === 'freitext')
                           ? ' · inkl. Freitext'
@@ -606,7 +606,7 @@ export function AngebotWizardPositionenByGewerk({
                       aria-expanded={open}
                       aria-label={open ? 'Gewerk einklappen' : 'Gewerk aufklappen'}
                     >
-                      <span className="text-[13px] font-semibold tabular-nums text-bw-text">
+                      <span className="text-[length:var(--fs-text)] font-semibold tabular-nums text-bw-text">
                         {formatEurBetrag(netto)}
                       </span>
                       <ChevronDown
@@ -677,7 +677,7 @@ export function AngebotWizardPositionenByGewerk({
                       }
                       betweenListAndAddRow={
                         <div className="px-3 py-2.5">
-                          <label className="flex cursor-pointer flex-wrap items-center gap-2 text-[13px] text-bw-text">
+                          <label className="flex cursor-pointer flex-wrap items-center gap-2 text-[length:var(--fs-text)] text-bw-text">
                             <input
                               type="checkbox"
                               checked={blockHatAnfahrt}
@@ -686,7 +686,7 @@ export function AngebotWizardPositionenByGewerk({
                               }
                             />
                             <span className="font-medium">{anfahrtLeistungText(firm)}</span>
-                            <span className="text-[11px] text-bw-text-muted">
+                            <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
                               nur für dieses Gewerk
                             </span>
                           </label>

@@ -17,7 +17,16 @@ export type DocumentCanvasProps = {
   /** DocBar Verwerfen — einzige destruktive Exit mit Confirm */
   onDiscard?: () => void
   docActions?: ReactNode
-  children: ReactNode
+  /** Legacy: gesamter Dokumentkörper (wenn document/meta fehlen) */
+  children?: ReactNode
+  /** Spec §6: Dokument-Spalte */
+  document?: ReactNode
+  /** Spec §6: Meta-Spalte (CollapseRow-Zeilen) */
+  meta?: ReactNode
+  /** Sticky Summenblock unten in der Meta-Spalte */
+  metaSum?: ReactNode
+  /** Mobil: Sticky-Footer-CTA */
+  footerCta?: ReactNode
   className?: string
   /** Portal fullscreen (default true) */
   portal?: boolean
@@ -40,6 +49,10 @@ export function DocumentCanvas({
   onDiscard,
   docActions,
   children,
+  document: documentSlot,
+  meta,
+  metaSum,
+  footerCta,
   className,
   portal = true,
   busy,
@@ -198,8 +211,21 @@ export function DocumentCanvas({
         ref={bodyRef}
         className={cn('document-canvas__body', interactionLocked && 'pointer-events-none')}
       >
-        <div className="document-canvas__paper">{children}</div>
+        {meta != null || documentSlot != null ? (
+          <div className="document-canvas__split">
+            <div className="document-canvas__paper document-canvas__paper--doc">
+              {documentSlot ?? children}
+            </div>
+            <aside className="document-canvas__meta">
+              <div className="document-canvas__meta-scroll">{meta}</div>
+              {metaSum ? <div className="document-canvas__meta-sum">{metaSum}</div> : null}
+            </aside>
+          </div>
+        ) : (
+          <div className="document-canvas__paper">{children}</div>
+        )}
       </div>
+      {footerCta ? <div className="document-canvas__footer-cta">{footerCta}</div> : null}
       {docActions ? (
         <footer
           className={cn(

@@ -19,7 +19,7 @@ const VORGANG_ITEMS: Array<{ ic: string; label: string; desc: string; href: stri
 
 const STAMM_ITEMS: Array<{ ic: string; label: string; desc: string; href: string }> = [
   { ic: 'users', label: 'Kunde', desc: 'Stammdaten', href: createKundeHref() },
-  { ic: 'tool', label: 'Partner', desc: 'Handwerker / Firma', href: createPartnerHref() },
+  { ic: 'tool', label: 'Handwerker', desc: 'Ausführungspartner', href: createPartnerHref() },
 ]
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {

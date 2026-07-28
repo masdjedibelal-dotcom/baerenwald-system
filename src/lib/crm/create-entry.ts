@@ -3,21 +3,19 @@
  * FAB + TopBar-CTAs + Deep-Links sollen hierher zeigen — keine Parallel-Legacy-Forms.
  *
  * Naming:
- * - Partner (Create) = Handwerker-Entity → `/neu?art=handwerker` → Liste `/handwerker`
- * - Netzwerk (Tabelle `partner`) hat eigenen Create-Flow unter `/partner` (nicht FAB)
+ * - Handwerker (Create) = Tabelle `handwerker` → `/neu?art=handwerker` → Liste `/handwerker`
+ * - Tabelle `partner` bleibt datenmäßig; kein Nav-/Create-Einstieg mehr (Phase 3)
  *
- * Surface-Regel (SURFACE-KONSOLIDIERUNG, beschlossen 2026-07-27):
- * - A DocumentCanvas / WizardShell — Dokument-Flows
- * - B EditorSheet — Entity create/edit
- *     mobile: Bottom Sheet
- *     desktop Detail: Slide-over | desktop aus Canvas: Center-Modal
+ * Surface-Regel (Spec §6 / Phase 2):
+ * - A DocumentCanvas — Dokument-Flows (Angebot, Rechnung, Abnahme, Abschlussbericht)
+ * - B EditorSheet — Entity create/edit (Desktop Slide-over, Mobil Bottom Sheet; nie Center)
  * - C ActionSheet — nur Aktion wählen
  * - D Inline — leichte Detail-Felder
- * - Kunde/Partner Create = EditorSheet Host `/neu?art=kunde|handwerker` (keine Fullpage-Form)
+ * - Kunde/Handwerker Create = EditorSheet Host `/neu?art=kunde|handwerker`
  * - PickerSheet = Kunde/Katalog/Vorgang wählen (+ Header-Neu)
  * - Overlay: kein Modal-in-Modal
- * Angebot: Kunde-Gate = PickerSheet, danach Canvas/Wizard.
- * Rechnung: Kunde (+ optional Vorgang) im FAB-Host als PickerSheet, danach Canvas/Wizard.
+ * Angebot: Kunde-Gate = PickerSheet, danach DocumentCanvas.
+ * Rechnung: Kunde (+ optional Vorgang) im FAB-Host als PickerSheet, danach DocumentCanvas.
  */
 
 export type CrmCreateArt =
@@ -56,7 +54,7 @@ export function createKundeHref(): string {
   return '/neu?art=kunde'
 }
 
-/** Partnerbetrieb = Tabelle `handwerker` (eine Create-Route). */
+/** Handwerker = Tabelle `handwerker` (eine Create-Route). */
 export function createPartnerHref(): string {
   return '/neu?art=handwerker'
 }
@@ -89,5 +87,6 @@ export const CREATE_ENTRY_LABELS = {
   angebot: 'Neues Angebot',
   rechnung: 'Neue Rechnung',
   kunde: 'Neuer Kunde',
-  partner: 'Neuer Partner',
+  partner: 'Neuer Handwerker',
+  handwerker: 'Neuer Handwerker',
 } as const

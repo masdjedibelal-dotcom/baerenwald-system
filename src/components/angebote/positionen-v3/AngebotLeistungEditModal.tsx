@@ -166,7 +166,7 @@ export function AngebotLeistungEditModal({
       ) : (
         <button
           type="button"
-          className="mt-3 text-[14px] font-medium text-bw-primary"
+          className="mt-3 text-[length:var(--fs-text)] font-medium text-bw-primary"
           onClick={() => setShowBeschreibung(true)}
         >
           + Beschreibung

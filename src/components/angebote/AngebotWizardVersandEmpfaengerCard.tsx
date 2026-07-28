@@ -29,7 +29,7 @@ export function AngebotWizardVersandEmpfaengerCard({
         </>
       }
     >
-      <p className="mb-3 text-[12.5px] leading-relaxed text-bw-text-muted">
+      <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed text-bw-text-muted">
         Prüfe An und CC, bevor du das {dokumentLabel} versendest. Weitere Adressen per Eingabe
         und Enter hinzufügen — entfernen per Klick auf das × in der Pille.
       </p>

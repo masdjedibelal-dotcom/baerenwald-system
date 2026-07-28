@@ -35,7 +35,7 @@ export function leadHatKiVertriebsDaten(
 function AnalyseAbschnitt({ text }: { text: string }) {
   const blocks = text.split(/\n(?=\*\*)/).filter(Boolean)
   return (
-    <div className="space-y-3 text-[13px] leading-relaxed text-bw-text">
+    <div className="space-y-3 text-[length:var(--fs-text)] leading-relaxed text-bw-text">
       {blocks.map((block, i) => {
         const m = block.match(/^\*\*(.+?)\*\*\n?([\s\S]*)$/)
         if (m) {
@@ -44,7 +44,7 @@ function AnalyseAbschnitt({ text }: { text: string }) {
           const isList = lines.every((l) => l.startsWith('- '))
           return (
             <div key={i}>
-              <p className="mb-1 text-xs font-semibold text-bw-text">{m[1]}</p>
+              <p className="mb-1 text-[length:var(--fs-meta)] font-semibold text-bw-text">{m[1]}</p>
               {isList ? (
                 <ul className="list-disc space-y-0.5 pl-4 text-bw-text-muted">
                   {lines.map((l) => (
@@ -70,8 +70,8 @@ function AnalyseAbschnitt({ text }: { text: string }) {
 function VertriebBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs font-semibold text-bw-text">{title}</p>
-      <div className="text-[13px] leading-relaxed text-bw-text-muted">{children}</div>
+      <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold text-bw-text">{title}</p>
+      <div className="text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">{children}</div>
     </div>
   )
 }
@@ -145,16 +145,16 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
       <div className="ki-bedarf-inline space-y-3 rounded-xl border border-[#2E7D52]/30 bg-[#EAF3DE]/55 p-3.5 md:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2E7D52]">
+            <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">
               Lead-Auskunft · KI
             </p>
             {istGpt ? (
-              <p className="mt-1 text-[13px] leading-relaxed text-bw-text-muted">
+              <p className="mt-1 text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
                 Quelle: <span className="font-medium text-bw-text">{quelleLabel}</span> — Chat,
                 Eingaben und Visualisierung für den Vertrieb.
               </p>
             ) : (
-              <p className="mt-1 text-[13px] leading-relaxed text-bw-text-muted">
+              <p className="mt-1 text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
                 Anfrage über den <span className="font-medium text-bw-text">KI-Rechner</span> —
                 Eingaben und Chat fließen in die Analyse ein.
               </p>
@@ -179,23 +179,23 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
         </div>
 
         {loading && !analyse ? (
-          <div className="flex items-center gap-2 text-sm text-bw-text-muted">
+          <div className="flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text-muted">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             Chat und Website-Verhalten werden ausgewertet…
           </div>
         ) : analyse ? (
           <AnalyseAbschnitt text={analyse} />
         ) : (
-          <p className="text-[13px] text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             {error ?? 'Noch keine Analyse — bitte „Aktualisieren“ tippen.'}
           </p>
         )}
 
-        {error && analyse ? <p className="text-xs text-status-cancel-text">{error}</p> : null}
+        {error && analyse ? <p className="text-[length:var(--fs-meta)] text-status-cancel-text">{error}</p> : null}
 
         {!analyse && erk && !loading ? (
           <div className="space-y-3 rounded-lg border border-[#2E7D52]/15 bg-white/60 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+            <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
               Rohdaten (Website)
             </p>
             {erk.zusammenfassung ? (
@@ -217,7 +217,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
 
         {galerie.length > 0 ? (
           <div>
-            <p className="mb-2 text-xs font-semibold text-bw-text">Kundenfotos (Website)</p>
+            <p className="mb-2 text-[length:var(--fs-meta)] font-semibold text-bw-text">Kundenfotos (Website)</p>
             <div className="flex flex-wrap gap-2">
               {galerie.map((url) => (
                 <a
@@ -242,14 +242,14 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
         {chat.length > 0 ? (
           <button
             type="button"
-            className="inline-flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-[#2E7D52]/25 bg-white/70 px-3 py-2 text-left text-[13px] font-semibold text-[#1A3D2B] transition hover:bg-white"
+            className="inline-flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-[#2E7D52]/25 bg-white/70 px-3 py-2 text-left text-[length:var(--fs-text)] font-semibold text-[#1A3D2B] transition hover:bg-white"
             onClick={() => setChatOpen(true)}
           >
             <span className="inline-flex items-center gap-2">
               <MessageSquare className="h-4 w-4 shrink-0 text-[#2E7D52]" aria-hidden />
               Chat-Verlauf ({chat.length})
             </span>
-            <span className="text-xs font-medium text-bw-text-muted">Öffnen</span>
+            <span className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Öffnen</span>
           </button>
         ) : null}
       </div>
@@ -267,11 +267,11 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             <div
               key={`${m.role}-${i}`}
               className={cn(
-                'rounded-lg px-3 py-2.5 text-[13px] leading-relaxed',
+                'rounded-lg px-3 py-2.5 text-[length:var(--fs-text)] leading-relaxed',
                 m.role === 'user' ? 'bg-bw-bg text-bw-text' : 'bg-[#EAF3DE] text-[#1A3D2B]'
               )}
             >
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-70">
+              <p className="mb-0.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide opacity-70">
                 {m.role === 'user' ? 'Kunde' : 'KI'}
               </p>
               <p className="whitespace-pre-wrap">{m.content}</p>

@@ -1,7 +1,7 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
@@ -13,8 +13,8 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
 import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
 import { DetailSection } from '@/components/vorgang/DetailSection'
-import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
-import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
@@ -42,14 +42,13 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungDetailsTab } from '@/components/rechnungen/RechnungDetailsTab'
+import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
 import {
   RechnungAuftragdetailsTab,
   RechnungZahlplanTab,
 } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
@@ -59,6 +58,7 @@ import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { buildLeadVerlaufItems } from '@/lib/crm/verlauf'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
+import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
@@ -76,7 +76,10 @@ import {
 } from '@/lib/rechnungen/mahnverlauf'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
-import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
+import { naechsterSchrittRechnung } from '@/lib/crm/naechster-schritt'
+import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
+import { loadHandwerkerBewertungZiele } from '@/app/(dashboard)/auftraege/handwerker-bewertung-actions'
+import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
@@ -97,32 +100,36 @@ import type {
   RechnungStatus,
 } from '@/lib/types'
 
-type RechnungDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
+type RechnungDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
-const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
+const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
+  'uebersicht',
+  'leistungen',
+  'zahlung',
+  'akte',
+  'aktivitaet',
+])
+const RECHNUNG_DETAIL_DEFAULT_TAB: RechnungDetailTab = 'leistungen'
 
 function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase()
-  if (!tab) return null
+  if (!tab) return RECHNUNG_DETAIL_DEFAULT_TAB
+  if (tab === 'zahlung' || tab === 'zahlplan' || tab === 'finanzen') return 'zahlung'
+  if (tab === 'leistungen' || tab === 'leistung' || tab === 'positionen') return 'leistungen'
   if (
     tab === 'akte' ||
-    tab === 'stammdaten' ||
-    tab === 'zahlplan' ||
-    tab === 'zahlung' ||
-    tab === 'finanzen' ||
     tab === 'dokumente' ||
-    tab === 'notizen' ||
-    tab === 'auftragdetails' ||
-    tab === 'auftrag' ||
-    tab === 'auftrag-details'
+    tab === 'notizen'
   ) {
     return 'akte'
   }
   if (
     tab === 'uebersicht' ||
+    tab === 'stammdaten' ||
+    tab === 'auftragdetails' ||
+    tab === 'auftrag' ||
+    tab === 'auftrag-details' ||
     tab === 'details' ||
-    tab === 'positionen' ||
-    tab === 'leistung' ||
     tab === 'rechnung-details' ||
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
@@ -144,7 +151,7 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
     return 'aktivitaet'
   }
   if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
-  return null
+  return RECHNUNG_DETAIL_DEFAULT_TAB
 }
 
 function tageSeitFaelligkeit(faelligAm: string | null): number {
@@ -218,18 +225,16 @@ export function RechnungDetailClient({
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
-  const isCrmAdmin = useIsCrmAdmin()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [mainTab, setMainTab] = useState<RechnungDetailTab>('uebersicht')
-  const [akteSegment, setAkteSegment] = useState<AkteSegment>('zahlung')
+  const [mainTab, setMainTab] = useState<RechnungDetailTab>(RECHNUNG_DETAIL_DEFAULT_TAB)
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
+  const [bewertungOpen, setBewertungOpen] = useState(false)
+  const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
-  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
-  const [impersonating, setImpersonating] = useState(false)
   const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | 'korrigieren' | null>(
     null
   )
@@ -241,18 +246,15 @@ export function RechnungDetailClient({
   useEffect(() => {
     const raw = searchParams.get('tab')
     if (isLegacyDetailTabAlias(raw) || raw === 'auftragdetails' || raw === 'zahlplan') {
-      const resolved = resolveRechnungDetailTabFromQuery(raw) ?? 'uebersicht'
-      const seg = parseAkteSegment(raw, searchParams.get('segment'))
+      const resolved = resolveRechnungDetailTabFromQuery(raw) ?? RECHNUNG_DETAIL_DEFAULT_TAB
       const q = new URLSearchParams(searchParams.toString())
       q.set('tab', resolved)
-      if (resolved === 'akte') q.set('segment', seg)
-      else q.delete('segment')
+      q.delete('segment')
       router.replace(`/rechnungen/${detail.id}?${q.toString()}`, { scroll: false })
       return
     }
     const tab = resolveRechnungDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
-    setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
   }, [searchParams, detail.id, router])
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
@@ -540,47 +542,10 @@ export function RechnungDetailClient({
           statusKey: menuStatusKey,
           customer: {
             name: kundeName,
-            mail: kundeEmail || undefined,
           },
         },
         {
           onCopy: () => runDuplicateRechnung(detail.id, router),
-          onPortal: () => {
-            if (!isCrmAdmin || !kundeId) {
-              toast.error('Admin Login nur für CRM-Admins mit Kundenkonto')
-              return
-            }
-            if (impersonating) return
-            setImpersonating(true)
-            void openPortalAsKunde(kundeId).then((r) => {
-              setImpersonating(false)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              window.open(r.url, '_blank', 'noopener,noreferrer')
-            })
-          },
-          onPortalLink: () => {
-            if (!kundeId) {
-              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
-              return
-            }
-            setPortalLinkModalOpen(true)
-          },
-          onEdit2:
-            rechnungKorrekturModus(detail.status) !== 'gesperrt' ? handleKorrigieren : undefined,
-          onMarkPaid:
-            detail.status === 'gesendet' || ueberfaellig
-              ? () => void setStatus('bezahlt')
-              : undefined,
-          onPdf: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
-          onSend:
-            detail.status === 'storniert' || detail.status === 'bezahlt'
-              ? undefined
-              : handleSenden,
-          mail: kundeEmail || null,
-          onMail: () => mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
           onDelete: rechnungDarfHardGeloeschtWerden(detail.status)
             ? () => {
                 startTransition(async () => {
@@ -608,38 +573,61 @@ export function RechnungDetailClient({
     detail.id,
     detail.auftrag_id,
     kundeName,
-    kundeEmail,
-    kundeId,
     menuStatusKey,
-    pdfHref,
     ueberfaellig,
-    mailCompose,
-    router,
-    isCrmAdmin,
-    impersonating,
     nachfolgerRechnungId,
     darfStornoZuruecknehmen,
+    router,
+    refresh,
+    startTransition,
   ])
 
   const primaryAction = useMemo((): DetailActionDef | null => {
-    if (detail.status === 'entwurf') {
-      return {
-        label: 'Versenden',
-        icon: 'send',
-        onClick: handleSenden,
-        disabled: pending,
-      }
+    const cta = primaryCta('rechnung', detail.status, { ueberfaellig })
+    if (!cta) return null
+    if (cta.id === 'rechnung_versenden') {
+      return { label: cta.label, icon: cta.icon, onClick: handleSenden, disabled: pending }
     }
-    if (detail.status === 'gesendet' || ueberfaellig) {
+    if (cta.id === 'als_bezahlt') {
       return {
-        label: 'Bezahlt',
-        icon: 'check',
+        label: cta.label,
+        icon: cta.icon,
         onClick: () => void setStatus('bezahlt'),
         disabled: pending,
       }
     }
+    if (cta.id === 'mahnung_senden') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: () => setErinnerungModalOpen(true),
+        disabled: pending,
+      }
+    }
+    if (cta.id === 'bewertung_einholen') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: () => {
+          const auftragId = detail.auftrag_id?.trim()
+          if (!auftragId) {
+            toast.error('Keine Auftragsverknüpfung für Bewertung.')
+            return
+          }
+          startTransition(async () => {
+            const r = await loadHandwerkerBewertungZiele(auftragId)
+            if (!r.ok) {
+              toast.error(r.message)
+              return
+            }
+            setBewertungZiele(r.ziele)
+            setBewertungOpen(true)
+          })
+        },
+      }
+    }
     return null
-  }, [detail.status, ueberfaellig, pending, handleSenden, setStatus])
+  }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden, setStatus])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if ((detail.status === 'gesendet' || ueberfaellig) && ueberfaellig && belegTyp === 'rechnung') {
@@ -679,12 +667,29 @@ export function RechnungDetailClient({
     <>
       <RechnungDetailsTab detail={detail} lead={lead} zahlungszielFallback={zahlungszielFallback} />
       {ueberfaellig && !zeigtMahnverlauf ? (
-        <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--danger, #c0392b)' }}>
+        <p style={{ marginTop: 10, fontSize: 'var(--fs-meta)', color: 'var(--danger, #c0392b)' }}>
           Seit {tageUeberfaellig} Tag{tageUeberfaellig === 1 ? '' : 'en'} überfällig
           {mahnLabel ? ` · ${mahnLabel}` : ''}.
         </p>
       ) : null}
     </>
+  )
+
+  const leistungenInhalt = (
+    <LeistungenTab
+      phase="rechnung"
+      rows={leistungenFromAngebotPositionen(normalizeAngebotPositionen(detail.positionen ?? []), {
+        status: detail.status === 'bezahlt' ? 'bezahlt' : detail.status === 'gesendet' ? 'gestellt' : 'entwurf',
+        statusLabel:
+          detail.status === 'bezahlt'
+            ? 'Bezahlt'
+            : detail.status === 'gesendet'
+              ? 'Gestellt'
+              : 'Entwurf',
+      })}
+      onOpenDokument={openWizard}
+      emptyHint="Noch keine Positionen — im Rechnungs-Dokument anlegen."
+    />
   )
 
   const verlaufInhalt = (
@@ -719,7 +724,7 @@ export function RechnungDetailClient({
     <AnfrageNotizenTab leadId={leadId} notizen={notizenRows} onReload={() => refresh()} />
   ) : (
     <MockCard title="Notizen" icon="messages">
-      <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
         Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
       </div>
     </MockCard>
@@ -730,18 +735,19 @@ export function RechnungDetailClient({
       id: 'uebersicht',
       label: entityDetailTabLabel('uebersicht'),
       icon: 'list-details',
-      count: positionenCount || undefined,
       render: () => (
         <div className="space-y-6">
           <PhaseCardsBlock
             kontext={projektKontext}
             fromRef={{ kind: 'rechnung', id: detail.id }}
           />
+          {stammdatenInhalt}
+          {detailsInhalt}
+          <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
           <ZugehoerigListe
             kontext={projektKontext}
             fromRef={{ kind: 'rechnung', id: detail.id }}
           />
-          {detailsInhalt}
           {vorgangFotos.length > 0 ? (
             <DetailSection title="Fotos">
               <VorgangFotosTab fotos={vorgangFotos} />
@@ -751,38 +757,32 @@ export function RechnungDetailClient({
       ),
     },
     {
+      id: 'leistungen',
+      label: entityDetailTabLabel('leistungen'),
+      icon: 'tool',
+      count: positionenCount || undefined,
+      render: () => <div className="space-y-6">{leistungenInhalt}</div>,
+    },
+    {
+      id: 'zahlung',
+      label: entityDetailTabLabel('zahlung'),
+      icon: 'receipt',
+      render: () => (
+        <RechnungZahlplanTab
+          auftragDetail={auftragDetail}
+          rechnungen={auftragRechnungen}
+          aktuelleRechnungId={detail.id}
+        />
+      ),
+    },
+    {
       id: 'akte',
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       render: () => (
         <VorgangAkteTab
-          initialSegment={akteSegment}
-          onSegmentChange={(s) => {
-            setAkteSegment(s)
-            const q = new URLSearchParams(searchParams.toString())
-            q.set('tab', 'akte')
-            q.set('segment', s)
-            router.replace(`/rechnungen/${detail.id}?${q.toString()}`, { scroll: false })
-          }}
-          zahlung={
-            <RechnungZahlplanTab
-              auftragDetail={auftragDetail}
-              rechnungen={auftragRechnungen}
-              aktuelleRechnungId={detail.id}
-            />
-          }
-          dateien={
-            <div className="space-y-4">
-              {dokumenteInhalt}
-              {notizenInhalt}
-            </div>
-          }
-          kunde={
-            <div className="space-y-4">
-              {stammdatenInhalt}
-              <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
-            </div>
-          }
+          dateien={dokumenteInhalt}
+          notizen={notizenInhalt}
         />
       ),
     },
@@ -809,13 +809,66 @@ export function RechnungDetailClient({
       crumbBackHref="/vorgaenge?tab=rechnung"
       crumbBackLabel="Zurück zu Vorgängen"
       className="space-y-4 pb-0"
+      wiedervorlageDatum={detail.wiedervorlage_datum}
+      wiedervorlageNotiz={detail.wiedervorlage_notiz}
+      wiedervorlageEntity="rechnung"
+      wiedervorlageEntityId={detail.id}
+      onWiedervorlageSaved={() => refresh()}
+      nextStepMetrics={[
+        {
+          label: 'Betrag',
+          value: detail.brutto != null ? formatEurBetrag(detail.brutto) : '—',
+        },
+        {
+          label: 'Positionen',
+          value: String(positionenCount),
+        },
+        {
+          label: 'Fällig',
+          value: detail.faellig_am ? formatDatum(detail.faellig_am) : '—',
+        },
+      ]}
+      quickBar={[
+        {
+          id: 'call',
+          label: 'Anrufen',
+          icon: 'phone',
+          disabled: !detail.kunden?.telefon?.trim() && !lead?.kontakt_telefon?.trim(),
+          onClick: () => {
+            const tel =
+              detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
+          },
+        },
+        {
+          id: 'mail',
+          label: 'Mail',
+          icon: 'mail',
+          disabled: !kundeEmail,
+          onClick: () =>
+            mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
+        },
+        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setMainTab('akte') },
+        {
+          id: 'foto',
+          label: 'Foto',
+          icon: 'camera',
+          onClick: () => setMainTab('uebersicht'),
+        },
+      ]}
+      nextStep={naechsterSchrittRechnung({
+        status: detail.status,
+        ueberfaellig,
+        belegTyp,
+      })}
       head={{
         title: crumbTitle && crumbTitle !== '—' ? crumbTitle : kundeName,
         sub: headSub,
         badges: (
-          <MockBadge kind={variantToMockBadgeKind(rechnungStatus.variant)}>
-            {rechnungStatus.label}
-          </MockBadge>
+          <StatusBadge
+            status={ueberfaellig ? 'ueberfaellig' : detail.status}
+            label={rechnungStatus.label}
+          />
         ),
         meta: headMeta,
         actions: (
@@ -853,6 +906,16 @@ export function RechnungDetailClient({
         }}
       />
 
+      {detail.auftrag_id ? (
+        <HandwerkerBewertungModal
+          open={bewertungOpen}
+          onClose={() => setBewertungOpen(false)}
+          auftragId={detail.auftrag_id}
+          ziele={bewertungZiele}
+          onSaved={() => refresh()}
+        />
+      ) : null}
+
       {wizardOpen && wizardBootstrap && firm ? (
         <ClientOnly>
           <RechnungWizard
@@ -877,13 +940,6 @@ export function RechnungDetailClient({
 
       {mailCompose.modal}
 
-      <KundenportalLinkVersendenModal
-        open={portalLinkModalOpen}
-        onClose={() => setPortalLinkModalOpen(false)}
-        kundeId={kundeId}
-        fallbackEmail={kundeEmail}
-      />
-
       <Modal
         open={rechnungConfirm === 'gutschrift'}
         onClose={() => setRechnungConfirm(null)}
@@ -900,7 +956,7 @@ export function RechnungDetailClient({
           </>
         }
       >
-        <p className="text-[14px] text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Es entsteht ein Gutschrift-Beleg (negative Beträge). Die Originalrechnung wird als
           storniert markiert.
         </p>
@@ -922,7 +978,7 @@ export function RechnungDetailClient({
           </>
         }
       >
-        <p className="text-[14px] text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Es wird eine Storno-Gutschrift erstellt und eine neue Rechnung mit neuer Nummer als
           Entwurf angelegt.
         </p>

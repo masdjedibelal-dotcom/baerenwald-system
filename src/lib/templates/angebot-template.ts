@@ -360,10 +360,12 @@ function rechtshinweisePlain(
   const parts: string[] = []
   const lohn = ka?.lohn_netto ?? 0
   const pStyle = `margin:0 0 8px;font-size:8pt;color:${TEXT_PRIMARY};line-height:1.55;text-align:left;font-weight:400;`
-  if (rh.hinweis_35a && lohn > 0) {
+  if (rh.hinweis_35a) {
     parts.push(
       `<p style="${pStyle}">
-        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${euro(lohn)} kann bei der Einkommensteuer geltend gemacht werden.
+        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil${
+          lohn > 0 ? ` in Höhe von ${euro(lohn)}` : ''
+        } kann bei der Einkommensteuer geltend gemacht werden.
       </p>`
     )
   }

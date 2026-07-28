@@ -41,6 +41,10 @@ export type PosBoardLine = {
   variante_id?: string | null
   /** katalog | frei */
   position_quelle?: 'katalog' | 'frei' | null
+  /** Kundennotiz / Regie-Meta */
+  notizExtern?: string
+  /** Sichtbarer Regieschein-Chip auf Rechnung */
+  regieSchein?: boolean
 }
 
 function parseKostenverteilung(v: unknown): KostenVerteilung {
@@ -184,6 +188,8 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
         : varianteId
           ? 'katalog'
           : 'frei',
+    notizExtern: z.notizExtern,
+    regieSchein: z.regieSchein,
   }
 }
 
@@ -201,6 +207,8 @@ export function posBoardLineToDokumentArtikel(
       id: line.id,
       bezeichnung: line.name,
       positionBeschreibung: line.beschreibung,
+      notizExtern: line.notizExtern ?? base?.notizExtern,
+      regieSchein: line.regieSchein ?? base?.regieSchein,
       menge: line.menge,
       einheit: line.einheit,
       vkNetto: line.preis,

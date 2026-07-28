@@ -1,12 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockProp } from '@/components/mock-ui/MockProp'
-import { PosBoard } from '@/components/posboard/PosBoard'
-import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import type { LeadDetail, Rechnung, RechnungBelegTyp } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
@@ -46,7 +42,7 @@ function tageSeitFaelligkeit(faelligAm: string | null): number {
   return Math.floor((today.getTime() - due.getTime()) / 86400000)
 }
 
-/** Details: Rechnungsdaten · Zahlungsstatus · PosBoard Leistungen (ohne Projekt-Übersicht). */
+/** Details: Rechnungsdaten · Zahlungsstatus (Leistungen → shared LeistungenTab). */
 export function RechnungDetailsTab({
   detail,
   zahlungszielFallback = 14,
@@ -57,8 +53,6 @@ export function RechnungDetailsTab({
 }) {
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
-  const pos = normalizeAngebotPositionen(detail.positionen ?? [])
-  const lines = useMemo(() => angebotPositionenToPosBoardLines(pos), [pos])
 
   const tageUeber = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
   const ueberfaellig =
@@ -136,8 +130,6 @@ export function RechnungDetailsTab({
           <MockProp label="Status">{zahlungsText}</MockProp>
         </div>
       </MockCard>
-
-      <PosBoard title="Leistungen" positionen={lines} showUst />
     </>
   )
 }

@@ -30,7 +30,7 @@ export function RechnungWizardPdfPreview({
     return (
       <div
         className="card"
-        style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}
+        style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--fs-text)' }}
       >
         <MockIcon ctx="default" n="hourglass" size={22} />
         <div style={{ marginTop: 10 }}>Rechnungsvorschau wird vorbereitet…</div>
@@ -51,7 +51,7 @@ export function RechnungWizardPdfPreview({
           gap: 12,
         }}
       >
-        <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
           Vorschau konnte nicht geladen werden.
         </div>
         {pdfHref ? (
@@ -74,7 +74,7 @@ export function RechnungWizardPdfPreview({
           padding: '8px 12px',
           borderBottom: '0.5px solid var(--border)',
           background: 'var(--bg-soft)',
-          fontSize: 12,
+          fontSize: 'var(--fs-meta)',
           color: 'var(--text-3)',
         }}
       >

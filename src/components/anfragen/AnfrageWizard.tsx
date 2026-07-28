@@ -146,8 +146,8 @@ export function AnfrageWizard({
       <div style={{ maxWidth: 720, margin: '0 auto', width: '100%' }}>
         {step === 2 ? (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Prüfen</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Prüfen</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
               Angaben prüfen und speichern
             </div>
           </div>

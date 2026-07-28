@@ -262,18 +262,19 @@ export function AngebotWizard({
 
   const [mounted, setMounted] = useState(false)
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
+  const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
   const [step, setStep] = useState(() => {
     const s = Number(initialStep)
     if (Number.isFinite(s) && s >= 1 && s <= 5) return Math.floor(s)
     if (focusField === 'positionen') return 2
-    // Korrektur = Job „Leistungen anpassen“, nicht Typ-Wizard
-    if (bootstrap?.auftragKorrektur?.auftragId) return 2
+    // Korrektur / Nachtrag = Job „Leistungen anpassen“, nicht Typ-Wizard
+    if (bootstrap?.auftragKorrektur?.auftragId || bootstrap?.nachtragZu?.auftragId) return 2
     return 1
   })
 
   useEffect(() => {
-    if (istAuftragKorrektur && step === 1) setStep(2)
-  }, [istAuftragKorrektur, step])
+    if ((istAuftragKorrektur || istNachtrag) && step === 1) setStep(2)
+  }, [istAuftragKorrektur, istNachtrag, step])
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
       .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -329,7 +330,11 @@ export function AngebotWizard({
   const [zahlungsplan] = useState<Zahlungsplan | null>(() => bootstrap?.zahlungsplan ?? null)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
-  const wizardTitel = istAuftragKorrektur ? 'Angebot korrigieren' : 'Angebot erstellen'
+  const wizardTitel = istNachtrag
+    ? 'Nachtrag erstellen'
+    : istAuftragKorrektur
+      ? 'Angebot korrigieren'
+      : 'Angebot erstellen'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const savedSnapshotRef = useRef<string | null>(null)
@@ -738,6 +743,7 @@ export function AngebotWizard({
               ? zahlungsplan
               : null,
           auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
+          nachtragZuAuftragId: istNachtrag ? bootstrap?.nachtragZu?.auftragId ?? null : null,
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
@@ -788,6 +794,8 @@ export function AngebotWizard({
       zahlfristDatum,
       wiederkehr,
       hwZuweisungen,
+      istNachtrag,
+      bootstrap?.nachtragZu?.auftragId,
     ]
   )
 
@@ -975,7 +983,7 @@ export function AngebotWizard({
 
   if (!mounted) return null
 
-  const wizardSteps = istAuftragKorrektur
+  const wizardSteps = istAuftragKorrektur || istNachtrag
     ? [
         { id: 2, label: 'Positionen' },
         { id: 3, label: 'Fuß' },
@@ -984,7 +992,7 @@ export function AngebotWizard({
       ]
     : WIZARD_STEP_LABELS.map((label, i) => ({ id: i + 1, label }))
 
-  const minStep = istAuftragKorrektur ? 2 : 1
+  const minStep = istAuftragKorrektur || istNachtrag ? 2 : 1
 
   const wizardDesktopActions = (
     <div className="wizard-nav-actions">
@@ -1146,6 +1154,14 @@ export function AngebotWizard({
       docActions={docActions}
       className="wizard-flow"
     >
+      {istNachtrag ? (
+        <div
+          className="mb-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[length:var(--fs-text)] text-sky-950"
+          role="status"
+        >
+          Erweitert den bestehenden Auftrag — ersetzt ihn nicht.
+        </div>
+      ) : null}
       {/* P5.2: eine Scroll-Seite — Chips = Anker */}
       <nav className="document-section-nav" aria-label="Abschnitte">
         {wizardSteps.map((s) => (
@@ -1170,7 +1186,7 @@ export function AngebotWizard({
       <section id="section-1" className="document-canvas-sec">
         <>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 17, fontWeight: 600 }}>Angebotsart</div>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600 }}>Angebotsart</div>
           </div>
           <div className="wz-overview" style={{ marginBottom: 20 }}>
             <div>
@@ -1211,7 +1227,7 @@ export function AngebotWizard({
           <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
           <div className="h-sep" />
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 17, fontWeight: 600 }}>Projekt</div>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600 }}>Projekt</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
             <MockField label="Projekt-Titel" required>
@@ -1262,7 +1278,7 @@ export function AngebotWizard({
                 {projektFotos.length} Foto{projektFotos.length === 1 ? '' : 's'}
               </span>
             </div>
-            <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <MockIcon ctx="default" n="info-circle" size={12} /> Erscheint im Angebot zwischen
               Beschreibung und Leistungen
             </span>
@@ -1467,8 +1483,8 @@ export function AngebotWizard({
       <section id="section-5" className="document-canvas-sec">
         <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Versenden</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
               Empfänger und Betreff prüfen — Vorschau zeigt die echte Versand-Vorlage
             </div>
           </div>
@@ -1524,7 +1540,7 @@ export function AngebotWizard({
               marginBottom: 0,
               textTransform: 'none',
               letterSpacing: 0,
-              fontSize: 14,
+              fontSize: 'var(--fs-text)',
               fontWeight: 600,
             }}
           >
@@ -1541,7 +1557,7 @@ export function AngebotWizard({
 
           <div
             style={{
-              fontSize: 12.5,
+              fontSize: 'var(--fs-meta)',
               color: 'var(--text-3)',
               display: 'flex',
               alignItems: 'flex-start',

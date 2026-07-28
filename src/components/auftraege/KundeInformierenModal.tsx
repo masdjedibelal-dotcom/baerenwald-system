@@ -141,18 +141,18 @@ export function KundeInformierenModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Update an <strong>{kundeName}</strong>
           {scopeHint ? <> · {scopeHint}</> : null}. Notizen und Fotos des Abschnitts werden auf der
           Kunden-Statusseite angezeigt.
         </p>
 
         <div className="flex gap-3">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
             <input type="radio" checked={anrede === 'sie'} onChange={() => setAnrede('sie')} />
             Sie
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
             <input type="radio" checked={anrede === 'du'} onChange={() => setAnrede('du')} />
             Du
           </label>

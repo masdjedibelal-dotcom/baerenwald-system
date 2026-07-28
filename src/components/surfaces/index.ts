@@ -6,5 +6,6 @@ export {
   GroupedFieldCard,
   GroupedFieldRow,
   AddRowList,
+  CollapseRow,
   DocActionBar,
 } from './primitives'

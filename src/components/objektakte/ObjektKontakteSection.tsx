@@ -168,7 +168,7 @@ export function ObjektKontakteSection({
           </MockBtn>
         }
       >
-        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Hausmeister, Beirat, Notfallkontakte — für die Disposition.
         </p>
         {liste.length === 0 ? (
@@ -191,7 +191,7 @@ export function ObjektKontakteSection({
                       <div
                         className="lc-sub"
                         style={{
-                          fontSize: 12,
+                          fontSize: 'var(--fs-meta)',
                           fontWeight: 400,
                           color: 'var(--text-3)',
                           marginTop: 2,
@@ -292,7 +292,7 @@ export function ObjektKontakteSection({
             }}
             rows={3}
           />
-          {err ? <p className="text-sm text-danger">{err}</p> : null}
+          {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
         </div>
       </EditorSheet>
     </>

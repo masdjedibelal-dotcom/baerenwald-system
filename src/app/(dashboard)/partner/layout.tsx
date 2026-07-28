@@ -1,17 +1,4 @@
-import type { Metadata } from 'next'
-import { PartnerMasterDetailShell } from '@/components/partner/PartnerMasterDetailShell'
-import { loadPartnerListe } from '@/lib/partner/load-partner-liste'
-
-export const metadata: Metadata = {
-  title: 'Netzwerk',
-}
-
-export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
-  const { partners, kategorien } = await loadPartnerListe()
-
-  return (
-    <PartnerMasterDetailShell partners={partners} kategorien={kategorien}>
-      {children}
-    </PartnerMasterDetailShell>
-  )
+/** Spec §3: keine Partner-Master-Detail-Shell — Redirect in den Pages. */
+export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+  return children
 }

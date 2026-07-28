@@ -196,6 +196,24 @@ export function AuftragDokumenteTab({
 
   return (
     <div className="auftrag-dok-panel pb-4">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <a
+          className="btn ghost sm"
+          href={`/api/auftraege/${detail.id}/regiebericht-lebenszyklus`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Regiebericht PDF
+        </a>
+        <a
+          className="btn ghost sm"
+          href={`/api/auftraege/${detail.id}/bautagebuch-lebenszyklus`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Bautagebuch PDF
+        </a>
+      </div>
       <Card
         className="dshell-framed"
         collapsible={false}
@@ -212,7 +230,7 @@ export function AuftragDokumenteTab({
           </button>
         }
       >
-        <p className="mb-3 text-[12.5px] text-bw-text-muted">
+        <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
           Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise findest
           du im Tab <span className="font-medium text-bw-text">Compliance</span>.
         </p>
@@ -257,7 +275,7 @@ export function AuftragDokumenteTab({
         </div>
 
         {zeilen.length === 0 ? (
-          <p className="py-6 text-center text-sm text-bw-text-muted">Noch keine Dokumente.</p>
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Dokumente.</p>
         ) : (
           <div className="dok-list">
             <div className="list-row head" aria-hidden>
@@ -286,7 +304,7 @@ export function AuftragDokumenteTab({
                     size={18}
                     className="text-bw-text-muted"
                   />
-                  <div className="min-w-0 truncate text-[13px] font-medium text-bw-text">
+                  <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
                     {pdfReady && href ? (
                       <a
                         href={href}
@@ -300,17 +318,17 @@ export function AuftragDokumenteTab({
                       row.name
                     )}
                   </div>
-                  <div className="min-w-0 truncate text-[12.5px] text-bw-text-muted">
+                  <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
                     {row.beschreibung && row.beschreibung !== '—' ? row.beschreibung : '—'}
                   </div>
-                  <div className="whitespace-nowrap text-[12px] tabular-nums text-bw-text-muted">
+                  <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
                     {row.datum ? formatDatum(row.datum) : '—'}
                   </div>
                   <div>
                     {readOnly ? (
                       <span
                         className={cn(
-                          'text-[11.5px]',
+                          'text-[length:var(--fs-meta)]',
                           row.fuerKunde ? 'text-bw-primary' : 'text-bw-text-muted'
                         )}
                       >

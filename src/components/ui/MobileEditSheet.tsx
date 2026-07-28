@@ -84,7 +84,7 @@ export function MobileEditableBlock({
         {!hideEditButton && !disabled ? (
           <button
             type="button"
-            className="mt-2 text-[14px] font-medium text-bw-primary"
+            className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-primary"
             onClick={() => setSheetOpen(true)}
           >
             {editLabel}
@@ -112,7 +112,7 @@ export function MobileOverviewField({
   value: ReactNode
 }) {
   return (
-    <div className="flex justify-between gap-3 py-1 text-[14px]">
+    <div className="flex justify-between gap-3 py-1 text-[length:var(--fs-text)]">
       <span className="text-bw-text-muted">{label}</span>
       <span className="text-right text-bw-text">{value}</span>
     </div>

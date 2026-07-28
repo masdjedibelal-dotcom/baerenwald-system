@@ -168,7 +168,7 @@ export function KatalogPickModal({
         <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">
           {grouped.map(([gewerkName, items]) => (
             <div key={gewerkName}>
-              <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+              <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
                 {gewerkName}
               </div>
               <ul>
@@ -179,12 +179,12 @@ export function KatalogPickModal({
                     <li key={p.id} className="border-t border-bw-border/60">
                       <button
                         type="button"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-bw-surface-2"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2"
                         onClick={() => tryPickPosition(p)}
                       >
                         <span className="min-w-0 flex-1 font-medium">{p.titel}</span>
                         <MockBadge kind="fertig">{p.kategorie}</MockBadge>
-                        <span className="shrink-0 text-[11px] text-bw-text-muted">
+                        <span className="shrink-0 text-[length:var(--fs-meta)] text-bw-text-muted">
                           {p.varianten.length} Var.
                         </span>
                       </button>
@@ -194,7 +194,7 @@ export function KatalogPickModal({
                             <li key={v.id}>
                               <button
                                 type="button"
-                                className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[12px] ${
+                                className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[length:var(--fs-meta)] ${
                                   picked?.variante.id === v.id
                                     ? 'bg-emerald-50 text-emerald-950'
                                     : 'hover:bg-white'
@@ -220,14 +220,14 @@ export function KatalogPickModal({
 
         {picked ? (
           <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-            <p className="text-[12px] font-medium text-emerald-950">
+            <p className="text-[length:var(--fs-meta)] font-medium text-emerald-950">
               {picked.position.titel}
               {picked.variante.variante?.trim()
                 ? ` · ${picked.variante.variante}`
                 : ''}{' '}
               · {formatEurBetrag(picked.variante.preis)} / {picked.variante.einheit}
             </p>
-            <label className="block text-[11px] text-bw-text-muted">
+            <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
               Menge
               <input
                 className="sel mt-0.5 w-full"
@@ -236,7 +236,7 @@ export function KatalogPickModal({
                 inputMode="decimal"
               />
             </label>
-            <label className="block text-[11px] text-bw-text-muted">
+            <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
               Beschreibung
               <textarea
                 className="sel mt-0.5 w-full"

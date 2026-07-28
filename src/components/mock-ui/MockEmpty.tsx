@@ -25,7 +25,7 @@ export function MockEmpty({
         {typeof icon === 'string' ? <MockIcon ctx="empty" n={icon} size={32} /> : icon}
       </div>
       <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>{title}</div>
-      {hint ? <div style={{ fontSize: 12.5 }}>{hint}</div> : null}
+      {hint ? <div style={{ fontSize: 'var(--fs-meta)' }}>{hint}</div> : null}
       {action ? <div style={{ marginTop: 16 }}>{action}</div> : null}
     </div>
   )

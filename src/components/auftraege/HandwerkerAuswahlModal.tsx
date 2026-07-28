@@ -180,9 +180,9 @@ export function HandwerkerAuswahlModal({
         ) : null}
       </p>
 
-      {listErr ? <p className="mb-2 text-sm text-danger">{listErr}</p> : null}
+      {listErr ? <p className="mb-2 text-[length:var(--fs-text)] text-danger">{listErr}</p> : null}
       {loading ? (
-        <p className="text-sm text-bw-text-muted">Handwerker werden geladen…</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Handwerker werden geladen…</p>
       ) : (
         <div className="max-h-[min(56vh,480px)] space-y-2 overflow-y-auto pr-0.5">
           <HandwerkerPickAccordion

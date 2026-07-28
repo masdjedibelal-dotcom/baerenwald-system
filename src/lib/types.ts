@@ -219,9 +219,15 @@ export type Lead = {
   kostentraeger?: string | null
   kostentraeger_vorgeschlagen?: boolean | null
   versicherungs_nr?: string | null
+  duplikat_hinweis?: boolean | null
+  /** Spec zusammengefuehrtIn — Ziel-Lead; duplikat_hinweis bleibt Vorstufe */
+  zusammengefuehrt_in?: string | null
+  /** Spec Wiedervorlage (lokal am Vorgang) */
+  wiedervorlage_datum?: string | null
+  wiedervorlage_notiz?: string | null
+  /** CACHE only — Phase aus Existenz Angebot/Auftrag/RE ableiten, nie als einzige Quelle */
   vorgang_phase?: string | null
   melde_tracking_token?: string | null
-  duplikat_hinweis?: boolean | null
   /** Bauprojekt — erweiterte Unterlagen & Bautagesberichte */
   ist_bauprojekt?: boolean
   /** Bestand: wiederkehrende Leistung */
@@ -421,6 +427,14 @@ export type Angebot = {
   /** Bestand: wiederkehrendes Angebot */
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** Unverbindlicher Zahlplan-Vorschlag (Spec Q2) — Entscheidung im RE-Flow */
+  zahlungsplan?: unknown
+  /** Spec Ketten */
+  ersetzt_durch?: string | null
+  korrektur_von?: string | null
+  korrektur_art?: 'ueberarbeitet' | string | null
+  wiedervorlage_datum?: string | null
+  wiedervorlage_notiz?: string | null
   projektbeschreibung?: string | null
   /** Öffentliche Bild-URLs (JSON-Array in DB) */
   fotos_urls?: string[] | unknown | null
@@ -562,12 +576,16 @@ export type Auftrag = {
   /** Bestand: wiederkehrender Wartungs-/Service-Auftrag */
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** Spec letzteAktivitaet — persistiert beim Erledigen einer Position */
+  letzte_aktivitaet?: string | null
+  wiedervorlage_datum?: string | null
+  wiedervorlage_notiz?: string | null
   /** Positions-IDs, die im Bautagebuch ausgeblendet sind */
   bautagebuch_hidden_position_ids?: string[] | null
   /** Notfall-Direktbeauftragung — CRM-Banner (§4) */
   ist_notfall?: boolean
-  /** aufwand | festpreis — Abrechnungshinweis im Notfall-Banner */
-  notfall_verguetung?: 'aufwand' | 'festpreis' | string | null
+  /** Nur aufwand (Spec Q3) */
+  notfall_verguetung?: 'aufwand' | string | null
   /** HV-Plattform: Kostenträger (Rechnung/Versicherungsakte) */
   kostentraeger?: string | null
   versicherungs_nr?: string | null
@@ -997,6 +1015,8 @@ export type Handwerker = {
   partner_kategorien?: PartnerKategorie | null
   partner_dokumente?: PartnerDokument[] | null
   auth_user_id?: string | null
+  /** partner = aus Tabelle partner migriert; null/handwerker = nativ */
+  herkunft?: 'handwerker' | 'partner' | string | null
   /** Partner vom Portal ausgeschlossen — Login/Register gesperrt */
   ist_portal_gesperrt?: boolean | null
   portal_gesperrt_am?: string | null
@@ -1154,6 +1174,15 @@ export type Rechnung = {
   rechnungsnummer: string
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
+  /** Spec Ketten */
+  ersetzt_durch?: string | null
+  korrektur_von?: string | null
+  korrektur_art?: 'ersetzt' | 'gutschrift' | string | null
+  /** Spec Rate-Reklamation — strittig ohne Statuswechsel */
+  reklamation_am?: string | null
+  reklamation_grund?: string | null
+  wiedervorlage_datum?: string | null
+  wiedervorlage_notiz?: string | null
   reverse_charge_13b?: boolean
   hinweis_35a?: boolean | null
   mwst_aufschluesselung?: MwstAufschluesselungJson[] | null

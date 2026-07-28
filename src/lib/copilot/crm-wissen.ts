@@ -95,7 +95,7 @@ export const CRM_WISSEN: CrmWissenThema[] = [
       'Angebot vorbereiten/speichern',
       'Angebot senden',
       'Gültigkeit verlängern',
-      'Ablehnen / Auftrag anlegen',
+      'Ablehnen / Angebot annehmen',
     ],
     tools: [
       'prepare_angebot_wizard',
@@ -114,7 +114,7 @@ export const CRM_WISSEN: CrmWissenThema[] = [
     soFunktioniertEs: [
       'Entsteht aus akzeptiertem Angebot (nicht direkt „Neuer Auftrag“).',
       'Status: geplant → in Arbeit → zur Abnahme → abgeschlossen.',
-      'Tab Vor Ort: Leistungen, Tagebuch, Abnahme; Abschluss darunter.',
+      'Tab Leistungen: Positionen + Dokumentation; Abnahme über Canvas; Bautagebuch im Portal.',
       'Zahlplan/Abschläge führen zu Rechnungen.',
     ],
     typischeAktionen: [

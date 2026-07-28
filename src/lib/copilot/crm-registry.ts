@@ -516,7 +516,7 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'create_rechnung_entwurf',
       kategorie: 'rechnungen',
-      beschreibung: 'Rechnungs-Entwurf aus Auftrag anlegen',
+      beschreibung: 'Rechnungs-Entwurf aus Auftrag erstellen',
       params: ['auftrag_id'],
     },
     handler: async (p) => {
@@ -561,8 +561,8 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'send_zahlungserinnerung',
       kategorie: 'rechnungen',
-      beschreibung: 'Mahnung / Zahlungserinnerung senden (Stufe 1 oder 2)',
-      params: ['rechnung_id', 'stufe?'],
+      beschreibung: 'Zahlungserinnerung senden',
+      params: ['rechnung_id'],
       bestaetigung: true,
     },
     handler: async (p) => {

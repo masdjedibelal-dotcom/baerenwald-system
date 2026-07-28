@@ -58,10 +58,10 @@ export function MockDashboardClient({
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 13.5, color: 'var(--text-3)' }}>{dateStr}</div>
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>{dateStr}</div>
         <div
           style={{
-            fontSize: 22,
+            fontSize: 'var(--fs-head)',
             fontWeight: 650,
             letterSpacing: '-0.02em',
             marginTop: 2,
@@ -100,7 +100,7 @@ export function MockDashboardClient({
           >
             <div style={{ margin: -14 }}>
               {p.rows.length === 0 ? (
-                <div style={{ padding: 14, fontSize: 12.5, color: 'var(--text-4)' }}>
+                <div style={{ padding: 14, fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
                   Nichts offen
                 </div>
               ) : (
@@ -126,7 +126,7 @@ export function MockDashboardClient({
                     <div style={{ minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: 'var(--fs-text)',
                           fontWeight: 500,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -137,7 +137,7 @@ export function MockDashboardClient({
                       </div>
                       <div
                         style={{
-                          fontSize: 11.5,
+                          fontSize: 'var(--fs-meta)',
                           color: 'var(--text-3)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',

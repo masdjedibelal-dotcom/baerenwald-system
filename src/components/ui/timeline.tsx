@@ -18,7 +18,7 @@ export type TimelineItem = {
 /** Mock-Timeline: `.timeline` + `.tl-item` (+ `.gray` für offen). */
 export function Timeline({ items, className }: { items: TimelineItem[]; className?: string }) {
   if (!items.length) {
-    return <p className="text-sm text-bw-text-muted">Keine Aktivität.</p>
+    return <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Aktivität.</p>
   }
 
   return (
@@ -64,7 +64,7 @@ export function Timeline({ items, className }: { items: TimelineItem[]; classNam
                 className="link"
                 style={{
                   display: 'block',
-                  fontSize: 12,
+                  fontSize: 'var(--fs-meta)',
                   marginTop: 2,
                   background: 'none',
                   border: 'none',

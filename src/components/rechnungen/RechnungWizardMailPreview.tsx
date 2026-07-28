@@ -79,7 +79,7 @@ export function RechnungWizardMailPreview({
     <div style={{ display: 'grid', gap: 8, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div
         style={{
-          fontSize: 12,
+          fontSize: 'var(--fs-meta)',
           color: 'var(--text-3)',
           display: 'flex',
           flexDirection: 'column',
@@ -103,7 +103,7 @@ export function RechnungWizardMailPreview({
             borderRadius: 8,
             border: '0.5px solid var(--border)',
             background: 'var(--bg-soft)',
-            fontSize: 13,
+            fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
           }}
         >

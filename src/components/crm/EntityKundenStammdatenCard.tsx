@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/app-toast'
 import { saveKunde } from '@/app/actions/kunden'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { splitDeutscherVollname } from '@/lib/kunde-namen'
+import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -221,6 +222,11 @@ export function EntityKundenStammdatenCard({
         {!editing && eingegangen ? (
           <InlineEditField label="Eingegangen" editing={false} value={eingegangen} />
         ) : null}
+        <StammdatenPortalZeile
+          kundeId={kundeId}
+          fallbackEmail={draft.email}
+          editing={editing}
+        />
       </div>
     </InlineEditSection>
   )

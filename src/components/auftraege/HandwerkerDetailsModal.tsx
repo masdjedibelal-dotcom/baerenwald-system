@@ -98,7 +98,7 @@ export function HandwerkerDetailsModal({
 
   const body = (
     <>
-      <p className="mb-3 text-sm text-bw-text-muted">
+      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
         Intern: Preis, Absprachen und Notizen zur Handwerker-Zuweisung.
       </p>
       <div className="space-y-3">

@@ -81,7 +81,7 @@ function FotoBeschreibungField({
       label="Beschreibung"
       value={
         hasText ? (
-          <RichTextContent html={foto.beschreibung} className="text-sm" />
+          <RichTextContent html={foto.beschreibung} className="text-[length:var(--fs-text)]" />
         ) : (
           <span className="text-bw-text-muted">Keine Beschreibung</span>
         )
@@ -113,7 +113,7 @@ function FotoBeschreibungField({
       <span className="wizard-projekt-field-label">Beschreibung</span>
       <button
         type="button"
-        className="wizard-foto-beschreibung-read w-full text-left text-[13px] leading-snug text-bw-text"
+        className="wizard-foto-beschreibung-read w-full text-left text-[length:var(--fs-text)] leading-snug text-bw-text"
         onClick={onStartEdit}
         disabled={disabled}
       >
@@ -172,7 +172,7 @@ function WizardFotoRow({
           {onVisualisieren ? (
             <button
               type="button"
-              className="btn ghost sm gap-1 px-2 py-1 text-xs"
+              className="btn ghost sm gap-1 px-2 py-1 text-[length:var(--fs-meta)]"
               title="KI-Visualisierung für dieses Foto"
               disabled={disabled || visualisierenLoading}
               onClick={onVisualisieren}
@@ -304,7 +304,7 @@ export function AngebotWizardFotodokumentation({
       <div className={cn(unselectedNotiz.length > 0 && 'mt-3')}>
         <label
           className={cn(
-            'wizard-foto-upload flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-bw-border bg-bw-hover/40 p-3 text-center text-[13px] text-bw-text-muted transition-colors',
+            'wizard-foto-upload flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-bw-border bg-bw-hover/40 p-3 text-center text-[length:var(--fs-text)] text-bw-text-muted transition-colors',
             isDragging && 'border-bw-link bg-blue-50',
             uploadBlocked && 'pointer-events-none opacity-60'
           )}
@@ -374,7 +374,7 @@ export function AngebotWizardFotodokumentation({
               return cap ? (
                 <RichTextContent
                   html={cap}
-                  className="max-w-prose text-center text-[12px] leading-snug text-bw-text-muted"
+                  className="max-w-prose text-center text-[length:var(--fs-meta)] leading-snug text-bw-text-muted"
                 />
               ) : null
             })()}

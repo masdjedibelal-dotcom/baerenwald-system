@@ -55,7 +55,7 @@ export function AngebotPositionDetailModal({
           <div className="col-span-full">
             <dt>Beschreibung</dt>
             <dd>
-              <RichTextContent html={besch} className="text-sm text-bw-text" />
+              <RichTextContent html={besch} className="text-[length:var(--fs-text)] text-bw-text" />
             </dd>
           </div>
         ) : null}

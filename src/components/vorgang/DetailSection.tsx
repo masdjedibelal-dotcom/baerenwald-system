@@ -22,9 +22,9 @@ export function DetailSection({
   return (
     <section className={cn('detail-section', className)}>
       <header className="detail-section__head">
-        <h3 className="text-headline detail-section__title">{title}</h3>
+        <h3 className="text-[length:var(--fs-head)] detail-section__title">{title}</h3>
         {count != null && count !== '' ? (
-          <span className="text-footnote detail-section__count">{count}</span>
+          <span className="text-[length:var(--fs-meta)] detail-section__count">{count}</span>
         ) : null}
         {action ? <div className="detail-section__action">{action}</div> : null}
       </header>

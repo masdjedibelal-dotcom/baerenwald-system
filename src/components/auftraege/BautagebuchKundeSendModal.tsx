@@ -143,7 +143,7 @@ export function BautagebuchKundeSendModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           <strong>{eintrag.titel}</strong> — E-Mail an <strong>{kundeName}</strong> mit Gewerk-Phase und
           Bautagebuch-Update.
         </p>
@@ -157,7 +157,7 @@ export function BautagebuchKundeSendModal({
           dokumentLabel="Projekt-Update"
         />
 
-        <div className="flex gap-4 border-b border-bw-border pb-4 text-sm">
+        <div className="flex gap-4 border-b border-bw-border pb-4 text-[length:var(--fs-text)]">
           <label className="flex items-center gap-2">
             <input type="radio" checked={anrede === 'sie'} onChange={() => onAnredeChange('sie')} />
             Sie
@@ -173,7 +173,7 @@ export function BautagebuchKundeSendModal({
         {previewHtml ? (
           <CollapsibleMailPreview previewHtml={previewHtml} />
         ) : mailReady ? (
-          <p className="py-6 text-center text-[13px] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
         ) : null}
 
         <Textarea

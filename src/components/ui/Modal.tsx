@@ -30,7 +30,7 @@ const SIZE_WIDTH: Record<NonNullable<ModalProps['size']>, string> = {
   xl: 'min(96vw, 56rem)',
 }
 
-/** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. Kanonisch für CRM. */
+/** Legacy-Name „Modal“ — Layout Spec §6: Desktop Slide-over, Mobil Bottom Sheet. Portal body. */
 export function Modal({
   open,
   onClose,

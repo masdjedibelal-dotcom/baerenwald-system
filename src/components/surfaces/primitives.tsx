@@ -80,6 +80,25 @@ export function AddRowList({
   )
 }
 
+export function CollapseRow({
+  summary,
+  children,
+  defaultOpen = false,
+  className,
+}: {
+  summary: ReactNode
+  children?: ReactNode
+  defaultOpen?: boolean
+  className?: string
+}) {
+  return (
+    <details className={cn('bw-collapse-row', className)} open={defaultOpen || undefined}>
+      <summary className="bw-collapse-row__summary">{summary}</summary>
+      {children ? <div className="bw-collapse-row__body">{children}</div> : null}
+    </details>
+  )
+}
+
 export function DocActionBar({
   actions,
   className,

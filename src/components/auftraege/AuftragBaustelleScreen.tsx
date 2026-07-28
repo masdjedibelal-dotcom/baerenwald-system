@@ -30,8 +30,8 @@ export function AuftragBaustelleScreen({
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
-            <p className="text-xs text-bw-text-muted">{subtitle}</p>
-            <h1 className="truncate text-base font-semibold text-bw-text">{title}</h1>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">{subtitle}</p>
+            <h1 className="truncate text-[length:var(--fs-title)] font-semibold text-bw-text">{title}</h1>
           </div>
         </div>
       }

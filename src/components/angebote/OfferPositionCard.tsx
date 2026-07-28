@@ -1,6 +1,8 @@
 'use client'
 
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Combobox, COMBOBOX_OPTION_THRESHOLD } from '@/components/ui/Combobox'
+import { Select } from '@/components/ui/Select'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -73,44 +75,58 @@ export function OfferPositionCard({
 
   return (
     <article
-      className={cn('overflow-hidden rounded-xl border border-bw-border bg-bw-card')}
+      className={cn('offer-pos-row overflow-hidden border-0 bg-transparent')}
     >
       <header className="flex flex-wrap items-center gap-2 border-b border-bw-border bg-bw-hover/40 px-3 py-2.5 sm:px-4">
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-sm font-semibold text-primary"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[length:var(--fs-text)] font-semibold text-primary"
           aria-hidden
         >
           {index + 1}
         </span>
         <label className="min-w-[140px] flex-1 space-y-0.5">
           <span className="sr-only">Gewerk</span>
-          <select
+          <Select
             value={row.gewerk_id}
             onChange={(e) => onGewerkChange(e.target.value)}
-            className="w-full min-h-[40px] rounded-lg border border-bw-border bg-surface px-2.5 text-sm font-medium text-ink focus:border-primary focus:ring-2 focus:ring-primary"
-          >
-            {gewerkSelectOptions.map((o) => (
-              <option key={o.value || '_'} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            className="w-full min-h-[40px] rounded-lg border border-bw-border bg-surface px-2.5 text-[length:var(--fs-text)] font-medium text-ink focus:border-primary focus:ring-2 focus:ring-primary"
+            options={gewerkSelectOptions}
+            placeholder="Gewerk wählen"
+          />
         </label>
         <label className="min-w-[160px] flex-[2] space-y-0.5">
           <span className="sr-only">Leistung</span>
-          <select
-            value={row.preisliste_id}
-            onChange={(e) => onPreislisteChange(e.target.value)}
-            disabled={!row.gewerk_id}
-            className="w-full min-h-[40px] rounded-lg border border-bw-border bg-surface px-2.5 text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
-          >
-            <option value="">Leistung wählen</option>
-            {preislistenForGewerk.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.leistung}
-              </option>
-            ))}
-          </select>
+          {preislistenForGewerk.length > COMBOBOX_OPTION_THRESHOLD ? (
+            <Combobox
+              value={row.preisliste_id}
+              onChange={onPreislisteChange}
+              disabled={!row.gewerk_id}
+              placeholder="Leistung wählen"
+              options={[
+                { value: '', label: 'Leistung wählen' },
+                ...preislistenForGewerk.map((p) => ({
+                  value: p.id,
+                  label: p.leistung,
+                  sub: p.einheit ? `Einheit ${p.einheit}` : undefined,
+                })),
+              ]}
+            />
+          ) : (
+            <Select
+              value={row.preisliste_id}
+              onChange={(e) => onPreislisteChange(e.target.value)}
+              disabled={!row.gewerk_id}
+              className="w-full min-h-[40px] rounded-lg border border-bw-border bg-surface px-2.5 text-[length:var(--fs-text)] text-ink focus:border-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
+              placeholder="Leistung wählen"
+              options={[
+                { value: '', label: 'Leistung wählen' },
+                ...preislistenForGewerk.map((p) => ({
+                  value: p.id,
+                  label: p.leistung,
+                })),
+              ]}
+            />
+          )}
         </label>
         <button
           type="button"
@@ -124,7 +140,7 @@ export function OfferPositionCard({
 
       <div className="grid gap-4 p-3 sm:grid-cols-2 sm:p-4">
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-light">Kalkulation (Kundensicht)</p>
+          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-light">Kalkulation (Kundensicht)</p>
           <div
             className={cn(
               'rounded-lg border border-bw-border bg-bw-hover/30 p-3',
@@ -132,16 +148,16 @@ export function OfferPositionCard({
             )}
           >
             {hervorhebePreise ? (
-              <p className="mb-2 text-xs font-medium text-amber-950">Preis prüfen (Vorlage/Kopie).</p>
+              <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-amber-950">Preis prüfen (Vorlage/Kopie).</p>
             ) : null}
-            <p className="mb-2 text-xs font-medium text-bw-text-mid">Lohn (netto / Einheit)</p>
+            <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-mid">Lohn (netto / Einheit)</p>
             <EuroNettoInput
               value={row.lohn_netto}
               onChange={(lohn_netto) => onPatch({ lohn_netto })}
             />
           </div>
           <div className="rounded-lg border border-bw-border bg-bw-hover/30 p-3">
-            <p className="mb-2 text-xs font-medium text-bw-text-mid">Material (netto / Einheit)</p>
+            <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-mid">Material (netto / Einheit)</p>
             <EuroNettoInput
               value={row.material_netto}
               onChange={(material_netto) => onPatch({ material_netto })}
@@ -172,25 +188,43 @@ export function OfferPositionCard({
         </div>
 
         <div className="space-y-3 border-t border-bw-border pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-light">Ausführung</p>
+          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-light">Ausführung</p>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-ink">Zugeordneter Handwerker</span>
-            <select
-              value={row.handwerker_id}
-              onChange={(e) => onPatch({ handwerker_id: e.target.value })}
-              disabled={!row.gewerk_id}
-              className="w-full min-h-[44px] rounded-lg border border-bw-border bg-surface px-3 text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
-            >
-              <option value="">— Keine Zuordnung —</option>
-              {handwerkerForGewerk.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {hwLabel(h)}
-                </option>
-              ))}
-            </select>
+            <span className="text-[length:var(--fs-text)] font-medium text-ink">Zugeordneter Handwerker</span>
+            {handwerkerForGewerk.length > COMBOBOX_OPTION_THRESHOLD ? (
+              <Combobox
+                value={row.handwerker_id}
+                onChange={(handwerker_id) => onPatch({ handwerker_id })}
+                disabled={!row.gewerk_id}
+                placeholder="— Keine Zuordnung —"
+                options={[
+                  { value: '', label: '— Keine Zuordnung —' },
+                  ...handwerkerForGewerk.map((h) => ({
+                    value: h.id,
+                    label: hwLabel(h),
+                    sub: [h.telefon, h.email].filter(Boolean).join(' · ') || undefined,
+                  })),
+                ]}
+              />
+            ) : (
+              <Select
+                value={row.handwerker_id}
+                onChange={(e) => onPatch({ handwerker_id: e.target.value })}
+                disabled={!row.gewerk_id}
+                className="w-full min-h-[44px] rounded-lg border border-bw-border bg-surface px-3 text-[length:var(--fs-text)] text-ink focus:border-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
+                placeholder="— Keine Zuordnung —"
+                options={[
+                  { value: '', label: '— Keine Zuordnung —' },
+                  ...handwerkerForGewerk.map((h) => ({
+                    value: h.id,
+                    label: hwLabel(h),
+                  })),
+                ]}
+              />
+            )}
           </label>
           {selectedHandwerker ? (
-            <p className="text-xs text-bw-text-muted">
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               {[selectedHandwerker.telefon, selectedHandwerker.email].filter(Boolean).join(' · ') ||
                 'Keine Kontaktdaten hinterlegt.'}
             </p>
@@ -198,7 +232,7 @@ export function OfferPositionCard({
 
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-lg border border-dashed border-bw-border bg-bw-hover/30 px-3 py-2 text-left text-sm font-medium text-ink hover:bg-bw-hover/60"
+            className="flex w-full items-center justify-between rounded-lg border border-dashed border-bw-border bg-bw-hover/30 px-3 py-2 text-left text-[length:var(--fs-text)] font-medium text-ink hover:bg-bw-hover/60"
             onClick={() => onPatch({ guInternOpen: !row.guInternOpen })}
           >
             <span>GU-Intern</span>
@@ -222,7 +256,7 @@ export function OfferPositionCard({
                 }}
               />
               {ekZeile != null ? (
-                <p className="text-xs text-bw-text-muted">
+                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   Marge (Zeile):{' '}
                   <span className="font-medium text-ink">
                     {margeEuro != null ? `${margeEuro.toLocaleString('de-DE')} €` : '—'}
@@ -232,7 +266,7 @@ export function OfferPositionCard({
                   ) : null}
                 </p>
               ) : (
-                <p className="text-xs text-bw-text-muted">EK eintragen für Marge-Hinweis.</p>
+                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">EK eintragen für Marge-Hinweis.</p>
               )}
               <Textarea
                 label="Notiz intern"
@@ -253,7 +287,7 @@ export function OfferPositionCard({
       </div>
 
       <footer className="border-t border-bw-border bg-bw-hover/25 px-3 py-2.5 sm:px-4">
-        <p className="text-right text-sm font-bold text-ink">
+        <p className="text-right text-[length:var(--fs-text)] font-bold text-ink">
           Gesamtpreis Position:{' '}
           <span className="tabular-nums">{nettoZeile.toLocaleString('de-DE')}</span> € netto
         </p>

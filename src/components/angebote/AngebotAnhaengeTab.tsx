@@ -146,7 +146,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
                 />
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 'var(--fs-text)',
                     fontWeight: 500,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -157,7 +157,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 12.5,
+                    fontSize: 'var(--fs-meta)',
                     color: 'var(--text-3)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -166,10 +166,10 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
                 >
                   {d.beschreibung || <span style={{ color: 'var(--text-4)' }}>—</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                   {formatDatum(d.created_at)}
                 </div>
-                <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>intern</span>
+                <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>intern</span>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
                 </div>
@@ -215,7 +215,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
                 size={44}
                 style={{ color: 'var(--text-4)' }}
               />
-              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 10 }}>{view.name}</div>
+              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500, marginTop: 10 }}>{view.name}</div>
               <a
                 href={view.href}
                 target="_blank"

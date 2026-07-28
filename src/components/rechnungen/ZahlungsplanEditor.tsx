@@ -54,11 +54,11 @@ function LeistungsMultiSelect({
     <div className="relative">
       <button
         type="button"
-        className="field w-full rounded-lg border border-bw-border bg-[var(--app-card)] px-3 py-2 text-left text-sm"
+        className="field w-full rounded-lg border border-bw-border bg-[var(--app-card)] px-3 py-2 text-left text-[length:var(--fs-text)]"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span className="field-l mb-1 block text-[11px] text-bw-text-muted">Leistungen</span>
+        <span className="field-l mb-1 block text-[length:var(--fs-meta)] text-bw-text-muted">Leistungen</span>
         <span className="flex items-center justify-between gap-2 text-bw-text">
           <span className="truncate">{label}</span>
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -78,7 +78,7 @@ function LeistungsMultiSelect({
               return (
                 <li key={p.id}>
                   <label
-                    className={`flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm ${
+                    className={`flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[length:var(--fs-text)] ${
                       blocked ? 'cursor-not-allowed opacity-45' : 'hover:bg-bw-hover/60'
                     }`}
                   >
@@ -92,7 +92,7 @@ function LeistungsMultiSelect({
                     <span className="min-w-0">
                       <span className="block text-bw-text">{positionAnzeigeLabel(p)}</span>
                       {blocked ? (
-                        <span className="text-[11px] text-bw-text-muted">Bereits anderem Abschlag zugeordnet</span>
+                        <span className="text-[length:var(--fs-meta)] text-bw-text-muted">Bereits anderem Abschlag zugeordnet</span>
                       ) : null}
                     </span>
                   </label>
@@ -211,7 +211,7 @@ export function ZahlungsplanEditor({
                   />
                 </label>
                 <div className="flex items-end justify-between gap-2 sm:col-span-2">
-                <div className="text-xs text-bw-text-muted">
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   <div>Plan netto {formatEurBetrag(z.netto)}</div>
                   <div>Plan brutto {formatEurBetrag(z.brutto)}</div>
                 </div>
@@ -231,7 +231,7 @@ export function ZahlungsplanEditor({
               {showLeistungsAuswahl && positionen.length > 0 ? (
                 <div className="mt-3 border-t border-bw-border pt-3">
                   {z.istSchluss ? (
-                    <p className="text-xs text-bw-text-muted">
+                    <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                       <span className="font-medium text-bw-text">Leistungen (automatisch): </span>
                       {schlussPositionen.length
                         ? schlussPositionen.map((p) => positionAnzeigeLabel(p)).join(' · ')
@@ -285,12 +285,12 @@ export function ZahlungsplanEditor({
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Abschlag hinzufügen
         </button>
-        <p className="text-xs text-bw-text-muted">
+        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
           Auftragssumme netto {formatEurBetrag(gesamtNetto)} · brutto {formatEurBetrag(kontext.gesamtBrutto)}
         </p>
       </div>
       {!sumGate.ok ? (
-        <p className="m-0 text-xs font-medium text-bw-danger" role="alert">
+        <p className="m-0 text-[length:var(--fs-meta)] font-medium text-bw-danger" role="alert">
           {sumGate.message}
         </p>
       ) : null}

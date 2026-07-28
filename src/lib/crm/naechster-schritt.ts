@@ -101,3 +101,45 @@ export function naechsterSchrittAuftrag(input: {
     hint: 'Leistungen prüfen — Vor-Ort-Doku im Portal, danach Abschluss und Rechnung.',
   }
 }
+
+export function naechsterSchrittRechnung(input: {
+  status: string
+  ueberfaellig?: boolean
+  belegTyp?: string | null
+}): NaechsterSchrittHint | null {
+  if (input.belegTyp === 'gutschrift') {
+    return {
+      label: 'Als Nächstes',
+      hint: 'Gutschrift prüfen und ggf. an den Kunden senden.',
+    }
+  }
+  if (input.status === 'storniert') return null
+  if (input.status === 'bezahlt') {
+    return {
+      label: 'Als Nächstes',
+      hint: 'Bezahlt — bei Bedarf Bewertung oder Unterlagen nachziehen.',
+    }
+  }
+  if (input.ueberfaellig || input.status === 'ueberfaellig') {
+    return {
+      label: 'Als Nächstes',
+      hint: 'Überfällig — Mahnung senden oder Zahlung erfassen.',
+    }
+  }
+  if (input.status === 'gesendet' || input.status === 'versendet') {
+    return {
+      label: 'Als Nächstes',
+      hint: 'Auf Zahlung warten — oder als bezahlt markieren.',
+    }
+  }
+  if (input.status === 'entwurf') {
+    return {
+      label: 'Als Nächstes',
+      hint: 'Positionen prüfen — dann Rechnung versenden.',
+    }
+  }
+  return {
+    label: 'Als Nächstes',
+    hint: 'Rechnungsstatus prüfen und nächsten Schritt setzen.',
+  }
+}

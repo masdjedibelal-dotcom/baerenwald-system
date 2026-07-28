@@ -108,6 +108,10 @@ export type VorgangListeRow = ResolvedVorgang & {
   wiederkehr_turnus?: string | null
   /** FAB-/Direktrechnung ohne Anfrage-/Auftrags-Verknüpfung. */
   standalone?: boolean
+  kontaktTelefon?: string | null
+  kontaktEmail?: string | null
+  /** Ersetzt-Kette (Angebot/Rechnung). */
+  ersetzt_durch?: string | null
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

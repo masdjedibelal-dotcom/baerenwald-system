@@ -161,7 +161,7 @@ export function KundenObjektModal({
         </div>
 
         <div className="border-t border-bw-border pt-3">
-          <p className="mb-2 text-[12px] font-medium text-bw-text">Meldeformular</p>
+          <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text">Meldeformular</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <Input
@@ -175,7 +175,7 @@ export function KundenObjektModal({
               Vorschlag
             </Button>
           </div>
-          <label className="mt-2 flex items-center gap-2 text-[13px] text-bw-text">
+          <label className="mt-2 flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text">
             <input
               type="checkbox"
               checked={meldeAktiv}
@@ -200,7 +200,7 @@ export function KundenObjektModal({
           />
         </div>
 
-        {err ? <p className="text-sm text-danger">{err}</p> : null}
+        {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
       </div>
     </EditorSheet>
   )

@@ -38,7 +38,7 @@ export function PageHeader({
         >
           {description ? (
             <div className="min-w-0">
-              <p className="text-sm text-bw-text-muted">{description}</p>
+              <p className="text-[length:var(--fs-text)] text-bw-text-muted">{description}</p>
             </div>
           ) : null}
           {action ? (

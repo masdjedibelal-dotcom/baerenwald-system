@@ -3,15 +3,16 @@
 import { useEffect, useState, useTransition } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { notfallDirektBeauftragen } from '@/app/(dashboard)/auftraege/notfall-direkt-actions'
 import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
-import type { PositionVerguetung } from '@/lib/auftraege/position-lebenszyklus'
 
 /**
- * Dialog Notfall / Direkt beauftragen (§4): Partner + Stundensatz oder Festpreis.
- * Stunden werden nicht vorab erfasst — Abrechnung später über Rechnung / Bautagebuch.
+ * Phase 9 / Spec §10: Notfall-Direktauftrag — nur Aufwand, ohne Cap-UI, ohne Festpreis-Zweig.
+ * Felder: Handwerker · Stundensatz + Materialaufschlag · Leistungsumfang · Beauftragen.
  */
 export function NotfallDirektBeauftragenModal({
   open,
@@ -34,18 +35,19 @@ export function NotfallDirektBeauftragenModal({
   const [pending, startTransition] = useTransition()
   const [handwerker, setHandwerker] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [hwId, setHwId] = useState('')
-  const [verguetung, setVerguetung] = useState<PositionVerguetung>('aufwand')
-  const [betrag, setBetrag] = useState('')
+  const [stundensatz, setStundensatz] = useState('')
+  const [materialaufschlag, setMaterialaufschlag] = useState('')
+  const [leistungsumfang, setLeistungsumfang] = useState('')
 
   const fromAnfrage = variant === 'anfrage'
   const title = fromAnfrage ? 'Notfall melden' : 'Direkt beauftragen'
-  const submitLabel = fromAnfrage ? 'Auftrag anlegen' : 'Direkt beauftragen'
   const gewerkLabel = gewerkName?.trim() || 'Gewerk'
 
   useEffect(() => {
     if (!open) return
-    setBetrag('')
-    setVerguetung('aufwand')
+    setStundensatz('')
+    setMaterialaufschlag('')
+    setLeistungsumfang('')
     void listHandwerkerAuswahlFuerGewerk({}).then((r) => {
       if (!r.ok) {
         toast.error(r.message)
@@ -61,37 +63,41 @@ export function NotfallDirektBeauftragenModal({
 
   function submit() {
     if (!hwId) {
-      toast.error('Bitte Partner wählen.')
+      toast.error('Bitte Handwerker wählen.')
       return
     }
-    const betragNum = betrag.trim() ? Number(betrag.replace(',', '.')) : NaN
-    if (!Number.isFinite(betragNum) || betragNum <= 0) {
-      toast.error(
-        verguetung === 'aufwand'
-          ? 'Bitte Stundensatz angeben.'
-          : 'Bitte Festpreis angeben.'
-      )
+    const satzNum = stundensatz.trim() ? Number(stundensatz.replace(',', '.')) : NaN
+    if (!Number.isFinite(satzNum) || satzNum <= 0) {
+      toast.error('Bitte Stundensatz angeben.')
       return
     }
+    const matRaw = materialaufschlag.trim()
+    const matNum = matRaw ? Number(matRaw.replace(',', '.')) : 0
+    if (matRaw && (!Number.isFinite(matNum) || matNum < 0)) {
+      toast.error('Materialaufschlag ungültig.')
+      return
+    }
+    const bullets = leistungsumfang
+      .split('\n')
+      .map((l) => l.replace(/^[-•*]\s*/, '').trim())
+      .filter(Boolean)
+
     startTransition(async () => {
       const r = await notfallDirektBeauftragen({
         auftragId,
         leadId,
         handwerkerId: hwId,
-        verguetung,
-        betragNetto: betragNum,
+        verguetung: 'aufwand',
+        betragNetto: satzNum,
+        materialaufschlagPct: matNum > 0 ? matNum : null,
+        leistungsumfang: bullets,
         gewerkName: gewerkName ?? 'Allgemein',
-        ohneDeckel: true,
       })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success(
-        fromAnfrage
-          ? 'Notfall-Auftrag angelegt'
-          : 'Notfall direkt beauftragt (ohne Deckel)'
-      )
+      toast.success(fromAnfrage ? 'Notfall-Auftrag angelegt' : 'Notfall beauftragt — nach Aufwand')
       onClose()
       onDone?.(r.auftragId)
     })
@@ -100,16 +106,16 @@ export function NotfallDirektBeauftragenModal({
   return (
     <Modal open={open} onClose={onClose} title={title} size="md">
       <div className="space-y-4 p-1">
-        <p className="text-[13px] text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           {fromAnfrage
-            ? `Aus der Anfrage wird direkt ein Auftrag mit Regie-Leistung „Notfalleinsatz [${gewerkLabel}]“ angelegt. Stunden später über Bautagebuch — daraus entsteht die Rechnung.`
-            : `Notfall ohne Betragsdeckel. Es wird automatisch eine Regie-Position „Notfalleinsatz [${gewerkLabel}]“ angelegt. Stunden nicht vorab — Abrechnung über Rechnung.`}
+            ? `Direktauftrag ohne Angebot: Notfalleinsatz [${gewerkLabel}] als Position nach Aufwand. Stunden später über Bautagebuch → Rechnung.`
+            : `Direktauftrag ohne Angebot mit Position nach Aufwand („Notfalleinsatz [${gewerkLabel}]“). Festpreis läuft über Angebot annehmen.`}
         </p>
 
-        <label className="block text-[12px] font-medium text-bw-text">
-          Partner
+        <label className="block text-[length:var(--fs-meta)] font-medium text-bw-text">
+          Handwerker zuordnen
           <select
-            className="mt-1 w-full rounded-md border border-bw-border bg-white px-3 py-2 text-[13px]"
+            className="mt-1 w-full rounded-md border border-bw-border bg-white px-3 py-2 text-[length:var(--fs-text)]"
             value={hwId}
             onChange={(e) => setHwId(e.target.value)}
           >
@@ -123,64 +129,42 @@ export function NotfallDirektBeauftragenModal({
           </select>
         </label>
 
-        <fieldset className="space-y-2">
-          <legend className="text-[12px] font-medium text-bw-text">Vergütung</legend>
-          <label className="flex items-center gap-2 text-[13px]">
-            <input
-              type="radio"
-              name="verguetung"
-              checked={verguetung === 'aufwand'}
-              onChange={() => setVerguetung('aufwand')}
-            />
-            Nach Aufwand (Stundensatz)
-          </label>
-          <label className="flex items-center gap-2 text-[13px]">
-            <input
-              type="radio"
-              name="verguetung"
-              checked={verguetung === 'festpreis'}
-              onChange={() => setVerguetung('festpreis')}
-            />
-            Festpreis
-          </label>
-        </fieldset>
-
-        {verguetung === 'aufwand' ? (
-          <label className="block text-[12px] font-medium text-bw-text">
-            Stundensatz netto (€)
-            <input
-              className="mt-1 w-full rounded-md border border-bw-border px-3 py-2 text-[13px]"
+        <div className="rounded-md border border-bw-border bg-bw-surface-2/40 px-3 py-2.5">
+          <p className="mb-2 text-[length:var(--fs-meta)] font-semibold text-bw-text">Vergütung nach Aufwand</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Stundensatz netto (€)"
               inputMode="decimal"
-              value={betrag}
-              onChange={(e) => setBetrag(e.target.value)}
+              value={stundensatz}
+              onChange={(e) => setStundensatz(e.target.value)}
               placeholder="z. B. 85"
               autoFocus
             />
-          </label>
-        ) : (
-          <label className="block text-[12px] font-medium text-bw-text">
-            Festpreis netto (€)
-            <input
-              className="mt-1 w-full rounded-md border border-bw-border px-3 py-2 text-[13px]"
+            <Input
+              label="Materialaufschlag (%)"
               inputMode="decimal"
-              value={betrag}
-              onChange={(e) => setBetrag(e.target.value)}
-              placeholder="z. B. 450"
-              autoFocus
+              value={materialaufschlag}
+              onChange={(e) => setMaterialaufschlag(e.target.value)}
+              placeholder="optional, z. B. 15"
             />
-          </label>
-        )}
+          </div>
+        </div>
 
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
-          Kein Deckel (DD-10). Keine Stunden im Voraus — Konditionen gehen an den Partner.
-        </p>
+        <Textarea
+          label="Leistungsumfang (Stichpunkte)"
+          plain
+          rows={4}
+          value={leistungsumfang}
+          onChange={(e) => setLeistungsumfang(e.target.value)}
+          placeholder={'Eine Zeile pro Punkt\nz. B. Leckage abdichten\nz. B. Trocknung vorbereiten'}
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
             Abbrechen
           </Button>
           <Button type="button" onClick={submit} loading={pending}>
-            {submitLabel}
+            Beauftragen
           </Button>
         </div>
       </div>

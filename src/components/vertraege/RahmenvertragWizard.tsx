@@ -73,7 +73,7 @@ export function RahmenvertragWizard({
         />
       }
     >
-      <p className="mb-3 text-[13px] text-bw-text-muted">
+      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
         {handwerkerAnzeigename(hw)}
         {vertragsNr !== 'RV-Entwurf' ? ` · ${vertragsNr}` : ''}
       </p>
@@ -96,30 +96,30 @@ export function RahmenvertragWizard({
       </nav>
 
       <section id="rv-sec-partner" className="document-canvas-sec space-y-3">
-        <h2 className="text-[17px] font-semibold">Partner</h2>
-        <p className="text-sm font-medium text-bw-text">{handwerkerAnzeigename(hw)}</p>
-        {hw.firma ? <p className="text-sm text-bw-text-muted">{hw.firma}</p> : null}
-        {hw.adresse ? <p className="text-sm">{hw.adresse}</p> : null}
-        {hw.telefon ? <p className="text-sm">Tel. {hw.telefon}</p> : null}
-        {hw.email ? <p className="text-sm">{hw.email}</p> : null}
+        <h2 className="text-[length:var(--fs-head)] font-semibold">Partner</h2>
+        <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{handwerkerAnzeigename(hw)}</p>
+        {hw.firma ? <p className="text-[length:var(--fs-text)] text-bw-text-muted">{hw.firma}</p> : null}
+        {hw.adresse ? <p className="text-[length:var(--fs-text)]">{hw.adresse}</p> : null}
+        {hw.telefon ? <p className="text-[length:var(--fs-text)]">Tel. {hw.telefon}</p> : null}
+        {hw.email ? <p className="text-[length:var(--fs-text)]">{hw.email}</p> : null}
         <Textarea
           label="Interne Notizen (optional)"
           rows={3}
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
         />
-        <p className="text-xs text-bw-text-muted">
+        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
           Der Rahmenvertrag regelt die allgemeinen Partnerschaftsbedingungen. Projektbezogene
           Leistungen werden in separaten Nachunternehmerverträgen festgelegt.
         </p>
       </section>
 
       <section id="rv-sec-pdf" className="document-canvas-sec mt-8 space-y-3">
-        <h2 className="text-[17px] font-semibold">PDF</h2>
-        <p className="text-sm text-bw-text-muted">
+        <h2 className="text-[length:var(--fs-head)] font-semibold">PDF</h2>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Der Rahmenvertrag wird im Bärenwald-Design erzeugt und als PDF gespeichert.
         </p>
-        <p className="text-sm text-bw-text-muted">Vertrags-Nr. {vertragsNr}</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Vertrags-Nr. {vertragsNr}</p>
         {pdfUrl ? (
           <div className="flex flex-wrap gap-2">
             <a

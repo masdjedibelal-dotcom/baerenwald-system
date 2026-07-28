@@ -93,12 +93,12 @@ export function RechnungMahnverlaufCard({
         ) : null
       }
     >
-      <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+      <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', marginBottom: 4 }}>
         Alle Mahnstufen gehören zur Rechnung{' '}
         <strong>{rechnung.rechnungsnummer?.trim() || '—'}</strong> — es werden keine separaten
         Rechnungen angelegt.
       </p>
-      <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>{statusHint}</p>
+      <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginBottom: 14 }}>{statusHint}</p>
 
       <Timeline items={timelineItems} />
 
@@ -109,7 +109,7 @@ export function RechnungMahnverlaufCard({
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              fontSize: 11,
+              fontSize: 'var(--fs-meta)',
               fontWeight: 600,
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
@@ -130,13 +130,13 @@ export function RechnungMahnverlaufCard({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 8,
-                  fontSize: 13,
+                  fontSize: 'var(--fs-text)',
                 }}
               >
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
                   {m.betreff}
                 </span>
-                <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                <span style={{ flexShrink: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                   {formatZeitpunkt(m.created_at)}
                 </span>
               </li>

@@ -176,7 +176,7 @@ export function AuftragAbnahmeprotokollCard({
             borderRadius: 10,
             border: '0.5px solid var(--amber-border, #f0d9a8)',
             background: 'var(--amber-50, #fff8eb)',
-            fontSize: 13,
+            fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
           }}
         >

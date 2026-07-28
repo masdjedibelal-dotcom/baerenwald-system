@@ -44,7 +44,7 @@ function FreitextRow({ entry }: { entry: Extract<AngebotBlockPdfEntry, { kind: '
           {entry.freitext.text ? (
             <RichTextContent
               html={entry.freitext.text}
-              className="mt-0.5 text-xs text-bw-text-muted"
+              className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted"
             />
           ) : null}
         </div>
@@ -305,7 +305,7 @@ export function AngebotPositionenV3Tab({
 
       {editable && selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
-          <span className="text-sm font-medium text-bw-text">{selectedCount} ausgewählt</span>
+          <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{selectedCount} ausgewählt</span>
           <Button type="button" variant="danger" size="sm" disabled={disabled} onClick={bulkDelete}>
             <Trash2 className="h-4 w-4" />
             Entfernen

@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation'
 import { MapPin } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektBewohnerSection } from '@/components/objektakte/ObjektBewohnerSection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { kundenObjektKurzlabel, kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
 
-type ObjektAkteTab = 'kontakte' | 'bewohner'
+type ObjektAkteTab = 'kontakte' | 'bewohner' | 'akte'
 
 export function ObjektAkteDetailClient({
   kunde,
@@ -33,6 +34,8 @@ export function ObjektAkteDetailClient({
   function refresh() {
     router.refresh()
   }
+
+  const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -64,6 +67,13 @@ export function ObjektAkteDetailClient({
         />
       ),
     },
+    {
+      id: 'akte',
+      label: 'Objektakte',
+      icon: 'file-text',
+      count: akteCount || undefined,
+      render: () => <ObjektAkteReadOnlySection data={akte} />,
+    },
   ]
 
   return (
@@ -77,16 +87,26 @@ export function ObjektAkteDetailClient({
         }
         meta={
           adresse ? (
-            <span className="inline-flex items-center gap-1 text-sm text-bw-text-muted">
+            <span className="inline-flex items-center gap-1 text-[length:var(--fs-text)] text-bw-text-muted">
               <MapPin className="h-3.5 w-3.5" aria-hidden />
               {adresse}
             </span>
           ) : null
         }
+        actions={
+          <a
+            className="btn ghost sm"
+            href={`/api/objekte/${objekt.id}/aushang-pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Aushang PDF
+          </a>
+        }
       />
 
-      <p className="text-[12px] text-bw-text-muted">
-        {kundenObjektKurzlabel(objekt)} — Kontakte und Bewohner für die Disposition.
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+        Objektakte · {kundenObjektKurzlabel(objekt)} — Kontakte und Bewohner für die Disposition.
       </p>
 
       <DetailShell

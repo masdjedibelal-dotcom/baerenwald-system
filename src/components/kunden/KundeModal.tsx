@@ -226,10 +226,10 @@ export function KundeModal({
       size="lg"
     >
       <div className="space-y-4">
-        {err ? <p className="text-sm text-status-cancel-text">{err}</p> : null}
+        {err ? <p className="text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
 
         {!editKunde && dupes.length > 0 ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             <p className="font-medium">Bereits als Kunde vorhanden</p>
             <ul className="mt-1 list-inside list-disc">
               {dupes.map((d) => (
@@ -253,7 +253,7 @@ export function KundeModal({
                 </Button>
               </div>
             ) : null}
-            <p className="mt-2 text-xs">
+            <p className="mt-2 text-[length:var(--fs-meta)]">
               Nur Hinweis auf bestehende Kunden-Datensätze. Handwerker/Partner mit gleichen Kontaktdaten sind
               erlaubt und bleiben getrennt — trotzdem speichern legt einen neuen Kunden an.
             </p>
@@ -261,7 +261,7 @@ export function KundeModal({
         ) : null}
 
         {editKunde && singleDupe ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             <p className="font-medium">Mögliches Duplikat</p>
             <p className="mt-1">
               {kundeDisplayName(singleDupe)} · {singleDupe.telefon ?? '—'} · {singleDupe.email ?? '—'}
@@ -416,7 +416,7 @@ export function KundeModal({
         }
       >
         {editKunde && mergeTarget ? (
-          <p className="text-sm text-bw-text">
+          <p className="text-[length:var(--fs-text)] text-bw-text">
             Kunde <strong>{kundeDisplayName(editKunde)}</strong> in{' '}
             <strong>{kundeDisplayName(mergeTarget)}</strong> überführen? Der aktuelle Datensatz wird entfernt,
             Vorgänge und Dokumente werden umgehängt.

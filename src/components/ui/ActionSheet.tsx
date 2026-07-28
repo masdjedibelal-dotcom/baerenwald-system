@@ -70,7 +70,7 @@ export function ActionSheet({
           className="flex items-center justify-between border-b border-bw-border px-4 py-2"
           {...dragZoneProps}
         >
-          <span className="text-[15px] font-semibold text-bw-text">{title}</span>
+          <span className="text-[length:var(--fs-title)] font-semibold text-bw-text">{title}</span>
           <button
             type="button"
             onClick={onClose}
@@ -86,7 +86,7 @@ export function ActionSheet({
             <button
               key={it.label}
               type="button"
-              className="action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-medium text-bw-text transition-colors active:bg-bw-hover"
+              className="action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium text-bw-text transition-colors active:bg-bw-hover"
               onClick={() => run(it)}
             >
               {it.icon ? (
@@ -96,7 +96,7 @@ export function ActionSheet({
               ) : null}
               <span className="min-w-0 flex-1">{it.label}</span>
               {it.hint ? (
-                <span className="shrink-0 text-xs font-normal text-bw-text-muted">{it.hint}</span>
+                <span className="shrink-0 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">{it.hint}</span>
               ) : null}
             </button>
           ))}
@@ -109,7 +109,7 @@ export function ActionSheet({
                   key={it.label}
                   type="button"
                   className={cn(
-                    'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-medium transition-colors active:bg-status-cancel-bg/30',
+                    'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium transition-colors active:bg-status-cancel-bg/30',
                     'text-status-cancel-text'
                   )}
                   onClick={() => run(it)}

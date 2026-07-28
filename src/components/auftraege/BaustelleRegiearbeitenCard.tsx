@@ -98,7 +98,7 @@ export function BaustelleRegiearbeitenCard({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           {regiearbeiten.length} Regiearbeit{regiearbeiten.length === 1 ? '' : 'en'}
         </p>
         <Button type="button" variant="secondary" size="sm" className="gap-1" onClick={openCreate}>
@@ -164,12 +164,12 @@ export function BaustelleRegiearbeitenCard({
           {regiearbeiten.map((r) => (
             <div key={r.id} className="flex items-start gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-bw-text">{r.bezeichnung}</p>
-                <p className="text-xs text-bw-text-muted">
+                <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{r.bezeichnung}</p>
+                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   {formatDatum(r.datum)} · {r.personen_anzahl} Pers. · {r.stunden} Std.
                 </p>
                 {r.beschreibung?.trim() ? (
-                  <p className="mt-1 text-xs text-bw-text-muted">{r.beschreibung}</p>
+                  <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">{r.beschreibung}</p>
                 ) : null}
               </div>
               <div className="flex shrink-0 gap-1">
@@ -184,7 +184,7 @@ export function BaustelleRegiearbeitenCard({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-bw-text-muted">Noch keine Regiearbeiten erfasst.</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Regiearbeiten erfasst.</p>
       )}
     </div>
   )

@@ -386,7 +386,7 @@ export function PreislistenClient({
       </div>
 
       {gewerkeTabs.length === 0 ? (
-        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>
+        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
           Kein aktives Gewerk. Bitte zuerst Gewerke anlegen und aktivieren.
         </p>
       ) : (
@@ -416,7 +416,7 @@ export function PreislistenClient({
         onConfirm={handleSave}
       >
         {editLeistung ? (
-          <div className="mb-4 border-b border-bw-border pb-3 text-xs text-bw-text-muted">
+          <div className="mb-4 border-b border-bw-border pb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
             {aktuellesGewerk?.name}
             {(editLeistung.kategorie ?? '').trim()
               ? ` · ${(editLeistung.kategorie ?? '').trim()}`
@@ -426,7 +426,7 @@ export function PreislistenClient({
         ) : null}
 
         {err ? (
-          <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+          <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
             {err}
           </p>
         ) : null}

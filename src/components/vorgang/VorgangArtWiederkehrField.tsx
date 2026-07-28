@@ -35,10 +35,10 @@ export function VorgangArtWiederkehrField({
   return (
     <div className={className} style={{ marginBottom: 16 }}>
       <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, letterSpacing: '-0.01em' }}>
           Art der Leistung
         </div>
-        <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>{hint}</div>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>{hint}</div>
       </div>
       <div className="doctype-row">
         <button

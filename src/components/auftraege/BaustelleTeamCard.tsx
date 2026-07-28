@@ -39,20 +39,20 @@ export function BaustelleTeamCard({
       <div className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 space-y-2">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-[length:var(--fs-text)]">
               <User className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
               <span className="font-medium text-bw-text">
                 {team.bauleiter_name?.trim() || 'Bauleiter noch nicht hinterlegt'}
               </span>
             </div>
             {team.bauleiter_telefon?.trim() ? (
-              <p className="flex items-center gap-2 text-sm text-bw-text-muted">
+              <p className="flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text-muted">
                 <Phone className="h-3.5 w-3.5" aria-hidden />
                 {team.bauleiter_telefon}
               </p>
             ) : null}
             {team.bauleiter_email?.trim() ? (
-              <p className="flex items-center gap-2 text-sm text-bw-text-muted">
+              <p className="flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text-muted">
                 <Mail className="h-3.5 w-3.5" aria-hidden />
                 {team.bauleiter_email}
               </p>
@@ -64,7 +64,7 @@ export function BaustelleTeamCard({
         </div>
 
         <div>
-          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-bw-text-muted">
+          <p className="mb-1.5 flex items-center gap-1.5 text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-text-muted">
             <Users className="h-3.5 w-3.5" aria-hidden />
             Mannschaft ({team.bau_mannschaft.length})
           </p>
@@ -73,20 +73,20 @@ export function BaustelleTeamCard({
               {team.bau_mannschaft.map((n) => (
                 <span
                   key={n}
-                  className="rounded-full border border-bw-border bg-bw-bg px-2.5 py-0.5 text-xs text-bw-text"
+                  className="rounded-full border border-bw-border bg-bw-bg px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text"
                 >
                   {n}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-bw-text-muted">Noch keine Mitarbeiter hinterlegt.</p>
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Mitarbeiter hinterlegt.</p>
           )}
         </div>
 
         {(team.bau_nachunternehmer_name?.trim() || team.bau_nachunternehmer_firma?.trim()) && (
-          <div className="rounded-lg border border-bw-border bg-bw-bg/50 px-3 py-2 text-sm">
-            <p className="text-xs font-medium text-bw-text-muted">Nachunternehmer (Info)</p>
+          <div className="rounded-lg border border-bw-border bg-bw-bg/50 px-3 py-2 text-[length:var(--fs-text)]">
+            <p className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Nachunternehmer (Info)</p>
             <p className="text-bw-text">
               {[team.bau_nachunternehmer_firma, team.bau_nachunternehmer_name]
                 .map((x) => x?.trim())

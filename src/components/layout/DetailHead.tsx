@@ -72,9 +72,9 @@ export function DetailVisual({
   }[tone]
 
   const sizeClass = {
-    sm: 'h-[26px] w-[26px] text-[10px]',
-    md: 'h-11 w-11 text-sm',
-    lg: 'h-11 w-11 text-sm md:h-[44px] md:w-[44px] md:text-sm',
+    sm: 'h-[26px] w-[26px] text-[length:var(--fs-meta)]',
+    md: 'h-11 w-11 text-[length:var(--fs-text)]',
+    lg: 'h-11 w-11 text-[length:var(--fs-text)] md:h-[44px] md:w-[44px] md:text-[length:var(--fs-text)]',
   }[size]
 
   return (

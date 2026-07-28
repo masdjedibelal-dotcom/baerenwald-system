@@ -249,7 +249,7 @@ export function PosTable({
               <div
                 style={{
                   padding: '12px 14px',
-                  fontSize: 12.5,
+                  fontSize: 'var(--fs-meta)',
                   color: 'var(--text-4)',
                   borderBottom: '0.5px solid var(--border)',
                 }}

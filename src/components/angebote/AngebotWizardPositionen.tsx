@@ -152,14 +152,14 @@ function FachbetriebHinweisCheckbox({
             })
           }}
         />
-        <span className="min-w-0 text-[13px] leading-snug text-bw-text">
+        <span className="min-w-0 text-[length:var(--fs-text)] leading-snug text-bw-text">
           <span className="font-medium text-ink">
             Hinweis „Ausführung durch zugelassenen Fachbetrieb“ in Angebot und Rechnung anzeigen
           </span>
           {hinweisText ? (
-            <span className="mt-1 block text-xs text-bw-text-muted">{hinweisText}</span>
+            <span className="mt-1 block text-[length:var(--fs-meta)] text-bw-text-muted">{hinweisText}</span>
           ) : (
-            <span className="mt-1 block text-xs text-bw-text-muted">
+            <span className="mt-1 block text-[length:var(--fs-meta)] text-bw-text-muted">
               Zusätzlich der Standard-Hinweis unter der Leistung im PDF.
             </span>
           )}
@@ -372,7 +372,7 @@ function PositionAccordionItem({
               </div>
             </WizardField>
             <WizardField label="Abzug (netto)">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums text-amber-800">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums text-amber-800">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -484,7 +484,7 @@ function PositionAccordionItem({
               <EuroNettoInput value={z.vkNetto} onChange={patchVkNetto} />
             </WizardField>
             <WizardField label="Zeilensumme">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -619,7 +619,7 @@ function PositionAccordionItem({
               </select>
             </WizardField>
             <WizardField label="Zeilensumme">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -942,8 +942,8 @@ export function AngebotWizardPositionen({
         <div className={cn('flex flex-wrap items-start justify-between gap-4', !hideTitle && 'mb-3.5')}>
           {!hideTitle ? (
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-bw-text">{titel}</h2>
-              <p className="mt-0.5 text-[12.5px] text-bw-text-muted">{caption}</p>
+              <h2 className="text-[length:var(--fs-head)] font-semibold tracking-tight text-bw-text">{titel}</h2>
+              <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">{caption}</p>
             </div>
           ) : (
             <div />
@@ -988,7 +988,7 @@ export function AngebotWizardPositionen({
           <div className="pos-list-head" aria-hidden>
             <div className="pos-nr">Nr.</div>
             <div className="pos-title">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-bw-text-muted">
+              <span className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-text-muted">
                 Leistung · Beschreibung
               </span>
             </div>
@@ -1001,7 +1001,7 @@ export function AngebotWizardPositionen({
         {listenZeilen.length === 0 ? (
           <div className="pos-empty">
             <p className="font-medium text-bw-text-mid">Noch keine Positionen</p>
-            <p className="mt-1 text-xs text-bw-text-muted">Wähle unten eine Hinzufüge-Option</p>
+            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">Wähle unten eine Hinzufüge-Option</p>
           </div>
         ) : (
           listenZeilen.map((z, i) => (

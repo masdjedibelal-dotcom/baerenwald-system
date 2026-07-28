@@ -550,6 +550,52 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   }
 }
 
+/**
+ * Phase 8: Abnahme speichern und Auftrag abschließen (ein Canvas-Weg).
+ * Liefert previousStatus für Undo im Toast.
+ */
+export async function saveAbnahmeAndAbschliessen(input: {
+  auftragId: string
+  abnahmeDatum: string
+  punkte: AbnahmePunkt[]
+  maengel: AbnahmeMangel[]
+  notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
+  protokollId?: string | null
+}): Promise<
+  | {
+      ok: true
+      pdfBase64: string
+      filename: string
+      publicUrl: string
+      updated: boolean
+      previousStatus: string
+    }
+  | { ok: false; message: string }
+> {
+  const detail = await loadAuftragDetail(input.auftragId)
+  if (!detail) return { ok: false, message: 'Auftrag nicht gefunden' }
+  const previousStatus = String(detail.status ?? 'in_arbeit')
+  if (previousStatus === 'abgeschlossen') {
+    return { ok: false, message: 'Auftrag ist bereits abgeschlossen.' }
+  }
+
+  const saved = await saveAbnahmeprotokollPdfOnly(input)
+  if (!saved.ok) return saved
+
+  const { finalizeAbschlussdokumentationOhneMail } = await import(
+    '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
+  )
+  const closed = await finalizeAbschlussdokumentationOhneMail(input.auftragId)
+  if (!closed.ok) return closed
+
+  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidatePath('/auftraege')
+  revalidatePath('/vorgaenge')
+
+  return { ...saved, previousStatus }
+}
+
 async function syncAuftragAbnahmeDenorm(auftragId: string): Promise<void> {
   const { data } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')

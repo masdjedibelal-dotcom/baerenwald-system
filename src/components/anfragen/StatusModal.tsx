@@ -267,7 +267,7 @@ export function StatusModal({
                 required
               />
               {terminAdresse ? (
-                <p className="md:col-span-2 text-xs text-bw-text-muted">
+                <p className="md:col-span-2 text-[length:var(--fs-meta)] text-bw-text-muted">
                   Ort: <strong className="text-bw-text">{terminAdresse}</strong>
                 </p>
               ) : null}
@@ -283,7 +283,7 @@ export function StatusModal({
               </div>
               <div className="md:col-span-2 space-y-3">
                 {kontaktEmail ? (
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
                     <input
                       type="checkbox"
                       checked={mailToggle}
@@ -292,7 +292,7 @@ export function StatusModal({
                     Bestätigungs-Mail an Kunden ({kontaktEmail})
                   </label>
                 ) : (
-                  <p className="text-xs text-bw-text-muted">
+                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                     Keine E-Mail beim Lead — Bestätigung nur im Kalender.
                   </p>
                 )}
@@ -421,7 +421,7 @@ export function StatusModal({
 
   return (
     <EditorSheet open={open} onClose={onClose} title={meta.title} context="detail" size="lg">
-      <p className="mb-4 text-sm text-bw-text-muted">{sub}</p>
+      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">{sub}</p>
       {formBody}
       <div className="mt-4 border-t border-[var(--app-separator)] pt-3">{formFooter}</div>
     </EditorSheet>

@@ -112,6 +112,8 @@ const AUFTRAG_DETAIL_SELECT_FALLBACK = `
       kunden(*),
       angebote(*, angebot_handwerker(${ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT})),
       auftrag_timeline(*),
+      nachtraege(*),
+      baustopps(*),
       auftrag_positionen(
         *,
         handwerker(id, name, email, telefon)
@@ -238,7 +240,7 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id'
+      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, reklamation_am, reklamation_grund'
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })

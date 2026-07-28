@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
-import { PosBoard } from '@/components/posboard/PosBoard'
+import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
-import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { AngebotDetail, Gewerk, LeadDetail } from '@/lib/types'
@@ -88,25 +87,35 @@ export function AngebotProjektinfosTab({
   )
 }
 
-/** Angebot: Leistungen (Positionen) — eigener Tab. */
+/** Angebot: Leistungen — shared read-only Tabelle (Phase 6). */
 export function AngebotLeistungenTab({
   detail,
+  onOpenDokument,
 }: {
   detail: AngebotDetail
   lead?: LeadDetail | null
   gewerke?: Gewerk[]
   editable?: boolean
   onSaved?: () => void
+  onOpenDokument?: () => void
 }) {
-  const [lines, setLines] = useState(() =>
-    angebotPositionenToPosBoardLines(detail.positionen ?? [])
+  const rows = useMemo(
+    () =>
+      leistungenFromAngebotPositionen(detail.positionen ?? [], {
+        status: 'entwurf',
+        statusLabel: 'Im Angebot',
+      }),
+    [detail.positionen]
   )
 
-  useEffect(() => {
-    setLines(angebotPositionenToPosBoardLines(detail.positionen ?? []))
-  }, [detail.id, detail.positionen])
-
-  return <PosBoard title="Leistungen" positionen={lines} showUst />
+  return (
+    <LeistungenTab
+      phase="angebot"
+      rows={rows}
+      onOpenDokument={onOpenDokument}
+      emptyHint="Noch keine Positionen — im Angebots-Dokument anlegen."
+    />
+  )
 }
 
 /** @deprecated Nutze AngebotProjektinfosTab + AngebotLeistungenTab. */

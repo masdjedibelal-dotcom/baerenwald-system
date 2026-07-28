@@ -50,14 +50,14 @@ export function RechnungDokumenteTab({
           </div>
           <div className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
             <MockIcon ctx="row" n="file-text" size={18} />
-            <div className="min-w-0 truncate text-[13px] font-medium text-bw-text">
+            <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
               <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="hover:text-bw-link">
                 {name}
               </a>
             </div>
-            <div className="min-w-0 truncate text-[12.5px] text-bw-text-muted">Rechnungs-PDF</div>
-            <div className="whitespace-nowrap text-[12px] tabular-nums text-bw-text-muted">{datum}</div>
-            <div className="text-[12px] text-bw-text-muted">—</div>
+            <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">Rechnungs-PDF</div>
+            <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">{datum}</div>
+            <div className="text-[length:var(--fs-meta)] text-bw-text-muted">—</div>
             <div className="flex justify-end gap-1">
               <MockBtn
                 sm

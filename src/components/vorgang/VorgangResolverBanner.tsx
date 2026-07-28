@@ -31,7 +31,7 @@ export function VorgangResolverBanner({
   return (
     <div
       className={cn(
-        'mb-4 rounded-xl border px-4 py-3 text-sm',
+        'mb-4 rounded-xl border px-4 py-3 text-[length:var(--fs-text)]',
         resolved.badges.notfall
           ? 'border-red-200 bg-red-50 text-red-950'
           : 'border-amber-200 bg-amber-50 text-amber-950',

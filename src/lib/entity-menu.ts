@@ -98,20 +98,28 @@ export function buildEntityMenu(
   const mail = h.mail ?? e.mail ?? e.customer?.mail ?? null
   const A: EntityMenuItem[] = []
 
+  const isVorgangPhase =
+    type === 'anfrage' || type === 'angebot' || type === 'auftrag' || type === 'rechnung'
+
   if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
   if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
 
-  /* Portal-Aktionen ohne Sep davor — Gruppe mit Bearbeiten/Kopieren */
-  if (h.onPortal) {
-    A.push({ icon: 'external-link', label: 'Als Kunde öffnen', onClick: h.onPortal })
-  }
-  if (h.onPortalLink) {
-    const linkLabel = portalLinkMenuLabel(type)
-    A.push({
-      icon: 'send',
-      label: linkLabel,
-      onClick: h.onPortalLink,
-    })
+  /**
+   * Phase 5c: Vorgang-⋯ nur Statuswechsel · Bearbeiten/Kopieren · Löschen.
+   * Kontakt / Portal / Notfall → Stammdaten bzw. QuickBar, nicht Menü.
+   */
+  if (!isVorgangPhase) {
+    if (h.onPortal) {
+      A.push({ icon: 'external-link', label: 'Als Kunde öffnen', onClick: h.onPortal })
+    }
+    if (h.onPortalLink) {
+      const linkLabel = portalLinkMenuLabel(type)
+      A.push({
+        icon: 'send',
+        label: linkLabel,
+        onClick: h.onPortalLink,
+      })
+    }
   }
 
   if (type === 'kunde' || type === 'handwerker') {
@@ -147,90 +155,36 @@ export function buildEntityMenu(
       onClick: () => h.onStatus!('verloren'),
     })
   }
-  /** Notfall / Angebot erstellen: nur wenn nicht schon Header-CTA (Handlers weglassen). */
-  if (type === 'anfrage' && (h.onNotfall || h.onAngebot)) {
-    A.push('sep')
-    if (h.onNotfall) {
-      A.push({ icon: 'alert-triangle', label: 'Notfall melden', onClick: h.onNotfall })
-    }
-    if (h.onAngebot) {
-      A.push({ icon: 'file-invoice', label: 'Angebot erstellen', onClick: h.onAngebot })
-    }
-  }
 
-  if (type === 'angebot') {
-    const kannAnnehmen =
-      st === 'gesendet_kunde' ||
-      st === 'gesendet' ||
-      st === 'abgelaufen' ||
-      st === 'entwurf'
-    const erledigt =
-      st === 'kunde_akzeptiert' || st === 'abgelehnt' || st === 'angenommen'
-    const jeVersendet = Boolean(st && st !== 'entwurf')
-    const before = A.length
-    A.push('sep')
-    if (h.onAccept && kannAnnehmen) A.push({ icon: 'check', label: 'Angebot annehmen', onClick: h.onAccept })
-    if (h.onPdf) A.push({ icon: 'download', label: 'Angebot PDF herunterladen', onClick: h.onPdf })
-    if (h.onSend && !erledigt) {
-      A.push({
-        icon: 'send',
-        label: jeVersendet ? 'Angebot nochmal versenden' : 'Angebot versenden',
-        onClick: h.onSend,
-      })
-    }
-    if (A.length === before + 1) A.pop()
-  }
+  /**
+   * Phase 5c: Prozess-CTAs (Versenden/Annehmen/PDF/…) gehören nicht ins Vorgang-⋯ —
+   * Primary-CTA bzw. Canvas. Für Kunde/Handwerker/Partner existieren diese Typ-Zweige ohnehin nicht.
+   */
 
-  if (type === 'auftrag') {
-    const laufend = st === 'offen' || st === 'in_arbeit' || st === 'aktiv' || st === 'in_bearbeitung'
-    const abschluss = st === 'abnahme' || st === 'abgeschlossen' || st === 'fertig'
-    const before = A.length
-    A.push('sep')
-    if (h.onEditAngebot && !abschluss) {
-      A.push({ icon: 'file-pencil', label: 'Angebot korrigieren', onClick: h.onEditAngebot })
-    }
-    if (h.onComplete && laufend) {
-      A.push({ icon: 'checks', label: 'Auftrag abschließen', onClick: h.onComplete })
-    }
-    if (h.onInvoice && (abschluss || laufend)) {
-      A.push({ icon: 'file-invoice', label: 'Rechnung erstellen', onClick: h.onInvoice })
-    }
-    if (A.length === before + 1) A.pop()
-  }
-
-  if (type === 'rechnung') {
-    const offen = st === 'versendet' || st === 'ueberfaellig' || st === 'gesendet'
-    const jeVersendet = Boolean(st && st !== 'entwurf')
-    const erledigt = st === 'bezahlt' || st === 'storniert'
-    const before = A.length
-    A.push('sep')
-    if (h.onEdit2) A.push({ icon: 'file-pencil', label: 'Rechnung korrigieren', onClick: h.onEdit2 })
-    if (h.onMarkPaid && offen) A.push({ icon: 'check', label: 'Als bezahlt markieren', onClick: h.onMarkPaid })
-    if (h.onPdf) A.push({ icon: 'download', label: 'Rechnung herunterladen', onClick: h.onPdf })
-    if (h.onSend && !erledigt) {
-      A.push({
-        icon: 'send',
-        label: jeVersendet ? 'Rechnung nochmal versenden' : 'Rechnung versenden',
-        onClick: h.onSend,
-      })
-    }
-    if (A.length === before + 1) A.pop()
-  }
-
-  const extraItems = h.extra ?? []
+  const extraItems = (h.extra ?? []).filter((c) => {
+    if (c === 'sep') return true
+    if (!isVorgangPhase) return true
+    const label = c.label.toLowerCase()
+    /* Phase 5c Grep-Ziel: keine Kontakt-/Portal-/Notfall-Einträge im Vorgang-⋯ */
+    if (label.includes('notfall')) return false
+    if (label.includes('portal')) return false
+    if (label === 'anrufen' || label.includes('mail schreiben') || label === 'kontakt') return false
+    return true
+  })
   const extraNormal: EntityMenuItem[] = []
   const extraDanger: EntityMenuItem[] = []
   for (const c of extraItems) {
     if (c !== 'sep' && c.danger) extraDanger.push(c)
     else extraNormal.push(c)
   }
-  extraNormal.forEach((c) => A.push(c))
+  if (extraNormal.length) {
+    A.push('sep')
+    extraNormal.forEach((c) => A.push(c))
+  }
 
-  /** Anrufen nur in Stammdaten (Kunde/Partner) — nicht in Vorgängen. */
-  const isVorgangPhase =
-    type === 'anfrage' || type === 'angebot' || type === 'auftrag' || type === 'rechnung'
+  /** Anrufen/Mail nur Kunde/Handwerker — Vorgänge: QuickBar / Stammdaten. */
   const showCall = !isVorgangPhase && (Boolean(tel) || Boolean(h.onCall))
-  const showMail = Boolean(mail) || Boolean(h.onMail)
+  const showMail = !isVorgangPhase && (Boolean(mail) || Boolean(h.onMail))
   if (showCall || showMail) A.push('sep')
   if (showCall) {
     A.push({

@@ -1,18 +1,39 @@
 'use server'
 
+import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
+import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
+import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
+import {
+  filterBerichtAufPosition,
+} from '@/lib/auftraege/bericht-datenquelle'
+import { loadBerichtDatenquelle } from '@/lib/auftraege/load-bericht-datenquelle'
+import { istRegiePosition } from '@/lib/auftraege/regie-display'
+import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
-import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import {
-  RegieberichtPdfDocument,
-  type RegieberichtPdfInput,
-} from '@/lib/pdf/regiebericht-pdf'
-import { renderToBuffer } from '@react-pdf/renderer'
-import React from 'react'
+  buildRegieberichtLebenszyklusHtml,
+  buildRegieberichtLebenszyklusPdfFooterTemplate,
+  resolveRegieSollIst,
+} from '@/lib/templates/regiebericht-lebenszyklus-template'
+import { kundeZeigt35a } from '@/lib/rechnung-berechnung'
+
+function firmZeileAdresse(f: FirmenEinstellungen): string {
+  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join(
+    '\n'
+  )
+}
+
+function firmKontaktZeile(f: FirmenEinstellungen): string {
+  return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? '']
+    .filter(Boolean)
+    .join(' · ')
+}
 
 /**
- * Regiebericht-PDF aus position_eintraege (neue Quelle §7).
- * Aggregiert Aufwand-Zeiten + Material einer Regie-Position.
+ * Regiebericht-PDF aus gemeinsamer Quelle (position_eintraege + Schichten).
+ * Phase 12 / Spec §16.
  */
 export async function renderRegieberichtFromLebenszyklus(
   auftragId: string,
@@ -24,111 +45,67 @@ export async function renderRegieberichtFromLebenszyklus(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
-  const { data: auf } = await supabaseAdmin
-    .from('auftraege')
-    .select('id, titel, kunden(name, adresse, plz, ort)')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (!auf) return { ok: false, message: 'Auftrag nicht gefunden.' }
+  const loaded = await loadBerichtDatenquelle(auftragId)
+  if (!loaded.ok) return loaded
 
-  let posQuery = supabaseAdmin
-    .from('auftrag_positionen')
-    .select(
-      'id, leistung_name, beschreibung, stundensatz, preis_partner, verguetung, typ, handwerker_id, handwerker(name, firma), gewerk_name'
-    )
-    .eq('auftrag_id', auftragId)
-    .eq('typ', 'regie')
+  let data = loaded.data
+  const regiePos = data.positionen.filter(istRegiePosition)
+  const focusId =
+    positionId?.trim() ||
+    regiePos[0]?.id ||
+    data.positionen.find((p) => (Number(p.geschaetzt_std) || 0) > 0 || p.stundensatz)?.id ||
+    data.positionen[0]?.id ||
+    null
 
-  if (positionId) posQuery = posQuery.eq('id', positionId)
-
-  const { data: posRows } = await posQuery.order('sort_order', { ascending: true }).limit(1)
-  const pos = posRows?.[0]
-  if (!pos) return { ok: false, message: 'Keine Regie-Position gefunden.' }
-
-  const eintraege = (await listAuftragPositionEintraege(auftragId)).filter(
-    (e) => e.position_id === String(pos.id)
-  )
-  const minuten = eintraege.reduce((s, e) => s + (Number(e.zeit_minuten) || 0), 0)
-  const stunden = Math.round((minuten / 60) * 100) / 100
-  const stundensatz = Number(pos.stundensatz ?? pos.preis_partner) || 0
-  const lohnNetto = Math.round(stunden * stundensatz * 100) / 100
-
-  const { data: mats } = await supabaseAdmin
-    .from('position_material')
-    .select('bezeichnung, menge, einzelpreis')
-    .eq('position_id', pos.id)
-  let materialNetto = 0
-  const matNames: string[] = []
-  for (const m of mats ?? []) {
-    const z = Number(m.menge) * Number(m.einzelpreis)
-    materialNetto += z
-    matNames.push(String(m.bezeichnung))
+  if (focusId) {
+    data = filterBerichtAufPosition(loaded.data, focusId)
   }
-  materialNetto = Math.round(materialNetto * 100) / 100
+
+  if (!data.positionen.length && !data.eintraege.length) {
+    return { ok: false, message: 'Keine Regie-/Positionsdaten gefunden.' }
+  }
+
+  const pos = data.positionen[0]
+  const stundensatz = Number(pos?.stundensatz) || 0
+  const stunden = data.summeMinuten / 60
+  const lohnNetto = Math.round(stunden * stundensatz * 100) / 100
+  const materialNetto = data.summeMaterialNetto
   const netto = lohnNetto + materialNetto
   const mwst = Math.round(netto * 0.19 * 100) / 100
   const brutto = Math.round((netto + mwst) * 100) / 100
 
-  const fotoUrls = eintraege
-    .flatMap((e) => e.eintrag_fotos ?? [])
-    .map((f) => f.display_url || f.storage_path)
-    .filter((u): u is string => Boolean(u))
-    .slice(0, 8)
+  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
+  const handwerkerName =
+    [pos?.handwerker_name, pos?.handwerker_firma].filter(Boolean).join(' · ') || 'Partner'
+  const hinweis35a = kundeZeigt35a(loaded.kunde?.typ) && lohnNetto > 0
 
-  const hwRaw = pos.handwerker
-  const hw = Array.isArray(hwRaw) ? hwRaw[0] : hwRaw
-  const kundeRaw = auf.kunden
-  const kunde = (Array.isArray(kundeRaw) ? kundeRaw[0] : kundeRaw) as {
-    name?: string
-    adresse?: string
-    plz?: string
-    ort?: string
-  } | null
-
-  const beschreibung =
-    eintraege
-      .map((e) => e.beschreibung)
-      .filter(Boolean)
-      .join('\n') || String(pos.beschreibung ?? pos.leistung_name)
-
-  const input: RegieberichtPdfInput = {
-    auftragIdShort: String(auftragId).slice(0, 8),
-    datumFormular: new Date().toISOString().slice(0, 10),
-    kundeBaustelle: {
-      id: '',
-      name: kunde?.name ?? 'Kunde',
-      adresse: kunde?.adresse ?? null,
-      plz: kunde?.plz ?? null,
-      ort: kunde?.ort ?? null,
-    } as never,
-    auftraggeberName: kunde?.name ?? 'Kunde',
-    auftraggeberAdresse: [kunde?.adresse, [kunde?.plz, kunde?.ort].filter(Boolean).join(' ')]
-      .filter(Boolean)
-      .join(', '),
-    handwerkerName: hw?.name ?? 'Partner',
-    handwerkerFirma: hw?.firma ?? null,
-    gewerkName: pos.gewerk_name ?? null,
-    beschreibung,
-    grund: String(pos.leistung_name),
-    stunden,
+  const htmlInput = {
+    firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
+    firmenname: firm.firmenname,
+    firmen_rechtsform: firm.rechtsform?.trim() || null,
+    firmen_adresse: firmZeileAdresse(firm),
+    firmen_kontakt: firmKontaktZeile(firm),
+    firmen_steuer_footer: firmenSteuerFooterZeilen(firm).join('\n'),
+    data,
+    focusPositionId: focusId,
     stundensatz,
     lohnNetto,
-    materialBezeichnung: matNames.join(', ') || '—',
     materialNetto,
-    netto,
     mwst,
     brutto,
-    fotoUrls,
-    unterschriftKunde: null,
-    unterschriftAt: null,
+    handwerkerName,
+    gewerkName: pos?.gewerk_name ?? null,
+    sollIst: resolveRegieSollIst(data, focusId),
+    hinweis35a,
   }
 
-  const buffer = await renderToBuffer(
-    React.createElement(RegieberichtPdfDocument, input) as never
-  )
+  const html = buildRegieberichtLebenszyklusHtml(htmlInput)
+  const footerTemplate = buildRegieberichtLebenszyklusPdfFooterTemplate(htmlInput)
+  const buffer = await renderHtmlToPdfBuffer(html, { footerTemplate })
+
   return {
     ok: true,
-    buffer: Buffer.from(buffer),
-    filename: `regiebericht-${String(pos.id).slice(0, 8)}.pdf`,
+    buffer,
+    filename: `regiebericht-${(focusId || auftragId).slice(0, 8)}.pdf`,
   }
 }

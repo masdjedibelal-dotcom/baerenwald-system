@@ -1,10 +1,10 @@
-import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = {
-  title: 'Netzwerk',
+export const metadata = {
+  title: 'Handwerker',
 }
 
-/** Listen-Inhalt kommt aus `partner/layout.tsx` (Master-Detail ab 900px). */
+/** Spec §3 / Phase 3: Netzwerk-Route entfernt — Redirect auf Handwerker. Tabelle `partner` bleibt. */
 export default function PartnerPage() {
-  return null
+  redirect('/handwerker')
 }

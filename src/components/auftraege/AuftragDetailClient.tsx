@@ -1,7 +1,7 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -15,20 +15,17 @@ import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@
 import { runDuplicateAuftrag } from '@/lib/list-actions'
 import { AuftragAuftragdetailsTab, AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
-import { AuftragZahlungsplanSection, type RechnungErstellenOpts } from '@/components/auftraege/AuftragZahlungsplanSection'
+import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
+import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
+import {
+  VorgangZahlungTab,
+  type RechnungErstellenOpts,
+} from '@/components/vorgang/VorgangZahlungTab'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
-import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
-import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
-import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschlussSection'
-import { AuftragVorOrtPanel, type VorOrtAbschnitt } from '@/components/auftraege/AuftragVorOrtPanel'
 import { AuftragKundenUpdatePanel } from '@/components/auftraege/AuftragKundenUpdatePanel'
-import { AuftragNachtragBaustoppSection } from '@/components/auftraege/AuftragNachtragBaustoppSection'
-import { AuftragLeistungVorOrtTabelle } from '@/components/auftraege/AuftragLeistungVorOrtTabelle'
 import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
-import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
-import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
@@ -89,7 +86,7 @@ import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
 import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
 import { DetailSection } from '@/components/vorgang/DetailSection'
-import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import {
   loadAbnahmeprotokolleListe,
   type AbnahmeprotokollListeEintrag,
@@ -97,7 +94,10 @@ import {
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen, updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
-import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+import {
+  loadAngebotKorrekturWizardBootstrap,
+  loadNachtragAngebotBootstrap,
+} from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
@@ -200,14 +200,20 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'akte' | 'ausfuehrung' | 'aktivitaet'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
+  'leistungen',
+  'zahlung',
   'akte',
-  'ausfuehrung',
   'aktivitaet',
 ])
+
+const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'leistungen'
+
+/** Legacy Deep-Link-Alias (kein eigener Tab mehr) → Leistungen. */
+type VorOrtAbschnitt = 'bautagebuch' | 'abnahme' | 'abschluss'
 
 function vorOrtAbschnittFromQuery(raw: string | null): VorOrtAbschnitt | null {
   const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
@@ -243,25 +249,8 @@ type AuftragDetailTabDefaultContext = {
   zahlungOffen?: boolean
 }
 
-function defaultAuftragDetailTabFromStatus(ctx: AuftragDetailTabDefaultContext): AuftragDetailTab {
-  if (String(ctx.status).toLowerCase() === 'abnahme') return 'ausfuehrung'
-  if (ctx.zahlungOffen) return 'akte'
-  return 'uebersicht'
-}
-
-function akteSegmentFromQuery(rawTab: string | null, segment: string | null): AkteSegment {
-  const s = (segment ?? '').trim().toLowerCase()
-  if (s === 'dateien' || s === 'dokumente' || s === 'notizen') return 'dateien'
-  if (s === 'kunde' || s === 'stammdaten') return 'kunde'
-  if (s === 'zahlung' || s === 'finanzen' || s === 'zahlplan') return 'zahlung'
-  const tab = (rawTab ?? '').trim().toLowerCase()
-  if (tab === 'dokumente' || tab === 'notizen' || tab === 'fotos' || tab === 'bilder' || tab === 'photos') {
-    return 'dateien'
-  }
-  if (tab === 'stammdaten' || tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
-    return 'kunde'
-  }
-  return 'zahlung'
+function defaultAuftragDetailTabFromStatus(_ctx: AuftragDetailTabDefaultContext): AuftragDetailTab {
+  return AUFTRAG_DETAIL_DEFAULT_TAB
 }
 
 function resolveAuftragDetailTabFromQuery(
@@ -273,16 +262,16 @@ function resolveAuftragDetailTabFromQuery(
     return defaultWhenEmpty ? defaultAuftragDetailTabFromStatus(defaultWhenEmpty) : null
   }
   if (
-    tab === 'akte' ||
-    tab === 'zahlplan' ||
     tab === 'zahlung' ||
-    tab === 'finanzen' ||
+    tab === 'zahlplan' ||
+    tab === 'finanzen'
+  ) {
+    return 'zahlung'
+  }
+  if (
+    tab === 'akte' ||
     tab === 'dokumente' ||
     tab === 'notizen' ||
-    tab === 'stammdaten' ||
-    tab === 'schritte' ||
-    tab === 'naechste-schritte' ||
-    tab === 'naechste_schritte' ||
     tab === 'compliance' ||
     tab === 'compliance-checkliste' ||
     tab === 'kommunikation'
@@ -290,7 +279,21 @@ function resolveAuftragDetailTabFromQuery(
     return 'akte'
   }
   if (
+    tab === 'leistungen' ||
+    tab === 'leistung' ||
+    tab === 'positionen' ||
+    tab === 'ausfuehrung' ||
+    tab === 'vor-ort' ||
+    vorOrtAbschnittFromQuery(tab)
+  ) {
+    return 'leistungen'
+  }
+  if (
     tab === 'uebersicht' ||
+    tab === 'stammdaten' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte' ||
     tab === 'auftragdetails' ||
     tab === 'auftrag-details' ||
     tab === 'auftragsdaten' ||
@@ -302,17 +305,11 @@ function resolveAuftragDetailTabFromQuery(
     tab === 'anfrage-details' ||
     tab === 'angebot' ||
     tab === 'angebot-details' ||
-    tab === 'positionen' ||
-    tab === 'leistung' ||
-    tab === 'leistungen' ||
     tab === 'fotos' ||
     tab === 'bilder' ||
     tab === 'photos'
   ) {
     return 'uebersicht'
-  }
-  if (vorOrtAbschnittFromQuery(tab) || tab === 'ausfuehrung' || tab === 'vor-ort') {
-    return 'ausfuehrung'
   }
   if (
     tab === 'verlauf' ||
@@ -324,7 +321,7 @@ function resolveAuftragDetailTabFromQuery(
     return 'aktivitaet'
   }
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
-  return null
+  return AUFTRAG_DETAIL_DEFAULT_TAB
 }
 
 function needsAkteAliasRedirect(rawTab: string | null): boolean {
@@ -332,16 +329,16 @@ function needsAkteAliasRedirect(rawTab: string | null): boolean {
   return (
     tab === 'finanzen' ||
     tab === 'zahlplan' ||
-    tab === 'zahlung' ||
     tab === 'dokumente' ||
     tab === 'notizen' ||
     tab === 'stammdaten' ||
     tab === 'auftragdetails' ||
     tab === 'leistung' ||
-    tab === 'leistungen' ||
     tab === 'fotos' ||
     tab === 'historie' ||
-    tab === 'schritte'
+    tab === 'schritte' ||
+    tab === 'ausfuehrung' ||
+    tab === 'vor-ort'
   )
 }
 
@@ -387,13 +384,10 @@ export function AuftragDetailClient({
   const [detail, setDetail] = useState(initial)
   const [, startTransition] = useTransition()
 
-  const [mainTab, setMainTab] = useState<AuftragDetailTab>('uebersicht')
-  const [akteSegment, setAkteSegment] = useState<AkteSegment>('zahlung')
+  const [mainTab, setMainTab] = useState<AuftragDetailTab>(AUFTRAG_DETAIL_DEFAULT_TAB)
   const [abnahmenListe, setAbnahmenListe] = useState<AbnahmeprotokollListeEintrag[]>([])
-  const [vorOrtFocus, setVorOrtFocus] = useState<VorOrtAbschnitt | null>(null)
+  // vorOrtFocus entfernt — kein Tagebuch-/Vor-Ort-Segment mehr (Phase 6)
 
-  const [abschlussModal, setAbschlussModal] = useState(false)
-  const [notfallModalOpen, setNotfallModalOpen] = useState(false)
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
   const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
@@ -404,12 +398,12 @@ export function AuftragDetailClient({
     useState<ProjektVertragWizardBootstrap | null>(null)
   const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
+  const [bewertungOpen, setBewertungOpen] = useState(false)
   const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
   const [angebotKorrekturBootstrap, setAngebotKorrekturBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
-  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   const openAngebotKorrektur = useCallback(() => {
     if (!detail.angebot_id) {
@@ -422,6 +416,24 @@ export function AuftragDetailClient({
     }
     startTransition(async () => {
       const res = await loadAngebotKorrekturWizardBootstrap(detail.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      setAngebotKorrekturBootstrap(res.bootstrap)
+      setAngebotKorrekturLead(res.lead)
+      setAngebotKorrekturKey((k) => k + 1)
+      setAngebotKorrekturOpen(true)
+    })
+  }, [detail.angebot_id, detail.id, detail.lead_id])
+
+  const openNachtragAngebot = useCallback(() => {
+    if (!detail.angebot_id || !detail.lead_id) {
+      toast.error('Nachtrag braucht verknüpftes Angebot und Anfrage.')
+      return
+    }
+    startTransition(async () => {
+      const res = await loadNachtragAngebotBootstrap(detail.id)
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -460,9 +472,8 @@ export function AuftragDetailClient({
   }, [])
 
   const openAuftragAbschliessen = useCallback(() => {
-    if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
-    else setAbschlussModal(true)
-  }, [detail.id, isMobile, router])
+    router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+  }, [detail.id, router])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
@@ -512,8 +523,7 @@ export function AuftragDetailClient({
   }, [hauptvertraegeFuerNachtrag, startNachtragWizard])
 
   const goZuNachtragAbschluss = useCallback(() => {
-    setMainTab('ausfuehrung')
-    setVorOrtFocus('abschluss')
+    setMainTab('leistungen')
     requestAnimationFrame(() => {
       window.setTimeout(() => {
         document
@@ -577,20 +587,16 @@ export function AuftragDetailClient({
     if (typeof window === 'undefined') return
     const hash = window.location.hash.replace(/^#/, '')
     if (hash === 'dokumentation') {
-      // Legacy: oft Abschlussbericht gemeint
-      setMainTab('ausfuehrung')
-      setVorOrtFocus('abschluss')
+      setMainTab('leistungen')
       return
     }
     if (hash === 'compliance' || hash === 'compliance-checkliste') {
       setMainTab('akte')
-      setAkteSegment('dateien')
       return
     }
     const focus = vorOrtAbschnittFromQuery(hash)
     if (focus) {
-      setMainTab('ausfuehrung')
-      setVorOrtFocus(focus)
+      setMainTab('leistungen')
     }
   }, [])
 
@@ -677,17 +683,17 @@ export function AuftragDetailClient({
   /** Nur Aktionen, die nicht schon über Header-CTA oder Detail-Tabs erreichbar sind */
   const aktionenMenuItems = useMemo(() => {
     const extras: EntityMenuItem[] = [
-      {
-        icon: 'alert-triangle',
-        label: 'Direkt beauftragen (Notfall)',
-        onClick: () => setNotfallModalOpen(true),
-      },
       ...(detail.angebot_id
         ? ([
             {
               icon: 'file-pencil',
               label: 'Angebot korrigieren',
               onClick: openAngebotKorrektur,
+            },
+            {
+              icon: 'file-plus',
+              label: 'Nachtrag erstellen',
+              onClick: openNachtragAngebot,
             },
           ] as EntityMenuItem[])
         : []),
@@ -764,23 +770,10 @@ export function AuftragDetailClient({
           status: detail.status,
           customer: {
             name: detail.kunden?.name ?? undefined,
-            mail: detail.kunden?.email?.trim() || undefined,
           },
         },
         {
           onCopy: () => runDuplicateAuftrag(detail.id, router),
-          // Admin Login nur Partner-/Kunden-Detail (UX2-6)
-          onPortalLink: () => {
-            if (!detail.kunde_id) {
-              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
-              return
-            }
-            setPortalLinkModalOpen(true)
-          },
-          mail: detail.kunden?.email?.trim() || null,
-          onMail: detail.kunden?.email?.trim()
-            ? () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))
-            : undefined,
           onDelete: detail.lead_id
             ? () => {
                 void deleteVorgang(detail.lead_id!).then((r) => {
@@ -801,16 +794,13 @@ export function AuftragDetailClient({
   }, [
     detail.angebot_id,
     detail.id,
-    detail.kunde_id,
     detail.kunden?.name,
-    detail.kunden?.email,
     detail.status,
     detail.kostentraeger,
     detail.lead_id,
-    mailCompose,
     hauptvertraegeFuerNachtrag.length,
     openAngebotKorrektur,
-    openNachtragErstellen,
+    openNachtragAngebot,
     goZuNachtragAbschluss,
     openNachunternehmervertrag,
     router,
@@ -860,63 +850,9 @@ export function AuftragDetailClient({
       editable={detail.status !== 'storniert'}
       mwstSatz={leistungenMwstSatz}
       onSaved={() => refresh()}
-    />
-  )
-
-  const abschlussInhalt = (
-    <AuftragAbschlussSection
-      auftragId={detail.id}
-      istAbgeschlossen={istAbgeschlossen}
-      abschlussUrl={detail.abschlussdokumentation_url}
-      abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
-      onRefresh={() => refresh()}
-      embedded
-    />
-  )
-
-  const ausfuehrungInhalt = (
-    <AuftragVorOrtPanel
-      auftragId={detail.id}
-      focus={vorOrtFocus}
-      onRefresh={() => refresh()}
-      leistungTabelle={
-        <AuftragLeistungVorOrtTabelle
-          auftragId={detail.id}
-          positionen={detail.auftrag_positionen ?? []}
-          gewerke={gewerke}
-          kundeName={name}
-          onChanged={() => refresh()}
-        />
-      }
-      abschluss={abschlussInhalt}
-      abschlussExtras={
-        <AuftragNachtragBaustoppSection
-          detail={detail}
-          onChanged={() => refresh()}
-          vertragNachtragVerfuegbar={nachtragCtaAktiv}
-          onVertragNachtragErstellen={openNachtragErstellen}
-        />
-      }
-      baustellenExtras={
-        istBauprojekt ? (
-          <AuftragBaustelleTab
-            auftragId={detail.id}
-            team={
-              detail.auftrag_baustelle_team ?? {
-                bau_mannschaft: [],
-              }
-            }
-            bautagesberichte={detail.auftrag_bautagesberichte ?? []}
-            regiearbeiten={detail.auftrag_regiearbeiten ?? []}
-            wochenberichte={detail.auftrag_wochenberichte ?? []}
-            baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
-            kundeName={name}
-            kundeAdresse={kundeAdresse}
-            handwerker={detail.auftrag_handwerker ?? []}
-            onChanged={() => refresh()}
-          />
-        ) : undefined
-      }
+      onOpenDokument={openAngebotKorrektur}
+      vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
+      onVertragNachtragErstellen={openNachtragErstellen}
     />
   )
 
@@ -957,11 +893,9 @@ export function AuftragDetailClient({
     const hasExplicitTab = rawTab !== null && rawTab.trim() !== ''
     if (hasExplicitTab && needsAkteAliasRedirect(rawTab)) {
       const resolved = resolveAuftragDetailTabFromQuery(rawTab) ?? 'uebersicht'
-      const seg = akteSegmentFromQuery(rawTab, searchParams.get('segment'))
       const q = new URLSearchParams(searchParams.toString())
       q.set('tab', resolved)
-      if (resolved === 'akte') q.set('segment', seg)
-      else q.delete('segment')
+      q.delete('segment')
       // replace: History nicht mit Alias-Hops füllen
       router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
       return
@@ -970,19 +904,41 @@ export function AuftragDetailClient({
       hasExplicitTab ? rawTab : null,
       hasExplicitTab ? undefined : { status: detail.status, zahlungOffen: zahlungOffen }
     )
-    const focus = vorOrtAbschnittFromQuery(hasExplicitTab ? rawTab : null)
-    if (focus) setVorOrtFocus(focus)
     if (tab) setMainTab(tab)
-    setAkteSegment(akteSegmentFromQuery(rawTab, searchParams.get('segment')))
+    if (searchParams.has('segment')) {
+      const q = new URLSearchParams(searchParams.toString())
+      q.delete('segment')
+      router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+    }
   }, [searchParams, detail.status, detail.id, zahlungOffen, router])
 
   const finanzenInhalt = (
-    <AuftragZahlungsplanSection
+    <VorgangZahlungTab
+      variant="auftrag"
       auftragId={detail.id}
-      zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
+      zahlungsplanRaw={
+        (() => {
+          const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+          return (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+        })()
+      }
       gesamtNetto={auftragNettoSumme}
       rechnungen={rechnungenListe}
       onCreateInvoice={openRechnungErstellen}
+      onOpenWizard={openRechnungWizard}
+      onEditInvoice={(rechnungId) => {
+        startTransition(async () => {
+          const { loadRechnungWizardBootstrap } = await import(
+            '@/app/(dashboard)/rechnungen/wizard-actions'
+          )
+          const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
+          if (!res.ok) {
+            toast.error(res.message)
+            return
+          }
+          openRechnungWizard(res.bootstrap)
+        })
+      }}
       onRefresh={() => refresh()}
     />
   )
@@ -1001,10 +957,8 @@ export function AuftragDetailClient({
         kontext={projektKontext}
         fromRef={{ kind: 'auftrag', id: detail.id }}
       />
+      {stammdatenInhalt}
       {auftragdetailsInhalt}
-      <DetailSection title="Leistungen" count={posCount}>
-        {leistungInhalt}
-      </DetailSection>
       {vorgangFotos.length > 0 ? (
         <DetailSection title="Fotos">
           <VorgangFotosTab fotos={vorgangFotos} />
@@ -1018,17 +972,13 @@ export function AuftragDetailClient({
     </div>
   )
 
+  /** Phase 6: nur LeistungenTab — kein Tagebuch-Segment / Vor-Ort-Umschalter */
+  const leistungenTabInhalt = <div className="space-y-6">{leistungInhalt}</div>
+
+  const zahlungTabInhalt = <div className="space-y-6">{finanzenInhalt}</div>
+
   const akteInhalt = (
     <VorgangAkteTab
-      initialSegment={akteSegment}
-      onSegmentChange={(s) => {
-        setAkteSegment(s)
-        const q = new URLSearchParams(searchParams.toString())
-        q.set('tab', 'akte')
-        q.set('segment', s)
-        router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
-      }}
-      zahlung={finanzenInhalt}
       dateien={
         <div className="space-y-4">
           <AuftragDokumenteTab
@@ -1046,14 +996,13 @@ export function AuftragDetailClient({
               onChanged={() => refresh()}
             />
           ) : null}
-          {notizenInhalt}
         </div>
       }
-      kunde={stammdatenInhalt}
+      notizen={notizenInhalt}
     />
   )
 
-  /** Spec: Übersicht · Akte · Vor Ort · Aktivität */
+  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte · Aktivität */
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -1062,17 +1011,24 @@ export function AuftragDetailClient({
       render: () => uebersichtInhalt,
     },
     {
+      id: 'leistungen',
+      label: entityDetailTabLabel('leistungen'),
+      icon: 'tool',
+      count: posCount || undefined,
+      render: () => leistungenTabInhalt,
+    },
+    {
+      id: 'zahlung',
+      label: entityDetailTabLabel('zahlung'),
+      icon: 'receipt',
+      render: () => zahlungTabInhalt,
+    },
+    {
       id: 'akte',
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: dokumenteCount || undefined,
       render: () => akteInhalt,
-    },
-    {
-      id: 'ausfuehrung',
-      label: entityDetailTabLabel('ausfuehrung'),
-      icon: 'clipboard-list',
-      render: () => ausfuehrungInhalt,
     },
     {
       id: 'aktivitaet',
@@ -1100,6 +1056,49 @@ export function AuftragDetailClient({
       crumbBackHref="/vorgaenge?tab=auftrag&lifecycle=offen"
       crumbBackLabel="Zurück zu Vorgängen"
       className="space-y-4 pb-0"
+      wiedervorlageDatum={detail.wiedervorlage_datum}
+      wiedervorlageNotiz={detail.wiedervorlage_notiz}
+      wiedervorlageEntity="auftrag"
+      wiedervorlageEntityId={detail.id}
+      onWiedervorlageSaved={() => refresh()}
+      nextStepMetrics={[
+        { label: 'Positionen', value: String(posCount) },
+        { label: 'Status', value: auftragStatus.label },
+        { label: 'Zahlung', value: zahlungOffen ? 'offen' : 'ok' },
+      ]}
+      quickBar={[
+        {
+          id: 'call',
+          label: 'Anrufen',
+          icon: 'phone',
+          disabled: !detail.kunden?.telefon?.trim() && !_leadDetail?.kontakt_telefon?.trim(),
+          onClick: () => {
+            const tel =
+              detail.kunden?.telefon?.trim() || _leadDetail?.kontakt_telefon?.trim() || ''
+            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
+          },
+        },
+        {
+          id: 'mail',
+          label: 'Mail',
+          icon: 'mail',
+          disabled: !detail.kunden?.email?.trim(),
+          onClick: () =>
+            mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id)),
+        },
+        {
+          id: 'notiz',
+          label: 'Notiz',
+          icon: 'messages',
+          onClick: () => setMainTab('akte'),
+        },
+        {
+          id: 'foto',
+          label: 'Foto',
+          icon: 'camera',
+          onClick: () => setMainTab('uebersicht'),
+        },
+      ]}
       nextStep={naechsterSchrittAuftrag({
         status: detail.status,
         istStorniert,
@@ -1109,40 +1108,41 @@ export function AuftragDetailClient({
         title: projektName,
         badges: (
           <>
-            <MockBadge kind={variantToMockBadgeKind(auftragStatus.variant)}>{auftragStatus.label}</MockBadge>
-            {zahlungOffen ? (
-              <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>Zahlung offen</MockBadge>
-            ) : null}
+            <StatusBadge status={detail.status} label={auftragStatus.label} />
+            {zahlungOffen ? <StatusBadge status="gesendet" label="Zahlung offen" /> : null}
           </>
         ),
         meta: headMeta,
         actions: (
           <DetailActionsBar
             sheetTitle="Auftrag"
-            primary={
-              !istStorniert
-                ? detail.status === 'abnahme'
-                  ? {
-                      label: 'Abnahme',
-                      icon: 'checks',
-                      onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
-                    }
-                  : {
-                      label: 'Nächste Rechnung',
-                      icon: 'file-invoice',
-                      onClick: () => openRechnungErstellen({ naechsterAbschlag: true }),
-                    }
-                : null
-            }
-            secondary={
-              !istAbgeschlossen && !istStorniert
-                ? {
-                    label: 'Auftrag abschließen',
-                    icon: 'checks',
-                    onClick: openAuftragAbschliessen,
-                  }
-                : null
-            }
+            primary={(() => {
+              if (istStorniert) return null
+              const cta = primaryCta('auftrag', detail.status, {
+                abnahmeFaellig: detail.status === 'abnahme',
+                rechnungBezahlt: !zahlungOffen && detail.status === 'abgeschlossen',
+              })
+              if (!cta) return null
+              const onClick = () => {
+                if (cta.id === 'abnahme_starten') {
+                  router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+                  return
+                }
+                if (cta.id === 'auftrag_abschliessen') {
+                  openAuftragAbschliessen()
+                  return
+                }
+                if (cta.id === 'rechnung_erstellen') {
+                  openRechnungErstellen({ naechsterAbschlag: true })
+                  return
+                }
+                if (cta.id === 'bewertung_einholen') {
+                  setBewertungOpen(true)
+                }
+              }
+              return { label: cta.label, icon: cta.icon, onClick }
+            })()}
+            secondary={null}
             menuItems={aktionenMenuItems}
           />
         ),
@@ -1154,8 +1154,8 @@ export function AuftragDetailClient({
       />
       {nachtragCtaAktiv ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-          <p className="text-sm text-muted">
-            Mehrleistung oder Vertrags-Nachtrag — unter Vor Ort · Abschluss.
+          <p className="text-[length:var(--fs-text)] text-muted">
+            Mehrleistung oder Vertrags-Nachtrag — unter Leistungen · Abschluss.
           </p>
           <button
             type="button"
@@ -1170,23 +1170,6 @@ export function AuftragDetailClient({
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as AuftragDetailTab)}
-      />
-
-      <NotfallDirektBeauftragenModal
-        open={notfallModalOpen}
-        onClose={() => setNotfallModalOpen(false)}
-        auftragId={detail.id}
-        leadId={detail.lead_id}
-        gewerkName={detail.auftrag_positionen?.[0]?.gewerk_name}
-        onDone={() => refresh()}
-      />
-
-      <AbschlussdokumentationModal
-        open={abschlussModal}
-        onClose={() => setAbschlussModal(false)}
-        auftragId={detail.id}
-        kundeName={name}
-        onDone={() => refresh()}
       />
 
       <RechnungAuswahlModal
@@ -1263,14 +1246,15 @@ export function AuftragDetailClient({
         onSelect={startNachtragWizard}
       />
 
-      {mailCompose.modal}
-
-      <KundenportalLinkVersendenModal
-        open={portalLinkModalOpen}
-        onClose={() => setPortalLinkModalOpen(false)}
-        kundeId={detail.kunde_id}
-        fallbackEmail={detail.kunden?.email}
+      <HandwerkerBewertungModal
+        open={bewertungOpen}
+        onClose={() => setBewertungOpen(false)}
+        auftragId={detail.id}
+        ziele={handwerkerAusAuftrag(detail)}
+        onSaved={() => refresh()}
       />
+
+      {mailCompose.modal}
 
       {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
         <AngebotWizard

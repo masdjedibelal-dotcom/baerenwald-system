@@ -11,10 +11,10 @@ import { MEHR_TILE_NAV } from '@/lib/nav-config'
 
 const ICON_MAP: Record<string, string> = {
   Kunden: 'users',
-  Partner: 'tool',
-  Netzwerk: 'building',
+  Handwerker: 'tool',
+  Kalender: 'calendar',
   Einstellungen: 'settings',
-  KI: 'sparkles',
+  'KI Analytics': 'sparkles',
 }
 
 export function MehrScreenClient({

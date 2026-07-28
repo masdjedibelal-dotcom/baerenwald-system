@@ -1,7 +1,7 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
@@ -12,18 +12,18 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
 import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
 import { DetailSection } from '@/components/vorgang/DetailSection'
-import { VorgangAkteTab, type AkteSegment } from '@/components/vorgang/VorgangAkteTab'
-import { parseAkteSegment, isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
-import {
-  leadKontaktAnzeigeName,
-  leadVertragsKundeId,
-} from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { AnfrageDetailsTab } from '@/components/anfragen/AnfrageDetailsTab'
+import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
+import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
+import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateAnfrage } from '@/lib/list-actions'
 import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
@@ -36,14 +36,11 @@ import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
-import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
 import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
@@ -58,7 +55,7 @@ const AngebotWizard = dynamic(
 )
 import { toast } from '@/components/ui/app-toast'
 import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
-import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
+import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
@@ -77,27 +74,43 @@ import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab = 'uebersicht' | 'akte' | 'aktivitaet'
+type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
-const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>(['uebersicht', 'akte', 'aktivitaet'])
+const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
+  'uebersicht',
+  'leistungen',
+  'zahlung',
+  'akte',
+  'aktivitaet',
+])
+const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'leistungen'
 
 /** Query-/Hash-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
-  if (!tab) return null
+  if (!tab) return ANFRAGE_DETAIL_DEFAULT_TAB
+  if (tab === 'zahlung' || tab === 'zahlplan' || tab === 'finanzen') return 'zahlung'
+  if (
+    tab === 'leistungen' ||
+    tab === 'leistung' ||
+    tab === 'bedarf' ||
+    tab === 'positionen'
+  ) {
+    return 'leistungen'
+  }
   if (
     tab === 'akte' ||
-    tab === 'stammdaten' ||
     tab === 'dokumente' ||
-    tab === 'notizen' ||
-    tab === 'schritte' ||
-    tab === 'naechste-schritte' ||
-    tab === 'naechste_schritte'
+    tab === 'notizen'
   ) {
     return 'akte'
   }
   if (
     tab === 'uebersicht' ||
+    tab === 'stammdaten' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte' ||
     tab === 'details' ||
     tab === 'projekt' ||
     tab === 'anfrage-details' ||
@@ -121,7 +134,7 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'uebersicht'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
-  return null
+  return ANFRAGE_DETAIL_DEFAULT_TAB
 }
 
 function kundenName(lead: LeadDetail) {
@@ -206,27 +219,26 @@ export function AnfrageDetailClient({
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
 
-  const [tab, setTab] = useState<AnfrageDetailTab>('uebersicht')
-  const [akteSegment, setAkteSegment] = useState<AkteSegment>('dateien')
-  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
-  const [notfallModalOpen, setNotfallModalOpen] = useState(false)
+  const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
 
   useEffect(() => {
     const raw = searchParams.get('tab')
     if (isLegacyDetailTabAlias(raw)) {
       const resolved = resolveAnfrageDetailTabFromQuery(raw) ?? 'uebersicht'
-      const seg = parseAkteSegment(raw, searchParams.get('segment'))
       const q = new URLSearchParams(searchParams.toString())
       q.set('tab', resolved)
-      if (resolved === 'akte') q.set('segment', seg)
-      else q.delete('segment')
+      q.delete('segment')
       router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
       return
     }
     const fromQuery = resolveAnfrageDetailTabFromQuery(raw)
     if (fromQuery) {
       setTab(fromQuery)
-      setAkteSegment(parseAkteSegment(raw, searchParams.get('segment')))
+      if (searchParams.has('segment')) {
+        const q = new URLSearchParams(searchParams.toString())
+        q.delete('segment')
+        router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
+      }
       return
     }
     if (typeof window !== 'undefined') {
@@ -330,7 +342,11 @@ export function AnfrageDetailClient({
     lead.kunden?.email ||
     lead.kontakt_email ||
     null
-  const kundeId = leadVertragsKundeId(lead)
+  const leadTel =
+    lead.auftraggeber?.telefon?.trim() ||
+    lead.kunden?.telefon?.trim() ||
+    lead.kontakt_telefon?.trim() ||
+    null
   const auftragId = leadStatusData.auftrag_id as string | undefined
   const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
 
@@ -405,37 +421,14 @@ export function AnfrageDetailClient({
   const canAcceptAngebot =
     Boolean(angebotFlowSnapshot?.angebotId) && !auftragId
 
-  const primaryCtaLabel = canAcceptAngebot ? CTA.angebotAnnehmen : CTA.angebotErstellen
-  const primaryCtaIcon = canAcceptAngebot ? 'check' : 'file-invoice'
+  const matrixCta = primaryCta('anfrage', lead.status)
 
   const primaryCtaAction = useCallback(() => {
-    if (canAcceptAngebot && angebotFlowSnapshot?.angebotId) {
-      const angebotId = angebotFlowSnapshot.angebotId
-      startTransition(async () => {
-        const start = new Date().toISOString().slice(0, 10)
-        const res = await acceptAngebotAndCreateAuftrag(angebotId, {
-          start_datum: start,
-          send_kunden_email: false,
-        })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        toast.success('Auftrag erstellt')
-        router.push(`/auftraege/${res.auftragId}`)
-        refresh()
-      })
-      return
+    if (!matrixCta) return
+    if (matrixCta.id === 'angebot_erstellen') {
+      openAngebotErstellen()
     }
-    openAngebotErstellen()
-  }, [
-    canAcceptAngebot,
-    angebotFlowSnapshot?.angebotId,
-    openAngebotErstellen,
-    router,
-    refresh,
-    startTransition,
-  ])
+  }, [matrixCta, openAngebotErstellen])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
@@ -450,18 +443,7 @@ export function AnfrageDetailClient({
         {
           onEdit: () => setBearbeitenOpen(true),
           onCopy: () => runDuplicateAnfrage(lead.id, router),
-          // Admin Login nur Partner-/Kunden-Detail (UX2-6)
-          onPortalLink: () => {
-            if (!kundeId) {
-              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
-              return
-            }
-            setPortalLinkModalOpen(true)
-          },
           onStatus: (k) => setStatusModalKind(k),
-          // Notfall + Angebot: Header-CTAs — nicht nochmal im Menü
-          mail: leadEmail?.trim() || null,
-          onMail: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
           onDelete: () => {
             startTransition(async () => {
               const r = await deleteAnfrage(lead.id)
@@ -479,15 +461,7 @@ export function AnfrageDetailClient({
       ),
       (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
     )
-  }, [
-    lead,
-    leadEmail,
-    mailCompose,
-    router,
-    startTransition,
-    refresh,
-    kundeId,
-  ])
+  }, [lead, router, startTransition, refresh])
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
 
@@ -515,6 +489,16 @@ export function AnfrageDetailClient({
     <AnfrageDetailsTab lead={lead} onSaved={() => refresh()} />
   )
 
+  const leistungenInhalt = (
+    <LeistungenTab
+      phase="anfrage"
+      rows={leistungenFromAnfrage(lead.funnel_daten)}
+      onOpenDokument={openAngebotErstellen}
+      emptyTitle="Noch keine Leistungen"
+      emptyHint="Bedarf aus der Anfrage erscheint hier. Verbindliche Positionen legst du im Angebot an."
+    />
+  )
+
   const notizenInhalt = (
     <AnfrageNotizenTab leadId={lead.id} notizen={notizenRows} onReload={() => refresh()} />
   )
@@ -530,11 +514,12 @@ export function AnfrageDetailClient({
             kontext={projektKontext}
             fromRef={{ kind: 'anfrage', id: lead.id }}
           />
+          {stammdatenInhalt}
+          {detailsInhalt}
           <ZugehoerigListe
             kontext={projektKontext}
             fromRef={{ kind: 'anfrage', id: lead.id }}
           />
-          {detailsInhalt}
           {vorgangFotos.length > 0 ? (
             <DetailSection title="Fotos">
               <VorgangFotosTab fotos={vorgangFotos} />
@@ -544,34 +529,38 @@ export function AnfrageDetailClient({
       ),
     },
     {
+      id: 'leistungen',
+      label: entityDetailTabLabel('leistungen'),
+      icon: 'tool',
+      render: () => <div className="space-y-6">{leistungenInhalt}</div>,
+    },
+    {
+      id: 'zahlung',
+      label: entityDetailTabLabel('zahlung'),
+      icon: 'receipt',
+      render: () => (
+        <AnfrageZahlungTab
+          rechnungen={projektKontext?.rechnungen ?? []}
+          onCreateAngebot={openAngebotErstellen}
+        />
+      ),
+    },
+    {
       id: 'akte',
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: (dokumenteCount || 0) + (notizenRows.length || 0) || undefined,
       render: () => (
         <VorgangAkteTab
-          hideZahlung
-          initialSegment={akteSegment === 'zahlung' ? 'dateien' : akteSegment}
-          onSegmentChange={(s) => {
-            setAkteSegment(s)
-            const q = new URLSearchParams(searchParams.toString())
-            q.set('tab', 'akte')
-            q.set('segment', s)
-            router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
-          }}
-          zahlung={null}
           dateien={
-            <div className="space-y-4">
-              <AnfrageDokumenteTab
-                leadId={lead.id}
-                dokumente={dokumenteRows}
-                angebote={angeboteListe}
-                onReload={() => refresh()}
-              />
-              {notizenInhalt}
-            </div>
+            <AnfrageDokumenteTab
+              leadId={lead.id}
+              dokumente={dokumenteRows}
+              angebote={angeboteListe}
+              onReload={() => refresh()}
+            />
           }
-          kunde={stammdatenInhalt}
+          notizen={notizenInhalt}
         />
       ),
     },
@@ -595,6 +584,35 @@ export function AnfrageDetailClient({
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=anfrage"
       crumbBackLabel="Zurück zu Vorgängen"
+      wiedervorlageDatum={lead.wiedervorlage_datum}
+      wiedervorlageNotiz={lead.wiedervorlage_notiz}
+      wiedervorlageEntity="lead"
+      wiedervorlageEntityId={lead.id}
+      onWiedervorlageSaved={() => refresh()}
+      nextStepMetrics={[
+        { label: 'Status', value: anfrageStatusDisplay(lead.status, { orgFreigabeStatus: lead.org_freigabe_status }).label },
+        { label: 'Angebote', value: String(angeboteListe.length) },
+      ]}
+      quickBar={[
+        {
+          id: 'call',
+          label: 'Anrufen',
+          icon: 'phone',
+          disabled: !leadTel,
+          onClick: () => {
+            if (leadTel) window.open(`tel:${leadTel.replace(/\s/g, '')}`)
+          },
+        },
+        {
+          id: 'mail',
+          label: 'Mail',
+          icon: 'mail',
+          disabled: !leadEmail,
+          onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
+        },
+        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setTab('akte') },
+        { id: 'foto', label: 'Foto', icon: 'camera', onClick: () => setTab('uebersicht') },
+      ]}
       nextStep={naechsterSchrittAnfrage({
         status: lead.status,
         hasAngebote,
@@ -607,37 +625,37 @@ export function AnfrageDetailClient({
           const s = anfrageStatusDisplay(lead.status, {
             orgFreigabeStatus: lead.org_freigabe_status,
           })
-          return <MockBadge kind={variantToMockBadgeKind(s.variant)}>{s.label}</MockBadge>
+          return <StatusBadge status={lead.status} label={s.label} />
         })(),
         meta: headMeta,
         actions: (
           <DetailActionsBar
             sheetTitle="Anfrage"
-            primary={{
-              label: primaryCtaLabel,
-              icon: primaryCtaIcon,
-              onClick: primaryCtaAction,
-              disabled: pending,
-            }}
-            secondary={
-              !auftragId
+            primary={
+              matrixCta
                 ? {
-                    label: 'Notfall melden',
-                    icon: 'alert-triangle',
-                    onClick: () => setNotfallModalOpen(true),
+                    label: matrixCta.label,
+                    icon: matrixCta.icon,
+                    onClick: primaryCtaAction,
                     disabled: pending,
                   }
                 : null
             }
+            secondary={null}
             menuItems={detailHeadMenuItems}
           />
         ),
       }}
     >
       <div className="space-y-4">
+      <DuplikatBand
+        leadId={lead.id}
+        duplikatHinweis={Boolean((lead as { duplikat_hinweis?: boolean }).duplikat_hinweis)}
+        zusammengefuehrtIn={(lead as { zusammengefuehrt_in?: string | null }).zusammengefuehrt_in}
+      />
       {noShowTerminHinweis ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-          <p className="text-sm text-muted">
+          <p className="text-[length:var(--fs-text)] text-muted">
             Kunde nicht erschienen? Status „Nicht erreichbar“ setzen (Wiedervorlage).
           </p>
           <button
@@ -705,13 +723,6 @@ export function AnfrageDetailClient({
         }}
       />
 
-      <KundenportalLinkVersendenModal
-        open={portalLinkModalOpen}
-        onClose={() => setPortalLinkModalOpen(false)}
-        kundeId={kundeId}
-        fallbackEmail={leadEmail}
-      />
-
       <StatusModal
         kind={statusModalKind}
         open={statusModalKind != null}
@@ -719,22 +730,6 @@ export function AnfrageDetailClient({
         onClose={() => setStatusModalKind(null)}
         onSaved={() => {
           setStatusModalKind(null)
-          refresh()
-        }}
-      />
-
-      <NotfallDirektBeauftragenModal
-        open={notfallModalOpen}
-        onClose={() => setNotfallModalOpen(false)}
-        leadId={lead.id}
-        variant="anfrage"
-        gewerkName={
-          bereicheFuerAnzeige(lead.bereiche, lead.situation)[0] ||
-          lead.situation ||
-          'Allgemein'
-        }
-        onDone={(id) => {
-          router.push(`/auftraege/${id}`)
           refresh()
         }}
       />

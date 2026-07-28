@@ -22,7 +22,7 @@ export function PosTotals({
   const row: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: 13,
+    fontSize: 'var(--fs-text)',
   }
 
   return (
@@ -58,7 +58,7 @@ export function PosTotals({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          fontSize: 15,
+          fontSize: 'var(--fs-title)',
           paddingTop: su ? 6 : 0,
           borderTop: su ? '0.5px solid var(--border)' : 'none',
         }}

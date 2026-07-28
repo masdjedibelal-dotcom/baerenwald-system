@@ -144,7 +144,7 @@ export function buildCrmOeffnenLink(input: {
     case 'kunde_neu':
       return { ok: true, href: createKundeHref(), label: 'Neuer Kunde' }
     case 'partner_neu':
-      return { ok: true, href: createPartnerHref(), label: 'Neuer Partner' }
+      return { ok: true, href: createPartnerHref(), label: 'Neuer Handwerker' }
     case 'anfrage_neu':
       return {
         ok: true,

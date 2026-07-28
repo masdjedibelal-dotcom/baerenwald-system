@@ -88,7 +88,7 @@ import {
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 
 type Rechnungsart = 'abschlag' | 'schluss'
-type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos'
+type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos' | 'regieschein'
 
 const ANLAGEN_DEF: Array<{
   key: AnlagenKey
@@ -109,6 +109,11 @@ const ANLAGEN_DEF: Array<{
   },
   { key: 'abnahme', label: 'Abnahmeprotokoll', sub: 'Unterschriebene Abnahme' },
   { key: 'fotos', label: 'Fotodokumentation', sub: 'Vorher/Nachher-Bilder' },
+  {
+    key: 'regieschein',
+    label: 'Regieschein',
+    sub: 'Anlage aus Bautagebuch / Aufwand-Position',
+  },
 ]
 
 const WIZARD_STEPS = [
@@ -236,6 +241,9 @@ export function RechnungWizard({
       bautagebuch: false,
       abnahme: istSchlussInit,
       fotos: false,
+      regieschein: (bootstrap.positionen ?? []).some((p) =>
+        /regieschein|nach aufwand/i.test(String(p.notiz_extern ?? ''))
+      ),
     }
   })
   const [einleitung, setEinleitung] = useState(() => {
@@ -323,6 +331,15 @@ export function RechnungWizard({
   const netto = berechnung.netto
   const brutto = berechnung.brutto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
+  const hasRegiePos = useMemo(
+    () => posBoardLines.some((p) => p.regieSchein),
+    [posBoardLines]
+  )
+
+  useEffect(() => {
+    if (!hasRegiePos) return
+    setAnlagen((a) => (a.regieschein ? a : { ...a, regieschein: true }))
+  }, [hasRegiePos])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
 
   const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
@@ -1283,6 +1300,11 @@ export function RechnungWizard({
             showUst
             gewerke={gewerkNamen}
             preislisten={preislisten}
+            badgeOf={(p) =>
+              p.regieSchein
+                ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
+                : null
+            }
             headerAction={
               <AngebotKiAssistentButton
                 sm
@@ -1298,6 +1320,20 @@ export function RechnungWizard({
               />
             }
           />
+
+          {hasRegiePos ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2" aria-label="Regie-Anlagen">
+              {posBoardLines.filter((p) => p.regieSchein).map((p) => (
+                <span key={`regie-${p.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-soft)] px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-2)]">
+                  <MockIcon ctx="default" n="paperclip" size={12} />
+                  Regieschein
+                  <span className="text-[var(--text-4)]">·</span>
+                  <span className="max-w-[140px] truncate">{p.name || 'Position'}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
         </>
       </section>
 

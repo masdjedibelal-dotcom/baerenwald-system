@@ -395,7 +395,7 @@ export function AngebotNeuForm({
                       ? `/angebote/${kopieVon.quelleId}`
                       : '/angebote'
             }
-            className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary"
+            className="inline-flex min-h-[44px] items-center text-[length:var(--fs-text)] font-medium text-primary"
           >
             Zurück
           </Link>
@@ -403,26 +403,26 @@ export function AngebotNeuForm({
       />
 
       {error ? (
-        <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
+        <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
           {error}
         </p>
       ) : null}
 
       {istKopie && kopieVon ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
           Kopie von Angebot <strong>{kopieVon.angebotLabel}</strong> — bitte Preise anpassen.
         </p>
       ) : null}
 
       {vorlageBootstrap && !editAngebot && !kopieVon && !modusVorlage ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
           Vorlage geladen: <strong>{vorlageBootstrap.name}</strong> — Preise prüfen.
         </p>
       ) : null}
 
       {modusVorlage ? (
         <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
-          <h2 className="text-lg font-semibold text-ink">Vorlage</h2>
+          <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Vorlage</h2>
           <Input
             label="Name"
             required
@@ -436,8 +436,8 @@ export function AngebotNeuForm({
             rows={2}
           />
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-medium text-ink">Preise speichern?</legend>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <legend className="mb-1 text-[length:var(--fs-text)] font-medium text-ink">Preise speichern?</legend>
+            <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
               <input
                 type="radio"
                 name="vorlage-preise"
@@ -446,7 +446,7 @@ export function AngebotNeuForm({
               />
               Mit Preisen
             </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
               <input
                 type="radio"
                 name="vorlage-preise"
@@ -459,22 +459,22 @@ export function AngebotNeuForm({
         </section>
       ) : (
       <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="text-lg font-semibold text-ink">Kunde</h2>
+        <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Kunde</h2>
         {readonlyKunde ? (
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-[length:var(--fs-text)]">
             <p className="font-medium text-ink">{readonlyKunde.name}</p>
             <p className="text-muted">{readonlyKunde.email ?? '—'}</p>
             <p className="text-muted">{readonlyKunde.telefon ?? '—'}</p>
-            <p className="text-xs text-muted">Aus Lead, nicht änderbar.</p>
+            <p className="text-[length:var(--fs-meta)] text-muted">Aus Lead, nicht änderbar.</p>
           </div>
         ) : istKopie && kopieKunde && kundeId === kopieKunde.id && !neuKundeOpen ? (
-          <div className="space-y-3 text-sm">
+          <div className="space-y-3 text-[length:var(--fs-text)]">
             <div className="rounded-lg border border-border bg-canvas/50 p-3">
               <p className="font-medium text-ink">{kopieKunde.name}</p>
               <p className="text-muted">{kopieKunde.email ?? '—'}</p>
               <p className="text-muted">{kopieKunde.telefon ?? '—'}</p>
             </div>
-            <p className="text-xs text-muted">
+            <p className="text-[length:var(--fs-meta)] text-muted">
               Übernommen aus dem kopierten Angebot — Sie können unten einen anderen Kunden suchen.
             </p>
             <div className="relative">
@@ -493,7 +493,7 @@ export function AngebotNeuForm({
                     <li key={k.id}>
                       <button
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-canvas"
+                        className="w-full px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas"
                         onClick={() => {
                           setKundeId(k.id)
                           setKundeSuche('')
@@ -524,7 +524,7 @@ export function AngebotNeuForm({
                     <li key={k.id}>
                       <button
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-canvas"
+                        className="w-full px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas"
                         onClick={() => {
                           setKundeId(k.id)
                           setKundeSuche(k.name)
@@ -533,7 +533,7 @@ export function AngebotNeuForm({
                         }}
                       >
                         <span className="font-medium text-ink">{k.name}</span>
-                        <span className="block text-xs text-muted">
+                        <span className="block text-[length:var(--fs-meta)] text-muted">
                           {k.email ?? ''}
                         </span>
                       </button>
@@ -544,7 +544,7 @@ export function AngebotNeuForm({
             </div>
             <button
               type="button"
-              className="text-sm font-medium text-primary underline"
+              className="text-[length:var(--fs-text)] font-medium text-primary underline"
               onClick={() => setNeuKundeOpen((o) => !o)}
             >
               {neuKundeOpen ? 'Suche nutzen' : 'Neuen Kunden anlegen'}
@@ -573,8 +573,8 @@ export function AngebotNeuForm({
       <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold text-ink">Positionen</h2>
-            <p className="text-sm text-muted">
+            <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Positionen</h2>
+            <p className="text-[length:var(--fs-text)] text-muted">
               Festpreise pro Einheit; Handwerker pro Position zuordnen.
             </p>
           </div>
@@ -611,7 +611,7 @@ export function AngebotNeuForm({
         </Button>
 
         {modusVorlage ? (
-          <div className="mt-4 rounded-lg border border-dashed border-bw-border bg-bw-bg/60 p-3 text-sm text-bw-text-muted">
+          <div className="mt-4 rounded-lg border border-dashed border-bw-border bg-bw-bg/60 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
             <span className="font-medium text-ink">Summe Vorlage (netto): </span>
             {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
           </div>
@@ -620,7 +620,7 @@ export function AngebotNeuForm({
 
       {!modusVorlage ? (
         <section className="mb-8 rounded-lg border border-border bg-surface p-4 shadow-card">
-          <h2 className="mb-3 text-lg font-semibold text-ink">Notizen</h2>
+          <h2 className="mb-3 text-[length:var(--fs-head)] font-semibold text-ink">Notizen</h2>
           <Textarea
             value={notizen}
             onChange={(e) => setNotizen(e.target.value)}
@@ -634,45 +634,45 @@ export function AngebotNeuForm({
         <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-white px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+              <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>
+              <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-ink">
                 {betragAnzeige(null, summen.lohnZeileMin, summen.lohnZeileMax)}
               </p>
-              <p className="text-xs text-bw-text-muted">netto</p>
+              <p className="text-[length:var(--fs-meta)] text-bw-text-muted">netto</p>
             </div>
             <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Gesamt Material</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+              <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Gesamt Material</p>
+              <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-ink">
                 {betragAnzeige(null, summen.materialZeileMin, summen.materialZeileMax)}
               </p>
-              <p className="text-xs text-bw-text-muted">netto</p>
+              <p className="text-[length:var(--fs-meta)] text-bw-text-muted">netto</p>
             </div>
             <div className="rounded-lg border border-bw-border bg-primary/8 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Netto Summe</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-primary">
+              <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Netto Summe</p>
+              <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-primary">
                 {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
               </p>
-              <p className="text-xs text-bw-text-muted">zzgl. MwSt.</p>
+              <p className="text-[length:var(--fs-meta)] text-bw-text-muted">zzgl. MwSt.</p>
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 border-t border-bw-border pt-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="text-sm text-bw-text-muted">
+            <div className="text-[length:var(--fs-text)] text-bw-text-muted">
               MwSt. {summen.mwstSatz}%:{' '}
               <span className="font-medium text-ink">
                 {betragAnzeige(null, summen.mwstBetragMin, summen.mwstBetragMax)}
               </span>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-bw-light">Brutto Endsumme</p>
+              <p className="text-[length:var(--fs-meta)] font-medium uppercase text-bw-light">Brutto Endsumme</p>
               <p
-                className="text-2xl font-bold tabular-nums tracking-tight"
+                className="text-[length:var(--fs-head)] font-bold tabular-nums tracking-tight"
                 style={{ color: 'var(--fl-accent)' }}
               >
                 {betragAnzeige(null, summen.bruttoMin, summen.bruttoMax)}
               </p>
             </div>
           </div>
-          <div className="mt-3 border-t border-bw-border pt-2 text-xs text-bw-text-muted">
+          <div className="mt-3 border-t border-bw-border pt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
             <span className="font-medium text-ink">Intern: </span>
             Einkauf {betragAnzeige(null, summen.einkaufZeileMin, summen.einkaufZeileMax)} · Marge{' '}
             {betragAnzeige(null, summen.margeMin, summen.margeMax)}

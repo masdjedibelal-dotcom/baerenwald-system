@@ -144,9 +144,9 @@ export function AbnahmeMaengelBearbeitenFlow({
   )
 
   const body = loading ? (
-    <p className="py-8 text-center text-sm text-bw-text-muted">Mängel werden geladen…</p>
+    <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Mängel werden geladen…</p>
   ) : maengel.length === 0 ? (
-    <p className="text-sm text-bw-text-muted">Keine Mängel im Protokoll — alles abgenommen.</p>
+    <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Mängel im Protokoll — alles abgenommen.</p>
   ) : (
     <>
       <input
@@ -160,7 +160,7 @@ export function AbnahmeMaengelBearbeitenFlow({
           e.target.value = ''
         }}
       />
-      <p className="mb-3 text-sm text-bw-text-muted">
+      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
         Nacharbeit für <strong>{kundeName}</strong>
         {offen > 0 ? (
           <>
@@ -185,15 +185,15 @@ export function AbnahmeMaengelBearbeitenFlow({
             >
               <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="text-[13px] font-semibold text-bw-text">{punkt?.beschreibung ?? m.beschreibung}</p>
-                  <p className="text-[11px] text-bw-text-muted">
+                  <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">{punkt?.beschreibung ?? m.beschreibung}</p>
+                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                     {punkt?.gewerk}
                     {punkt?.leistung_name ? ` · ${punkt.leistung_name}` : ''}
                   </p>
                 </div>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                     offenItem ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
                   )}
                 >
@@ -252,7 +252,7 @@ export function AbnahmeMaengelBearbeitenFlow({
                 </div>
               ) : null}
               {(m.verlauf ?? []).length > 0 ? (
-                <ul className="mt-2 space-y-0.5 text-[11px] text-bw-text-muted">
+                <ul className="mt-2 space-y-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
                   {m.verlauf!.map((v, i) => (
                     <li key={`${v.at}-${i}`}>
                       {formatDatum(v.at.slice(0, 10))} · {v.typ}

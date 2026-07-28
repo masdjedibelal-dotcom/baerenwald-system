@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { Paperclip } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
@@ -25,6 +25,10 @@ function defaultStufe(opts: {
   return 1
 }
 
+/**
+ * N4 / Spec §6: Mahnung als EditorSheet-Drawer (kein Center-Modal).
+ * Export-Name bleibt für bestehende Imports.
+ */
 export function ZahlungserinnerungMailModal({
   open,
   onClose,
@@ -60,13 +64,16 @@ export function ZahlungserinnerungMailModal({
     stufe1Gesendet: boolean
     stufe2Gesendet: boolean
   } | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open) {
       setMail(null)
+      setDirty(false)
       return
     }
     setStufe(defaultStufe({ erinnerung7: erinnerung7SentAt, erinnerung21: erinnerung21SentAt }))
+    setDirty(false)
   }, [open, erinnerung7SentAt, erinnerung21SentAt])
 
   useEffect(() => {
@@ -93,6 +100,7 @@ export function ZahlungserinnerungMailModal({
         stufe1Gesendet: res.stufe1Gesendet,
         stufe2Gesendet: res.stufe2Gesendet,
       })
+      setDirty(false)
     })()
     return () => {
       cancelled = true
@@ -122,6 +130,7 @@ export function ZahlungserinnerungMailModal({
           ? `Zahlungserinnerung für ${rechnungsnummer} gesendet`
           : `2. Zahlungserinnerung für ${rechnungsnummer} gesendet`
       )
+      setDirty(false)
       onSent?.()
       router.refresh()
       onClose()
@@ -129,11 +138,19 @@ export function ZahlungserinnerungMailModal({
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title={`Zahlungserinnerung — ${rechnungsnummer}`}
+      title="Mahnung"
+      subtitle={rechnungsnummer}
+      context="detail"
       size="lg"
+      compose
+      composeLabel="Jetzt senden"
+      onConfirm={sendNow}
+      confirmDisabled={!mail || loading}
+      confirmBusy={pending || loading}
+      dirty={dirty}
       footer={
         <ModalFormFooter
           onCancel={onClose}
@@ -146,7 +163,7 @@ export function ZahlungserinnerungMailModal({
       }
     >
       {loading ? (
-        <p className="text-sm text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
       ) : mail ? (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -157,7 +174,7 @@ export function ZahlungserinnerungMailModal({
                   key={s}
                   type="button"
                   className={cn(
-                    'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                    'rounded-lg border px-3 py-2 text-[length:var(--fs-text)] font-medium transition-colors',
                     stufe === s
                       ? 'border-bw-primary bg-bw-primary/10 text-bw-primary'
                       : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover/60'
@@ -166,20 +183,20 @@ export function ZahlungserinnerungMailModal({
                 >
                   Stufe {s}
                   {gesendet ? (
-                    <span className="ml-1.5 text-xs font-normal text-bw-text-muted">(bereits gesendet)</span>
+                    <span className="ml-1.5 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">(bereits gesendet)</span>
                   ) : null}
                 </button>
               )
             })}
           </div>
 
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             {stufe === 1
               ? 'Freundliche Erinnerung — neue Frist: bisherige Fälligkeit + 7 Tage.'
               : 'Deutlichere Erinnerung — erneut +7 Tage auf die aktuelle Fälligkeit.'}{' '}
             Zahlbar bis: <strong>{mail.zahlbarBisLabel}</strong>
             {erinnerung7SentAt ? (
-              <span className="mt-1 block text-xs text-amber-900/80">
+              <span className="mt-1 block text-[length:var(--fs-meta)] text-amber-900/80">
                 Stufe 1 zuletzt: {formatDatum(erinnerung7SentAt.slice(0, 10))}
               </span>
             ) : null}
@@ -188,29 +205,38 @@ export function ZahlungserinnerungMailModal({
           <Input
             label="Betreff"
             value={mail.betreff}
-            onChange={(e) => setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))}
+            onChange={(e) => {
+              setDirty(true)
+              setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
+            }}
           />
           <EmailPillsField
             label="An"
             required
             emails={mail.to}
-            onChange={(emails) => setMail((prev) => (prev ? { ...prev, to: emails } : prev))}
+            onChange={(emails) => {
+              setDirty(true)
+              setMail((prev) => (prev ? { ...prev, to: emails } : prev))
+            }}
             placeholder="kunde@beispiel.de"
           />
           <EmailPillsField
             label="CC"
             emails={mail.cc}
-            onChange={(emails) => setMail((prev) => (prev ? { ...prev, cc: emails } : prev))}
+            onChange={(emails) => {
+              setDirty(true)
+              setMail((prev) => (prev ? { ...prev, cc: emails } : prev))
+            }}
             placeholder="weitere@beispiel.de"
             hint={KUNDE_MAIL_BCC_HINT}
           />
-          <p className="inline-flex items-center gap-1.5 text-xs text-bw-text-muted">
+          <p className="inline-flex items-center gap-1.5 text-[length:var(--fs-meta)] text-bw-text-muted">
             <Paperclip className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Anhang: {mail.pdfName}
           </p>
           <CollapsibleMailPreview previewHtml={mail.html} />
         </div>
       ) : null}
-    </Modal>
+    </EditorSheet>
   )
 }

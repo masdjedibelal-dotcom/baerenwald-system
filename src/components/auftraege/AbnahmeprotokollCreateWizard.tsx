@@ -13,8 +13,12 @@ import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/Mobile
 import { toast } from '@/components/ui/app-toast'
 import {
   downloadAbnahmeprotokollPdf,
+  saveAbnahmeAndAbschliessen,
   saveAbnahmeprotokollPdfOnly,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
+import { istAuftragPositionFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
+import type { AuftragStatus } from '@/lib/types'
 import {
   ABNAHME_ERGEBNIS_LABEL,
   emptyAbnahmeProtokollMeta,
@@ -38,12 +42,11 @@ const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string 
 }
 import { heuteYmd } from '@/lib/angebot-einfach'
 
+/** Spec §8 / Phase 8: drei Schritte im Abnahme-Canvas */
 const SECTIONS = [
-  { id: 'inhalt', label: 'Inhalt' },
-  { id: 'pruefen', label: 'Prüfen' },
-  { id: 'fotos', label: 'Fotos' },
-  { id: 'unterschrift', label: 'Unterschrift' },
-  { id: 'fertig', label: 'Fertig' },
+  { id: 'checkliste', label: 'Checkliste & Ergebnis' },
+  { id: 'angaben', label: 'Angaben' },
+  { id: 'pruefen', label: 'Prüfen & PDF' },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -67,8 +70,8 @@ function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
 function StepIntro({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="mb-4">
-      <div className="text-[17px] font-semibold tracking-tight text-bw-text">{title}</div>
-      <p className="mt-1 text-[13px] text-bw-text-muted">{hint}</p>
+      <div className="text-[length:var(--fs-head)] font-semibold tracking-tight text-bw-text">{title}</div>
+      <p className="mt-1 text-[length:var(--fs-text)] text-bw-text-muted">{hint}</p>
     </div>
   )
 }
@@ -76,7 +79,7 @@ function StepIntro({ title, hint }: { title: string; hint: string }) {
 function PhaseSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-bw-border pb-6 last:border-0 last:pb-0">
-      <h3 className="mb-3 text-[15px] font-semibold text-bw-text">{title}</h3>
+      <h3 className="mb-3 text-[length:var(--fs-title)] font-semibold text-bw-text">{title}</h3>
       {children}
     </section>
   )
@@ -110,7 +113,7 @@ export function AbnahmeprotokollCreateWizard({
   protokollId?: string | null
 }) {
   const router = useRouter()
-  const [activeSection, setActiveSection] = useState<SectionId>('inhalt')
+  const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
   const [pending, startTransition] = useTransition()
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -127,7 +130,7 @@ export function AbnahmeprotokollCreateWizard({
     emptyAbnahmeProtokollMeta(initialMeta)
   )
 
-  const onClose = () => router.push(`/auftraege/${auftragId}?tab=abnahme`)
+  const onClose = () => router.push(`/auftraege/${auftragId}?tab=leistungen`)
 
   const ausgewaehlt = useMemo(
     () => filterAbnahmePunkteFuerDokument(punkte).length,
@@ -135,6 +138,20 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const maengelListe = useMemo(() => maengelAusPunkten(punkte), [punkte])
+
+  /** Gate: Positionen ohne dokumentierten Abschluss (leistung_status ≠ erledigt). */
+  const undokumentiert = useMemo(() => {
+    const alle = positionen.filter(istAuftragPositionFuerSumme)
+    const offen = alle.filter((p) => String(p.leistung_status ?? '').toLowerCase() !== 'erledigt')
+    return { n: offen.length, m: alle.length }
+  }, [positionen])
+
+  const hasSignatur = Boolean(
+    meta.unterschrift_ort_datum_an.trim() && meta.unterschrift_ort_datum_ag.trim()
+  )
+  const primaryCtaLabel = hasSignatur
+    ? 'Abnahme speichern & Auftrag abschließen'
+    : 'Abnahme speichern'
 
   function patchMeta(patch: Partial<AbnahmeProtokollMeta>) {
     setMeta((m) => ({ ...m, ...patch }))
@@ -152,7 +169,7 @@ export function AbnahmeprotokollCreateWizard({
     }
   }
 
-  function validateInhalt(): string | null {
+  function validateAngaben(): string | null {
     if (!abnahmeDatum.trim()) return 'Bitte Übergabedatum angeben.'
     if (!meta.uebergabe_ort.trim()) return 'Bitte Übergabeort angeben.'
     if (!meta.vertreter_an.trim()) return 'Bitte Vertreter (Auftragnehmer) angeben.'
@@ -162,14 +179,21 @@ export function AbnahmeprotokollCreateWizard({
   }
 
   function validateBeforeSave(): string | null {
-    return validateInhalt()
+    return validateAngaben()
   }
 
   function goSection(id: SectionId) {
-    if (id !== 'inhalt') {
-      const err = validateInhalt()
+    if (id === 'pruefen' || id === 'angaben') {
+      if (ausgewaehlt === 0) {
+        toast.error('Mindestens eine Leistung für die Abnahme auswählen (OK).')
+        return
+      }
+    }
+    if (id === 'pruefen') {
+      const err = validateAngaben()
       if (err) {
         toast.error(err)
+        setActiveSection('angaben')
         return
       }
       setMeta((m) => ensureUnterschriftOrtDatum(m))
@@ -258,7 +282,7 @@ export function AbnahmeprotokollCreateWizard({
     }
   }
 
-  function erstellen() {
+  function erstellen(opts?: { abschliessen?: boolean }) {
     const err = validateBeforeSave()
     if (err) {
       toast.error(err)
@@ -266,8 +290,9 @@ export function AbnahmeprotokollCreateWizard({
     }
     const metaReady = ensureUnterschriftOrtDatum(meta)
     setMeta(metaReady)
+    const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
     startTransition(async () => {
-      const r = await saveAbnahmeprotokollPdfOnly({
+      const payload = {
         auftragId,
         abnahmeDatum,
         punkte,
@@ -275,7 +300,34 @@ export function AbnahmeprotokollCreateWizard({
         notizen: notizen.trim() || null,
         meta: metaReady,
         protokollId,
-      })
+      }
+      if (abschliessen) {
+        const r = await saveAbnahmeAndAbschliessen(payload)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        downloadPdfFromBase64(r.pdfBase64, r.filename)
+        const prev = r.previousStatus
+        toast.success('Abnahme gespeichert — Auftrag abgeschlossen', {
+          action: {
+            label: 'Rückgängig',
+            onClick: () => {
+              void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                if (!u.ok) toast.error(u.message)
+                else {
+                  toast.success('Abschluss rückgängig gemacht')
+                  router.refresh()
+                }
+              })
+            },
+          },
+        })
+        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        router.refresh()
+        return
+      }
+      const r = await saveAbnahmeprotokollPdfOnly(payload)
       if (!r.ok) {
         toast.error(r.message)
         return
@@ -286,7 +338,7 @@ export function AbnahmeprotokollCreateWizard({
           ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
           : 'Abnahmeprotokoll erstellt'
       )
-      router.push(`/auftraege/${auftragId}?tab=abnahme`)
+      router.push(`/auftraege/${auftragId}?tab=leistungen`)
       router.refresh()
     })
   }
@@ -365,7 +417,7 @@ export function AbnahmeprotokollCreateWizard({
   const ergebnisForm = (
     <div className="space-y-3">
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">Ergebnis</legend>
+        <legend className="mb-2 text-[length:var(--fs-text)] font-medium">Ergebnis</legend>
         <div
           className="pos-segmented abnahme-ergebnis-segmented"
           role="radiogroup"
@@ -389,7 +441,7 @@ export function AbnahmeprotokollCreateWizard({
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs leading-snug text-bw-text-muted">
+        <p className="mt-2 text-[length:var(--fs-meta)] leading-snug text-bw-text-muted">
           {ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
         </p>
       </fieldset>
@@ -419,7 +471,7 @@ export function AbnahmeprotokollCreateWizard({
 
   const unterschriftenForm = (
     <div className="space-y-3">
-      <p className="text-[13px] text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         Zeile „Ort, Datum“ unter jeder Unterschrift im PDF — leer = aus Übergabe übernommen.
       </p>
       <Input
@@ -458,9 +510,111 @@ export function AbnahmeprotokollCreateWizard({
     </div>
   )
 
-  const phaseInhalt = (
-    <div id="abnahme-sec-inhalt" className="document-canvas-sec space-y-8">
-      <StepIntro title="Inhalt" hint="Übergabe, Personen, Projekt und Leistungen für das PDF." />
+  const phaseCheckliste = (
+    <div id="abnahme-sec-checkliste" className="document-canvas-sec space-y-8">
+      <StepIntro
+        title="Checkliste & Ergebnis"
+        hint="Leistungen durchgehen (OK / Mangel) und Abnahmeergebnis festlegen."
+      />
+      <PhaseSection title="Leistungen">
+        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+          OK / Mangel / Offen steuert das PDF — Drag zum Sortieren.
+        </p>
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => setPunkte(markAllOk(punkte))}>
+            Alle OK
+          </Button>
+        </div>
+        <AbnahmeprotokollChecklist
+          punkte={punkte}
+          onChange={setPunkte}
+          mode="edit"
+          gewerke={gewerke}
+        />
+      </PhaseSection>
+      <PhaseSection title="Ergebnis">
+        <Card title="Abnahmeergebnis">
+          <MobileEditableBlock
+            sheetTitle="Ergebnis bearbeiten"
+            overview={
+              <dl className="space-y-2.5">
+                <MobileOverviewField
+                  label="Ergebnis"
+                  value={ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
+                />
+                <MobileOverviewField
+                  label="Hinweis"
+                  value={meta.hinweis_sonstiges.trim() || '—'}
+                />
+                <MobileOverviewField
+                  label="Mängelbeseitigung"
+                  value={meta.maengel_beseitigung_spaetestens.trim() || '—'}
+                />
+                <MobileOverviewField label="Anmerkungen" value={notizen.trim() || '—'} />
+              </dl>
+            }
+          >
+            {ergebnisForm}
+          </MobileEditableBlock>
+        </Card>
+      </PhaseSection>
+      <PhaseSection title="Mängel">
+        <Card title="Festgestellte Hinweise">
+          {maengelListe.length === 0 ? (
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Mängel markiert.</p>
+          ) : (
+            <ul className="space-y-3">
+              {maengelListe.map((m) => {
+                const punkt = punkte.find((p) => p.id === m.punkt_id)
+                return (
+                  <li
+                    key={m.punkt_id}
+                    className="rounded-lg border border-red-200 bg-red-50/40 p-3 space-y-2"
+                  >
+                    <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{m.beschreibung}</p>
+                    {punkt ? (
+                      <>
+                        <Input
+                          label="Mangel-Beschreibung (PDF)"
+                          value={punkt.notiz ?? ''}
+                          onChange={(e) =>
+                            setPunkte((prev) =>
+                              prev.map((p) =>
+                                p.id === punkt.id ? { ...p, notiz: e.target.value } : p
+                              )
+                            )
+                          }
+                          placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
+                        />
+                        <Input
+                          label="Beseitigung bis"
+                          type="date"
+                          value={punkt.mangel_frist?.slice(0, 10) ?? ''}
+                          onChange={(e) =>
+                            setPunkte((prev) =>
+                              prev.map((p) =>
+                                p.id === punkt.id
+                                  ? { ...p, mangel_frist: e.target.value.trim() || null }
+                                  : p
+                              )
+                            )
+                          }
+                        />
+                      </>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      </PhaseSection>
+    </div>
+  )
+
+  const phaseAngaben = (
+    <div id="abnahme-sec-angaben" className="document-canvas-sec space-y-8">
+      <StepIntro title="Angaben" hint="Übergabe, Personen, Projekt, Fotos und Unterschriften." />
       <PhaseSection title="Übergabe">
         <Card title="Ort & Zeit">
           <MobileEditableBlock
@@ -524,121 +678,7 @@ export function AbnahmeprotokollCreateWizard({
           </MobileEditableBlock>
         </Card>
       </PhaseSection>
-      <PhaseSection title="Leistungen">
-        <p className="mb-3 text-[13px] text-bw-text-muted">
-          OK / Mangel / Weg steuert das PDF — Drag zum Sortieren.
-        </p>
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={() => setPunkte(markAllOk(punkte))}>
-            Alle OK
-          </Button>
-        </div>
-        <AbnahmeprotokollChecklist
-          punkte={punkte}
-          onChange={setPunkte}
-          mode="edit"
-          gewerke={gewerke}
-        />
-      </PhaseSection>
-    </div>
-  )
-
-  const phasePruefen = (
-    <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-8">
-      <StepIntro
-        title="Prüfen"
-        hint="Ergebnis, Mängel-Fristen, Fotos mit Beschriftung und Unterschriften."
-      />
-      <PhaseSection title="Ergebnis">
-        <Card title="Abnahmeergebnis">
-          <MobileEditableBlock
-            sheetTitle="Ergebnis bearbeiten"
-            overview={
-              <dl className="space-y-2.5">
-                <MobileOverviewField
-                  label="Ergebnis"
-                  value={ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
-                />
-                <MobileOverviewField
-                  label="Hinweis"
-                  value={meta.hinweis_sonstiges.trim() || '—'}
-                />
-                <MobileOverviewField
-                  label="Mängelbeseitigung"
-                  value={meta.maengel_beseitigung_spaetestens.trim() || '—'}
-                />
-                <MobileOverviewField label="Anmerkungen" value={notizen.trim() || '—'} />
-              </dl>
-            }
-          >
-            {ergebnisForm}
-          </MobileEditableBlock>
-        </Card>
-      </PhaseSection>
-
-      <PhaseSection title="Mängel">
-        <Card title="Festgestellte Hinweise">
-          {maengelListe.length === 0 ? (
-            <p className="text-sm text-bw-text-muted">Keine Mängel markiert.</p>
-          ) : (
-            <ul className="space-y-3">
-              {maengelListe.map((m) => {
-                const punkt = punkte.find((p) => p.id === m.punkt_id)
-                return (
-                  <li
-                    key={m.punkt_id}
-                    className="rounded-lg border border-red-200 bg-red-50/40 p-3 space-y-2"
-                  >
-                    <p className="text-[14px] font-medium text-bw-text">{m.beschreibung}</p>
-                    {punkt ? (
-                      <>
-                        <Input
-                          label="Mangel-Beschreibung (PDF)"
-                          value={punkt.notiz ?? ''}
-                          onChange={(e) =>
-                            setPunkte((prev) =>
-                              prev.map((p) =>
-                                p.id === punkt.id ? { ...p, notiz: e.target.value } : p
-                              )
-                            )
-                          }
-                          placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
-                        />
-                        <Input
-                          label="Beseitigung bis"
-                          type="date"
-                          value={punkt.mangel_frist?.slice(0, 10) ?? ''}
-                          onChange={(e) =>
-                            setPunkte((prev) =>
-                              prev.map((p) =>
-                                p.id === punkt.id
-                                  ? { ...p, mangel_frist: e.target.value.trim() || null }
-                                  : p
-                              )
-                            )
-                          }
-                        />
-                      </>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          {maengelListe.length > 0 ? (
-            <div className="mt-3">
-              <Input
-                label="Mängelbeseitigung (global, PDF)"
-                value={meta.maengel_beseitigung_spaetestens}
-                onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
-                placeholder="z. B. spätestens am …"
-              />
-            </div>
-          ) : null}
-        </Card>
-      </PhaseSection>
-
-      <PhaseSection title="Fotos"><span id="abnahme-sec-fotos" className="sr-only" />
+      <PhaseSection title="Fotos">
         <Card title="Übergabe-Fotos">
           <input
             ref={fileRef}
@@ -684,7 +724,7 @@ export function AbnahmeprotokollCreateWizard({
                     />
                     <button
                       type="button"
-                      className="mt-1 text-[12px] text-bw-text-muted underline"
+                      className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted underline"
                       onClick={() => removeFoto(url)}
                     >
                       Entfernen
@@ -694,12 +734,11 @@ export function AbnahmeprotokollCreateWizard({
               ))}
             </div>
           ) : (
-            <p className="mt-3 text-sm text-bw-text-muted">Noch keine Fotos.</p>
+            <p className="mt-3 text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Fotos.</p>
           )}
         </Card>
       </PhaseSection>
-
-      <PhaseSection title="Unterschriften"><span id="abnahme-sec-unterschrift" className="sr-only" />
+      <PhaseSection title="Unterschriften">
         <Card title="Ort & Datum">
           <MobileEditableBlock
             sheetTitle="Unterschriften bearbeiten"
@@ -727,16 +766,67 @@ export function AbnahmeprotokollCreateWizard({
     </div>
   )
 
-  const phaseFertig = (
-    <div id="abnahme-sec-fertig" className="document-canvas-sec">
+  const footerActions = (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="gap-1.5"
+        loading={previewBusy}
+        disabled={pending}
+        onClick={() => void vorschauPdf()}
+      >
+        <Eye className="h-4 w-4" />
+        Vorschau
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        size="sm"
+        className="gap-1.5"
+        loading={pending}
+        disabled={previewBusy}
+        onClick={() => erstellen({ abschliessen: hasSignatur })}
+      >
+        <Check className="h-4 w-4" />
+        {primaryCtaLabel}
+      </Button>
+    </div>
+  )
+
+  const phasePruefen = (
+    <div id="abnahme-sec-pruefen" className="document-canvas-sec">
       <StepIntro
-        title="Fertig"
+        title="Prüfen & PDF"
         hint={
-          isEdit
-            ? 'Vorschau prüfen, dann speichern — PDF wird neu erzeugt.'
-            : 'PDF-Vorschau, dann abschließen.'
+          hasSignatur
+            ? 'Vorschau prüfen — Speichern schließt den Auftrag ab.'
+            : 'Unterschriften (Ort/Datum AN + AG) setzen, dann Abnahme speichern & abschließen.'
         }
       />
+      {undokumentiert.n > 0 && undokumentiert.m > 0 ? (
+        <div
+          className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[length:var(--fs-text)] text-amber-950"
+          role="status"
+        >
+          <p>
+            {undokumentiert.n} von {undokumentiert.m} Leistungen sind noch nicht dokumentiert — als
+            Abnahme unter Vorbehalt vermerken.
+          </p>
+          {meta.abnahme_ergebnis !== 'mit_vorbehalt' ? (
+            <button
+              type="button"
+              className="mt-2 text-[length:var(--fs-meta)] font-medium underline"
+              onClick={() => patchMeta({ abnahme_ergebnis: 'mit_vorbehalt' })}
+            >
+              Als Abnahme unter Vorbehalt setzen
+            </button>
+          ) : (
+            <p className="mt-1 text-[length:var(--fs-meta)] text-amber-900/80">Ergebnis: unter Vorbehalt.</p>
+          )}
+        </div>
+      ) : null}
       <Card title="Zusammenfassung">
         <dl className="space-y-2.5">
           <MobileOverviewField
@@ -773,7 +863,7 @@ export function AbnahmeprotokollCreateWizard({
         <MobileEditableBlock
           sheetTitle="Rechtshinweise"
           overview={
-            <p className="line-clamp-4 whitespace-pre-wrap text-sm text-bw-text-mid">
+            <p className="line-clamp-4 whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text-mid">
               {meta.rechtshinweise.trim() || '—'}
             </p>
           }
@@ -787,32 +877,7 @@ export function AbnahmeprotokollCreateWizard({
           />
         </MobileEditableBlock>
       </Card>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1.5"
-          loading={previewBusy}
-          disabled={pending}
-          onClick={() => void vorschauPdf()}
-        >
-          <Eye className="h-4 w-4" />
-          Vorschau
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          className="gap-1.5"
-          loading={pending}
-          disabled={previewBusy}
-          onClick={erstellen}
-        >
-          <Check className="h-4 w-4" />
-          Fertig
-        </Button>
-      </div>
+      <div className="mt-4 hidden sm:block">{footerActions}</div>
     </div>
   )
 
@@ -821,12 +886,13 @@ export function AbnahmeprotokollCreateWizard({
       portal={false}
       title="Abnahme"
       onClose={onClose}
-      onSave={erstellen}
+      onSave={() => erstellen({ abschliessen: hasSignatur })}
       saveBusy={pending}
+      footerCta={footerActions}
       className="wizard-flow"
     >
       {subtitle ? (
-        <p className="mb-3 text-[13px] text-bw-text-muted">{subtitle}</p>
+        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
       ) : null}
 
       <nav className="document-section-nav" aria-label="Abschnitte">
@@ -846,14 +912,14 @@ export function AbnahmeprotokollCreateWizard({
       </nav>
 
       {pending || uploading || previewBusy ? (
-        <p className="mb-3 text-[12px] text-bw-text-muted">
+        <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
           {pending ? 'Erzeugt PDF…' : previewBusy ? 'Vorschau…' : 'Lädt Fotos…'}
         </p>
       ) : null}
 
-      {phaseInhalt}
-      {phasePruefen}
-      {phaseFertig}
+      {activeSection === 'checkliste' ? phaseCheckliste : null}
+      {activeSection === 'angaben' ? phaseAngaben : null}
+      {activeSection === 'pruefen' ? phasePruefen : null}
     </DocumentCanvas>
   )
 }

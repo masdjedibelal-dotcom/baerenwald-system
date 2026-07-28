@@ -281,7 +281,7 @@ export function ProjektVertragWizard({
       docActions={docActions}
       className="wizard-flow"
     >
-      {subtitle ? <p className="mb-3 text-[13px] text-bw-text-muted">{subtitle}</p> : null}
+      {subtitle ? <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p> : null}
 
       <nav className="document-section-nav" aria-label="Abschnitte">
         {PHASES.map((p) => (
@@ -343,7 +343,7 @@ export function ProjektVertragWizard({
           >
             <div className="space-y-4">
               {nachtragMode ? (
-                <div className="rounded-lg border border-bw-border bg-bw-primary/5 p-3 text-sm">
+                <div className="rounded-lg border border-bw-border bg-bw-primary/5 p-3 text-[length:var(--fs-text)]">
                   <p className="font-medium text-bw-text">Ergänzung zum bestehenden Vertrag</p>
                   <p className="mt-1 text-bw-text-muted">
                     Bezug: Nachunternehmervertrag
@@ -356,7 +356,7 @@ export function ProjektVertragWizard({
                 </div>
               ) : null}
               {acceptMode || nachtragMode ? (
-                <p className="text-sm text-bw-text-muted">
+                <p className="text-[length:var(--fs-text)] text-bw-text-muted">
                   Partner und Gewerk sind für diesen Nachtrag festgelegt.
                 </p>
               ) : null}
@@ -396,7 +396,7 @@ export function ProjektVertragWizard({
                 }}
               />
               {handwerker ? (
-                <div className="rounded-lg border border-bw-border bg-bw-hover/40 p-3 text-sm text-bw-text-muted">
+                <div className="rounded-lg border border-bw-border bg-bw-hover/40 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
                   <p className="font-medium text-bw-text">{handwerkerAnzeigename(handwerker)}</p>
                   {handwerker.adresse ? <p>{handwerker.adresse}</p> : null}
                   {handwerker.telefon ? <p>Tel. {handwerker.telefon}</p> : null}
@@ -437,7 +437,7 @@ export function ProjektVertragWizard({
                   onChange={(e) => setMeta((m) => ({ ...m, verguetung_text: e.target.value }))}
                 />
                 {nachtragMode?.parent_verguetung_text ? (
-                  <div className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-xs text-bw-text-muted">
+                  <div className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-meta)] text-bw-text-muted">
                     <p className="mb-1 font-medium text-bw-text">Ursprüngliche Vergütung (Referenz)</p>
                     <p className="whitespace-pre-wrap">{nachtragMode.parent_verguetung_text}</p>
                   </div>
@@ -507,13 +507,13 @@ export function ProjektVertragWizard({
             {acceptMode ? (
               <Card title="Unterlagen für den Partner">
                 <div className="space-y-4">
-                  <p className="text-sm text-bw-text-muted">
+                  <p className="text-[length:var(--fs-text)] text-bw-text-muted">
                     Wähle aus dem Leistungs-Pool, welche Unterlagen der Handwerker für diesen Auftrag
                     verbindlich einreichen muss. Er kann Stamm-Dokumente aus seinem Profil
                     wiederverwenden oder projektbezogen hochladen.
                   </p>
                   {!acceptMode.compliance_pool.length ? (
-                    <p className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-sm text-bw-text-muted">
+                    <p className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-text)] text-bw-text-muted">
                       Keine passenden Leistungs-Unterlagen im Pool — der Partner muss nur den
                       Projektvertrag bestätigen.
                     </p>
@@ -538,16 +538,16 @@ export function ProjektVertragWizard({
                                 onChange={() => toggleComplianceSlug(item.slug)}
                               />
                               <span className="min-w-0">
-                                <span className="block text-sm font-medium text-bw-text">
+                                <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">
                                   {item.bezeichnung}
                                   {item.default_pflicht ? (
-                                    <span className="ml-2 text-xs font-normal text-bw-text-muted">
+                                    <span className="ml-2 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
                                       (Standard-Pflicht)
                                     </span>
                                   ) : null}
                                 </span>
                                 {item.beschreibung?.trim() ? (
-                                  <span className="mt-0.5 block text-xs text-bw-text-muted">
+                                  <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                                     {item.beschreibung.trim()}
                                   </span>
                                 ) : null}
@@ -558,7 +558,7 @@ export function ProjektVertragWizard({
                       })}
                     </ul>
                   )}
-                  <p className="text-xs text-bw-text-muted">
+                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                     Ausgewählt: {complianceSlugs.length} Unterlage(n). Nach dem PDF-Versand erscheinen
                     Vertrag und Checkliste als To-do im Partner-Portal.
                   </p>
@@ -574,7 +574,7 @@ export function ProjektVertragWizard({
               acceptMode ? 'Vertrag senden' : nachtragMode ? 'Ergänzung als PDF' : 'PDF erzeugen'
             }
           >
-            <div className="space-y-4 text-sm">
+            <div className="space-y-4 text-[length:var(--fs-text)]">
               <p className="text-bw-text-muted">
                 {acceptMode
                   ? 'Der Vertrag wird erzeugt. Im Partner-Portal erscheint er unter Vorgänge zum Download bzw. zur verbindlichen Zustimmung sowie die gewählten Unterlagen. Eine separate Vertrags-Mail wird nicht versendet.'

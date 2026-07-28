@@ -65,7 +65,7 @@ export function RechnungWizardZahlungCard({
       </label>
 
       {meta.zahlungsart === 'abschlaege' ? (
-        <p className="text-[12px] text-bw-text-muted" title={fachbegriff('satellit')}>
+        <p className="text-[length:var(--fs-meta)] text-bw-text-muted" title={fachbegriff('satellit')}>
           {fachbegriff('abschlag')}
         </p>
       ) : null}

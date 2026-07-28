@@ -73,7 +73,7 @@ export function StaffSkipHint({ onSkip }: { onSkip: () => void }) {
   return (
     <button
       type="button"
-      className="mt-4 text-[12.5px] font-medium text-[var(--text-3)] underline-offset-2 hover:text-[var(--text)] hover:underline"
+      className="mt-4 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)] underline-offset-2 hover:text-[var(--text)] hover:underline"
       onClick={onSkip}
     >
       Weiß ich nicht / überspringen

@@ -77,7 +77,7 @@ export function abrechnungOffen(kontext: AuftragPipelineKontext): boolean {
   return aktiv.length === 0
 }
 
-/** Angebote-Pipeline: Verkauf / Nachfassen / Auftrag anlegen. */
+/** Angebote-Pipeline: Verkauf / Nachfassen / Angebot annehmen. */
 export function angebotInAngebotePipeline(
   angebot: AngebotListeEintrag,
   angebotIdsMitAuftrag: ReadonlySet<string>,

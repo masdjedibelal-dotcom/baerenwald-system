@@ -20,7 +20,7 @@ export function AngebotNeuKundeGate() {
 
   return (
     <>
-      <div className="py-8 text-center text-sm text-bw-text-muted">Kunde wählen…</div>
+      <div className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Kunde wählen…</div>
       <KundePickerSheet
         open={pickerOpen && !createOpen}
         onClose={() => {

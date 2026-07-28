@@ -39,7 +39,7 @@ const TYPE_CONFIG: Record<
   anfrage: { icon: resolveMockIcon(TYPE_ICONS.anfrage), label: 'Anfragen', color: 'text-bw-link' },
   angebot: { icon: resolveMockIcon(TYPE_ICONS.angebot), label: 'Angebote', color: 'text-orange-600' },
   auftrag: { icon: resolveMockIcon(TYPE_ICONS.auftrag), label: 'Aufträge', color: 'text-bw-success' },
-  handwerker: { icon: resolveMockIcon(TYPE_ICONS.handwerker), label: 'Partner', color: 'text-bw-accent' },
+  handwerker: { icon: resolveMockIcon(TYPE_ICONS.handwerker), label: 'Handwerker', color: 'text-bw-accent' },
   rechnung: { icon: resolveMockIcon(TYPE_ICONS.rechnung), label: 'Rechnungen', color: 'text-purple-500' },
   kunde: { icon: resolveMockIcon(TYPE_ICONS.kunde), label: 'Kunden', color: 'text-bw-mid' },
 }
@@ -264,7 +264,7 @@ export function GlobalSearch() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Suchen in Anfragen, Angeboten, Aufträgen, Rechnungen, Kunden…"
-            className="flex-1 bg-transparent text-bw-text outline-none placeholder:text-bw-light placeholder:text-[12px] placeholder:font-normal"
+            className="flex-1 bg-transparent text-bw-text outline-none placeholder:text-bw-light placeholder:text-[length:var(--fs-meta)] placeholder:font-normal"
             style={{ fontSize: '16px' }}
             autoComplete="off"
           />
@@ -273,22 +273,22 @@ export function GlobalSearch() {
               <X className="h-4 w-4" />
             </button>
           ) : null}
-          <kbd className="hidden rounded bg-bw-hover px-2 py-1 font-mono text-xs text-bw-light md:block">ESC</kbd>
+          <kbd className="hidden rounded bg-bw-hover px-2 py-1 font-mono text-[length:var(--fs-meta)] text-bw-light md:block">ESC</kbd>
         </div>
 
         <div className="max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="px-4 py-8 text-center text-sm text-bw-light">Suche...</div>
+            <div className="px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-light">Suche...</div>
           ) : null}
 
           {!loading && query.length >= 2 && results.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-bw-light">
+            <div className="px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-light">
               Keine Ergebnisse für „{query}“
             </div>
           ) : null}
 
           {!loading && query.length < 2 ? (
-            <div className="px-4 py-6 text-center text-sm text-bw-light">Mindestens 2 Zeichen eingeben…</div>
+            <div className="px-4 py-6 text-center text-[length:var(--fs-text)] text-bw-light">Mindestens 2 Zeichen eingeben…</div>
           ) : null}
 
           {TYPE_ORDER.map((type) => {
@@ -298,7 +298,7 @@ export function GlobalSearch() {
             const Icon = config.icon
             return (
               <div key={type}>
-                <div className="sticky top-0 bg-bw-hover px-4 py-2 text-xs font-medium uppercase tracking-wide text-bw-light">
+                <div className="sticky top-0 bg-bw-hover px-4 py-2 text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">
                   {config.label}
                 </div>
                 {items.map((item) => {
@@ -318,8 +318,8 @@ export function GlobalSearch() {
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-bw-text">{item.title}</div>
-                        <div className="truncate text-xs text-bw-light">{item.subtitle || '—'}</div>
+                        <div className="truncate text-[length:var(--fs-text)] font-medium text-bw-text">{item.title}</div>
+                        <div className="truncate text-[length:var(--fs-meta)] text-bw-light">{item.subtitle || '—'}</div>
                       </div>
                     </button>
                   )
@@ -330,7 +330,7 @@ export function GlobalSearch() {
         </div>
 
         {results.length > 0 ? (
-          <div className="flex items-center gap-4 border-t border-bw-border px-4 py-2 text-xs text-bw-light">
+          <div className="flex items-center gap-4 border-t border-bw-border px-4 py-2 text-[length:var(--fs-meta)] text-bw-light">
             <span>↑↓ Navigieren</span>
             <span>↵ Öffnen</span>
             <span>ESC Schließen</span>

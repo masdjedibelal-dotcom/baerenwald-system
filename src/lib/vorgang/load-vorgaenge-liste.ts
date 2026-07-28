@@ -71,7 +71,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('angebote')
         .select(
-          'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus'
+          'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch'
         )
         .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
@@ -81,7 +81,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('auftraege')
         .select(
-          'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus'
+          'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall'
         )
         .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
@@ -91,7 +91,7 @@ export async function loadVorgaengeListe(): Promise<{
       db
         .from('rechnungen')
         .select(
-          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ)'
+          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ)'
         )
         .order('created_at', { ascending: false })
         .limit(500)
@@ -171,6 +171,7 @@ export async function loadVorgaengeListe(): Promise<{
     updated_at: string | null
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
+    ersetzt_durch?: string | null
   }>
   const auftraege = (auftraegeRes.data ?? []) as Array<{
     id: string
@@ -182,6 +183,7 @@ export async function loadVorgaengeListe(): Promise<{
     updated_at: string | null
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
+    ist_notfall?: boolean | null
   }>
   const rechnungen = (rechnungenRes.data ?? []) as Array<{
     id: string
@@ -197,6 +199,7 @@ export async function loadVorgaengeListe(): Promise<{
     rechnungsnummer: string | null
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
+    ersetzt_durch?: string | null
     angebote?: { lead_id: string | null } | { lead_id: string | null }[] | null
     auftraege?: { lead_id: string | null } | { lead_id: string | null }[] | null
     kunden?:
@@ -232,6 +235,7 @@ export async function loadVorgaengeListe(): Promise<{
     rechnungsnummer: string | null
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
+    ersetzt_durch?: string | null
   }
 
   const rechnungenAll: RechnungNorm[] = rechnungen.map((r) => {
@@ -256,6 +260,7 @@ export async function loadVorgaengeListe(): Promise<{
       rechnungsnummer: r.rechnungsnummer,
       ist_wiederkehrend: r.ist_wiederkehrend,
       wiederkehr_turnus: r.wiederkehr_turnus,
+      ersetzt_durch: r.ersetzt_durch ?? null,
     }
   })
 
@@ -421,6 +426,16 @@ export async function loadVorgaengeListe(): Promise<{
       handwerkerIds,
       ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
       wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
+      kontaktTelefon: lead.kontakt_telefon ?? null,
+      kontaktEmail: lead.kontakt_email ?? null,
+      ersetzt_durch:
+        resolved.phase === 'angebot'
+          ? (angeboteByLead.get(lead.id) ?? []).find((a) => a.id === resolved.entityId)
+              ?.ersetzt_durch ?? null
+          : resolved.phase === 'rechnung'
+            ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
+                ?.ersetzt_durch ?? null
+            : null,
     })
 
     // Abschläge als eigene Zeilen, solange Stamm Auftrag bleibt.

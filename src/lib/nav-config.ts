@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Settings, Sparkles, Wrench } from 'lucide-react'
+import { Calendar, Settings, Sparkles, Wrench } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import {
   CREATE_ENTRY_LABELS,
@@ -43,12 +43,12 @@ function nav(
 }
 
 /**
- * Sidebar: Arbeit (Dashboard, Vorgänge, Kunden, Partner, KI) + Planung (Kalender).
+ * Sidebar Spec §3:
+ * Arbeit = Dashboard · Vorgänge · Kunden · Handwerker
+ * Organisation = Kalender · KI Analytics
+ * unten abgesetzt: Einstellungen (Sidebar-Footer, nicht in Gruppen)
  *
- * Naming (zwei Entitäten):
- * - Partner = Tabelle `handwerker`, Route `/handwerker` (Ausführungspartner / Partnerbetriebe)
- * - Netzwerk = Tabelle `partner`, Route `/partner` (Versicherung, Makler, Lieferanten …)
- * Routen nicht mergen — unterschiedliche Datenmodelle.
+ * Tabelle `partner` bleibt (Daten), Route/Nav-Einstieg entfernt → Redirect `/handwerker`.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -63,14 +63,16 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
         '/rechnungen',
       ]),
       nav('/kunden', 'users', 'Kunden'),
-      nav('/handwerker', 'tool', 'Partner'),
-      nav('/ki-analytics', 'sparkles', 'KI'),
+      nav('/handwerker', 'tool', 'Handwerker'),
     ],
   },
   {
-    id: 'planung',
-    label: 'Planung',
-    items: [nav('/kalender', 'calendar', 'Kalender')],
+    id: 'organisation',
+    label: 'Organisation',
+    items: [
+      nav('/kalender', 'calendar', 'Kalender'),
+      nav('/ki-analytics', 'sparkles', 'KI Analytics'),
+    ],
   },
 ]
 
@@ -81,9 +83,8 @@ export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS[0].items
 export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).flatMap((g) => g.items)
 
 /**
- * Mobile BottomNav (W6-10): Dashboard · Vorgänge · Kalender · Kunden (+ FAB + Mehr).
- * Layout: 2 Tabs | FAB | 2 Tabs | Mehr — `flex:1` skaliert Labels.
- * Kunden entfällt auf dem Mehr-Screen (Doppel-Link vermeiden).
+ * Bottom-Nav Spec §3: Dashboard · Vorgänge · + · Kunden · Mehr
+ * Kalender / Handwerker / KI Analytics / Einstellungen → Mehr
  */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/', 'layout-dashboard', 'Dashboard', true),
@@ -93,7 +94,6 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
     '/auftraege',
     '/rechnungen',
   ]),
-  nav('/kalender', 'calendar', 'Kalender'),
   nav('/kunden', 'users', 'Kunden'),
 ]
 
@@ -104,8 +104,9 @@ export const MEHR_TILE_NAV: Array<{
   label: string
   desc: string
 }> = [
-  { href: '/handwerker', icon: Wrench, label: 'Partner', desc: 'Handwerker & Netzwerk' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI', desc: 'Empfehlungen & Funnel' },
+  { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Ausführungspartner' },
+  { href: '/kalender', icon: Calendar, label: 'Kalender', desc: 'Termine & Planung' },
+  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics', desc: 'Empfehlungen & Funnel' },
   { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
@@ -132,9 +133,8 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
     title: 'Rechnungen',
     cta: { label: CREATE_ENTRY_LABELS.rechnung, href: createRechnungHref() },
   },
-  '/handwerker': { title: 'Partner' },
+  '/handwerker': { title: 'Handwerker' },
   '/kunden': { title: 'Kunden' },
-  '/partner': { title: 'Netzwerk' },
   '/kalender': { title: 'Kalender' },
   '/angebote': {
     title: 'Angebote',
@@ -142,7 +142,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   },
   '/einstellungen': { title: 'Einstellungen' },
   '/mehr': { title: 'Mehr' },
-  '/ki-analytics': { title: 'KI' },
+  '/ki-analytics': { title: 'KI Analytics' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -150,14 +150,13 @@ export const SECTION_LABELS: Record<string, string> = {
   anfragen: 'Anfragen',
   auftraege: 'Aufträge',
   rechnungen: 'Rechnungen',
-  handwerker: 'Partner',
+  handwerker: 'Handwerker',
   kunden: 'Kunden',
-  partner: 'Netzwerk',
   kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
   mehr: 'Mehr',
-  'ki-analytics': 'KI',
+  'ki-analytics': 'KI Analytics',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

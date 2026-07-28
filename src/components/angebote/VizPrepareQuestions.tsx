@@ -23,9 +23,9 @@ export function VizPrepareQuestions({
         className
       )}
     >
-      <p className="text-sm font-semibold text-bw-text">{question.question}</p>
+      <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">{question.question}</p>
       {question.hint ? (
-        <p className="mt-1 text-xs text-bw-text-muted">{question.hint}</p>
+        <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">{question.hint}</p>
       ) : null}
       <div className="mt-3 flex flex-col gap-2">
         {question.options.map((opt) => (
@@ -40,9 +40,9 @@ export function VizPrepareQuestions({
             )}
             onClick={() => onAnswer(question.id, opt.id, opt.label)}
           >
-            <span className="block text-sm font-medium text-bw-text">{opt.label}</span>
+            <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">{opt.label}</span>
             {opt.hint ? (
-              <span className="mt-0.5 block text-xs text-bw-text-muted">{opt.hint}</span>
+              <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">{opt.hint}</span>
             ) : null}
           </button>
         ))}

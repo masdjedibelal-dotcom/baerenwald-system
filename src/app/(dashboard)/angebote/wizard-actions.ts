@@ -37,6 +37,7 @@ import { rebindLooseAnfahrtPositionen } from '@/lib/anfahrt-angebot'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncAuftragAusAngebotKorrektur } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+import { upsertNachtragEntwurfFromAngebotWizard } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import {
   syncInputsFromAngebotPositionen,
   syncInputsFromDokumentArtikel,
@@ -68,6 +69,8 @@ export type SaveAngebotWizardDraftPayload = {
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
   /** Nach Speichern: Auftragspositionen aus Angebot übernehmen */
   auftragKorrekturId?: string | null
+  /** Phase 10/N3: Nachtrags-Angebot → nachtraege[] am Auftrag schreiben */
+  nachtragZuAuftragId?: string | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
 }
@@ -257,6 +260,16 @@ export async function saveAngebotWizardDraft(
       })
       if (!sync.ok) return sync
     }
+    if (input.nachtragZuAuftragId?.trim()) {
+      const n = await upsertNachtragEntwurfFromAngebotWizard({
+        auftragId: input.nachtragZuAuftragId.trim(),
+        angebotId: input.angebotId,
+        grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
+        beschreibung: input.meta.leistungsumfang?.trim() || null,
+        positionen,
+      })
+      if (!n.ok) return n
+    }
     return { ok: true, angebotId: input.angebotId, angebotsnr: nrRow?.angebotsnr ?? null }
   }
 
@@ -296,6 +309,16 @@ export async function saveAngebotWizardDraft(
     .eq('id', created.id)
     .maybeSingle()
   await persistAngebotPdfNachEntwurfSpeichern(created.id, input.lead_id, opts)
+  if (input.nachtragZuAuftragId?.trim()) {
+    const n = await upsertNachtragEntwurfFromAngebotWizard({
+      auftragId: input.nachtragZuAuftragId.trim(),
+      angebotId: created.id,
+      grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
+      beschreibung: input.meta.leistungsumfang?.trim() || null,
+      positionen,
+    })
+    if (!n.ok) return n
+  }
   return { ok: true, angebotId: created.id, angebotsnr: nrRow?.angebotsnr ?? null }
 }
 

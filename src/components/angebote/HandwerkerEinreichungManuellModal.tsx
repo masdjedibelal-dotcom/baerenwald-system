@@ -81,7 +81,7 @@ export function HandwerkerEinreichungManuellModal({
         </div>
       }
     >
-      <p className="mb-4 text-sm text-bw-text-muted">
+      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">
         {handwerkerName} · {gewerkName}. Wie eine Portal-Einreichung: Preis, PDF und Status
         „eingereicht“. Danach im Angebot mit „Bestätigen & Partner informieren“ abschließen.
       </p>
@@ -101,12 +101,12 @@ export function HandwerkerEinreichungManuellModal({
           inputMode="decimal"
           placeholder="z. B. 5355"
         />
-        <label className="block text-sm">
+        <label className="block text-[length:var(--fs-text)]">
           <span className="mb-1 block font-medium text-bw-text">Angebots-PDF</span>
           <input
             type="file"
             accept="application/pdf,.pdf"
-            className="block w-full text-sm text-bw-text"
+            className="block w-full text-[length:var(--fs-text)] text-bw-text"
             onChange={(e) => setPdf(e.target.files?.[0] ?? null)}
           />
         </label>

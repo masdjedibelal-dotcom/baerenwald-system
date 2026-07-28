@@ -137,7 +137,7 @@ function GewerkHandwerkerBlock({
 
   return (
     <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-4">
-      <p className="mb-3 text-[13px] font-semibold text-bw-text">{block.gewerk_name}</p>
+      <p className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">{block.gewerk_name}</p>
       <MobileEditableBlock
         sheetTitle={block.gewerk_name}
         overview={overview}
@@ -170,7 +170,7 @@ export function AngebotWizardHandwerkerStep({
   if (!blocks.length) {
     return (
       <Card title="Handwerker">
-        <p className="text-sm text-bw-text-muted">
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Bitte zuerst Positionen mit Gewerk erfassen.
         </p>
       </Card>
@@ -183,7 +183,7 @@ export function AngebotWizardHandwerkerStep({
 
   return (
     <Card title="Handwerker — Angebot / Rechnung einholen">
-      <p className="mb-4 text-sm text-bw-text-muted">
+      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">
         Pro Gewerk Partner auswählen und optional eine Notiz für die Anfrage hinterlegen. Erst nach
         Partner-Einreichung und Bestätigung: danach sendest du das Angebot an den Kunden.
       </p>

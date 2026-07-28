@@ -251,7 +251,7 @@ export function NeuErstellenClient({
         {!preset && art === 'vorgang' ? (
           <>
             <div className="form-section-h">Vorgangstyp</div>
-            <p className="mb-3 text-[13px] text-[var(--text-3)]">
+            <p className="mb-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
               Öffnet den gleichen Weg wie der FAB — kein separates Kurzformular.
             </p>
             <div className="chiprow" style={{ marginBottom: 22 }}>
@@ -539,7 +539,7 @@ export function NeuErstellenClient({
                         checked={gewerkSlugs.has(g.slug)}
                         onChange={() => toggleGewerk(g.slug)}
                       />
-                      <span style={{ fontSize: 13 }}>{g.name}</span>
+                      <span style={{ fontSize: 'var(--fs-text)' }}>{g.name}</span>
                     </label>
                   ))}
                 </div>

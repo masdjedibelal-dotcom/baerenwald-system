@@ -163,7 +163,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
             </>
           }
         >
-          <dl className="space-y-1.5 text-[13px]">
+          <dl className="space-y-1.5 text-[length:var(--fs-text)]">
             <div>
               <dt className="text-bw-text-muted">Organisation</dt>
               <dd className="font-medium text-bw-text">
@@ -185,7 +185,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
               <div className="pt-1">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 text-[12px] text-bw-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-primary hover:underline"
                   onClick={() => void kopieren(buildMeldeLink(auftraggeber.org_kennung!), 'Melde-Link')}
                 >
                   <Copy className="h-3 w-3" aria-hidden />
@@ -205,7 +205,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
             </>
           }
         >
-          <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
+          <dl className="grid gap-2 text-[length:var(--fs-text)] sm:grid-cols-2">
             {lead.melder_name ? (
               <div>
                 <dt className="text-bw-text-muted">Name</dt>
@@ -284,7 +284,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
               </Button>
               <Link
                 href="/einstellungen/firma"
-                className="inline-flex items-center text-[12px] text-bw-primary hover:underline"
+                className="inline-flex items-center text-[length:var(--fs-meta)] text-bw-primary hover:underline"
               >
                 Datenschutz-Modul →
               </Link>
@@ -295,21 +295,21 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
 
       {objekt ? (
         <Card title="Objekt">
-          <p className="text-[13px] font-medium text-bw-text">{objekt.titel}</p>
-          <p className="mt-1 text-[12px] text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{objekt.titel}</p>
+          <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
             {[kundenObjektStrasseZeile(objekt), [objekt.plz, objekt.ort].filter(Boolean).join(' ')]
               .filter(Boolean)
               .join(', ') || '—'}
           </p>
           {objekt.einheiten_hinweis ? (
-            <p className="mt-1 text-[12px] text-bw-text-muted">{objekt.einheiten_hinweis}</p>
+            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">{objekt.einheiten_hinweis}</p>
           ) : null}
         </Card>
       ) : null}
 
       {zeigtServicepaket ? (
         <Card title="Servicepaket">
-          <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
+          <dl className="grid gap-2 text-[length:var(--fs-text)] sm:grid-cols-2">
             {lead.service_modus ? (
               <div>
                 <dt className="text-bw-text-muted">Modus</dt>
@@ -351,7 +351,7 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
 
       {zeigtHavarieAktionen ? (
         <Card title="Havarie / Notmaßnahme">
-          <p className="mb-3 text-[13px] text-bw-text-muted">
+          <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
             Bei Havarie darf das CRM eine Notmaßnahme vor HV-Freigabe disponieren. Die HV wird
             informiert; Folgearbeiten über der Schwelle laufen über den Angebotsweg.
           </p>
@@ -417,18 +417,9 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
         </Card>
       ) : null}
 
-      {(lead as { duplikat_hinweis?: boolean }).duplikat_hinweis ? (
-        <Card title="Duplikat-Hinweis">
-          <p className="text-[13px] text-amber-900">
-            In den letzten 24 Stunden wurde für dieselbe Einheit bereits eine Meldung erfasst. Kein
-            Block — bitte prüfen.
-          </p>
-        </Card>
-      ) : null}
-
       {lead.org_freigabe_log && lead.org_freigabe_log.length > 0 ? (
         <Card title="Freigabe-Verlauf">
-          <ul className="divide-y divide-bw-border text-[12px]">
+          <ul className="divide-y divide-bw-border text-[length:var(--fs-meta)]">
             {lead.org_freigabe_log.map((e: OrgFreigabeLogRow) => (
               <li key={e.id} className="flex justify-between gap-3 py-2">
                 <span className="capitalize text-bw-text">{e.aktion}</span>

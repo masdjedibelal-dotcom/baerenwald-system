@@ -275,11 +275,11 @@ export function AuftragPartnerCompliancePanel({
     <div className="space-y-5">
       {partner.leistungen.length > 0 ? (
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+          <h3 className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
             Leistungen
           </h3>
           <div className="dok-table-wrap overflow-x-auto">
-            <table className="dok-table text-sm">
+            <table className="dok-table text-[length:var(--fs-text)]">
               <thead>
                 <tr>
                   <th>Leistung</th>
@@ -304,7 +304,7 @@ export function AuftragPartnerCompliancePanel({
                       <td className="text-right tabular-nums">
                         {formatPreis(pos.preis_fix ?? null, null, null)}
                       </td>
-                      <td className="whitespace-nowrap text-xs text-bw-text-muted">
+                      <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
                         {pos.start_datum ? formatDatum(pos.start_datum) : '—'}
                         {pos.end_datum ? ` → ${formatDatum(pos.end_datum)}` : ''}
                       </td>
@@ -316,17 +316,17 @@ export function AuftragPartnerCompliancePanel({
           </div>
         </section>
       ) : (
-        <p className="text-sm text-bw-text-muted">Keine einzelnen Leistungen zugewiesen.</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine einzelnen Leistungen zugewiesen.</p>
       )}
 
       <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+          <h3 className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
             Erforderliche Nachweise
           </h3>
           <span
             className={cn(
-              'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+              'rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
               pflichtOk ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'
             )}
           >
@@ -337,7 +337,7 @@ export function AuftragPartnerCompliancePanel({
         </div>
 
         {offeneTypen.length === 0 ? (
-          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-sm text-bw-text-muted">
+          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             Alle Pflichtnachweise sind hochgeladen und bestätigt.
           </p>
         ) : (
@@ -360,20 +360,20 @@ export function AuftragPartnerCompliancePanel({
                   className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-bw-text">
+                    <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
                       {typ.bezeichnung}
                       {pflicht ? (
-                        <span className="ml-1.5 text-[10px] font-semibold uppercase text-bw-primary">
+                        <span className="ml-1.5 text-[length:var(--fs-meta)] font-semibold uppercase text-bw-primary">
                           Pflicht
                         </span>
                       ) : null}
                     </p>
                     {typ.beschreibung ? (
-                      <p className="text-xs text-bw-text-muted line-clamp-2">{typ.beschreibung}</p>
+                      <p className="text-[length:var(--fs-meta)] text-bw-text-muted line-clamp-2">{typ.beschreibung}</p>
                     ) : null}
                     <span
                       className={cn(
-                        'mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        'mt-1 inline-flex rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                         complianceStatusPill(status)
                       )}
                     >
@@ -386,7 +386,7 @@ export function AuftragPartnerCompliancePanel({
                             : 'Offen'}
                     </span>
                     {doc?.status === 'abgelehnt' && doc.ablehnung_grund ? (
-                      <p className="mt-1 text-xs text-status-cancel-text">{doc.ablehnung_grund}</p>
+                      <p className="mt-1 text-[length:var(--fs-meta)] text-status-cancel-text">{doc.ablehnung_grund}</p>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
@@ -407,7 +407,7 @@ export function AuftragPartnerCompliancePanel({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-8 gap-1 text-xs"
+                      className="h-8 gap-1 text-[length:var(--fs-meta)]"
                       disabled={busy}
                       onClick={() => typRefs.current[typ.slug]?.click()}
                     >
@@ -423,14 +423,14 @@ export function AuftragPartnerCompliancePanel({
 
         {indTyp ? (
           <div className="mt-3 space-y-2 rounded-lg border border-dashed border-bw-border p-3">
-            <p className="text-sm font-medium text-bw-text">{indTyp.bezeichnung}</p>
-            <p className="text-xs text-bw-text-muted">
+            <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{indTyp.bezeichnung}</p>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               Frei benennbarer Nachweis — z. B. SiGeKo-Unterweisung, Gerüstfreigabe.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <input
                 type="text"
-                className="input flex-1 py-1.5 text-sm"
+                className="input flex-1 py-1.5 text-[length:var(--fs-text)]"
                 value={individuellTitel}
                 onChange={(e) => setIndividuellTitel(e.target.value)}
                 placeholder="Bezeichnung des Nachweises"
@@ -458,7 +458,7 @@ export function AuftragPartnerCompliancePanel({
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="h-8 gap-1 text-xs"
+                className="h-8 gap-1 text-[length:var(--fs-meta)]"
                 disabled={busy}
                 onClick={() => individuellRef.current?.click()}
               >
@@ -471,16 +471,16 @@ export function AuftragPartnerCompliancePanel({
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+        <h3 className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
           Hochgeladene Dokumente
         </h3>
         {hochgeladeneZeilen.length === 0 ? (
-          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-sm text-bw-text-muted">
+          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             Noch keine Dokumente hochgeladen.
           </p>
         ) : (
           <div className="dok-table-wrap overflow-x-auto">
-            <table className="dok-table text-sm">
+            <table className="dok-table text-[length:var(--fs-text)]">
               <thead>
                 <tr>
                   <th>Dokument</th>
@@ -501,7 +501,7 @@ export function AuftragPartnerCompliancePanel({
                       <td className="font-medium text-bw-text">
                         {titel}
                         {typ?.slug !== INDIVIDUELL_TYP_SLUG && typ ? (
-                          <span className="mt-0.5 block text-xs font-normal text-bw-text-muted">
+                          <span className="mt-0.5 block text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
                             {typ.bezeichnung}
                           </span>
                         ) : null}
@@ -509,7 +509,7 @@ export function AuftragPartnerCompliancePanel({
                       <td>
                         <span
                           className={cn(
-                            'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                            'inline-flex rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                             partnerDocStatusPill(doc.status)
                           )}
                         >
@@ -518,12 +518,12 @@ export function AuftragPartnerCompliancePanel({
                             : partnerDokumentStatusLabel(doc.status)}
                         </span>
                         {compStatus === 'warnung' || compStatus === 'abgelaufen' ? (
-                          <span className="mt-0.5 block text-[10px] text-amber-800">
+                          <span className="mt-0.5 block text-[length:var(--fs-meta)] text-amber-800">
                             {compStatus === 'abgelaufen' ? 'Abgelaufen' : 'Läuft bald ab'}
                           </span>
                         ) : null}
                         {doc.status === 'abgelehnt' && doc.ablehnung_grund ? (
-                          <span className="mt-0.5 block text-[10px] text-status-cancel-text">
+                          <span className="mt-0.5 block text-[length:var(--fs-meta)] text-status-cancel-text">
                             {doc.ablehnung_grund}
                           </span>
                         ) : null}
@@ -531,7 +531,7 @@ export function AuftragPartnerCompliancePanel({
                       <td>
                         <input
                           type="date"
-                          className="input py-1 text-xs w-[9rem]"
+                          className="input py-1 text-[length:var(--fs-meta)] w-[9rem]"
                           defaultValue={doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''}
                           key={`${doc.id}-${doc.gueltig_bis ?? ''}`}
                           disabled={busy}
@@ -542,7 +542,7 @@ export function AuftragPartnerCompliancePanel({
                           }}
                         />
                       </td>
-                      <td className="whitespace-nowrap text-xs text-bw-text-muted">
+                      <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
                         {doc.hochgeladen_am ? formatDatum(doc.hochgeladen_am) : '—'}
                       </td>
                       <td>
@@ -562,7 +562,7 @@ export function AuftragPartnerCompliancePanel({
                                 type="button"
                                 variant="primary"
                                 size="sm"
-                                className="h-8 gap-1 px-2 text-xs"
+                                className="h-8 gap-1 px-2 text-[length:var(--fs-meta)]"
                                 disabled={busy}
                                 onClick={() => freigeben(doc.id)}
                               >
@@ -573,7 +573,7 @@ export function AuftragPartnerCompliancePanel({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 text-xs text-status-cancel-text"
+                                className="h-8 text-[length:var(--fs-meta)] text-status-cancel-text"
                                 disabled={busy}
                                 onClick={() => ablehnen(doc.id, titel)}
                               >

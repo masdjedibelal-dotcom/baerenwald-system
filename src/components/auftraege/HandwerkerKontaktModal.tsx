@@ -140,23 +140,23 @@ export function HandwerkerKontaktModal({
       }
     >
       <div className="space-y-4">
-        <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Projektdaten</p>
+        <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-text)]">
+          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">Projektdaten</p>
           <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-bw-text-muted">Kunde</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Kunde</dt>
               <dd className="font-medium text-bw-text">{projektKurz.kunde}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Ort</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Ort</dt>
               <dd className="font-medium text-bw-text">{projektKurz.ort}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Gewerk</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Gewerk</dt>
               <dd className="font-medium text-bw-text">{projektKurz.gewerk}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Zeitraum</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Zeitraum</dt>
               <dd className="font-medium text-bw-text">{projektKurz.zeitraum}</dd>
             </div>
           </dl>
@@ -181,7 +181,7 @@ export function HandwerkerKontaktModal({
               rows={14}
               value={nachricht}
               onChange={(e) => setNachricht(e.target.value)}
-              className="font-mono text-[13px]"
+              className="font-mono text-[length:var(--fs-text)]"
               hint="Enthält Kunde, Ort, Zeitraum, Gewerk und Leistungen — vor dem Senden anpassen."
             />
           </>
@@ -200,11 +200,11 @@ export function HandwerkerKontaktModal({
               rows={14}
               value={nachricht}
               onChange={(e) => setNachricht(e.target.value)}
-              className="font-mono text-[13px]"
+              className="font-mono text-[length:var(--fs-text)]"
               hint="Enthält die wichtigsten Projektdaten — vor dem Öffnen der Mail-App anpassen."
             />
             {!email?.trim() ? (
-              <p className="flex items-start gap-2 text-sm text-amber-800">
+              <p className="flex items-start gap-2 text-[length:var(--fs-text)] text-amber-800">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 Keine E-Mail beim Handwerker hinterlegt — bitte unter An eine Adresse eintragen.
               </p>

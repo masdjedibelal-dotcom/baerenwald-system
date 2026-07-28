@@ -71,7 +71,7 @@ export function PositionModal({
       {onRemove ? (
         <button
           type="button"
-          className="mb-3 text-[14px] font-medium text-status-cancel-text"
+          className="mb-3 text-[length:var(--fs-text)] font-medium text-status-cancel-text"
           onClick={() => {
             onRemove()
             onClose()
@@ -253,7 +253,7 @@ export function PositionModal({
             <div />
           )}
           <Field label="Zeilensumme">
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>
+            <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
               {formatEurBetrag(line)}
             </div>
           </Field>

@@ -33,7 +33,7 @@ export function AkteRueckwegChip({ displayLabel }: { displayLabel?: string | nul
     <button
       type="button"
       onClick={onClick}
-      className="akte-rueckweg-chip mb-2 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-footnote font-medium text-bw-primary hover:bg-bw-primary/10"
+      className="akte-rueckweg-chip mb-2 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-primary/10"
       aria-label={akteFromLabel(ref, displayLabel)}
     >
       <ChevronLeft className="h-4 w-4" aria-hidden />

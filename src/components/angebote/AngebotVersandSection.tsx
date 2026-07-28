@@ -285,28 +285,28 @@ export function AngebotVersandSection({
     <section className={showKundeModalOnly ? undefined : 'mb-6'}>
       {!showKundeModalOnly ? (
         <div className="mb-3">
-          <h2 className="mb-1 text-lg font-semibold text-ink">Versand</h2>
-          <p className="m-0 text-sm text-muted">
+          <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Versand</h2>
+          <p className="m-0 text-[length:var(--fs-text)] text-muted">
             Zuerst Partner anfragen (falls nötig), danach Angebot an den Kunden senden.
           </p>
         </div>
       ) : null}
 
       {allHandwerkerAngefragt && rows.length > 0 && showHandwerkerBlock ? (
-        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-text)] text-emerald-950">
           Alle Partner wurden angefragt.
         </div>
       ) : null}
 
       {showKundeBlock && !showKundeModalOnly ? (
       <Card id="angebot-versand-kunde" className="mb-4 space-y-4 p-4">
-        <h3 className="text-sm font-semibold text-bw-text">An Kunden</h3>
+        <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">An Kunden</h3>
         {kannAnKunde ? (
           <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
             Angebot an Kunden senden
           </Button>
         ) : (
-          <p className="text-sm text-muted">
+          <p className="text-[length:var(--fs-text)] text-muted">
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
               : !darfAngebotAnKundeSenden(rows, detail.status)
@@ -319,9 +319,9 @@ export function AngebotVersandSection({
 
       {showHandwerkerBlock ? (
       <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
-        <h3 className="text-sm font-semibold text-bw-text">Partner anfragen</h3>
+        <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Partner anfragen</h3>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted">Keine Partner zugewiesen.</p>
+          <p className="text-[length:var(--fs-text)] text-muted">Keine Partner zugewiesen.</p>
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((z) => {
@@ -354,7 +354,7 @@ export function AngebotVersandSection({
                       </p>
                       <span
                         className={cn(
-                          'mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                          'mt-1 inline-block rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                           hwBadgeClass(z.status as string)
                         )}
                       >
@@ -481,22 +481,22 @@ export function AngebotVersandSection({
           </div>
         }
       >
-        <p className="mb-2 text-sm text-bw-text-muted">
+        <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Empfänger: <span className="font-medium text-bw-text">{kundeEmail}</span>
         </p>
         <Input label="Betreff" value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
-        <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
+        <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
         <iframe
           title="Vorschau"
           sandbox="allow-same-origin"
           className="mb-3 h-[280px] w-full rounded-lg border border-bw-border bg-white"
           srcDoc={previewHtml}
         />
-        <p className="mb-3 text-sm text-bw-text">
+        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text">
           Gesamtbetrag (Brutto):{' '}
           <strong>{betragAnzeige(null, bruttoMin, bruttoMax)}</strong>
         </p>
-        <p className="text-xs text-bw-text-muted">PDF wird angehängt.</p>
+        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">PDF wird angehängt.</p>
       </Modal>
 
       <Modal
@@ -517,7 +517,7 @@ export function AngebotVersandSection({
       >
         {hwModal ? (
           <div className="space-y-3">
-            <p className="text-sm text-bw-text-muted">
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
               Gewerk: <span className="font-medium text-bw-text">{hwModal.gewerk}</span>
             </p>
             <Input
@@ -539,8 +539,8 @@ export function AngebotVersandSection({
               placeholder="weitere@beispiel.de"
               hint="Optional — nur für zusätzliche Empfänger sichtbar."
             />
-            <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
-            <p className="text-xs text-bw-text-muted">
+            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               Versand über Partner-Portal (Website); bei Fehler automatisch per CRM-Resend.
             </p>
             <iframe
