@@ -1,9 +1,10 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
-import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
@@ -37,13 +38,17 @@ import {
   kundeNeuerAuftragHref,
 } from '@/lib/kunden/kunde-pipeline-nav'
 import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveKunde, saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
@@ -52,17 +57,14 @@ import {
   defaultPortalInviteBetreff,
   defaultPortalInviteText,
 } from '@/lib/portal-utils'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateKunde } from '@/lib/list-actions'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import { TodosPanel } from '@/components/todos/TodosPanel'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -119,7 +121,7 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'akte'
+type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'todos' | 'akte'
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -155,9 +157,14 @@ export function KundeDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
   const [hasPortalAccount, setHasPortalAccount] = useState(false)
+
+  useKiAssistDraftConsumer(portalModalOpen, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: setPortalBetreff,
+      setBody: setPortalText,
+    })
+  })
   const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
-  const isCrmAdmin = useIsCrmAdmin()
-  const [impersonating, setImpersonating] = useState(false)
   const [spamPending, setSpamPending] = useState(false)
   const [rechnungModalOpen, setRechnungModalOpen] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
@@ -458,6 +465,7 @@ export function KundeDetailClient({
       onCancel={cancelEditKontakt}
       onSave={saveKundeStamm}
       saving={pending}
+      hideEditTrigger
     >
       {editingKontakt ? (
         <p className="inline-edit-hint">
@@ -714,104 +722,15 @@ export function KundeDetailClient({
     </Suspense>
   )
 
-  const kundeMenuItems = useMemo(() => {
-    const extra: import('@/lib/entity-menu').EntityMenuItem[] = []
-    if (zeigtOrganisationTab) {
-      extra.push({
-        icon: 'plug',
-        label: 'Organisation & Portal',
-        onClick: () => setTab('organisation'),
-      })
-    }
-    extra.push('sep', {
-      icon: 'users',
-      label: 'Mit anderem zusammenführen',
-      onClick: () => setMergePickerOpen(true),
-    })
-    extra.push('sep', {
-      icon: istSpam ? 'check' : 'shield-x',
-      label: istSpam ? 'Spam-Markierung aufheben' : 'Als Spam markieren',
-      danger: !istSpam,
-      hint: spamPending ? 'Speichere…' : undefined,
-      onClick: () => {
-        if (spamPending) return
-        toggleSpam()
-      },
-    })
-
-    return entityMenuToActionItems(
-      buildEntityMenu(
-        'kunde',
-        {
-          name: kundeDisplayName(kunde),
-          tel: kunde.telefon,
-          mail: kunde.email,
-        },
-        {
-          onEdit: beginEditKontakt,
-          onCopy: () => runDuplicateKunde(kunde.id, router),
-          onPortal: isCrmAdmin
-            ? () => {
-                if (!hasPortalAccount) {
-                  toast.error('Kein Portal-Account')
-                  return
-                }
-                if (istSpam) {
-                  toast.error('Kunde ist als Spam markiert — Portal-Zugang gesperrt.')
-                  return
-                }
-                if (impersonating) return
-                setImpersonating(true)
-                const popup = window.open('about:blank', '_blank')
-                void openPortalAsKunde(kunde.id).then((r) => {
-                  setImpersonating(false)
-                  if (!r.ok) {
-                    popup?.close()
-                    toast.error(r.message)
-                    return
-                  }
-                  if (popup) {
-                    popup.location.href = r.url
-                  } else {
-                    window.location.assign(r.url)
-                  }
-                })
-              }
-            : undefined,
-          onPortalLink: () => {
-            if (!kunde.email?.trim()) {
-              toast.error('Keine E-Mail')
-              return
-            }
-            if (istSpam) {
-              toast.error('Kunde ist als Spam markiert — Portal-Zugang gesperrt.')
-              return
-            }
-            void openPortalModal()
-          },
-          onCreateAnfrage: () => router.push(kundeNeueAnfrageHref(kunde.id)),
-          onCreateAngebot: () => router.push(kundeNeuesAngebotHref(kunde)),
-          onCreateAuftrag: () => router.push(kundeNeuerAuftragHref(kunde)),
-          onCreateRechnung: () => setRechnungModalOpen(true),
-          tel: kunde.telefon,
-          mail: kunde.email,
-          onMail: () => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id)),
-          extra,
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
-    )
-  }, [
-    kunde,
-    router,
-    isCrmAdmin,
-    impersonating,
-    hasPortalAccount,
-    zeigtOrganisationTab,
-    mailCompose,
-    istSpam,
-    spamPending,
-  ])
+  const tabTodos = (
+    <TodosPanel
+      compact
+      title="To-dos"
+      showFilterChips
+      filter={{ kundeId: kunde.id }}
+      lockedLinks={{ kundeId: kunde.id, label: kundeDisplayName(kunde) }}
+    />
+  )
 
   const tabOrganisation = zeigtOrganisationTab ? (
     <KundenOrganisationTab kunde={kunde} onSaved={() => refresh()} />
@@ -830,6 +749,12 @@ export function KundeDetailClient({
       icon: 'folders',
       count: kundeVorgaengeCount || undefined,
       render: () => tabVorgaenge,
+    },
+    {
+      id: 'todos',
+      label: 'To-dos',
+      icon: 'clipboard-list',
+      render: () => tabTodos,
     },
     ...(zeigtObjekteTab
       ? [
@@ -876,9 +801,8 @@ export function KundeDetailClient({
           </>
         }
         badges={kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null}
-        actions={
-          <DetailActionsBar sheetTitle="Kunde" menuItems={kundeMenuItems} />
-        }
+        titleTrailing={<PortalLoginIconButton kundeId={kunde.id} label="Kundenportal öffnen" />}
+        actions={<DetailActionsBar sheetTitle="Kunde" menuItems={[]} />}
       />
 
       {zeigtOrganisationTab && tab === 'organisation' ? (
@@ -946,8 +870,22 @@ export function KundeDetailClient({
               { value: 'sie', label: 'Sie' },
             ]}
           />
-          <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
-          <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          <KiAssistFieldLabel
+            label="Betreff"
+            scope="portal"
+            extraHint="Portal-Einladung Betreff an den Kunden."
+            draftInput={portalBetreff || null}
+          >
+            <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
+            label="Text"
+            scope="portal"
+            extraHint="Portal-Einladungstext an den Kunden."
+            draftInput={[portalBetreff, portalText].filter(Boolean).join('\n\n') || null}
+          >
+            <Textarea rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          </KiAssistFieldLabel>
           <div>
             <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe

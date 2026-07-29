@@ -14,6 +14,8 @@ export type DetailHeadProps = {
   badges?: ReactNode
   /** Badges direkt neben dem Titel (Mock: Freigabe) */
   titleBadges?: ReactNode
+  /** Icon-Aktionen rechts im Titel (z. B. Portal-Login) — immer sichtbar, nicht im ⋯ */
+  titleTrailing?: ReactNode
   actions?: ReactNode
   /** Stärkerer Projekt-Kopf mit Trennlinie */
   variant?: 'default' | 'project'
@@ -27,6 +29,7 @@ export function DetailHead({
   meta,
   badges,
   titleBadges,
+  titleTrailing,
   actions,
   variant = 'project',
   className,
@@ -39,6 +42,11 @@ export function DetailHead({
         <div className="dh-titlerow">
           <div className="dh-title vgid-name">{title}</div>
           {titleBadges ? <div className="dh-title-badges">{titleBadges}</div> : null}
+          {titleTrailing ? (
+            <div className="dh-title-trailing ml-auto flex shrink-0 items-center gap-1">
+              {titleTrailing}
+            </div>
+          ) : null}
         </div>
         {hasMetaRow ? (
           <div className="dh-meta vgid-meta">

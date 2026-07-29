@@ -16,6 +16,13 @@ import {
   lookupCrmWissen,
 } from '@/lib/copilot/crm-wissen'
 import { planeArbeitstag } from '@/lib/copilot/plane-arbeitstag'
+import { readCrmDocument } from '@/lib/copilot/read-document'
+import { vorschlageHandwerkerZuordnung } from '@/lib/copilot/handwerker-vorschlaege'
+import {
+  listTodosCopilot,
+  saveTodoCopilot,
+  setTodoErledigtCopilot,
+} from '@/lib/copilot/todo-copilot'
 import {
   listHandwerkerFuerGewerkCopilot,
   prepareAngebotWizardCopilot,
@@ -79,6 +86,48 @@ export async function executeCopilotTool(
       )
     case 'get_entity':
       return getEntity(String(input.typ), String(input.id))
+    case 'read_document':
+      return readCrmDocument({
+        typ: String(input.typ),
+        id: String(input.id),
+        include_pdf_text: input.include_pdf_text !== false,
+      })
+    case 'list_todos':
+      return listTodosCopilot({
+        nur_wichtige: input.nur_wichtige === true,
+        erledigt:
+          typeof input.erledigt === 'boolean' ? input.erledigt : undefined,
+        kunde_id: typeof input.kunde_id === 'string' ? input.kunde_id : undefined,
+        lead_id: typeof input.lead_id === 'string' ? input.lead_id : undefined,
+        auftrag_id: typeof input.auftrag_id === 'string' ? input.auftrag_id : undefined,
+        limit: typeof input.limit === 'number' ? input.limit : undefined,
+      })
+    case 'save_todo':
+      return saveTodoCopilot({
+        id: typeof input.id === 'string' ? input.id : undefined,
+        titel: String(input.titel ?? ''),
+        beschreibung: typeof input.beschreibung === 'string' ? input.beschreibung : undefined,
+        faellig_am: typeof input.faellig_am === 'string' ? input.faellig_am : undefined,
+        prioritaet:
+          input.prioritaet === 'niedrig' || input.prioritaet === 'hoch' || input.prioritaet === 'normal'
+            ? input.prioritaet
+            : undefined,
+        kunde_id: typeof input.kunde_id === 'string' ? input.kunde_id : undefined,
+        lead_id: typeof input.lead_id === 'string' ? input.lead_id : undefined,
+        auftrag_id: typeof input.auftrag_id === 'string' ? input.auftrag_id : undefined,
+        handwerker_id: typeof input.handwerker_id === 'string' ? input.handwerker_id : undefined,
+        zugewiesen_an: typeof input.zugewiesen_an === 'string' ? input.zugewiesen_an : undefined,
+      })
+    case 'set_todo_erledigt':
+      return setTodoErledigtCopilot(
+        String(input.id),
+        input.erledigt !== false
+      )
+    case 'vorschlage_handwerker_zuordnung':
+      return vorschlageHandwerkerZuordnung({
+        angebot_id: typeof input.angebot_id === 'string' ? input.angebot_id : undefined,
+        auftrag_id: typeof input.auftrag_id === 'string' ? input.auftrag_id : undefined,
+      })
     case 'get_offene_angebote':
       return getOffeneAngebote()
     case 'get_offene_rechnungen':

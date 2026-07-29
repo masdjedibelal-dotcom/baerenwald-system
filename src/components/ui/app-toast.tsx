@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { CheckCircle, XCircle, Info, X, Loader2 } from 'lucide-react'
+import { actionBusy } from '@/components/ui/action-busy'
 import { cn } from '@/lib/utils'
 
 type ToastType = 'success' | 'error' | 'info' | 'loading'
@@ -26,10 +27,18 @@ type ToastApi = {
 }
 
 let toastApi: ToastApi | null = null
+/** loading-Toasts, die ein actionBusy.show ausgelöst haben */
+const loadingBusyIds = new Set<string>()
 
 function formatMessage(title: string, opts?: { description?: string }): string {
   if (opts?.description) return `${title} — ${opts.description}`
   return title
+}
+
+function releaseLoadingBusy(id: string) {
+  if (!loadingBusyIds.has(id)) return
+  loadingBusyIds.delete(id)
+  actionBusy.hide()
 }
 
 function pushToast(type: ToastType, message: string, opts?: ToastOpts): string {
@@ -38,16 +47,35 @@ function pushToast(type: ToastType, message: string, opts?: ToastOpts): string {
 }
 
 export const toast = {
-  success: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
-    pushToast('success', msg, { id: opts?.id, action: opts?.action, persist: Boolean(opts?.action) }),
-  error: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
-    pushToast('error', msg, { id: opts?.id, action: opts?.action }),
-  info: (msg: string, opts?: { id?: string; action?: ToastAction }) =>
-    pushToast('info', msg, { id: opts?.id, action: opts?.action }),
-  /** Bleibt stehen, bis dismiss/success/error mit derselben id. */
-  loading: (msg: string, opts?: { id?: string }) =>
-    pushToast('loading', msg, { id: opts?.id, persist: true }),
-  dismiss: (id: string) => toastApi?.dismiss(id),
+  success: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
+    if (opts?.id) releaseLoadingBusy(opts.id)
+    return pushToast('success', msg, {
+      id: opts?.id,
+      action: opts?.action,
+      persist: Boolean(opts?.action),
+    })
+  },
+  error: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
+    if (opts?.id) releaseLoadingBusy(opts.id)
+    return pushToast('error', msg, { id: opts?.id, action: opts?.action })
+  },
+  info: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
+    if (opts?.id) releaseLoadingBusy(opts.id)
+    return pushToast('info', msg, { id: opts?.id, action: opts?.action })
+  },
+  /** Bleibt stehen, bis dismiss/success/error mit derselben id — inkl. Loading-Screen. */
+  loading: (msg: string, opts?: { id?: string }) => {
+    const id = pushToast('loading', msg, { id: opts?.id, persist: true })
+    if (id && !loadingBusyIds.has(id)) {
+      loadingBusyIds.add(id)
+      actionBusy.show(msg)
+    }
+    return id
+  },
+  dismiss: (id: string) => {
+    releaseLoadingBusy(id)
+    toastApi?.dismiss(id)
+  },
   message: (title: string, opts?: { description?: string }) =>
     pushToast('info', formatMessage(title, opts)),
 }

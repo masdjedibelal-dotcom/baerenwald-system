@@ -1,6 +1,7 @@
 "use client";
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from 'react';
 import {
   deleteLeadDokument,
   insertLeadDokument,
@@ -90,13 +91,16 @@ export function AnfrageDokumenteTab({
   dokumente,
   angebote,
   rechnungen = [],
+  immerRechnungIds = [],
   onReload,
 }: {
-  leadId: string;
-  dokumente: LeadDokumentRow[];
-  angebote: AngebotKurz[];
-  rechnungen?: RechnungKurz[];
-  onReload: () => void;
+  leadId: string
+  dokumente: LeadDokumentRow[]
+  angebote: AngebotKurz[]
+  rechnungen?: RechnungKurz[]
+  /** Auch Entwürfe / sonst ausgefilterte Rechnungen (z. B. aktuelle RE in der Akte). */
+  immerRechnungIds?: string[]
+  onReload: () => void
 }) {
   const [meta, setMeta] = useState<
     Record<string, { name?: string; beschreibung: string; freigabe: boolean; created_at?: string }>
@@ -144,15 +148,19 @@ export function AnfrageDokumenteTab({
     }
 
     for (const r of rechnungen) {
-      if (!rechnungIstAlsAkteUnterlage(r)) continue;
-      const id = `rechnung-${r.id}`;
-      const m = meta[id];
-      const st = (r.status ?? "").toLowerCase();
+      const force = immerRechnungIds.includes(r.id)
+      if (!force && !rechnungIstAlsAkteUnterlage(r)) continue
+      const id = `rechnung-${r.id}`
+      const m = meta[id]
+      const st = (r.status ?? "").toLowerCase()
       const art =
         (r.beleg_typ ?? "").toLowerCase() === "gutschrift"
           ? "Gutschrift"
-          : rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index);
-      const defaultName = r.rechnungsnummer?.trim() || art;
+          : rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
+      const defaultName = r.rechnungsnummer?.trim() || art
+      const defaultBeschreibung = force && st === "entwurf"
+        ? "Rechnungs-PDF"
+        : `${art} · ${st || "—"}`
       rows.push({
         id,
         name: m?.name?.trim() || defaultName,
@@ -165,15 +173,15 @@ export function AnfrageDokumenteTab({
           new Date().toISOString(),
         groesse_bytes: null,
         quelle: "rechnung",
-        beschreibung: m?.beschreibung?.trim() || `${art} · ${st || "—"}`,
+        beschreibung: m?.beschreibung?.trim() || defaultBeschreibung,
         freigabe: m?.freigabe ?? (st === "gesendet" || st === "bezahlt" || st === "versendet"),
-      });
+      })
     }
 
     return rows.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-  }, [dokumente, angebote, rechnungen, meta]);
+    )
+  }, [dokumente, angebote, rechnungen, immerRechnungIds, meta])
 
   const upd = (id: string, patch: Partial<{ name: string; beschreibung: string; freigabe: boolean; created_at: string }>) => {
     setMeta((prev) => {
@@ -304,90 +312,11 @@ export function AnfrageDokumenteTab({
         ) : null}
 
         {docs.length === 0 ? (
-          isMobile ? (
-            <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-              Noch keine Dokumente. Über „Dokument“ oben hochladen.
-            </p>
-          ) : null
-        ) : isMobile ? (
-          <div className="dok-cards">
-            {docs.map((d) => {
-              const sizeLabel = formatBytes(d.groesse_bytes);
-              const isFoto = isImageDoc(d.name, d.href);
-              const quelleLabel =
-                d.quelle === "angebot"
-                  ? "Angebot"
-                  : d.quelle === "rechnung"
-                    ? "Rechnung"
-                    : "Upload";
-              const meta = [
-                quelleLabel,
-                formatDatum(d.created_at),
-                sizeLabel,
-                d.beschreibung.trim() || null,
-              ]
-                .filter(Boolean)
-                .join(" · ");
-              return (
-                <div
-                  key={d.id}
-                  className="dok-card dok-card--tappable"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openView(d)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openView(d);
-                    }
-                  }}
-                >
-                  <div className="dok-card__icon" aria-hidden>
-                    <MockIcon ctx="row" n={isFoto ? "photo" : "file-text"} size={18} />
-                  </div>
-                  <div className="dok-card__body">
-                    <div className="dok-card__top">
-                      <span className="dok-card__title">{d.name}</span>
-                      <div
-                        className="dok-card__actions"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        <MockBtn
-                          sm
-                          kind="ghost"
-                          icon="eye"
-                          title="Ansehen"
-                          onClick={() => openView(d)}
-                        />
-                        {d.quelle === "upload" ? (
-                          <MockBtn
-                            sm
-                            kind="ghost"
-                            icon="trash"
-                            title="Löschen"
-                            disabled={busy}
-                            onClick={() => removeDoc(d)}
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                    {meta ? <div className="dok-card__meta">{meta}</div> : null}
-                    <div className="dok-card__foot">
-                      <span
-                        className={cn(
-                          "dok-card__tag",
-                          d.freigabe ? "dok-card__tag--kunde" : "dok-card__tag--muted",
-                        )}
-                      >
-                        {d.freigabe ? "Kunde" : "intern"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+            {isMobile
+              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
+              : 'Noch keine Dokumente.'}
+          </p>
         ) : (
           <div className="dok-list">
             <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
@@ -402,14 +331,40 @@ export function AnfrageDokumenteTab({
               const editing = editId === d.id;
               const sizeLabel = formatBytes(d.groesse_bytes);
               const isFoto = isImageDoc(d.name, d.href);
+              const quelleLabel =
+                d.quelle === "angebot"
+                  ? "Angebot"
+                  : d.quelle === "rechnung"
+                    ? "Rechnung"
+                    : "Upload";
+              const subMeta = [
+                quelleLabel,
+                formatDatum(d.created_at),
+                sizeLabel,
+                d.freigabe ? "Kunde" : "intern",
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <div
                   key={d.id}
-                  className="list-row"
+                  className={cn("list-row", !editing && "dok-list__row--openable")}
                   style={{
                     gridTemplateColumns: COLS,
-                    cursor: "default",
+                    cursor: editing ? "default" : "pointer",
                     alignItems: editing ? "start" : "center",
+                  }}
+                  role={editing ? undefined : "button"}
+                  tabIndex={editing ? undefined : 0}
+                  onClick={() => {
+                    if (!editing) openView(d);
+                  }}
+                  onKeyDown={(e) => {
+                    if (editing) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openView(d);
+                    }
                   }}
                 >
                   <MockIcon
@@ -425,44 +380,30 @@ export function AnfrageDokumenteTab({
                       onChange={(e) => upd(d.id, { name: e.target.value })}
                       style={{ height: 30 }}
                       autoFocus
+                      onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div
-                      style={{
-                        fontSize: "var(--fs-text)",
-                        fontWeight: 500,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {d.name}
-                      {sizeLabel ? (
-                        <span style={{ color: "var(--text-4)", fontWeight: 400 }}>
-                          {" "}
-                          · {sizeLabel}
-                        </span>
-                      ) : null}
+                    <div className="dok-list__main min-w-0">
+                      <div className="dok-list__name">
+                        {d.name}
+                        {sizeLabel ? (
+                          <span className="dok-list__name-size"> · {sizeLabel}</span>
+                        ) : null}
+                      </div>
+                      {subMeta ? <div className="dok-list__sub">{subMeta}</div> : null}
                     </div>
                   )}
                   {editing ? (
                     <input
-                      className="txt"
+                      className="txt dok-list__cell--desk"
                       value={d.beschreibung}
                       onChange={(e) => upd(d.id, { beschreibung: e.target.value })}
                       placeholder="Beschreibung…"
                       style={{ height: 30 }}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div
-                      style={{
-                        fontSize: "var(--fs-meta)",
-                        color: "var(--text-3)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <div className="dok-list__cell--desk dok-list__desc">
                       {d.beschreibung || (
                         <span style={{ color: "var(--text-4)" }}>—</span>
                       )}
@@ -470,7 +411,7 @@ export function AnfrageDokumenteTab({
                   )}
                   {editing ? (
                     <input
-                      className="txt"
+                      className="txt dok-list__cell--desk"
                       type="date"
                       defaultValue={d.created_at.slice(0, 10)}
                       onChange={(e) => {
@@ -480,13 +421,15 @@ export function AnfrageDokumenteTab({
                         });
                       }}
                       style={{ height: 30, fontSize: "var(--fs-meta)" }}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-3)" }}>
+                    <div className="dok-list__cell--desk dok-list__date">
                       {formatDatum(d.created_at)}
                     </div>
                   )}
                   <label
+                    className="dok-list__freigabe"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -494,6 +437,7 @@ export function AnfrageDokumenteTab({
                       cursor: "pointer",
                       fontSize: "var(--fs-meta)",
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
@@ -505,7 +449,12 @@ export function AnfrageDokumenteTab({
                       {d.freigabe ? "Kunde" : "intern"}
                     </span>
                   </label>
-                  <div style={{ display: "flex", gap: 0, justifyContent: "flex-end" }}>
+                  <div
+                    className="dok-list__actions"
+                    style={{ display: "flex", gap: 0, justifyContent: "flex-end" }}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     {editing ? (
                       <MockBtn
                         sm

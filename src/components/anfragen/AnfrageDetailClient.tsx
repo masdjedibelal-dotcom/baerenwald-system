@@ -1,11 +1,11 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
@@ -20,12 +20,11 @@ import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateAnfrage } from '@/lib/list-actions'
-import { softDeleteAnfrage, restoreAnfrage } from '@/app/(dashboard)/anfragen/actions'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
@@ -53,6 +52,7 @@ const AngebotWizard = dynamic(
 )
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { TodosPanel } from '@/components/todos/TodosPanel'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -69,7 +69,7 @@ import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet' | 'todos'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'uebersicht',
@@ -77,6 +77,7 @@ const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'zahlung',
   'akte',
   'aktivitaet',
+  'todos',
 ])
 const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'uebersicht'
 
@@ -126,6 +127,7 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
   ) {
     return 'aktivitaet'
   }
+  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'todos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'uebersicht'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
@@ -202,13 +204,13 @@ export function AnfrageDetailClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const isMobile = useIsMobile()
   const { refresh, generation } = useCrmRefresh()
   const [lead, setLead] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
   const [wvOpen, setWvOpen] = useState(false)
   const [zusammenfuehrenOpen, setZusammenfuehrenOpen] = useState(false)
-  const [impersonating, setImpersonating] = useState(false)
   const [angebotWizardOpen, setAngebotWizardOpen] = useState(false)
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
@@ -436,83 +438,45 @@ export function AnfrageDetailClient({
     setAngebotWizardBootstrap(null)
   }, [])
 
-  const detailHeadMenuItems = useMemo(() => {
+  const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
+  const kundeTitel = useMemo(() => kundenName(lead), [lead])
+  const portalKundeId = useMemo(() => leadVertragsKundeId(lead), [lead])
+
+  const statusBadge = useMemo(() => {
+    const s = anfrageStatusDisplay(lead.status, {
+      orgFreigabeStatus: lead.org_freigabe_status,
+    })
+    const badge = <StatusBadge status={lead.status} label={s.label} />
+    const st = String(lead.status ?? '').trim().toLowerCase()
     const hasAngenommen = angeboteListe.some((a) =>
       isAngenommenesAngebotStatus(a.status, a.status_einfach)
     )
-    const kundeId = leadVertragsKundeId(lead)
-    const showZusammen =
-      Boolean((lead as { duplikat_hinweis?: boolean }).duplikat_hinweis) ||
-      Boolean((lead as { duplikat_band_dismissed?: boolean }).duplikat_band_dismissed)
-
-    return entityMenuToActionItems(
-      buildEntityMenu(
-        'anfrage',
-        {
-          name: kundenName(lead),
-          status: lead.status,
-          hasAngebote: angeboteListe.length > 0,
-          hasAngenommenesAngebot: hasAngenommen,
-          showZusammenfuehren: showZusammen && !lead.zusammengefuehrt_in,
-        },
-        {
-          onEdit: () => setBearbeitenOpen(true),
-          onCopy: () => runDuplicateAnfrage(lead.id, router),
-          onStatus: (k) => setStatusModalKind(k),
-          onAngeboteVerwalten: () => setAngebotAuswahlOpen(true),
-          onZusammenfuehren: () => setZusammenfuehrenOpen(true),
-          onPortal: kundeId
-            ? () => {
-                if (impersonating) return
-                setImpersonating(true)
-                const popup = window.open('about:blank', '_blank')
-                void openPortalAsKunde(kundeId).then((r) => {
-                  setImpersonating(false)
-                  if (!r.ok) {
-                    popup?.close()
-                    toast.error(r.message)
-                    return
-                  }
-                  if (popup) popup.location.href = r.url
-                  else window.location.assign(r.url)
-                })
-              }
-            : undefined,
-          onDelete: () => {
-            startTransition(async () => {
-              const r = await softDeleteAnfrage(lead.id)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              toast.success('Anfrage gelöscht', {
-                action: {
-                  label: 'Rückgängig',
-                  onClick: () => {
-                    void restoreAnfrage(lead.id).then((ur) => {
-                      if (!ur.ok) toast.error(ur.message)
-                      else {
-                        toast.success('Wiederhergestellt')
-                        router.push(`/anfragen/${lead.id}`)
-                        refresh()
-                      }
-                    })
-                  },
-                },
-              })
-              router.push('/vorgaenge?tab=anfrage')
-              refresh()
-            })
-          },
-          deleteLabel: kundenName(lead),
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
-    )
-  }, [lead, angeboteListe, router, startTransition, refresh, impersonating])
-
-  const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
-  const kundeTitel = useMemo(() => kundenName(lead), [lead])
+    const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] = []
+    if (st === 'neu' || st === 'kontaktiert') {
+      actions.push({
+        id: 'termin',
+        label: 'Termin vereinbart',
+        icon: 'calendar-event',
+        onClick: () => setStatusModalKind('termin'),
+      })
+      actions.push({
+        id: 'nicht_erreichbar',
+        label: 'Nicht erreichbar',
+        icon: 'phone-off',
+        onClick: () => setStatusModalKind('nicht_erreichbar'),
+      })
+    }
+    if (!hasAngenommen && st !== 'abgebrochen') {
+      actions.push({
+        id: 'verloren',
+        label: 'Als verloren markieren',
+        icon: 'circle-x',
+        danger: true,
+        onClick: () => setStatusModalKind('verloren'),
+      })
+    }
+    return <StatusBadgeActionPopover badge={badge} actions={actions} title="Status" />
+  }, [lead.status, lead.org_freigabe_status, angeboteListe])
 
   const noShowTerminHinweis = useMemo(
     () =>
@@ -625,6 +589,22 @@ export function AnfrageDetailClient({
       count: timelineItems.length || undefined,
       render: () => timelineTab,
     },
+    {
+      id: 'todos',
+      label: entityDetailTabLabel('todos'),
+      icon: 'clipboard-list',
+      render: () => (
+        <TodosPanel
+          compact
+          filter={{ leadId: lead.id }}
+          lockedLinks={{
+            leadId: lead.id,
+            kundeId: leadVertragsKundeId(lead) ?? null,
+            label: leadKontaktAnzeigeName(lead) || 'Anfrage',
+          }}
+        />
+      ),
+    },
   ]
 
   return (
@@ -645,13 +625,10 @@ export function AnfrageDetailClient({
       quickBar={quickBar}
       head={{
         title: kundeTitel,
-        badges: (() => {
-          const s = anfrageStatusDisplay(lead.status, {
-            orgFreigabeStatus: lead.org_freigabe_status,
-          })
-          return <StatusBadge status={lead.status} label={s.label} />
-        })(),
+        titleBadges: isMobile ? statusBadge : undefined,
+        badges: isMobile ? undefined : statusBadge,
         meta: headMeta,
+        titleTrailing: <PortalLoginIconButton kundeId={portalKundeId} label="Kundenportal öffnen" />,
         actions: (
           <DetailActionsBar
             sheetTitle="Anfrage"
@@ -665,8 +642,7 @@ export function AnfrageDetailClient({
                   }
                 : null
             }
-            secondary={null}
-            menuItems={detailHeadMenuItems}
+            menuItems={[]}
           />
         ),
       }}

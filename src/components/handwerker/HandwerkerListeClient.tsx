@@ -20,6 +20,7 @@ import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
+import { runDuplicateHandwerker } from '@/lib/list-actions'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
@@ -624,11 +625,7 @@ export function HandwerkerListeClient({
             const tel = h.telefon?.trim() || ''
             const mail = h.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
-            const call = tel
-              ? () => {
-                  window.location.href = `tel:${tel}`
-                }
-              : undefined
+            const copy = () => runDuplicateHandwerker(h.id, router)
             const row = (
               <div
                 role="button"
@@ -697,8 +694,8 @@ export function HandwerkerListeClient({
               <SwipeRow
                 key={h.id}
                 disabled={!isMobile || selectMode}
-                onSwipeRight={isMobile && !selectMode ? call : undefined}
-                rightLabel="Anrufen"
+                onSwipeRight={isMobile && !selectMode ? copy : undefined}
+                rightLabel="Kopieren"
               >
                 {row}
               </SwipeRow>

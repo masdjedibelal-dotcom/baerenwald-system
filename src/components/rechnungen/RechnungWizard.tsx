@@ -9,6 +9,10 @@ import {
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { DocActionBar } from '@/components/surfaces/primitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft, applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import {
   MetaCrowButton,
   TotBand,
@@ -31,6 +35,10 @@ import {
   syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
+import {
+  createAbschlussberichtPdf,
+  loadAbschlussberichtWizardHint,
+} from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   dokumentZeilenToAngebotPositionen,
@@ -223,9 +231,25 @@ export function RechnungWizard({
     kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
   )
   const [mailCc, setMailCc] = useState<string[]>([])
+  const [abschlussHint, setAbschlussHint] = useState<{
+    showBlock: boolean
+    hasBericht: boolean
+    berichtUrl: string | null
+  } | null>(null)
+  const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
+  const [abschlussBusy, setAbschlussBusy] = useState(false)
   const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlplan' | 'versand' | null
+    'kunde' | 'dokument' | 'zahlung' | 'versand' | null
   >(null)
+  useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
+    applyKiDokumentTextDraft(d, { setText: setEinleitung })
+  })
+  useKiAssistDraftConsumer(sheet === 'versand', ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: setMailBetreff,
+      setBody: () => {},
+    })
+  })
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -252,6 +276,27 @@ export function RechnungWizard({
       document.body.style.overflow = ''
     }
   }, [])
+
+  useEffect(() => {
+    const aid = bootstrap.auftragId?.trim()
+    if (!aid || istDirektrechnung) {
+      setAbschlussHint(null)
+      return
+    }
+    let cancelled = false
+    void loadAbschlussberichtWizardHint(aid).then((h) => {
+      if (cancelled) return
+      setAbschlussHint({
+        showBlock: h.showBlock,
+        hasBericht: h.hasBericht,
+        berichtUrl: h.berichtUrl,
+      })
+      if (h.hasBericht) setAbschlussMitVersand(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [bootstrap.auftragId, istDirektrechnung])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -502,7 +547,7 @@ export function RechnungWizard({
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Zahlplan noch nicht 100 % — vor Versand anpassen.')
+      toast.error('Abschlagsplan noch nicht 100 % — vor Versand anpassen.')
     }
     const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
@@ -761,7 +806,7 @@ export function RechnungWizard({
       return null
     }
     if (!planOk) {
-      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return null
     }
     const nextMeta = buildMetaForSave()
@@ -821,7 +866,7 @@ export function RechnungWizard({
 
   async function persistDraft(): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Zahlplan entfernen.')
+      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
       return null
     }
     // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
@@ -834,7 +879,7 @@ export function RechnungWizard({
 
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
     const id = await persistDraft()
@@ -881,6 +926,9 @@ export function RechnungWizard({
         rechnungId: id,
         mailTo: to,
         mailCc: mailCc.filter((e) => isValidEmail(e)),
+        mitAbschlussbericht: Boolean(
+          abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
+        ),
       })
       if (!res.ok) {
         toast.error(res.message)
@@ -1160,8 +1208,6 @@ export function RechnungWizard({
         restBrutto={schlussAbrechnung?.rest_brutto ?? null}
       />
 
-      {steuernBlock}
-
       <section className="document-section">
         <h2 className="document-section__label">Vorschau</h2>
         {activeVersandId ? (
@@ -1234,9 +1280,9 @@ export function RechnungWizard({
         onClick={() => setSheet('dokument')}
       />
       <MetaCrowButton
-        label="Zahlplan"
+        label="Zahlung"
         value={zahlplanCrowValue}
-        onClick={() => setSheet('zahlplan')}
+        onClick={() => setSheet('zahlung')}
       />
       <MetaCrowButton
         label="Versand"
@@ -1388,6 +1434,13 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
+        headerEnd={
+          <KiAssistIconButton
+            scope="dokument"
+            extraHint="Rechnung-Einleitung / Anschreiben (kundensichtbar)."
+            draftInput={einleitung || null}
+          />
+        }
       >
         <div className="form-grid form-grid--sheet">
           {hatAuftrag && !rateLocked ? (
@@ -1459,21 +1512,28 @@ export function RechnungWizard({
               }
             />
           </MockField>
-          <MockField label="Einleitung (Anschreiben)" full>
-            <textarea
-              className="input ta"
-              rows={5}
-              value={einleitung}
-              onChange={(e) => setEinleitung(e.target.value)}
-            />
-          </MockField>
+          <div className="full">
+            <KiAssistFieldLabel
+              label="Einleitung (Anschreiben)"
+              scope="dokument"
+              extraHint="Rechnung-Anschreiben für Kunde (PDF + Mail)."
+              draftInput={einleitung || null}
+            >
+              <textarea
+                className="input ta"
+                rows={5}
+                value={einleitung}
+                onChange={(e) => setEinleitung(e.target.value)}
+              />
+            </KiAssistFieldLabel>
+          </div>
         </div>
       </EditorSheet>
 
       <EditorSheet
-        open={sheet === 'zahlplan'}
+        open={sheet === 'zahlung'}
         onClose={closeSheet}
-        title="Zahlplan"
+        title="Zahlung"
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
@@ -1518,7 +1578,7 @@ export function RechnungWizard({
                   Optional: Teile die Auftragssumme in Abschläge auf.
                 </div>
                 <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
-                  Zahlplan hinzufügen
+                  Abschlagsplan hinzufügen
                 </MockBtn>
               </div>
             </div>
@@ -1611,6 +1671,8 @@ export function RechnungWizard({
               )}
             </div>
           )}
+
+          <div className="full">{steuernBlock}</div>
         </div>
       </EditorSheet>
 
@@ -1645,13 +1707,116 @@ export function RechnungWizard({
             placeholder="optional"
             disabled={saving}
           />
-          <MockField label="Betreff" full>
+          <KiAssistFieldLabel
+            label="Betreff"
+            scope="mail"
+            extraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
+            draftInput={mailBetreff || defaultBetreff || null}
+          >
             <input
               className="input"
               value={mailBetreff || defaultBetreff}
               onChange={(e) => setMailBetreff(e.target.value)}
             />
-          </MockField>
+          </KiAssistFieldLabel>
+          {abschlussHint?.showBlock ? (
+            <div
+              className="full"
+              style={{
+                border: '1px solid var(--bw-border, #e5e7eb)',
+                borderRadius: 10,
+                padding: '12px 14px',
+                display: 'grid',
+                gap: 10,
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 'var(--fs-text)' }}>Abschlussbericht</div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--bw-text-muted, #6b7280)',
+                }}
+              >
+                Optional mit der Rechnung an den Kunden senden
+                {abschlussHint.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <MockBtn
+                  kind="ghost"
+                  disabled={saving || abschlussBusy || !bootstrap.auftragId}
+                  onClick={() => {
+                    const aid = bootstrap.auftragId?.trim()
+                    if (!aid) return
+                    setAbschlussBusy(true)
+                    void createAbschlussberichtPdf(aid)
+                      .then((r) => {
+                        if (!r.ok) {
+                          toast.error(r.message)
+                          return
+                        }
+                        setAbschlussHint({
+                          showBlock: true,
+                          hasBericht: true,
+                          berichtUrl: r.publicUrl,
+                        })
+                        setAbschlussMitVersand(true)
+                        toast.success('Abschlussbericht erstellt')
+                        window.open(r.publicUrl, '_blank', 'noopener,noreferrer')
+                      })
+                      .finally(() => setAbschlussBusy(false))
+                  }}
+                >
+                  {abschlussBusy
+                    ? '…'
+                    : abschlussHint.hasBericht
+                      ? 'Neu erzeugen'
+                      : 'PDF erzeugen'}
+                </MockBtn>
+                {abschlussHint.berichtUrl ? (
+                  <MockBtn
+                    kind="ghost"
+                    disabled={saving}
+                    onClick={() =>
+                      window.open(abschlussHint.berichtUrl!, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    Vorschau
+                  </MockBtn>
+                ) : null}
+              </div>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  cursor: 'pointer',
+                  fontSize: 'var(--fs-text)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={abschlussMitVersand}
+                  disabled={saving}
+                  onChange={(e) => setAbschlussMitVersand(e.target.checked)}
+                />
+                <span>
+                  <span style={{ fontWeight: 500 }}>Mit Rechnung versenden</span>
+                  <span
+                    style={{
+                      display: 'block',
+                      marginTop: 2,
+                      fontSize: 'var(--fs-meta)',
+                      color: 'var(--bw-text-muted, #6b7280)',
+                    }}
+                  >
+                    Fehlt noch ein PDF, wird es beim Senden automatisch erzeugt.
+                  </span>
+                </span>
+              </label>
+            </div>
+          ) : null}
           <div className="full" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <MockBtn
               kind="ghost"

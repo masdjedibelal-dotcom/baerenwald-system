@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { PartnerCreateSheet } from '@/components/handwerker/PartnerCreateSheet'
@@ -8,11 +9,28 @@ import {
   FabVorgangStartModal,
   type FabVorgangArt,
 } from '@/components/neu/FabVorgangStartModal'
+import { KalenderTerminEditorSheet } from '@/components/kalender/KalenderTerminEditorSheet'
+import { TodoEditorSheet } from '@/components/todos/TodoEditorSheet'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 
-export type FabOverlayArt = 'kunde' | 'handwerker' | 'rechnung' | 'angebot'
+export type FabOverlayArt =
+  | 'kunde'
+  | 'handwerker'
+  | 'rechnung'
+  | 'angebot'
+  | 'termin'
+  | 'todo'
 
 const EVENT = 'fab-create'
+
+const FAB_ARTS = new Set<FabOverlayArt>([
+  'kunde',
+  'handwerker',
+  'rechnung',
+  'angebot',
+  'termin',
+  'todo',
+])
 
 /** Öffnet Create-Overlay auf der aktuellen Seite (ohne weiße `/neu`-Zwischenseite). */
 export function openFabCreate(art: FabOverlayArt) {
@@ -29,6 +47,7 @@ type GewerkOpt = { id: string; name: string; slug: string }
  * Shell-Host für FAB-Create: Sheet/Picker auf der aktuellen Seite.
  * Angebot/Rechnung: Kunde wählen → Wizard-URL.
  * Kunde/Handwerker: Create-Sheet → Detail nach Speichern.
+ * Termin / To-do: EditorSheet auf der aktuellen Seite.
  */
 export function FabCreateHost() {
   const router = useRouter()
@@ -40,9 +59,7 @@ export function FabCreateHost() {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<{ art?: FabOverlayArt }>).detail
       const next = detail?.art
-      if (next === 'kunde' || next === 'handwerker' || next === 'rechnung' || next === 'angebot') {
-        setArt(next)
-      }
+      if (next && FAB_ARTS.has(next)) setArt(next)
     }
     document.addEventListener(EVENT, onOpen)
     return () => document.removeEventListener(EVENT, onOpen)
@@ -87,6 +104,26 @@ export function FabCreateHost() {
         open={vorgangArt != null}
         art={vorgangArt}
         onClose={() => setArt(null)}
+      />
+
+      <KalenderTerminEditorSheet
+        open={art === 'termin'}
+        termin={null}
+        onClose={() => setArt(null)}
+        onSaved={() => {
+          setArt(null)
+          router.refresh()
+        }}
+      />
+
+      <TodoEditorSheet
+        open={art === 'todo'}
+        todo={null}
+        onClose={() => setArt(null)}
+        onSaved={() => {
+          setArt(null)
+          router.refresh()
+        }}
       />
     </>
   )

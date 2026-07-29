@@ -34,7 +34,7 @@ export function buildAssistentContextHint(pathname: string): string {
   }
 
   lines.push(
-    'Modus: AUSKUNFT (crm_hilfe, search_crm) · AUSFÜHREN (crm_aktion, Vorschau dann bestaetigt) · NAVIGIEREN (crm_oeffnen Deep-Links) · PLANEN (plane_arbeitstag). Sidepanel zeigt Links und Vorschau-Karten.'
+    'Modus: AUSKUNFT (crm_hilfe, search_crm, get_entity, read_document, list_todos) · AUSFÜHREN (crm_aktion, Vorschau dann bestaetigt) · NAVIGIEREN (crm_oeffnen) · PLANEN (plane_arbeitstag). Sidepanel zeigt Links und Vorschau-Karten. Agentische Flows: Anfrage→Angebot→Annehmen→HW-Zuordnung→Rechnung.'
   )
 
   return lines.join('\n')

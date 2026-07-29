@@ -1,7 +1,12 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { Input } from '@/components/ui/Input'
@@ -148,6 +153,19 @@ export function BautagebuchKundeSendModal({
 
   if (!eintrag) return null
 
+  useKiAssistDraftConsumer(open, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: (v) => {
+        setBetreff(v)
+        setDirty(true)
+      },
+      setBody: (v) => {
+        setNachricht(v)
+        setDirty(true)
+      },
+    })
+  })
+
   return (
     <EditorSheet
       open={open}
@@ -161,6 +179,13 @@ export function BautagebuchKundeSendModal({
       composeLabel="Senden"
       onConfirm={senden}
       confirmBusy={pending}
+      headerEnd={
+        <KiAssistIconButton
+          scope="mail"
+          extraHint={`Bautagebuch-Mail an ${kundeName}. Anrede: ${anrede}.`}
+          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
+        />
+      }
       footer={<VersandFooter pending={pending} onSubmit={senden} />}
     >
       <div className="space-y-4">
@@ -194,14 +219,20 @@ export function BautagebuchKundeSendModal({
           </label>
         </div>
 
-        <Input
+        <KiAssistFieldLabel
           label="Betreff"
-          value={betreff}
-          onChange={(e) => {
-            setBetreff(e.target.value)
-            setDirty(true)
-          }}
-        />
+          scope="mail"
+          extraHint={`Bautagebuch-Mail an ${kundeName}.`}
+          draftInput={betreff || null}
+        >
+          <Input
+            value={betreff}
+            onChange={(e) => {
+              setBetreff(e.target.value)
+              setDirty(true)
+            }}
+          />
+        </KiAssistFieldLabel>
 
         {previewHtml ? (
           <CollapsibleMailPreview previewHtml={previewHtml} />
@@ -211,16 +242,22 @@ export function BautagebuchKundeSendModal({
           </p>
         ) : null}
 
-        <Textarea
+        <KiAssistFieldLabel
           label="Nachricht"
-          plain
-          rows={6}
-          value={nachricht}
-          onChange={(e) => {
-            setNachricht(e.target.value)
-            setDirty(true)
-          }}
-        />
+          scope="mail"
+          extraHint={`Bautagebuch-Mailtext. Anrede: ${anrede}.`}
+          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
+        >
+          <Textarea
+            plain
+            rows={6}
+            value={nachricht}
+            onChange={(e) => {
+              setNachricht(e.target.value)
+              setDirty(true)
+            }}
+          />
+        </KiAssistFieldLabel>
       </div>
     </EditorSheet>
   )

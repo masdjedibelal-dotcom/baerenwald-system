@@ -1,14 +1,13 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import {
   LeistungenTab,
   leistungenFromAuftragPositionen,
-  maengelFuerLeistungenTab,
-  type LeistungMangelAnzeige,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
@@ -17,9 +16,7 @@ import {
   type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
-import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -159,13 +156,12 @@ export function AuftragLeistungenTab({
 }) {
   const [, startTransition] = useTransition()
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
-  const [maengel, setMaengel] = useState<LeistungMangelAnzeige[]>([])
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
-  const [eintragByPos, setEintragByPos] = useState<
-    Record<string, { at?: string | null; text: string }[]>
-  >({})
+  const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
+    'leistungen'
+  )
 
   const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
   const disabled = istAbgeschlossen || !editable
@@ -193,59 +189,18 @@ export function AuftragLeistungenTab({
   }, [detail.auftrag_positionen, mwstSatz])
 
   const rows = useMemo(() => {
-    const base = leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [])
-    const mangelGewerke = new Set(
-      maengel
-        .filter((m) => m.status !== 'behoben')
-        .map((m) => (m.gewerk ?? '').trim().toLowerCase())
-        .filter(Boolean)
-    )
-    return base.map((row) => {
-      const extra = eintragByPos[row.id]
-      const existing = row.dokumentationEintraege ?? []
-      const doku = extra?.length ? [...extra, ...existing] : existing
-      const hatMangel =
-        Boolean(row.gewerkName && mangelGewerke.has(row.gewerkName.trim().toLowerCase())) &&
-        row.status !== 'erledigt' &&
-        row.status !== 'abgenommen'
-      return {
-        ...row,
-        dokumentationEintraege: doku,
-        hatMangel,
-        status: hatMangel ? 'mangel' : row.status,
-        statusLabel: hatMangel ? 'Mangel' : row.statusLabel,
-        subline: hatMangel
-          ? [row.handwerkerName, 'Mangel erfasst'].filter(Boolean).join(' · ')
-          : row.subline,
-      }
-    })
-  }, [detail.auftrag_positionen, eintragByPos, maengel])
+    return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [])
+  }, [detail.auftrag_positionen])
 
   useEffect(() => {
     let cancelled = false
-    void loadAbnahmeprotokollSummary(detail.id).then((s) => {
-      if (cancelled) return
-      setMaengel(
-        s
-          ? maengelFuerLeistungenTab(s.maengel ?? [], s.punkte ?? [])
-          : []
-      )
-    })
     void listAuftragPositionEintraege(detail.id).then((list) => {
       if (cancelled) return
-      const m: Record<string, { at?: string | null; text: string }[]> = {}
       const enriched: BautagebuchListenEintrag[] = []
       for (const e of list) {
         const leistungName = e.position_id ? posNameById.get(e.position_id) ?? null : null
         enriched.push({ ...e, leistungName })
-        if (!e.position_id) continue
-        const text = [eintragTypLabel(e.typ), e.beschreibung?.trim()].filter(Boolean).join(': ')
-        if (!text) continue
-        const arr = m[e.position_id] ?? []
-        arr.push({ at: e.ereignis_zeit || e.created_at || null, text })
-        m[e.position_id] = arr
       }
-      setEintragByPos(m)
       setBautagebuchEintraege(enriched)
     })
     return () => {
@@ -278,54 +233,79 @@ export function AuftragLeistungenTab({
   }
 
   return (
-    <div className="space-y-6">
-      <LeistungenTab
-        phase="auftrag"
-        rows={rows}
-        maengel={maengel}
-        groupByGewerk
-        footerNettoMwst={footerNettoMwst}
-        onOpenDokument={
-          vertragNachtragVerfuegbar && onVertragNachtragErstellen
-            ? onVertragNachtragErstellen
-            : onOpenDokument
-        }
-        dokumentHint="Positionen sind beauftragt — Änderungen brauchen einen Nachtrag."
-        dokumentActionLabel="Nachtrag erstellen"
-        emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
-        bulkActions={
-          disabled
-            ? undefined
-            : [
-                { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
-                { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
-              ]
-        }
-        drawerActionsForRow={
-          disabled
-            ? undefined
-            : (row) => [
-                {
-                  id: 'fortschritt',
-                  label: 'Eintrag erfassen',
-                  variant: 'primary',
-                  onClick: () => openTagebuch(row.id),
-                },
-                {
-                  id: 'zuweisen',
-                  label: 'Zuweisung ändern',
-                  variant: 'ghost',
-                  onClick: () => setZuweisungIds([row.id]),
-                },
-              ]
-        }
-      />
+    <div className="space-y-4">
+      <div className="lt-view-seg" role="tablist" aria-label="Ansicht">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={leistungenView === 'leistungen'}
+          className={leistungenView === 'leistungen' ? 'on' : undefined}
+          onClick={() => setLeistungenView('leistungen')}
+        >
+          Leistungen
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={leistungenView === 'bautagebuch'}
+          className={leistungenView === 'bautagebuch' ? 'on' : undefined}
+          onClick={() => setLeistungenView('bautagebuch')}
+        >
+          Bautagebuch
+          {bautagebuchEintraege.length > 0 ? (
+            <span className="lt-view-seg__count">{bautagebuchEintraege.length}</span>
+          ) : null}
+        </button>
+      </div>
 
-      <AuftragBautagebuchSection
-        eintraege={bautagebuchEintraege}
-        disabled={disabled}
-        onAdd={() => openTagebuch(null)}
-      />
+      {leistungenView === 'leistungen' ? (
+        <LeistungenTab
+          phase="auftrag"
+          rows={rows}
+          groupByGewerk
+          footerNettoMwst={footerNettoMwst}
+          onOpenDokument={
+            vertragNachtragVerfuegbar && onVertragNachtragErstellen
+              ? onVertragNachtragErstellen
+              : onOpenDokument
+          }
+          dokumentHint={null}
+          dokumentActionLabel="Bearbeiten"
+          emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
+          bulkActions={
+            disabled
+              ? undefined
+              : [
+                  { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
+                  { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
+                ]
+          }
+          drawerActionsForRow={
+            disabled
+              ? undefined
+              : (row) => [
+                  {
+                    id: 'eintrag',
+                    label: 'Tagebuch-Eintrag',
+                    variant: 'ghost',
+                    onClick: () => openTagebuch(row.id),
+                  },
+                  {
+                    id: 'zuweisen',
+                    label: 'Zuweisung ändern',
+                    variant: 'ghost',
+                    onClick: () => setZuweisungIds([row.id]),
+                  },
+                ]
+          }
+        />
+      ) : (
+        <AuftragBautagebuchSection
+          eintraege={bautagebuchEintraege}
+          disabled={disabled}
+          onAdd={() => openTagebuch(null)}
+        />
+      )}
 
       {zuweisungIds ? (
         <AuftragLeistungZuweisungModal

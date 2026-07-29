@@ -1,11 +1,19 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Wrench } from 'lucide-react'
 import { AuftragBaustelleScreen } from '@/components/auftraege/AuftragBaustelleScreen'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import {
+  applyKiDokumentTextDraft,
+  claimKiAssistListTarget,
+  setKiAssistListTarget,
+} from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import {
   loadAbnahmeprotokollSummary,
@@ -39,6 +47,21 @@ export function AbnahmeMaengelBearbeitenFlow({
   const [uploadTarget, setUploadTarget] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useKiAssistDraftConsumer(true, 'text', (d) => {
+    for (const m of maengel) {
+      if (claimKiAssistListTarget(m.punkt_id)) {
+        applyKiDokumentTextDraft(d, {
+          setText: (v) => {
+            setMaengel((prev) =>
+              prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, beschreibung: v } : x))
+            )
+          },
+        })
+        return
+      }
+    }
+  })
 
   useEffect(() => {
     void (async () => {
@@ -200,17 +223,24 @@ export function AbnahmeMaengelBearbeitenFlow({
                   {mangelStatusLabel(m.status)}
                 </span>
               </div>
-              <Textarea
+              <KiAssistFieldLabel
                 label="Beschreibung"
-                rows={2}
-                value={m.beschreibung}
-                onChange={(e) => {
-                  const next = maengel.map((x) =>
-                    x.punkt_id === m.punkt_id ? { ...x, beschreibung: e.target.value } : x
-                  )
-                  setMaengel(next)
-                }}
-              />
+                scope="mangel"
+                extraHint="Mangel-Beschreibung für Abnahme/PDF (kundensichtbar)."
+                draftInput={m.beschreibung || null}
+                onBeforeOpen={() => setKiAssistListTarget(m.punkt_id)}
+              >
+                <Textarea
+                  rows={2}
+                  value={m.beschreibung}
+                  onChange={(e) => {
+                    const next = maengel.map((x) =>
+                      x.punkt_id === m.punkt_id ? { ...x, beschreibung: e.target.value } : x
+                    )
+                    setMaengel(next)
+                  }}
+                />
+              </KiAssistFieldLabel>
               <Input
                 label="Frist"
                 type="date"

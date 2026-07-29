@@ -6,7 +6,6 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
-import { formatDatum } from '@/lib/utils'
 import type { LeistungDrawerAction, LeistungRow } from '@/components/leistungen/types'
 
 function Section({
@@ -30,8 +29,8 @@ function Section({
 }
 
 /**
- * Leistungs-Drawer (EditorSheet rechts): Position · Zuweisung · Dokumentation · Abnahme.
- * Aktionen ausschließlich als Footer-CTAs.
+ * Leistungs-Drawer: Position · Zuweisung.
+ * Dokumentation → Bautagebuch · Abnahme → Auftrag abschließen.
  */
 export function LeistungDrawer({
   open,
@@ -53,12 +52,6 @@ export function LeistungDrawer({
       </EditorSheet>
     )
   }
-
-  const hasDoku = (row.dokumentationEintraege?.length ?? 0) > 0
-  const abgenommen =
-    row.status === 'erledigt' ||
-    row.status === 'abgenommen' ||
-    (row.abnahmeLabel ?? '').toLowerCase().includes('abgenommen')
 
   const footer =
     actions.length > 0 ? (
@@ -113,34 +106,6 @@ export function LeistungDrawer({
           {row.zeitraumLabel ? (
             <DetailProp label="Zeitraum">{row.zeitraumLabel}</DetailProp>
           ) : null}
-        </div>
-      </Section>
-
-      <Section title="Dokumentation" icon="clipboard-list">
-        {hasDoku ? (
-          <ul className="ldr-doku-list">
-            {row.dokumentationEintraege!.map((e, i) => (
-              <li key={`${e.at ?? i}-${i}`}>
-                {e.at ? (
-                  <span className="ldr-doku-at">{formatDatum(e.at.slice(0, 10))}</span>
-                ) : null}
-                <span>{e.text}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="ldr-empty">
-            Noch keine Einträge — hier wird der Fortschritt festgehalten.
-          </div>
-        )}
-      </Section>
-
-      <Section title="Abnahme" icon="checks">
-        <div className="ldr-empty" style={abgenommen ? { borderStyle: 'solid' } : undefined}>
-          {abgenommen
-            ? row.abnahmeLabel || 'Abgenommen'
-            : row.abnahmeLabel ||
-              'Noch nicht abgenommen — Ergebnis und Notiz fließen ins Abnahmedokument.'}
         </div>
       </Section>
     </EditorSheet>

@@ -21,6 +21,11 @@ const STAMM_ITEMS: NeuItem[] = [
   { ic: 'tool', label: 'Handwerker', desc: 'Ausführungspartner', overlay: 'handwerker' },
 ]
 
+const PLAN_ITEMS: NeuItem[] = [
+  { ic: 'calendar-event', label: 'Termin', desc: 'Kalender-Eintrag', overlay: 'termin' },
+  { ic: 'clipboard-list', label: 'To-do', desc: 'Aufgabe mit Fälligkeit', overlay: 'todo' },
+]
+
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter()
 
@@ -65,6 +70,23 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
         ))}
         <div className="neu-pop-sep" />
         {STAMM_ITEMS.map((it) => (
+          <button
+            key={it.label}
+            type="button"
+            className="neu-pop-item"
+            onClick={() => go(it)}
+          >
+            <span className="neu-pop-ico">
+              <MockIcon ctx="default" n={it.ic} size={18} />
+            </span>
+            <span className="neu-pop-txt">
+              <span className="l">{it.label}</span>
+              <span className="d">{it.desc}</span>
+            </span>
+          </button>
+        ))}
+        <div className="neu-pop-sep" />
+        {PLAN_ITEMS.map((it) => (
           <button
             key={it.label}
             type="button"

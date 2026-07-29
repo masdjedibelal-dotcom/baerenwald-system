@@ -189,10 +189,6 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const aktiveAuftraegeCount = auftraegeZ.filter((a) =>
     isAktiverAuftragStatus(a.status as string)
   ).length
-  const bestandAktivCount = auftraegeZ.filter(
-    (a) =>
-      a.ist_wiederkehrend === true && isAktiverAuftragStatus(a.status as string)
-  ).length
   const offeneRechnungenCount = rechnungenZ.filter((r) => isOffeneRechnungStatus(r.status)).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
@@ -215,12 +211,6 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       label: 'Aktive Aufträge',
       value: aktiveAuftraegeCount,
       href: '/vorgaenge?tab=auftrag&lifecycle=offen',
-    },
-    {
-      icon: 'refresh',
-      label: 'Bestand aktiv',
-      value: bestandAktivCount,
-      href: '/vorgaenge?tab=bestand&lifecycle=offen',
     },
     {
       icon: 'receipt',

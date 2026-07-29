@@ -1,8 +1,9 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Camera, ChevronRight, ExternalLink, ImagePlus, Plus, X } from 'lucide-react'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Note } from '@/components/ui/note'

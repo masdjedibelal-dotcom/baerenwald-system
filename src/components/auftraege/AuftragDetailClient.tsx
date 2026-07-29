@@ -1,19 +1,19 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
-import { confirmDelete } from '@/components/ui/confirm-delete'
-import { runDuplicateAuftrag } from '@/lib/list-actions'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragAbschliessenSheet } from '@/components/auftraege/AuftragAbschliessenSheet'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
@@ -52,7 +52,6 @@ import type {
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
@@ -81,6 +80,7 @@ import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { TodosPanel } from '@/components/todos/TodosPanel'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
@@ -217,7 +217,7 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet' | 'todos'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
@@ -225,6 +225,7 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'zahlung',
   'akte',
   'aktivitaet',
+  'todos',
 ])
 
 const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
@@ -337,6 +338,7 @@ function resolveAuftragDetailTabFromQuery(
   ) {
     return 'aktivitaet'
   }
+  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'todos'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
   return AUFTRAG_DETAIL_DEFAULT_TAB
 }
@@ -430,6 +432,7 @@ export function AuftragDetailClient({
   const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
   const [bewertungOpen, setBewertungOpen] = useState(false)
+  const [abschliessenOpen, setAbschliessenOpen] = useState(false)
   const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
   const [angebotKorrekturBootstrap, setAngebotKorrekturBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
@@ -503,15 +506,14 @@ export function AuftragDetailClient({
   }, [])
 
   const openAuftragAbschliessen = useCallback(() => {
-    router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
-  }, [detail.id, router])
+    setAbschliessenOpen(true)
+  }, [])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
     setVertragWizardKey((k) => k + 1)
     setVertragWizardOpen(true)
   }, [])
-
 
   const startNachtragWizard = useCallback(
     (parentVertragId: string) => {
@@ -542,17 +544,6 @@ export function AuftragDetailClient({
     }
     setNachtragPickerOpen(true)
   }, [hauptvertraegeFuerNachtrag, startNachtragWizard])
-
-  const goZuNachtragAbschluss = useCallback(() => {
-    setMainTab('leistungen')
-    requestAnimationFrame(() => {
-      window.setTimeout(() => {
-        document
-          .getElementById('auftrag-nachtrag-section')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }, 160)
-    })
-  }, [])
 
   const openRechnungErstellen = useCallback(
     (opts?: RechnungErstellenOpts) => {
@@ -640,8 +631,6 @@ export function AuftragDetailClient({
     kunde?.name ||
     'Auftrag'
   const posCount = auftragPositionenFuerSumme(detail.auftrag_positionen).length
-
-
 
   const istBauprojekt = useMemo(
     () =>
@@ -801,70 +790,8 @@ export function AuftragDetailClient({
     projektName,
   ])
 
-  const istAbgeschlossen = detail.status === 'abgeschlossen'
   const istStorniert = detail.status === 'storniert'
 
-  const nachtragCtaAktiv =
-    istBauprojekt && hauptvertraegeFuerNachtrag.length > 0 && !istStorniert
-
-  /** Mock ⋯: Abnahme · Abschlussbericht · Kopieren · Nachtrag · Löschen */
-  const aktionenMenuItems = useMemo(() => {
-    const items: EntityMenuItem[] = []
-    if (!istAbgeschlossen && !istStorniert) {
-      items.push({
-        icon: 'clipboard-list',
-        label: 'Abnahme starten',
-        onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
-      })
-    }
-    items.push({
-      icon: 'file-text',
-      label: 'Abschlussbericht erstellen',
-      onClick: () => router.push(`/auftraege/${detail.id}/abschluss`),
-    })
-    items.push({
-      icon: 'copy',
-      label: 'Kopieren',
-      onClick: () => runDuplicateAuftrag(detail.id, router),
-    })
-    if (detail.angebot_id) {
-      items.push({
-        icon: 'file-plus',
-        label: 'Nachtrag anlegen',
-        onClick: openNachtragAngebot,
-      })
-    }
-    if (detail.lead_id) {
-      items.push('sep')
-      items.push({
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () =>
-          confirmDelete(projektName, () => {
-            void deleteVorgang(detail.lead_id!).then((r) => {
-              if (!r.ok) toast.error(r.message)
-              else {
-                toast.success('Vorgang gelöscht')
-                router.push('/vorgaenge?tab=auftrag')
-              }
-            })
-          }),
-      })
-    }
-    return entityMenuToActionItems(items, (n, size) =>
-      mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
-    )
-  }, [
-    detail.id,
-    detail.angebot_id,
-    detail.lead_id,
-    istAbgeschlossen,
-    istStorniert,
-    openNachtragAngebot,
-    router,
-    projektName,
-  ])
 
   const timelineCount = useMemo(() => {
     const lead = leadTimeline.length
@@ -1084,6 +1011,23 @@ export function AuftragDetailClient({
       count: timelineCount || undefined,
       render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
     },
+    {
+      id: 'todos',
+      label: entityDetailTabLabel('todos'),
+      icon: 'clipboard-list',
+      render: () => (
+        <TodosPanel
+          compact
+          filter={{ auftragId: detail.id }}
+          lockedLinks={{
+            auftragId: detail.id,
+            leadId: detail.lead_id ?? null,
+            kundeId: detail.kunde_id ?? null,
+            label: detail.titel?.trim() || formatAuftragsNr(detail) || 'Auftrag',
+          }}
+        />
+      ),
+    },
   ]
 
   return (
@@ -1116,6 +1060,12 @@ export function AuftragDetailClient({
           <StatusBadge status={detail.status} label={auftragStatus.label} />
         ),
         meta: headMeta,
+        titleTrailing: (
+          <PortalLoginIconButton
+            kundeId={detail.kunde_id ?? detail.kunden?.id}
+            label="Kundenportal öffnen"
+          />
+        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Auftrag"
@@ -1134,11 +1084,7 @@ export function AuftragDetailClient({
                 }
               }
               const onClick = () => {
-                if (cta.id === 'abnahme_starten') {
-                  router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
-                  return
-                }
-                if (cta.id === 'auftrag_abschliessen') {
+                if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
                   openAuftragAbschliessen()
                   return
                 }
@@ -1152,26 +1098,11 @@ export function AuftragDetailClient({
               }
               return { label: cta.label, icon: cta.icon, onClick }
             })()}
-            secondary={null}
-            menuItems={aktionenMenuItems}
+            menuItems={[]}
           />
         ),
       }}
     >
-      {nachtragCtaAktiv ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-          <p className="text-[length:var(--fs-text)] text-muted">
-            Mehrleistung oder Vertrags-Nachtrag — unter Leistungen · Abschluss.
-          </p>
-          <button
-            type="button"
-            className="btn ghost sm shrink-0"
-            onClick={goZuNachtragAbschluss}
-          >
-            Zu Nachträge
-          </button>
-        </div>
-      ) : null}
       <DetailShell
         groups={detailShellGroups}
         value={mainTab}
@@ -1258,6 +1189,15 @@ export function AuftragDetailClient({
         auftragId={detail.id}
         ziele={handwerkerAusAuftrag(detail)}
         onSaved={() => refresh()}
+      />
+
+      <AuftragAbschliessenSheet
+        open={abschliessenOpen}
+        onClose={() => setAbschliessenOpen(false)}
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        onDone={() => refresh()}
+        onNachRechnung={() => openRechnungErstellen({ naechsterAbschlag: true })}
       />
 
       {quickActionSheets}

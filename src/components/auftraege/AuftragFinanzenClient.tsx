@@ -1,7 +1,8 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { toast } from '@/components/ui/app-toast'
 import {

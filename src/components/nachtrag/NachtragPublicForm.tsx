@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import { acceptNachtragByToken, type NachtragPublicPayload } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'

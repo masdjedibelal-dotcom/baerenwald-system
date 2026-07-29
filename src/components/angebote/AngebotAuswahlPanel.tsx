@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Copy, Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'

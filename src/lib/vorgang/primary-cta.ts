@@ -104,9 +104,6 @@ export function primaryCta(
 
   if (phase === 'auftrag') {
     if (ui === 'geplant' || ui === 'aktiv') {
-      if (ctx.abnahmeFaellig || norm(status) === 'abnahme') {
-        return { id: 'abnahme_starten', label: 'Abnahme starten', icon: 'clipboard-check' }
-      }
       return { id: 'auftrag_abschliessen', label: 'Auftrag abschließen', icon: 'check' }
     }
     if (ui === 'fertig') {
@@ -118,15 +115,9 @@ export function primaryCta(
     return null
   }
 
-  // rechnung
+  // rechnung — Erinnerung/Bezahlt leben im Zahlplan, nicht als Primary
   if (ui === 'entwurf') {
     return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
-  }
-  if (ctx.ueberfaellig || ui === 'ueberfaellig') {
-    return { id: 'mahnung_senden', label: 'Mahnung senden', icon: 'alert-triangle' }
-  }
-  if (ui === 'versendet') {
-    return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
   }
   if (ui === 'bezahlt') {
     return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }

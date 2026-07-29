@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, Pencil } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
@@ -30,8 +32,6 @@ type PhaseRowModel = {
   sub?: string | null
   betrag?: string | null
   href: string | null
-  /** Bearbeiten → Leistungen; Angebot → Wizard (?bearbeiten=1) */
-  editHref: string | null
   sheetTitle: string
   /** Breadcrumb über dem Sheet-Titel (Mock: „RE-… >“) */
   sheetCrumb?: string | null
@@ -89,8 +89,10 @@ export function VorgangPhasenVerlauf({
   const isMobile = useIsMobile()
   const [readKind, setReadKind] = useState<PhaseKind | null>(null)
   const [showEarlier, setShowEarlier] = useState(false)
+  const [navBusy, setNavBusy] = useState(false)
   const stripRef = useRef<HTMLDivElement>(null)
   const currentCardRef = useRef<HTMLDivElement>(null)
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const withFrom = (pathname: string, extra?: Record<string, string>) => {
     if (fromRef) return hrefWithAkteFrom(pathname, fromRef, extra)
@@ -139,16 +141,41 @@ export function VorgangPhasenVerlauf({
     setReadKind(null)
   }
 
-  function onBearbeiten() {
-    if (!active?.editHref) return
-    closeRead()
-    router.push(active.editHref)
+  function navigateFromPhaseSheet(href: string | null | undefined, label: string) {
+    if (navBusy) return
+    const target = (href ?? '').trim()
+    if (!target) {
+      toast.error(`${label} ist noch nicht verfügbar.`)
+      return
+    }
+    setNavBusy(true)
+    actionBusy.show('Phase wird geladen…')
+    if (navTimerRef.current) clearTimeout(navTimerRef.current)
+    navTimerRef.current = setTimeout(() => {
+      setNavBusy(false)
+      actionBusy.hide()
+      toast.error('Laden dauert zu lange — bitte erneut versuchen.')
+    }, 10000)
+    try {
+      // Sheet ohne History-Back schließen, sonst frisst history.back() die Navigation
+      setReadKind(null)
+      router.push(target)
+    } catch (e) {
+      setNavBusy(false)
+      actionBusy.hide()
+      if (navTimerRef.current) clearTimeout(navTimerRef.current)
+      toast.error(e instanceof Error ? e.message : 'Navigation fehlgeschlagen.')
+    }
   }
 
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current)
+    }
+  }, [])
+
   function onZurPhase() {
-    if (!active?.href) return
-    closeRead()
-    router.push(active.href)
+    navigateFromPhaseSheet(active?.href, active?.label ?? 'Phase')
   }
 
   return (
@@ -278,28 +305,21 @@ export function VorgangPhasenVerlauf({
         title={active?.sheetTitle ?? ''}
         crumb={active?.sheetCrumb ?? null}
         size="lg"
-        headerEnd={
-          active?.editHref ? (
-            <button
-              type="button"
-              className="editor-sheet__icon-btn"
-              onClick={onBearbeiten}
-              aria-label="Bearbeiten"
-              title="Bearbeiten"
-            >
-              <Pencil className="h-5 w-5" aria-hidden />
-            </button>
-          ) : null
-        }
+        manageHistory={false}
         footer={
           active ? (
             <div className="phase-sheet-footer">
               {active.href && fromRef?.kind !== active.kind ? (
-                <button type="button" className="btn primary" onClick={onZurPhase}>
-                  Zur Phase
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={onZurPhase}
+                  disabled={navBusy}
+                >
+                  {navBusy ? 'Laden…' : 'Zur Phase'}
                 </button>
               ) : (
-                <button type="button" className="btn ghost" onClick={closeRead}>
+                <button type="button" className="btn ghost" onClick={closeRead} disabled={navBusy}>
                   Schließen
                 </button>
               )}
@@ -421,7 +441,6 @@ function buildPhaseRows(
       kopf: anfrageKopf,
       betrag: budget !== '—' ? budget : null,
       href: leadId ? withFrom(`/anfragen/${leadId}`) : null,
-      editHref: leadId ? withFrom(`/anfragen/${leadId}`, { tab: 'leistungen' }) : null,
       sheetTitle: 'Anfrage',
       props: anfrageProps.length
         ? anfrageProps
@@ -451,9 +470,6 @@ function buildPhaseRows(
           )
         : null,
       href: hasAngebot ? withFrom(`/angebote/${angebot!.id}`) : null,
-      editHref: hasAngebot
-        ? withFrom(`/angebote/${angebot!.id}`, { bearbeiten: '1' })
-        : null,
       sheetTitle: angebotNr ? `Angebot ${angebotNr}` : 'Angebot',
       props: hasAngebot
         ? [
@@ -490,9 +506,6 @@ function buildPhaseRows(
       sub: auftragExtra?.sub ?? null,
       betrag: auftragExtra?.betrag ?? null,
       href: auftrag ? withFrom(`/auftraege/${auftrag.id}`) : null,
-      editHref: auftrag
-        ? withFrom(`/auftraege/${auftrag.id}`, { tab: 'leistungen' })
-        : null,
       sheetTitle: auftrag?.titel?.trim() || 'Auftrag',
       props:
         auftragExtra?.props ??
@@ -522,9 +535,6 @@ function buildPhaseRows(
             )
           : null),
       href: hasRechnung ? withFrom(`/rechnungen/${latestRe!.id}`) : null,
-      editHref: hasRechnung
-        ? withFrom(`/rechnungen/${latestRe!.id}`, { tab: 'leistungen' })
-        : null,
       sheetCrumb: rechnungExtra?.sheetCrumb ?? (latestRe?.rechnungsnummer?.trim()
         ? `${latestRe.rechnungsnummer.trim()} >`
         : null),

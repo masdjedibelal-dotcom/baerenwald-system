@@ -1,8 +1,13 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { Input } from '@/components/ui/Input'
@@ -146,6 +151,19 @@ export function KundeInformierenModal({
           ? `Leistung: ${scope.leistungName}`
           : ''
 
+  useKiAssistDraftConsumer(open, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: (v) => {
+        setBetreff(v)
+        setDirty(true)
+      },
+      setBody: (v) => {
+        setNachricht(v)
+        setDirty(true)
+      },
+    })
+  })
+
   return (
     <EditorSheet
       open={open}
@@ -159,6 +177,13 @@ export function KundeInformierenModal({
       composeLabel="Senden"
       onConfirm={senden}
       confirmBusy={pending}
+      headerEnd={
+        <KiAssistIconButton
+          scope="portal"
+          extraHint={`Kunden-Update / Statusseite + Mail an ${kundeName}. ${scopeHint}`}
+          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
+        />
+      }
       footer={
         <InformierenFooter
           pending={pending}
@@ -200,23 +225,35 @@ export function KundeInformierenModal({
           </label>
         </div>
 
-        <Input
+        <KiAssistFieldLabel
           label="Betreff"
-          value={betreff}
-          onChange={(e) => {
-            setBetreff(e.target.value)
-            setDirty(true)
-          }}
-        />
-        <Textarea
+          scope="mail"
+          extraHint={`Kunde informieren · ${kundeName}`}
+          draftInput={betreff || null}
+        >
+          <Input
+            value={betreff}
+            onChange={(e) => {
+              setBetreff(e.target.value)
+              setDirty(true)
+            }}
+          />
+        </KiAssistFieldLabel>
+        <KiAssistFieldLabel
           label="Nachricht"
-          rows={6}
-          value={nachricht}
-          onChange={(e) => {
-            setNachricht(e.target.value)
-            setDirty(true)
-          }}
-        />
+          scope="portal"
+          extraHint="Erscheint in Mail und auf der Kunden-Statusseite."
+          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
+        >
+          <Textarea
+            rows={6}
+            value={nachricht}
+            onChange={(e) => {
+              setNachricht(e.target.value)
+              setDirty(true)
+            }}
+          />
+        </KiAssistFieldLabel>
 
         {showPreview && previewHtml ? <CollapsibleMailPreview previewHtml={previewHtml} /> : null}
       </div>

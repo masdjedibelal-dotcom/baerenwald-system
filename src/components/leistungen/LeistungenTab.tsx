@@ -9,10 +9,8 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 import { LeistungDrawer } from '@/components/leistungen/LeistungDrawer'
-import { LeistungenMaengelCard } from '@/components/leistungen/LeistungenMaengelCard'
 import type {
   LeistungDrawerAction,
-  LeistungMangelAnzeige,
   LeistungPhase,
   LeistungRow,
 } from '@/components/leistungen/types'
@@ -51,6 +49,41 @@ const DEFAULT_VISIBLE: Record<ColId, boolean> = {
   ek: false,
 }
 
+/** Mobile Auftrag: Zuweisungs-Dot (rot / gelb / grün). */
+function handwerkerZuweisungTone(
+  row: LeistungRow
+): 'offen' | 'warten' | 'zugewiesen' {
+  const anfrage = (row.anfrageStatusLabel ?? '').toLowerCase()
+  if (anfrage.includes('anfrag') || anfrage.includes('wart')) return 'warten'
+  if (row.handwerkerName?.trim()) return 'zugewiesen'
+  return 'offen'
+}
+
+function handwerkerZuweisungLabel(
+  row: LeistungRow,
+  tone: ReturnType<typeof handwerkerZuweisungTone>
+): string {
+  const name = row.handwerkerName?.trim()
+  if (tone === 'warten') return name || row.anfrageStatusLabel || 'Angefragt'
+  if (tone === 'zugewiesen') return name || 'Zugewiesen'
+  return 'Nicht zugewiesen'
+}
+
+/** Ampel für Leistungs-Phase: offen=rot · in Arbeit=gelb · erledigt=grün */
+function leistungStatusAmpelKind(row: LeistungRow): string {
+  const st = String(rowStatusKindStatic(row)).toLowerCase()
+  if (st === 'ueberfaellig' || st.includes('mangel')) return 'storniert'
+  if (st === 'erledigt' || st === 'abgenommen' || st === 'fertig') return 'aktiv'
+  if (st === 'in_arbeit' || st === 'aktiv' || st === 'abnahme') return 'warten'
+  return 'storniert'
+}
+
+function rowStatusKindStatic(row: LeistungRow) {
+  return row.hatMangel || row.statusLabel.toLowerCase().includes('mangel')
+    ? 'ueberfaellig'
+    : row.status
+}
+
 function loadVisible(): Record<ColId, boolean> {
   if (typeof window === 'undefined') return { ...DEFAULT_VISIBLE }
   try {
@@ -77,7 +110,6 @@ function loadVisible(): Record<ColId, boolean> {
 export function LeistungenTab({
   phase,
   rows,
-  maengel = [],
   onOpenDokument,
   dokumentHint,
   dokumentActionLabel,
@@ -91,7 +123,8 @@ export function LeistungenTab({
 }: {
   phase: LeistungPhase
   rows: LeistungRow[]
-  maengel?: LeistungMangelAnzeige[]
+  /** @deprecated Abnahme/Mängel nicht mehr in Leistungen */
+  maengel?: unknown
   /** Öffnet Angebots-/Rechnungs-Canvas (read-only Tab schreibt nicht). */
   onOpenDokument?: () => void
   dokumentHint?: string | null
@@ -241,9 +274,7 @@ export function LeistungenTab({
   }
 
   function rowStatusKind(row: LeistungRow) {
-    return row.hatMangel || row.statusLabel.toLowerCase().includes('mangel')
-      ? 'ueberfaellig'
-      : row.status
+    return rowStatusKindStatic(row)
   }
 
   function renderMobileCard(row: LeistungRow) {
@@ -252,7 +283,7 @@ export function LeistungenTab({
     const showSub = Boolean(row.subline) && (isAuftrag || isRechnung || !groupGewerk)
     const showPreis = isRechnung || !isAuftrag || visibleCols.preis
     const showMenge = isRechnung || (!isAuftrag && visibleCols.menge)
-    const handwerker = row.handwerkerName?.trim()
+    const hwTone = isAuftrag ? handwerkerZuweisungTone(row) : null
 
     return (
       <div
@@ -284,14 +315,29 @@ export function LeistungenTab({
           <div className="lt-card__head">
             <span className="lt-card__title">{row.bezeichnung}</span>
             {showStatus ? (
-              <StatusBadge status={rowStatusKind(row)} label={row.statusLabel} />
+              <StatusBadge
+                status={rowStatusKind(row)}
+                label={row.statusLabel}
+                kind={leistungStatusAmpelKind(row)}
+              />
             ) : null}
           </div>
           {showSub ? <div className="lt-card__sub">{row.subline}</div> : null}
           <div className="lt-card__meta">
             <div className="lt-card__meta-left">
-              {isAuftrag && handwerker ? (
-                <span>{handwerker}</span>
+              {isAuftrag && hwTone ? (
+                <span
+                  className="lt-card__hw"
+                  title={handwerkerZuweisungLabel(row, hwTone)}
+                >
+                  <span
+                    className={cn('lt-card__hw-dot', `lt-card__hw-dot--${hwTone}`)}
+                    aria-hidden
+                  />
+                  <span className={cn(hwTone === 'offen' && 'lt-card__dim')}>
+                    {handwerkerZuweisungLabel(row, hwTone)}
+                  </span>
+                </span>
               ) : (
                 <>
                   {showMenge ? <span>{row.mengeLabel}</span> : null}
@@ -379,7 +425,11 @@ export function LeistungenTab({
                   <span className="lt-nametext">{row.bezeichnung}</span>
                   {showStatus ? (
                     <span className={cn('lt-status-inline', !isAuftrag && 'lt-status-mobile')}>
-                      <StatusBadge status={rowStatusKind(row)} label={row.statusLabel} />
+                      <StatusBadge
+                        status={rowStatusKind(row)}
+                        label={row.statusLabel}
+                        kind={leistungStatusAmpelKind(row)}
+                      />
                     </span>
                   ) : null}
                 </div>
@@ -427,7 +477,11 @@ export function LeistungenTab({
           if (id === 'status') {
             return (
               <div key={id} className="lt-c lt-desk">
-                <StatusBadge status={row.status} label={row.statusLabel} />
+                <StatusBadge
+                  status={rowStatusKind(row)}
+                  label={row.statusLabel}
+                  kind={leistungStatusAmpelKind(row)}
+                />
               </div>
             )
           }
@@ -497,7 +551,6 @@ export function LeistungenTab({
   if (!rows.length) {
     return (
       <div className="lt-root space-y-3">
-        <LeistungenMaengelCard maengel={maengel} />
         <MockEmpty
           icon="clipboard-list"
           title={emptyTitle}
@@ -517,27 +570,37 @@ export function LeistungenTab({
 
   return (
     <div className={cn('lt-root space-y-3', isMobile && 'lt-root--mobile-cards')}>
-      <LeistungenMaengelCard maengel={maengel} />
-
       {isRechnung || isAuftrag ? (
         <div className="lt-sec-h">
           <span className="lt-sec-title">Leistungen</span>
-          {toolbar}
+          <div className="lt-sec-h__actions">
+            {onOpenDokument ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="lt-sec-edit"
+                onClick={onOpenDokument}
+              >
+                {openDocLabel}
+              </Button>
+            ) : null}
+            {toolbar}
+          </div>
         </div>
       ) : null}
 
-      {hint ? (
+      {hint && !isAuftrag ? (
         <div className="lt-hint">
           <Info className="h-4 w-4" aria-hidden />
           <span>{hint}</span>
-          {onOpenDokument ? (
+          {onOpenDokument && !isRechnung ? (
             <Button type="button" variant="secondary" className="!px-2 !py-1 text-[length:var(--fs-meta)]" onClick={onOpenDokument}>
-              {isRechnung ? `✎ ${openDocLabel}` : openDocLabel}
+              {openDocLabel}
             </Button>
           ) : null}
           {!isRechnung ? toolbar : null}
         </div>
-      ) : toolbar && !isRechnung ? (
+      ) : toolbar && !isRechnung && !isAuftrag ? (
         <div className="lt-hint lt-hint--bare">{toolbar}</div>
       ) : null}
 
@@ -613,27 +676,6 @@ export function LeistungenTab({
               </>
             ) : null}
           </span>
-          {!isAuftrag && !isRechnung && !footerNettoMwst ? (
-            <>
-              <span className="sep">·</span>
-              <span>
-                Summe <b>{formatEurBetrag(summe)}</b>
-              </span>
-            </>
-          ) : null}
-          {!isAuftrag && !isRechnung && footerNettoMwst ? (
-            <>
-              <span className="sep">·</span>
-              <span>
-                Netto <b>{formatEurBetrag(footerNettoMwst.netto)}</b>
-              </span>
-              <span className="sep">·</span>
-              <span>
-                MwSt. {footerNettoMwst.mwstSatz}%{' '}
-                <b>{formatEurBetrag(footerNettoMwst.mwstBetrag)}</b>
-              </span>
-            </>
-          ) : null}
         </div>
         {(isAuftrag || isRechnung) && footerNettoMwst ? (
           <div className="lt-foot-sum">
@@ -653,6 +695,30 @@ export function LeistungenTab({
                     footerNettoMwst.netto + footerNettoMwst.mwstBetrag
                 )}
               </b>
+            </div>
+          </div>
+        ) : !isAuftrag && !isRechnung && footerNettoMwst ? (
+          <div className="lt-foot-sum">
+            <div>
+              <span>Netto</span>
+              <b>{formatEurBetrag(footerNettoMwst.netto)}</b>
+            </div>
+            <div>
+              <span>MwSt. {footerNettoMwst.mwstSatz} %</span>
+              <b>{formatEurBetrag(footerNettoMwst.mwstBetrag)}</b>
+            </div>
+            {footerNettoMwst.brutto != null ? (
+              <div className="lt-foot-brutto">
+                <span>Brutto</span>
+                <b>{formatEurBetrag(footerNettoMwst.brutto)}</b>
+              </div>
+            ) : null}
+          </div>
+        ) : !isAuftrag && !isRechnung ? (
+          <div className="lt-foot-sum">
+            <div className="lt-foot-brutto">
+              <span>Summe</span>
+              <b>{formatEurBetrag(summe)}</b>
             </div>
           </div>
         ) : null}

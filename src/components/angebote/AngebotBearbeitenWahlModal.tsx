@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Copy, Pencil } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'

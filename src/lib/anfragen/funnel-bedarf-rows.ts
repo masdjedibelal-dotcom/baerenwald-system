@@ -1,6 +1,8 @@
 import type { ProjektUebersichtExtraRow } from '@/components/crm/EntityProjektUebersichtCard'
 import {
+  isEchterFreitext,
   kundentypLabel,
+  parseWebsiteAnfrageDump,
   resolveLeadPreisAnzeige,
   zeitraumLabel,
 } from '@/lib/lead-display-helpers'
@@ -124,6 +126,20 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
 
   const fachdetailRows = fachdetailsForProjektUebersicht(fdRaw, bereiche)
   for (const entry of fachdetailRows) {
+    if (entry.configKey === 'projekt_gu') {
+      for (const raw of entry.values) {
+        const m = raw.match(/^([^:]+):\s*(.+)$/)
+        if (m) {
+          extraRows.push({ label: m[1]!.trim(), children: m[2]!.trim() })
+        } else if (raw.trim()) {
+          extraRows.push({
+            label: fachdetailPropLabel(entry.configKey, bereiche),
+            children: raw.trim(),
+          })
+        }
+      }
+      continue
+    }
     const text = entry.values
       .map((v) => fachdetailDisplayLabel(entry.configKey, v))
       .filter(Boolean)
@@ -287,9 +303,26 @@ export function buildAnfragePhaseSheetProps(lead: {
   push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
   push('Vorhaben', strFromFunnel(fd, 'vorhaben'))
 
+  // Strukturierte Funnel-/Website-Felder vor Kontakt (kein Freitext-Dump)
+  const { extraRows } = buildFunnelBedarfExtraRows(lead)
+  for (const row of extraRows) {
+    if (typeof row.children === 'string') push(row.label, row.children)
+  }
+
+  // Fallback: Website-Dump in kontakt_nachricht / formattedSummary → einzelne Props
+  const dumpSources = [
+    lead.kontakt_nachricht,
+    typeof fd.formattedSummary === 'string' ? fd.formattedSummary : null,
+    typeof fd.technicalDetails === 'string' ? fd.technicalDetails : null,
+  ]
+  for (const src of dumpSources) {
+    for (const row of parseWebsiteAnfrageDump(src)) {
+      push(row.k, row.v)
+    }
+  }
+
   const beschreibung = (lead.kontakt_nachricht ?? '').trim()
-  if (beschreibung) {
-    // Vorhaben steckt oft in der ersten Zeile von kontakt_nachricht
+  if (isEchterFreitext(beschreibung)) {
     const vorhaben = strFromFunnel(fd, 'vorhaben')
     const body =
       vorhaben && beschreibung.startsWith(vorhaben)
@@ -334,11 +367,6 @@ export function buildAnfragePhaseSheetProps(lead: {
   )
   push('Budgetrahmen', budget === '—' ? null : budget)
   push('Budget-Hinweis', strFromFunnel(fd, 'budget_hinweis', 'budgetHinweis'))
-
-  const { extraRows } = buildFunnelBedarfExtraRows(lead)
-  for (const row of extraRows) {
-    if (typeof row.children === 'string') push(row.label, row.children)
-  }
 
   // Adresse aus Kunde, falls Funnel nichts hatte
   if (!seen.has('Adresse')) {

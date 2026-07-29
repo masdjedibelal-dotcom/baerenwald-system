@@ -1,14 +1,16 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { useEffect, useMemo, useState } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
@@ -27,14 +29,8 @@ import {
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
 import {
-  RechnungMahnverlaufCard,
-  type RechnungMahnMailZeile,
-} from '@/components/rechnungen/RechnungMahnverlaufCard'
-import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
-import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
-  deleteRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import {
@@ -46,10 +42,12 @@ import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteT
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateRechnung } from '@/lib/list-actions'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { buildLeadVerlaufItems } from '@/lib/crm/verlauf'
+import {
+  buildLeadVerlaufItems,
+  buildRechnungMahnVerlaufItems,
+  type RechnungMahnMailZeile,
+} from '@/lib/crm/verlauf'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -65,9 +63,6 @@ import {
   rechnungDarfOhneErsatzStorniertWerden,
   rechnungKorrekturModus,
 } from '@/lib/rechnungen/rechnung-korrektur'
-import {
-  rechnungHatMahnverlauf,
-} from '@/lib/rechnungen/mahnverlauf'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
@@ -224,7 +219,6 @@ export function RechnungDetailClient({
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
-  const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
   const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | null>(null)
 
   useEffect(() => {
@@ -260,12 +254,6 @@ export function RechnungDetailClient({
     detail.status !== 'storniert' &&
     belegTyp === 'rechnung'
 
-  const zeigtMahnverlauf =
-    belegTyp === 'rechnung' &&
-    (detail.status === 'gesendet' ||
-      detail.status === 'bezahlt' ||
-      rechnungHatMahnverlauf(detail))
-
   const zahlungszielFallback = Math.max(
     1,
     parseInt(firm?.zahlungsziel_tage ?? '', 10) || defaultZahlungszielTage(detail.kunden?.typ)
@@ -297,7 +285,7 @@ export function RechnungDetailClient({
       fallbackCreatedLabel: `Rechnung angelegt${detail.rechnungsnummer?.trim() ? ` — ${detail.rechnungsnummer.trim()}` : ''}`,
     })
 
-    return base.map((item) => {
+    const mapped = base.map((item) => {
       if (item.inspect?.kind === 'rechnung' || item.source === 'fallback') {
         return {
           ...item,
@@ -315,7 +303,14 @@ export function RechnungDetailClient({
       }
       return item
     })
-  }, [timelineInitial, detail.created_at, detail.rechnungsnummer, detail.id])
+
+    const mahn =
+      belegTyp === 'rechnung'
+        ? buildRechnungMahnVerlaufItems(detail, mahnMails)
+        : []
+
+    return [...mapped, ...mahn].sort((a, b) => a.ts - b.ts)
+  }, [timelineInitial, detail, belegTyp, mahnMails])
 
   async function setStatus(s: RechnungStatus, opts?: { notifyKunde?: boolean }) {
     startTransition(async () => {
@@ -395,186 +390,11 @@ export function RechnungDetailClient({
     })
   }
 
-  const menuStatusKey = ueberfaellig
-    ? 'ueberfaellig'
-    : detail.status === 'gesendet'
-      ? 'gesendet'
-      : detail.status
-
-  const detailHeadMenuItems = useMemo(() => {
-    const extras = []
-    if (belegTyp === 'rechnung' && detail.status !== 'storniert') {
-      extras.push({
-        icon: 'file-off',
-        label: 'Gutschrift (Teil/Kulanz)',
-        onClick: handleGutschrift,
-      })
-    }
-    if (rechnungDarfOhneErsatzStorniertWerden(detail.status) && belegTyp === 'rechnung') {
-      extras.push({
-        icon: 'ban',
-        label: 'Ohne Ersatz stornieren',
-        hint: 'Nur bei Fehlversand — sonst „Rechnung korrigieren“',
-        danger: true,
-        onClick: () => {
-          if (
-            !window.confirm(
-              'Rechnung endgültig stornieren, ohne Ersatzbeleg?\n\nFür Betrags- oder Positionsänderungen bitte „Rechnung korrigieren“ nutzen.'
-            )
-          ) {
-            return
-          }
-          startTransition(async () => {
-            const r = await storniereRechnungOhneErsatz(detail.id)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            toast.success('Rechnung storniert')
-            setDetail((d) => ({ ...d, status: 'storniert' }))
-            refresh()
-          })
-        },
-      })
-    }
-    if (detail.status === 'gesendet' && belegTyp === 'rechnung') {
-      extras.push({
-        icon: 'alert-triangle',
-        label: 'Zahlungserinnerung senden',
-        onClick: () => setErinnerungModalOpen(true),
-      })
-      extras.push({
-        icon: 'mail',
-        label: 'Bezahlt + Bestätigung senden',
-        onClick: () => void setStatus('bezahlt', { notifyKunde: true }),
-      })
-    }
-    if (detail.status === 'bezahlt' && belegTyp === 'rechnung') {
-      extras.push({
-        icon: 'mail',
-        label: 'Zahlungsbestätigung senden',
-        onClick: () => {
-          startTransition(async () => {
-            const r = await sendZahlungsbestaetigung(detail.id)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            toast.success(
-              r.skipped
-                ? 'Keine Kunden-E-Mail — Bestätigung übersprungen'
-                : 'Zahlungsbestätigung gesendet'
-            )
-            refresh()
-          })
-        },
-      })
-    }
-    if (detail.status === 'storniert' && nachfolgerRechnungId) {
-      extras.push({
-        icon: 'arrow-right',
-        label: 'Zur Nachfolger-Rechnung',
-        onClick: () => router.push(`/rechnungen/${nachfolgerRechnungId}`),
-      })
-    }
-    if (darfStornoZuruecknehmen && belegTyp === 'rechnung') {
-      extras.push({
-        icon: 'history',
-        label: 'Storno zurücknehmen',
-        onClick: () => {
-          if (!window.confirm('Soft-Storno zurücknehmen und Status wieder auf „Gesendet“ setzen?')) {
-            return
-          }
-          startTransition(async () => {
-            const r = await nehmeRechnungStornoZurueck(detail.id)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            toast.success('Storno zurückgenommen')
-            setDetail((d) => ({ ...d, status: 'gesendet' }))
-            refresh()
-          })
-        },
-      })
-    }
-
-    return entityMenuToActionItems(
-      buildEntityMenu(
-        'rechnung',
-        {
-          name: kundeName,
-          status: detail.status,
-          statusKey: menuStatusKey,
-          customer: {
-            name: kundeName,
-          },
-        },
-        {
-          onEdit:
-            detail.status === 'storniert'
-              ? undefined
-              : detail.status === 'entwurf'
-                ? openWizard
-                : handleKorrigieren,
-          onCopy: () => runDuplicateRechnung(detail.id, router),
-          onDelete: rechnungDarfHardGeloeschtWerden(detail.status)
-            ? () => {
-                startTransition(async () => {
-                  const r = await deleteRechnungEntwurf(detail.id)
-                  if (!r.ok) {
-                    toast.error(r.message)
-                    return
-                  }
-                  toast.success('Entwurf gelöscht')
-                  router.push('/vorgaenge?tab=rechnung')
-                })
-              }
-            : undefined,
-          deleteMenuLabel: 'Löschen',
-          deleteLabel: kundeName,
-          extra: extras,
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    belegTyp,
-    detail.status,
-    detail.id,
-    detail.auftrag_id,
-    kundeName,
-    menuStatusKey,
-    ueberfaellig,
-    nachfolgerRechnungId,
-    darfStornoZuruecknehmen,
-    router,
-    refresh,
-    startTransition,
-  ])
-
   const primaryAction = useMemo((): DetailActionDef | null => {
     const cta = primaryCta('rechnung', detail.status, { ueberfaellig })
     if (!cta) return null
     if (cta.id === 'rechnung_versenden') {
       return { label: cta.label, icon: cta.icon, onClick: handleSenden, disabled: pending }
-    }
-    if (cta.id === 'als_bezahlt') {
-      return {
-        label: cta.label,
-        icon: cta.icon,
-        onClick: () => void setStatus('bezahlt'),
-        disabled: pending,
-      }
-    }
-    if (cta.id === 'mahnung_senden') {
-      return {
-        label: cta.label,
-        icon: cta.icon,
-        onClick: () => setErinnerungModalOpen(true),
-        disabled: pending,
-      }
     }
     if (cta.id === 'bewertung_einholen') {
       return {
@@ -599,9 +419,7 @@ export function RechnungDetailClient({
       }
     }
     return null
-  }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden, setStatus])
-
-  const secondaryAction = null
+  }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden])
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
   const rechnungStatus = rechnungStatusDisplay(detail.status, { ueberfaellig })
@@ -740,24 +558,7 @@ export function RechnungDetailClient({
     )
   })()
 
-  const verlaufInhalt = (
-    <div className="space-y-6">
-      <VerlaufPanel items={timelineItems} />
-      {belegTyp === 'rechnung' ? (
-        <RechnungMahnverlaufCard
-          rechnung={detail}
-          mahnMails={mahnMails}
-          empty={detail.status === 'entwurf' && !rechnungHatMahnverlauf(detail)}
-          onSendErinnerung={
-            detail.status === 'gesendet' || ueberfaellig || zeigtMahnverlauf
-              ? () => setErinnerungModalOpen(true)
-              : undefined
-          }
-          onMailAnsehen={(id) => setEmailPreviewId(id)}
-        />
-      ) : null}
-    </div>
-  )
+  const verlaufInhalt = <VerlaufPanel items={timelineItems} />
 
   const dokumenteInhalt = (
     <RechnungDokumenteTab
@@ -873,12 +674,14 @@ export function RechnungDetailClient({
           />
         ),
         meta: headMeta,
+        titleTrailing: (
+          <PortalLoginIconButton kundeId={detail.kunde_id} label="Kundenportal öffnen" />
+        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Rechnung"
             primary={primaryAction}
-            secondary={secondaryAction}
-            menuItems={detailHeadMenuItems}
+            menuItems={[]}
           />
         ),
       }}
@@ -887,12 +690,6 @@ export function RechnungDetailClient({
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as RechnungDetailTab)}
-      />
-
-      <EmailLogPreviewModal
-        emailLogId={emailPreviewId}
-        open={Boolean(emailPreviewId)}
-        onClose={() => setEmailPreviewId(null)}
       />
 
       <ZahlungserinnerungMailModal

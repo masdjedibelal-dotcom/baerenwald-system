@@ -1,8 +1,12 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft, setKiAssistListTarget, claimKiAssistListTarget } from '@/lib/copilot/ki-assist-apply'
 import {
   type BaustoppTyp,
   beendeBaustopp,
@@ -80,6 +84,16 @@ export function AuftragNachtragBaustoppSection({
   const [grund, setGrund] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [posText, setPosText] = useState('')
+
+  useKiAssistDraftConsumer(nachtragOpen, 'text', (d) => {
+    if (claimKiAssistListTarget('nachtrag-pos')) {
+      applyKiDokumentTextDraft(d, { setText: setPosText })
+      return
+    }
+    if (claimKiAssistListTarget('nachtrag-besch')) {
+      applyKiDokumentTextDraft(d, { setText: setBeschreibung })
+    }
+  })
   const [posMin, setPosMin] = useState('')
   const [posMax, setPosMax] = useState('')
   const [hwBest, setHwBest] = useState(false)
@@ -178,11 +192,11 @@ export function AuftragNachtragBaustoppSection({
           <div className="flex flex-wrap gap-2">
             {vertragNachtragVerfuegbar && onVertragNachtragErstellen ? (
               <Button type="button" variant="secondary" onClick={onVertragNachtragErstellen}>
-                Vertrags-Nachtrag
+                Vertrags-Änderung
               </Button>
             ) : null}
             <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
-              Nachtrag anlegen
+              Änderung anlegen
             </Button>
           </div>
         </div>
@@ -456,18 +470,32 @@ export function AuftragNachtragBaustoppSection({
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 />
               </label>
-              <Textarea
+              <KiAssistFieldLabel
                 label="Beschreibung"
-                value={beschreibung}
-                onChange={(e) => setBeschreibung(e.target.value)}
-                rows={3}
-              />
-              <Textarea
+                scope="dokument"
+                extraHint="Nachtrag-Beschreibung für den Kunden."
+                draftInput={beschreibung || null}
+                onBeforeOpen={() => setKiAssistListTarget('nachtrag-besch')}
+              >
+                <Textarea
+                  value={beschreibung}
+                  onChange={(e) => setBeschreibung(e.target.value)}
+                  rows={3}
+                />
+              </KiAssistFieldLabel>
+              <KiAssistFieldLabel
                 label="Position (Beschreibung)"
-                value={posText}
-                onChange={(e) => setPosText(e.target.value)}
-                rows={2}
-              />
+                scope="position"
+                extraHint="Leistungsbeschreibung der Nachtragsposition."
+                draftInput={posText || null}
+                onBeforeOpen={() => setKiAssistListTarget('nachtrag-pos')}
+              >
+                <Textarea
+                  value={posText}
+                  onChange={(e) => setPosText(e.target.value)}
+                  rows={2}
+                />
+              </KiAssistFieldLabel>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="font-medium">Preis min (€)</span>

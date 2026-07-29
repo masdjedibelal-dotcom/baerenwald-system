@@ -1,9 +1,13 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
@@ -65,6 +69,16 @@ export function ZahlungserinnerungMailModal({
     stufe2Gesendet: boolean
   } | null>(null)
   const [dirty, setDirty] = useState(false)
+
+  useKiAssistDraftConsumer(open && !!mail, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: (v) => {
+        setDirty(true)
+        setMail((prev) => (prev ? { ...prev, betreff: v } : prev))
+      },
+      setBody: () => {},
+    })
+  })
 
   useEffect(() => {
     if (!open) {
@@ -202,14 +216,20 @@ export function ZahlungserinnerungMailModal({
             ) : null}
           </p>
 
-          <Input
+          <KiAssistFieldLabel
             label="Betreff"
-            value={mail.betreff}
-            onChange={(e) => {
-              setDirty(true)
-              setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
-            }}
-          />
+            scope="mail"
+            extraHint={`Zahlungserinnerung Stufe ${stufe} — Betreff an den Kunden.`}
+            draftInput={mail.betreff || null}
+          >
+            <Input
+              value={mail.betreff}
+              onChange={(e) => {
+                setDirty(true)
+                setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
+              }}
+            />
+          </KiAssistFieldLabel>
           <EmailPillsField
             label="An"
             required

@@ -6,6 +6,13 @@ import { AngebotWizardPositionen } from '@/components/angebote/AngebotWizardPosi
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { toast } from '@/components/ui/app-toast'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import {
+  applyKiDokumentTextDraft,
+  claimKiAssistListTarget,
+  setKiAssistListTarget,
+} from '@/lib/copilot/ki-assist-apply'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   GEWERK_BLOCK_ANFAHRT,
@@ -100,11 +107,13 @@ const GEWERK_BESCHREIBUNG_HINT =
   'Optional: Fließtext direkt unter dem Gewerk-Titel im PDF — z. B. Umfang oder Hinweise zum Abschnitt'
 
 function GewerkBlockMeta({
+  blockKey,
   displayTitle,
   blockBeschreibung,
   onRename,
   onBeschreibungChange,
 }: {
+  blockKey: string
   displayTitle: string
   blockBeschreibung: string
   onRename: (name: string) => void
@@ -112,6 +121,11 @@ function GewerkBlockMeta({
 }) {
   const isMobile = useIsMobile()
   const [titleDraft, setTitleDraft] = useState(displayTitle)
+
+  useKiAssistDraftConsumer(true, 'text', (d) => {
+    if (!claimKiAssistListTarget(`gewerk-besch:${blockKey}`)) return
+    applyKiDokumentTextDraft(d, { setText: onBeschreibungChange })
+  })
 
   useEffect(() => {
     setTitleDraft(displayTitle)
@@ -147,8 +161,13 @@ function GewerkBlockMeta({
         />
         <p className="wizard-field-hint mt-1">{GEWERK_TITEL_HINT}</p>
       </label>
-      <label className="block min-w-0">
-        <span className="input-label">Beschreibung (optional)</span>
+      <KiAssistFieldLabel
+        label="Beschreibung (optional)"
+        scope="dokument"
+        extraHint={GEWERK_BESCHREIBUNG_HINT}
+        draftInput={blockBeschreibung || null}
+        onBeforeOpen={() => setKiAssistListTarget(`gewerk-besch:${blockKey}`)}
+      >
         <textarea
           className="input min-h-[72px] w-full resize-y text-[length:var(--fs-meta)] leading-relaxed"
           value={blockBeschreibung}
@@ -157,7 +176,7 @@ function GewerkBlockMeta({
           aria-label={`Beschreibung für ${displayTitle}`}
         />
         <p className="wizard-field-hint mt-1">{GEWERK_BESCHREIBUNG_HINT}</p>
-      </label>
+      </KiAssistFieldLabel>
     </div>
   )
 
@@ -587,6 +606,7 @@ export function AngebotWizardPositionenByGewerk({
                     ) : null}
                     <div className="min-w-0 flex-1">
                       <GewerkBlockMeta
+                        blockKey={block.key}
                         displayTitle={displayTitle}
                         blockBeschreibung={blockBeschreibung}
                         onRename={(name) => renameBlockTitle(block.key, name)}

@@ -84,6 +84,8 @@ export function PosTable({
   ust,
   brutto,
   disabledAddKinds,
+  /** Mobil: keine Inline-Add-Row/Gewerk-+ — ein zentraler Plus-Button außen */
+  unifiedAdd = false,
 }: {
   groups: PosTableGroup[]
   /** @deprecated Prefer onAddKind — kept for per-group fallback */
@@ -111,6 +113,7 @@ export function PosTable({
   ust?: number
   brutto?: number
   disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
+  unifiedAdd?: boolean
 }) {
   const sel = selected ?? {}
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null)
@@ -129,7 +132,7 @@ export function PosTable({
   }
 
   return (
-    <div className="postable2">
+    <div className={unifiedAdd ? 'postable2 postable2--unified-add' : 'postable2'}>
       {(groups ?? []).map((g) => {
         const items = g.items ?? []
         const allSel = Boolean(selectable && items.length > 0 && items.every((it) => sel[it.id]))
@@ -227,7 +230,7 @@ export function PosTable({
               <span className="g">{g.gewerk || 'Ohne Gewerk'}</span>
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
-              {onAddKind ? (
+              {onAddKind && !unifiedAdd ? (
                 <button
                   type="button"
                   className={`pt2-gewerk-add${addOpen ? ' is-open' : ''}`}
@@ -247,6 +250,7 @@ export function PosTable({
             </div>
             {items.length === 0 && !addOpen ? (
               <div
+                className="pt2-empty"
                 style={{
                   padding: '12px 14px',
                   fontSize: 'var(--fs-meta)',
@@ -417,7 +421,7 @@ export function PosTable({
                 </div>
               )
             })}
-            {addOpen ? (
+            {addOpen && !unifiedAdd ? (
               <div className="pt2-gewerk-add-panel">
                 <PosAddRow
                   onAdd={(kind) => {
@@ -428,7 +432,7 @@ export function PosTable({
                 />
               </div>
             ) : null}
-            {!onAddKind && onAddItem ? (
+            {!onAddKind && onAddItem && !unifiedAdd ? (
               <button
                 type="button"
                 className="pt-add"
@@ -441,12 +445,12 @@ export function PosTable({
           </div>
         )
       })}
-      {onAddKind && !hasGroups ? (
+      {onAddKind && !hasGroups && !unifiedAdd ? (
         <div style={{ padding: '12px 0 4px' }}>
           <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
         </div>
       ) : null}
-      {onAddGroup ? (
+      {onAddGroup && !unifiedAdd ? (
         <button
           type="button"
           className="pt-add"

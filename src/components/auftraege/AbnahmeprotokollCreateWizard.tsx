@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Eye, Plus } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
@@ -13,6 +14,9 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft, claimKiAssistListTarget, setKiAssistListTarget } from '@/lib/copilot/ki-assist-apply'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -116,6 +120,29 @@ export function AbnahmeprotokollCreateWizard({
   const [meta, setMeta] = useState<AbnahmeProtokollMeta>(() =>
     emptyAbnahmeProtokollMeta(initialMeta)
   )
+
+  useKiAssistDraftConsumer(true, 'text', (d) => {
+    for (const p of punkte) {
+      if (claimKiAssistListTarget(`mangel:${p.id}`)) {
+        applyKiDokumentTextDraft(d, {
+          setText: (v) =>
+            setPunkte((prev) => prev.map((x) => (x.id === p.id ? { ...x, notiz: v } : x))),
+        })
+        return
+      }
+    }
+    if (claimKiAssistListTarget('rechtshinweise')) {
+      applyKiDokumentTextDraft(d, {
+        setText: (v) => setMeta((m) => ({ ...m, rechtshinweise: v })),
+      })
+      return
+    }
+    if (claimKiAssistListTarget('hinweis_sonstiges')) {
+      applyKiDokumentTextDraft(d, {
+        setText: (v) => setMeta((m) => ({ ...m, hinweis_sonstiges: v })),
+      })
+    }
+  })
 
   const onClose = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -370,14 +397,21 @@ export function AbnahmeprotokollCreateWizard({
           {ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
         </p>
       </fieldset>
-      <Textarea
+      <KiAssistFieldLabel
         label="Hinweis (z. B. nicht Vertragsgegenstand)"
-        plain
-        rows={3}
-        value={meta.hinweis_sonstiges}
-        onChange={(e) => patchMeta({ hinweis_sonstiges: e.target.value })}
-        placeholder="Optional…"
-      />
+        scope="dokument"
+        extraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
+        draftInput={meta.hinweis_sonstiges || null}
+        onBeforeOpen={() => setKiAssistListTarget('hinweis_sonstiges')}
+      >
+        <Textarea
+          plain
+          rows={3}
+          value={meta.hinweis_sonstiges}
+          onChange={(e) => patchMeta({ hinweis_sonstiges: e.target.value })}
+          placeholder="Optional…"
+        />
+      </KiAssistFieldLabel>
       <Input
         label="Mängelbeseitigung (global, PDF)"
         value={meta.maengel_beseitigung_spaetestens}
@@ -413,18 +447,25 @@ export function AbnahmeprotokollCreateWizard({
                   </p>
                   {punkt ? (
                     <>
-                      <Input
+                      <KiAssistFieldLabel
                         label="Mangel-Beschreibung (PDF)"
-                        value={punkt.notiz ?? ''}
-                        onChange={(e) =>
-                          setPunkte((prev) =>
-                            prev.map((p) =>
-                              p.id === punkt.id ? { ...p, notiz: e.target.value } : p
+                        scope="mangel"
+                        extraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
+                        draftInput={punkt.notiz || null}
+                        onBeforeOpen={() => setKiAssistListTarget(`mangel:${punkt.id}`)}
+                      >
+                        <Input
+                          value={punkt.notiz ?? ''}
+                          onChange={(e) =>
+                            setPunkte((prev) =>
+                              prev.map((p) =>
+                                p.id === punkt.id ? { ...p, notiz: e.target.value } : p
+                              )
                             )
-                          )
-                        }
-                        placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
-                      />
+                          }
+                          placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
+                        />
+                      </KiAssistFieldLabel>
                       <Input
                         label="Beseitigung bis"
                         type="date"
@@ -819,13 +860,20 @@ export function AbnahmeprotokollCreateWizard({
             </p>
           }
         >
-          <Textarea
+          <KiAssistFieldLabel
             label="Weitere Hinweise (Rechtstext)"
-            plain
-            rows={6}
-            value={meta.rechtshinweise}
-            onChange={(e) => patchMeta({ rechtshinweise: e.target.value })}
-          />
+            scope="dokument"
+            extraHint="Rechtshinweise im Abnahmeprotokoll (kundensichtbar)."
+            draftInput={meta.rechtshinweise || null}
+            onBeforeOpen={() => setKiAssistListTarget('rechtshinweise')}
+          >
+            <Textarea
+              plain
+              rows={6}
+              value={meta.rechtshinweise}
+              onChange={(e) => patchMeta({ rechtshinweise: e.target.value })}
+            />
+          </KiAssistFieldLabel>
         </MobileEditableBlock>
       </FieldCard>
       <div className="hidden sm:block">{footerActions}</div>

@@ -20,15 +20,26 @@ function eintragZeit(e: BautagebuchListenEintrag): string {
   }
 }
 
-function eintragText(e: BautagebuchListenEintrag): string {
+function eintragTitel(e: BautagebuchListenEintrag): string {
   const body = e.beschreibung?.trim() || e.beschreibung_roh?.trim() || ''
-  if (body) return body
+  if (body) {
+    const first = body.split(/\n+/)[0]?.trim() ?? ''
+    if (first.length > 0 && first.length <= 72) return first
+    if (first.length > 72) return `${first.slice(0, 69)}…`
+  }
   return eintragTypLabel(e.typ)
 }
 
+function eintragText(e: BautagebuchListenEintrag): string {
+  const body = e.beschreibung?.trim() || e.beschreibung_roh?.trim() || ''
+  if (!body) return ''
+  const lines = body.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+  if (lines.length <= 1) return ''
+  return lines.slice(1).join(' ').slice(0, 160)
+}
+
 /**
- * Bautagebuch unter den Leistungen — Verlauf + „+ Eintrag“ (Mock Surface B).
- * Abnahme / Abschlussbericht bleiben über Aktionen erreichbar.
+ * Bautagebuch = Portal-Updates als Inserat-Cards.
  */
 export function AuftragBautagebuchSection({
   eintraege,
@@ -46,71 +57,72 @@ export function AuftragBautagebuchSection({
   })
 
   return (
-    <section className="bt-sec space-y-3" aria-label="Bautagebuch">
-      <div className="bt-sec-h">
-        <div className="bt-sec-h__left">
-          <MockIcon ctx="default" n="clipboard-list" size={18} />
-          <div>
-            <h2 className="bt-sec-title">Bautagebuch</h2>
-            <p className="bt-sec-sub">
-              {sorted.length === 0
-                ? 'Optional · laufende Updates von Baustelle und Partner'
-                : `${sorted.length} Eintrag${sorted.length === 1 ? '' : 'e'} · optional Soft-Bezug zur Leistung`}
-            </p>
-          </div>
+    <section className="bt-feed" aria-label="Bautagebuch">
+      <div className="bt-feed-h">
+        <div className="bt-feed-h__left">
+          <h2 className="bt-feed-title">Bautagebuch</h2>
+          <p className="bt-feed-sub">
+            {sorted.length === 0
+              ? 'Updates fürs Kundenportal — Fotos, Titel, Text'
+              : `${sorted.length} Eintrag${sorted.length === 1 ? '' : 'e'}`}
+          </p>
         </div>
         {!disabled ? (
-          <Button type="button" variant="secondary" size="sm" onClick={onAdd}>
+          <Button type="button" variant="primary" size="sm" onClick={onAdd}>
             + Eintrag
           </Button>
         ) : null}
       </div>
 
       {sorted.length === 0 ? (
-        <div className="bt-empty">
+        <div className="bt-feed-empty">
+          <MockIcon ctx="empty" n="camera" size={28} />
           <p>Noch keine Einträge.</p>
-          <p className="bt-empty__hint">
-            Freie Updates (Wetter, Regie, Fortschritt) — ohne Zwang auf Angebotszeilen. Abnahme
-            und Abschlussbericht startest du über Aktionen.
+          <p className="bt-feed-empty__hint">
+            Einträge erscheinen im Kundenportal. Leistung und Stunden sind optional.
           </p>
-          {!disabled ? (
-            <button type="button" className="lt-add-entry" onClick={onAdd}>
-              + Eintrag hinzufügen
-            </button>
-          ) : null}
         </div>
       ) : (
-        <ul className="bt-list">
+        <ul className="bt-inserat-list">
           {sorted.map((e) => {
-            const foto = e.eintrag_fotos?.find((f) => f.display_url)?.display_url
-            const fotoCount = e.eintrag_fotos?.length ?? 0
+            const fotos = (e.eintrag_fotos ?? []).filter((f) => f.display_url)
+            const cover = fotos[0]?.display_url
+            const desc = eintragText(e)
+            const stunden =
+              e.zeit_minuten != null && e.zeit_minuten > 0
+                ? `${Math.floor(e.zeit_minuten / 60)}:${String(e.zeit_minuten % 60).padStart(2, '0')} Std.`
+                : null
             return (
-              <li key={e.id} className="bt-entry">
-                <span className="bt-check on" aria-hidden>
-                  <MockIcon ctx="default" n="check" size={12} />
-                </span>
-                {foto ? (
-                  <div className="bt-thumb">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={foto} alt="" />
-                    {fotoCount > 1 ? <span className="count">+{fotoCount - 1}</span> : null}
-                  </div>
-                ) : (
-                  <div className="bt-thumb" aria-hidden>
-                    <Camera className="h-5 w-5 opacity-40" />
-                  </div>
-                )}
-                <div className="bt-main">
-                  <div className="bt-title">
-                    <span>{eintragTypLabel(e.typ)}</span>
+              <li key={e.id} className="bt-inserat">
+                <div className="bt-inserat__media" aria-hidden>
+                  {cover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={cover} alt="" />
+                  ) : (
+                    <div className="bt-inserat__media-empty">
+                      <Camera className="h-7 w-7 opacity-35" />
+                    </div>
+                  )}
+                  {fotos.length > 1 ? (
+                    <span className="bt-inserat__count">+{fotos.length - 1}</span>
+                  ) : null}
+                </div>
+                <div className="bt-inserat__body">
+                  <div className="bt-inserat__title">{eintragTitel(e)}</div>
+                  {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
+                  <div className="bt-inserat__meta">
+                    <span>{eintragZeit(e)}</span>
                     {e.leistungName?.trim() ? (
-                      <span className="badge warten">{e.leistungName.trim()}</span>
+                      <span className="bt-inserat__chip">{e.leistungName.trim()}</span>
                     ) : (
-                      <span className="badge warten">Ohne Leistung</span>
+                      <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
                     )}
+                    {stunden ? (
+                      <span className="bt-inserat__intern" title="Nur intern">
+                        {stunden}
+                      </span>
+                    ) : null}
                   </div>
-                  <p className="bt-desc">{eintragText(e)}</p>
-                  <p className="bt-meta">{eintragZeit(e)}</p>
                 </div>
               </li>
             )

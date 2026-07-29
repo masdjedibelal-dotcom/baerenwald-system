@@ -1,12 +1,16 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import { saveEmailTemplate, type EmailTemplateRow } from '@/app/(dashboard)/einstellungen/email/actions'
 import { applyEmailTemplateVars, type EmailPreviewVars } from '@/lib/email-template-preview-vars'
@@ -53,6 +57,13 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
   const [pending, startTransition] = useTransition()
   const betreffRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
+
+  useKiAssistDraftConsumer(!!open && tab === 'edit', ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff,
+      setBody: setBodyHtml,
+    })
+  })
 
   function openModal(t: EmailTemplateRow) {
     setOpen(t)
@@ -178,12 +189,18 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
             {tab === 'edit' ? (
               <>
                 <div>
-                  <Input
-                    ref={betreffRef}
+                  <KiAssistFieldLabel
                     label="Betreff"
-                    value={betreff}
-                    onChange={(e) => setBetreff(e.target.value)}
-                  />
+                    scope="mail"
+                    extraHint="E-Mail-Vorlage Betreff (kann {{Variablen}} enthalten)."
+                    draftInput={betreff || null}
+                  >
+                    <Input
+                      ref={betreffRef}
+                      value={betreff}
+                      onChange={(e) => setBetreff(e.target.value)}
+                    />
+                  </KiAssistFieldLabel>
                   <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">Variablen:</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {VARIABLES.map((v) => (
@@ -199,26 +216,32 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   </div>
                 </div>
                 <div>
-                  <p className="input-label">Inhalt (HTML)</p>
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {VARIABLES.map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        className="chip text-[length:var(--fs-meta)]"
-                        onClick={() => chipBody(v)}
-                      >
-                        {`{{${v}}}`}
-                      </button>
-                    ))}
-                  </div>
-                  <Textarea
-                    ref={bodyRef}
-                    rows={14}
-                    value={bodyHtml}
-                    onChange={(e) => setBodyHtml(e.target.value)}
-                    className="font-mono text-[length:var(--fs-text)]"
-                  />
+                  <KiAssistFieldLabel
+                    label="Inhalt (HTML)"
+                    scope="mail"
+                    extraHint="E-Mail-Vorlage Inhalt. Variablen wie {{kundenname}} beibehalten."
+                    draftInput={[betreff, bodyHtml].filter(Boolean).join('\n\n') || null}
+                  >
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {VARIABLES.map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className="chip text-[length:var(--fs-meta)]"
+                          onClick={() => chipBody(v)}
+                        >
+                          {`{{${v}}}`}
+                        </button>
+                      ))}
+                    </div>
+                    <Textarea
+                      ref={bodyRef}
+                      rows={14}
+                      value={bodyHtml}
+                      onChange={(e) => setBodyHtml(e.target.value)}
+                      className="font-mono text-[length:var(--fs-text)]"
+                    />
+                  </KiAssistFieldLabel>
                 </div>
               </>
             ) : (

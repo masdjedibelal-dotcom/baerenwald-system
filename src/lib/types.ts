@@ -1076,6 +1076,30 @@ export type KalenderTermin = {
   } | null
 }
 
+export type TodoPrioritaet = 'niedrig' | 'normal' | 'hoch'
+
+export type CrmTodo = {
+  id: string
+  titel: string
+  beschreibung: string | null
+  erledigt: boolean
+  erledigt_at: string | null
+  faellig_am: string | null
+  prioritaet: TodoPrioritaet
+  zugewiesen_an: string | null
+  kunde_id: string | null
+  lead_id: string | null
+  auftrag_id: string | null
+  handwerker_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  kunden?: { id: string; name: string | null } | null
+  leads?: { id: string; kontakt_name: string | null } | null
+  auftraege?: { id: string; titel: string | null } | null
+  handwerker?: { id: string; name: string | null; firma: string | null } | null
+}
+
 export type FormularSubtyp =
   | 'bautagebuch'
   | 'bautagebuch_kurz'

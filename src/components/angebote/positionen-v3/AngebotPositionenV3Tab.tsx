@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -252,7 +253,6 @@ export function AngebotPositionenV3Tab({
       </div>
     )
   }
-
 
   return (
     <div className="pos-v3">

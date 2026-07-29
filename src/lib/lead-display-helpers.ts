@@ -241,3 +241,144 @@ export function resolveLeadPreisAnzeige(
 
   return '—'
 }
+
+const WEBSITE_DUMP_LINE_LABELS: Record<string, string> = {
+  bereiche: 'Bereiche',
+  plz: 'PLZ',
+  zeitraum: 'Zeitraum',
+  kundentyp: 'Kundentyp',
+  garten: 'Garten',
+  bad: 'Bad',
+  heizung: 'Heizung',
+  elektrik: 'Elektrik',
+  boden: 'Boden',
+  fassade: 'Fassade',
+  dach: 'Dach',
+  fenster: 'Fenster',
+  situation: 'Situation',
+  leistungen: 'Leistungen',
+  umfang: 'Umfang',
+  dringlichkeit: 'Dringlichkeit',
+}
+
+const WEBSITE_DUMP_VALUE_LABELS: Record<string, string> = {
+  ...KUNDENTYP_MAP,
+  gartengestaltung: 'Garten',
+  flexibel: 'Flexibel',
+  terrasse: 'Terrasse / Außenbereich',
+  naturstein: 'Naturstein/Platten',
+  nein: 'Nein',
+  ja: 'Ja',
+}
+
+/**
+ * Website-`=== Projektanfrage ===`-Dump → lesbare Prop-Zeilen
+ * (Fallback, wenn funnel_daten unvollständig und kontakt_nachricht den Dump enthält).
+ */
+export function parseWebsiteAnfrageDump(
+  text: string | null | undefined
+): { k: string; v: string }[] {
+  if (!text?.trim()) return []
+  if (isEchterFreitext(text)) return []
+  const t = text.trim()
+  if (
+    !t.includes('===') &&
+    !t.includes('Strukturierte') &&
+    !t.includes('Bereiche:') &&
+    !t.includes('Projektanfrage')
+  ) {
+    return []
+  }
+
+  const out: { k: string; v: string }[] = []
+  const seen = new Set<string>()
+  const push = (k: string, v: string) => {
+    const key = k.trim()
+    const val = v.trim()
+    if (!key || !val || val === '—' || val.startsWith('{')) return
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push({ k: key, v: val })
+  }
+
+  const formatVal = (raw: string) => {
+    const s = raw.trim()
+    return WEBSITE_DUMP_VALUE_LABELS[s.toLowerCase()] ?? WEBSITE_DUMP_VALUE_LABELS[s] ?? s
+  }
+
+  // JSON-Blöcke (z. B. unter „Projekt-Details:“)
+  const jsonMatches = t.match(/\{[^{}]+\}/g) ?? []
+  for (const rawJson of jsonMatches) {
+    try {
+      const obj = JSON.parse(rawJson) as Record<string, unknown>
+      for (const [key, val] of Object.entries(obj)) {
+        if (val == null || val === '') continue
+        const label =
+          (
+            {
+              gartenLeistung: 'Garten-Leistung',
+              gartenTerrasseMaterial: 'Terrassen-Material',
+              gartenZaun: 'Zaun',
+              gartenZugaenglichkeit: 'Zugang Garten',
+              ausbauRohbau: 'Rohbau vorhanden',
+              ausbauDeckenhoehe: 'Deckenhöhe',
+              durchbruchAnzahl: 'Durchbrüche',
+              durchbruchTragend: 'Tragende Wand',
+              terrasseMaterial: 'Terrasse Material',
+              terrasseUnterbau: 'Terrasse Unterbau',
+            } as Record<string, string>
+          )[key] ?? key
+        if (typeof val === 'boolean') {
+          push(label, val ? 'Ja' : 'Nein')
+        } else if (typeof val === 'number') {
+          push(label, String(val))
+        } else if (typeof val === 'string') {
+          push(label, formatVal(val))
+        }
+      }
+    } catch {
+      /* ignore malformed */
+    }
+  }
+
+  for (const rawLine of t.split(/\n/)) {
+    const line = rawLine.replace(/^[-–*•]\s*/, '').trim()
+    if (!line || line.startsWith('===') || line.startsWith('{')) continue
+    if (/^strukturierte\b/i.test(line)) continue
+    if (/^projekt-?details\b/i.test(line) && line.includes('{')) continue
+    if (/^antworten\b/i.test(line)) continue
+
+    const m = line.match(/^([A-Za-zÄÖÜäöüß0-9 _/-]+):\s*(.+)$/)
+    if (!m) continue
+    const rawKey = m[1]!.trim()
+    const rawVal = m[2]!.trim()
+    if (rawVal.startsWith('{')) continue
+    if (/projekt-?details|fachdetails|antworten/i.test(rawKey)) continue
+
+    const keyNorm = rawKey.toLowerCase().replace(/\s+/g, '')
+    const label =
+      WEBSITE_DUMP_LINE_LABELS[keyNorm] ??
+      WEBSITE_DUMP_LINE_LABELS[rawKey.toLowerCase()] ??
+      rawKey
+
+    // Mehrteilige Garten-Zeile: „Fläche/Umfang: … · Leistung: …“
+    if (/^[·•|]/.test(rawVal) === false && rawVal.includes('·')) {
+      const parts = rawVal.split(/\s*·\s*/)
+      const leftover: string[] = []
+      for (const part of parts) {
+        const pm = part.match(/^([^:]+):\s*(.+)$/)
+        if (pm) {
+          push(pm[1]!.trim(), formatVal(pm[2]!))
+        } else {
+          leftover.push(part.trim())
+        }
+      }
+      if (leftover.length) push(label, leftover.map(formatVal).join(' · '))
+      continue
+    }
+
+    push(label, formatVal(rawVal))
+  }
+
+  return out
+}

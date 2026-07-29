@@ -1,10 +1,11 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { useEffect, useMemo, useState } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
@@ -19,12 +20,15 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateAngebot } from '@/lib/list-actions'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -34,7 +38,6 @@ import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-ac
 import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
 import {
   previewAuftragsbestaetigungMail,
-  deleteAngebot,
   recordKundeAbgelehntMitDetails,
   schliesseLeadNachAngebotVerlust,
 } from '@/app/(dashboard)/angebote/actions'
@@ -187,6 +190,13 @@ export function AngebotDetailPageClient({
   const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
   const [ablehnenNotiz, setAblehnenNotiz] = useState('')
   const [ablehnenKonkurrenz, setAblehnenKonkurrenz] = useState('')
+
+  useKiAssistDraftConsumer(acceptOpen, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: setAufBetreff,
+      setBody: () => {},
+    })
+  })
 
   useEffect(() => {
     const raw = searchParams.get('tab')
@@ -439,70 +449,6 @@ export function AngebotDetailPageClient({
     setAcceptOpen(true)
   }
 
-  const detailHeadMenuItems = useMemo(() => {
-    const items = entityMenuToActionItems(
-      buildEntityMenu(
-        'angebot',
-        {
-          name: kundeName,
-          status: statusEinfach,
-          statusKey: statusEinfach,
-        },
-        {
-          onEdit: kannBearbeiten ? () => openWizardBearbeiten() : undefined,
-          onCopy: () => runDuplicateAngebot(detail.id, router),
-          onDelete: () => {
-            startTransition(async () => {
-              const r = await deleteAngebot(detail.id)
-              if ('error' in r) {
-                toast.error(r.error)
-                return
-              }
-              toast.success('Angebot gelöscht')
-              if (detail.lead_id) router.push(`/anfragen/${detail.lead_id}`)
-              else router.push('/angebote')
-            })
-          },
-          deleteLabel: kundeName,
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
-    )
-
-    if (
-      (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
-      !auftragId
-    ) {
-      const ablehnenItem = {
-        label: 'Ablehnen',
-        icon: mockMenuIcon('x', 15),
-        danger: true as const,
-        onClick: () => {
-          setAblehnenGrund('')
-          setAblehnenNotiz('')
-          setAblehnenKonkurrenz('')
-          setAblehnenOpen(true)
-        },
-      }
-      const delIdx = items.findIndex((i) => i !== 'sep' && i.label === 'Löschen')
-      if (delIdx >= 0) {
-        return [...items.slice(0, delIdx), ablehnenItem, ...items.slice(delIdx)]
-      }
-      return [...items, ablehnenItem]
-    }
-
-    return items
-  }, [
-    kundeName,
-    detail.id,
-    detail.lead_id,
-    statusEinfach,
-    auftragId,
-    router,
-    startTransition,
-    kannBearbeiten,
-  ])
-
   const primaryAction = useMemo((): DetailActionDef | null => {
     const cta = primaryCta('angebot', statusEinfach || detail.status)
     if (!cta) return null
@@ -523,7 +469,7 @@ export function AngebotDetailPageClient({
       }
     }
     return null
-  }, [statusEinfach, detail.status, pending, openAcceptModal])
+  }, [statusEinfach, detail.status, pending])
 
   const stammdatenInhalt = (
     <>
@@ -637,14 +583,38 @@ export function AngebotDetailPageClient({
         title: kundeName,
         sub: headSub,
         badges: (
-          <StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />
+          <StatusBadgeActionPopover
+            title="Status"
+            badge={<StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />}
+            actions={
+              (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId
+                ? [
+                    {
+                      id: 'ablehnen',
+                      label: 'Ablehnen',
+                      icon: 'x',
+                      danger: true,
+                      onClick: () => {
+                        setAblehnenGrund('')
+                        setAblehnenNotiz('')
+                        setAblehnenKonkurrenz('')
+                        setAblehnenOpen(true)
+                      },
+                    },
+                  ]
+                : []
+            }
+          />
         ),
         meta: headMeta,
+        titleTrailing: (
+          <PortalLoginIconButton kundeId={detail.kunde_id} label="Kundenportal öffnen" />
+        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Angebot"
             primary={primaryAction}
-            menuItems={detailHeadMenuItems}
+            menuItems={[]}
           />
         ),
       }}
@@ -744,12 +714,18 @@ export function AngebotDetailPageClient({
               <p className="text-[length:var(--fs-text)] text-amber-700">Keine E-Mail-Adresse — Auftrag wird ohne Mail erstellt.</p>
             ) : (
               <>
-                <Input
+                <KiAssistFieldLabel
                   label="Betreff"
-                  value={aufBetreff}
-                  onChange={(e) => setAufBetreff(e.target.value)}
-                  className="mb-3"
-                />
+                  scope="mail"
+                  extraHint="Auftragsbestätigung — Betreff an den Kunden."
+                  draftInput={aufBetreff || null}
+                >
+                  <Input
+                    value={aufBetreff}
+                    onChange={(e) => setAufBetreff(e.target.value)}
+                    className="mb-3"
+                  />
+                </KiAssistFieldLabel>
                 <EmailPillsField
                   label="An"
                   required

@@ -1,63 +1,38 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
 import { Modal } from '@/components/ui/Modal'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { cn } from '@/lib/utils'
-import {
-  deleteKalenderTermin,
-  saveKalenderTermin,
-} from '@/app/(dashboard)/kalender/actions'
+import { deleteKalenderTermin } from '@/app/(dashboard)/kalender/actions'
+import { TodosPanel } from '@/components/todos/TodosPanel'
 import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
 import {
   kalenderTerminEndeVergangen,
 } from '@/lib/kalender/termin-no-show-hint'
+import {
+  formatHm,
+  KalenderTerminEditorSheet,
+  katLabel,
+  typToKat,
+  type KalenderTerminEditorPrefill,
+} from '@/components/kalender/KalenderTerminEditorSheet'
 
 type UiView = 'tag' | 'woche' | 'monat'
-
-/** Mock-Farben: green / blue / yellow */
-type MockKat = 'green' | 'blue' | 'yellow'
+type UiMode = 'kalender' | 'todos'
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7) // 7–19
 const HOUR_PX = 52
 const DOW = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const
-
-const KAT_OPTIONS: { value: MockKat; label: string; typ: KalenderTermin['typ'] }[] = [
-  { value: 'green', label: 'Vor-Ort / Arbeit', typ: 'besichtigung' },
-  { value: 'blue', label: 'Kontakt / Kickoff', typ: 'sonstiges' },
-  { value: 'yellow', label: 'Abnahme', typ: 'abnahme' },
-]
-
-function typToKat(typ: KalenderTermin['typ']): MockKat {
-  if (typ === 'abnahme') return 'yellow'
-  if (typ === 'sonstiges' || typ === 'intern') return 'blue'
-  return 'green'
-}
-
-function katToTyp(kat: MockKat): KalenderTermin['typ'] {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.typ ?? 'besichtigung'
-}
-
-function katLabel(kat: MockKat): string {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.label ?? 'Vor-Ort / Arbeit'
-}
 
 function ymd(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
-}
-
-function parseYmd(s: string): Date {
-  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
-  return new Date(y!, m! - 1, d!, 12, 0, 0)
 }
 
 function startOfWeek(d: Date): Date {
@@ -94,19 +69,6 @@ function timeToHours(t: string | null | undefined): number | null {
   return h! + (Number.isFinite(m) ? m! / 60 : 0)
 }
 
-function formatHm(t: string | null | undefined): string {
-  if (!t?.trim()) return ''
-  return t.trim().slice(0, 5)
-}
-
-function normalizeTimeInput(t: string): string | null {
-  const v = t.trim()
-  if (!v) return null
-  if (/^\d{2}:\d{2}$/.test(v)) return `${v}:00`
-  if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v
-  return v
-}
-
 function hourTop(v: number): number {
   return (v - HOURS[0]!) * HOUR_PX
 }
@@ -127,20 +89,13 @@ export function KalenderClient() {
   const [termine, setTermine] = useState<KalenderTermin[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [view, setView] = useState<UiView>('monat')
+  const [mode, setMode] = useState<UiMode>('kalender')
   const [cursor, setCursor] = useState(() => new Date())
-  const [pending, startTransition] = useTransition()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [editing, setEditing] = useState<KalenderTermin | null>(null)
-
-  const [fTitel, setFTitel] = useState('')
-  const [fKat, setFKat] = useState<MockKat>('green')
-  const [fDatum, setFDatum] = useState('')
-  const [fVon, setFVon] = useState('09:00')
-  const [fBis, setFBis] = useState('10:00')
-  const [fOrt, setFOrt] = useState('')
-  const [fDesc, setFDesc] = useState('')
+  const [editorPrefill, setEditorPrefill] = useState<KalenderTerminEditorPrefill | null>(null)
 
   const todayYmd = ymd(new Date())
 
@@ -188,39 +143,17 @@ export function KalenderClient() {
     return m
   }, [termine])
 
-  function openNeu(prefill?: { day?: Date; startHour?: number }) {
+  function openNeu(prefill?: KalenderTerminEditorPrefill) {
     setEditing(null)
+    setEditorPrefill(prefill ?? null)
     setDetailOpen(false)
-    const d = prefill?.day ?? cursor
-    setFTitel('')
-    setFKat('green')
-    setFDatum(ymd(d))
-    const sh = prefill?.startHour
-    if (sh != null) {
-      const von = `${String(Math.floor(sh)).padStart(2, '0')}:${sh % 1 ? '30' : '00'}`
-      const bisH = sh + 1
-      const bis = `${String(Math.floor(bisH)).padStart(2, '0')}:${bisH % 1 ? '30' : '00'}`
-      setFVon(von)
-      setFBis(bis)
-    } else {
-      setFVon('09:00')
-      setFBis('10:00')
-    }
-    setFOrt('')
-    setFDesc('')
     setModalOpen(true)
   }
 
   function openEdit(t: KalenderTermin) {
     setEditing(t)
+    setEditorPrefill(null)
     setDetailOpen(false)
-    setFTitel(t.titel)
-    setFKat(typToKat(t.typ))
-    setFDatum(t.datum.slice(0, 10))
-    setFVon(formatHm(t.uhrzeit_von) || '09:00')
-    setFBis(formatHm(t.uhrzeit_bis) || '10:00')
-    setFOrt(t.adresse ?? '')
-    setFDesc(t.beschreibung ?? '')
     setModalOpen(true)
   }
 
@@ -248,38 +181,6 @@ export function KalenderClient() {
 
   function goToday() {
     setCursor(new Date())
-  }
-
-  function saveTermin() {
-    startTransition(async () => {
-      const res = await saveKalenderTermin({
-        id: editing?.id,
-        titel: fTitel,
-        typ: katToTyp(fKat),
-        datum: fDatum,
-        uhrzeit_von: normalizeTimeInput(fVon),
-        uhrzeit_bis: normalizeTimeInput(fBis),
-        adresse: fOrt.trim() || null,
-        beschreibung: fDesc.trim() || null,
-        lead_id: editing?.lead_id ?? null,
-        auftrag_id: editing?.auftrag_id ?? null,
-        zugewiesen_an: editing?.zugewiesen_an ?? null,
-        erledigt: editing?.erledigt ?? false,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(editing ? 'Termin gespeichert' : `Termin „${fTitel.trim() || 'Neuer Termin'}“ angelegt`)
-      setModalOpen(false)
-      setEditing(null)
-      await load()
-    })
-  }
-
-  function submitForm(e: React.FormEvent) {
-    e.preventDefault()
-    saveTermin()
   }
 
   async function onDelete() {
@@ -491,6 +392,31 @@ export function KalenderClient() {
 
   return (
     <div>
+      <div className="kalender-mode-seg" role="tablist" aria-label="Kalender oder To-dos">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'kalender'}
+          className={cn('kalender-mode-seg__btn', mode === 'kalender' && 'on')}
+          onClick={() => setMode('kalender')}
+        >
+          Kalender
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'todos'}
+          className={cn('kalender-mode-seg__btn', mode === 'todos' && 'on')}
+          onClick={() => setMode('todos')}
+        >
+          To-dos
+        </button>
+      </div>
+
+      {mode === 'todos' ? (
+        <TodosPanel title="To-dos" />
+      ) : (
+        <>
       {nav}
 
       {loadErr ? (
@@ -589,69 +515,18 @@ export function KalenderClient() {
         ) : null}
       </Modal>
 
-      <EditorSheet
+      <KalenderTerminEditorSheet
         open={modalOpen}
+        termin={editing}
+        prefill={editorPrefill}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
-        context="detail"
-        size="md"
-        confirmBusy={pending}
-        onConfirm={() => {
-          const form = document.getElementById('kalender-termin-form') as HTMLFormElement | null
-          if (form?.reportValidity()) saveTermin()
+        onSaved={() => {
+          setEditing(null)
+          void load()
         }}
-      >
-        <form id="kalender-termin-form" onSubmit={submitForm} className="form-grid">
-          <div className="full">
-            <Input
-              label="Titel"
-              value={fTitel}
-              onChange={(e) => setFTitel(e.target.value)}
-              placeholder="z.B. Vor-Ort Termin Koch"
-              required
-            />
-          </div>
-          <div className="full">
-            <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">Kategorie</div>
-            <div className="seg">
-              {KAT_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  className={cn(fKat === o.value && 'on')}
-                  onClick={() => setFKat(o.value)}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Input type="date" label="Datum" value={fDatum} onChange={(e) => setFDatum(e.target.value)} required />
-          <div />
-          <Input type="time" label="Von" value={fVon} onChange={(e) => setFVon(e.target.value)} />
-          <Input type="time" label="Bis" value={fBis} onChange={(e) => setFBis(e.target.value)} />
-          <div className="full">
-            <Input
-              label="Ort"
-              value={fOrt}
-              onChange={(e) => setFOrt(e.target.value)}
-              placeholder="Stadtteil / Adresse"
-            />
-          </div>
-          {editing ? (
-            <div className="full">
-              <Textarea label="Beschreibung" value={fDesc} onChange={(e) => setFDesc(e.target.value)} rows={2} />
-            </div>
-          ) : null}
-          {editing ? (
-            <div className="full pt-2">
-              <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
-                Termin löschen
-              </MockBtn>
-            </div>
-          ) : null}
-        </form>
-      </EditorSheet>
+      />
+        </>
+      )}
     </div>
   )
 }

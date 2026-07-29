@@ -1,10 +1,13 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { toast } from '@/components/ui/app-toast'
+import { KiChatComposer } from '@/components/assistent/KiChatComposer'
 import {
   angebotKiGenerate,
   angebotKiLernen,
@@ -187,17 +190,26 @@ export function AngebotKiAssistentButton({
           {!ergebnis ? (
             <MockField
               label="Prompt"
-              hint="Beschreibe Leistungen — Titel und Beschreibung kommen als Positionen mit."
+              hint="Beschreib konkret, was rein soll — Gewerk, Mengen, Qualität. Mobil: Tippen oder Sprechen."
               full
             >
-              <textarea
-                className="input ta"
+              <KiChatComposer
+                multiline
                 rows={4}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="z. B. Bad komplett: Abbruch, Fliesen, Sanitär — inkl. Titel & Kurzbeschreibung, mittelpreisig"
+                onChange={setPrompt}
+                onSubmit={generieren}
                 disabled={pending}
-                autoFocus
+                placeholder="z. B. Bad 8 m²: Abbruch Altfliesen, Abdichtung, Fliesenwand/-boden Mittelklasse, WC und Waschtisch — inkl. Dokumenttitel & Kurzbeschreibung"
+                submitLabel={
+                  pending ? (
+                    'Generiert…'
+                  ) : (
+                    <>
+                      <MockIcon ctx="btn" n="sparkles" size={14} /> Generieren
+                    </>
+                  )
+                }
               />
             </MockField>
           ) : (

@@ -17,6 +17,7 @@ import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
+import { runDuplicateKunde } from '@/lib/list-actions'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
@@ -602,11 +603,7 @@ export function KundenListeClient({
             const tel = k.telefon?.trim() || ''
             const mail = k.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
-            const call = tel
-              ? () => {
-                  window.location.href = `tel:${tel}`
-                }
-              : undefined
+            const copy = () => runDuplicateKunde(k.id, router)
             const row = (
               <div
                 role="button"
@@ -660,8 +657,8 @@ export function KundenListeClient({
               <SwipeRow
                 key={k.id}
                 disabled={!isMobile || selectMode}
-                onSwipeRight={isMobile && !selectMode ? call : undefined}
-                rightLabel="Anrufen"
+                onSwipeRight={isMobile && !selectMode ? copy : undefined}
+                rightLabel="Kopieren"
               >
                 {row}
               </SwipeRow>

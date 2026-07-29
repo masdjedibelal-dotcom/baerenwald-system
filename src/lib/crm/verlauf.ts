@@ -5,6 +5,16 @@
 import type { AuftragTimelineEvent, LeadTimelineRow } from '@/lib/types'
 import { formatRelativeDate, formatTimelineStamp } from '@/lib/utils'
 import type { TimelineItem } from '@/components/ui/timeline'
+import {
+  buildRechnungMahnverlauf,
+  type RechnungMahnKontext,
+} from '@/lib/rechnungen/mahnverlauf'
+
+export type RechnungMahnMailZeile = {
+  id: string
+  betreff: string
+  created_at: string
+}
 
 export type VerlaufInspectKind = 'email' | 'angebot' | 'rechnung' | 'event'
 
@@ -210,6 +220,55 @@ function dedupeAuftragMailsAgainstLeadEmails(
     const t = normTyp(i.inspect?.typ)
     return t !== 'mail_kunde' && t !== 'mail_handwerker'
   })
+}
+
+/**
+ * Mahnpunkte (Erinnerungen / interne Warnung) als normale Verlaufseinträge —
+ * nur tatsächlich versendete Stufen, keine offene Prozess-Timeline.
+ */
+export function buildRechnungMahnVerlaufItems(
+  rechnung: RechnungMahnKontext & { id?: string },
+  mahnMails: RechnungMahnMailZeile[] = []
+): VerlaufBuiltItem[] {
+  if ((rechnung.beleg_typ ?? 'rechnung') === 'gutschrift') return []
+
+  const stufen = buildRechnungMahnverlauf(rechnung)
+  const stufe1Mail = mahnMails[0] ?? null
+  const stufe2Mail = mahnMails[1] ?? null
+  const items: VerlaufBuiltItem[] = []
+
+  for (const s of stufen) {
+    if (!s.sentAt) continue
+    // Prozess-Start „Rechnung versendet“ gehört nicht zu den Mahnpunkten
+    if (s.id === 'rechnung') continue
+
+    const mail =
+      s.id === 'stufe1' ? stufe1Mail : s.id === 'stufe2' ? stufe2Mail : null
+
+    const inspect: VerlaufInspectTarget = mail
+      ? {
+          kind: 'email',
+          title: s.label,
+          description: s.hint ?? mail.betreff,
+          createdAt: s.sentAt,
+          typ: 'rechnung_erinnerung',
+          emailLogId: mail.id,
+        }
+      : {
+          kind: 'rechnung',
+          title: s.label,
+          description: s.hint ?? null,
+          createdAt: s.sentAt,
+          typ: 'rechnung_erinnerung',
+          rechnungId: rechnung.id ?? null,
+          href: rechnung.id ? `/rechnungen/${rechnung.id}` : null,
+          hrefLabel: rechnung.id ? 'Zur Rechnung' : null,
+        }
+
+    items.push(toItem(`mahn-${s.id}`, s.label, s.sentAt, inspect, 'fallback', 'done'))
+  }
+
+  return items
 }
 
 export function buildLeadVerlaufItems(

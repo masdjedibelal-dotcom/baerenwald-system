@@ -1,7 +1,8 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +10,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
@@ -94,6 +98,13 @@ export function AngebotVersandSection({
     else setKundeModalInternal(open)
   }
   const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
+
+  useKiAssistDraftConsumer(kundeModal, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: setSubject,
+      setBody: () => {},
+    })
+  })
   const [hwModal, setHwModal] = useState<{
     id: string
     name: string
@@ -484,7 +495,14 @@ export function AngebotVersandSection({
         <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Empfänger: <span className="font-medium text-bw-text">{kundeEmail}</span>
         </p>
-        <Input label="Betreff" value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
+        <KiAssistFieldLabel
+          label="Betreff"
+          scope="mail"
+          extraHint="Angebotsversand — Betreff an den Kunden."
+          draftInput={subject || null}
+        >
+          <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
+        </KiAssistFieldLabel>
         <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
         <iframe
           title="Vorschau"

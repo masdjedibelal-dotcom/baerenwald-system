@@ -1,9 +1,13 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
 import { formatDatum, cn } from '@/lib/utils'
 
@@ -67,6 +71,12 @@ export function EntityProjektUebersichtCard({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initial)
   const [pending, startTransition] = useTransition()
+
+  useKiAssistDraftConsumer(editing && editableFields.includes('beschreibung'), 'text', (d) => {
+    applyKiDokumentTextDraft(d, {
+      setText: (v) => setDraft((prev) => ({ ...prev, beschreibung: v })),
+    })
+  })
 
   useEffect(() => {
     if (!editing) setDraft(initial)
@@ -141,18 +151,27 @@ export function EntityProjektUebersichtCard({
         </InlineEditField>
 
         {(editing && editableFields.includes('beschreibung')) || draft.beschreibung.trim() ? (
-          <InlineEditField
-            label="Beschreibung"
-            editing={can('beschreibung')}
-            value={draft.beschreibung.trim() || '—'}
-          >
-            <textarea
-              className="input"
-              rows={3}
-              value={draft.beschreibung}
-              onChange={(e) => patch({ beschreibung: e.target.value })}
+          can('beschreibung') ? (
+            <KiAssistFieldLabel
+              label="Beschreibung"
+              scope="dokument"
+              extraHint="Projektbeschreibung (kundensichtbar)."
+              draftInput={draft.beschreibung || null}
+            >
+              <textarea
+                className="input"
+                rows={3}
+                value={draft.beschreibung}
+                onChange={(e) => patch({ beschreibung: e.target.value })}
+              />
+            </KiAssistFieldLabel>
+          ) : (
+            <InlineEditField
+              label="Beschreibung"
+              editing={false}
+              value={draft.beschreibung.trim() || '—'}
             />
-          </InlineEditField>
+          )
         ) : null}
 
         {(extraRows ?? []).map((row, i) => (

@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 

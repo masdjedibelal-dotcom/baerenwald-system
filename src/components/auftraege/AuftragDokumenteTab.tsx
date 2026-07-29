@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createAuftragDokumentEintrag,
   deleteAuftragDokumentEintrag,
@@ -338,16 +339,16 @@ export function AuftragDokumenteTab({
     return parts.join(' · ')
   }
 
-  function renderMobileCard(row: AuftragDokumentZeile) {
+  function renderDeskRow(row: AuftragDokumentZeile) {
     const href = rowHref(row)
     const ready = rowPdfReady(row)
     const openable = Boolean(ready && href)
-
     return (
       <div
         key={row.id}
-        className={cn('dok-card', openable && 'dok-card--tappable')}
-        role={openable ? 'link' : undefined}
+        className={cn('list-row', openable && 'dok-list__row--openable')}
+        style={{ cursor: openable ? 'pointer' : 'default' }}
+        role={openable ? 'button' : undefined}
         tabIndex={openable ? 0 : undefined}
         onClick={() => {
           if (openable && href) window.open(href, '_blank', 'noopener,noreferrer')
@@ -360,42 +361,34 @@ export function AuftragDokumenteTab({
           }
         }}
       >
-        <div className="dok-card__icon" aria-hidden>
-          <MockIcon ctx="row" n={isFotoRow(row) ? 'photo' : 'file-text'} size={18} />
-        </div>
-        <div className="dok-card__body">
-          <div className="dok-card__top">
-            {renderNameLink(row, 'dok-card__title')}
-            {renderActions(row)}
-          </div>
-          {metaLine(row) ? <div className="dok-card__meta">{metaLine(row)}</div> : null}
-          <div className="dok-card__foot">{renderFreigabe(row, true)}</div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderDeskRow(row: AuftragDokumentZeile) {
-    return (
-      <div key={row.id} className="list-row" style={{ cursor: 'default' }}>
         <MockIcon
           ctx="row"
           n={isFotoRow(row) ? 'photo' : 'file-text'}
           size={18}
           className="text-bw-text-muted"
         />
-        <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
-          {renderNameLink(row)}
+        <div className="dok-list__main min-w-0">
+          <div className="dok-list__name truncate text-[length:var(--fs-text)] font-medium text-bw-text">
+            {renderNameLink(row)}
+          </div>
+          <div className="dok-list__sub">{metaLine(row)}</div>
         </div>
-        <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
+        <div className="dok-list__cell--desk min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
           {dokumentTypLabel(row.quelle)}
           {row.beschreibung && row.beschreibung !== '—' ? ` · ${row.beschreibung}` : ''}
         </div>
-        <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
+        <div className="dok-list__cell--desk whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
           {row.datum ? formatDatum(row.datum) : '—'}
         </div>
-        <div>{renderFreigabe(row)}</div>
-        <div className="inline-flex justify-end gap-0.5">{renderActions(row)}</div>
+        <div className="dok-list__freigabe" onClick={(e) => e.stopPropagation()}>
+          {renderFreigabe(row)}
+        </div>
+        <div
+          className="dok-list__actions inline-flex justify-end gap-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {renderActions(row)}
+        </div>
       </div>
     )
   }
@@ -494,8 +487,6 @@ export function AuftragDokumenteTab({
               ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
               : 'Noch keine Dokumente.'}
           </p>
-        ) : isMobile ? (
-          <div className="dok-cards">{zeilen.map(renderMobileCard)}</div>
         ) : (
           <div className="dok-list">
             <div className="list-row head" aria-hidden>

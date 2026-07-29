@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockField } from '@/components/mock-ui/MockForm'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -89,6 +91,10 @@ export function KundenportalLinkVersendenModal({
     return () => clearTimeout(timer)
   }, [open, kundeId, text, anrede, loading])
 
+  useKiAssistDraftConsumer(open, ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, { setBetreff, setBody: setText })
+  })
+
   async function handleSend() {
     if (!kundeId?.trim()) {
       toast.error('Kein Kunde verknüpft.')
@@ -164,15 +170,26 @@ export function KundenportalLinkVersendenModal({
             hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={sending}
           />
-          <MockField label="Betreff" full required>
+          <KiAssistFieldLabel
+            label="Betreff"
+            scope="mail"
+            extraHint={`Portal-Einladung. Anrede: ${anrede}.`}
+            draftInput={betreff || null}
+            required
+          >
             <input
               className="txt"
               value={betreff}
               onChange={(e) => setBetreff(e.target.value)}
               disabled={sending}
             />
-          </MockField>
-          <MockField label="Text" full>
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
+            label="Text"
+            scope="mail"
+            extraHint="Portal-Einladungsmail an den Kunden."
+            draftInput={[betreff, text].filter(Boolean).join('\n\n') || null}
+          >
             <textarea
               className="ta"
               rows={5}
@@ -180,7 +197,7 @@ export function KundenportalLinkVersendenModal({
               onChange={(e) => setText(e.target.value)}
               disabled={sending}
             />
-          </MockField>
+          </KiAssistFieldLabel>
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>
               Mail-Vorschau
@@ -199,9 +216,15 @@ export function KundenportalLinkVersendenModal({
             />
           </div>
           {portalLink ? (
-            <MockField label="Portal-Login" full hint="Button in der Mail führt auf diese Adresse.">
+            <div>
+              <div className="field-label" style={{ marginBottom: 6 }}>
+                Portal-Login
+              </div>
               <input className="txt" value={portalLink} readOnly />
-            </MockField>
+              <p className="field-hint" style={{ marginTop: 6 }}>
+                Button in der Mail führt auf diese Adresse.
+              </p>
+            </div>
           ) : null}
         </div>
       )}

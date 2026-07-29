@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import { addKundenNotiz, deleteKundenNotiz } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenNotizRow } from '@/lib/types'

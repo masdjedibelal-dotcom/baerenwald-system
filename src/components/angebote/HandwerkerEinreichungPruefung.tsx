@@ -1,10 +1,11 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 /**
  * @deprecated Gegenvorschlag-Prüfung — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
  */
 import Link from 'next/link'
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'

@@ -1,8 +1,11 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
 import {
   katalogPreisLabel,
@@ -15,7 +18,7 @@ import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 import type { KatalogPickResult } from '@/components/posboard/KatalogPickModal'
 
-export type PositionAddMode = 'preisliste' | 'frei'
+export type PositionAddMode = 'preisliste' | 'frei' | 'freitext' | 'nachlass' | 'gewerk'
 
 export type FreiePositionDraft = {
   name: string
@@ -25,6 +28,18 @@ export type FreiePositionDraft = {
   preis: number
   ust: number
   gewerk: string
+}
+
+export type FreitextDraft = {
+  name: string
+  beschreibung: string
+  gewerk: string
+}
+
+export type NachlassDraft = {
+  name: string
+  nachlassModus: 'prozent' | 'betrag'
+  preis: number
 }
 
 const emptyFrei = (gewerk: string): FreiePositionDraft => ({
@@ -37,9 +52,21 @@ const emptyFrei = (gewerk: string): FreiePositionDraft => ({
   gewerk: gewerk.trim() || 'Allgemein',
 })
 
+const emptyFreitext = (gewerk: string): FreitextDraft => ({
+  name: '',
+  beschreibung: '',
+  gewerk: gewerk.trim() || 'Allgemein',
+})
+
+const emptyNachlass = (): NachlassDraft => ({
+  name: 'Nachlass',
+  nachlassModus: 'prozent',
+  preis: 0,
+})
+
 /**
  * Position hinzufügen: Desktop Split-over · mobil Bottom Sheet.
- * Chips: Preisliste | Freie Position.
+ * Chips: Preisliste | Frei | Freitext | Nachlass | (optional) Gewerk.
  */
 export function PositionAddSheet({
   open,
@@ -48,8 +75,13 @@ export function PositionAddSheet({
   preferredGewerkName,
   gewerke = [],
   showUst = true,
+  allowGewerk = true,
+  allowNachlass = true,
   onPickKatalog,
   onAddFrei,
+  onAddFreitext,
+  onAddNachlass,
+  onAddGewerk,
 }: {
   open: boolean
   onClose: () => void
@@ -57,8 +89,15 @@ export function PositionAddSheet({
   preferredGewerkName?: string | null
   gewerke?: string[]
   showUst?: boolean
+  /** Gewerk-Chip (komplexe Dokumente) */
+  allowGewerk?: boolean
+  allowNachlass?: boolean
   onPickKatalog: (result: KatalogPickResult) => void
   onAddFrei: (draft: FreiePositionDraft) => void
+  onAddFreitext?: (draft: FreitextDraft) => void
+  onAddNachlass?: (draft: NachlassDraft) => void
+  /** Neuer Gewerk-Abschnitt — Sheet bleibt offen und wechselt zu Preisliste */
+  onAddGewerk?: (name: string) => void
 }) {
   const [mode, setMode] = useState<PositionAddMode>(initialMode)
   const [pending, startTransition] = useTransition()
@@ -75,6 +114,13 @@ export function PositionAddSheet({
   const [frei, setFrei] = useState<FreiePositionDraft>(() =>
     emptyFrei(preferredGewerkName || '')
   )
+  const [freitext, setFreitext] = useState<FreitextDraft>(() =>
+    emptyFreitext(preferredGewerkName || '')
+  )
+  const [nachlass, setNachlass] = useState<NachlassDraft>(emptyNachlass)
+  const [gewerkPick, setGewerkPick] = useState('')
+  const [gewerkCustom, setGewerkCustom] = useState('')
+  const [activeGewerk, setActiveGewerk] = useState(preferredGewerkName?.trim() || '')
 
   useEffect(() => {
     if (!open) return
@@ -84,7 +130,13 @@ export function PositionAddSheet({
     setPicked(null)
     setMenge('1')
     setBeschreibung('')
-    setFrei(emptyFrei(preferredGewerkName || ''))
+    const g = preferredGewerkName || ''
+    setActiveGewerk(g.trim())
+    setFrei(emptyFrei(g))
+    setFreitext(emptyFreitext(g))
+    setNachlass(emptyNachlass())
+    setGewerkPick('')
+    setGewerkCustom('')
     setGewerkFilter(null)
     if (initialMode !== 'preisliste') return
     startTransition(async () => {
@@ -145,10 +197,25 @@ export function PositionAddSheet({
     () =>
       Array.from(
         new Set(
-          [...gewerke, preferredGewerkName || '', frei.gewerk, 'Allgemein'].filter(Boolean)
+          [
+            ...gewerke,
+            preferredGewerkName || '',
+            activeGewerk,
+            frei.gewerk,
+            freitext.gewerk,
+            'Allgemein',
+          ].filter(Boolean)
         )
       ),
-    [gewerke, preferredGewerkName, frei.gewerk]
+    [gewerke, preferredGewerkName, activeGewerk, frei.gewerk, freitext.gewerk]
+  )
+
+  const stammdatenGewerke = useMemo(
+    () =>
+      Array.from(new Set(gewerke.map((g) => g.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, 'de')
+      ),
+    [gewerke]
   )
 
   function selectVariante(position: KatalogPosition, variante: KatalogVariante) {
@@ -185,15 +252,132 @@ export function PositionAddSheet({
       ...frei,
       name: frei.name.trim(),
       beschreibung: frei.beschreibung.trim(),
-      gewerk: frei.gewerk.trim() || preferredGewerkName?.trim() || 'Allgemein',
+      gewerk: frei.gewerk.trim() || activeGewerk || preferredGewerkName?.trim() || 'Allgemein',
       menge: Number.isFinite(frei.menge) && frei.menge > 0 ? frei.menge : 1,
     })
     onClose()
   }
 
+  function confirmFreitext() {
+    if (!onAddFreitext) return
+    if (!freitext.name.trim() && !freitext.beschreibung.trim()) return
+    onAddFreitext({
+      name: freitext.name.trim() || 'Hinweis',
+      beschreibung: freitext.beschreibung.trim(),
+      gewerk:
+        freitext.gewerk.trim() || activeGewerk || preferredGewerkName?.trim() || 'Allgemein',
+    })
+    onClose()
+  }
+
+  function confirmNachlass() {
+    if (!onAddNachlass) return
+    onAddNachlass({
+      name: nachlass.name.trim() || 'Nachlass',
+      nachlassModus: nachlass.nachlassModus,
+      preis: Number.isFinite(nachlass.preis) ? Math.max(0, nachlass.preis) : 0,
+    })
+    onClose()
+  }
+
+  function confirmGewerk() {
+    const name = gewerkCustom.trim() || gewerkPick.trim()
+    if (!name || !onAddGewerk) return
+    onAddGewerk(name)
+    setActiveGewerk(name)
+    setFrei((f) => ({ ...f, gewerk: name }))
+    setFreitext((f) => ({ ...f, gewerk: name }))
+    setGewerkPick('')
+    setGewerkCustom('')
+    setMode('preisliste')
+  }
+
   const freiSumme = (Number(frei.menge) || 0) * (Number(frei.preis) || 0)
   const canConfirmFrei = Boolean(frei.name.trim())
   const canConfirmKatalog = Boolean(picked)
+  const canConfirmFreitext = Boolean(
+    freitext.name.trim() || freitext.beschreibung.trim()
+  )
+  const canConfirmNachlass = true
+  const canConfirmGewerk = Boolean(gewerkCustom.trim() || gewerkPick.trim())
+
+  const chips: { mode: PositionAddMode; label: string; show?: boolean }[] = [
+    { mode: 'preisliste', label: 'Preisliste' },
+    { mode: 'frei', label: 'Frei' },
+    { mode: 'freitext', label: 'Freitext', show: Boolean(onAddFreitext) },
+    { mode: 'nachlass', label: 'Nachlass', show: allowNachlass && Boolean(onAddNachlass) },
+    { mode: 'gewerk', label: 'Gewerk', show: allowGewerk && Boolean(onAddGewerk) },
+  ]
+
+  function onConfirm() {
+    if (mode === 'frei') confirmFrei()
+    else if (mode === 'freitext') confirmFreitext()
+    else if (mode === 'nachlass') confirmNachlass()
+    else if (mode === 'gewerk') confirmGewerk()
+    else confirmKatalog()
+  }
+
+  const confirmDisabled =
+    mode === 'frei'
+      ? !canConfirmFrei
+      : mode === 'freitext'
+        ? !canConfirmFreitext
+        : mode === 'nachlass'
+          ? !canConfirmNachlass
+          : mode === 'gewerk'
+            ? !canConfirmGewerk
+            : !canConfirmKatalog
+
+  const confirmLabel =
+    mode === 'gewerk'
+      ? 'Gewerk übernehmen'
+      : mode === 'preisliste'
+        ? 'Übernehmen'
+        : 'Hinzufügen'
+
+  useKiAssistDraftConsumer(open && (mode === 'frei' || mode === 'freitext'), ['position', 'text'], (d) => {
+    if (d.type === 'position') {
+      if (mode === 'freitext') {
+        setFreitext((f) => ({
+          ...f,
+          name: d.name || f.name,
+          beschreibung: d.beschreibung?.trim() || d.name || f.beschreibung,
+        }))
+        setMode('freitext')
+      } else {
+        setFrei((f) => ({
+          ...f,
+          name: d.name || f.name,
+          beschreibung: d.beschreibung ?? f.beschreibung,
+          menge: d.menge && d.menge > 0 ? d.menge : f.menge,
+          einheit: d.einheit?.trim() || f.einheit,
+          preis: d.preis != null && d.preis >= 0 ? d.preis : f.preis,
+        }))
+        setMode('frei')
+      }
+    } else if (d.type === 'text') {
+      if (mode === 'freitext') {
+        setFreitext((f) => ({
+          ...f,
+          name: d.titel?.trim() || f.name,
+          beschreibung: d.text || f.beschreibung,
+        }))
+      } else {
+        setFrei((f) => ({
+          ...f,
+          name: d.titel?.trim() || f.name,
+          beschreibung: d.text || f.beschreibung,
+        }))
+      }
+    }
+  })
+
+  const showFooter =
+    mode === 'frei' ||
+    mode === 'freitext' ||
+    mode === 'nachlass' ||
+    mode === 'gewerk' ||
+    (mode === 'preisliste' && picked)
 
   return (
     <EditorSheet
@@ -202,45 +386,62 @@ export function PositionAddSheet({
       title="Position hinzufügen"
       context="canvas"
       size="lg"
-      onConfirm={mode === 'frei' ? confirmFrei : confirmKatalog}
-      confirmDisabled={mode === 'frei' ? !canConfirmFrei : !canConfirmKatalog}
+      onConfirm={onConfirm}
+      confirmDisabled={confirmDisabled}
+      headerEnd={
+        mode === 'frei' || mode === 'freitext' || mode === 'preisliste' ? (
+          <KiAssistIconButton
+            scope={mode === 'freitext' ? 'freitext' : mode === 'preisliste' ? 'positionen' : 'position'}
+            extraHint={
+              preferredGewerkName
+                ? `Gewerk-Kontext: ${preferredGewerkName}. Dokument: Angebot/Rechnung-Position.`
+                : 'Dokument: Angebot/Rechnung-Position (Handwerk).'
+            }
+            draftInput={
+              mode === 'frei'
+                ? [frei.name, frei.beschreibung].filter(Boolean).join(' — ') || null
+                : mode === 'freitext'
+                  ? [freitext.name, freitext.beschreibung].filter(Boolean).join(' — ') || null
+                  : null
+            }
+          />
+        ) : null
+      }
       footer={
-        mode === 'frei' ? (
-          <div className="rate-drawer-cta">
-            <MockBtn kind="primary" icon="check" disabled={!canConfirmFrei} onClick={confirmFrei}>
-              Hinzufügen
-            </MockBtn>
-          </div>
-        ) : picked ? (
+        showFooter ? (
           <div className="rate-drawer-cta">
             <MockBtn
               kind="primary"
               icon="check"
-              disabled={!canConfirmKatalog || pending}
-              onClick={confirmKatalog}
+              disabled={confirmDisabled || (mode === 'preisliste' && pending)}
+              onClick={onConfirm}
             >
-              Übernehmen
+              {confirmLabel}
             </MockBtn>
           </div>
         ) : undefined
       }
     >
-      <div className="picker-sheet__chips" role="group" aria-label="Quelle">
-        <button
-          type="button"
-          className={cn('picker-sheet__chip', mode === 'preisliste' && 'is-active')}
-          onClick={() => setMode('preisliste')}
-        >
-          Preisliste
-        </button>
-        <button
-          type="button"
-          className={cn('picker-sheet__chip', mode === 'frei' && 'is-active')}
-          onClick={() => setMode('frei')}
-        >
-          Freie Position
-        </button>
+      <div className="picker-sheet__chips" role="group" aria-label="Art">
+        {chips
+          .filter((c) => c.show !== false)
+          .map((c) => (
+            <button
+              key={c.mode}
+              type="button"
+              className={cn('picker-sheet__chip', mode === c.mode && 'is-active')}
+              onClick={() => setMode(c.mode)}
+            >
+              {c.label}
+            </button>
+          ))}
       </div>
+
+      {activeGewerk && mode !== 'gewerk' && mode !== 'nachlass' ? (
+        <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+          Gewerk: <span className="font-medium text-bw-text">{activeGewerk}</span>
+        </p>
+      ) : null}
 
       {mode === 'preisliste' ? (
         <div className="space-y-3">
@@ -364,7 +565,9 @@ export function PositionAddSheet({
             </div>
           ) : null}
         </div>
-      ) : (
+      ) : null}
+
+      {mode === 'frei' ? (
         <div className="form-grid">
           <div className="field">
             <div className="field-label">Gewerk</div>
@@ -382,8 +585,15 @@ export function PositionAddSheet({
           </div>
           <div />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <div className="field-label">
-              Bezeichnung<span className="req">*</span>
+            <div className="field-label field-label--with-ki">
+              <span>
+                Bezeichnung<span className="req">*</span>
+              </span>
+              <KiAssistIconButton
+                scope="position"
+                extraHint="Freie Kalkulationsposition für Angebot/Rechnung."
+                draftInput={[frei.name, frei.beschreibung].filter(Boolean).join(' — ') || null}
+              />
             </div>
             <input
               className="txt"
@@ -470,7 +680,141 @@ export function PositionAddSheet({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
+
+      {mode === 'freitext' ? (
+        <div className="form-grid">
+          <div className="field">
+            <div className="field-label">Gewerk</div>
+            <select
+              className="sel"
+              value={freitext.gewerk}
+              onChange={(e) => setFreitext((f) => ({ ...f, gewerk: e.target.value }))}
+            >
+              {gewerkOptions.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div />
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="field-label">Überschrift</div>
+            <input
+              className="txt"
+              value={freitext.name}
+              onChange={(e) => setFreitext((f) => ({ ...f, name: e.target.value }))}
+              placeholder="z. B. Wichtiger Hinweis"
+              autoFocus
+            />
+          </div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="field-label">Text</div>
+            <textarea
+              className="ta"
+              value={freitext.beschreibung}
+              onChange={(e) => setFreitext((f) => ({ ...f, beschreibung: e.target.value }))}
+              rows={3}
+              placeholder="Erscheint ohne Preis auf dem Dokument"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {mode === 'nachlass' ? (
+        <div className="form-grid">
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="field-label">Bezeichnung</div>
+            <input
+              className="txt"
+              value={nachlass.name}
+              onChange={(e) => setNachlass((n) => ({ ...n, name: e.target.value }))}
+              placeholder="Nachlass"
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <div className="field-label">Art</div>
+            <select
+              className="sel"
+              value={nachlass.nachlassModus}
+              onChange={(e) =>
+                setNachlass((n) => ({
+                  ...n,
+                  nachlassModus: e.target.value as 'prozent' | 'betrag',
+                }))
+              }
+            >
+              <option value="prozent">Prozent vom Netto</option>
+              <option value="betrag">Fester Betrag</option>
+            </select>
+          </div>
+          <div className="field">
+            <div className="field-label">
+              {nachlass.nachlassModus === 'prozent' ? 'Prozent' : 'Betrag netto'}
+            </div>
+            <div className="txt-prefix">
+              <span className="prefix">{nachlass.nachlassModus === 'prozent' ? '%' : '€'}</span>
+              <input
+                className="txt"
+                type="number"
+                step={nachlass.nachlassModus === 'prozent' ? '0.5' : '0.01'}
+                min={0}
+                value={nachlass.preis}
+                onChange={(e) =>
+                  setNachlass((n) => ({ ...n, preis: Number(e.target.value) || 0 }))
+                }
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {mode === 'gewerk' ? (
+        <div className="space-y-3">
+          {stammdatenGewerke.length > 0 ? (
+            <div className="field">
+              <div className="field-label">Aus Stammdaten</div>
+              <select
+                className="sel"
+                value={gewerkPick}
+                onChange={(e) => {
+                  setGewerkPick(e.target.value)
+                  if (e.target.value) setGewerkCustom('')
+                }}
+              >
+                <option value="">Gewerk wählen…</option>
+                {stammdatenGewerke.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.
+            </p>
+          )}
+          <div className="field">
+            <div className="field-label">Oder freie Bezeichnung</div>
+            <input
+              className="txt"
+              value={gewerkCustom}
+              onChange={(e) => {
+                setGewerkCustom(e.target.value)
+                if (e.target.value.trim()) setGewerkPick('')
+              }}
+              placeholder="z.B. Trockenbau · 1. OG"
+              autoFocus={!stammdatenGewerke.length}
+            />
+          </div>
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            Anschließend kannst du direkt Positionen für dieses Gewerk hinzufügen.
+          </p>
+        </div>
+      ) : null}
     </EditorSheet>
   )
 }

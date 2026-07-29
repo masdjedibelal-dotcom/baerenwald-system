@@ -18,6 +18,11 @@ import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marke
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
+import { useAssistent } from '@/components/assistent/AssistentProvider'
+import {
+  buildDashboardKpiSnapshot,
+  DASHBOARD_KPI_ANALYSE_PROMPT,
+} from '@/lib/dashboard/dashboard-kpi-snapshot'
 
 export type DashboardKpi = {
   icon: string
@@ -364,6 +369,7 @@ export function DashboardClient({
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
+  const { openAutoSession } = useAssistent()
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()
@@ -380,6 +386,26 @@ export function DashboardClient({
     []
   )
 
+  function openKpiAnalyse() {
+    const snapshot = buildDashboardKpiSnapshot({
+      zeitraumFilter,
+      kpis,
+      marketing,
+      umsatzMonate,
+      funnel,
+      gewerk,
+      rankingHandwerker,
+      rankingKunden,
+    })
+    openAutoSession({
+      title: 'KI · Dashboard-Analyse',
+      intro:
+        'Ich analysiere jetzt die aktuell sichtbaren KPIs und Charts — aus Sicht eines Analysten für dich als Geschäftsführer.',
+      contextExtra: snapshot,
+      autoPrompt: DASHBOARD_KPI_ANALYSE_PROMPT,
+    })
+  }
+
   return (
     <div className="dashboard-page min-w-0 overflow-x-hidden">
       <header className="dash-hero mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3">
@@ -389,7 +415,18 @@ export function DashboardClient({
             {greeting}, {vorname}
           </div>
         </div>
-        <DashboardZeitraumFilterBar filter={zeitraumFilter} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <DashboardZeitraumFilterBar filter={zeitraumFilter} />
+          <button
+            type="button"
+            className="ki-assist-icon-btn"
+            title="KPIs mit KI analysieren"
+            aria-label="KPIs mit KI analysieren"
+            onClick={openKpiAnalyse}
+          >
+            <MockIcon ctx="btn" n="sparkles" size={16} />
+          </button>
+        </div>
       </header>
 
       <section className="dash-sec" aria-label="Heute">
@@ -418,7 +455,14 @@ export function DashboardClient({
       </section>
 
       <section className="dash-sec dash-sec--zahlen" aria-label="Auswertung">
-        <h2 className="dash-sec__title">Auswertung</h2>
+        <div className="dash-sec__title-row">
+          <h2 className="dash-sec__title">Auswertung</h2>
+          {isMobile ? (
+            <span className="dash-sec__scroll-hint" aria-hidden>
+              <MockIcon ctx="empty" n="arrows-exchange" size={14} />
+            </span>
+          ) : null}
+        </div>
         <div className="dash-zahlen">
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
             <UmsatzBarChart months={umsatzMonate} />

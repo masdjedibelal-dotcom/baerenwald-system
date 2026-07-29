@@ -1374,10 +1374,12 @@ export async function sendRechnungWizard(input: {
   rechnungId: string
   mailTo: string[]
   mailCc?: string[]
+  mitAbschlussbericht?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await sendRechnung(input.rechnungId, {
     to: input.mailTo,
     cc: input.mailCc,
+    mitAbschlussbericht: input.mitAbschlussbericht,
   })
   if (!res.ok) return res
   revalidatePath('/rechnungen')

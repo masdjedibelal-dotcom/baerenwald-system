@@ -1,0 +1,227 @@
+'use client'
+import { useTransition } from '@/components/ui/action-busy'
+
+import { useEffect, useMemo, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import {
+  AbnahmeBegehListe,
+  AbnahmeProgressBar,
+  countAbgenommeneLeistungen,
+} from '@/components/auftraege/AbnahmeBegehListe'
+import { Button } from '@/components/ui/Button'
+import { Textarea } from '@/components/ui/Textarea'
+import { toast } from '@/components/ui/app-toast'
+import { saveAbnahmeAndAbschliessen } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
+import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
+import {
+  buildAbnahmePunkteInitial,
+  maengelAusPunkten,
+  type AbnahmePunkt,
+} from '@/lib/auftraege/abnahme-protokoll-types'
+import { heuteYmd } from '@/lib/angebot-einfach'
+import type { AuftragPosition } from '@/lib/types'
+
+type Step = 'frage' | 'checkliste'
+
+/**
+ * Auftrag abschließen: optional Abnahme-Checkliste (Bottom/Split), sonst direkt abschließen.
+ * Signatur entfällt (Portal / vor Ort).
+ */
+export function AuftragAbschliessenSheet({
+  open,
+  onClose,
+  auftragId,
+  positionen,
+  onDone,
+  onNachRechnung,
+}: {
+  open: boolean
+  onClose: () => void
+  auftragId: string
+  positionen: AuftragPosition[]
+  onDone?: () => void
+  /** Nach Abschluss ohne Abnahme — z. B. Rechnung öffnen */
+  onNachRechnung?: () => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [step, setStep] = useState<Step>('frage')
+  const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
+  const [notizen, setNotizen] = useState('')
+  const [maengelFrei, setMaengelFrei] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    setStep('frage')
+    setPunkte(buildAbnahmePunkteInitial({ positionen, angebotPositionen: null, gewerke: [] }))
+    setNotizen('')
+    setMaengelFrei('')
+  }, [open, positionen])
+
+  const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
+
+  useKiAssistDraftConsumer(open && step === 'checkliste', ['maengel', 'text'], (d) => {
+    if (d.type === 'maengel') setMaengelFrei(d.text)
+    else if (d.type === 'text') {
+      if (d.titel || d.text) {
+        setMaengelFrei((prev) => (prev.trim() ? `${prev.trim()}\n${d.text}` : d.text))
+      }
+    }
+  })
+
+  function abschliessenOhneAbnahme() {
+    startTransition(async () => {
+      const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Auftrag abgeschlossen')
+      onClose()
+      onDone?.()
+      onNachRechnung?.()
+    })
+  }
+
+  function speichernMitAbnahme() {
+    startTransition(async () => {
+      const meta = emptyAbnahmeProtokollMeta({
+        abnahme_ergebnis: 'abgenommen',
+        uebergabe_ort: 'Baustelle',
+        projektbezeichnung: 'Abnahme',
+        vertreter_an: 'Auftragnehmer',
+        unterschrift_ort_datum_an: `Baustelle, ${heuteYmd()}`,
+        unterschrift_ort_datum_ag: `Baustelle, ${heuteYmd()}`,
+      })
+      const extraNote = [notizen.trim(), maengelFrei.trim() ? `Mängel:\n${maengelFrei.trim()}` : '']
+        .filter(Boolean)
+        .join('\n\n')
+      const r = await saveAbnahmeAndAbschliessen({
+        auftragId,
+        abnahmeDatum: heuteYmd(),
+        punkte,
+        maengel: maengelAusPunkten(punkte),
+        notizen: extraNote || null,
+        meta,
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Abnahmeprotokoll gespeichert — Auftrag abgeschlossen')
+      onClose()
+      onDone?.()
+    })
+  }
+
+  if (step === 'frage') {
+    return (
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title="Auftrag abschließen"
+        size="md"
+        footer={
+          <div className="ldr-cta" style={{ flexDirection: 'column', gap: 8 }}>
+            <Button
+              type="button"
+              variant="primary"
+              className="w-full"
+              disabled={pending}
+              loading={pending}
+              onClick={() => setStep('checkliste')}
+            >
+              Ja — Abnahmeprotokoll erstellen
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={pending}
+              onClick={abschliessenOhneAbnahme}
+            >
+              Nein — nur abschließen
+            </Button>
+            <Button type="button" variant="ghost" className="w-full" onClick={onClose} disabled={pending}>
+              Abbrechen
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
+          Soll ein Abnahmeprotokoll mit Leistungs-Checkliste und Mängeln erstellt und in den
+          Dokumenten abgelegt werden? Signatur erfolgt vor Ort / im Portal — nicht hier.
+        </p>
+      </EditorSheet>
+    )
+  }
+
+  return (
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title="Abnahmeprotokoll"
+      size="lg"
+      dirty={!pending}
+      headerEnd={
+        <KiAssistIconButton
+          scope="mangel"
+          extraHint="Abnahme: freie Mängel ohne Leistungsbezug."
+          draftInput={maengelFrei.trim() || null}
+        />
+      }
+      footer={
+        <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
+          <Button type="button" variant="ghost" onClick={() => setStep('frage')} disabled={pending}>
+            Zurück
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            loading={pending}
+            onClick={speichernMitAbnahme}
+          >
+            Speichern & abschließen
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-5">
+        <AbnahmeProgressBar done={progress.done} total={progress.total} />
+        <div>
+          <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+            Leistungen
+          </h3>
+          <AbnahmeBegehListe punkte={punkte} onChange={setPunkte} />
+        </div>
+        <label className="block">
+          <span className="lt-field-lbl lt-field-lbl--with-ki">
+            <span>Mängel (frei, optional)</span>
+            <KiAssistIconButton
+              scope="mangel"
+              extraHint="Abnahme-Mängel formulieren."
+              draftInput={maengelFrei.trim() || null}
+            />
+          </span>
+          <Textarea
+            rows={3}
+            value={maengelFrei}
+            onChange={(e) => setMaengelFrei(e.target.value)}
+            placeholder="Offene Punkte ohne Leistungsbezug…"
+          />
+        </label>
+        <label className="block">
+          <span className="lt-field-lbl">Notizen</span>
+          <Textarea
+            rows={2}
+            value={notizen}
+            onChange={(e) => setNotizen(e.target.value)}
+            placeholder="Optional"
+          />
+        </label>
+      </div>
+    </EditorSheet>
+  )
+}

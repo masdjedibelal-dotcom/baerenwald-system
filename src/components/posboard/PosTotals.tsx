@@ -35,11 +35,11 @@ export function PosTotals({
         marginLeft: 'auto',
         maxWidth: 300,
         marginTop: 12,
-        padding: '12px 14px',
-        background: 'var(--card)',
-        border: '0.5px solid var(--border)',
-        borderRadius: 10,
-        boxShadow: 'var(--shadow)',
+        padding: '10px 2px 2px',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 0,
+        boxShadow: 'none',
       }}
     >
       {su ? (

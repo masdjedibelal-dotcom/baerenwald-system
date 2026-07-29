@@ -203,6 +203,7 @@ export const FUNNEL_BEREICH_LABELS: Record<string, string> = {
   sanitaer: 'Sanitär / Wasser',
   schimmel: 'Schimmel / Feuchtigkeit',
   garten: 'Garten',
+  gartengestaltung: 'Garten',
   reinigung: 'Reinigung',
   hausmeister: 'Hausmeister',
   winterdienst: 'Winterdienst',
@@ -344,7 +345,7 @@ function fachdetailAnswerValues(raw: unknown): string[] {
   return []
 }
 
-const PROJEKT_DETAIL_LABELS: Record<string, string> = {
+export const PROJEKT_DETAIL_LABELS: Record<string, string> = {
   ausbauRohbau: 'Rohbau vorhanden',
   ausbauDeckenhoehe: 'Deckenhöhe',
   durchbruchAnzahl: 'Durchbrüche',
@@ -357,28 +358,46 @@ const PROJEKT_DETAIL_LABELS: Record<string, string> = {
   gartenZugaenglichkeit: 'Zugang Garten',
 }
 
+function formatProjektDetailValue(val: unknown): string | null {
+  if (val == null || val === '') return null
+  if (typeof val === 'boolean') return val ? 'Ja' : 'Nein'
+  if (typeof val === 'number' && Number.isFinite(val)) return String(val)
+  if (typeof val === 'string' && val.trim()) {
+    return websiteFachdetailOptionLabel(val.trim())
+  }
+  return null
+}
+
 function mergeProjektFachdetails(
   fachdetails: Record<string, string[]>,
   projekt: Record<string, unknown> | undefined
 ) {
   if (!projekt || typeof projekt !== 'object') return
-  const parts: string[] = []
   for (const [key, val] of Object.entries(projekt)) {
-    if (val == null || val === '') continue
+    const formatted = formatProjektDetailValue(val)
+    if (!formatted) continue
     const label = PROJEKT_DETAIL_LABELS[key] ?? key
-    if (typeof val === 'boolean') {
-      parts.push(`${label}: ${val ? 'Ja' : 'Nein'}`)
-      continue
-    }
-    if (typeof val === 'number') {
-      parts.push(`${label}: ${val}`)
-      continue
-    }
-    if (typeof val === 'string') {
-      parts.push(`${label}: ${websiteFachdetailOptionLabel(val)}`)
-    }
+    mergeFachdetailValues(fachdetails, 'projekt_gu', [`${label}: ${formatted}`])
   }
-  if (parts.length) mergeFachdetailValues(fachdetails, 'projekt_gu', parts)
+}
+
+/** Top-Level Website-Keys (gartenLeistung, …) → Fachdetails. */
+function mergeTopLevelProjektDetails(
+  fachdetails: Record<string, string[]>,
+  fd: Record<string, unknown>
+) {
+  const bag: Record<string, unknown> = {}
+  for (const key of Object.keys(PROJEKT_DETAIL_LABELS)) {
+    if (fd[key] != null && fd[key] !== '') bag[key] = fd[key]
+  }
+  const nested =
+    fd.projektDetails && typeof fd.projektDetails === 'object' && !Array.isArray(fd.projektDetails)
+      ? (fd.projektDetails as Record<string, unknown>)
+      : fd.projekt && typeof fd.projekt === 'object' && !Array.isArray(fd.projekt)
+        ? (fd.projekt as Record<string, unknown>)
+        : null
+  if (nested) Object.assign(bag, nested)
+  mergeProjektFachdetails(fachdetails, bag)
 }
 
 function mergeFachdetailAnswers(
@@ -517,9 +536,10 @@ export function normalizeFunnelDaten(
   const fd = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>
 
   const bereicheFromFunnel = coerceBereicheArray(fd.bereiche)
-  const bereiche: string[] = bereicheFromFunnel.length
+  const bereicheRaw: string[] = bereicheFromFunnel.length
     ? bereicheFromFunnel
     : coerceBereicheArray(leadBereiche)
+  const bereiche = bereicheRaw.map((b) => (b === 'gartengestaltung' ? 'garten' : b))
 
   const situation = typeof fd.situation === 'string' ? fd.situation : null
 
@@ -602,6 +622,8 @@ export function normalizeFunnelDaten(
       mergeProjektFachdetails(fachdetails, projekt as Record<string, unknown>)
     }
   }
+
+  mergeTopLevelProjektDetails(fachdetails, fd)
 
   if (breakdown.length > 0) {
     const globalSeen = allFachdetailDisplayValues(fachdetails)

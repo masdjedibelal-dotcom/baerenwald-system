@@ -270,9 +270,11 @@ export async function createCrmPositionEintrag(
 
   const status = String(pos.leistung_status ?? 'offen')
   const isAufwand = String(pos.verguetung ?? '') === 'aufwand'
-  const zeitMinuten = isAufwand
-    ? zeitMinutenFromStdMin(input.zeitStd, input.zeitMin)
-    : null
+  /** CRM-Tagebuch: Stunden auch bei Festpreis speichern (interner Abgleich). */
+  const zeitMinuten =
+    input.typ === 'weitere_arbeit' || isAufwand
+      ? zeitMinutenFromStdMin(input.zeitStd, input.zeitMin)
+      : null
 
   if (input.typ === 'start') {
     if (status !== 'offen' && !(status === 'in_arbeit' && !pos.gestartet_am)) {

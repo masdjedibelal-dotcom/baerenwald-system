@@ -5,6 +5,9 @@ import { Input } from '@/components/ui/Input'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { previewBesichtigungTerminMail } from '@/app/actions/mails'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import { TERMIN_MAIL_AUTO_MARKER } from '@/lib/mail/termin-mail-editor'
@@ -151,6 +154,19 @@ export function TerminBestaetigungMailEditor({
 
   const draft = value ?? emptyDraft(kontaktEmail)
 
+  useKiAssistDraftConsumer(active, ['mail', 'text'], (d) => {
+    const next = { ...draft }
+    applyKiMailOrTextDraft(d, {
+      setBetreff: (v) => {
+        next.betreff = v
+      },
+      setBody: (v) => {
+        next.bodyText = v
+      },
+    })
+    onChange(next)
+  })
+
   return (
     <div className="space-y-3 rounded-lg border border-bw-border bg-bw-bg p-3">
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
@@ -163,12 +179,18 @@ export function TerminBestaetigungMailEditor({
         </p>
       ) : null}
       {error ? <p className="text-[length:var(--fs-meta)] text-red-600">{error}</p> : null}
-      <Input
+      <KiAssistFieldLabel
         label="Betreff"
-        value={draft.betreff}
-        onChange={(e) => onChange({ ...draft, betreff: e.target.value })}
-        placeholder={loading ? 'Wird geladen…' : undefined}
-      />
+        scope="mail"
+        extraHint={`Terminbestätigung an ${kontaktName || 'Kunde'}.`}
+        draftInput={draft.betreff || null}
+      >
+        <Input
+          value={draft.betreff}
+          onChange={(e) => onChange({ ...draft, betreff: e.target.value })}
+          placeholder={loading ? 'Wird geladen…' : undefined}
+        />
+      </KiAssistFieldLabel>
       <EmailPillsField
         label="An"
         required
@@ -183,14 +205,20 @@ export function TerminBestaetigungMailEditor({
         placeholder="weitere@beispiel.de"
         hint="Optional."
       />
-      <Textarea
+      <KiAssistFieldLabel
         label="Nachricht"
-        rows={8}
-        value={draft.bodyText}
-        onChange={(e) => onChange({ ...draft, bodyText: e.target.value })}
-        disabled={loading && !draft.bodyText}
-        placeholder={loading ? 'Text wird geladen…' : undefined}
-      />
+        scope="mail"
+        extraHint={`Terminbestätigung Mailtext. Marker „${TERMIN_MAIL_AUTO_MARKER}“ belassen.`}
+        draftInput={[draft.betreff, draft.bodyText].filter(Boolean).join('\n\n') || null}
+      >
+        <Textarea
+          rows={8}
+          value={draft.bodyText}
+          onChange={(e) => onChange({ ...draft, bodyText: e.target.value })}
+          disabled={loading && !draft.bodyText}
+          placeholder={loading ? 'Text wird geladen…' : undefined}
+        />
+      </KiAssistFieldLabel>
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Die Zeile „{TERMIN_MAIL_AUTO_MARKER}“ nicht löschen — danach kommen Datum, Ort und der
         restliche Inhalt automatisch in der Vorschau.

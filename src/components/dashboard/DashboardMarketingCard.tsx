@@ -5,6 +5,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 function formatNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
@@ -47,8 +48,10 @@ function CompactKpi({
 }
 
 export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnapshot }) {
+  const isMobile = useIsMobile()
   const [tab, setTab] = useState<'marketing' | 'sichtbarkeit'>('marketing')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [funnelOpen, setFunnelOpen] = useState(false)
 
   const maxFunnel = useMemo(() => {
     const counts = data.funnelStages.map((s) => s.count)
@@ -63,6 +66,74 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
     }
     return best?.key ?? null
   }, [data.funnelStages])
+
+  const funnelBody =
+    data.funnelOk && data.funnelStages.length > 0 ? (
+      <div className="mkt-funnel-list">
+        {data.funnelStages.map((s) => {
+          const hasDrop =
+            s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
+          const isWorst = worstDropKey === s.key
+          const detail = hasDrop
+            ? `↓ −${s.dropoffPct}% · −${formatNum(s.dropoffLost)}${
+                isWorst ? ' · größter Absprung' : ''
+              }`
+            : s.key === 'start'
+              ? 'Start'
+              : s.key === 'lead'
+                ? 'Conversion'
+                : null
+          return (
+            <div key={s.key} className="mkt-funnel-row">
+              <div className="mkt-funnel-left">
+                <span className="mkt-funnel-title">{s.label}</span>
+                {detail ? (
+                  <span
+                    className={
+                      isWorst ? 'mkt-funnel-detail worst' : 'mkt-funnel-detail'
+                    }
+                  >
+                    {detail}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mkt-funnel-bar">
+                <div
+                  className="mkt-funnel-bar-fill"
+                  style={{
+                    width: `${Math.round((s.count / maxFunnel) * 100)}%`,
+                  }}
+                />
+              </div>
+              <div className="mkt-funnel-nums">
+                <span className="mkt-funnel-count">{formatNum(s.count)}</span>
+                <span className="mkt-funnel-pct">
+                  {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    ) : (
+      <div className="mkt-funnel-empty">
+        {data.funnelOk
+          ? 'Noch keine Rechner-Events im Zeitraum.'
+          : 'Funnel nicht verfügbar.'}
+        {!data.funnelOk && data.funnelError ? (
+          <>
+            {' '}
+            <button
+              type="button"
+              className="underline decoration-dotted"
+              onClick={() => setErrorDetail(data.funnelError)}
+            >
+              Details
+            </button>
+          </>
+        ) : null}
+      </div>
+    )
 
   return (
     <div className="card">
@@ -152,78 +223,32 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               />
             </div>
 
-            <div className="mkt-funnel-block">
-              <p className="mkt-funnel-h">Rechner-Funnel</p>
-              {data.funnelOk && data.funnelStages.length > 0 ? (
-                <div className="mkt-funnel-list">
-                  {data.funnelStages.map((s) => {
-                    const hasDrop =
-                      s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
-                    const isWorst = worstDropKey === s.key
-                    const detail = hasDrop
-                      ? `↓ −${s.dropoffPct}% · −${formatNum(s.dropoffLost)}${
-                          isWorst ? ' · größter Absprung' : ''
-                        }`
-                      : s.key === 'start'
-                        ? 'Start'
-                        : s.key === 'lead'
-                          ? 'Conversion'
-                          : null
-                    return (
-                      <div key={s.key} className="mkt-funnel-row">
-                        <div className="mkt-funnel-left">
-                          <span className="mkt-funnel-title">{s.label}</span>
-                          {detail ? (
-                            <span
-                              className={
-                                isWorst
-                                  ? 'mkt-funnel-detail worst'
-                                  : 'mkt-funnel-detail'
-                              }
-                            >
-                              {detail}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mkt-funnel-bar">
-                          <div
-                            className="mkt-funnel-bar-fill"
-                            style={{
-                              width: `${Math.round((s.count / maxFunnel) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="mkt-funnel-nums">
-                          <span className="mkt-funnel-count">{formatNum(s.count)}</span>
-                          <span className="mkt-funnel-pct">
-                            {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+            <div className={`mkt-funnel-block${isMobile ? ' mkt-funnel-block--acc' : ''}`}>
+              {isMobile ? (
+                <button
+                  type="button"
+                  className="mkt-funnel-acc-trigger"
+                  aria-expanded={funnelOpen}
+                  onClick={() => setFunnelOpen((o) => !o)}
+                >
+                  <span className="mkt-funnel-h">Rechner-Funnel</span>
+                  <MockIcon
+                    ctx="empty"
+                    n="chevron-down"
+                    size={16}
+                    className={funnelOpen ? 'mkt-funnel-acc-ico open' : 'mkt-funnel-acc-ico'}
+                  />
+                </button>
               ) : (
-                <div className="mkt-funnel-empty">
-                  {data.funnelOk
-                    ? 'Noch keine Rechner-Events im Zeitraum.'
-                    : 'Funnel nicht verfügbar.'}
-                  {!data.funnelOk && data.funnelError ? (
-                    <>
-                      {' '}
-                      <button
-                        type="button"
-                        className="underline decoration-dotted"
-                        onClick={() => setErrorDetail(data.funnelError)}
-                      >
-                        Details
-                      </button>
-                    </>
-                  ) : null}
-                </div>
+                <p className="mkt-funnel-h">Rechner-Funnel</p>
               )}
-              {data.funnelOk && data.funnelError ? (
-                <p className="mkt-funnel-hint">Hinweis: {data.funnelError}</p>
+              {(!isMobile || funnelOpen) ? (
+                <>
+                  {funnelBody}
+                  {data.funnelOk && data.funnelError ? (
+                    <p className="mkt-funnel-hint">Hinweis: {data.funnelError}</p>
+                  ) : null}
+                </>
               ) : null}
             </div>
           </>

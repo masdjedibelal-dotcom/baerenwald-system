@@ -376,14 +376,6 @@ export async function createAbschlussberichtPdf(
     mitPreisen: true,
   }
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
-  const voraus = await loadAbschlussVoraussetzungen(auftragId)
-  if (!voraus.hasAbnahme) {
-    return {
-      ok: false,
-      message: 'Abschlussbericht erst nach Abnahmeprotokoll-PDF möglich.',
-    }
-  }
-
   const built = await buildAbschlussPdf(auftragId, optionen)
   if (!built.ok) return built
 
@@ -409,6 +401,28 @@ export async function createAbschlussberichtPdf(
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
   return { ok: true, publicUrl: stored.publicUrl }
+}
+
+/** Ob der Wizard-Block „Abschlussbericht“ Sinn ergibt. */
+export async function loadAbschlussberichtWizardHint(auftragId: string): Promise<{
+  hasAbnahme: boolean
+  hasBautagebuch: boolean
+  hasBericht: boolean
+  berichtUrl: string | null
+  showBlock: boolean
+}> {
+  const detail = await loadAuftragDetail(auftragId)
+  const bt = await listAuftragBautagebuch(auftragId)
+  const hasAbnahme = Boolean(detail?.abnahme_protokoll_url)
+  const hasBautagebuch = bt.length > 0
+  const berichtUrl = detail?.abschlussdokumentation_url?.trim() || null
+  return {
+    hasAbnahme,
+    hasBautagebuch,
+    hasBericht: Boolean(berichtUrl),
+    berichtUrl,
+    showBlock: hasAbnahme || hasBautagebuch || Boolean(berichtUrl),
+  }
 }
 
 export async function getAbschlussdokumentationMailDefaults(auftragId: string): Promise<

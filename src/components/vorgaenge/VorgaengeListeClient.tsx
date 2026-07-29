@@ -20,6 +20,10 @@ import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-
 import {
   runDeleteStandaloneRechnung,
   runDeleteVorgang,
+  runDuplicateAnfrage,
+  runDuplicateAngebot,
+  runDuplicateAuftrag,
+  runDuplicateRechnung,
 } from '@/lib/list-actions'
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
@@ -777,7 +781,24 @@ export function VorgaengeListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Phase">
+        <div className="listbar-chips" role="group" aria-label="Filter">
+          <div className="listbar-lifecycle-chips">
+            <MockChip
+              active={lifecycle === 'offen'}
+              count={lifecycleCounts.offen}
+              onClick={() => setLifecycleFilter('offen')}
+            >
+              Offen
+            </MockChip>
+            <MockChip
+              active={lifecycle === 'erledigt'}
+              count={lifecycleCounts.erledigt}
+              onClick={() => setLifecycleFilter('erledigt')}
+            >
+              Erledigt
+            </MockChip>
+            <span className="listbar-chips-sep" aria-hidden />
+          </div>
           {VORGANG_FILTERS.map((p) => (
             <MockChip
               key={p}
@@ -800,32 +821,6 @@ export function VorgaengeListeClient({
         <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
-          leading={
-            <div className="segment-toggle segment-toggle--listbar" role="group" aria-label="Lebenszyklus">
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'offen' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('offen')}
-              >
-                Offen
-                <span className="segment-toggle-count">{lifecycleCounts.offen}</span>
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('erledigt')}
-              >
-                Erledigt
-                <span className="segment-toggle-count">{lifecycleCounts.erledigt}</span>
-              </button>
-            </div>
-          }
           items={[
             {
               icon: 'filter',
@@ -1189,15 +1184,16 @@ export function VorgaengeListeClient({
             const kind = statusKind(v)
             const label = statusLabel(v)
             const ersetzt = isErsetzt(v)
-            const call = () => {
-              const tel = v.kontaktTelefon?.replace(/\s/g, '')
-              if (tel) window.location.href = `tel:${tel}`
-              else if (v.kundeId) window.open(`/kunden/${v.kundeId}`, '_blank')
-              else toast.info('Keine Kundentelefonnummer hinterlegt')
-            }
             const del = () => {
               if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
               else runDeleteVorgang(v.leadId, router)
+            }
+            const copy = () => {
+              if (v.phase === 'anfrage') runDuplicateAnfrage(v.leadId || v.entityId, router)
+              else if (v.phase === 'angebot') runDuplicateAngebot(v.entityId, router)
+              else if (v.phase === 'auftrag') runDuplicateAuftrag(v.entityId, router)
+              else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
+              else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
             const row = (
               <div
@@ -1281,9 +1277,9 @@ export function VorgaengeListeClient({
                 key={key}
                 disabled={!isMobile}
                 onSwipeLeft={isMobile ? del : undefined}
-                onSwipeRight={isMobile ? call : undefined}
+                onSwipeRight={isMobile ? copy : undefined}
                 leftLabel="Löschen"
-                rightLabel="Anrufen"
+                rightLabel="Kopieren"
               >
                 {row}
               </SwipeRow>

@@ -120,14 +120,12 @@ export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): 
       const statusLabel =
         st === 'erledigt' ? 'Abgenommen' : leistungStatusLabel(st)
 
+      // Subline nur Fortschritt — Handwerker/Zuweisung erscheinen in Spalte bzw. Mobile-Dot
       const subParts: string[] = []
-      if (hwName) subParts.push(hwName)
       if (st === 'in_arbeit' && p.gestartet_am) {
         subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
       } else if (st === 'erledigt') {
         subParts.push('dokumentiert · abgenommen')
-      } else if (st === 'offen' && !hwName) {
-        subParts.push('noch nicht zugewiesen')
       }
 
       return {

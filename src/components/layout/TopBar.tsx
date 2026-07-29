@@ -102,9 +102,7 @@ function pathToBreadcrumbs(pathname: string): {
 
 /**
  * Eine einzige Kopfzeile (Mock).
- * Früher: Mobile- + Desktop-`<header className="topbar">` parallel —
- * unlayered `.topbar { display:flex }` in mock-design-system.css hat Tailwind
- * `hidden` / `md:hidden` überschrieben → doppelte Suche/Glocke.
+ * Mobil: Titel links · Suche-Icon · Assistent · Profil (kein zweiter Titelstreifen).
  */
 export function TopBar({ user }: TopBarProps) {
   const pathname = usePathname() ?? '/'
@@ -136,7 +134,7 @@ export function TopBar({ user }: TopBarProps) {
   return (
       <div className="topbar-stack">
         <header className="topbar">
-          {/* Desktop: Titel/Breadcrumbs. Mobil: nur Suche + Assistent + Profil. */}
+          {/* Desktop: Titel/Breadcrumbs. Mobil: Titel links, Icons rechts. */}
           <div className={cn('topbar-title', !title && !parents.length && 'topbar-title--empty')}>
             {parentHref ? (
               <Link href={parentHref} aria-label="Zurück" className="topbar-back">
@@ -230,18 +228,6 @@ export function TopBar({ user }: TopBarProps) {
             </MockPopover>
           </div>
         </header>
-
-        {/* Mobil: Screen-Titel nur wenn Inhalt (sonst leerer Streifen) */}
-        {title || parentHref ? (
-          <div className="mobile-screen-title">
-            {parentHref ? (
-              <Link href={parentHref} aria-label="Zurück" className="mobile-screen-title-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            ) : null}
-            {title ? <h1 className="mobile-screen-title-text">{title}</h1> : null}
-          </div>
-        ) : null}
       </div>
   )
 }

@@ -6,6 +6,13 @@ import { Select } from '@/components/ui/Select'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import {
+  applyKiDokumentTextDraft,
+  claimKiAssistListTarget,
+  setKiAssistListTarget,
+} from '@/lib/copilot/ki-assist-apply'
 import { cn } from '@/lib/utils'
 import type { Gewerk, Handwerker, Preisliste } from '@/lib/types'
 
@@ -72,6 +79,20 @@ export function OfferPositionCard({
     margeEuro != null && nettoZeile > 0
       ? Math.round((margeEuro / nettoZeile) * 1000) / 10
       : null
+
+  useKiAssistDraftConsumer(true, 'text', (d) => {
+    if (claimKiAssistListTarget(row.key)) {
+      applyKiDokumentTextDraft(d, {
+        setText: (v) => onPatch({ beschreibung: v }),
+      })
+      return
+    }
+    if (claimKiAssistListTarget(`ext:${row.key}`)) {
+      applyKiDokumentTextDraft(d, {
+        setText: (v) => onPatch({ notiz_extern: v }),
+      })
+    }
+  })
 
   return (
     <article
@@ -178,13 +199,20 @@ export function OfferPositionCard({
               onChange={(e) => onPatch({ einheit: e.target.value })}
             />
           </div>
-          <Textarea
+          <KiAssistFieldLabel
             label="Beschreibung (Kundentext)"
-            hint="Wird im Angebot / PDF angezeigt"
-            value={row.beschreibung}
-            onChange={(e) => onPatch({ beschreibung: e.target.value })}
-            rows={2}
-          />
+            scope="position"
+            extraHint="Leistungsbeschreibung auf Angebot/PDF."
+            draftInput={row.beschreibung || null}
+            onBeforeOpen={() => setKiAssistListTarget(row.key)}
+          >
+            <Textarea
+              hint="Wird im Angebot / PDF angezeigt"
+              value={row.beschreibung}
+              onChange={(e) => onPatch({ beschreibung: e.target.value })}
+              rows={2}
+            />
+          </KiAssistFieldLabel>
         </div>
 
         <div className="space-y-3 border-t border-bw-border pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
@@ -277,12 +305,19 @@ export function OfferPositionCard({
             </div>
           ) : null}
 
-          <Textarea
+          <KiAssistFieldLabel
             label="Notiz für Kunden"
-            value={row.notiz_extern}
-            onChange={(e) => onPatch({ notiz_extern: e.target.value })}
-            rows={2}
-          />
+            scope="dokument"
+            extraHint="Kundennotiz zur Position (sichtbar)."
+            draftInput={row.notiz_extern || null}
+            onBeforeOpen={() => setKiAssistListTarget(`ext:${row.key}`)}
+          >
+            <Textarea
+              value={row.notiz_extern}
+              onChange={(e) => onPatch({ notiz_extern: e.target.value })}
+              rows={2}
+            />
+          </KiAssistFieldLabel>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'

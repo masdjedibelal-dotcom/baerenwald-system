@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -45,6 +46,7 @@ import type {
 import { formatDatum, cn } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { StatusTone } from '@/lib/status/status-tone'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 export type RechnungErstellenOpts = {
   zeileId?: string
@@ -165,6 +167,7 @@ export function VorgangZahlungTab({
   readOnly?: boolean
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [pending, startTransition] = useTransition()
   const initial = useMemo(
     () => parseZahlungsplan(zahlungsplanRaw) ?? emptyZahlungsplan(),
@@ -702,7 +705,8 @@ export function VorgangZahlungTab({
     const aktiv =
       (row.rechnungId != null && row.rechnungId === aktuelleRechnungId) ||
       belege.some((b) => b.id === aktuelleRechnungId)
-    const showAccordion = hasBelege && (showGruppen || belege.length > 1)
+    // Accordion nur Desktop; mobil öffnet Tap immer den Bottom-Sheet (RateDrawer)
+    const showAccordion = !isMobile && hasBelege && (showGruppen || belege.length > 1)
     // Standard: nur die aktive Rate offen, Rest zugeklappt
     const expanded = isRateExpanded(row.id, showAccordion && aktiv)
 
@@ -835,7 +839,7 @@ export function VorgangZahlungTab({
   if (empty) {
     return (
       <>
-        <MockCard title="Zahlung" icon="calculator">
+        <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
             <div className="zahlplan-empty__title">
@@ -888,6 +892,7 @@ export function VorgangZahlungTab({
       <MockCard
         title="Zahlung"
         icon="calculator"
+        className="zahlplan-shell"
         actions={
           canEditPlan ? (
             <MockBtn

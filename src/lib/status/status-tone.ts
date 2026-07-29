@@ -43,6 +43,8 @@ export const STATUSES: Record<string, StatusEntry> = {
   aktiv: { label: 'Aktiv', tone: 'blau' },
   abnahme: { label: 'Abnahme', tone: 'blau' },
   fertig: { label: 'Fertig', tone: 'gruen' },
+  erledigt: { label: 'Erledigt', tone: 'gruen' },
+  abgenommen: { label: 'Abgenommen', tone: 'gruen' },
   storniert: { label: 'Storniert', tone: 'rot' },
 
   // Rechnung

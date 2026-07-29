@@ -1,11 +1,15 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAuftragBautagesbericht,
@@ -260,6 +264,16 @@ export function AuftragBautagesberichtCard({
   }
 
   const formOpen = addOpen || editId != null
+  const btFieldRef = useRef<'behinderungen' | 'qualitaetssicherung' | 'zusammenfassung'>('zusammenfassung')
+
+  useKiAssistDraftConsumer(formOpen, 'text', (d) => {
+    applyKiDokumentTextDraft(d, {
+      setText: (v) => {
+        const key = btFieldRef.current
+        setForm((f) => ({ ...f, [key]: v }))
+      },
+    })
+  })
 
   const sheetTitle = editId
     ? 'Bautagesbericht bearbeiten'
@@ -440,20 +454,44 @@ export function AuftragBautagesberichtCard({
             placeholder="Leistung beschreiben…"
           />
           <div className="form-field">
-            <label className="form-field-label">Behinderungen und Besonderheiten</label>
-            <Textarea
-              rows={3}
-              value={form.behinderungen}
-              onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
-            />
+            <KiAssistFieldLabel
+              label="Behinderungen und Besonderheiten"
+              scope="dokument"
+              extraHint="Bautagesbericht — Behinderungen (PDF)."
+              draftInput={form.behinderungen || null}
+              onBeforeOpen={() => {
+                btFieldRef.current = 'behinderungen'
+              }}
+            >
+              <Textarea
+                rows={3}
+                value={form.behinderungen}
+                onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
+                onFocus={() => {
+                  btFieldRef.current = 'behinderungen'
+                }}
+              />
+            </KiAssistFieldLabel>
           </div>
           <div className="form-field">
-            <label className="form-field-label">Qualitätssicherung und Dokumentation</label>
-            <Textarea
-              rows={3}
-              value={form.qualitaetssicherung}
-              onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
-            />
+            <KiAssistFieldLabel
+              label="Qualitätssicherung und Dokumentation"
+              scope="dokument"
+              extraHint="Bautagesbericht — Qualitätssicherung (PDF)."
+              draftInput={form.qualitaetssicherung || null}
+              onBeforeOpen={() => {
+                btFieldRef.current = 'qualitaetssicherung'
+              }}
+            >
+              <Textarea
+                rows={3}
+                value={form.qualitaetssicherung}
+                onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
+                onFocus={() => {
+                  btFieldRef.current = 'qualitaetssicherung'
+                }}
+              />
+            </KiAssistFieldLabel>
           </div>
           <StringListEditor
             label="Risiken & Hinweise"
@@ -461,12 +499,24 @@ export function AuftragBautagesberichtCard({
             onChange={(risiken) => setForm((f) => ({ ...f, risiken }))}
           />
           <div className="form-field">
-            <label className="form-field-label">Zusammenfassung</label>
-            <Textarea
-              rows={3}
-              value={form.zusammenfassung}
-              onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
-            />
+            <KiAssistFieldLabel
+              label="Zusammenfassung"
+              scope="dokument"
+              extraHint="Bautagesbericht — Zusammenfassung (PDF)."
+              draftInput={form.zusammenfassung || null}
+              onBeforeOpen={() => {
+                btFieldRef.current = 'zusammenfassung'
+              }}
+            >
+              <Textarea
+                rows={3}
+                value={form.zusammenfassung}
+                onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
+                onFocus={() => {
+                  btFieldRef.current = 'zusammenfassung'
+                }}
+              />
+            </KiAssistFieldLabel>
           </div>
           <StringListEditor
             label="Personalnachweis (Namen)"

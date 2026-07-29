@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronDown,
   Circle,
@@ -41,7 +42,6 @@ import type { AuftragHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib
 import { cn, formatPreis } from '@/lib/utils'
 
 type PosVisualState = 'done' | 'wait' | 'open'
-
 
 const ToolIcon = resolveMockIcon('tool')
 

@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, Mail } from 'lucide-react'
 import { loadEmailLogDetail, type EmailLogDetail } from '@/app/(dashboard)/email-log/actions'
 import { Modal } from '@/components/ui/Modal'

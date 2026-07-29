@@ -22,6 +22,10 @@ import {
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { applyKiDokumentTextDraft, applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { DocActionBar } from '@/components/surfaces/primitives'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -120,7 +124,7 @@ function kundenName(lead: LeadDetail) {
 type WizardSheetId =
   | 'kunde'
   | 'dokument'
-  | 'konditionen'
+  | 'zahlung'
   | 'anschreiben'
   | 'vorschau'
   | 'senden'
@@ -168,7 +172,7 @@ function regionLabel(lead: LeadDetail): string {
 
 /**
  * Angebots-Wizard — DocumentCanvas 1:1 Mock:
- * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Konditionen/Anschreiben),
+ * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Anschreiben),
  * DocBar Vorschau · Senden · PDF · Verwerfen, mobil Sticky Speichern.
  */
 export function AngebotWizard({
@@ -277,6 +281,18 @@ export function AngebotWizard({
     if (focusField === 'titel' || focusField === 'beschreibung') return 'dokument'
     return null
   })
+  const anschreibenFieldRef = useRef<'einleitung' | 'schluss'>('einleitung')
+  useKiAssistDraftConsumer(sheet === 'anschreiben', 'text', (d) => {
+    applyKiDokumentTextDraft(d, {
+      setText: (v) => {
+        if (anschreibenFieldRef.current === 'schluss') {
+          setMeta((m) => ({ ...m, schluss: v }))
+        } else {
+          setMeta((m) => ({ ...m, einleitung: v }))
+        }
+      },
+    })
+  })
   const [kundePickerOpen, setKundePickerOpen] = useState(false)
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
@@ -349,6 +365,16 @@ export function AngebotWizard({
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailBetreff, setMailBetreff] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+
+  useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
+    applyKiDokumentTextDraft(d, { setText: setProjektbeschreibung })
+  })
+  useKiAssistDraftConsumer(sheet === 'senden', ['mail', 'text'], (d) => {
+    applyKiMailOrTextDraft(d, {
+      setBetreff: setMailBetreff,
+      setBody: () => {},
+    })
+  })
 
   const zahlfristInit = zahlfristSegFromAngebotMeta(meta)
   const [zahlfristSeg, setZahlfristSeg] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -1008,7 +1034,7 @@ export function AngebotWizard({
     dokumentTyp === 'projekt' ? 'Komplex' : 'Einfach',
   ].join(' · ')
 
-  const konditionenCrowValue = [
+  const zahlungCrowValue = [
     meta.gueltig_bis ? `bis ${formatDatum(meta.gueltig_bis)}` : 'Gültig offen',
     zahlfristText,
   ]
@@ -1102,9 +1128,9 @@ export function AngebotWizard({
         onClick={() => setSheet('dokument')}
       />
       <MetaCrowButton
-        label="Konditionen"
-        value={konditionenCrowValue}
-        onClick={() => setSheet('konditionen')}
+        label="Zahlung"
+        value={zahlungCrowValue}
+        onClick={() => setSheet('zahlung')}
       />
       <MetaCrowButton
         label="Anschreiben"
@@ -1249,7 +1275,12 @@ export function AngebotWizard({
               placeholder="z.B. Badmodernisierung"
             />
           </MockField>
-          <MockField label="Beschreibung" full>
+          <KiAssistFieldLabel
+            label="Beschreibung"
+            scope="dokument"
+            extraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
+            draftInput={projektbeschreibung || null}
+          >
             <textarea
               className="input ta"
               rows={5}
@@ -1257,7 +1288,7 @@ export function AngebotWizard({
               onChange={(e) => setProjektbeschreibung(e.target.value)}
               autoFocus={focusField === 'beschreibung'}
             />
-          </MockField>
+          </KiAssistFieldLabel>
           <div className="full">
             <div className="section-h" style={{ marginBottom: 10, textTransform: 'none', letterSpacing: 0 }}>
               Fotos · {projektFotos.length}
@@ -1324,9 +1355,9 @@ export function AngebotWizard({
       </EditorSheet>
 
       <EditorSheet
-        open={sheet === 'konditionen'}
+        open={sheet === 'zahlung'}
         onClose={closeSheet}
-        title="Konditionen"
+        title="Zahlung"
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
@@ -1376,15 +1407,14 @@ export function AngebotWizard({
               ) : null}
             </div>
           </MockField>
-          <div className="full">
-            <AngebotWizardRechtlicheHinweiseCard
-              meta={meta}
-              onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-              hinweis35aErlaubt={hinweis35aErlaubt}
-              hinweis13bErlaubt={hinweis13bErlaubt}
-              lohnNettoPdf={lohnNettoPdf}
-            />
-          </div>
+          <AngebotWizardRechtlicheHinweiseCard
+            embedded
+            meta={meta}
+            onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
+            hinweis35aErlaubt={hinweis35aErlaubt}
+            hinweis13bErlaubt={hinweis13bErlaubt}
+            lohnNettoPdf={lohnNettoPdf}
+          />
         </div>
       </EditorSheet>
 
@@ -1393,24 +1423,57 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Anschreiben"
         context="canvas"
+        headerEnd={
+          <KiAssistIconButton
+            scope="dokument"
+            extraHint="Angebot-Anschreiben (Einleitung/Schluss) für den Kunden auf dem PDF."
+            draftInput={
+              anschreibenFieldRef.current === 'schluss'
+                ? meta.schluss || null
+                : meta.einleitung || null
+            }
+          />
+        }
       >
-        <div className="form-grid form-grid--sheet">
-          <MockField label="Einleitung" full>
+        <div className="form-grid form-grid--sheet space-y-4">
+          <KiAssistFieldLabel
+            label="Einleitung"
+            scope="dokument"
+            extraHint="Angebot-Einleitung (kundensichtbar auf PDF)."
+            draftInput={meta.einleitung || null}
+            onBeforeOpen={() => {
+              anschreibenFieldRef.current = 'einleitung'
+            }}
+          >
             <textarea
               className="input ta"
               rows={5}
               value={meta.einleitung}
+              onFocus={() => {
+                anschreibenFieldRef.current = 'einleitung'
+              }}
               onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
             />
-          </MockField>
-          <MockField label="Schlusstext" full>
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
+            label="Schlusstext"
+            scope="dokument"
+            extraHint="Angebot-Schlusstext (kundensichtbar auf PDF)."
+            draftInput={meta.schluss || null}
+            onBeforeOpen={() => {
+              anschreibenFieldRef.current = 'schluss'
+            }}
+          >
             <textarea
               className="input ta"
               rows={4}
               value={meta.schluss}
+              onFocus={() => {
+                anschreibenFieldRef.current = 'schluss'
+              }}
               onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
             />
-          </MockField>
+          </KiAssistFieldLabel>
         </div>
       </EditorSheet>
 
@@ -1474,7 +1537,13 @@ export function AngebotWizard({
             hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={saving}
           />
-          <MockField label="Betreff" full required>
+          <KiAssistFieldLabel
+            label="Betreff"
+            scope="mail"
+            extraHint="Mail-Betreff für den Angebotsversand an den Kunden."
+            draftInput={mailBetreff || null}
+            required
+          >
             <input
               className="txt"
               value={mailBetreff}
@@ -1482,7 +1551,7 @@ export function AngebotWizard({
               disabled={saving}
               placeholder={defaultMailBetreff}
             />
-          </MockField>
+          </KiAssistFieldLabel>
           <div className="wz-overview">
             <div>
               <span className="k">Gültig bis</span>

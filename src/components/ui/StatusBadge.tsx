@@ -15,13 +15,17 @@ export function StatusBadge({
   status,
   label: labelOverride,
   tone: toneOverride,
+  kind: kindOverride,
 }: {
   status?: string | null
   label?: string
   tone?: StatusTone
+  /** Explizites MockBadge-Kind (z. B. Ampel: storniert/warten/aktiv) */
+  kind?: string
 }) {
   const resolved = resolveStatus(status)
   const label = labelOverride ?? resolved.label
   const tone = toneOverride ?? resolved.tone
-  return <MockBadge kind={toneToMockBadgeKind(tone)}>{label}</MockBadge>
+  const kind = kindOverride ?? toneToMockBadgeKind(tone)
+  return <MockBadge kind={kind}>{label}</MockBadge>
 }

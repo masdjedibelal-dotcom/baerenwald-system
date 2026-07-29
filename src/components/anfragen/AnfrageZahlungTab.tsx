@@ -27,10 +27,10 @@ export function AnfrageZahlungTab({
 
   if (aktiv.length === 0) {
     return (
-      <MockCard title="Zahlung" icon="calculator">
-        <div className="zahlplan-empty">
-          <MockIcon ctx="empty" n="calculator" size={26} />
-          <div className="zahlplan-empty__title">Noch keine Zahlung</div>
+        <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
+          <div className="zahlplan-empty">
+            <MockIcon ctx="empty" n="calculator" size={26} />
+            <div className="zahlplan-empty__title">Noch keine Zahlung</div>
           <div className="zahlplan-empty__text">
             Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten
             Schritt fest.
@@ -60,6 +60,7 @@ export function AnfrageZahlungTab({
     <MockCard
       title="Zahlung"
       icon="calculator"
+      className="zahlplan-shell"
       actions={
         <span className="text-[length:var(--fs-meta)] text-bw-text-muted">{zustandLabel}</span>
       }

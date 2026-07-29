@@ -19,14 +19,14 @@ export type DetailActionDef = {
 }
 
 type Props = {
-  /** Haupt-CTA — mobil ~¾ Breite */
+  /** Haupt-CTA — mobil zentriert wenn allein, sonst ~¾ Breite mit Overflow */
   primary?: DetailActionDef | null
   /**
    * Zweite Action: Desktop als eigener Button,
-   * mobil wandert sie ins ⋯-Menü (nicht als zweiter großer CTA).
+   * mobil wandert sie ins ⋯-Menü (nur falls Menü existiert).
    */
   secondary?: DetailActionDef | null
-  menuItems: ActionsMenuItem[]
+  menuItems?: ActionsMenuItem[]
   sheetTitle?: string
 }
 
@@ -78,12 +78,6 @@ function ActionControl({
   )
 }
 
-/**
- * Desktop: Actions im Detail-Kopf.
- * Mobil: Sticky-Bar über Bottom-Nav — Primär ~¾, ⋯ ~¼.
- * Zweite Action (secondary) nur Desktop als Button, mobil im Menü.
- * S-4: Primary-Label nie zusätzlich im ⋯ (ebenenklar).
- */
 function withoutPrimaryDuplicate(
   items: ActionsMenuItem[],
   primaryLabel?: string | null
@@ -96,10 +90,18 @@ function withoutPrimaryDuplicate(
   })
 }
 
+function hasMenuContent(items: ActionsMenuItem[]): boolean {
+  return items.some((it) => it !== 'sep')
+}
+
+/**
+ * Desktop: Primary (+ optional Secondary / ⋯ nur wenn Items).
+ * Mobil: Sticky-Bar — Primary zentriert wenn allein; mit Menü Primär + ⋯.
+ */
 export function DetailActionsBar({
   primary,
   secondary,
-  menuItems,
+  menuItems = [],
   sheetTitle = 'Aktionen',
 }: Props) {
   const [mounted, setMounted] = useState(false)
@@ -125,6 +127,9 @@ export function DetailActionsBar({
     return [item, 'sep', ...cleanMenuItems]
   }, [secondary, cleanMenuItems])
 
+  const showOverflow = hasMenuContent(mobileMenuItems)
+  const alonePrimary = Boolean(primary) && !showOverflow && !secondary
+
   const menuTrigger = (compact: boolean, items: ActionsMenuItem[]) => (
     <ActionsMenu
       sheetTitle={sheetTitle}
@@ -146,7 +151,12 @@ export function DetailActionsBar({
   )
 
   const desktop: ReactNode = (
-    <div className="detail-actions-desktop hidden items-center justify-end gap-2 md:flex">
+    <div
+      className={cn(
+        'detail-actions-desktop hidden items-center gap-2 md:flex',
+        alonePrimary ? 'justify-center w-full' : 'justify-end'
+      )}
+    >
       {secondary ? (
         <button
           type="button"
@@ -160,28 +170,45 @@ export function DetailActionsBar({
         </button>
       ) : null}
       {primary ? <ActionControl action={primary} /> : null}
-      {menuTrigger(false, cleanMenuItems)}
+      {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
     </div>
   )
 
   const mobileBar =
-    mounted && (primary || mobileMenuItems.length > 0)
+    mounted && (primary || showOverflow)
       ? createPortal(
           <div
             className={cn(
               'detail-mobile-action-bar md:hidden',
-              hideChrome && 'detail-mobile-action-bar--hidden'
+              hideChrome && 'detail-mobile-action-bar--hidden',
+              alonePrimary && 'detail-mobile-action-bar--solo'
             )}
             role="toolbar"
             aria-label="Aktionen"
           >
-            <div className="detail-mobile-action-bar__inner">
-              {primary ? (
-                <ActionControl action={primary} size="md" className="detail-mobile-action-bar__primary" />
-              ) : (
-                <div className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--empty" />
+            <div
+              className={cn(
+                'detail-mobile-action-bar__inner',
+                alonePrimary && 'detail-mobile-action-bar__inner--solo'
               )}
-              <div className="detail-mobile-action-bar__overflow">{menuTrigger(true, mobileMenuItems)}</div>
+            >
+              {primary ? (
+                <ActionControl
+                  action={primary}
+                  size="md"
+                  className={cn(
+                    'detail-mobile-action-bar__primary',
+                    alonePrimary && 'detail-mobile-action-bar__primary--solo'
+                  )}
+                />
+              ) : showOverflow ? (
+                <div className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--empty" />
+              ) : null}
+              {showOverflow ? (
+                <div className="detail-mobile-action-bar__overflow">
+                  {menuTrigger(true, mobileMenuItems)}
+                </div>
+              ) : null}
             </div>
           </div>,
           document.body

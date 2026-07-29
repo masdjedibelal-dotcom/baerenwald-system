@@ -1,9 +1,11 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -18,8 +20,9 @@ import {
 import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { TodosPanel } from '@/components/todos/TodosPanel'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
 import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { ClientOnly } from '@/components/ui/ClientOnly'
@@ -57,10 +60,6 @@ import {
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
 import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
-import { openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
-import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
-import { runDuplicateHandwerker } from '@/lib/list-actions'
 import {
   FabVorgangStartModal,
   type FabVorgangArt,
@@ -69,7 +68,7 @@ import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClien
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
 
-type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
+type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'todos' | 'compliance' | 'akte'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -176,8 +175,6 @@ export function HandwerkerDetailClient({
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
   const [hasPortalAccount, setHasPortalAccount] = useState(false)
-  const isCrmAdmin = useIsCrmAdmin()
-  const [impersonating, setImpersonating] = useState(false)
   const [vorgangArt, setVorgangArt] = useState<FabVorgangArt | null>(null)
   const [portalGesperrtPending, setPortalGesperrtPending] = useState(false)
   const [istPortalGesperrt, setIstPortalGesperrt] = useState(Boolean(hw.ist_portal_gesperrt))
@@ -425,98 +422,6 @@ export function HandwerkerDetailClient({
     return () => clearTimeout(timer)
   }, [portalModalOpen, portalText, hw.id])
 
-  const handwerkerMenuItems = useMemo(() => {
-    const extra: import('@/lib/entity-menu').EntityMenuItem[] = [
-      'sep',
-      {
-        icon: 'file-pencil',
-        label: 'Rahmenvertrag',
-        onClick: () => void openRahmenvertrag(),
-      },
-      'sep',
-      {
-        icon: istPortalGesperrt ? 'check' : 'shield-x',
-        label: istPortalGesperrt ? 'Portal-Ausschluss aufheben' : 'Vom Portal ausschließen',
-        danger: !istPortalGesperrt,
-        hint: portalGesperrtPending ? 'Speichere…' : undefined,
-        onClick: () => {
-          if (portalGesperrtPending) return
-          togglePortalGesperrt()
-        },
-      },
-    ]
-
-    const items = buildEntityMenu(
-      'handwerker',
-      {
-        name: handwerkerDisplayName(hw),
-        tel: hw.telefon,
-        mail: hw.email,
-      },
-      {
-        onEdit: () => {
-          setTab('uebersicht')
-          beginEditKontakt()
-        },
-        onCopy: () => runDuplicateHandwerker(hw.id, router),
-        onPortal: isCrmAdmin
-          ? () => {
-              if (!hasPortalAccount) {
-                toast.error('Kein Portal-Account')
-                return
-              }
-              if (istPortalGesperrt) {
-                toast.error('Partner ist vom Portal ausgeschlossen — Zugang gesperrt.')
-                return
-              }
-              if (impersonating) {
-                toast.error('Anmeldung läuft bereits…')
-                return
-              }
-              setImpersonating(true)
-              // Popup sofort im User-Gesture öffnen — sonst blockiert der Browser ab dem 2. Partner.
-              const popup = window.open('about:blank', '_blank')
-              void openPortalAsHandwerker(hw.id).then((r) => {
-                setImpersonating(false)
-                if (!r.ok) {
-                  popup?.close()
-                  toast.error(r.message)
-                  return
-                }
-                if (popup) {
-                  popup.location.href = r.url
-                } else {
-                  window.location.assign(r.url)
-                }
-              })
-            }
-          : undefined,
-        onPortalLink: () => {
-          if (istPortalGesperrt) {
-            toast.error('Partner ist vom Portal ausgeschlossen — Zugang gesperrt.')
-            return
-          }
-          void openPortalModal()
-        },
-        onCreateAnfrage: () => router.push('/anfragen/neu'),
-        onCreateAngebot: () => setVorgangArt('angebot'),
-        onCreateRechnung: () => setVorgangArt('rechnung'),
-        tel: hw.telefon,
-        mail: hw.email,
-        extra,
-      }
-    )
-    return entityMenuToActionItems(items, (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size))
-  }, [
-    hw,
-    isCrmAdmin,
-    hasPortalAccount,
-    impersonating,
-    router,
-    openRahmenvertrag,
-    istPortalGesperrt,
-    portalGesperrtPending,
-  ])
 
   const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
 
@@ -525,15 +430,6 @@ export function HandwerkerDetailClient({
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Stammdaten</div>
-          <button
-            type="button"
-            className="qa-btn"
-            title="Stammdaten bearbeiten"
-            aria-label="Stammdaten bearbeiten"
-            onClick={beginEditKontakt}
-          >
-            <MockIcon ctx="default" n="pencil" size={14} />
-          </button>
         </div>
         <div className="card-b">
           {editingKontakt ? (
@@ -902,6 +798,18 @@ export function HandwerkerDetailClient({
     </Suspense>
   )
 
+  const todosInhalt = (
+    <TodosPanel
+      compact
+      title="To-dos"
+      filter={{ handwerkerId: hw.id }}
+      lockedLinks={{
+        handwerkerId: hw.id,
+        label: handwerkerDisplayName(hw),
+      }}
+    />
+  )
+
   const appendNotiz = useCallback(() => {
     const text = notizDraft.trim()
     if (!text) return
@@ -1010,6 +918,12 @@ export function HandwerkerDetailClient({
       render: () => vorgaengeInhalt,
     },
     {
+      id: 'todos',
+      label: 'To-dos',
+      icon: 'clipboard-list',
+      render: () => todosInhalt,
+    },
+    {
       id: 'compliance',
       label: 'Compliance',
       icon: 'shield-check',
@@ -1058,7 +972,8 @@ export function HandwerkerDetailClient({
             ) : null}
           </>
         }
-        actions={<DetailActionsBar sheetTitle="Handwerker" menuItems={handwerkerMenuItems} />}
+        titleTrailing={<PortalLoginIconButton handwerkerId={hw.id} label="Partner-Portal öffnen" />}
+        actions={<DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />}
       />
 
       <DetailShell

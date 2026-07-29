@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, type ReactNode, type TouchEvent } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { MockIconName } from '@/lib/mock-icons'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -21,8 +21,24 @@ export type DetailShellProps = {
   className?: string
 }
 
+const SWIPE_MIN_DX = 56
+const SWIPE_RATIO = 1.35
+
+function touchBlockedByNestedScroll(target: EventTarget | null, boundary: HTMLElement | null): boolean {
+  let node = target as HTMLElement | null
+  while (node && node !== boundary) {
+    if (node.classList?.contains('swiperow')) return true
+    const ox = getComputedStyle(node).overflowX
+    if ((ox === 'auto' || ox === 'scroll') && node.scrollWidth > node.clientWidth + 8) {
+      return true
+    }
+    node = node.parentElement
+  }
+  return false
+}
+
 /**
- * Spec §4: Desktop Nav links · Mobil horizontale Unterstrich-Tabs (alle sichtbar, sticky).
+ * Spec §4: Desktop Nav links · Mobil horizontale Tabs (sticky) + Swipe zwischen Tabs.
  * Unbekannter `value` → erster Tab (kein leerer Bereich).
  */
 export function DetailShell({ groups, value, onChange, className }: DetailShellProps) {
@@ -31,6 +47,7 @@ export function DetailShell({ groups, value, onChange, className }: DetailShellP
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
   const tabsRef = useRef<HTMLElement>(null)
+  const swipeRef = useRef<{ x: number; y: number; blocked: boolean } | null>(null)
 
   useEffect(() => {
     const el = bodyRef.current
@@ -48,6 +65,46 @@ export function DetailShell({ groups, value, onChange, className }: DetailShellP
     const btn = tabsRef.current.querySelector<HTMLElement>(`[data-tab-id="${active.id}"]`)
     btn?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
   }, [active, isMobile])
+
+  const goRelative = useCallback(
+    (dir: -1 | 1) => {
+      if (!groups.length || !active) return
+      const idx = groups.findIndex((g) => g.id === active.id)
+      if (idx < 0) return
+      const next = groups[idx + dir]
+      if (next) onChange(next.id)
+    },
+    [active, groups, onChange]
+  )
+
+  const onTouchStart = useCallback(
+    (e: TouchEvent) => {
+      if (!isMobile) return
+      const t = e.touches[0]
+      if (!t) return
+      const blocked = touchBlockedByNestedScroll(e.target, bodyRef.current)
+      swipeRef.current = { x: t.clientX, y: t.clientY, blocked }
+    },
+    [isMobile]
+  )
+
+  const onTouchEnd = useCallback(
+    (e: TouchEvent) => {
+      if (!isMobile) return
+      const start = swipeRef.current
+      swipeRef.current = null
+      if (!start || start.blocked) return
+      const t = e.changedTouches[0]
+      if (!t) return
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      if (Math.abs(dx) < SWIPE_MIN_DX) return
+      if (Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return
+      // Swipe links → nächster Tab · rechts → vorheriger
+      goRelative(dx < 0 ? 1 : -1)
+    },
+    [goRelative, isMobile]
+  )
 
   if (!groups.length) {
     return (
@@ -90,7 +147,13 @@ export function DetailShell({ groups, value, onChange, className }: DetailShellP
           )
         })}
       </nav>
-      <div className="dshell-body" ref={bodyRef}>
+      <div
+        className="dshell-body"
+        ref={bodyRef}
+        onTouchStart={isMobile ? onTouchStart : undefined}
+        onTouchEnd={isMobile ? onTouchEnd : undefined}
+        onTouchCancel={isMobile ? () => { swipeRef.current = null } : undefined}
+      >
         <div className="dshell-group active">
           <div className="dshell-cards">{active ? active.render() : null}</div>
         </div>

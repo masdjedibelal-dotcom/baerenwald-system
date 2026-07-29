@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { actionBusy } from '@/components/ui/action-busy'
 
 type ConfirmState = {
   label: string
@@ -47,12 +48,14 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
   async function handleConfirm() {
     if (!state || pending) return
     setPending(true)
+    actionBusy.show('Wird gelöscht…')
     try {
       await Promise.resolve(state.onConfirm())
       setState(null)
     } catch {
       // Fehler-Toast kommt vom Aufrufer — Modal bleibt zum erneuten Versuch
     } finally {
+      actionBusy.hide()
       setPending(false)
     }
   }

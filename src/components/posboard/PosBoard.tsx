@@ -5,7 +5,10 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { PositionModal } from '@/components/posboard/PositionModal'
-import { PositionAddSheet, type PositionAddMode } from '@/components/posboard/PositionAddSheet'
+import {
+  PositionAddSheet,
+  type PositionAddMode,
+} from '@/components/posboard/PositionAddSheet'
 import type { PosAddKind } from '@/components/posboard/PosAddRow'
 import { guardSheetPointerFallthrough } from '@/lib/surfaces/editor-sheet-history'
 import {
@@ -27,6 +30,7 @@ import {
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { Preisliste } from '@/lib/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -123,8 +127,10 @@ export function PosBoard({
   suggestContext = null,
   className,
 }: PosBoardProps) {
+  const isMobile = useIsMobile()
   const positionen = Array.isArray(positionenProp) ? positionenProp : []
   const editable = Boolean(onChange)
+  const unifiedAdd = isMobile && editable
   const [editId, setEditId] = useState<string | null>(null)
   const [gEdit, setGEdit] = useState<string | null>(null)
   const [gName, setGName] = useState('')
@@ -230,14 +236,17 @@ export function PosBoard({
     setAddSheetOpen(true)
   }
 
-  const addFreitext = (gewerk?: string) => {
+  const addFreitext = (
+    gewerk?: string,
+    draft?: { name?: string; beschreibung?: string }
+  ) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
       gewerk: gewerk?.trim() || defaultGewerk(),
-      name: '',
-      beschreibung: '',
+      name: draft?.name?.trim() || '',
+      beschreibung: draft?.beschreibung?.trim() || '',
       menge: 0,
       einheit: '',
       preis: 0,
@@ -245,30 +254,43 @@ export function PosBoard({
       kind: 'freitext',
     })
     onChange([...positionen, np])
-    setEditId(id)
+    setEditId(draft?.name?.trim() || draft?.beschreibung?.trim() ? null : id)
   }
 
-  const addNachlass = () => {
+  const addNachlass = (draft?: {
+    name?: string
+    nachlassModus?: 'prozent' | 'betrag'
+    preis?: number
+  }) => {
     if (!onChange) return
     const existing = positionen.find((p) => p.kind === 'nachlass')
     if (existing) {
+      if (draft) {
+        update(existing.id, {
+          name: draft.name?.trim() || existing.name,
+          nachlassModus: draft.nachlassModus ?? existing.nachlassModus ?? 'prozent',
+          preis: draft.preis ?? existing.preis,
+          einheit: (draft.nachlassModus ?? existing.nachlassModus) === 'betrag' ? '€' : '%',
+        })
+      }
       setEditId(existing.id)
       return
     }
+    const modus = draft?.nachlassModus ?? 'prozent'
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
       gewerk: 'Allgemein',
-      name: 'Nachlass',
+      name: draft?.name?.trim() || 'Nachlass',
       menge: 1,
-      einheit: '%',
-      preis: 0,
+      einheit: modus === 'betrag' ? '€' : '%',
+      preis: draft?.preis ?? 0,
       ust: 0,
       kind: 'nachlass',
-      nachlassModus: 'prozent',
+      nachlassModus: modus,
     })
     onChange([...positionen, np])
-    setEditId(id)
+    setEditId(draft ? null : id)
   }
 
   const addFromPreisliste = (pl: Preisliste) => {
@@ -345,11 +367,11 @@ export function PosBoard({
     setGewerkAddOpen(true)
   }
 
-  const confirmAddGewerk = () => {
+  const confirmAddGewerk = (forcedName?: string) => {
     const used = new Set(positionen.map(gewerkOf))
     const fromSelect = gewerkAddPick.trim()
     const fromCustom = gewerkAddCustom.trim()
-    let name = fromCustom || fromSelect
+    let name = (forcedName?.trim() || fromCustom || fromSelect).trim()
     if (!name) return
     if (used.has(name)) {
       let n = 2
@@ -360,7 +382,9 @@ export function PosBoard({
     setGewerkAddOpen(false)
     setGewerkAddPick('')
     setGewerkAddCustom('')
-    openAddSheet(name, 'preisliste')
+    setPreislisteTargetGewerk(name)
+    setAddSheetMode('preisliste')
+    setAddSheetOpen(true)
   }
 
   const renameGewerk = (from: string, to: string) => {
@@ -579,7 +603,7 @@ export function PosBoard({
     <div className={className}>
       {title || headerAction ? (
         <div
-          className="section-h"
+          className="section-h posboard-sec-h"
           style={{
             margin: '2px 2px 10px',
             display: 'flex',
@@ -593,8 +617,8 @@ export function PosBoard({
             color: title ? undefined : 'var(--text)',
           }}
         >
-          <span>{title || null}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+          <span className="posboard-sec-h__title">{title || null}</span>
+          <div className="posboard-sec-h__actions">
             {headerAction}
             <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
               {positionen.length} {positionen.length === 1 ? 'Position' : 'Positionen'}
@@ -684,21 +708,21 @@ export function PosBoard({
       ) : null}
       <PosTable
         groups={groups}
-        onAddKind={editable ? onAddKind : undefined}
-        onAddGroup={editable && !hideAddGewerk ? addGewerk : undefined}
+        onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
+        onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
         groupActions={groupActions}
-        itemActions={itemActions}
+        itemActions={unifiedAdd ? undefined : itemActions}
         selectable={selectable}
         selected={sel}
         onToggleItem={toggleItem}
         onToggleGroup={toggleGroup}
-        dnd={editable}
+        dnd={editable && !unifiedAdd}
         onReorder={reorder}
         onDropToGroup={dropToGroup}
         onReorderGroup={reorderGroups}
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
         onMengeChange={
-          editable
+          editable && !unifiedAdd
             ? (id, menge) => update(id, { menge })
             : undefined
         }
@@ -706,10 +730,26 @@ export function PosBoard({
         netto={netto}
         ust={ust}
         brutto={brutto}
+        unifiedAdd={unifiedAdd}
         disabledAddKinds={{
           preisliste: false,
         }}
       />
+      {unifiedAdd ? (
+        <>
+          {groups.length === 0 ? (
+            <p className="posboard-empty-hint">Noch keine Positionen.</p>
+          ) : null}
+          <button
+            type="button"
+            className="posboard-add-fab"
+            onClick={() => openAddSheet(defaultGewerk(), 'preisliste')}
+          >
+            <MockIcon ctx="btn" n="plus" size={18} />
+            Position hinzufügen
+          </button>
+        </>
+      ) : null}
       {editP && helpers
         ? renderEditor
           ? renderEditor(editP, helpers)
@@ -837,6 +877,8 @@ export function PosBoard({
           preferredGewerkName={preislisteTargetGewerk}
           gewerke={gewerkOptions}
           showUst={showUst}
+          allowGewerk={!hideAddGewerk}
+          allowNachlass
           onClose={() => {
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)
@@ -857,6 +899,32 @@ export function PosBoard({
             })
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)
+          }}
+          onAddFreitext={(draft) => {
+            addFreitext(draft.gewerk, {
+              name: draft.name,
+              beschreibung: draft.beschreibung,
+            })
+            setAddSheetOpen(false)
+            setPreislisteTargetGewerk(null)
+          }}
+          onAddNachlass={(draft) => {
+            addNachlass(draft)
+            setAddSheetOpen(false)
+            setPreislisteTargetGewerk(null)
+          }}
+          onAddGewerk={(name) => {
+            const used = new Set(positionen.map(gewerkOf))
+            let n = name.trim()
+            if (!n) return
+            if (used.has(n)) {
+              let i = 2
+              const base = n
+              while (used.has(`${base} ${i}`)) i += 1
+              n = `${base} ${i}`
+            }
+            setPreislisteTargetGewerk(n)
+            setAddSheetMode('preisliste')
           }}
         />
       ) : null}

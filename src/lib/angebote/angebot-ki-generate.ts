@@ -27,6 +27,8 @@ import {
 const SYSTEM = `Du bist Dokument-Assistent für Bärenwald München (Angebot & Rechnung).
 Alles ist eine Position — auch Titel und Beschreibung. Keine separaten Felder.
 
+Nutzer-Prompts sind oft konkret („Bad 8 m² Fliesen Mittelklasse“) — daraus realistische Positionen mit Mengen, Einheiten und klaren Leistungsbeschreibungen ableiten. Keine Marketing-Floskeln.
+
 ANTWORT NUR als JSON:
 {
   "positionen": [

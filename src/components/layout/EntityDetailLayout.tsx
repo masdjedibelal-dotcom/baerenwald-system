@@ -82,6 +82,7 @@ export function EntityDetailLayout({
           title={head.title}
           badges={head.badges}
           titleBadges={head.titleBadges}
+          titleTrailing={head.titleTrailing}
           meta={undefined}
           sub={undefined}
           actions={head.actions}
