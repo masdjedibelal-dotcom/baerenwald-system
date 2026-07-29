@@ -14,6 +14,27 @@ export type FabKundeAuftragZeile = {
   created_at: string
 }
 
+/** Gewerke für FAB-Handwerker-Create (Overlay-Host). */
+export async function listGewerkeFuerFab(): Promise<
+  { ok: true; gewerke: { id: string; name: string; slug: string }[] } | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('gewerke')
+    .select('id, name, slug')
+    .eq('aktiv', true)
+    .order('name')
+  if (error) return { ok: false, message: error.message }
+  return {
+    ok: true,
+    gewerke: (data ?? []).map((g) => ({
+      id: String(g.id),
+      name: String(g.name),
+      slug: String(g.slug),
+    })),
+  }
+}
+
 /** Aufträge eines Kunden für optionale Verknüpfung (z. B. Rechnung).
  * Keine stornierten/abgeschlossenen und keine Geister ohne bestehenden Lead. */
 export async function listAuftraegeFuerKunde(

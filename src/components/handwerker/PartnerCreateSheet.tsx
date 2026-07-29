@@ -6,7 +6,7 @@ import {
   createHandwerker,
   insertPartnerDokument,
 } from '@/app/(dashboard)/handwerker/actions'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { VERSICHERUNG_TYP_SLUG } from '@/lib/handwerker-versicherung'
@@ -36,6 +36,31 @@ function buildNotizen(notiz: string, stundensatz: string): string | null {
   if (satz) parts.push(`Stundensatz: ${satz} €/h`)
   if (notiz.trim()) parts.push(notiz.trim())
   return parts.length ? parts.join('\n\n') : null
+}
+
+function PartnerCreateFooter({
+  pending,
+  onSubmit,
+}: {
+  pending: boolean
+  onSubmit: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="hw-create-footer">
+      <button
+        type="button"
+        className="btn ghost"
+        onClick={() => requestClose?.()}
+        disabled={pending}
+      >
+        Abbrechen
+      </button>
+      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
+        {pending ? '…' : 'Handwerker anlegen'}
+      </MockBtn>
+    </div>
+  )
 }
 
 /** Handwerker anlegen — EditorSheet, Host z. B. `/neu?art=handwerker`. */
@@ -164,16 +189,7 @@ export function PartnerCreateSheet({
     })
   }
 
-  const footer = (
-    <div className="hw-create-footer">
-      <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={submit}>
-        {pending ? '…' : 'Handwerker anlegen'}
-      </MockBtn>
-    </div>
-  )
+  const footer = <PartnerCreateFooter pending={pending} onSubmit={submit} />
 
   return (
     <EditorSheet

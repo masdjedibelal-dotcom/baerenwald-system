@@ -1,7 +1,9 @@
 'use client'
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -16,9 +18,24 @@ import { Button } from '@/components/ui/Button'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { trapFocus } from '@/lib/a11y/focus-trap'
+import {
+  pushEditorSheetHistory,
+  releaseEditorSheetHistory,
+  restoreEditorSheetHistoryAfterDirtyPop,
+  updateEditorSheetHistoryPop,
+} from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
 
 export type EditorSheetContext = 'detail' | 'canvas'
+
+type EditorSheetApi = { requestClose: () => void }
+
+const EditorSheetApiContext = createContext<EditorSheetApi | null>(null)
+
+/** Für Footer-Abbrechen: gleicher Dirty-Confirm wie X/Swipe/Backdrop. */
+export function useEditorSheetRequestClose(): (() => void) | null {
+  return useContext(EditorSheetApiContext)?.requestClose ?? null
+}
 
 export type EditorSheetProps = {
   open: boolean
@@ -82,16 +99,43 @@ export function EditorSheet({
   const [discardOpen, setDiscardOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  const sheetId = `editor-sheet:${titleId}`
   const historyPushed = useRef(false)
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const onDismissAttemptRef = useRef(onDismissAttempt)
+  onDismissAttemptRef.current = onDismissAttempt
+
+  const finishClose = useCallback(() => {
+    setDiscardOpen(false)
+    const stillPushed = historyPushed.current
+    historyPushed.current = false
+    releaseEditorSheetHistory(sheetId, { historyStillPushed: stillPushed })
+    onCloseRef.current()
+  }, [sheetId])
 
   const requestClose = useCallback(() => {
-    onDismissAttempt?.()
-    if (dirty) {
+    onDismissAttemptRef.current?.()
+    if (dirtyRef.current) {
       setDiscardOpen(true)
       return
     }
-    onClose()
-  }, [dirty, onClose, onDismissAttempt])
+    finishClose()
+  }, [finishClose])
+
+  const handleHistoryPop = useCallback(() => {
+    onDismissAttemptRef.current?.()
+    if (dirtyRef.current) {
+      setDiscardOpen(true)
+      restoreEditorSheetHistoryAfterDirtyPop(sheetId)
+      return
+    }
+    historyPushed.current = false
+    releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
+    onCloseRef.current()
+  }, [sheetId])
 
   // Spec §6 / Phase 2: nie center — Desktop Slide, Mobil Bottom
   const layout: 'bottom' | 'slide' = isMobile ? 'bottom' : 'slide'
@@ -102,39 +146,32 @@ export function EditorSheet({
   })
 
   const confirmClose = useCallback(() => {
-    setDiscardOpen(false)
-    onClose()
-  }, [onClose])
+    finishClose()
+  }, [finishClose])
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  /* S10: History-Entry */
+  /* S10: History-Entry — Stack, damit Split-over → Split-over kein Fremd-Discard auslöst */
   useEffect(() => {
     if (!open || !mounted) return
-    const key = `editor-sheet:${titleId}`
-    window.history.pushState({ [key]: true }, '')
+    pushEditorSheetHistory(sheetId, handleHistoryPop)
     historyPushed.current = true
-    const onPop = () => {
-      historyPushed.current = false
-      if (dirty) {
-        setDiscardOpen(true)
-        window.history.pushState({ [key]: true }, '')
-        historyPushed.current = true
-        return
-      }
-      onClose()
-    }
-    window.addEventListener('popstate', onPop)
     return () => {
-      window.removeEventListener('popstate', onPop)
       if (historyPushed.current) {
         historyPushed.current = false
-        window.history.back()
+        releaseEditorSheetHistory(sheetId, { historyStillPushed: true })
+      } else {
+        releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
       }
     }
-  }, [open, mounted, dirty, onClose, titleId])
+  }, [open, mounted, sheetId, handleHistoryPop])
+
+  useEffect(() => {
+    if (!open) return
+    updateEditorSheetHistoryPop(sheetId, handleHistoryPop)
+  }, [open, sheetId, handleHistoryPop])
 
   /* Body scroll lock + focus trap */
   useEffect(() => {
@@ -174,6 +211,8 @@ export function EditorSheet({
   }, [open, isMobile])
 
   if (!open || !mounted) return null
+
+  const api: EditorSheetApi = { requestClose }
 
   const end =
     headerEnd ??
@@ -244,12 +283,16 @@ export function EditorSheet({
         </button>
       </header>
       <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
-      {footer ? <div className="editor-sheet__footer">{footer}</div> : null}
+      {footer ? (
+        <EditorSheetApiContext.Provider value={api}>
+          <div className="editor-sheet__footer">{footer}</div>
+        </EditorSheetApiContext.Provider>
+      ) : null}
     </div>
   )
 
   return createPortal(
-    <>
+    <EditorSheetApiContext.Provider value={api}>
       <div
         className={cn(
           'editor-sheet-overlay',
@@ -294,7 +337,7 @@ export function EditorSheet({
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">Ungespeicherte Eingaben gehen verloren.</p>
         </Modal>
       )}
-    </>,
+    </EditorSheetApiContext.Provider>,
     document.body
   )
 }

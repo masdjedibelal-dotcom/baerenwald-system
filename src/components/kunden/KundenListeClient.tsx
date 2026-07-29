@@ -12,6 +12,7 @@ import {
   MockSortHead,
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
+import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
@@ -101,7 +102,8 @@ export function KundenListeClient({
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') {
-      router.replace('/neu?art=kunde')
+      router.replace('/kunden')
+      openFabCreate('kunde')
     }
   }, [searchParams, router])
 
@@ -574,7 +576,7 @@ export function KundenListeClient({
             }
             action={
               kunden.length === 0 ? (
-                <MockBtn kind="primary" icon="plus" onClick={() => router.push('/neu?art=kunde')}>
+                <MockBtn kind="primary" icon="plus" onClick={() => openFabCreate('kunde')}>
                   Neuen Kunden anlegen
                 </MockBtn>
               ) : (

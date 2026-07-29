@@ -17,6 +17,15 @@ function isFabArt(v: string | null): v is FabVorgangArt {
   return v != null && VORGANG_ARTS.has(v as FabVorgangArt)
 }
 
+/** Deep-Link-Abbruch: zurück zur vorherigen Seite, sonst sensible Liste. */
+function closeDeepLink(router: ReturnType<typeof useRouter>, fallback: string) {
+  if (typeof window !== 'undefined' && window.history.length > 1) {
+    router.back()
+    return
+  }
+  router.replace(fallback)
+}
+
 function NeuVorgangHost({
   gewerkeOptionen,
 }: {
@@ -55,58 +64,45 @@ function NeuVorgangHost({
   }, [artParam])
 
   if (artParam === 'anfrage' || artParam === 'angebot') {
-    return (
-      <div className="py-8 text-center text-sm text-bw-text-muted">
-        {artParam === 'anfrage' ? 'Anfrage' : 'Angebot'} wird geöffnet…
-      </div>
-    )
+    return <CrmInlineLoading label="Wird geöffnet …" />
   }
 
   if (artParam === 'kunde') {
     return (
-      <>
-        <div className="py-8 text-center text-sm text-bw-text-muted">Kunde wird vorbereitet…</div>
-        <KundeModal
-          open={kundeSheetOpen}
-          onClose={() => {
-            setKundeSheetOpen(false)
-            router.replace('/kunden')
-          }}
-        />
-      </>
+      <KundeModal
+        open={kundeSheetOpen}
+        onClose={() => {
+          setKundeSheetOpen(false)
+          closeDeepLink(router, '/kunden')
+        }}
+      />
     )
   }
 
   if (artParam === 'handwerker' || artParam === 'partner') {
     return (
-      <>
-        <div className="py-8 text-center text-sm text-bw-text-muted">Handwerker wird vorbereitet…</div>
-        <PartnerCreateSheet
-          open={partnerSheetOpen}
-          gewerkeOptionen={gewerkeOptionen}
-          onClose={() => {
-            setPartnerSheetOpen(false)
-            router.replace('/handwerker')
-          }}
-        />
-      </>
+      <PartnerCreateSheet
+        open={partnerSheetOpen}
+        gewerkeOptionen={gewerkeOptionen}
+        onClose={() => {
+          setPartnerSheetOpen(false)
+          closeDeepLink(router, '/handwerker')
+        }}
+      />
     )
   }
 
   if (isFabArt(artParam) || art) {
     return (
-      <>
-        <div className="py-8 text-center text-sm text-bw-text-muted">Vorgang wird vorbereitet…</div>
-        <FabVorgangStartModal
-          open={art != null}
-          art={art}
-          initialKundeId={kundeIdParam}
-          onClose={() => {
-            setArt(null)
-            router.replace('/vorgaenge')
-          }}
-        />
-      </>
+      <FabVorgangStartModal
+        open={art != null}
+        art={art}
+        initialKundeId={kundeIdParam}
+        onClose={() => {
+          setArt(null)
+          closeDeepLink(router, '/vorgaenge')
+        }}
+      />
     )
   }
 

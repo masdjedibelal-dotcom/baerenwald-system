@@ -16,6 +16,7 @@ import {
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
+import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
@@ -145,7 +146,8 @@ export function HandwerkerListeClient({
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') {
-      router.replace('/neu?art=handwerker')
+      router.replace('/handwerker')
+      openFabCreate('handwerker')
     }
   }, [searchParams, router])
 
@@ -542,7 +544,7 @@ export function HandwerkerListeClient({
             hint={rows.length === 0 ? 'Partner anlegen' : 'Filter zurücksetzen'}
             action={
               rows.length === 0 ? (
-                <MockBtn kind="primary" icon="plus" onClick={() => router.push('/neu?art=handwerker')}>
+                <MockBtn kind="primary" icon="plus" onClick={() => openFabCreate('handwerker')}>
                   Handwerker anlegen
                 </MockBtn>
               ) : (

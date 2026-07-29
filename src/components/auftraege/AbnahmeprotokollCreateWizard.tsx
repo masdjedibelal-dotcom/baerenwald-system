@@ -117,7 +117,13 @@ export function AbnahmeprotokollCreateWizard({
     emptyAbnahmeProtokollMeta(initialMeta)
   )
 
-  const onClose = () => router.push(`/auftraege/${auftragId}?tab=leistungen`)
+  const onClose = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push(`/auftraege/${auftragId}?tab=leistungen`)
+  }
 
   const ausgewaehlt = useMemo(
     () => filterAbnahmePunkteFuerDokument(punkte).length,
@@ -828,12 +834,12 @@ export function AbnahmeprotokollCreateWizard({
 
   return (
     <DocumentCanvas
-      portal={false}
-      title="Abnahme & Abschluss"
+      portal
+      manageHistory={false}
+      title="Abnahme"
       subtitle={subtitle || undefined}
       onClose={onClose}
       onSave={() => erstellen({ abschliessen: hasSignatur })}
-      saveLabel="Abnahme speichern"
       saveBusy={pending}
       footerCta={footerActions}
       className="wizard-flow abnahme-canvas"

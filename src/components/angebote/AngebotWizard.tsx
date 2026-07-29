@@ -1143,6 +1143,7 @@ export function AngebotWizard({
         metaSum={metaSum}
         footerCta={footerCta}
         className="wizard-flow"
+        manageHistory={false}
       />
 
       <EditorSheet

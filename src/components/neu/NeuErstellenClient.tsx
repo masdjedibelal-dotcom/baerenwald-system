@@ -18,6 +18,7 @@ import {
   createAngebotHref,
   createRechnungHref,
 } from '@/lib/crm/create-entry'
+import { openFabCreate } from '@/components/neu/FabCreateHost'
 
 type Art = '' | 'vorgang' | 'kunde' | 'handwerker'
 type VorgangTyp = '' | 'anfrage' | 'angebot' | 'rechnung'
@@ -226,11 +227,11 @@ export function NeuErstellenClient({
                   className={`neu-vorgang-tile${art === o.v ? ' sel' : ''}`}
                   onClick={() => {
                     if (o.v === 'kunde') {
-                      router.replace('/neu?art=kunde')
+                      openFabCreate('kunde')
                       return
                     }
                     if (o.v === 'handwerker') {
-                      router.replace('/neu?art=handwerker')
+                      openFabCreate('handwerker')
                       return
                     }
                     setArt(o.v)

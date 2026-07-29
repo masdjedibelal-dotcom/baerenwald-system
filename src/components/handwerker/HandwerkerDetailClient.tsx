@@ -14,8 +14,6 @@ import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/Han
 import {
   filterStandardComplianceTypen,
   standardDokumente,
-  dokumentFuerTyp,
-  complianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
 import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
 import { DetailHead } from '@/components/layout/DetailHead'
@@ -524,13 +522,6 @@ export function HandwerkerDetailClient({
 
   const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
 
-  function formatGueltigKurz(iso: string | null | undefined): string | null {
-    if (!iso?.trim()) return null
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return null
-    return d.toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
-  }
-
   const uebersichtInhalt = (
     <div className="space-y-4">
       <div className="card">
@@ -961,87 +952,36 @@ export function HandwerkerDetailClient({
             color: 'var(--text-3)',
           }}
         >
-          Nachweise
+          Unterlagen
         </span>
         <div style={{ flex: 1 }} />
         <ComplianceBadge status={hw.compliance_status} />
       </div>
+
+      <p
+        style={{
+          margin: '0 0 14px',
+          fontSize: 'var(--fs-meta)',
+          color: 'var(--text-3)',
+          lineHeight: 1.45,
+        }}
+      >
+        Nachweise aus dem CRM oder vom Partner. Hochladen öffnet ein Sheet mit Datei, Titel,
+        Beschreibung und Gültigkeit — vorhandene Unterlagen kannst du ansehen, bearbeiten oder
+        löschen.
+      </p>
 
       {complianceTypenStandard.length === 0 ? (
         <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
           Keine Compliance-Typen konfiguriert.
         </p>
       ) : (
-        <div className="listcard">
-          {complianceTypenStandard.map((typ) => {
-            const doc = dokumentFuerTyp(standardDokumente(payload.dokumente), typ.slug, {
-              handwerkerId: hw.id,
-              auftragId: null,
-            })
-            const st = complianceDokumentStatus(typ, doc)
-            const gueltig = formatGueltigKurz(doc?.gueltig_bis)
-            let sub = 'fehlt'
-            if (st === 'ok') sub = gueltig ? `gültig bis ${gueltig}` : 'geprüft'
-            else if (st === 'warnung') sub = gueltig ? `läuft ab ${gueltig}` : 'Prüfung ausstehend'
-            else if (st === 'abgelaufen') sub = gueltig ? `abgelaufen ${gueltig}` : 'abgelaufen'
-            const ok = st === 'ok'
-            return (
-              <div
-                key={typ.id}
-                className="list-row"
-                style={{
-                  gridTemplateColumns: '1fr 28px',
-                  alignItems: 'center',
-                  cursor: 'default',
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {typ.bezeichnung}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 'var(--fs-meta)',
-                      color: 'var(--text-3)',
-                      marginTop: 2,
-                    }}
-                  >
-                    {sub}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <MockIcon
-                    ctx="default"
-                    n={ok ? 'check' : st === 'warnung' ? 'alert-triangle' : 'x'}
-                    size={16}
-                    style={{ color: ok ? 'var(--green)' : 'var(--text-4)' }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <HandwerkerComplianceUnterlagenTable
+          handwerkerId={hw.id}
+          dokumente={payload.dokumente}
+          typen={complianceTypenStandard}
+        />
       )}
-
-      <div style={{ marginTop: 20 }}>
-        <details>
-          <summary
-            style={{
-              cursor: 'pointer',
-              fontSize: 'var(--fs-meta)',
-              color: 'var(--text-3)',
-              marginBottom: 10,
-            }}
-          >
-            Unterlagen hochladen & bearbeiten
-          </summary>
-          <HandwerkerComplianceUnterlagenTable
-            handwerkerId={hw.id}
-            dokumente={payload.dokumente}
-            typen={complianceTypenStandard}
-          />
-        </details>
-      </div>
     </div>
   )
 

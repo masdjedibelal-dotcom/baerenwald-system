@@ -19,6 +19,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
+import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
@@ -77,7 +78,7 @@ import {
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Preisliste } from '@/lib/types'
+import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
 import {
   normalizeVorgangWiederkehr,
   type VorgangWiederkehr,
@@ -92,40 +93,6 @@ import {
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 
 type Rechnungsart = 'abschlag' | 'schluss'
-type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos' | 'regieschein'
-
-const ANLAGEN_DEF: Array<{
-  key: AnlagenKey
-  label: string
-  sub: string
-  locked?: boolean
-}> = [
-  { key: 'rechnung', label: 'Rechnung (PDF)', sub: 'Pflichtdokument', locked: true },
-  {
-    key: 'leistungsnachweis',
-    label: 'Leistungsnachweis',
-    sub: 'Positionen & Mengen aus dem Auftrag',
-  },
-  {
-    key: 'bautagebuch',
-    label: 'Bautagebuch-Export',
-    sub: 'Einträge & Fotos der Baustelle',
-  },
-  { key: 'abnahme', label: 'Abnahmeprotokoll', sub: 'Unterschriebene Abnahme' },
-  { key: 'fotos', label: 'Fotodokumentation', sub: 'Vorher/Nachher-Bilder' },
-  {
-    key: 'regieschein',
-    label: 'Regieschein',
-    sub: 'Anlage aus Bautagebuch / Aufwand-Position',
-  },
-]
-
-const WIZARD_STEPS = [
-  { id: 1, label: 'Positionen' },
-  { id: 2, label: 'Details' },
-  { id: 3, label: 'Anlagen' },
-  { id: 4, label: 'Senden' },
-]
 
 const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
   { name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
@@ -153,7 +120,7 @@ function planIstOk(plan: Zahlungsplan): boolean {
 
 /**
  * Rechnungs-Wizard:
- * Positionen → Rechnungsdetails → Anlagen & Versand → Versand
+ * Positionen → Rechnungsdetails → Versand (nur Rechnung-PDF, kein Dokumentpaket)
  */
 export function RechnungWizard({
   bootstrap,
@@ -174,11 +141,14 @@ export function RechnungWizard({
 }) {
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
+  const [kunde, setKunde] = useState(bootstrap.kunde)
+  const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
+  const [kundePickerOpen, setKundePickerOpen] = useState(false)
   const kundeName =
-    bootstrap.kunde?.name?.trim() ||
-    [bootstrap.kunde?.vorname, bootstrap.kunde?.nachname].filter(Boolean).join(' ') ||
-    'Kunde'
-  const kundeEmail = (bootstrap.kunde?.email || '').trim()
+    kunde?.name?.trim() ||
+    [kunde?.vorname, kunde?.nachname].filter(Boolean).join(' ') ||
+    'Kunde wählen'
+  const kundeEmail = (kunde?.email || '').trim()
   const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
   const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
   const auftragLabel =
@@ -234,22 +204,6 @@ export function RechnungWizard({
       bootstrap.zahlungsplan?.zeilen?.length &&
       bootstrap.zahlungsplanBearbeiten !== true
   )
-  const [anlagen, setAnlagen] = useState<Record<AnlagenKey, boolean>>(() => {
-    const istSchlussInit = Boolean(
-      bootstrap.abschlag?.istSchluss ||
-        (bootstrap.abschlag?.rechnungArt === 'schluss')
-    )
-    return {
-      rechnung: true,
-      leistungsnachweis: false,
-      bautagebuch: false,
-      abnahme: istSchlussInit,
-      fotos: false,
-      regieschein: (bootstrap.positionen ?? []).some((p) =>
-        /regieschein|nach aufwand/i.test(String(p.notiz_extern ?? ''))
-      ),
-    }
-  })
   const [einleitung, setEinleitung] = useState(() => {
     const existing = bootstrap.meta.einleitung?.trim()
     if (existing) return existing
@@ -265,10 +219,8 @@ export function RechnungWizard({
     kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
   )
   const [mailCc, setMailCc] = useState<string[]>([])
-  const [docPreviewTab, setDocPreviewTab] = useState<AnlagenKey>('rechnung')
-  const [docAccordionOpen, setDocAccordionOpen] = useState(true)
   const [sheet, setSheet] = useState<
-    'dokument' | 'zahlplan' | 'anlagen' | 'versand' | null
+    'kunde' | 'dokument' | 'zahlplan' | 'versand' | null
   >(null)
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
@@ -285,7 +237,6 @@ export function RechnungWizard({
   const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
-  const kundeId = bootstrap.kundeId
   const hasPlan = plan.zeilen.length > 0
   const planOk = planIstOk(plan)
 
@@ -338,15 +289,6 @@ export function RechnungWizard({
   const netto = berechnung.netto
   const brutto = berechnung.brutto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
-  const hasRegiePos = useMemo(
-    () => posBoardLines.some((p) => p.regieSchein),
-    [posBoardLines]
-  )
-
-  useEffect(() => {
-    if (!hasRegiePos) return
-    setAnlagen((a) => (a.regieschein ? a : { ...a, regieschein: true }))
-  }, [hasRegiePos])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
 
   const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
@@ -524,36 +466,10 @@ export function RechnungWizard({
     hasPlan && selRate?.faellig_am?.trim()
       ? selRate.faellig_am.trim().slice(0, 10)
       : einzelFaellig
-  /** Abschluss-Paket (Abnahme o. ä.) nur bei Schluss-/Endrechnung — nicht bei laufenden Abschlägen. */
-  const istEndrechnung = Boolean(
-    selBerechnet?.istSchluss ||
-      bootstrap.abschlag?.istSchluss ||
-      bootstrap.abschlag?.rechnungArt === 'schluss' ||
-      (!hasPlan && rechnungsart === 'schluss' && bootstrap.modus !== 'voll')
-  )
-  const showAbschlussPaket = istEndrechnung
-  const wizardSteps = showAbschlussPaket
-    ? WIZARD_STEPS
-    : [
-        { id: 1, label: 'Positionen' },
-        { id: 2, label: 'Details' },
-        { id: 4, label: 'Senden' },
-      ]
-  const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
-  const selectedAnlagen = ANLAGEN_DEF.filter((a) => anlagen[a.key])
+  /** Rechnung versendet immer nur die Rechnung — kein Abschluss-/Dokumentpaket-Frage. */
   const previewNr = rechnungsnummer.trim() || 'Rechnung'
   const activeVersandId = versandRechnungId ?? rechnungId
   const defaultBetreff = `${previewNr} · ${rTitel}`
-
-  useEffect(() => {
-    if (showAbschlussPaket) return
-    setAnlagen((a) => ({
-      ...a,
-      abnahme: false,
-      bautagebuch: false,
-      fotos: false,
-    }))
-  }, [showAbschlussPaket])
 
   function scrollToSection(sec: number) {
     requestAnimationFrame(() => {
@@ -569,8 +485,7 @@ export function RechnungWizard({
   }
 
   function goPrevStep() {
-    const next =
-      step === 4 && !showAbschlussPaket ? 2 : Math.max(1, step - 1)
+    const next = step === 4 ? 2 : Math.max(1, step - 1)
     goToSection(next)
   }
 
@@ -584,7 +499,7 @@ export function RechnungWizard({
     if (step === 2 && hasPlan && !planOk) {
       toast.error('Zahlplan noch nicht 100 % — vor Versand anpassen.')
     }
-    const next = step === 2 && !showAbschlussPaket ? 4 : Math.min(4, step + 1)
+    const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
     if (enteringVersand) {
       const id = await persistDraft()
@@ -597,12 +512,10 @@ export function RechnungWizard({
       if (!einleitung.trim()) {
         setEinleitung(
           defaultRechnungMailEinleitung(
-            istPrivatKundeTyp(bootstrap.kunde?.typ) ? 'du' : 'sie'
+            istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
           )
         )
       }
-      const firstDoc = selectedAnlagen[0]?.key ?? 'rechnung'
-      setDocPreviewTab(firstDoc)
     }
     goToSection(next)
   }
@@ -652,9 +565,8 @@ export function RechnungWizard({
         plan,
         einleitung,
         mailBetreff,
-        anlagen,
       }),
-    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, anlagen]
+    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -711,10 +623,6 @@ export function RechnungWizard({
   function clearPlan() {
     setPlan(emptyZahlungsplan())
     setAktivRate(null)
-  }
-
-  function toggleAnlage(k: AnlagenKey) {
-    setAnlagen((a) => ({ ...a, [k]: !a[k] }))
   }
 
   const persistEinzel = useCallback(
@@ -1003,9 +911,6 @@ export function RechnungWizard({
         .filter(Boolean)
         .join(' · ')
 
-  const anlagenCrowValue =
-    anlagenCount === 1 ? '1 Anlage' : `${anlagenCount} Anlagen`
-
   const versandCrowValue = mailTo[0]?.trim() || 'Kundenportal'
 
   const wizardTitel =
@@ -1023,7 +928,31 @@ export function RechnungWizard({
     .filter(Boolean)
     .join(' · ')
 
-  const primarySaveLabel = 'Rechnung speichern & senden'
+  function onKundePick(k: Kunde) {
+    setKunde({
+      id: k.id,
+      name: k.name,
+      vorname: k.vorname,
+      nachname: k.nachname,
+      email: k.email,
+      telefon: k.telefon,
+      adresse: k.adresse,
+      strasse: k.strasse,
+      hausnummer: k.hausnummer,
+      plz: k.plz,
+      ort: k.ort,
+      typ: k.typ,
+      ust_id: k.ust_id,
+      kundennummer: k.kundennummer,
+    })
+    setKundeId(k.id)
+    setKundePickerOpen(false)
+    setSheet(null)
+    const email = (k.email || '').trim()
+    if (email && isValidEmail(email)) setMailTo([email])
+    setDraftDirty(true)
+    toast.success('Kunde übernommen')
+  }
 
   const steuernBlock = (
     <div className="rw-tax">
@@ -1192,6 +1121,11 @@ export function RechnungWizard({
         Rechnungsdaten
       </div>
       <MetaCrowButton
+        label={hatAuftrag ? 'Auftrag' : 'Kunde'}
+        value={hatAuftrag ? auftragLabel : kundeName}
+        onClick={() => setSheet(hatAuftrag ? 'dokument' : 'kunde')}
+      />
+      <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
         onClick={() => setSheet('dokument')}
@@ -1200,11 +1134,6 @@ export function RechnungWizard({
         label="Zahlplan"
         value={zahlplanCrowValue}
         onClick={() => setSheet('zahlplan')}
-      />
-      <MetaCrowButton
-        label="Anlagen"
-        value={anlagenCrowValue}
-        onClick={() => setSheet('anlagen')}
       />
       <MetaCrowButton
         label="Versand"
@@ -1227,19 +1156,18 @@ export function RechnungWizard({
   )
 
   const footerCta = (
-    <>
-      <button type="button" className="btn ghost" disabled={saving} onClick={handleRequestClose}>
-        Abbrechen
-      </button>
-      <button
-        type="button"
-        className="btn primary"
-        disabled={saving || (hasPlan && !planOk)}
-        onClick={() => void handleFinish(true)}
-      >
-        {saving ? '…' : `✓ ${primarySaveLabel}`}
-      </button>
-    </>
+    <button
+      type="button"
+      className="btn primary"
+      disabled={saving || (hasPlan && !planOk)}
+      onClick={() =>
+        void persistDraft().then((id) => {
+          if (id) toast.success('Entwurf gespeichert')
+        })
+      }
+    >
+      {saving ? 'Speichern…' : 'Speichern'}
+    </button>
   )
 
   const docActions = (
@@ -1272,8 +1200,11 @@ export function RechnungWizard({
         title={wizardTitel}
         subtitle={wizardSubtitle}
         onClose={handleRequestClose}
-        onSave={() => void handleFinish(true)}
-        saveLabel={primarySaveLabel}
+        onSave={() =>
+          void persistDraft().then((id) => {
+            if (id) toast.success('Entwurf gespeichert')
+          })
+        }
         saveBusy={saving}
         busy={saving}
         busyLabel="Wird versendet…"
@@ -1288,6 +1219,46 @@ export function RechnungWizard({
         metaSum={metaSum}
         footerCta={footerCta}
         className="wizard-flow"
+        manageHistory={false}
+      />
+
+      <EditorSheet
+        open={sheet === 'kunde'}
+        onClose={closeSheet}
+        title="Kunde"
+        context="canvas"
+        headerEnd={
+          <button
+            type="button"
+            className="editor-sheet__confirm-text"
+            onClick={() => setKundePickerOpen(true)}
+          >
+            Wechseln
+          </button>
+        }
+      >
+        <div className="gfc">
+          <div className="gfc-row">
+            <span className="gfc-l">Name</span>
+            <span className="gfc-v">{kundeName}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-v">{kundeEmail || <em>fehlt</em>}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Telefon</span>
+            <span className="gfc-v">{kunde?.telefon?.trim() || '—'}</span>
+          </div>
+        </div>
+      </EditorSheet>
+
+      <KundePickerSheet
+        open={kundePickerOpen}
+        onClose={() => setKundePickerOpen(false)}
+        onPick={onKundePick}
+        context="canvas"
+        title="Kunde"
       />
 
       <EditorSheet
@@ -1300,7 +1271,7 @@ export function RechnungWizard({
           {hatAuftrag && !rateLocked ? (
             <div className="full">
               <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
-                Rechnungsart
+                Art
               </div>
               <div className="seg" role="group" aria-label="Rechnungsart">
                 <button
@@ -1315,7 +1286,18 @@ export function RechnungWizard({
                   className={rechnungsart === 'schluss' ? 'on' : undefined}
                   onClick={() => setRechnungsart('schluss')}
                 >
-                  Schlussrechnung
+                  Schluss
+                </button>
+              </div>
+            </div>
+          ) : !hatAuftrag ? (
+            <div className="full">
+              <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
+                Art
+              </div>
+              <div className="seg" role="group" aria-label="Rechnungsart">
+                <button type="button" className="on" disabled>
+                  Einzel
                 </button>
               </div>
             </div>
@@ -1507,42 +1489,6 @@ export function RechnungWizard({
               )}
             </div>
           )}
-        </div>
-      </EditorSheet>
-
-      <EditorSheet
-        open={sheet === 'anlagen'}
-        onClose={closeSheet}
-        title="Anlagen"
-        context="canvas"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {ANLAGEN_DEF.map((a) => {
-            if (!showAbschlussPaket && (a.key === 'abnahme' || a.key === 'bautagebuch' || a.key === 'fotos')) {
-              return null
-            }
-            const on = !!anlagen[a.key]
-            return (
-              <button
-                key={a.key}
-                type="button"
-                disabled={a.locked}
-                onClick={() => !a.locked && toggleAnlage(a.key)}
-                className={on ? 'rw-tax__opt on' : 'rw-tax__opt'}
-              >
-                <span className="rw-tax__check" aria-hidden>
-                  {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
-                </span>
-                <span className="rw-tax__txt">
-                  <span className="rw-tax__lab">
-                    {a.label}
-                    {a.locked ? ' (immer dabei)' : ''}
-                  </span>
-                  <span className="rw-tax__sub">{a.sub}</span>
-                </span>
-              </button>
-            )
-          })}
         </div>
       </EditorSheet>
 

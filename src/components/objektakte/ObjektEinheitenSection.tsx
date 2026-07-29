@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
   createObjektEinheit,
@@ -15,6 +15,31 @@ import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
 const COLS = 'minmax(0, 1.4fr) 90px 110px 100px 28px'
+
+function EinheitFormFooter({
+  pending,
+  onSave,
+}: {
+  pending: boolean
+  onSave: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="kunde-create-footer">
+      <button
+        type="button"
+        className="btn ghost"
+        onClick={() => requestClose?.()}
+        disabled={pending}
+      >
+        Abbrechen
+      </button>
+      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
+        {pending ? '…' : 'Speichern'}
+      </MockBtn>
+    </div>
+  )
+}
 
 /** Mock: Einheiten-Tabelle Bezeichnung · Fläche · Status · Miete · Chevron */
 export function ObjektEinheitenSection({
@@ -68,6 +93,12 @@ export function ObjektEinheitenSection({
     setErr(null)
     setDirty(false)
     setModalOpen(true)
+  }
+
+  /** Detail-Split-over → Edit-Split-over: erst schließen, dann öffnen (kein Discard-Dialog). */
+  function openEditFromDrawer(e: ObjektEinheit) {
+    setDrawer(null)
+    requestAnimationFrame(() => openEdit(e))
   }
 
   function speichern() {
@@ -215,16 +246,7 @@ export function ObjektEinheitenSection({
         crumb="Einheiten >"
         dirty={dirty}
         size="md"
-        footer={
-          <div className="kunde-create-footer">
-            <button type="button" className="btn ghost" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </button>
-            <MockBtn kind="primary" icon="check" disabled={pending} onClick={speichern}>
-              {pending ? '…' : 'Speichern'}
-            </MockBtn>
-          </div>
-        }
+        footer={<EinheitFormFooter pending={pending} onSave={speichern} />}
       >
         <div className="kunde-create">
           {err ? <p className="kunde-create__err">{err}</p> : null}
@@ -267,7 +289,7 @@ export function ObjektEinheitenSection({
             <button
               type="button"
               className="btn ghost"
-              onClick={() => drawer && openEdit(drawer)}
+              onClick={() => drawer && openEditFromDrawer(drawer)}
               disabled={!drawer}
             >
               Bearbeiten

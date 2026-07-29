@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { Eye, EyeOff, Send } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { Eye, EyeOff } from 'lucide-react'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -16,6 +15,46 @@ import {
   type KundeInformierenScope,
 } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 
+function InformierenFooter({
+  pending,
+  showPreview,
+  onTogglePreview,
+  onSend,
+}: {
+  pending: boolean
+  showPreview: boolean
+  onTogglePreview: () => void
+  onSend: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+        Abbrechen
+      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" loading={pending} onClick={onTogglePreview}>
+          {showPreview ? (
+            <>
+              <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
+              Vorschau aus
+            </>
+          ) : (
+            <>
+              <Eye className="mr-1.5 h-4 w-4" aria-hidden />
+              Vorschau
+            </>
+          )}
+        </Button>
+        <Button type="button" variant="primary" loading={pending} onClick={onSend}>
+          Senden
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Kunde informieren — EditorSheet Split-over (Mock Surface B). */
 export function KundeInformierenModal({
   open,
   onClose,
@@ -39,6 +78,7 @@ export function KundeInformierenModal({
   const [nachricht, setNachricht] = useState(defaultNachricht)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -46,6 +86,7 @@ export function KundeInformierenModal({
     setNachricht(defaultNachricht)
     setPreviewHtml(null)
     setShowPreview(false)
+    setDirty(false)
     void getKundeInformierenMailDefaults(auftragId).then((r) => {
       if (r.ok) setAnrede(r.defaultAnrede)
     })
@@ -91,6 +132,7 @@ export function KundeInformierenModal({
         return
       }
       toast.success('E-Mail an Kund:in gesendet')
+      setDirty(false)
       onClose()
     })
   }
@@ -105,43 +147,29 @@ export function KundeInformierenModal({
           : ''
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title="Kunde informieren"
+      crumb="Vor Ort >"
+      context="detail"
+      dirty={dirty}
       size="lg"
+      compose
+      composeLabel="Senden"
+      onConfirm={senden}
+      confirmBusy={pending}
       footer={
-        <ModalFormFooter
-          onCancel={onClose}
-          onSubmit={senden}
-          submitLabel="Senden"
-          loading={pending}
-          extra={
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full md:w-auto"
-              loading={pending}
-              onClick={() => (showPreview ? setShowPreview(false) : void loadPreview())}
-            >
-              {showPreview ? (
-                <>
-                  <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
-                  Vorschau aus
-                </>
-              ) : (
-                <>
-                  <Eye className="mr-1.5 h-4 w-4" aria-hidden />
-                  Vorschau
-                </>
-              )}
-            </Button>
-          }
+        <InformierenFooter
+          pending={pending}
+          showPreview={showPreview}
+          onTogglePreview={() => (showPreview ? setShowPreview(false) : void loadPreview())}
+          onSend={senden}
         />
       }
     >
       <div className="space-y-4">
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
           Update an <strong>{kundeName}</strong>
           {scopeHint ? <> · {scopeHint}</> : null}. Notizen und Fotos des Abschnitts werden auf der
           Kunden-Statusseite angezeigt.
@@ -149,25 +177,49 @@ export function KundeInformierenModal({
 
         <div className="flex gap-3">
           <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
-            <input type="radio" checked={anrede === 'sie'} onChange={() => setAnrede('sie')} />
+            <input
+              type="radio"
+              checked={anrede === 'sie'}
+              onChange={() => {
+                setAnrede('sie')
+                setDirty(true)
+              }}
+            />
             Sie
           </label>
           <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
-            <input type="radio" checked={anrede === 'du'} onChange={() => setAnrede('du')} />
+            <input
+              type="radio"
+              checked={anrede === 'du'}
+              onChange={() => {
+                setAnrede('du')
+                setDirty(true)
+              }}
+            />
             Du
           </label>
         </div>
 
-        <Input label="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+        <Input
+          label="Betreff"
+          value={betreff}
+          onChange={(e) => {
+            setBetreff(e.target.value)
+            setDirty(true)
+          }}
+        />
         <Textarea
           label="Nachricht"
           rows={6}
           value={nachricht}
-          onChange={(e) => setNachricht(e.target.value)}
+          onChange={(e) => {
+            setNachricht(e.target.value)
+            setDirty(true)
+          }}
         />
 
         {showPreview && previewHtml ? <CollapsibleMailPreview previewHtml={previewHtml} /> : null}
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

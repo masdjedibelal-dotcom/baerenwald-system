@@ -9,10 +9,10 @@ import {
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -398,20 +398,35 @@ export function AuftragDokumenteTab({
         )}
       </Card>
 
-      <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Dokument bearbeiten" size="sm">
+      <EditorSheet
+        open={!!editRow}
+        onClose={() => setEditRow(null)}
+        title="Dokument bearbeiten"
+        crumb="Dokumente >"
+        context="detail"
+        dirty
+        size="md"
+        footer={<DokumentEditFooter pending={pending} onSave={saveEdit} />}
+      >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
           <Textarea label="Beschreibung" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3} />
         </div>
-        <div className="mt-4 flex gap-2">
-          <Button variant="secondary" onClick={() => setEditRow(null)}>
-            Abbrechen
-          </Button>
-          <Button variant="primary" loading={pending} onClick={saveEdit}>
-            Speichern
-          </Button>
-        </div>
-      </Modal>
+      </EditorSheet>
+    </div>
+  )
+}
+
+function DokumentEditFooter({ pending, onSave }: { pending: boolean; onSave: () => void }) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
+      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+        Abbrechen
+      </Button>
+      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
+        ✓ Speichern
+      </Button>
     </div>
   )
 }

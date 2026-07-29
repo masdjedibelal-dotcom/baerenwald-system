@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { TopBar } from '@/components/layout/TopBar'
 import { MockNeuPopover } from '@/components/layout/MockNeuPopover'
+import { FabCreateHost } from '@/components/neu/FabCreateHost'
 import { GlobalShortcuts } from '@/components/layout/GlobalShortcuts'
 import { DemoModeBanner } from '@/components/dashboard/DemoModeBanner'
 import { ToastProvider } from '@/components/ui'
@@ -64,6 +65,7 @@ function ShellChrome({
       </div>
 
       <MockNeuPopover open={neuOpen} onClose={() => setNeuOpen(false)} />
+      <FabCreateHost />
       <GlobalShortcuts onNeu={() => setNeuOpen(true)} />
       <AssistentPanel />
       <ToastProvider />

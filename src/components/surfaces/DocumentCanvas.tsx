@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import { ActionSheet } from '@/components/ui/ActionSheet'
 import { trapFocus } from '@/lib/a11y/focus-trap'
+import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
 
 export type DocumentCanvasProps = {
@@ -34,6 +35,11 @@ export type DocumentCanvasProps = {
   className?: string
   /** Portal fullscreen (default true) */
   portal?: boolean
+  /**
+   * Browser-Back schließt Canvas (default true).
+   * Auf eigenen Routes (`/angebote/neu`) aus — sonst kämpft die History mit PickerSheets.
+   */
+  manageHistory?: boolean
   /** Vollflächiger Lade-Overlay (z. B. Versand) */
   busy?: boolean
   busyLabel?: string
@@ -61,6 +67,7 @@ export function DocumentCanvas({
   footerCta,
   className,
   portal = true,
+  manageHistory = true,
   busy,
   busyLabel,
 }: DocumentCanvasProps) {
@@ -101,10 +108,17 @@ export function DocumentCanvas({
   }, [])
 
   useEffect(() => {
-    if (!open || !mounted || !portal) return
+    if (!open || !mounted || !portal || !manageHistory) return
     window.history.pushState({ documentCanvas: true }, '')
     historyPushed.current = true
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
+      // Sheet geschlossen → wir landen wieder auf Canvas-State → offen lassen
+      const st = e.state as { documentCanvas?: boolean } | null
+      if (st?.documentCanvas) {
+        historyPushed.current = true
+        return
+      }
+      if (editorSheetStackDepth() > 0) return
       historyPushed.current = false
       handleClose()
     }
@@ -116,7 +130,7 @@ export function DocumentCanvas({
         window.history.back()
       }
     }
-  }, [open, mounted, portal, handleClose])
+  }, [open, mounted, portal, manageHistory, handleClose])
 
   useEffect(() => {
     if (!open || !mounted) return
@@ -130,15 +144,41 @@ export function DocumentCanvas({
     }
   }, [open, mounted, handleClose])
 
-  /* S7-ähnlich: Viewport für sticky DocBar */
+  /* S7: visualViewport nur mobil (Tastatur) — Desktop immer echter Fullscreen ohne Lücken */
   useEffect(() => {
-    if (!open) return
+    if (!open || !mounted) return
     const root = rootRef.current
     const vv = window.visualViewport
     if (!root || !vv) return
+
+    const isMobile = window.matchMedia('(max-width: 768px)').matches
+    if (!isMobile) {
+      root.style.top = ''
+      root.style.height = ''
+      root.style.left = ''
+      root.style.right = ''
+      root.style.width = ''
+      root.style.bottom = ''
+      return
+    }
+
     const sync = () => {
-      root.style.height = `${vv.height}px`
+      const kbOpen = Math.max(0, window.innerHeight - vv.height - vv.offsetTop) > 40
+      if (!kbOpen) {
+        root.style.top = '0'
+        root.style.left = '0'
+        root.style.right = '0'
+        root.style.width = '100%'
+        root.style.height = '100dvh'
+        root.style.bottom = 'auto'
+        return
+      }
       root.style.top = `${vv.offsetTop}px`
+      root.style.left = '0'
+      root.style.right = '0'
+      root.style.width = '100%'
+      root.style.height = `${vv.height}px`
+      root.style.bottom = 'auto'
     }
     sync()
     vv.addEventListener('resize', sync)
@@ -148,8 +188,12 @@ export function DocumentCanvas({
       vv.removeEventListener('scroll', sync)
       root.style.height = ''
       root.style.top = ''
+      root.style.left = ''
+      root.style.right = ''
+      root.style.width = ''
+      root.style.bottom = ''
     }
-  }, [open])
+  }, [open, mounted])
 
   /* Spec §10 / §16: DocBar kompakt beim Scrollen */
   useEffect(() => {
@@ -182,7 +226,7 @@ export function DocumentCanvas({
   const ui = (
     <div
       ref={rootRef}
-      className={cn('document-canvas relative', className)}
+      className={cn('document-canvas', className)}
       role="dialog"
       aria-modal="true"
       aria-busy={interactionLocked || undefined}

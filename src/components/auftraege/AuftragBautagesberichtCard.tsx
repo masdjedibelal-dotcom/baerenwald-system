@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -153,6 +154,12 @@ export function AuftragBautagesberichtCard({
     setEditId(null)
   }
 
+  function closeForm() {
+    setAddOpen(false)
+    setEditId(null)
+    resetNeu()
+  }
+
   function startEdit(b: AuftragBautagesbericht) {
     setEditId(b.id)
     setAddOpen(false)
@@ -222,7 +229,7 @@ export function AuftragBautagesberichtCard({
           return
         }
         toast.success('Bautagesbericht gespeichert')
-        setEditId(null)
+        closeForm()
       } else {
         const r = await createAuftragBautagesbericht({ auftrag_id: auftragId, ...payload })
         if (!r.ok) {
@@ -230,8 +237,7 @@ export function AuftragBautagesberichtCard({
           return
         }
         toast.success(`Bautagesbericht Tag ${String(naechsterTag).padStart(2, '0')} angelegt`)
-        setAddOpen(false)
-        resetNeu()
+        closeForm()
       }
       const list = await listAuftragBautagesberichte(auftragId)
       setRows(list)
@@ -255,6 +261,10 @@ export function AuftragBautagesberichtCard({
 
   const formOpen = addOpen || editId != null
 
+  const sheetTitle = editId
+    ? 'Bautagesbericht bearbeiten'
+    : `Tag ${String(naechsterTag).padStart(2, '0')}`
+
   return (
     <div className="space-y-4">
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
@@ -262,7 +272,7 @@ export function AuftragBautagesberichtCard({
         Abschlussdokumentation).
       </p>
 
-      {rows.length === 0 && !formOpen ? (
+      {rows.length === 0 ? (
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Bautagesberichte.</p>
       ) : (
         <ul className="space-y-2">
@@ -350,11 +360,31 @@ export function AuftragBautagesberichtCard({
         </ul>
       )}
 
-      {formOpen ? (
-        <div className="rounded-lg border border-bw-border bg-bw-surface p-4 space-y-4">
-          <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">
-            {editId ? 'Bautagesbericht bearbeiten' : `Neuer Bautagesbericht — Tag ${String(naechsterTag).padStart(2, '0')}`}
-          </h3>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="gap-1"
+        onClick={() => {
+          resetNeu()
+          setAddOpen(true)
+        }}
+      >
+        <Plus className="h-4 w-4" />
+        Bautagesbericht Tag {String(naechsterTag).padStart(2, '0')}
+      </Button>
+
+      <EditorSheet
+        open={formOpen}
+        onClose={closeForm}
+        title={sheetTitle}
+        crumb="Bautagebuch >"
+        context="detail"
+        dirty
+        size="lg"
+        footer={<BautagesberichtFormFooter pending={pending} onSave={save} />}
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="form-field">
               <label className="form-field-label">Datum</label>
@@ -501,39 +531,28 @@ export function AuftragBautagesberichtCard({
               }}
             />
           </div>
-          <div className="flex gap-2 justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setAddOpen(false)
-                setEditId(null)
-                resetNeu()
-              }}
-            >
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" size="sm" loading={pending} onClick={save}>
-              Speichern
-            </Button>
-          </div>
         </div>
-      ) : (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1"
-          onClick={() => {
-            resetNeu()
-            setAddOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          Bautagesbericht Tag {String(naechsterTag).padStart(2, '0')}
-        </Button>
-      )}
+      </EditorSheet>
+    </div>
+  )
+}
+
+function BautagesberichtFormFooter({
+  pending,
+  onSave,
+}: {
+  pending: boolean
+  onSave: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
+      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+        Abbrechen
+      </Button>
+      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
+        ✓ Speichern
+      </Button>
     </div>
   )
 }

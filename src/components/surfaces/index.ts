@@ -1,4 +1,4 @@
-export { EditorSheet, type EditorSheetContext, type EditorSheetProps } from './EditorSheet'
+export { EditorSheet, useEditorSheetRequestClose, type EditorSheetContext, type EditorSheetProps } from './EditorSheet'
 export { PickerSheet, type PickerSheetProps } from './PickerSheet'
 export { DocumentCanvas, DocumentSection, type DocumentCanvasProps } from './DocumentCanvas'
 export {

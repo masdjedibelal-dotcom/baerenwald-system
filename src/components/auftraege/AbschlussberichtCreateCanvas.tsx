@@ -71,6 +71,10 @@ export function AbschlussberichtCreateCanvas({
   const badgeLabel = hasAbschlussbericht ? 'Erstellt' : 'Entwurf'
 
   function onClose() {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
     router.push(`/auftraege/${auftragId}`)
   }
 
@@ -115,12 +119,12 @@ export function AbschlussberichtCreateCanvas({
 
   return (
     <DocumentCanvas
-      portal={false}
+      portal
+      manageHistory={false}
       title="Abschlussbericht"
       subtitle={subtitle || undefined}
       onClose={onClose}
       onSave={canCreate ? erstellen : undefined}
-      saveLabel="Bericht erstellen"
       saveBusy={pending}
       footerCta={footerCta}
       className="wizard-flow abschluss-canvas"

@@ -2,24 +2,23 @@
 
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import {
-  createAnfrageHref,
-  createAngebotHref,
-  createKundeHref,
-  createPartnerHref,
-  createRechnungHref,
-} from '@/lib/crm/create-entry'
+import { openFabCreate, type FabOverlayArt } from '@/components/neu/FabCreateHost'
+import { createAnfrageHref } from '@/lib/crm/create-entry'
 
-/** FAB: nur kanonische Create-Entry-Pfade (siehe `@/lib/crm/create-entry`). */
-const VORGANG_ITEMS: Array<{ ic: string; label: string; desc: string; href: string }> = [
+type NeuItem =
+  | { ic: string; label: string; desc: string; href: string }
+  | { ic: string; label: string; desc: string; overlay: FabOverlayArt }
+
+/** FAB: Overlay für Kunde/HW/Angebot/Rechnung; Fullpage nur Anfrage-Funnel. */
+const VORGANG_ITEMS: NeuItem[] = [
   { ic: 'inbox', label: 'Anfrage', desc: 'Neuer Kundenbedarf', href: createAnfrageHref() },
-  { ic: 'file-invoice', label: 'Angebot', desc: 'Positionen & Preis', href: createAngebotHref() },
-  { ic: 'receipt', label: 'Rechnung', desc: 'Abschlag oder Schluss', href: createRechnungHref() },
+  { ic: 'file-invoice', label: 'Angebot', desc: 'Positionen & Preis', overlay: 'angebot' },
+  { ic: 'receipt', label: 'Rechnung', desc: 'Abschlag oder Schluss', overlay: 'rechnung' },
 ]
 
-const STAMM_ITEMS: Array<{ ic: string; label: string; desc: string; href: string }> = [
-  { ic: 'users', label: 'Kunde', desc: 'Stammdaten', href: createKundeHref() },
-  { ic: 'tool', label: 'Handwerker', desc: 'Ausführungspartner', href: createPartnerHref() },
+const STAMM_ITEMS: NeuItem[] = [
+  { ic: 'users', label: 'Kunde', desc: 'Stammdaten', overlay: 'kunde' },
+  { ic: 'tool', label: 'Handwerker', desc: 'Ausführungspartner', overlay: 'handwerker' },
 ]
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -27,9 +26,13 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
 
   if (!open) return null
 
-  function go(href: string) {
+  function go(item: NeuItem) {
     onClose()
-    router.push(href)
+    if ('overlay' in item) {
+      openFabCreate(item.overlay)
+      return
+    }
+    router.push(item.href)
   }
 
   return (
@@ -49,7 +52,7 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
             key={it.label}
             type="button"
             className="neu-pop-item"
-            onClick={() => go(it.href)}
+            onClick={() => go(it)}
           >
             <span className="neu-pop-ico">
               <MockIcon ctx="default" n={it.ic} size={18} />
@@ -66,7 +69,7 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
             key={it.label}
             type="button"
             className="neu-pop-item"
-            onClick={() => go(it.href)}
+            onClick={() => go(it)}
           >
             <span className="neu-pop-ico">
               <MockIcon ctx="default" n={it.ic} size={18} />

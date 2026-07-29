@@ -10,10 +10,10 @@ import { toast } from '@/components/ui/app-toast'
 import type { Kunde } from '@/lib/types'
 
 /**
- * Deep-Link `/angebote/neu` ohne kunde_id — Fullscreen-Canvas + Picker sofort offen.
- * FAB öffnet den Picker über FabCreateHost (ohne diese Zwischenseite).
+ * Deep-Link `/rechnungen/neu` ohne kunde_id — Fullscreen-Canvas + Kunden-Picker (Mock `.doccv`).
+ * FAB öffnet den Picker über FabCreateHost; nach Wahl → Wizard mit kunde_id.
  */
-export function AngebotNeuKundeGate({
+export function RechnungNeuKundeGate({
   initialError,
 }: {
   initialError?: string | null
@@ -30,7 +30,7 @@ export function AngebotNeuKundeGate({
   function goWizard(kundeId: string) {
     setOpening(true)
     setPickerOpen(false)
-    router.replace(`/angebote/neu?kunde_id=${encodeURIComponent(kundeId)}`)
+    router.replace(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
   }
 
   function dismiss() {
@@ -39,21 +39,21 @@ export function AngebotNeuKundeGate({
       router.back()
       return
     }
-    router.replace('/vorgaenge?tab=angebot')
+    router.replace('/vorgaenge?tab=rechnung')
   }
 
   return (
     <>
       <DocumentCanvas
-        title="Angebot erstellen"
+        title="Rechnung erstellen"
         onClose={dismiss}
         portal
         manageHistory={false}
-        className="wizard-flow angebot-neu-gate"
+        className="wizard-flow rechnung-neu-gate"
       >
         <DocumentSection label="Kunde">
           <DashedAddCard
-            label={opening ? 'Angebot wird geöffnet…' : 'Kunde wählen'}
+            label={opening ? 'Rechnung wird geöffnet…' : 'Kunde wählen'}
             onClick={() => {
               if (opening) return
               setPickerOpen(true)
@@ -61,7 +61,9 @@ export function AngebotNeuKundeGate({
           />
         </DocumentSection>
         <DocumentSection label="Kopf">
-          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">Nr. · Datum · Gültig bis</p>
+          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+            Nr. · Datum · Fällig
+          </p>
         </DocumentSection>
         <DocumentSection label="Positionen">
           <DashedAddCard
@@ -80,7 +82,7 @@ export function AngebotNeuKundeGate({
           setPickerOpen(false)
           dismiss()
         }}
-        title="Angebot"
+        title="Rechnung"
         context="canvas"
         onNeu={() => setCreateOpen(true)}
         onPick={(k: Kunde) => goWizard(k.id)}

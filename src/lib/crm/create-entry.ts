@@ -1,9 +1,11 @@
 /**
  * Kanonische Create-Entry-Pfade fürs CRM.
- * FAB + TopBar-CTAs + Deep-Links sollen hierher zeigen — keine Parallel-Legacy-Forms.
+ * FAB öffnet Kunde/Handwerker/Rechnung als Overlay auf der aktuellen Seite
+ * (`openFabCreate` / `FabCreateHost`) — ohne weiße `/neu`-Zwischenseite.
+ * Deep-Links `/neu?art=` bleiben für Copilot/Bookmarks.
  *
  * Naming:
- * - Handwerker (Create) = Tabelle `handwerker` → `/neu?art=handwerker` → Liste `/handwerker`
+ * - Handwerker (Create) = Tabelle `handwerker` → Overlay oder `/neu?art=handwerker` → Liste `/handwerker`
  * - Tabelle `partner` bleibt datenmäßig; kein Nav-/Create-Einstieg mehr (Phase 3)
  *
  * Surface-Regel (Spec §6 / Phase 2):
@@ -11,11 +13,11 @@
  * - B EditorSheet — Entity create/edit (Desktop Slide-over, Mobil Bottom Sheet; nie Center)
  * - C ActionSheet — nur Aktion wählen
  * - D Inline — leichte Detail-Felder
- * - Kunde/Handwerker Create = EditorSheet Host `/neu?art=kunde|handwerker`
+ * - Kunde/Handwerker Create = EditorSheet Overlay (FAB) bzw. Deep-Link Host `/neu?art=`
  * - PickerSheet = Kunde/Katalog/Vorgang wählen (+ Header-Neu)
  * - Overlay: kein Modal-in-Modal
  * Angebot: Kunde-Gate = PickerSheet, danach DocumentCanvas.
- * Rechnung: Kunde (+ optional Vorgang) im FAB-Host als PickerSheet, danach DocumentCanvas.
+ * Rechnung: Kundenschritt im FAB-Overlay als PickerSheet, danach DocumentCanvas.
  */
 
 export type CrmCreateArt =
@@ -34,7 +36,8 @@ export function createAnfrageHref(kundeId?: string | null): string {
 
 /**
  * Angebot: direkt `/angebote/neu` — Kundenschritt im Gate (wie Anfrage-Funnel).
- * Rechnung: Kundenschritt über FAB-Modal-Host `/neu?art=rechnung`.
+ * Rechnung: Kundenschritt über FAB-Overlay (`openFabCreate('rechnung')`);
+ * Deep-Link bleibt `/neu?art=rechnung`.
  */
 export function createAngebotHref(kundeId?: string | null): string {
   const kid = kundeId?.trim()

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
@@ -24,6 +24,33 @@ const TYP_OPTS = [
   { value: 'hausverwaltung', label: 'Hausverwaltung' },
   { value: 'gewerbe', label: 'Gewerbe' },
 ] as const
+
+function KundeModalFooter({
+  pending,
+  isCreate,
+  onSubmit,
+}: {
+  pending: boolean
+  isCreate: boolean
+  onSubmit: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="kunde-create-footer">
+      <button
+        type="button"
+        className="btn ghost"
+        onClick={() => requestClose?.()}
+        disabled={pending}
+      >
+        Abbrechen
+      </button>
+      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
+        {pending ? '…' : isCreate ? 'Kunde anlegen' : 'Speichern'}
+      </MockBtn>
+    </div>
+  )
+}
 
 export function KundeModal({
   open,
@@ -216,14 +243,7 @@ export function KundeModal({
   }
 
   const footer = (
-    <div className="kunde-create-footer">
-      <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={submit}>
-        {pending ? '…' : isCreate ? 'Kunde anlegen' : 'Speichern'}
-      </MockBtn>
-    </div>
+    <KundeModalFooter pending={pending} isCreate={isCreate} onSubmit={submit} />
   )
 
   return (

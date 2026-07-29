@@ -12,6 +12,10 @@ import {
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
+import {
+  AuftragBautagebuchSection,
+  type BautagebuchListenEintrag,
+} from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
@@ -27,7 +31,6 @@ import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { Button } from '@/components/ui/Button'
 
 type AuftragLeadSnap = Pick<
   Lead,
@@ -159,6 +162,7 @@ export function AuftragLeistungenTab({
   const [maengel, setMaengel] = useState<LeistungMangelAnzeige[]>([])
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
+  const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
   const [eintragByPos, setEintragByPos] = useState<
     Record<string, { at?: string | null; text: string }[]>
   >({})
@@ -166,6 +170,14 @@ export function AuftragLeistungenTab({
   const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
   const disabled = istAbgeschlossen || !editable
   const angebotTitel = projektTitel(detail, lead)
+
+  const posNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const p of detail.auftrag_positionen ?? []) {
+      m.set(p.id, p.leistung_name?.trim() || 'Leistung')
+    }
+    return m
+  }, [detail.auftrag_positionen])
 
   const footerNettoMwst = useMemo(() => {
     const netto = auftragSummenAusPositionen(
@@ -222,7 +234,10 @@ export function AuftragLeistungenTab({
     void listAuftragPositionEintraege(detail.id).then((list) => {
       if (cancelled) return
       const m: Record<string, { at?: string | null; text: string }[]> = {}
+      const enriched: BautagebuchListenEintrag[] = []
       for (const e of list) {
+        const leistungName = e.position_id ? posNameById.get(e.position_id) ?? null : null
+        enriched.push({ ...e, leistungName })
         if (!e.position_id) continue
         const text = [eintragTypLabel(e.typ), e.beschreibung?.trim()].filter(Boolean).join(': ')
         if (!text) continue
@@ -231,11 +246,12 @@ export function AuftragLeistungenTab({
         m[e.position_id] = arr
       }
       setEintragByPos(m)
+      setBautagebuchEintraege(enriched)
     })
     return () => {
       cancelled = true
     }
-  }, [detail.id, detail.updated_at])
+  }, [detail.id, detail.updated_at, posNameById])
 
   function openTagebuch(positionId?: string | null) {
     setTagebuchPositionId(positionId ?? null)
@@ -262,7 +278,7 @@ export function AuftragLeistungenTab({
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <LeistungenTab
         phase="auftrag"
         rows={rows}
@@ -291,7 +307,7 @@ export function AuftragLeistungenTab({
             : (row) => [
                 {
                   id: 'fortschritt',
-                  label: 'Fortschritt erfassen',
+                  label: 'Eintrag erfassen',
                   variant: 'primary',
                   onClick: () => openTagebuch(row.id),
                 },
@@ -301,24 +317,14 @@ export function AuftragLeistungenTab({
                   variant: 'ghost',
                   onClick: () => setZuweisungIds([row.id]),
                 },
-                {
-                  id: 'abnahme',
-                  label: 'Abnahme erfassen',
-                  variant: 'ghost',
-                  onClick: () => {
-                    window.location.href = `/auftraege/${detail.id}/abnahme/erstellen`
-                  },
-                  disabled: row.status === 'erledigt' || row.status === 'abgenommen',
-                },
               ]
         }
-        belowTable={
-          !disabled ? (
-            <button type="button" className="lt-add-entry" onClick={() => openTagebuch(null)}>
-              + Tagebuch-Eintrag
-            </button>
-          ) : null
-        }
+      />
+
+      <AuftragBautagebuchSection
+        eintraege={bautagebuchEintraege}
+        disabled={disabled}
+        onAdd={() => openTagebuch(null)}
       />
 
       {zuweisungIds ? (
@@ -346,7 +352,7 @@ export function AuftragLeistungenTab({
         initialPositionId={tagebuchPositionId}
         onSaved={() => onSaved?.()}
       />
-    </>
+    </div>
   )
 }
 

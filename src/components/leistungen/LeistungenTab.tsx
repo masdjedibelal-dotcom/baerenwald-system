@@ -416,7 +416,7 @@ export function LeistungenTab({
     <div className="lt-root space-y-3">
       <LeistungenMaengelCard maengel={maengel} />
 
-      {isRechnung ? (
+      {isRechnung || isAuftrag ? (
         <div className="lt-sec-h">
           <span className="lt-sec-title">Leistungen</span>
           {toolbar}

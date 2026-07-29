@@ -95,11 +95,12 @@ export function CrmPositionEintragModal({
       toast.error('Bitte Beschreibung angeben.')
       return
     }
-    if (ohneLeistung) {
-      toast.error('Bitte eine Leistung wählen — oder öffne den Eintrag über eine Position.')
+    if (!positionId) {
+      toast.error('Bitte eine Leistung zuordnen (Soft-Bezug).')
       return
     }
-    const eintragTyp: EintragTyp = typ === 'notiz' ? 'fortschritt' : typ
+    const eintragTyp: EintragTyp =
+      typ === 'notiz' ? 'weitere_arbeit' : typ === 'fortschritt' && ohneLeistung ? 'weitere_arbeit' : typ
     const text = [titel.trim(), beschreibung.trim()].filter(Boolean).join('\n\n')
     startTransition(async () => {
       const r = await createCrmPositionEintrag({
@@ -174,7 +175,7 @@ export function CrmPositionEintragModal({
                   </option>
                 ))}
               </select>
-              <span className="lt-field-opt">für Speichern erforderlich</span>
+              <span className="lt-field-opt">optional Soft-Bezug — Angebotszeile ≠ Baustellen-Update</span>
             </label>
           </>
         ) : null}

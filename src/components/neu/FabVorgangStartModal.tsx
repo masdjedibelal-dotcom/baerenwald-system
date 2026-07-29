@@ -17,9 +17,9 @@ import { fachbegriff } from '@/lib/crm/fachbegriffe'
 export type FabVorgangArt = 'anfrage' | 'angebot' | 'rechnung'
 
 /**
- * FAB-Zwischenschritt.
- * Anfrage & Angebot: Redirect zum Funnel/Gate.
- * Rechnung: KundePickerSheet (+ nested Create) · optional Vorgang-Picker bei vorausgewähltem Kunden.
+ * FAB-Zwischenschritt auf der aktuellen Seite (kein weißer `/neu`-Host).
+ * Anfrage: direkt Funnel.
+ * Angebot / Rechnung: KundePicker → danach Wizard-URL.
  */
 export function FabVorgangStartModal({
   open,
@@ -41,28 +41,20 @@ export function FabVorgangStartModal({
   const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
-    if (!open || (art !== 'anfrage' && art !== 'angebot')) return
+    if (!open || art !== 'anfrage') return
     const kid = initialKundeId?.trim()
-    const href =
-      art === 'anfrage'
-        ? kid
-          ? `/anfragen/neu?kunde_id=${encodeURIComponent(kid)}`
-          : '/anfragen/neu'
-        : kid
-          ? `/angebote/neu?kunde_id=${encodeURIComponent(kid)}`
-          : '/angebote/neu'
-    router.push(href)
+    router.push(kid ? `/anfragen/neu?kunde_id=${encodeURIComponent(kid)}` : '/anfragen/neu')
     onClose()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei open/art/kunde
   }, [open, art, initialKundeId, router])
 
   useEffect(() => {
-    if (!open || !art || art === 'anfrage' || art === 'angebot') return
+    if (!open || !art || art === 'anfrage') return
     const kid = initialKundeId?.trim() || null
     setKundeId(kid)
     setAuftraege([])
     setCreateOpen(false)
-    if (kid) {
+    if (art === 'rechnung' && kid) {
       setStep(2)
       setLoadingAuftraege(true)
       startTransition(async () => {
@@ -81,7 +73,12 @@ export function FabVorgangStartModal({
     setLoadingAuftraege(false)
   }, [open, art, initialKundeId])
 
-  if (!art || art === 'anfrage' || art === 'angebot') return null
+  if (!art || art === 'anfrage') return null
+
+  function startAngebot(kid: string) {
+    onClose()
+    router.push(`/angebote/neu?kunde_id=${encodeURIComponent(kid)}`)
+  }
 
   function startRechnung(withAuftragId: string | null, kid = kundeId) {
     if (!kid) {
@@ -100,60 +97,67 @@ export function FabVorgangStartModal({
 
   function onKundePick(k: Kunde) {
     setKundeId(k.id)
+    if (art === 'angebot') {
+      startAngebot(k.id)
+      return
+    }
     startRechnung(null, k.id)
   }
 
   const kundeVorausgewaehlt = Boolean(initialKundeId?.trim())
+  const pickerTitle = art === 'angebot' ? 'Angebot' : 'Rechnung'
 
   return (
     <>
       <KundePickerSheet
         open={open && step === 1 && !createOpen}
         onClose={() => !pending && onClose()}
-        title="Rechnung"
+        title={pickerTitle}
         context="canvas"
         onNeu={() => setCreateOpen(true)}
         onPick={onKundePick}
       />
 
-      <PickerSheet
-        open={open && step === 2 && !createOpen}
-        onClose={() => {
-          if (pending) return
-          if (!kundeVorausgewaehlt) {
-            setStep(1)
-            return
-          }
-          onClose()
-        }}
-        title="Vorgang"
-        context="canvas"
-        empty={loadingAuftraege ? <p className="picker-sheet__empty">Lädt…</p> : undefined}
-      >
-        <ul className="picker-sheet__rows">
-          <li>
-            <button type="button" className="picker-sheet__row" onClick={() => startRechnung(null)}>
-              <span className="picker-sheet__row-title">Ohne Vorgang</span>
-              <span className="picker-sheet__row-meta" title={fachbegriff('ohne_vorgang')}>
-                Direktrechnung
-              </span>
-            </button>
-          </li>
-          {auftraege.map((a) => (
-            <li key={a.id}>
-              <button type="button" className="picker-sheet__row" onClick={() => startRechnung(a.id)}>
-                <span className="picker-sheet__row-title">
-                  {a.titel?.trim() || `Auftrag ${a.id.slice(0, 8).toUpperCase()}`}
-                </span>
-                <span className="picker-sheet__row-meta">
-                  {a.status}
-                  {a.created_at ? ` · ${formatDatum(a.created_at)}` : ''}
+      {art === 'rechnung' ? (
+        <PickerSheet
+          open={open && step === 2 && !createOpen}
+          onClose={() => {
+            if (pending) return
+            if (!kundeVorausgewaehlt) {
+              setStep(1)
+              return
+            }
+            onClose()
+          }}
+          title="Vorgang"
+          context="canvas"
+          empty={loadingAuftraege ? <p className="picker-sheet__empty">Lädt…</p> : undefined}
+        >
+          <ul className="picker-sheet__rows">
+            <li>
+              <button type="button" className="picker-sheet__row" onClick={() => startRechnung(null)}>
+                <span className="picker-sheet__row-title">Ohne Vorgang</span>
+                <span className="picker-sheet__row-meta" title={fachbegriff('ohne_vorgang')}>
+                  Direktrechnung
                 </span>
               </button>
             </li>
-          ))}
-        </ul>
-      </PickerSheet>
+            {auftraege.map((a) => (
+              <li key={a.id}>
+                <button type="button" className="picker-sheet__row" onClick={() => startRechnung(a.id)}>
+                  <span className="picker-sheet__row-title">
+                    {a.titel?.trim() || `Auftrag ${a.id.slice(0, 8).toUpperCase()}`}
+                  </span>
+                  <span className="picker-sheet__row-meta">
+                    {a.status}
+                    {a.created_at ? ` · ${formatDatum(a.created_at)}` : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </PickerSheet>
+      ) : null}
 
       <KundeModal
         open={createOpen}
@@ -161,7 +165,9 @@ export function FabVorgangStartModal({
         stayOnPage
         onSaved={(id) => {
           setCreateOpen(false)
-          if (id) startRechnung(null, id)
+          if (!id) return
+          if (art === 'angebot') startAngebot(id)
+          else startRechnung(null, id)
         }}
       />
     </>
