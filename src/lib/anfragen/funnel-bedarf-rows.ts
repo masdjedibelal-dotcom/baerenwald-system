@@ -1,6 +1,7 @@
 import type { ProjektUebersichtExtraRow } from '@/components/crm/EntityProjektUebersichtCard'
 import {
   kundentypLabel,
+  resolveLeadPreisAnzeige,
   zeitraumLabel,
 } from '@/lib/lead-display-helpers'
 import {
@@ -13,8 +14,10 @@ import {
   normalizeFunnelDaten,
 } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
+import { STAFF_ANLIEGEN } from '@/lib/anfragen/staff-funnel-types'
+import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
-import { BEREICH_LABELS, formatDatum, formatDatumZeit } from '@/lib/utils'
+import { BEREICH_LABELS, formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
 
 export type FunnelBedarfLeadPick = {
   situation?: string | null
@@ -198,4 +201,158 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
   }
 
   return { extraRows, footerRows }
+}
+
+const ORG_FREIGABE_KURZ: Record<string, string> = {
+  ausstehend: 'Ausstehend',
+  freigegeben: 'Freigegeben',
+  abgelehnt: 'Abgelehnt',
+  nicht_noetig: 'Nicht nötig',
+}
+
+/**
+ * Prop-Zeilen für Anfrage-Phase-Sheet (Verlauf Split-over) —
+ * alle mitgegebenen Funnel-/Kontakt-/Stammdaten als Strings.
+ */
+export function buildAnfragePhaseSheetProps(lead: {
+  id: string
+  status?: string | null
+  kanal?: string | null
+  situation?: string | null
+  bereiche?: string[] | null
+  kundentyp?: string | null
+  zeitraum?: string | null
+  zeitraum_von?: string | null
+  zeitraum_bis?: string | null
+  funnel_daten?: unknown
+  created_at?: string | null
+  plz?: string | null
+  budget_ca?: number | null
+  preis_min?: number | null
+  preis_max?: number | null
+  kontakt_name?: string | null
+  kontakt_email?: string | null
+  kontakt_telefon?: string | null
+  kontakt_nachricht?: string | null
+  notizen?: string | null
+  melder_name?: string | null
+  melder_telefon?: string | null
+  melder_email?: string | null
+  melder_einheit?: string | null
+  org_freigabe_status?: string | null
+  kunden?: {
+    name?: string | null
+    email?: string | null
+    telefon?: string | null
+    plz?: string | null
+    ort?: string | null
+    strasse?: string | null
+    hausnummer?: string | null
+  } | null
+  auftraggeber?: { name?: string | null; org_anzeigename?: string | null } | null
+  kunden_objekte?: {
+    titel?: string | null
+    strasse?: string | null
+    hausnummer?: string | null
+    plz?: string | null
+    ort?: string | null
+  } | null
+}): { k: string; v: string }[] {
+  const out: { k: string; v: string }[] = []
+  const seen = new Set<string>()
+  const push = (k: string, v: string | null | undefined) => {
+    const t = (v ?? '').trim()
+    if (!t || t === '—') return
+    if (seen.has(k)) return
+    seen.add(k)
+    out.push({ k, v: t })
+  }
+
+  const fd =
+    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
+      ? (lead.funnel_daten as Record<string, unknown>)
+      : {}
+
+  push('Eingegangen', lead.created_at ? formatDatumZeit(lead.created_at) : null)
+  push(
+    'Status',
+    anfrageStatusDisplay(lead.status ?? 'neu', {
+      orgFreigabeStatus: lead.org_freigabe_status,
+    }).label
+  )
+  push('Quelle', kanalLabel(lead.kanal ?? ''))
+
+  const anliegenId = typeof fd.anliegen === 'string' ? fd.anliegen.trim() : ''
+  const anliegenLabel = STAFF_ANLIEGEN.find((a) => a.id === anliegenId)?.label
+  push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
+  push('Vorhaben', strFromFunnel(fd, 'vorhaben'))
+
+  const beschreibung = (lead.kontakt_nachricht ?? '').trim()
+  if (beschreibung) {
+    // Vorhaben steckt oft in der ersten Zeile von kontakt_nachricht
+    const vorhaben = strFromFunnel(fd, 'vorhaben')
+    const body =
+      vorhaben && beschreibung.startsWith(vorhaben)
+        ? beschreibung.slice(vorhaben.length).replace(/^\n+/, '').trim()
+        : beschreibung
+    push('Beschreibung', body || beschreibung)
+  }
+
+  push('Kunde', lead.kontakt_name?.trim() || lead.kunden?.name?.trim() || null)
+  push('Telefon', lead.kontakt_telefon?.trim() || lead.kunden?.telefon?.trim() || null)
+  push('E-Mail', lead.kontakt_email?.trim() || lead.kunden?.email?.trim() || null)
+
+  const agName =
+    lead.auftraggeber?.org_anzeigename?.trim() || lead.auftraggeber?.name?.trim() || null
+  push('Auftraggeber', agName)
+
+  if (lead.kunden_objekte) {
+    const o = lead.kunden_objekte
+    const strasse = [o.strasse, o.hausnummer].filter(Boolean).join(' ')
+    const ort = [o.plz, o.ort].filter(Boolean).join(' ')
+    push('Objekt', [o.titel?.trim(), strasse, ort].filter(Boolean).join(' · ') || null)
+  }
+
+  push('Melder', lead.melder_name)
+  push(
+    'Melder-Kontakt',
+    [lead.melder_telefon, lead.melder_email].filter(Boolean).join(' · ') || null
+  )
+  push('Einheit', lead.melder_einheit)
+
+  const freigabe = (lead.org_freigabe_status ?? '').trim()
+  if (freigabe && freigabe !== 'nicht_noetig') {
+    push('HV-Freigabe', ORG_FREIGABE_KURZ[freigabe] ?? freigabe)
+  }
+
+  const budget = resolveLeadPreisAnzeige(
+    (lead.kanal ?? 'sonstiges') as import('@/lib/types').LeadKanal,
+    lead.budget_ca,
+    lead.preis_min,
+    lead.preis_max,
+    lead.funnel_daten
+  )
+  push('Budgetrahmen', budget === '—' ? null : budget)
+  push('Budget-Hinweis', strFromFunnel(fd, 'budget_hinweis', 'budgetHinweis'))
+
+  const { extraRows } = buildFunnelBedarfExtraRows(lead)
+  for (const row of extraRows) {
+    if (typeof row.children === 'string') push(row.label, row.children)
+  }
+
+  // Adresse aus Kunde, falls Funnel nichts hatte
+  if (!seen.has('Adresse')) {
+    const strasse = [lead.kunden?.strasse, lead.kunden?.hausnummer].filter(Boolean).join(' ')
+    push('Adresse', strasse || null)
+  }
+  if (!seen.has('Ort')) {
+    const ortZeile = [lead.plz || lead.kunden?.plz, lead.kunden?.ort]
+      .filter(Boolean)
+      .join(' ')
+    push('Ort', ortZeile || null)
+  }
+
+  push('Interne Notiz', lead.notizen)
+
+  return out
 }

@@ -1,6 +1,8 @@
 'use client'
 
-/** Banner am Auftrag (§10): Notfall — Abrechnung nur nach Aufwand. */
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+
+/** Banner am Auftrag (§10): Notfall — Abrechnung nur nach Aufwand. Mock: grünes OK-Band. */
 export function AuftragNotfallBanner({
   istNotfall,
   verguetung: _verguetung,
@@ -12,12 +14,11 @@ export function AuftragNotfallBanner({
   if (!istNotfall) return null
 
   return (
-    <div
-      className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[length:var(--fs-text)] text-emerald-950"
-      role="status"
-    >
-      <strong className="font-semibold">Notfall:</strong> Ausführung läuft · HV informiert ·
-      Abrechnung nach Aufwand
+    <div className="auftrag-notfall-banner" role="status">
+      <MockIcon ctx="emphasis" n="checks" size={16} />
+      <span>
+        <strong>Notfall:</strong> Ausführung läuft · HV informiert · Abrechnung nach Aufwand
+      </span>
     </div>
   )
 }

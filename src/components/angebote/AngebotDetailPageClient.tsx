@@ -25,8 +25,7 @@ import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateAngebot } from '@/lib/list-actions'
-import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromAngebot } from '@/app/(dashboard)/kommunikation/actions'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
@@ -207,15 +206,6 @@ export function AngebotDetailPageClient({
     if (tab) setMainTab(tab)
   }, [searchParams, detail.id, router])
 
-  useEffect(() => {
-    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : ''
-    if (hash !== 'angebot-versand-handwerker' && hash !== 'handwerker-partner') return
-    const t = window.setTimeout(() => {
-      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 120)
-    return () => window.clearTimeout(t)
-  }, [detail.id, detail.angebot_handwerker])
-
   const statusEinfach = resolveStatusEinfach(detail)
   const angebotStatus = useMemo(() => angebotStatusDisplay(detail), [detail])
 
@@ -256,6 +246,25 @@ export function AngebotDetailPageClient({
       openWizardMitBootstrap(res.bootstrap)
     })
   }
+
+  useEffect(() => {
+    if (searchParams.get('bearbeiten') !== '1') return
+    const q = new URLSearchParams(searchParams.toString())
+    q.delete('bearbeiten')
+    const qs = q.toString()
+    router.replace(`/angebote/${detail.id}${qs ? `?${qs}` : ''}`, { scroll: false })
+    openWizardBearbeiten()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- einmalig bei ?bearbeiten=1
+  }, [searchParams, detail.id])
+
+  useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : ''
+    if (hash !== 'angebot-versand-handwerker' && hash !== 'handwerker-partner') return
+    const t = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [detail.id, detail.angebot_handwerker])
 
   function closeWizard() {
     setWizardOpen(false)
@@ -402,9 +411,21 @@ export function AngebotDetailPageClient({
       ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
       : undefined
 
-  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const kundeEmail =
-    lead?.auftraggeber?.email?.trim() || kunde?.email?.trim() || ''
+    lead?.auftraggeber?.email?.trim() ||
+    kunde?.email?.trim() ||
+    lead?.kontakt_email?.trim() ||
+    ''
+  const kundeTel =
+    detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+  const akteLeadId = detail.lead_id ?? lead?.id ?? null
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kundeTel,
+    email: kundeEmail,
+    notiz: akteLeadId ? { kind: 'lead', leadId: akteLeadId } : null,
+    dokument: akteLeadId ? { kind: 'lead', leadId: akteLeadId } : null,
+    onSaved: () => refresh(),
+  })
 
   function openAcceptModal() {
     setAufBetreff('')
@@ -606,34 +627,7 @@ export function AngebotDetailPageClient({
           value: String(positionenAnzeigeCount),
         },
       ]}
-      quickBar={[
-        {
-          id: 'call',
-          label: 'Anrufen',
-          icon: 'phone',
-          disabled: !detail.kunden?.telefon?.trim() && !lead?.kontakt_telefon?.trim(),
-          onClick: () => {
-            const tel =
-              detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
-            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
-          },
-        },
-        {
-          id: 'mail',
-          label: 'Mail',
-          icon: 'mail',
-          disabled: !kundeEmail,
-          onClick: () =>
-            mailCompose.openCompose(() => mailComposeContextFromAngebot(detail.id)),
-        },
-        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setMainTab('akte') },
-        {
-          id: 'foto',
-          label: 'Foto',
-          icon: 'camera',
-          onClick: () => setMainTab('akte'),
-        },
-      ]}
+      quickBar={quickBar}
       nextStep={naechsterSchrittAngebot({
         statusEinfach,
         hasAuftrag: Boolean(auftragId),
@@ -946,7 +940,7 @@ export function AngebotDetailPageClient({
         </div>
       </Modal>
 
-      {mailCompose.modal}
+      {quickActionSheets}
     </EntityDetailLayout>
   )
 }

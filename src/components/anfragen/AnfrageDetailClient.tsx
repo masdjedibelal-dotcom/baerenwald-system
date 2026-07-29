@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
@@ -15,8 +16,6 @@ import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
-import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
 import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
@@ -37,7 +36,6 @@ import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
@@ -343,7 +341,13 @@ export function AnfrageDetailClient({
     lead.kontakt_telefon?.trim() ||
     null
   const auftragId = leadStatusData.auftrag_id as string | undefined
-  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: leadTel,
+    email: leadEmail,
+    notiz: { kind: 'lead', leadId: lead.id },
+    dokument: { kind: 'lead', leadId: lead.id },
+    onSaved: () => refresh(),
+  })
 
   const openAngebotWizard = useCallback((bootstrap: AngebotWizardBootstrap | null) => {
     setAngebotWizardBootstrap(bootstrap)
@@ -559,8 +563,10 @@ export function AnfrageDetailClient({
       phase="anfrage"
       rows={leistungenFromAnfrage(lead.funnel_daten)}
       onOpenDokument={openAngebotErstellen}
+      dokumentHint="Verbindliche Leistungen entstehen erst mit dem Angebot — hier siehst du nur den Bedarf aus der Anfrage."
+      dokumentActionLabel="Angebot erstellen"
       emptyTitle="Noch keine Leistungen"
-      emptyHint="Bedarf aus der Anfrage erscheint hier. Verbindliche Positionen legst du im Angebot an."
+      emptyHint="Zuerst Angebot erstellen — dort legst du verbindliche Positionen an."
     />
   )
 
@@ -626,12 +632,7 @@ export function AnfrageDetailClient({
       label: entityDetailTabLabel('aktivitaet'),
       icon: 'history',
       count: timelineItems.length || undefined,
-      render: () => (
-        <div className="space-y-6">
-          {timelineTab}
-          <ProjektHistorieTab kontext={projektKontext} />
-        </div>
-      ),
+      render: () => timelineTab,
     },
   ]
 
@@ -656,26 +657,7 @@ export function AnfrageDetailClient({
           : []),
         { label: 'Angebote', value: String(angeboteListe.length) },
       ]}
-      quickBar={[
-        {
-          id: 'call',
-          label: 'Anrufen',
-          icon: 'phone',
-          disabled: !leadTel,
-          onClick: () => {
-            if (leadTel) window.open(`tel:${leadTel.replace(/\s/g, '')}`)
-          },
-        },
-        {
-          id: 'mail',
-          label: 'Mail',
-          icon: 'mail',
-          disabled: !leadEmail,
-          onClick: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
-        },
-        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setTab('akte') },
-        { id: 'foto', label: 'Foto', icon: 'camera', onClick: () => setTab('uebersicht') },
-      ]}
+      quickBar={quickBar}
       nextStep={
         !hasAngebote && !auftragId && lead.status !== 'abgebrochen'
           ? {
@@ -821,7 +803,7 @@ export function AnfrageDetailClient({
         }}
       />
 
-      {mailCompose.modal}
+      {quickActionSheets}
       </div>
     </EntityDetailLayout>
   )

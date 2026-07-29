@@ -11,7 +11,7 @@ export type QuickBarAction = {
   disabled?: boolean
 }
 
-/** Mobil Spec §4: Anrufen · Mail · Notiz · Foto */
+/** Mobil Spec §4: Anrufen · Mail · Notiz · Dokument */
 export function DetailQuickBar({
   actions,
   className,

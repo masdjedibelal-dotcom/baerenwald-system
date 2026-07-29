@@ -8,12 +8,14 @@ import { cn } from '@/lib/utils'
 export function MockFormSection({
   title,
   icon,
+  actions,
   children,
   columns,
   className,
 }: {
   title?: string
   icon?: string
+  actions?: ReactNode
   children: ReactNode
   columns?: number
   className?: string
@@ -21,9 +23,10 @@ export function MockFormSection({
   return (
     <div className={cn('form-section', className)}>
       {title ? (
-        <div className="form-section-h">
+        <div className="form-section-h" style={actions ? { display: 'flex', alignItems: 'center', gap: 8 } : undefined}>
           {icon ? <MockIcon ctx="default" n={icon} size={13} /> : null}
-          {title}
+          <span style={{ flex: actions ? 1 : undefined }}>{title}</span>
+          {actions}
         </div>
       ) : null}
       <div

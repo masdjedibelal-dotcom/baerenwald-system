@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
+import { Plus } from 'lucide-react'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
-import { deleteKundenObjekt } from '@/app/actions/kunden-objekte'
+import {
+  deleteKundenObjekt,
+  fetchKundenObjektListenStats,
+  type KundenObjektListenStats,
+} from '@/app/actions/kunden-objekte'
 import {
   filterObjekteFuerKunde,
   kundenObjektKurzlabel,
@@ -17,14 +21,14 @@ import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import type { EntityMenuItem } from '@/lib/entity-menu'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { KundenObjekt } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 type Props = {
   kundeId: string
   objekte: KundenObjekt[]
+  verwaltungName?: string
   /** Org-Kennung für Melde-Links */
   orgKennung?: string | null
   /** Anfrage/Wizard: aktuell gewähltes Objekt */
@@ -36,11 +40,12 @@ type Props = {
   className?: string
 }
 
-const COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 140px 44px'
+const COLS = 'minmax(0, 1.6fr) 140px 110px 28px'
 
 export function KundenObjekteCard({
   kundeId,
   objekte,
+  verwaltungName,
   orgKennung,
   selectedId,
   onSelect,
@@ -53,6 +58,7 @@ export function KundenObjekteCard({
   const [editObjekt, setEditObjekt] = useState<KundenObjekt | null>(null)
   const [pending, startTransition] = useTransition()
   const [localObjekte, setLocalObjekte] = useState(() => filterObjekteFuerKunde(objekte, kundeId))
+  const [statsById, setStatsById] = useState<Record<string, KundenObjektListenStats>>({})
 
   useEffect(() => {
     setLocalObjekte(filterObjekteFuerKunde(objekte, kundeId))
@@ -69,12 +75,19 @@ export function KundenObjekteCard({
     return merged.sort((a, b) => a.titel.localeCompare(b.titel, 'de'))
   }, [localObjekte, objekte, kundeId])
 
-  function kopierenLink(url: string) {
-    void navigator.clipboard.writeText(url).then(
-      () => toast.success('Melde-Link kopiert'),
-      () => toast.error('Kopieren fehlgeschlagen')
-    )
-  }
+  useEffect(() => {
+    if (variant !== 'full' || liste.length === 0) return
+    let cancelled = false
+    void fetchKundenObjektListenStats(
+      kundeId,
+      liste.map((o) => o.id)
+    ).then((next) => {
+      if (!cancelled) setStatsById(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [liste, variant, kundeId])
 
   const orgSlug = orgKennung?.trim().toLowerCase() || null
 
@@ -88,11 +101,6 @@ export function KundenObjekteCard({
 
   function openNeu() {
     setEditObjekt(null)
-    setModalOpen(true)
-  }
-
-  function openBearbeiten(o: KundenObjekt) {
-    setEditObjekt(o)
     setModalOpen(true)
   }
 
@@ -131,35 +139,6 @@ export function KundenObjekteCard({
     })
   }
 
-  function rowMenuItems(o: KundenObjekt): EntityMenuItem[] {
-    const items: EntityMenuItem[] = [
-      { icon: 'external-link', label: 'Öffnen', onClick: () => openAkte(o) },
-      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openBearbeiten(o) },
-    ]
-    if (orgSlug && o.melde_slug?.trim()) {
-      const url = buildMeldeLink(orgSlug, o.melde_slug)
-      items.push(
-        'sep',
-        { icon: 'copy', label: 'Melde-Link kopieren', onClick: () => kopierenLink(url) },
-        {
-          icon: 'external-link',
-          label: 'Melde-Link öffnen',
-          onClick: () => window.open(url, '_blank', 'noopener,noreferrer'),
-        }
-      )
-    }
-    items.push('sep', {
-      icon: 'trash',
-      label: 'Löschen',
-      danger: true,
-      onClick: () => {
-        if (pending) return
-        entfernen(o)
-      },
-    })
-    return items
-  }
-
   const selectBlock = (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
       <div className="min-w-0 flex-1">
@@ -183,6 +162,7 @@ export function KundenObjekteCard({
       open={modalOpen}
       onClose={() => setModalOpen(false)}
       kundeId={kundeId}
+      verwaltungName={verwaltungName}
       editObjekt={editObjekt}
       onSaved={onObjektSaved}
     />
@@ -201,19 +181,33 @@ export function KundenObjekteCard({
   }
 
   return (
-    <MockCard
-      title={liste.length ? `Objekte · ${liste.length}` : 'Objekte'}
-      icon="building"
-      className={className}
-      actions={
+    <div className={cn('objekte-tab', className)}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 'var(--fs-meta)',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'var(--text-3)',
+          }}
+        >
+          Objekte
+        </span>
+        <div style={{ flex: 1 }} />
         <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
-          Hinzufügen
+          Objekt
         </MockBtn>
-      }
-    >
-      <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
-        Gebäude, WEGs und weitere Objekte dieses Kunden — für Angebote und Ausführungsort.
-      </p>
+      </div>
 
       {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
 
@@ -221,30 +215,39 @@ export function KundenObjekteCard({
         <MockEmpty
           icon="building"
           title="Noch keine Objekte"
-          hint="Objekt hinzufügen für Angebote und Melde-Links"
+          hint="Objekt anlegen für Gebäude, WEGs und Melde-Links"
+          action={
+            <MockBtn kind="primary" icon="plus" onClick={openNeu}>
+              Objekt anlegen
+            </MockBtn>
+          }
         />
       ) : (
         <div className="listcard">
           <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
             <div>Objekt</div>
-            <div>Adresse</div>
-            <div>Melde-Link</div>
+            <div>Einheiten</div>
+            <div>Miete</div>
             <div />
           </div>
           {liste.map((o) => {
-            const adresse =
-              [kundenObjektStrasseZeile(o), [o.plz, o.ort].filter(Boolean).join(' ')]
-                .filter(Boolean)
-                .join(', ') || '—'
-            const meldeAktiv = Boolean(orgSlug && o.melde_slug?.trim() && o.melde_aktiv !== false)
-            const meldeInaktiv = Boolean(orgSlug && o.melde_slug?.trim() && o.melde_aktiv === false)
+            const str = kundenObjektStrasseZeile(o)
+            const ortZeile = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
+            const sub = [str, ortZeile].filter(Boolean).join(' · ') || '—'
+            const st = statsById[o.id]
+            const einheitenLabel =
+              st && st.einheitenTotal > 0
+                ? `${st.einheitenVermietet}/${st.einheitenTotal} vermietet`
+                : o.einheiten_hinweis?.trim() || '—'
+            const mieteLabel = '—'
+
             return (
               <div
                 key={o.id}
                 role="button"
                 tabIndex={0}
                 className={cn('list-row', selectedId === o.id && 'sel')}
-                style={{ gridTemplateColumns: COLS }}
+                style={{ gridTemplateColumns: COLS, alignItems: 'center' }}
                 onClick={() => openAkte(o)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -252,41 +255,34 @@ export function KundenObjekteCard({
                     openAkte(o)
                   }
                 }}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  if (pending) return
+                  if (confirm(`Objekt „${o.titel}“ löschen?`)) entfernen(o)
+                }}
               >
-                <div className="lc-title" style={{ fontWeight: 600 }}>
-                  {o.titel}
+                <div style={{ minWidth: 0 }}>
+                  <div className="lc-title" style={{ fontWeight: 600 }}>
+                    {o.titel}
+                  </div>
+                  <div
+                    className="lc-sub"
+                    style={{
+                      color: 'var(--text-3)',
+                      fontSize: 'var(--fs-meta)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={sub}
+                  >
+                    {sub}
+                  </div>
                 </div>
-                <div
-                  className="lc-sub"
-                  style={{
-                    color: 'var(--text-2)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                  title={adresse}
-                >
-                  {adresse}
-                </div>
-                <div className="lc-pills">
-                  {meldeAktiv ? (
-                    <span className="pill-tag" style={{ cursor: 'default' }}>
-                      Aktiv
-                    </span>
-                  ) : meldeInaktiv ? (
-                    <span className="pill-tag" style={{ cursor: 'default', opacity: 0.7 }}>
-                      Inaktiv
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--text-3)' }}>—</span>
-                  )}
-                </div>
-                <div
-                  className="row-actions always"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ justifyContent: 'flex-end' }}
-                >
-                  <MockEntityRowMenu items={rowMenuItems(o)} title="Objekt" />
+                <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>{einheitenLabel}</div>
+                <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>{mieteLabel}</div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
+                  <MockIcon ctx="default" n="chevron-right" size={16} />
                 </div>
               </div>
             )
@@ -294,7 +290,33 @@ export function KundenObjekteCard({
         </div>
       )}
 
+      {orgSlug && liste.some((o) => o.melde_slug?.trim()) ? (
+        <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
+          Melde-Links:{' '}
+          {liste
+            .filter((o) => o.melde_slug?.trim())
+            .slice(0, 2)
+            .map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="btn ghost sm"
+                style={{ marginRight: 4 }}
+                onClick={() => {
+                  const url = buildMeldeLink(orgSlug, o.melde_slug!)
+                  void navigator.clipboard.writeText(url).then(
+                    () => toast.success('Melde-Link kopiert'),
+                    () => toast.error('Kopieren fehlgeschlagen')
+                  )
+                }}
+              >
+                {o.titel}
+              </button>
+            ))}
+        </p>
+      ) : null}
+
       {modal}
-    </MockCard>
+    </div>
   )
 }

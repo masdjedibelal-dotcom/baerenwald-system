@@ -10,21 +10,34 @@ import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { toast } from '@/components/ui/app-toast'
 import {
+  FACHDETAILS_CONFIG,
+  GROESSEN_CONFIG,
   KUNDENTYP_OPTIONS,
+  groessePropLabel,
   type SituationValue,
 } from '@/lib/vorab-formular-config'
+import { defaultGroesseEinheit, GROESSEN_EINHEITEN, groesseEinheitLabel } from '@/lib/dokument-einheiten'
 import { KANAL_LABELS, cn } from '@/lib/utils'
 import type { Kunde, LeadKanal } from '@/lib/types'
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import {
+  DRINGLICHKEIT_OPTIONS,
   STAFF_ANLIEGEN,
+  UMFANG_OPTIONS,
   ZEITRAUM_ERNEUERN_OPTIONS,
+  ZUGAENGLICHKEIT_OPTIONS,
+  ZUSTAND_OPTIONS,
   anliegenToSituation,
   createInitialStaffFunnelState,
   type StaffAnliegenId,
   type StaffFunnelState,
 } from '@/lib/anfragen/staff-funnel-types'
-import { bereicheForStaffSituation } from '@/lib/anfragen/staff-funnel-steps'
+import {
+  bereicheForStaffSituation,
+  staffFunnelDynamicBlocks,
+  staffFunnelFachdetailKeys,
+  staffFunnelGroesseBereiche,
+} from '@/lib/anfragen/staff-funnel-steps'
 import { estimateStaffFunnelPrice } from '@/lib/anfragen/staff-funnel-price'
 import { staffFunnelKontaktName, staffFunnelToPayload } from '@/lib/anfragen/staff-funnel-payload'
 import {
@@ -122,6 +135,10 @@ export function StaffFunnelWizard({
     state.situation,
     state.bereiche,
     state.groessen,
+    state.umfang,
+    state.zugaenglichkeit,
+    state.zustand,
+    state.fachdetails,
     state.dringlichkeit,
     state.plz,
     state.badAusstattung,
@@ -239,6 +256,10 @@ export function StaffFunnelWizard({
 
   const showBereiche = state.anliegen !== 'gewerbe' && Boolean(state.anliegen)
   const showPreis = Boolean(state.anliegen)
+  const dyn = useMemo(() => staffFunnelDynamicBlocks(state), [state])
+  const fachKeys = useMemo(() => staffFunnelFachdetailKeys(state), [state])
+  const groesseBereiche = useMemo(() => staffFunnelGroesseBereiche(state), [state])
+  const showDetails = Boolean(state.anliegen) && dyn.any
 
   if (!open || !mounted) return null
 
@@ -366,6 +387,163 @@ export function StaffFunnelWizard({
                 )
               })}
             </div>
+          </section>
+        ) : null}
+
+        {showDetails ? (
+          <section className="sf-sec">
+            <h3 className="sf-sec-l">Details</h3>
+            <MockFormSection>
+              {dyn.umfang ? (
+                <MockField label="Umfang / Rhythmus" full>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={UMFANG_OPTIONS}
+                    value={state.umfang}
+                    onChange={(v) => patch({ umfang: v })}
+                  />
+                </MockField>
+              ) : null}
+
+              {dyn.zugaenglichkeit ? (
+                <MockField label="Zugänglichkeit" full>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={ZUGAENGLICHKEIT_OPTIONS}
+                    value={state.zugaenglichkeit}
+                    onChange={(v) => patch({ zugaenglichkeit: v })}
+                  />
+                </MockField>
+              ) : null}
+
+              {dyn.zustand ? (
+                <MockField label="Zustand" full>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={ZUSTAND_OPTIONS}
+                    value={state.zustand}
+                    onChange={(v) => patch({ zustand: v })}
+                  />
+                </MockField>
+              ) : null}
+
+              {dyn.badAusstattung ? (
+                <MockField
+                  label={FACHDETAILS_CONFIG.bad_ausstattung?.frage ?? 'Bad — Ausstattung'}
+                  full
+                >
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={FACHDETAILS_CONFIG.bad_ausstattung.optionen}
+                    value={state.badAusstattung}
+                    onChange={(v) => patch({ badAusstattung: v })}
+                  />
+                </MockField>
+              ) : null}
+
+              {dyn.fachdetails
+                ? fachKeys.map((key) => {
+                    const config = FACHDETAILS_CONFIG[key]
+                    if (!config) return null
+                    return (
+                      <MockField key={key} label={config.frage} full>
+                        <StaffChoiceGrid
+                          columns={2}
+                          options={config.optionen}
+                          value={state.fachdetails[key] ?? ''}
+                          onChange={(v) =>
+                            setState((s) => ({
+                              ...s,
+                              fachdetails: { ...s.fachdetails, [key]: v },
+                            }))
+                          }
+                        />
+                      </MockField>
+                    )
+                  })
+                : null}
+
+              {dyn.groesse
+                ? groesseBereiche.map((bereich) => {
+                    const g = GROESSEN_CONFIG[bereich]
+                    if (!g) return null
+                    return (
+                      <MockField key={bereich} label={groessePropLabel(bereich)} full hint={g.hinweis}>
+                        <div className="sf-groesse-row">
+                          <input
+                            type="number"
+                            min={0}
+                            className="input"
+                            value={state.groessen[bereich] ?? ''}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              setState((s) => {
+                                const next = { ...s.groessen }
+                                if (raw === '') delete next[bereich]
+                                else {
+                                  const n = Number(raw)
+                                  if (Number.isFinite(n) && n >= 0) next[bereich] = n
+                                }
+                                return { ...s, groessen: next }
+                              })
+                            }}
+                            placeholder="0"
+                          />
+                          <select
+                            className="input sf-groesse-einheit"
+                            value={
+                              state.groessenEinheiten[bereich] ?? defaultGroesseEinheit(bereich)
+                            }
+                            onChange={(e) =>
+                              setState((s) => ({
+                                ...s,
+                                groessenEinheiten: {
+                                  ...s.groessenEinheiten,
+                                  [bereich]: e.target.value,
+                                },
+                              }))
+                            }
+                            aria-label={`Einheit ${groessePropLabel(bereich)}`}
+                          >
+                            {GROESSEN_EINHEITEN.map((u) => (
+                              <option key={u} value={u}>
+                                {groesseEinheitLabel(u)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </MockField>
+                    )
+                  })
+                : null}
+
+              {dyn.dringlichkeit ? (
+                <MockField label="Dringlichkeit" full>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={DRINGLICHKEIT_OPTIONS}
+                    value={state.dringlichkeit}
+                    onChange={(v) => patch({ dringlichkeit: v })}
+                  />
+                </MockField>
+              ) : null}
+
+              {dyn.beratung ? (
+                <MockField
+                  label="Beratung / Hinweis"
+                  full
+                  hint="Kurz was im Gespräch geklärt werden soll — analog Website-Beratungspfad"
+                >
+                  <textarea
+                    className="input ta"
+                    rows={3}
+                    value={state.beratungText}
+                    onChange={(e) => patch({ beratungText: e.target.value })}
+                    placeholder="z.B. Vor-Ort-Termin, Aufmaß, individuelle Planung…"
+                  />
+                </MockField>
+              ) : null}
+            </MockFormSection>
           </section>
         ) : null}
 

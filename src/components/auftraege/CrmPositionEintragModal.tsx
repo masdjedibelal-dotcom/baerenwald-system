@@ -1,21 +1,21 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { Camera } from 'lucide-react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import {
   eintragTypLabel,
-  type EintragQuelle,
   type EintragTyp,
 } from '@/lib/auftraege/position-lebenszyklus'
+import { cn } from '@/lib/utils'
 import type { AuftragPosition } from '@/lib/types'
 
 /**
- * CRM-Nacherfassung in position_eintraege (Bautagebuch-Lebenszyklus).
- * Freier Eintrag (ohne Leistung) oder gebunden an eine Position.
+ * Fortschritt / freier Tagebuch-Eintrag — EditorSheet rechts (Mock).
  */
 export function CrmPositionEintragModal({
   open,
@@ -35,13 +35,9 @@ export function CrmPositionEintragModal({
 }) {
   const [pending, startTransition] = useTransition()
   const [positionId, setPositionId] = useState<string>('')
-  const [typ, setTyp] = useState<EintragTyp>('notiz')
+  const [typ, setTyp] = useState<EintragTyp>('fortschritt')
+  const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
-  const [quelle, setQuelle] = useState<EintragQuelle>('telefonisch')
-  const [ereignisZeit, setEreignisZeit] = useState('')
-  const [rueckgrund, setRueckgrund] = useState('')
-  const [zeitStd, setZeitStd] = useState('')
-  const [zeitMin, setZeitMin] = useState('')
   const [fotoPath, setFotoPath] = useState('')
 
   const sortedPos = useMemo(
@@ -61,26 +57,21 @@ export function CrmPositionEintragModal({
     const pref = initialPositionId?.trim() || ''
     setPositionId(pref)
     setTyp(pref ? 'fortschritt' : 'notiz')
+    setTitel('')
     setBeschreibung('')
-    setQuelle('telefonisch')
-    setEreignisZeit('')
-    setRueckgrund('')
-    setZeitStd('')
-    setZeitMin('')
     setFotoPath('')
   }, [open, initialPositionId])
 
   const selected = sortedPos.find((p) => p.id === positionId) ?? null
   const ohneLeistung = !positionId
-  const isAufwand = String(selected?.verguetung ?? '') === 'aufwand'
 
-  const typOptions: EintragTyp[] = ohneLeistung
-    ? ['notiz']
-    : selected?.leistung_status === 'offen' && !selected?.gestartet_am
-      ? ['start', 'fortschritt']
-      : selected?.leistung_status === 'erledigt'
-        ? ['fortschritt', 'weitere_arbeit']
-        : ['start', 'fortschritt', 'ergebnis', 'weitere_arbeit']
+  const typTabs: { id: EintragTyp; label: string }[] = ohneLeistung
+    ? [{ id: 'notiz', label: 'Notiz' }]
+    : [
+        { id: 'start', label: 'Start' },
+        { id: 'fortschritt', label: 'Fortschritt' },
+        { id: 'ergebnis', label: 'Ergebnis' },
+      ]
 
   async function uploadFoto(file: File) {
     const fd = new FormData()
@@ -101,24 +92,25 @@ export function CrmPositionEintragModal({
 
   function speichern() {
     if (!beschreibung.trim() && !fotoPath) {
-      toast.error('Bitte Beschreibung oder Foto angeben.')
+      toast.error('Bitte Beschreibung angeben.')
       return
     }
-    if (!positionId.trim()) {
-      toast.error('Bitte eine Leistung wählen.')
+    if (ohneLeistung) {
+      toast.error('Bitte eine Leistung wählen — oder öffne den Eintrag über eine Position.')
       return
     }
     const eintragTyp: EintragTyp = typ === 'notiz' ? 'fortschritt' : typ
+    const text = [titel.trim(), beschreibung.trim()].filter(Boolean).join('\n\n')
     startTransition(async () => {
       const r = await createCrmPositionEintrag({
         positionId,
         typ: eintragTyp,
-        beschreibung: beschreibung.trim() || null,
-        quelle,
-        rueckdatiertGrund: rueckgrund.trim() || null,
-        ereignisZeit: ereignisZeit ? new Date(ereignisZeit).toISOString() : null,
-        zeitStd: zeitStd ? Number(zeitStd) : null,
-        zeitMin: zeitMin ? Number(zeitMin) : null,
+        beschreibung: text || null,
+        quelle: 'vor_ort',
+        rueckdatiertGrund: null,
+        ereignisZeit: null,
+        zeitStd: null,
+        zeitMin: null,
         fotoStoragePath: fotoPath.trim() || null,
       })
       if (!r.ok) {
@@ -131,151 +123,146 @@ export function CrmPositionEintragModal({
     })
   }
 
+  const crumb = ohneLeistung
+    ? 'Freier Eintrag >'
+    : selected
+      ? `${selected.leistung_name?.trim() || 'Leistung'} >`
+      : null
+  const title = ohneLeistung ? 'Tagebuch-Eintrag' : 'Fortschritt erfassen'
+  const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath)
+
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title="Tagebucheintrag"
+      title={title}
+      crumb={crumb}
       size="lg"
+      dirty={dirty && !pending}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
-            Abbrechen
+        <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
+            {ohneLeistung ? 'Abbrechen' : '< Zurück'}
           </Button>
           <Button type="button" variant="primary" loading={pending} onClick={speichern}>
-            Speichern
+            ✓ Speichern
           </Button>
         </div>
       }
     >
-      <div className="space-y-3">
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Dokumentation landet in <code className="text-[length:var(--fs-meta)]">position_eintraege</code>{' '}
-          (gleiche Quelle wie Regiebericht / Bautagebuch-PDF).
-        </p>
+      <div className="space-y-4">
+        {ohneLeistung ? (
+          <>
+            <div className="ldr-empty" style={{ borderStyle: 'solid' }}>
+              Freier Eintrag ohne Leistungsbezug — für Wetter, Baustellenzustand, Besuche oder
+              Behinderungen.
+            </div>
+            <label className="block">
+              <span className="lt-field-lbl">Leistung</span>
+              <select
+                className="input"
+                value={positionId}
+                onChange={(e) => {
+                  setPositionId(e.target.value)
+                  setTyp(e.target.value ? 'fortschritt' : 'notiz')
+                }}
+              >
+                <option value="">Leistung zuordnen…</option>
+                {sortedPos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.leistung_name?.trim() || 'Leistung'}
+                  </option>
+                ))}
+              </select>
+              <span className="lt-field-opt">für Speichern erforderlich</span>
+            </label>
+          </>
+        ) : null}
 
-        <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-          Leistung (optional)
-          <select
-            className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-            value={positionId}
-            onChange={(e) => {
-              const next = e.target.value
-              setPositionId(next)
-              setTyp(next ? 'fortschritt' : 'notiz')
-            }}
-          >
-            <option value="">Ohne Leistungsbezug (freie Notiz)</option>
-            {sortedPos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.leistung_name?.trim() || 'Leistung'}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!ohneLeistung && typTabs.length > 1 ? (
+          <div>
+            <div className="lt-seg-label">Art des Eintrags</div>
+            <div className="lt-seg" role="tablist">
+              {typTabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={typ === t.id}
+                  className={cn('lt-seg__btn', typ === t.id && 'on')}
+                  onClick={() => setTyp(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
-        {!ohneLeistung ? (
-          <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-            Typ
+        {ohneLeistung ? (
+          <label className="block">
+            <span className="lt-field-lbl">Titel</span>
+            <input
+              className="input"
+              value={titel}
+              onChange={(e) => setTitel(e.target.value)}
+              placeholder="z.B. Regen — Außenarbeiten verschoben"
+            />
+            <span className="lt-field-opt">optional</span>
+          </label>
+        ) : null}
+
+        {!ohneLeistung && !selected ? (
+          <label className="block">
+            <span className="lt-field-lbl">Leistung</span>
             <select
-              className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-              value={typ}
-              onChange={(e) => setTyp(e.target.value as EintragTyp)}
+              className="input"
+              value={positionId}
+              onChange={(e) => {
+                setPositionId(e.target.value)
+                setTyp(e.target.value ? 'fortschritt' : 'notiz')
+              }}
             >
-              {typOptions.map((t) => (
-                <option key={t} value={t}>
-                  {eintragTypLabel(t)}
+              <option value="">Leistung wählen…</option>
+              {sortedPos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.leistung_name?.trim() || 'Leistung'}
                 </option>
               ))}
             </select>
           </label>
         ) : null}
 
-        <Textarea
-          label="Beschreibung"
-          rows={3}
-          value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
-          placeholder="Was wurde gemacht / beobachtet…"
-        />
+        <label className="block">
+          <span className="lt-field-lbl">
+            Beschreibung <span aria-hidden>*</span>
+          </span>
+          <Textarea
+            rows={4}
+            value={beschreibung}
+            onChange={(e) => setBeschreibung(e.target.value)}
+            placeholder="Was ist passiert?"
+          />
+        </label>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-            Quelle
-            <select
-              className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-              value={quelle}
-              onChange={(e) => setQuelle(e.target.value as EintragQuelle)}
-            >
-              <option value="telefonisch">telefonisch</option>
-              <option value="foto_erhalten">Foto erhalten</option>
-              <option value="vor_ort">vor Ort</option>
-            </select>
-          </label>
-          <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-            Ereigniszeit (Rückdatierung)
-            <input
-              type="datetime-local"
-              className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-              value={ereignisZeit}
-              onChange={(e) => setEreignisZeit(e.target.value)}
-            />
-          </label>
-        </div>
-
-        {ereignisZeit ? (
-          <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-            Grund für Rückdatierung
-            <input
-              className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-              value={rueckgrund}
-              onChange={(e) => setRueckgrund(e.target.value)}
-              placeholder="Pflicht bei Rückdatierung"
-            />
-          </label>
-        ) : null}
-
-        {isAufwand || ohneLeistung ? (
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-              Std
-              <input
-                className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-                value={zeitStd}
-                onChange={(e) => setZeitStd(e.target.value)}
-                inputMode="decimal"
-              />
-            </label>
-            <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-              Min
-              <input
-                className="mt-0.5 w-full rounded-md border border-bw-border bg-bw-card px-2 py-2 text-[length:var(--fs-text)]"
-                value={zeitMin}
-                onChange={(e) => setZeitMin(e.target.value)}
-                inputMode="numeric"
-              />
-            </label>
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-[length:var(--fs-text)]">
-            <span className="sr-only">Foto</span>
+        <div>
+          <span className="lt-field-lbl">Foto</span>
+          <label className="lt-foto-zone">
+            <Camera className="h-5 w-5" aria-hidden />
+            <span>{fotoPath ? 'Foto ersetzt — tippen zum Ändern' : 'Foto hinzufügen'}</span>
             <input
               type="file"
               accept="image/*"
+              className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) void uploadFoto(f)
-                e.target.value = ''
               }}
             />
           </label>
-          {fotoPath ? (
-            <span className="text-[length:var(--fs-meta)] text-emerald-800">Foto gesetzt</span>
-          ) : null}
+          <span className="lt-field-opt">optional</span>
         </div>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

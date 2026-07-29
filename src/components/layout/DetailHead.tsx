@@ -12,6 +12,8 @@ export type DetailHeadProps = {
   /** Meta-Zeile (.dh-meta) — Badges gehören hierhin (inline), nicht darunter */
   meta?: ReactNode
   badges?: ReactNode
+  /** Badges direkt neben dem Titel (Mock: Freigabe) */
+  titleBadges?: ReactNode
   actions?: ReactNode
   /** Stärkerer Projekt-Kopf mit Trennlinie */
   variant?: 'default' | 'project'
@@ -24,6 +26,7 @@ export function DetailHead({
   sub,
   meta,
   badges,
+  titleBadges,
   actions,
   variant = 'project',
   className,
@@ -35,6 +38,7 @@ export function DetailHead({
       <div className="detail-head-main vgid min-w-0 flex-1">
         <div className="dh-titlerow">
           <div className="dh-title vgid-name">{title}</div>
+          {titleBadges ? <div className="dh-title-badges">{titleBadges}</div> : null}
         </div>
         {hasMetaRow ? (
           <div className="dh-meta vgid-meta">

@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createPortal } from 'react-dom'
 import {
   AngebotKiAssistentButton,
   type AngebotKiApplyPayload,
 } from '@/components/angebote/AngebotKiAssistent'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { DocActionBar } from '@/components/surfaces/primitives'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import {
+  MetaCrowButton,
+  TotBand,
+} from '@/components/angebote/AngebotWizardCanvasMeta'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -263,6 +267,9 @@ export function RechnungWizard({
   const [mailCc, setMailCc] = useState<string[]>([])
   const [docPreviewTab, setDocPreviewTab] = useState<AnlagenKey>('rechnung')
   const [docAccordionOpen, setDocAccordionOpen] = useState(true)
+  const [sheet, setSheet] = useState<
+    'dokument' | 'zahlplan' | 'anlagen' | 'versand' | null
+  >(null)
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -963,116 +970,77 @@ export function RechnungWizard({
 
   if (!mounted) return null
 
-  const desktopActions = (
-    <div className="wizard-nav-actions">
-      {step > 1 ? (
-        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
-          Zurück
-        </MockBtn>
-      ) : null}
-      {step < 4 ? (
-        <MockBtn
-          kind="primary"
-          icon="chevron-right"
-          disabled={saving}
-          onClick={() => void handleWeiter()}
-        >
-          {saving ? 'Speichern…' : 'Weiter'}
-        </MockBtn>
-      ) : (
-        <>
-          <MockBtn
-            kind="ghost"
-            disabled={saving || (hasPlan && !planOk)}
-            onClick={() => void handleFinish(false)}
-          >
-            {saving ? 'Erstellen…' : 'Erstellen'}
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="send"
-            disabled={saving || (hasPlan && !planOk)}
-            onClick={() => void handleFinish(true)}
-          >
-            Erstellen und versenden
-          </MockBtn>
-        </>
-      )}
-    </div>
-  )
+  const displayBrutto = rBrutto
+  const displayNetto = hasPlan && selBerechnet ? selBerechnet.netto : netto
+  const displayMwst = Math.max(0, displayBrutto - displayNetto)
+  const ustLabel = meta.reverse_charge_13b
+    ? 'MwSt 0% (§13b)'
+    : berechnung.mwst_satz === 0
+      ? 'MwSt 0%'
+      : `MwSt ${berechnung.mwst_satz}%`
 
-  const mobileActions = null
+  const dokumentCrowValue = [
+    rechnungsnummer.trim() || 'Entwurf',
+    selBerechnet?.istSchluss || rechnungsart === 'schluss'
+      ? 'Schlussrechnung'
+      : hasPlan || rechnungsart === 'abschlag'
+        ? 'Abschlag'
+        : 'Rechnung',
+  ].join(' · ')
 
-  const mobileFooter =
-    step < 4 ? (
-      <>
-        {step > 1 ? (
-          <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
-            Zurück
-          </MockBtn>
-        ) : (
-          <span />
-        )}
-        <MockBtn
-          kind="primary"
-          icon="chevron-right"
-          className="wizard-mobile-footer__primary"
-          disabled={saving}
-          onClick={() => void handleWeiter()}
-        >
-          {saving ? 'Speichern…' : 'Weiter'}
-        </MockBtn>
-      </>
-    ) : (
-      <>
-        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep} disabled={saving}>
-          Zurück
-        </MockBtn>
-        <div className="wizard-mobile-footer__end">
-          <MockBtn
-            kind="ghost"
-            disabled={saving || (hasPlan && !planOk)}
-            onClick={() => void handleFinish(false)}
-          >
-            Erstellen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="send"
-            className="wizard-mobile-footer__primary"
-            disabled={saving || (hasPlan && !planOk)}
-            onClick={() => void handleFinish(true)}
-          >
-            Versenden
-          </MockBtn>
-        </div>
-      </>
-    )
+  const zahlplanCrowValue = hasPlan
+    ? [
+        selRate?.titel || 'Abschlagsplan',
+        rFaellig ? `fällig ${formatDateDe(rFaellig)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : [
+        'Einzelrechnung',
+        zahlfrist === 'datum' ? null : `${zahlfrist} Tage`,
+        rFaellig ? `fällig ${formatDateDe(rFaellig)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+
+  const anlagenCrowValue =
+    anlagenCount === 1 ? '1 Anlage' : `${anlagenCount} Anlagen`
+
+  const versandCrowValue = mailTo[0]?.trim() || 'Kundenportal'
+
+  const wizardTitel =
+    selBerechnet?.istSchluss
+      ? 'Schlussrechnung'
+      : rateLocked && selBerechnet
+        ? 'Abschlagsrechnung'
+        : 'Rechnung erstellen'
+
+  const wizardSubtitle = [
+    rechnungsnummer.trim() || null,
+    bootstrap.projektTitel?.trim() || auftragLabel,
+    kundeName,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const primarySaveLabel = 'Rechnung speichern & senden'
 
   const steuernBlock = (
-    <>
-      <div
-        className="section-h"
-        style={{
-          marginBottom: 10,
-          marginTop: 18,
-          textTransform: 'none',
-          letterSpacing: 0,
-          fontSize: 'var(--fs-text)',
-          fontWeight: 600,
-          color: 'var(--text)',
-        }}
-      >
+    <div className="rw-tax">
+      <div className="document-section__label" style={{ marginBottom: 10 }}>
         Steuerliche Hinweise
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="rw-tax__list">
         {(
           [
             {
               on: meta.hinweis_35a,
               set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
               label: '§35a EStG-Hinweis ausweisen',
-              sub: 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
+              sub:
+                berechnung.lohn_netto > 0
+                  ? `Lohnkostenanteil ${formatEurBetrag(berechnung.lohn_netto)} — steuerlich begünstigt`
+                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
             },
             {
               on: meta.reverse_charge_13b,
@@ -1085,170 +1053,253 @@ export function RechnungWizard({
           <button
             key={c.label}
             type="button"
+            className={c.on ? 'rw-tax__opt on' : 'rw-tax__opt'}
             onClick={() => c.set(!c.on)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              padding: '10px 12px',
-              border: `1px solid ${c.on ? 'var(--green)' : 'var(--border)'}`,
-              background: c.on ? 'var(--green-50)' : 'var(--card)',
-              borderRadius: 9,
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
           >
-            <span
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 5,
-                border: `1.5px solid ${c.on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                background: c.on ? 'var(--green)' : 'transparent',
-                display: 'grid',
-                placeItems: 'center',
-                flex: '0 0 auto',
-                color: '#fff',
-              }}
-            >
+            <span className="rw-tax__check" aria-hidden>
               {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
             </span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>{c.label}</div>
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{c.sub}</div>
-            </div>
+            <span className="rw-tax__txt">
+              <span className="rw-tax__lab">{c.label}</span>
+              <span className="rw-tax__sub">{c.sub}</span>
+            </span>
           </button>
         ))}
       </div>
+    </div>
+  )
+
+  const documentColumn = (
+    <div className="dc-doc flex flex-col gap-4">
+      {vkSoftWarn.warn ? (
+        <div className="nachtrags-band" role="status">
+          <MockIcon ctx="default" n="alert-triangle" size={16} />
+          <span>
+            <b>{vkSoftWarn.message}</b>
+            <br />
+            Speichern kann blockiert werden, wenn die Summe die Auftragssumme überschreitet.
+          </span>
+        </div>
+      ) : null}
+
+      {rateLocked && selBerechnet ? (
+        <div className="nachtrags-band" role="status">
+          <MockIcon ctx="default" n="info-circle" size={16} />
+          <span>
+            {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} · {selBerechnet.titel}
+            {' — '}
+            {formatEurBetrag(selBerechnet.brutto)} brutto
+          </span>
+        </div>
+      ) : null}
+
+      <PosBoard
+        title={`Positionen · ${hatAuftrag ? `Auftrag ${auftragLabel}` : 'Direktrechnung'} · ${kundeName}`}
+        positionen={posBoardLines}
+        onChange={onPosBoardChange}
+        showUst
+        gewerke={gewerkNamen}
+        preislisten={preislisten}
+        badgeOf={(p) =>
+          p.regieSchein
+            ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
+            : null
+        }
+        headerAction={
+          <AngebotKiAssistentButton
+            sm
+            label="Mit KI"
+            dokumentLabel="Rechnung"
+            leadKurz={kiLeadKurz}
+            titel={bootstrap.projektTitel || rTitel}
+            beschreibung={einleitung}
+            positionen={kiKontextPositionen}
+            preislisten={kiKontextPreislisten}
+            gewerke={kiGewerke}
+            onApply={applyRechnungKi}
+          />
+        }
+      />
+
+      <TotBand
+        netto={displayNetto}
+        ust={displayMwst}
+        brutto={displayBrutto}
+        ustLabel={ustLabel}
+      />
+
+      {steuernBlock}
+
+      <section className="document-section">
+        <h2 className="document-section__label">Vorschau</h2>
+        {activeVersandId ? (
+          <RechnungWizardPdfPreview
+            rechnungId={activeVersandId}
+            kundeName={kundeName}
+          />
+        ) : (
+          <div className="rw-preview-card">
+            <div className="rw-preview-card__banner">
+              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
+              {rTitel ? ` · ${rTitel}` : ''}
+            </div>
+            <div className="rw-preview-card__body">
+              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
+                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
+              </p>
+              <ul className="rw-preview-card__pos">
+                {positionenBerechnet.slice(0, 6).map((p, i) => (
+                  <li key={`${p.leistung}-${i}`}>
+                    <span>
+                      {p.leistung}
+                      {p.menge != null
+                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
+                        : ''}
+                    </span>
+                    <b>
+                      {formatEurBetrag(
+                        (p.vk_netto ??
+                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
+                          (p.menge ?? 1) *
+                          1.19
+                      )}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+              <div className="rw-preview-card__sum">
+                <span>Rechnungsbetrag</span>
+                <b>{formatEurBetrag(displayBrutto)}</b>
+              </div>
+              {rFaellig ? (
+                <div className="rw-preview-card__faellig">
+                  Fällig am {formatDateDe(rFaellig)}
+                </div>
+              ) : null}
+            </div>
+            <div className="rw-preview-card__foot">
+              Bärenwald · an {kundeName}
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+
+  const metaColumn = (
+    <div className="dc-meta-stack">
+      <div className="document-section__label" style={{ marginBottom: 10 }}>
+        Rechnungsdaten
+      </div>
+      <MetaCrowButton
+        label="Dokument"
+        value={dokumentCrowValue}
+        onClick={() => setSheet('dokument')}
+      />
+      <MetaCrowButton
+        label="Zahlplan"
+        value={zahlplanCrowValue}
+        onClick={() => setSheet('zahlplan')}
+      />
+      <MetaCrowButton
+        label="Anlagen"
+        value={anlagenCrowValue}
+        onClick={() => setSheet('anlagen')}
+      />
+      <MetaCrowButton
+        label="Versand"
+        value={versandCrowValue}
+        onClick={() => setSheet('versand')}
+      />
+    </div>
+  )
+
+  const metaSum = (
+    <div className="dc-re-sum">
+      <div className="dc-re-sum__row">
+        <span>Rechnungsbetrag</span>
+        <b>{formatEurBetrag(displayBrutto)}</b>
+      </div>
+      <div className="dc-re-sum__faellig">
+        {rFaellig ? `fällig ${formatDateDe(rFaellig)}` : 'Fälligkeit offen'}
+      </div>
+    </div>
+  )
+
+  const footerCta = (
+    <>
+      <button type="button" className="btn ghost" disabled={saving} onClick={handleRequestClose}>
+        Abbrechen
+      </button>
+      <button
+        type="button"
+        className="btn primary"
+        disabled={saving || (hasPlan && !planOk)}
+        onClick={() => void handleFinish(true)}
+      >
+        {saving ? '…' : `✓ ${primarySaveLabel}`}
+      </button>
     </>
   )
 
-  const wizard = (
-    <DocumentCanvas
-      portal={false}
-      className="wizard-flow"
-      title={
-        selBerechnet?.istSchluss
-          ? 'Schlussrechnung'
-          : rateLocked && selBerechnet
-            ? 'Abschlagsrechnung'
-            : 'Rechnung erstellen'
-      }
-      onClose={handleRequestClose}
-      onSave={() => void goNextStep().catch(() => undefined)}
-      saveBusy={saving}
-      busy={saving}
-      busyLabel="Wird versendet…"
-      onDiscard={() => onClose()}
-      docActions={
-        <DocActionBar
-          actions={[
-            {
-              id: 'preview',
-              label: 'Vorschau',
-              onClick: () => goToSection(showAbschlussPaket ? 3 : 4),
-              icon: <MockIcon ctx="default" n="file-text" size={20} />,
-            },
-            {
-              id: 'send',
-              label: 'Senden',
-              onClick: () => goToSection(4),
-              icon: <MockIcon ctx="default" n="send" size={20} />,
-            },
-          ]}
-        />
-      }
-    >
-      <nav className="document-section-nav" aria-label="Abschnitte">
-        {wizardSteps.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={
-              s.id === step
-                ? 'document-section-nav__chip document-section-nav__chip--active'
-                : 'document-section-nav__chip'
-            }
-            onClick={() => goToSection(s.id)}
-          >
-            {s.label}
-          </button>
-        ))}
-        <div className="ml-auto hidden md:flex">{desktopActions}</div>
-        <div className="flex w-full gap-2 md:hidden">{mobileFooter}</div>
-      </nav>
+  const docActions = (
+    <DocActionBar
+      actions={[
+        {
+          id: 'preview',
+          label: 'Vorschau',
+          onClick: () => {
+            const el = document.getElementById('rw-vorschau')
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          },
+          icon: <MockIcon ctx="default" n="file-text" size={20} />,
+        },
+        {
+          id: 'send',
+          label: 'Senden',
+          onClick: () => setSheet('versand'),
+          icon: <MockIcon ctx="default" n="send" size={20} />,
+        },
+      ]}
+    />
+  )
 
-      <section id="section-1" className="document-canvas-sec">
-        <>
-          {vkSoftWarn.warn ? (
-            <div
-              role="status"
-              style={{
-                marginBottom: 14,
-                padding: '12px 14px',
-                border: '0.5px solid var(--border)',
-                borderRadius: 8,
-                background: 'var(--bg-soft)',
-                fontSize: 'var(--fs-text)',
-                lineHeight: 1.45,
-                color: 'var(--text-2)',
-              }}
-            >
-              <b style={{ color: 'var(--text)' }}>{vkSoftWarn.message}</b>
-              <div style={{ marginTop: 4 }}>
-                Speichern kann blockiert werden, wenn die Summe die Auftragssumme überschreitet.
-              </div>
-            </div>
-          ) : null}
-          {rateLocked && selBerechnet ? (
-            <div
-              style={{
-                marginBottom: 14,
-                padding: '12px 14px',
-                border: '0.5px solid var(--border)',
-                borderRadius: 8,
-                background: 'var(--bg-soft)',
-              }}
-            >
-              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
-                {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} ·{' '}
-                {selBerechnet.titel}
-              </div>
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 4, lineHeight: 1.45 }}>
-                {selBerechnet.istSchluss ? (
-                  <>
-                    Die Schlussrechnung enthält alle Auftragsleistungen und zieht bereits gestellte
-                    Abschläge ab. Rest laut Plan:{' '}
-                    <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto.
-                    {schlussAbrechnung ? (
-                      <>
-                        {' '}
-                        Bereits gezahlt{' '}
-                        <b>{formatEurBetrag(schlussAbrechnung.bereits_gezahlt_brutto)}</b>, Rest{' '}
-                        <b>{formatEurBetrag(schlussAbrechnung.rest_brutto)}</b> brutto.
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    Auf der Abschlagsrechnung steht der Planbetrag als Pauschale (
-                    {formatEurBetrag(selBerechnet.brutto)} brutto). Eine volle Leistungsaufstellung
-                    gehört in die Schlussrechnung.
-                  </>
-                )}
-              </div>
-            </div>
-          ) : hatAuftrag ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                marginBottom: 16,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
+  const closeSheet = () => setSheet(null)
+
+  const wizard = (
+    <>
+      <DocumentCanvas
+        title={wizardTitel}
+        subtitle={wizardSubtitle}
+        onClose={handleRequestClose}
+        onSave={() => void handleFinish(true)}
+        saveLabel={primarySaveLabel}
+        saveBusy={saving}
+        busy={saving}
+        busyLabel="Wird versendet…"
+        onDiscard={() => onClose()}
+        docActions={docActions}
+        document={
+          <div id="rw-vorschau" className="contents">
+            {documentColumn}
+          </div>
+        }
+        meta={metaColumn}
+        metaSum={metaSum}
+        footerCta={footerCta}
+        className="wizard-flow"
+      />
+
+      <EditorSheet
+        open={sheet === 'dokument'}
+        onClose={closeSheet}
+        title="Dokument"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
+          {hatAuftrag && !rateLocked ? (
+            <div className="full">
+              <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
                 Rechnungsart
               </div>
               <div className="seg" role="group" aria-label="Rechnungsart">
@@ -1267,120 +1318,62 @@ export function RechnungWizard({
                   Schlussrechnung
                 </button>
               </div>
-              <div style={{ flex: 1 }} />
-              <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-                Auftrag {auftragLabel} · {kundeName}
-              </span>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                marginBottom: 16,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
-                Direktrechnung
-              </div>
-              <div style={{ flex: 1 }} />
-              <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>{kundeName}</span>
-            </div>
-          )}
-          <VorgangArtWiederkehrField
-            value={wiederkehr}
-            onChange={setWiederkehr}
-            hint="Wiederkehrend — Abrechnung zu wiederkehrendem Auftrag (Wartung, Winterdienst)"
-          />
-          <PosBoard
-            positionen={posBoardLines}
-            onChange={onPosBoardChange}
-            showUst
-            gewerke={gewerkNamen}
-            preislisten={preislisten}
-            badgeOf={(p) =>
-              p.regieSchein
-                ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
-                : null
-            }
-            headerAction={
-              <AngebotKiAssistentButton
-                sm
-                label="Mit KI"
-                dokumentLabel="Rechnung"
-                leadKurz={kiLeadKurz}
-                titel={bootstrap.projektTitel || rTitel}
-                beschreibung={einleitung}
-                positionen={kiKontextPositionen}
-                preislisten={kiKontextPreislisten}
-                gewerke={kiGewerke}
-                onApply={applyRechnungKi}
-              />
-            }
-          />
-
-          {hasRegiePos ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2" aria-label="Regie-Anlagen">
-              {posBoardLines.filter((p) => p.regieSchein).map((p) => (
-                <span key={`regie-${p.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-soft)] px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-2)]">
-                  <MockIcon ctx="default" n="paperclip" size={12} />
-                  Regieschein
-                  <span className="text-[var(--text-4)]">·</span>
-                  <span className="max-w-[140px] truncate">{p.name || 'Position'}</span>
-                </span>
-              ))}
             </div>
           ) : null}
-
-        </>
-      </section>
-
-      <section id="section-2" className="document-canvas-sec">
-        <>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: 12,
-              marginBottom: 14,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                Rechnungsdetails
-              </div>
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-                Zahlungsziel, Leistungszeitraum und steuerliche Hinweise
-              </div>
-            </div>
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-              Gesamt{' '}
-              <b style={{ color: 'var(--green)' }}>
-                {formatEurBetrag(hasPlan && selBerechnet ? selBerechnet.brutto : brutto)}
-              </b>{' '}
-              brutto
-              {schlussAbrechnung ? (
-                <div style={{ marginTop: 4, lineHeight: 1.45 }}>
-                  Bereits gezahlt{' '}
-                  <b style={{ color: 'var(--text-2)' }}>
-                    {formatEurBetrag(schlussAbrechnung.bereits_gezahlt_brutto)}
-                  </b>
-                  {' · '}
-                  Rest{' '}
-                  <b style={{ color: 'var(--green)' }}>
-                    {formatEurBetrag(schlussAbrechnung.rest_brutto)}
-                  </b>{' '}
-                  brutto
-                </div>
-              ) : null}
-            </div>
+          <div className="full">
+            <VorgangArtWiederkehrField
+              value={wiederkehr}
+              onChange={setWiederkehr}
+              hint="Wiederkehrend — Abrechnung zu wiederkehrendem Auftrag"
+            />
           </div>
+          <MockField label="Rechnungsdatum">
+            <input
+              type="date"
+              className="input"
+              value={meta.rechnungsdatum}
+              onChange={(e) => setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))}
+            />
+          </MockField>
+          <MockField label="Leistungszeitraum von">
+            <input
+              type="date"
+              className="input"
+              value={meta.leistungszeitraum_von}
+              onChange={(e) =>
+                setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+              }
+            />
+          </MockField>
+          <MockField label="Leistungszeitraum bis" full>
+            <input
+              type="date"
+              className="input"
+              value={meta.leistungszeitraum_bis}
+              onChange={(e) =>
+                setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+              }
+            />
+          </MockField>
+          <MockField label="Einleitung (Anschreiben)" full>
+            <textarea
+              className="input ta"
+              rows={5}
+              value={einleitung}
+              onChange={(e) => setEinleitung(e.target.value)}
+            />
+          </MockField>
+        </div>
+      </EditorSheet>
 
-          <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung">
+      <EditorSheet
+        open={sheet === 'zahlplan'}
+        onClose={closeSheet}
+        title="Zahlplan"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
+          <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung" full>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <MockZahlfristSeg
                 value={zahlfrist}
@@ -1400,312 +1393,77 @@ export function RechnungWizard({
             </div>
           </MockField>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: 14,
-              marginTop: 16,
-            }}
-          >
-            <MockField label="Rechnungsdatum">
-              <input
-                type="date"
-                className="input"
-                value={meta.rechnungsdatum}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))
-                }
-              />
-            </MockField>
-            <MockField label="Leistungszeitraum von" hint="Auf der Rechnung sichtbar">
-              <input
-                type="date"
-                className="input"
-                value={meta.leistungszeitraum_von}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-                }
-              />
-            </MockField>
-            <MockField label="Leistungszeitraum bis">
-              <input
-                type="date"
-                className="input"
-                value={meta.leistungszeitraum_bis}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-                }
-              />
-            </MockField>
-          </div>
-
-          <div style={{ marginTop: 18 }}>
-            {!hatAuftrag ? (
-              <div className="card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>Direktrechnung ohne Auftrag</div>
-                <p
-                  className="text-[length:var(--fs-meta)] leading-relaxed"
-                  style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
-                >
-                  Abschlagspläne sind nur mit Auftrag möglich. Diese Rechnung wird als einfache
-                  Vollrechnung erstellt.
-                </p>
+          {!hatAuftrag ? (
+            <div className="full card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
+                Direktrechnung ohne Auftrag
               </div>
-            ) : !hasPlan ? (
-              <div className="card" style={{ padding: 20 }}>
-                <div className="zahlplan-empty">
-                  <MockIcon ctx="empty" n="calculator" size={26} />
-                  <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
-                  <div className="zahlplan-empty__text">
-                    Optional: Teile die Auftragssumme von{' '}
-                    <b>{formatEurBetrag(netto)}</b> netto in Abschläge auf — z. B. 30 % bei Beginn,
-                    40 % nach Rohbau, 30 % zur Schlussrechnung.
-                  </div>
-                  <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
-                    Zahlplan hinzufügen
-                  </MockBtn>
+              <p
+                className="text-[length:var(--fs-meta)] leading-relaxed"
+                style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
+              >
+                Abschlagspläne sind nur mit Auftrag möglich.
+              </p>
+            </div>
+          ) : !hasPlan ? (
+            <div className="full card" style={{ padding: 20 }}>
+              <div className="zahlplan-empty">
+                <MockIcon ctx="empty" n="calculator" size={26} />
+                <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
+                <div className="zahlplan-empty__text">
+                  Optional: Teile die Auftragssumme in Abschläge auf.
                 </div>
+                <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
+                  Zahlplan hinzufügen
+                </MockBtn>
               </div>
-            ) : (
-              <>
-                {rateLocked && selBerechnet ? (
+            </div>
+          ) : (
+            <div className="full">
+              {rateLocked && selBerechnet ? (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    border: '1px solid var(--green)',
+                    background: 'var(--green-50)',
+                    borderRadius: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
+                    {selBerechnet.titel}
+                  </div>
+                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
+                    {formatEurBetrag(selBerechnet.brutto)} brutto
+                  </div>
+                </div>
+              ) : (
+                <>
                   <div
                     style={{
-                      padding: '12px 14px',
-                      border: '1px solid var(--green)',
-                      background: 'var(--green-50)',
-                      borderRadius: 8,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
-                      marginBottom: 14,
+                      gap: 8,
+                      marginBottom: 10,
+                      flexWrap: 'wrap',
                     }}
                   >
-                    <MockIcon ctx="btn" n="check" size={16} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
-                        {selBerechnet.titel}
-                        {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
-                      </div>
-                      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-                        {selBerechnet.istSchluss ? (
-                          <>
-                            Vorgewählt aus dem Zahlplan — Schlussrechnung mit allen Leistungen und
-                            Abzug der Abschläge. Rest{' '}
-                            <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto.
-                          </>
-                        ) : (
-                          <>
-                            Vorgewählt aus dem Zahlplan — Betrag{' '}
-                            <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto als Pauschale.
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        marginBottom: 10,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div
-                        className="section-h"
-                        style={{ marginBottom: 0, textTransform: 'none', flex: 1 }}
+                    <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                      Vorlage:
+                    </span>
+                    {PLAN_PRESETS.map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        className="zahlplan-preset-chip"
+                        onClick={() => setPlan(p.build())}
                       >
-                        Zahlplan
-                      </div>
-                      <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', alignSelf: 'center' }}>
-                        Vorlage:
-                      </span>
-                      {PLAN_PRESETS.map((p) => (
-                        <button
-                          key={p.name}
-                          type="button"
-                          className="zahlplan-preset-chip"
-                          onClick={() => setPlan(p.build())}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
-                      <MockBtn sm kind="ghost" onClick={clearPlan}>
-                        Entfernen
-                      </MockBtn>
-                    </div>
-
-                    <div
-                      style={{
-                        border: '0.5px solid var(--border)',
-                        borderRadius: 10,
-                        overflow: 'hidden',
-                        background: 'var(--card)',
-                        boxShadow: 'var(--shadow)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
-                          gap: 10,
-                          padding: '9px 14px',
-                          background: 'var(--bg-soft)',
-                          borderBottom: '0.5px solid var(--border)',
-                          fontSize: 'var(--fs-meta)',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          color: 'var(--text-2)',
-                        }}
-                      >
-                        <div>Bezeichnung</div>
-                        <div>Art</div>
-                        <div style={{ textAlign: 'right' }}>Anteil</div>
-                        <div style={{ textAlign: 'right' }}>Betrag brutto</div>
-                        <div>Fällig</div>
-                        <div />
-                      </div>
-                      {plan.zeilen.map((z) => {
-                        const berech = planKontext.zeilen.find((x) => x.id === z.id)
-                        return (
-                          <div
-                            key={z.id}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
-                              gap: 10,
-                              padding: '8px 14px',
-                              borderBottom: '0.5px solid var(--border)',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <input
-                              className="input"
-                              value={z.titel}
-                              onChange={(e) => patchPlanZeile(z.id, { titel: e.target.value })}
-                              style={{ height: 32 }}
-                            />
-                            <select
-                              className="input"
-                              value={z.typ}
-                              onChange={(e) =>
-                                patchPlanZeile(z.id, {
-                                  typ: e.target.value as ZahlungsplanAbschlagTyp,
-                                })
-                              }
-                              style={{ height: 32, fontSize: 'var(--fs-meta)' }}
-                            >
-                              <option value="prozent">Prozent</option>
-                              <option value="betrag">Euro netto</option>
-                              <option value="rest">Rest</option>
-                            </select>
-                            <div style={{ position: 'relative' }}>
-                              <input
-                                className="input"
-                                type="number"
-                                disabled={z.typ === 'rest'}
-                                value={z.typ === 'rest' ? '' : z.wert}
-                                placeholder={z.typ === 'rest' ? 'auto' : undefined}
-                                onChange={(e) =>
-                                  patchPlanZeile(z.id, { wert: Number(e.target.value) || 0 })
-                                }
-                                style={{ textAlign: 'right', paddingRight: 28, height: 32 }}
-                              />
-                              <span
-                                style={{
-                                  position: 'absolute',
-                                  right: 8,
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  fontSize: 'var(--fs-meta)',
-                                  color: 'var(--text-3)',
-                                }}
-                              >
-                                {z.typ === 'prozent' ? '%' : z.typ === 'betrag' ? '€' : ''}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                textAlign: 'right',
-                                fontWeight: 600,
-                                fontVariantNumeric: 'tabular-nums',
-                                fontSize: 'var(--fs-text)',
-                              }}
-                            >
-                              {formatEurBetrag(berech?.brutto ?? 0)}
-                            </div>
-                            <input
-                              className="input"
-                              type="date"
-                              value={z.faellig_am?.slice(0, 10) ?? ''}
-                              onChange={(e) =>
-                                patchPlanZeile(z.id, { faellig_am: e.target.value || null })
-                              }
-                              style={{ height: 32, fontSize: 'var(--fs-meta)' }}
-                            />
-                            <MockBtn
-                              sm
-                              kind="ghost"
-                              icon="trash"
-                              title="Entfernen"
-                              onClick={() => removePlanZeile(z.id)}
-                            />
-                          </div>
-                        )
-                      })}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '8px 14px',
-                          gap: 10,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="pt-add"
-                          style={{ border: 'none', padding: 0, width: 'auto' }}
-                          onClick={addPlanZeile}
-                        >
-                          <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
-                        </button>
-                        <div style={{ flex: 1 }} />
-                        <span
-                          style={{
-                            fontSize: 'var(--fs-meta)',
-                            fontWeight: 600,
-                            color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
-                          }}
-                        >
-                          {plan.zeilen.every((z) => z.typ === 'prozent')
-                            ? `Summe ${planProzentSumme(plan)}%${planOk ? '' : ' · muss 100% sein'}`
-                            : planOk
-                              ? 'Plan ok'
-                              : 'Plan prüfen'}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Immer sichtbar, sobald ein Abschlagsplan aktiv ist */}
-                <div style={{ marginTop: 14 }}>
-                  <div
-                    className="section-h"
-                    style={{
-                      marginBottom: 8,
-                      textTransform: 'none',
-                      letterSpacing: 0,
-                      fontSize: 'var(--fs-text)',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Welche Abschlagsrechnung jetzt erstellen?
+                        {p.name}
+                      </button>
+                    ))}
+                    <MockBtn sm kind="ghost" onClick={clearPlan}>
+                      Entfernen
+                    </MockBtn>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {planKontext.zeilen.map((z) => {
@@ -1730,34 +1488,12 @@ export function RechnungWizard({
                             textAlign: 'left',
                           }}
                         >
-                          <span
-                            style={{
-                              width: 17,
-                              height: 17,
-                              borderRadius: 20,
-                              border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                              background: on ? 'var(--green)' : 'transparent',
-                              display: 'grid',
-                              placeItems: 'center',
-                              color: '#fff',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
-                          </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>{z.titel}</div>
+                            <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>
+                              {z.titel}
+                            </div>
                             <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                              {z.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'}
-                              {' · '}
-                              {z.typ === 'prozent'
-                                ? `${z.wert}%`
-                                : z.typ === 'betrag'
-                                  ? formatEurBetrag(z.wert)
-                                  : 'Rest'}
-                              {z.faellig_am
-                                ? ` · fällig ${formatDateDe(z.faellig_am.slice(0, 10))}`
-                                : ''}
+                              {z.istSchluss ? 'Schlussrechnung' : 'Abschlag'}
                             </div>
                           </div>
                           <b style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -1767,313 +1503,121 @@ export function RechnungWizard({
                       )
                     })}
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {steuernBlock ? (
-            <details
-              className="wizard-optional-block"
-              open={hintsOpen}
-              onToggle={(e) => setHintsOpen((e.target as HTMLDetailsElement).open)}
-            >
-              <summary className="wizard-optional-block__sum">Weitere Hinweise (optional)</summary>
-              <div className="wizard-optional-block__body">{steuernBlock}</div>
-            </details>
-          ) : null}
-        </>
-      </section>
-
-      {showAbschlussPaket ? (
-      <section id="section-3" className="document-canvas-sec">
-        <>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Anlagen & Versand</div>
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-              Schlussrechnung: optional Abnahme und weitere Unterlagen mitsenden. Abschläge laufen
-              ohne dieses Paket — Abschlussbericht und Abnahme gehören zum Auftragsabschluss.
+                </>
+              )}
             </div>
-          </div>
-          <div
-            className="section-h"
-            style={{
-              marginBottom: 10,
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 'var(--fs-text)',
-              fontWeight: 600,
-              color: 'var(--text)',
-            }}
-          >
-            Dokumentpaket{' '}
-            <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>
-              · {anlagenCount} Anlage{anlagenCount === 1 ? '' : 'n'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ANLAGEN_DEF.map((a) => {
-              const on = !!anlagen[a.key]
-              return (
-                <button
-                  key={a.key}
-                  type="button"
-                  disabled={a.locked}
-                  onClick={() => !a.locked && toggleAnlage(a.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 11,
-                    padding: '10px 12px',
-                    border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                    background: on ? 'var(--green-50)' : 'var(--card)',
-                    borderRadius: 9,
-                    cursor: a.locked ? 'default' : 'pointer',
-                    textAlign: 'left',
-                    opacity: a.locked && !on ? 0.6 : 1,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 5,
-                      border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
-                      background: on ? 'var(--green)' : 'transparent',
-                      display: 'grid',
-                      placeItems: 'center',
-                      flex: '0 0 auto',
-                      color: '#fff',
-                    }}
-                  >
-                    {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>
-                      {a.label}
-                      {a.locked ? (
-                        <span
-                          style={{
-                            fontSize: 'var(--fs-meta)',
-                            color: 'var(--text-3)',
-                            fontWeight: 400,
-                            marginLeft: 6,
-                          }}
-                        >
-                          (immer dabei)
-                        </span>
-                      ) : null}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{a.sub}</div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      </section>
-      ) : null}
+          )}
+        </div>
+      </EditorSheet>
 
-      <section id="section-4" className="document-canvas-sec">
-        <div style={{ display: 'grid', gap: 18, maxWidth: 760, margin: '0 auto' }}>
-          <div>
-            <div style={{ fontSize: 'var(--fs-head)', fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-              E-Mail prüfen — Vorschau zeigt die echte Versand-Vorlage. Erstellen legt die Rechnung
-              an (Portal), Erstellen und versenden schickt zusätzlich die Mail
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <MockField label="Rechnungstitel" full>
-                <input className="input" value={rTitel} readOnly />
-              </MockField>
-              <EmailPillsField
-                label="An"
-                required
-                emails={mailTo}
-                onChange={setMailTo}
-                placeholder="kunde@beispiel.de"
-                hint="Mindestens eine Empfänger-Adresse"
-                disabled={saving}
-              />
-              <EmailPillsField
-                label="CC"
-                emails={mailCc}
-                onChange={setMailCc}
-                placeholder="weitere@beispiel.de"
-                hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
-                disabled={saving}
-              />
-              <MockField label="Betreff" full required>
-                <input
-                  className="input"
-                  value={mailBetreff}
-                  onChange={(e) => setMailBetreff(e.target.value)}
-                  disabled={saving}
-                  placeholder={defaultBetreff}
-                />
-              </MockField>
-              <MockField label="Beschreibung / Einleitung" full>
-                <textarea
-                  className="input ta"
-                  rows={4}
-                  value={einleitung}
-                  onChange={(e) => setEinleitung(e.target.value)}
-                  disabled={saving}
-                />
-              </MockField>
-            </div>
-            <div className="wz-overview" style={{ marginTop: 14 }}>
-              <div>
-                <span className="k">Kunde</span>
-                <b>{kundeName}</b>
-              </div>
-              <div>
-                <span className="k">Fällig am</span>
-                <b>{formatDateDe(rFaellig)}</b>
-              </div>
-              <div>
-                <span className="k">Betrag</span>
-                <b>{formatEurBetrag(rBrutto)} brutto</b>
-              </div>
-              <div>
-                <span className="k">Art</span>
-                <b>{rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'}</b>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="section-h"
-            style={{
-              marginBottom: 0,
-              textTransform: 'none',
-              letterSpacing: 0,
-              fontSize: 'var(--fs-text)',
-              fontWeight: 600,
-            }}
-          >
-            E-Mail-Vorschau
-          </div>
-          <RechnungWizardMailPreview
-            rechnungId={activeVersandId}
-            kundeId={kundeId}
-            betreff={mailBetreff.trim() || defaultBetreff}
-            einleitung={einleitung}
-            brutto={rBrutto}
-            faelligAm={rFaellig}
-            projektTitel={bootstrap.projektTitel || rTitel}
-            rechnungsnummer={rechnungsnummer.trim() || previewNr}
-            empfaengerHint={mailTo[0] || kundeEmail || kundeName}
-          />
-
-          <div>
-            <button
-              type="button"
-              onClick={() => setDocAccordionOpen((o) => !o)}
-              style={{
-                display: 'flex',
-                width: '100%',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                marginBottom: 10,
-              }}
-            >
-              <span
-                className="section-h"
-                style={{
-                  marginBottom: 0,
-                  textTransform: 'none',
-                  letterSpacing: 0,
-                  fontSize: 'var(--fs-text)',
-                  fontWeight: 600,
-                }}
+      <EditorSheet
+        open={sheet === 'anlagen'}
+        onClose={closeSheet}
+        title="Anlagen"
+        context="canvas"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {ANLAGEN_DEF.map((a) => {
+            if (!showAbschlussPaket && (a.key === 'abnahme' || a.key === 'bautagebuch' || a.key === 'fotos')) {
+              return null
+            }
+            const on = !!anlagen[a.key]
+            return (
+              <button
+                key={a.key}
+                type="button"
+                disabled={a.locked}
+                onClick={() => !a.locked && toggleAnlage(a.key)}
+                className={on ? 'rw-tax__opt on' : 'rw-tax__opt'}
               >
-                Dokument-Vorschauen
-              </span>
-              <MockIcon
-                ctx="default"
-                n={docAccordionOpen ? 'chevron-up' : 'chevron-down'}
-                size={16}
-              />
-            </button>
+                <span className="rw-tax__check" aria-hidden>
+                  {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+                </span>
+                <span className="rw-tax__txt">
+                  <span className="rw-tax__lab">
+                    {a.label}
+                    {a.locked ? ' (immer dabei)' : ''}
+                  </span>
+                  <span className="rw-tax__sub">{a.sub}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </EditorSheet>
 
-            {docAccordionOpen ? (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 6,
-                    flexWrap: 'wrap',
-                    marginBottom: 12,
-                  }}
-                >
-                  {selectedAnlagen.map((a) => {
-                    const on = docPreviewTab === a.key
-                    return (
-                      <button
-                        key={a.key}
-                        type="button"
-                        onClick={() => setDocPreviewTab(a.key)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: 8,
-                          border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                          background: on ? 'var(--green-50)' : 'var(--card)',
-                          fontSize: 'var(--fs-meta)',
-                          fontWeight: on ? 600 : 500,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {a.label}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {docPreviewTab === 'rechnung' ? (
-                  <RechnungWizardPdfPreview
-                    rechnungId={activeVersandId}
-                    loading={saving && !activeVersandId}
-                    kundeName={kundeName}
-                  />
-                ) : (
-                  <div className="card" style={{ padding: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <MockIcon ctx="default" n="file-text" size={22} />
-                      <div>
-                        <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
-                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.label}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 'var(--fs-meta)',
-                            color: 'var(--text-3)',
-                            marginTop: 4,
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.sub}. Wird mit dem
-                          Rechnungsversand als Anlage vorbereitet — Live-PDF-Vorschau folgt, sobald
-                          das Dokument erzeugt ist.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : null}
+      <EditorSheet
+        open={sheet === 'versand'}
+        onClose={closeSheet}
+        title="Versand"
+        context="canvas"
+        compose
+        composeLabel={saving ? '…' : 'Senden'}
+        onConfirm={() => void handleFinish(true)}
+        confirmDisabled={saving || (hasPlan && !planOk)}
+        confirmBusy={saving}
+      >
+        <div className="form-grid form-grid--sheet">
+          <MockField label="Rechnungstitel" full>
+            <input className="input" value={rTitel} readOnly />
+          </MockField>
+          <EmailPillsField
+            label="An"
+            required
+            emails={mailTo}
+            onChange={setMailTo}
+            placeholder="kunde@beispiel.de"
+            hint="Mindestens eine Empfänger-Adresse"
+            disabled={saving}
+          />
+          <EmailPillsField
+            label="Cc"
+            emails={mailCc}
+            onChange={setMailCc}
+            placeholder="optional"
+            disabled={saving}
+          />
+          <MockField label="Betreff" full>
+            <input
+              className="input"
+              value={mailBetreff || defaultBetreff}
+              onChange={(e) => setMailBetreff(e.target.value)}
+            />
+          </MockField>
+          <div className="full" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <MockBtn
+              kind="ghost"
+              disabled={saving || (hasPlan && !planOk)}
+              onClick={() => void handleFinish(false)}
+            >
+              Nur erstellen
+            </MockBtn>
+            <MockBtn
+              kind="primary"
+              icon="send"
+              disabled={saving || (hasPlan && !planOk)}
+              onClick={() => void handleFinish(true)}
+            >
+              Erstellen und versenden
+            </MockBtn>
+          </div>
+          <div className="full">
+            <RechnungWizardMailPreview
+              rechnungId={activeVersandId}
+              kundeId={kundeId}
+              betreff={mailBetreff || defaultBetreff}
+              einleitung={einleitung}
+              rechnungsnummer={previewNr}
+              brutto={displayBrutto}
+              faelligAm={rFaellig}
+              projektTitel={bootstrap.projektTitel || rTitel}
+              empfaengerHint={mailTo[0] || kundeEmail || kundeName}
+            />
           </div>
         </div>
-      </section>
-    </DocumentCanvas>
+      </EditorSheet>
+    </>
   )
 
-  return createPortal(wizard, document.body)
+  return wizard
 }

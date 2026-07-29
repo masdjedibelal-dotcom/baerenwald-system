@@ -15,7 +15,6 @@ import {
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
-import { MyWorkInbox, type MyWorkItem } from '@/components/dashboard/MyWorkInbox'
 import { cn } from '@/lib/utils'
 
 export type DashboardKpi = {
@@ -346,7 +345,6 @@ export function DashboardClient({
   gewerk,
   rankingHandwerker,
   rankingKunden,
-  myWorkCounts,
 }: {
   vorname: string
   zeitraumFilter: DashboardZeitraumFilter
@@ -361,12 +359,6 @@ export function DashboardClient({
   gewerk: { zeilen: GewerkUmsatzZeile[]; gesamt: number }
   rankingHandwerker: RankingZeile[]
   rankingKunden: RankingZeile[]
-  myWorkCounts?: {
-    reUeberfaellig: number
-    angeboteWarten: number
-    anfragenOhneAntwort?: number
-    auftraegeOhneFortschritt?: number
-  }
 }) {
   const router = useRouter()
 
@@ -384,50 +376,6 @@ export function DashboardClient({
       }),
     []
   )
-
-  const { tagItems, waitingItems } = useMemo(() => {
-    const reUeberfaellig = myWorkCounts?.reUeberfaellig ?? 0
-    const angeboteWarten = myWorkCounts?.angeboteWarten ?? 0
-    const anfragenOhne = myWorkCounts?.anfragenOhneAntwort ?? 0
-    const ohneFortschritt = myWorkCounts?.auftraegeOhneFortschritt ?? 0
-
-    const tag: MyWorkItem[] = [
-      {
-        id: 'anfragen-ohne',
-        label: 'Anfragen ohne Antwort',
-        hint: 'Neu · wartet auf Reaktion',
-        href: '/vorgaenge?tab=anfrage&lifecycle=offen',
-        icon: 'inbox',
-        count: anfragenOhne,
-      },
-      {
-        id: 'ag-stille',
-        label: 'Stille Angebote',
-        hint: 'Gesendet · keine Antwort',
-        href: '/vorgaenge?tab=angebot&lifecycle=offen',
-        icon: 'file-invoice',
-        count: angeboteWarten,
-      },
-      {
-        id: 'au-stille',
-        label: 'Aufträge ohne Fortschritt',
-        hint: '>10 Tage seit letzter Aktivität',
-        href: '/vorgaenge?tab=auftrag&lifecycle=offen',
-        icon: 'briefcase',
-        count: ohneFortschritt,
-      },
-      {
-        id: 're-ueberfaellig',
-        label: 'RE überfällig',
-        hint: 'Zahlung offen · fällig',
-        href: '/vorgaenge?tab=rechnung&lifecycle=offen',
-        icon: 'receipt',
-        count: reUeberfaellig,
-      },
-    ]
-
-    return { tagItems: tag, waitingItems: [] as MyWorkItem[] }
-  }, [myWorkCounts])
 
   return (
     <div className="dashboard-page min-w-0 overflow-x-hidden">
@@ -448,10 +396,6 @@ export function DashboardClient({
           </div>
         </div>
         <DashboardZeitraumFilterBar filter={zeitraumFilter} />
-      </div>
-
-      <div className="mb-[22px]">
-        <MyWorkInbox tagItems={tagItems} waitingItems={waitingItems} />
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 22 }}>

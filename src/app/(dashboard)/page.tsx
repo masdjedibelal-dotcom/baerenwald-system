@@ -9,8 +9,6 @@ import {
   isFunnelAuftragStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
-  isUeberfaelligeRechnung,
-  isAngebotWartetAufKundeStatus,
 } from '@/lib/dashboard-mock-mapping'
 import {
   buildGewerkUmsatz,
@@ -196,39 +194,6 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       a.ist_wiederkehrend === true && isAktiverAuftragStatus(a.status as string)
   ).length
   const offeneRechnungenCount = rechnungenZ.filter((r) => isOffeneRechnungStatus(r.status)).length
-  const reUeberfaelligCount = rechnungen.filter((r) =>
-    isUeberfaelligeRechnung({ status: r.status, faellig_am: r.faellig_am })
-  ).length
-  const angeboteWartenCount = angebote.filter((a) =>
-    isAngebotWartetAufKundeStatus(a.status as string, a.status_einfach as string | null)
-  ).length
-
-  /** Phase 10: Anfragen ohne Antwort — neu / offen ohne verknüpftes Angebot. */
-  const angebotLeadIds = new Set(
-    angebote.map((a) => String((a as { lead_id?: string | null }).lead_id ?? '')).filter(Boolean)
-  )
-  const anfragenOhneAntwortCount = leads.filter((l) => {
-    const st = String(l.status ?? '').toLowerCase()
-    if (st === 'abgeschlossen' || st === 'storniert' || st === 'verloren') return false
-    return !angebotLeadIds.has(String(l.id))
-  }).length
-
-  /** >10 Tage seit letzte_aktivitaet; hoher Fortschritt zählt nicht. */
-  const zehnTageMs = 10 * 24 * 60 * 60 * 1000
-  const nowMs = Date.now()
-  const auftraegeOhneFortschrittCount = auftraege.filter((a) => {
-    const st = String(a.status ?? '').toLowerCase()
-    if (st === 'abgeschlossen' || st === 'storniert') return false
-    const fortschritt = Number((a as { fortschritt?: number | null }).fortschritt) || 0
-    if (fortschritt >= 80) return false
-    const last =
-      String((a as { letzte_aktivitaet?: string | null }).letzte_aktivitaet ?? '').trim() ||
-      String(a.created_at ?? '')
-    if (!last) return false
-    const t = new Date(last).getTime()
-    if (!Number.isFinite(t)) return false
-    return nowMs - t > zehnTageMs
-  }).length
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 
@@ -442,12 +407,6 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       gewerk={gewerk}
       rankingHandwerker={rankingHandwerker}
       rankingKunden={rankingKunden}
-      myWorkCounts={{
-        reUeberfaellig: reUeberfaelligCount,
-        angeboteWarten: angeboteWartenCount,
-        anfragenOhneAntwort: anfragenOhneAntwortCount,
-        auftraegeOhneFortschritt: auftraegeOhneFortschrittCount,
-      }}
     />
   )
 }

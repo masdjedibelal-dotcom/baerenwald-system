@@ -31,6 +31,7 @@ export type EntityDetailLayoutProps = {
   /** Status→Aktion-Hinweis unter dem Kopf */
   nextStep?: NaechsterSchrittHint | null
   nextStepMetrics?: NextStepMetric[]
+  onNextStepClick?: () => void
   wiedervorlageDatum?: string | null
   wiedervorlageNotiz?: string | null
   /** Phase 10: Chip editierbar machen */
@@ -44,6 +45,8 @@ export type EntityDetailLayoutProps = {
   crumbBackHref?: string
   crumbBackLabel?: string
   crumbSectionLabel?: string
+  /** Kontext-Band zwischen Kopf und NextStep (z. B. Notfall) */
+  banner?: ReactNode
   children: ReactNode
   className?: string
 }
@@ -54,6 +57,7 @@ export function EntityDetailLayout({
   head,
   nextStep,
   nextStepMetrics,
+  onNextStepClick,
   wiedervorlageDatum,
   wiedervorlageNotiz,
   wiedervorlageEntity,
@@ -66,6 +70,7 @@ export function EntityDetailLayout({
   crumbBackHref,
   crumbBackLabel,
   crumbSectionLabel,
+  banner,
   children,
   className,
 }: EntityDetailLayoutProps) {
@@ -130,8 +135,13 @@ export function EntityDetailLayout({
           badges={badges}
           className={cn(head.className, scrolled && 'shrunk')}
         />
+        {banner ? <div className="detail-entity-banner">{banner}</div> : null}
         {!showResolver ? (
-          <NextStepBar step={nextStep ?? null} metrics={nextStepMetrics} />
+          <NextStepBar
+            step={nextStep ?? null}
+            metrics={nextStepMetrics}
+            onStepClick={onNextStepClick}
+          />
         ) : null}
         {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
       </div>

@@ -6,7 +6,6 @@ import {
   MockBtn,
   MockChip,
   MockEmpty,
-  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -19,7 +18,6 @@ import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import { mergeKunden } from '@/app/actions/kunden'
 import { Modal } from '@/components/ui/Modal'
@@ -46,7 +44,6 @@ const KUNDEN_COLS: ResizableColDef[] = [
   { id: 'typ', defaultWidth: 130, minWidth: 90, maxWidth: 200 },
   { id: 'telefon', defaultWidth: 150, minWidth: 110, maxWidth: 220 },
   { id: 'email', defaultWidth: 220, minWidth: 140, maxWidth: 360 },
-  { id: 'actions', defaultWidth: 48, minWidth: 48, maxWidth: 48, fixed: true },
 ]
 
 const KUNDEN_COLS_SELECT: ResizableColDef[] = [
@@ -258,17 +255,6 @@ export function KundenListeClient({
 
   function openDetail(id: string) {
     router.push(`/kunden/${id}`)
-  }
-
-  function rowMenuItems(k: KundeListeZeile): EntityMenuItem[] {
-    return [
-      { label: 'Öffnen', icon: 'eye', onClick: () => openDetail(k.id) },
-      {
-        label: 'Bearbeiten',
-        icon: 'pencil',
-        onClick: () => router.push(`/kunden/${k.id}?edit=1`),
-      },
-    ]
   }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
@@ -575,7 +561,6 @@ export function KundenListeClient({
           >
             Email
           </MockSortHead>
-          <div aria-hidden />
         </div>
 
         {pageItems.length === 0 ? (
@@ -643,13 +628,6 @@ export function KundenListeClient({
                 }}
               >
                 {k.email?.trim() || '—'}
-              </div>
-              <div
-                className="row-actions always"
-                onClick={(e) => e.stopPropagation()}
-                style={{ justifyContent: 'flex-end' }}
-              >
-                <MockEntityRowMenu items={rowMenuItems(k)} title="Kunde" />
               </div>
             </div>
           ))

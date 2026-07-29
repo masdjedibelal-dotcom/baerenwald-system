@@ -2,21 +2,26 @@
 
 import { useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { toast } from '@/components/ui/app-toast'
 
 function Sec({
   title,
+  icon,
   actions,
   children,
 }: {
   title: string
+  icon?: string
   actions?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 32 }}>
       <div
         style={{
           display: 'flex',
@@ -27,7 +32,18 @@ function Sec({
           borderBottom: '0.5px solid var(--border)',
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
+        <span
+          style={{
+            fontSize: 'var(--fs-meta)',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'var(--text-3)',
+          }}
+        >
+          {title}
+        </span>
         <div style={{ flex: 1 }} />
         {actions}
       </div>
@@ -35,27 +51,6 @@ function Sec({
     </div>
   )
 }
-
-type StammKey =
-  | 'firmenname'
-  | 'geschaeftsfuehrer'
-  | 'adresse'
-  | 'ust_id'
-  | 'telefon'
-  | 'email'
-  | 'bank'
-
-type StammRow = { key: StammKey; label: string; link?: boolean }
-
-const STAMM_ROWS: StammRow[] = [
-  { key: 'firmenname', label: 'Firma' },
-  { key: 'geschaeftsfuehrer', label: 'Inhaber' },
-  { key: 'adresse', label: 'Adresse' },
-  { key: 'ust_id', label: 'USt-IdNr.' },
-  { key: 'telefon', label: 'Telefon', link: true },
-  { key: 'email', label: 'E-Mail', link: true },
-  { key: 'bank', label: 'Bankverbindung' },
-]
 
 function formatAdresse(v: FirmenEinstellungen): string {
   return [v.strasse, [v.plz, v.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
@@ -68,12 +63,6 @@ function formatBank(v: FirmenEinstellungen): string {
   return [v.bank_name?.trim(), short].filter(Boolean).join(' · ') || '—'
 }
 
-function displayValue(v: FirmenEinstellungen, key: StammKey): string {
-  if (key === 'adresse') return formatAdresse(v) || '—'
-  if (key === 'bank') return formatBank(v)
-  return (v[key] as string)?.trim() || '—'
-}
-
 function parseAdresse(text: string, base: FirmenEinstellungen): FirmenEinstellungen {
   const next = { ...base }
   const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
@@ -83,12 +72,12 @@ function parseAdresse(text: string, base: FirmenEinstellungen): FirmenEinstellun
   }
   next.strasse = parts[0] ?? text
   if (parts.length >= 2) {
-    const m = parts[1].match(/^(\d{4,5})\s+(.+)$/)
+    const m = parts[1]!.match(/^(\d{4,5})\s+(.+)$/)
     if (m) {
-      next.plz = m[1]
-      next.ort = m[2]
+      next.plz = m[1]!
+      next.ort = m[2]!
     } else {
-      next.ort = parts[1]
+      next.ort = parts[1]!
     }
   }
   return next
@@ -98,34 +87,48 @@ function parseBank(text: string, base: FirmenEinstellungen): FirmenEinstellungen
   const next = { ...base }
   const ibanMatch = text.match(/IBAN\s*[.…]*\s*([A-Z0-9]+)/i)
   if (ibanMatch) {
-    const raw = ibanMatch[1].replace(/[.…]/g, '')
+    const raw = ibanMatch[1]!.replace(/[.…]/g, '')
     if (raw.length >= 8) next.iban = raw
   } else {
     const bare = text.match(/\b([A-Z]{2}\d{2}[A-Z0-9]{10,30})\b/i)
-    if (bare) next.iban = bare[1].toUpperCase()
+    if (bare) next.iban = bare[1]!.toUpperCase()
   }
   const namePart = text.split(/[·•|]/)[0]?.replace(/\s*IBAN.*/i, '').trim()
   if (namePart) next.bank_name = namePart
   return next
 }
 
+type EditDraft = {
+  firmenname: string
+  geschaeftsfuehrer: string
+  adresse: string
+  ust_id: string
+  steuernummer: string
+  handelsregister: string
+  telefon: string
+  email: string
+  bank: string
+}
+
+/** Mock-Parität: Firma Stammdaten + Brand & Rechnung (randlos). */
 export function FirmaBrandingForm({
   initial,
   naechsteRechnungsnummer,
 }: {
   initial: FirmenEinstellungen
-  /** z. B. „0184“ oder „2069“ für Anzeige unter Rechnungsnummern */
   naechsteRechnungsnummer?: string | null
 }) {
   const [v, setV] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [uploading, setUploading] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<Record<StammKey, string>>(() => ({
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [draft, setDraft] = useState<EditDraft>(() => ({
     firmenname: initial.firmenname,
     geschaeftsfuehrer: initial.geschaeftsfuehrer,
     adresse: formatAdresse(initial),
     ust_id: initial.ust_id,
+    steuernummer: initial.steuernummer,
+    handelsregister: initial.pdf_fusszeile,
     telefon: initial.telefon,
     email: initial.email,
     bank: formatBank(initial) === '—' ? '' : formatBank(initial),
@@ -144,21 +147,27 @@ export function FirmaBrandingForm({
     return nr ? `${base} · aktuell ${nr}` : base
   }, [naechsteRechnungsnummer])
 
-  function startEdit() {
+  const metaLine = useMemo(() => {
+    const parts = [
+      formatAdresse(v) || null,
+      v.geschaeftsfuehrer?.trim() ? `Inhaber ${v.geschaeftsfuehrer.trim()}` : null,
+    ].filter(Boolean)
+    return parts.join(' · ')
+  }, [v])
+
+  function openEdit() {
     setDraft({
       firmenname: v.firmenname,
       geschaeftsfuehrer: v.geschaeftsfuehrer,
       adresse: formatAdresse(v),
       ust_id: v.ust_id,
+      steuernummer: v.steuernummer,
+      handelsregister: v.pdf_fusszeile,
       telefon: v.telefon,
       email: v.email,
       bank: formatBank(v) === '—' ? '' : formatBank(v),
     })
-    setEditing(true)
-  }
-
-  function cancelEdit() {
-    setEditing(false)
+    setSheetOpen(true)
   }
 
   function saveStamm() {
@@ -168,6 +177,8 @@ export function FirmaBrandingForm({
         firmenname: draft.firmenname,
         geschaeftsfuehrer: draft.geschaeftsfuehrer,
         ust_id: draft.ust_id,
+        steuernummer: draft.steuernummer,
+        pdf_fusszeile: draft.handelsregister,
         telefon: draft.telefon,
         email: draft.email,
       }
@@ -179,7 +190,7 @@ export function FirmaBrandingForm({
         return
       }
       setV(next)
-      setEditing(false)
+      setSheetOpen(false)
       toast.success('Gespeichert')
     })
   }
@@ -228,63 +239,82 @@ export function FirmaBrandingForm({
     })
   }
 
+  const detailRows: { label: string; value: string }[] = [
+    { label: 'USt-IdNr.', value: v.ust_id?.trim() || '—' },
+    { label: 'Steuernummer', value: v.steuernummer?.trim() || '—' },
+    { label: 'Handelsregister', value: v.pdf_fusszeile?.trim() || '—' },
+    { label: 'Bankverbindung', value: formatBank(v) },
+  ]
+
   return (
-    <div className="einstellungen-firma-grid">
-      <Sec title="Stammdaten">
-        <div className="props">
-          {STAMM_ROWS.map((r) => {
-            const value = displayValue(v, r.key)
-            return (
-              <div className="prop" key={r.key}>
-                <div className="prop-l">{r.label}</div>
-                {editing ? (
-                  <input
-                    className="txt"
-                    style={{ height: 30 }}
-                    value={draft[r.key]}
-                    onChange={(e) => setDraft((d) => ({ ...d, [r.key]: e.target.value }))}
-                    placeholder={r.key === 'bank' ? 'Bank · IBAN …' : undefined}
-                  />
-                ) : r.link && value !== '—' ? (
-                  <div className="prop-v link">
-                    {r.key === 'telefon' ? (
-                      <a href={`tel:${value.replace(/\s/g, '')}`}>{value}</a>
-                    ) : r.key === 'email' ? (
-                      <a href={`mailto:${value}`}>{value}</a>
-                    ) : (
-                      value
-                    )}
-                  </div>
-                ) : (
-                  <div className="prop-v">{value}</div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>
-          {editing ? (
-            <>
-              <MockBtn sm kind="primary" icon="check" disabled={pending} onClick={saveStamm}>
-                Speichern
-              </MockBtn>
-              <MockBtn sm kind="ghost" disabled={pending} onClick={cancelEdit}>
-                Abbrechen
-              </MockBtn>
-            </>
-          ) : (
-            <MockBtn sm onClick={startEdit}>
-              Bearbeiten
-            </MockBtn>
+    <div>
+      <Sec
+        title="Stammdaten"
+        icon="clipboard-list"
+        actions={
+          <button
+            type="button"
+            className="qa-btn"
+            title="Bearbeiten"
+            aria-label="Stammdaten bearbeiten"
+            onClick={openEdit}
+          >
+            <MockIcon ctx="default" n="pencil" size={14} />
+          </button>
+        }
+      >
+        <div className="vgid" style={{ marginBottom: 16 }}>
+          <div className="vgid-name" style={{ fontSize: 'var(--fs-head)' }}>
+            {v.firmenname?.trim() || '—'}
+          </div>
+          {metaLine ? (
+            <div className="vgid-meta" style={{ marginTop: 4 }}>
+              {metaLine}
+            </div>
+          ) : null}
+          {(v.telefon?.trim() || v.email?.trim()) && (
+            <div className="vgid-chips" style={{ marginTop: 12 }}>
+              {v.telefon?.trim() ? (
+                <a className="vgid-chip" href={`tel:${v.telefon.replace(/\s/g, '')}`}>
+                  <MockIcon ctx="default" n="phone" size={14} />
+                  {v.telefon.trim()}
+                </a>
+              ) : null}
+              {v.email?.trim() ? (
+                <a className="vgid-chip" href={`mailto:${v.email.trim()}`}>
+                  <MockIcon ctx="default" n="mail" size={14} />
+                  {v.email.trim()}
+                </a>
+              ) : null}
+            </div>
           )}
+        </div>
+
+        <div>
+          {detailRows.map((r) => (
+            <div
+              key={r.label}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '140px 1fr',
+                gap: 12,
+                padding: '12px 0',
+                borderBottom: '0.5px solid var(--border)',
+                fontSize: 'var(--fs-text)',
+              }}
+            >
+              <div style={{ color: 'var(--text-3)' }}>{r.label}</div>
+              <div style={{ color: 'var(--text)', fontWeight: 500 }}>{r.value}</div>
+            </div>
+          ))}
         </div>
       </Sec>
 
-      <Sec title="Brand & Rechnung">
+      <Sec title="Brand & Rechnung" icon="file-invoice">
         <div className="setting-row">
           <div>
             <div className="lbl">Logo</div>
-            <div className="sub">Wird auf Rechnungen und Angeboten verwendet</div>
+            <div className="sub">Wird auf Rechnungen und Angeboten verwendet.</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {v.logo_url ? (
@@ -318,7 +348,7 @@ export function FirmaBrandingForm({
         <div className="setting-row">
           <div>
             <div className="lbl">Primärfarbe</div>
-            <div className="sub">Akzentfarbe in PDF-Vorlagen</div>
+            <div className="sub">Akzentfarbe in PDF-Vorlagen.</div>
           </div>
           <div
             style={{
@@ -345,7 +375,7 @@ export function FirmaBrandingForm({
         <div className="setting-row">
           <div>
             <div className="lbl">Zahlungsziel</div>
-            <div className="sub">Standardfrist nach Rechnungsversand</div>
+            <div className="sub">Standardfrist nach Rechnungsversand.</div>
           </div>
           {editZahlungsziel ? (
             <input
@@ -367,7 +397,7 @@ export function FirmaBrandingForm({
               type="button"
               onClick={() => setEditZahlungsziel(true)}
               style={{
-                fontSize: 13,
+                fontSize: 'var(--fs-text)',
                 fontWeight: 500,
                 background: 'none',
                 border: 'none',
@@ -381,6 +411,95 @@ export function FirmaBrandingForm({
           )}
         </div>
       </Sec>
+
+      <EditorSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Stammdaten bearbeiten"
+        crumb="Firma >"
+        size="lg"
+        footer={
+          <div className="kunde-create-footer">
+            <button type="button" className="btn ghost" onClick={() => setSheetOpen(false)}>
+              Abbrechen
+            </button>
+            <MockBtn kind="primary" icon="check" disabled={pending} onClick={saveStamm}>
+              Speichern
+            </MockBtn>
+          </div>
+        }
+      >
+        <div className="kunde-create">
+          <MockFormSection title="Firma" icon="building">
+            <MockField label="Firma" required full>
+              <input
+                className="input"
+                value={draft.firmenname}
+                onChange={(e) => setDraft((d) => ({ ...d, firmenname: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="Inhaber" full>
+              <input
+                className="input"
+                value={draft.geschaeftsfuehrer}
+                onChange={(e) => setDraft((d) => ({ ...d, geschaeftsfuehrer: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="Adresse" full>
+              <input
+                className="input"
+                value={draft.adresse}
+                onChange={(e) => setDraft((d) => ({ ...d, adresse: e.target.value }))}
+                placeholder="Straße, PLZ Ort"
+              />
+            </MockField>
+            <MockField label="Telefon">
+              <input
+                className="input"
+                value={draft.telefon}
+                onChange={(e) => setDraft((d) => ({ ...d, telefon: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="E-Mail">
+              <input
+                className="input"
+                value={draft.email}
+                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="USt-IdNr.">
+              <input
+                className="input"
+                value={draft.ust_id}
+                onChange={(e) => setDraft((d) => ({ ...d, ust_id: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="Steuernummer">
+              <input
+                className="input"
+                value={draft.steuernummer}
+                onChange={(e) => setDraft((d) => ({ ...d, steuernummer: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="Handelsregister" full>
+              <input
+                className="input"
+                value={draft.handelsregister}
+                onChange={(e) => setDraft((d) => ({ ...d, handelsregister: e.target.value }))}
+                placeholder="HRB … · AG …"
+              />
+            </MockField>
+            <MockField label="Bankverbindung" full>
+              <input
+                className="input"
+                value={draft.bank}
+                onChange={(e) => setDraft((d) => ({ ...d, bank: e.target.value }))}
+                placeholder="Bank · IBAN …"
+              />
+            </MockField>
+          </MockFormSection>
+        </div>
+      </EditorSheet>
     </div>
   )
 }

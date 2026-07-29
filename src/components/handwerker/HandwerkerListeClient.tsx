@@ -9,14 +9,12 @@ import {
   MockBtn,
   MockChip,
   MockEmpty,
-  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
@@ -65,7 +63,6 @@ const HW_COLS: ResizableColDef[] = [
   { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
   { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
   { id: 'status', defaultWidth: 110, minWidth: 88, maxWidth: 160 },
-  { id: 'actions', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
 const HW_COLS_SELECT: ResizableColDef[] = [
@@ -256,17 +253,6 @@ export function HandwerkerListeClient({
     10,
     paginationResetKey
   )
-
-  function openDetail(id: string) {
-    router.push(`/handwerker/${id}`)
-  }
-
-  function rowMenuItems(h: HandwerkerZeile): EntityMenuItem[] {
-    return [
-      { label: 'Öffnen', icon: 'eye', onClick: () => openDetail(h.id) },
-      { label: 'Bearbeiten', icon: 'pencil', onClick: () => openDetail(h.id) },
-    ]
-  }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
   const isMobile = useIsMobile()
@@ -547,7 +533,6 @@ export function HandwerkerListeClient({
           >
             Status
           </MockSortHead>
-          <div aria-hidden />
         </div>
 
         {pageItems.length === 0 ? (
@@ -636,13 +621,6 @@ export function HandwerkerListeClient({
                   </span>
                 </div>
                 <div className="lc-status">{handwerkerStatusBadge(h)}</div>
-                <div
-                  className="row-actions always"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ justifyContent: 'flex-end' }}
-                >
-                  <MockEntityRowMenu items={rowMenuItems(h)} title="Partner" />
-                </div>
               </Link>
             )
           })

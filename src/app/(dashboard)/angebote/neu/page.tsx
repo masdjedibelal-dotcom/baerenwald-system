@@ -53,7 +53,14 @@ export default async function AngebotNeuRedirectPage({
     ])
 
     if (error || !kunde) {
-      return <AngebotNeuKundeGate />
+      return (
+        <AngebotNeuKundeGate
+          initialError={
+            error?.message ||
+            'Kunde nicht gefunden oder keine Berechtigung — bitte erneut wählen.'
+          }
+        />
+      )
     }
 
     return (

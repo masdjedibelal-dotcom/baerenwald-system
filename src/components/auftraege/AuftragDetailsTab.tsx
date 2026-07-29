@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
@@ -12,9 +11,7 @@ import {
   type LeistungMangelAnzeige,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
-import { AuftragAbnahmeprotokollCard } from '@/components/auftraege/AuftragAbnahmeprotokollCard'
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
-import { AuftragNachtragBaustoppSection } from '@/components/auftraege/AuftragNachtragBaustoppSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
@@ -25,9 +22,12 @@ import {
 } from '@/app/(dashboard)/auftraege/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
+import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { Button } from '@/components/ui/Button'
 
 type AuftragLeadSnap = Pick<
   Lead,
@@ -136,6 +136,7 @@ export function AuftragLeistungenTab({
   detail,
   lead,
   editable = true,
+  mwstSatz = 19,
   onSaved,
   onOpenDokument,
   vertragNachtragVerfuegbar = false,
@@ -165,24 +166,58 @@ export function AuftragLeistungenTab({
   const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
   const disabled = istAbgeschlossen || !editable
   const angebotTitel = projektTitel(detail, lead)
+
+  const footerNettoMwst = useMemo(() => {
+    const netto = auftragSummenAusPositionen(
+      auftragPositionenToAngebotPositionen(
+        (detail.auftrag_positionen ?? []).filter(
+          (p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt'
+        )
+      )
+    ).netto
+    const satz = Math.max(0, mwstSatz)
+    const mwstBetrag = Math.round(netto * (satz / 100) * 100) / 100
+    return { netto, mwstSatz: satz, mwstBetrag }
+  }, [detail.auftrag_positionen, mwstSatz])
+
   const rows = useMemo(() => {
     const base = leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [])
+    const mangelGewerke = new Set(
+      maengel
+        .filter((m) => m.status !== 'behoben')
+        .map((m) => (m.gewerk ?? '').trim().toLowerCase())
+        .filter(Boolean)
+    )
     return base.map((row) => {
       const extra = eintragByPos[row.id]
-      if (!extra?.length) return row
       const existing = row.dokumentationEintraege ?? []
+      const doku = extra?.length ? [...extra, ...existing] : existing
+      const hatMangel =
+        Boolean(row.gewerkName && mangelGewerke.has(row.gewerkName.trim().toLowerCase())) &&
+        row.status !== 'erledigt' &&
+        row.status !== 'abgenommen'
       return {
         ...row,
-        dokumentationEintraege: [...extra, ...existing],
+        dokumentationEintraege: doku,
+        hatMangel,
+        status: hatMangel ? 'mangel' : row.status,
+        statusLabel: hatMangel ? 'Mangel' : row.statusLabel,
+        subline: hatMangel
+          ? [row.handwerkerName, 'Mangel erfasst'].filter(Boolean).join(' · ')
+          : row.subline,
       }
     })
-  }, [detail.auftrag_positionen, eintragByPos])
+  }, [detail.auftrag_positionen, eintragByPos, maengel])
 
   useEffect(() => {
     let cancelled = false
     void loadAbnahmeprotokollSummary(detail.id).then((s) => {
       if (cancelled) return
-      setMaengel(s ? maengelFuerLeistungenTab(s.maengel ?? []) : [])
+      setMaengel(
+        s
+          ? maengelFuerLeistungenTab(s.maengel ?? [], s.punkte ?? [])
+          : []
+      )
     })
     void listAuftragPositionEintraege(detail.id).then((list) => {
       if (cancelled) return
@@ -232,8 +267,15 @@ export function AuftragLeistungenTab({
         phase="auftrag"
         rows={rows}
         maengel={maengel}
-        onOpenDokument={onOpenDokument}
-        dokumentHint="Positionen stammen aus dem Angebot. Änderungen öffnen das Dokument — hier nur Steuerung."
+        groupByGewerk
+        footerNettoMwst={footerNettoMwst}
+        onOpenDokument={
+          vertragNachtragVerfuegbar && onVertragNachtragErstellen
+            ? onVertragNachtragErstellen
+            : onOpenDokument
+        }
+        dokumentHint="Positionen sind beauftragt — Änderungen brauchen einen Nachtrag."
+        dokumentActionLabel="Nachtrag erstellen"
         emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
         bulkActions={
           disabled
@@ -241,7 +283,6 @@ export function AuftragLeistungenTab({
             : [
                 { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
                 { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
-                { id: 'termin', label: 'Termin', onClick: (ids) => setZuweisungIds(ids) },
               ]
         }
         drawerActionsForRow={
@@ -249,59 +290,34 @@ export function AuftragLeistungenTab({
             ? undefined
             : (row) => [
                 {
-                  id: 'zuweisen',
-                  label: row.handwerkerId ? 'Handwerker ändern' : 'Handwerker anfragen',
-                  variant: 'secondary',
-                  onClick: () => setZuweisungIds([row.id]),
-                },
-                {
-                  id: 'tagebuch',
-                  label: 'Tagebucheintrag',
-                  variant: 'secondary',
+                  id: 'fortschritt',
+                  label: 'Fortschritt erfassen',
+                  variant: 'primary',
                   onClick: () => openTagebuch(row.id),
                 },
                 {
-                  id: 'erledigt',
-                  label: 'Als erledigt',
-                  variant: 'secondary',
-                  onClick: () => markErledigt([row.id]),
-                  disabled: row.status === 'erledigt',
+                  id: 'zuweisen',
+                  label: 'Zuweisung ändern',
+                  variant: 'ghost',
+                  onClick: () => setZuweisungIds([row.id]),
+                },
+                {
+                  id: 'abnahme',
+                  label: 'Abnahme erfassen',
+                  variant: 'ghost',
+                  onClick: () => {
+                    window.location.href = `/auftraege/${detail.id}/abnahme/erstellen`
+                  },
+                  disabled: row.status === 'erledigt' || row.status === 'abgenommen',
                 },
               ]
         }
         belowTable={
-          <div className="space-y-4 pt-1">
-            <div className="flex flex-wrap gap-2">
-              {!disabled ? (
-                <Button type="button" variant="secondary" onClick={() => openTagebuch(null)}>
-                  Tagebucheintrag
-                </Button>
-              ) : null}
-              <a
-                className="btn ghost"
-                href={`/api/auftraege/${detail.id}/regiebericht-lebenszyklus`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Regiebericht PDF
-              </a>
-              <a
-                className="btn ghost"
-                href={`/api/auftraege/${detail.id}/bautagebuch-lebenszyklus`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Bautagebuch PDF
-              </a>
-            </div>
-            <AuftragAbnahmeprotokollCard auftragId={detail.id} onChanged={() => onSaved?.()} />
-            <AuftragNachtragBaustoppSection
-              detail={detail}
-              onChanged={() => onSaved?.()}
-              vertragNachtragVerfuegbar={vertragNachtragVerfuegbar}
-              onVertragNachtragErstellen={onVertragNachtragErstellen}
-            />
-          </div>
+          !disabled ? (
+            <button type="button" className="lt-add-entry" onClick={() => openTagebuch(null)}>
+              + Tagebuch-Eintrag
+            </button>
+          ) : null
         }
       />
 

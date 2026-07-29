@@ -1,31 +1,39 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MapPin } from 'lucide-react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
-import { ObjektBewohnerSection } from '@/components/objektakte/ObjektBewohnerSection'
+import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
-import { kundenObjektKurzlabel, kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
+import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
+import type { VorgangListeRow } from '@/lib/vorgang/types'
 
-type ObjektAkteTab = 'kontakte' | 'bewohner' | 'akte'
+type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'vorgaenge' | 'akte'
 
 export function ObjektAkteDetailClient({
   kunde,
   objekt,
   akte,
+  vorgaengeRows = [],
 }: {
-  kunde: Pick<Kunde, 'id' | 'name'>
+  kunde: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>
   objekt: KundenObjekt
   akte: ObjektAkteDetailPayload
+  vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<ObjektAkteTab>('kontakte')
+  const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
 
   const adresse = [kundenObjektStrasseZeile(objekt), [objekt.plz, objekt.ort].filter(Boolean).join(' ')]
     .filter(Boolean)
@@ -35,30 +43,95 @@ export function ObjektAkteDetailClient({
     router.refresh()
   }
 
+  const einheiten = useMemo(
+    () => akte.einheiten.filter((e) => e.aktiv !== false),
+    [akte.einheiten]
+  )
+
+  const vermietet = useMemo(() => {
+    const occupied = new Set(
+      akte.bewohner.filter((b) => b.aktiv !== false).map((b) => b.objekt_einheit_id)
+    )
+    return einheiten.filter((e) => occupied.has(e.id)).length
+  }, [akte.bewohner, einheiten])
+
+  const flaecheGesamt = useMemo(
+    () =>
+      einheiten.reduce((s, e) => s + (e.wohnflaeche_m2 != null ? Number(e.wohnflaeche_m2) : 0), 0),
+    [einheiten]
+  )
+
   const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
+
+  const kundeVorgaenge = useMemo(
+    () => vorgaengeRows.filter((r) => r.kundeId === kunde.id),
+    [vorgaengeRows, kunde.id]
+  )
+
+  const overview = (
+    <div className="space-y-4">
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">Objektdaten</div>
+        </div>
+        <div className="card-b">
+          <div className="vgid">
+            <div className="vgid-name">{objekt.titel}</div>
+            {adresse ? <div className="vgid-meta">{adresse}</div> : null}
+            {objekt.einheiten_hinweis?.trim() ? (
+              <div className="vgid-meta" style={{ marginTop: 4 }}>
+                {objekt.einheiten_hinweis.trim()}
+              </div>
+            ) : null}
+            <div className="vgid-chips" style={{ marginTop: 10 }}>
+              <span className="vgid-chip ghost">
+                <MockIcon ctx="default" n="building" size={14} />
+                {einheiten.length} Einheiten
+              </span>
+              <span className="vgid-chip ghost">
+                <MockIcon ctx="default" n="users" size={14} />
+                {vermietet} vermietet
+              </span>
+              {flaecheGesamt > 0 ? (
+                <span className="vgid-chip ghost">
+                  <MockIcon ctx="default" n="building" size={14} />
+                  {Math.round(flaecheGesamt)} m²
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+            Verwaltung:{' '}
+            <Link href={`/kunden/${kunde.id}`} className="text-bw-link hover:underline">
+              {kunde.name}
+            </Link>
+          </p>
+        </div>
+      </div>
+
+      <ObjektKontakteSection
+        kundeId={kunde.id}
+        objektId={objekt.id}
+        kontakte={akte.kontakte}
+        onChanged={refresh}
+      />
+    </div>
+  )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
-      id: 'kontakte',
-      label: 'Kontakte vor Ort',
-      icon: 'user',
-      count: akte.kontakte.length || undefined,
-      render: () => (
-        <ObjektKontakteSection
-          kundeId={kunde.id}
-          objektId={objekt.id}
-          kontakte={akte.kontakte}
-          onChanged={refresh}
-        />
-      ),
+      id: 'uebersicht',
+      label: 'Übersicht',
+      icon: 'layout-dashboard',
+      render: () => overview,
     },
     {
-      id: 'bewohner',
-      label: 'Bewohner',
-      icon: 'users',
-      count: akte.bewohner.length || undefined,
+      id: 'einheiten',
+      label: 'Einheiten',
+      icon: 'building',
+      count: einheiten.length || undefined,
       render: () => (
-        <ObjektBewohnerSection
+        <ObjektEinheitenSection
           kundeId={kunde.id}
           objektId={objekt.id}
           einheiten={akte.einheiten}
@@ -68,8 +141,23 @@ export function ObjektAkteDetailClient({
       ),
     },
     {
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      count: kundeVorgaenge.length || undefined,
+      render: () => (
+        <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
+          <VorgaengeListeClient
+            rows={vorgaengeRows}
+            embedded
+            restrictKundeId={kunde.id}
+          />
+        </Suspense>
+      ),
+    },
+    {
       id: 'akte',
-      label: 'Objektakte',
+      label: 'Akte',
       icon: 'file-text',
       count: akteCount || undefined,
       render: () => <ObjektAkteReadOnlySection data={akte} />,
@@ -78,21 +166,15 @@ export function ObjektAkteDetailClient({
 
   return (
     <div className="space-y-4 pb-6">
+      <MockDetailBackLink href={`/kunden/${kunde.id}`} label={`Zurück zu ${kunde.name}`} />
       <DetailHead
         title={objekt.titel}
-        sub={
-          <Link href={`/kunden/${kunde.id}`} className="text-bw-link hover:underline">
-            ← {kunde.name}
-          </Link>
+        titleBadges={
+          vermietet > 0 ? <MockBadge kind="aktiv">Vermietet</MockBadge> : (
+            <MockBadge kind="storniert">Frei</MockBadge>
+          )
         }
-        meta={
-          adresse ? (
-            <span className="inline-flex items-center gap-1 text-[length:var(--fs-text)] text-bw-text-muted">
-              <MapPin className="h-3.5 w-3.5" aria-hidden />
-              {adresse}
-            </span>
-          ) : null
-        }
+        badges={adresse ? <span>{adresse}</span> : null}
         actions={
           <a
             className="btn ghost sm"
@@ -105,9 +187,20 @@ export function ObjektAkteDetailClient({
         }
       />
 
-      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-        Objektakte · {kundenObjektKurzlabel(objekt)} — Kontakte und Bewohner für die Disposition.
-      </p>
+      <NextStepBar
+        step={{
+          label: `→ ${einheiten.length} Wohneinheiten`,
+          hint: `${vermietet} vermietet`,
+        }}
+        metrics={[
+          { label: 'Einheiten', value: String(einheiten.length) },
+          { label: 'Vermietet', value: String(vermietet) },
+          {
+            label: 'Fläche',
+            value: flaecheGesamt > 0 ? `${Math.round(flaecheGesamt)} m²` : '—',
+          },
+        ]}
+      />
 
       <DetailShell
         groups={detailShellGroups}

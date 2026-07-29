@@ -1,12 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Pencil } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { toast } from '@/components/ui/app-toast'
-import { updateLeadBeschreibung, updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
   angebotNrAnzeige,
@@ -17,10 +14,9 @@ import {
 } from '@/lib/vorgang/projekt-kontext-labels'
 import { hrefWithAkteFrom, type AkteFromRef } from '@/lib/vorgang/akte-from'
 import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
-import { formatDatum, kanalLabel } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { buildAnfragePhaseSheetProps } from '@/lib/anfragen/funnel-bedarf-rows'
+import { formatDatum, kanalLabel, cn } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
-import { useIsMobile } from '@/hooks/useIsMobile'
 
 type PhaseKind = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
 type PhaseState = 'done' | 'current' | 'open'
@@ -30,12 +26,32 @@ type PhaseRowModel = {
   label: string
   state: PhaseState
   kopf: string
+  sub?: string | null
   betrag?: string | null
   href: string | null
+  /** Bearbeiten → Leistungen; Angebot → Wizard (?bearbeiten=1) */
+  editHref: string | null
   sheetTitle: string
+  /** Breadcrumb über dem Sheet-Titel (Mock: „RE-… >“) */
+  sheetCrumb?: string | null
   props: { k: string; v: string }[]
-  /** Keine Angebotsnummer in Anfrage-Props — Grep-Abnahme */
-  editMode: 'anfrage-sheet' | 'navigate-canvas' | null
+}
+
+export type VorgangPhasenExtras = {
+  auftrag?: {
+    kopf?: string
+    sub?: string
+    betrag?: string | null
+    props?: { k: string; v: string }[]
+  }
+  rechnung?: {
+    kopf?: string
+    sub?: string
+    betrag?: string | null
+    props?: { k: string; v: string }[]
+    sheetCrumb?: string | null
+    sheetTitle?: string
+  }
 }
 
 function hasAngebotRecord(
@@ -55,52 +71,60 @@ export function VorgangPhasenVerlauf({
   kontext,
   fromRef,
   lead,
-  onSaved,
+  onSaved: _onSaved,
+  extras,
   className,
 }: {
   kontext: ProjektKontext | null | undefined
   fromRef?: AkteFromRef | null
-  lead: LeadDetail
+  lead?: LeadDetail | null
   onSaved?: () => void
+  extras?: VorgangPhasenExtras
   className?: string
 }) {
+  void _onSaved
   const router = useRouter()
-  const isMobile = useIsMobile()
   const [readKind, setReadKind] = useState<PhaseKind | null>(null)
-  const [editOpen, setEditOpen] = useState(false)
+  const [showEarlier, setShowEarlier] = useState(false)
 
-  const withFrom = (href: string) =>
-    fromRef ? hrefWithAkteFrom(href, fromRef) : href
+  const withFrom = (pathname: string, extra?: Record<string, string>) => {
+    if (fromRef) return hrefWithAkteFrom(pathname, fromRef, extra)
+    if (!extra) return pathname
+    const q = new URLSearchParams(extra)
+    const qs = q.toString()
+    return qs ? `${pathname}?${qs}` : pathname
+  }
 
   const rows = useMemo(
-    () => buildPhaseRows(kontext, lead, withFrom),
+    () => buildPhaseRows(kontext, lead ?? null, withFrom, extras),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- withFrom stable via fromRef
-    [kontext, lead, fromRef]
+    [kontext, lead, fromRef, extras]
   )
+
+  const currentIdx = rows.findIndex((r) => r.state === 'current')
+  const collapseFrom =
+    fromRef?.kind === 'auftrag' || fromRef?.kind === 'rechnung'
+      ? Math.max(0, currentIdx)
+      : 0
+  const earlierCount = collapseFrom
+  const visibleRows =
+    showEarlier || earlierCount <= 0 ? rows : rows.slice(collapseFrom)
 
   const active = rows.find((r) => r.kind === readKind) ?? null
 
   function openRow(row: PhaseRowModel) {
     if (row.state === 'open') return
-    setEditOpen(false)
     setReadKind(row.kind)
   }
 
   function closeRead() {
-    setEditOpen(false)
     setReadKind(null)
   }
 
   function onBearbeiten() {
-    if (!active) return
-    if (active.editMode === 'navigate-canvas' && active.href) {
-      closeRead()
-      router.push(active.href)
-      return
-    }
-    if (active.editMode === 'anfrage-sheet') {
-      setEditOpen(true)
-    }
+    if (!active?.editHref) return
+    closeRead()
+    router.push(active.editHref)
   }
 
   function onZurPhase() {
@@ -116,9 +140,28 @@ export function VorgangPhasenVerlauf({
           <div className="card-title title">Verlauf des Vorgangs</div>
         </div>
         <div className="card-b">
+          {earlierCount > 0 && !showEarlier ? (
+            <button
+              type="button"
+              className="vgp-earlier"
+              onClick={() => setShowEarlier(true)}
+            >
+              <ChevronRight size={14} aria-hidden />
+              {earlierCount} frühere Phasen anzeigen
+            </button>
+          ) : null}
+          {earlierCount > 0 && showEarlier ? (
+            <button
+              type="button"
+              className="vgp-earlier"
+              onClick={() => setShowEarlier(false)}
+            >
+              Frühere Phasen ausblenden
+            </button>
+          ) : null}
           <div className="vgp-list" role="list">
-            {rows.map((row, i) => {
-              const isLast = i === rows.length - 1
+            {visibleRows.map((row, i) => {
+              const isLast = i === visibleRows.length - 1
               const clickable = row.state !== 'open'
               return (
                 <div
@@ -148,6 +191,7 @@ export function VorgangPhasenVerlauf({
                           <span className="vgp-betrag">{row.betrag}</span>
                         ) : null}
                       </span>
+                      {row.sub ? <span className="vgp-sub">{row.sub}</span> : null}
                     </span>
                     {clickable ? (
                       <ChevronRight className="vgp-chv" size={16} aria-hidden />
@@ -161,21 +205,28 @@ export function VorgangPhasenVerlauf({
       </div>
 
       <EditorSheet
-        open={Boolean(active) && !(editOpen && !isMobile)}
+        open={Boolean(active)}
         onClose={closeRead}
         title={active?.sheetTitle ?? ''}
+        crumb={active?.sheetCrumb ?? null}
         size="lg"
-        className={cn(editOpen && isMobile && 'editor-sheet--recessed')}
-        overlayClassName={cn(editOpen && isMobile && 'editor-sheet-overlay--recessed')}
+        headerEnd={
+          active?.editHref ? (
+            <button
+              type="button"
+              className="editor-sheet__icon-btn"
+              onClick={onBearbeiten}
+              aria-label="Bearbeiten"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null
+        }
         footer={
-          active && !editOpen ? (
+          active ? (
             <div className="phase-sheet-footer">
-              {active.editMode ? (
-                <button type="button" className="btn ghost" onClick={onBearbeiten}>
-                  Bearbeiten
-                </button>
-              ) : null}
-              {active.href ? (
+              {active.href && fromRef?.kind !== active.kind ? (
                 <button type="button" className="btn primary" onClick={onZurPhase}>
                   Zur Phase
                 </button>
@@ -193,55 +244,56 @@ export function VorgangPhasenVerlauf({
             {active.props.map((p) => (
               <div key={p.k} className="prop">
                 <span className="k">{p.k}</span>
-                <span className="v">{p.v}</span>
+                <span className="v" style={{ whiteSpace: 'pre-wrap' }}>
+                  {p.v}
+                </span>
               </div>
             ))}
           </div>
         ) : null}
       </EditorSheet>
-
-      <AnfragePhaseEditSheet
-        open={editOpen && readKind === 'anfrage'}
-        lead={lead}
-        onClose={() => setEditOpen(false)}
-        onSaved={() => {
-          setEditOpen(false)
-          onSaved?.()
-        }}
-      />
     </>
   )
 }
 
 function buildPhaseRows(
   kontext: ProjektKontext | null | undefined,
-  lead: LeadDetail,
-  withFrom: (href: string) => string
+  lead: LeadDetail | null,
+  withFrom: (pathname: string, extra?: Record<string, string>) => string,
+  extras?: VorgangPhasenExtras
 ): PhaseRowModel[] {
   const angebot = kontext?.angebote[0]
   const hasAngebot = hasAngebotRecord(angebot)
   const auftrag = kontext?.auftrag ?? null
+  const rechnungen = kontext?.rechnungen ?? []
   const latestRe = kontext
-    ? [...kontext.rechnungen].sort((a, b) =>
+    ? [...rechnungen].sort((a, b) =>
         String(b.rechnungsdatum || b.created_at || '').localeCompare(
           String(a.rechnungsdatum || a.created_at || '')
         )
       )[0]
     : undefined
   const hasRechnung = Boolean(latestRe)
-
-  const budget = resolveLeadPreisAnzeige(
-    lead.kanal,
-    lead.budget_ca,
-    lead.preis_min,
-    lead.preis_max,
-    lead.funnel_daten
+  const aktiveRechnungen = rechnungen.filter(
+    (r) => String(r.status).toLowerCase() !== 'storniert'
   )
+
+  const budget = lead
+    ? resolveLeadPreisAnzeige(
+        lead.kanal,
+        lead.budget_ca,
+        lead.preis_min,
+        lead.preis_max,
+        lead.funnel_daten
+      )
+    : '—'
 
   const anfrageTitel =
     kontext?.lead?.label?.trim() ||
-    lead.situation?.trim() ||
+    lead?.situation?.trim() ||
     'Anfrage'
+  const leadId = lead?.id ?? kontext?.lead?.id ?? null
+  const leadCreated = lead?.created_at ?? kontext?.lead?.created_at ?? null
 
   // Zustände aus Daten, nicht aus Phasenfeld
   let anfrageState: PhaseState = 'current'
@@ -265,28 +317,33 @@ function buildPhaseRows(
 
   const anfrageKopf =
     anfrageState === 'done'
-      ? `eingegangen ${lead.created_at ? formatDatum(lead.created_at) : '—'}`
+      ? `eingegangen ${leadCreated ? formatDatum(leadCreated) : '—'}`
       : anfrageState === 'current'
-        ? lead.created_at
-          ? `eingegangen ${formatDatum(lead.created_at)}`
+        ? leadCreated
+          ? `eingegangen ${formatDatum(leadCreated)}`
           : 'in Bearbeitung'
         : 'noch nicht erstellt'
 
-  // Anfrage-Props: keine angebot.nummer
-  const anfrageProps: { k: string; v: string }[] = [
-    {
-      k: 'Eingegangen',
-      v: lead.created_at ? formatDatum(lead.created_at) : '—',
-    },
-    { k: 'Quelle', v: kanalLabel(lead.kanal) || '—' },
-    { k: 'Anliegen', v: anfrageTitel },
-    { k: 'Budgetrahmen', v: budget === '—' ? '—' : budget },
-    { k: 'Vorgang', v: lead.id.slice(0, 8).toUpperCase() },
-  ]
+  const anfrageProps = lead ? buildAnfragePhaseSheetProps(lead) : []
 
   const angebotNr = hasAngebot
     ? angebotNrAnzeige(angebot!.angebotsnr, angebot!.id)
     : null
+
+  const auftragExtra = extras?.auftrag
+  const rechnungExtra = extras?.rechnung
+
+  const defaultAuftragKopf =
+    auftragState === 'open'
+      ? 'noch nicht erstellt'
+      : auftragStatusKurz(auftrag!.status) || 'in Bearbeitung'
+
+  const defaultRechnungKopf =
+    rechnungState === 'open'
+      ? 'noch nicht erstellt'
+      : aktiveRechnungen.length > 1
+        ? `${aktiveRechnungen.length} gestellt`
+        : rechnungStatusKurz(latestRe!.status) || 'in Bearbeitung'
 
   return [
     {
@@ -295,10 +352,19 @@ function buildPhaseRows(
       state: anfrageState,
       kopf: anfrageKopf,
       betrag: budget !== '—' ? budget : null,
-      href: withFrom(`/anfragen/${lead.id}`),
+      href: leadId ? withFrom(`/anfragen/${leadId}`) : null,
+      editHref: leadId ? withFrom(`/anfragen/${leadId}`, { tab: 'leistungen' }) : null,
       sheetTitle: 'Anfrage',
-      props: anfrageProps,
-      editMode: 'anfrage-sheet',
+      props: anfrageProps.length
+        ? anfrageProps
+        : [
+            {
+              k: 'Eingegangen',
+              v: leadCreated ? formatDatum(leadCreated) : '—',
+            },
+            { k: 'Quelle', v: lead ? kanalLabel(lead.kanal) || '—' : '—' },
+            { k: 'Anliegen', v: anfrageTitel },
+          ],
     },
     {
       kind: 'angebot',
@@ -317,6 +383,9 @@ function buildPhaseRows(
           )
         : null,
       href: hasAngebot ? withFrom(`/angebote/${angebot!.id}`) : null,
+      editHref: hasAngebot
+        ? withFrom(`/angebote/${angebot!.id}`, { bearbeiten: '1' })
+        : null,
       sheetTitle: angebotNr ? `Angebot ${angebotNr}` : 'Angebot',
       props: hasAngebot
         ? [
@@ -344,223 +413,79 @@ function buildPhaseRows(
             },
           ]
         : [],
-      editMode: hasAngebot ? 'navigate-canvas' : null,
     },
     {
       kind: 'auftrag',
       label: 'Auftrag',
       state: auftragState,
-      kopf:
-        auftragState === 'open'
-          ? 'noch nicht erstellt'
-          : auftragStatusKurz(auftrag!.status) || 'in Bearbeitung',
-      betrag: null,
+      kopf: auftragExtra?.kopf ?? defaultAuftragKopf,
+      sub: auftragExtra?.sub ?? null,
+      betrag: auftragExtra?.betrag ?? null,
       href: auftrag ? withFrom(`/auftraege/${auftrag.id}`) : null,
+      editHref: auftrag
+        ? withFrom(`/auftraege/${auftrag.id}`, { tab: 'leistungen' })
+        : null,
       sheetTitle: auftrag?.titel?.trim() || 'Auftrag',
-      props: auftrag
-        ? [
-            { k: 'Titel', v: auftrag.titel?.trim() || '—' },
-            {
-              k: 'Datum',
-              v: auftrag.created_at ? formatDatum(auftrag.created_at) : '—',
-            },
-            { k: 'Status', v: auftragStatusKurz(auftrag.status) },
-          ]
-        : [],
-      editMode: auftrag ? 'navigate-canvas' : null,
+      props:
+        auftragExtra?.props ??
+        (auftrag
+          ? [
+              { k: 'Titel', v: auftrag.titel?.trim() || '—' },
+              {
+                k: 'Datum',
+                v: auftrag.created_at ? formatDatum(auftrag.created_at) : '—',
+              },
+              { k: 'Status', v: auftragStatusKurz(auftrag.status) },
+            ]
+          : []),
     },
     {
       kind: 'rechnung',
       label: 'Rechnung',
       state: rechnungState,
-      kopf:
-        rechnungState === 'open'
-          ? 'noch nicht erstellt'
-          : rechnungStatusKurz(latestRe!.status) || 'in Bearbeitung',
-      betrag: hasRechnung ? formatEurKurz(latestRe!.brutto) : null,
+      kopf: rechnungExtra?.kopf ?? defaultRechnungKopf,
+      sub: rechnungExtra?.sub ?? null,
+      betrag:
+        rechnungExtra?.betrag ??
+        (hasRechnung
+          ? formatEurKurz(
+              aktiveRechnungen.reduce((s, r) => s + (r.brutto ?? 0), 0) ||
+                latestRe!.brutto
+            )
+          : null),
       href: hasRechnung ? withFrom(`/rechnungen/${latestRe!.id}`) : null,
-      sheetTitle: latestRe?.rechnungsnummer?.trim()
-        ? `Rechnung ${latestRe.rechnungsnummer.trim()}`
-        : 'Rechnung',
-      props: hasRechnung
-        ? [
-            {
-              k: 'Nummer',
-              v: latestRe!.rechnungsnummer?.trim() || '—',
-            },
-            {
-              k: 'Datum',
-              v: latestRe!.rechnungsdatum
-                ? formatDatum(latestRe!.rechnungsdatum)
-                : '—',
-            },
-            { k: 'Summe', v: formatEurKurz(latestRe!.brutto) || '—' },
-            { k: 'Status', v: rechnungStatusKurz(latestRe!.status) },
-          ]
-        : [],
-      editMode: hasRechnung ? 'navigate-canvas' : null,
+      editHref: hasRechnung
+        ? withFrom(`/rechnungen/${latestRe!.id}`, { tab: 'leistungen' })
+        : null,
+      sheetCrumb: rechnungExtra?.sheetCrumb ?? (latestRe?.rechnungsnummer?.trim()
+        ? `${latestRe.rechnungsnummer.trim()} >`
+        : null),
+      sheetTitle: rechnungExtra?.sheetTitle ?? 'Rechnung',
+      props:
+        rechnungExtra?.props ??
+        (hasRechnung
+          ? [
+              {
+                k: 'Nummer',
+                v: latestRe!.rechnungsnummer?.trim() || '—',
+              },
+              {
+                k: 'Datum',
+                v: latestRe!.rechnungsdatum
+                  ? formatDatum(latestRe!.rechnungsdatum)
+                  : '—',
+              },
+              { k: 'Summe', v: formatEurKurz(latestRe!.brutto) || '—' },
+              { k: 'Status', v: rechnungStatusKurz(latestRe!.status) },
+              ...(aktiveRechnungen.length > 1
+                ? [{ k: 'Anzahl', v: String(aktiveRechnungen.length) }]
+                : []),
+            ]
+          : []),
     },
   ]
 }
 
-function AnfragePhaseEditSheet({
-  open,
-  lead,
-  onClose,
-  onSaved,
-}: {
-  open: boolean
-  lead: LeadDetail
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [name, setName] = useState(lead.kontakt_name ?? '')
-  const [telefon, setTelefon] = useState(lead.kontakt_telefon ?? '')
-  const [email, setEmail] = useState(lead.kontakt_email ?? '')
-  const [anliegen, setAnliegen] = useState(lead.situation ?? '')
-  const [ort, setOrt] = useState(lead.kunden?.ort ?? '')
-  const [plz, setPlz] = useState(lead.plz ?? lead.kunden?.plz ?? '')
-  const [budgetVon, setBudgetVon] = useState(
-    lead.preis_min != null ? String(lead.preis_min) : ''
-  )
-  const [budgetBis, setBudgetBis] = useState(
-    lead.preis_max != null ? String(lead.preis_max) : lead.budget_ca != null ? String(lead.budget_ca) : ''
-  )
-  const [notiz, setNotiz] = useState(lead.kontakt_nachricht ?? '')
-  const [pending, startTransition] = useTransition()
-
-  // Sync when opening
-  useEffect(() => {
-    if (!open) return
-    setName(lead.kontakt_name ?? '')
-    setTelefon(lead.kontakt_telefon ?? '')
-    setEmail(lead.kontakt_email ?? '')
-    setAnliegen(lead.situation ?? '')
-    setOrt(lead.kunden?.ort ?? '')
-    setPlz(lead.plz ?? lead.kunden?.plz ?? '')
-    setBudgetVon(lead.preis_min != null ? String(lead.preis_min) : '')
-    setBudgetBis(
-      lead.preis_max != null
-        ? String(lead.preis_max)
-        : lead.budget_ca != null
-          ? String(lead.budget_ca)
-          : ''
-    )
-    setNotiz(lead.kontakt_nachricht ?? '')
-  }, [open, lead])
-
-  function save() {
-    startTransition(async () => {
-      const k = await updateLeadKontakt(lead.id, {
-        kontakt_name: name.trim() || '—',
-        kontakt_telefon: telefon.trim() || null,
-        kontakt_email: email.trim() || null,
-        plz: plz.trim() || null,
-      })
-      if (!k.ok) {
-        toast.error(k.message)
-        return
-      }
-      const b = await updateLeadBeschreibung(lead.id, notiz)
-      if (!b.ok) {
-        toast.error(b.message)
-        return
-      }
-      toast.success('Anfrage gespeichert')
-      onSaved()
-    })
-  }
-
-  return (
-    <EditorSheet
-      open={open}
-      onClose={onClose}
-      title="Anfrage bearbeiten"
-      size="lg"
-      dirty={false}
-      overlayClassName="editor-sheet-overlay--stack"
-      footer={
-        <div className="phase-sheet-footer" style={{ justifyContent: 'space-between' }}>
-          <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </button>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={save}
-            disabled={pending}
-          >
-            <MockIcon ctx="default" n="check" size={14} />
-            Speichern
-          </button>
-        </div>
-      }
-    >
-      <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
-        <p className="text-[length:var(--fs-meta)] font-bold uppercase tracking-wide text-bw-text-muted">
-          Kontakt
-        </p>
-        <label className="field">
-          <span>Name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Telefon</span>
-          <input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>E-Mail</span>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-
-        <p className="text-[length:var(--fs-meta)] font-bold uppercase tracking-wide text-bw-text-muted mt-3">
-          Anliegen
-        </p>
-        <label className="field">
-          <span>Leistung / Projekt</span>
-          <input
-            className="input"
-            value={anliegen}
-            onChange={(e) => setAnliegen(e.target.value)}
-            readOnly
-            title="Vorhaben über Bearbeiten-Wizard ändern"
-          />
-        </label>
-        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <label className="field">
-            <span>Region / Stadtteil</span>
-            <input className="input" value={ort} onChange={(e) => setOrt(e.target.value)} readOnly />
-          </label>
-          <label className="field">
-            <span>PLZ</span>
-            <input className="input" value={plz} onChange={(e) => setPlz(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Budget von</span>
-            <input className="input" value={budgetVon} readOnly />
-          </label>
-          <label className="field">
-            <span>Budget bis</span>
-            <input className="input" value={budgetBis} readOnly />
-          </label>
-        </div>
-        <label className="field">
-          <span>Quelle</span>
-          <input className="input" value={kanalLabel(lead.kanal)} readOnly />
-        </label>
-        <label className="field">
-          <span>Notiz</span>
-          <textarea
-            className="input"
-            rows={4}
-            value={notiz}
-            onChange={(e) => setNotiz(e.target.value)}
-          />
-        </label>
-      </div>
-    </EditorSheet>
-  )
-}
 
 /** @deprecated unused — kept for typecheck of optional children patterns */
 export type VorgangPhasenVerlaufSlot = ReactNode

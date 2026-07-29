@@ -7,7 +7,6 @@ import {
   MockBtn,
   MockChip,
   MockEmpty,
-  MockEntityRowMenu,
   MockIcon,
   MockModal,
   MockPager,
@@ -15,16 +14,11 @@ import {
 } from '@/components/mock-ui'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
-import { buildListRowMenu } from '@/lib/entity-menu'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
   runDeleteStandaloneRechnung,
   runDeleteVorgang,
-  runDuplicateAnfrage,
-  runDuplicateAngebot,
-  runDuplicateAuftrag,
-  runDuplicateRechnung,
 } from '@/lib/list-actions'
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
@@ -57,7 +51,6 @@ const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'wert', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
   { id: 'datum', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
   { id: 'status', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
-  { id: 'actions', defaultWidth: 72, minWidth: 40, maxWidth: 120, fixed: true },
 ]
 
 const COL_LABELS: Record<DataColId, string> = {
@@ -231,9 +224,7 @@ export function VorgaengeListeClient({
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const colDefs = useMemo(() => {
-    const data = VORGAENGE_DATA_COLS.filter(
-      (c) => c.id === 'actions' || visibleCols[c.id as DataColId]
-    )
+    const data = VORGAENGE_DATA_COLS.filter((c) => visibleCols[c.id as DataColId])
     return [VORGAENGE_CHECK_COL, ...data]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
@@ -646,35 +637,6 @@ export function VorgaengeListeClient({
     })
     setSelected(n)
   }
-
-  const rowMenuItems = useCallback(
-    (v: VorgangListeRow) => {
-      const isAnfrage = v.phase === 'anfrage'
-      const isAngebot = v.phase === 'angebot'
-      const isAuftrag = v.phase === 'auftrag'
-      const isRechnung = v.phase === 'rechnung'
-      return buildListRowMenu(v.phase, { status: v.unterstatus, titel: v.titel, name: v.kundeName }, {
-        onEdit: () => openDetail(v.detailHref),
-        onCopy: () => {
-          if (isAnfrage) runDuplicateAnfrage(v.leadId, router)
-          else if (isAngebot) runDuplicateAngebot(v.entityId, router)
-          else if (isAuftrag) runDuplicateAuftrag(v.entityId, router)
-          else if (isRechnung) runDuplicateRechnung(v.entityId, router)
-        },
-        onPdf: isAngebot
-          ? () => window.open(`/api/angebote/${v.entityId}/pdf`, '_blank')
-          : isRechnung
-            ? () => window.open(`/api/rechnungen/${v.entityId}/pdf`, '_blank')
-            : undefined,
-        onDelete: () =>
-          v.standalone
-            ? runDeleteStandaloneRechnung(v.entityId, router, v.titel)
-            : runDeleteVorgang(v.leadId, router),
-        deleteLabel: v.titel,
-      })
-    },
-    [router]
-  )
 
   const isMobile = useIsMobile()
 
@@ -1324,51 +1286,6 @@ export function VorgaengeListeClient({
                   <MockBadge kind={kind}>{label}</MockBadge>
                 </div>
                 ) : null}
-                <div
-                  className="vg-actions"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ position: 'relative' }}
-                >
-                  {!isMobile ? (
-                    <>
-                      {v.kontaktTelefon?.trim() ? (
-                        <button
-                          type="button"
-                          className="qa-btn"
-                          title="Anrufen"
-                          aria-label="Anrufen"
-                          onClick={call}
-                        >
-                          <MockIcon ctx="row" n="phone" size={16} />
-                        </button>
-                      ) : null}
-                      {v.kontaktEmail?.trim() ? (
-                        <button
-                          type="button"
-                          className="qa-btn"
-                          title="Mail"
-                          aria-label="Mail"
-                          onClick={() => {
-                            const mail = v.kontaktEmail?.trim()
-                            if (mail) window.location.href = `mailto:${mail}`
-                          }}
-                        >
-                          <MockIcon ctx="row" n="mail" size={16} />
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="qa-btn"
-                        title="Bearbeiten"
-                        aria-label="Bearbeiten"
-                        onClick={() => openDetail(v.detailHref)}
-                      >
-                        <MockIcon ctx="row" n="pencil" size={16} />
-                      </button>
-                    </>
-                  ) : null}
-                  <MockEntityRowMenu items={rowMenuItems(v)} title="Vorgang" />
-                </div>
               </div>
             )
             return (
@@ -1390,7 +1307,7 @@ export function VorgaengeListeClient({
             <div className="vg-check" />
             <div className="vg-kunde" style={{ gridColumn: '1 / -1' }}>
               <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                {filtered.length} Vorgänge · offen {lifecycleCounts.offen} · Summe{' '}
+                {filtered.length} Vorgänge · Summe{' '}
                 {filtered
                   .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
                   .toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}

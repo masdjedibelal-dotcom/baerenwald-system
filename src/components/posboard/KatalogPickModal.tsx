@@ -130,12 +130,12 @@ export function KatalogPickModal({
     <PickerSheet
       open={open}
       onClose={onClose}
-      title="Katalog"
+      title="Position hinzufügen"
       context="canvas"
       search={
         <input
           className="sel w-full"
-          placeholder="Suchen…"
+          placeholder="Leistung suchen…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus

@@ -47,11 +47,6 @@ function planToRates(plan: Zahlungsplan, gesamtNetto: number): EditorRate[] {
   })
 }
 
-/**
- * Editor speichert alles als %-Zeilen. Eingefrorene Raten (gestellt/bezahlt) müssen
- * 1:1 aus dem bisherigen Plan bleiben — sonst wird z. B. typ „rest“ zu „prozent“
- * und der Server-Gate blockiert mit „Betrag/Typ nicht änderbar“.
- */
 function ratesToPlan(
   rates: EditorRate[],
   initial: Zahlungsplan | null,
@@ -89,10 +84,12 @@ function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
   })
 }
 
+/** Mock Abschlagsplan-Editor — EditorSheet rechts. */
 export function AbschlagsplanEditorModal({
   open,
   onClose,
   gesamtNetto,
+  gesamtBrutto,
   initial,
   onSave,
   saving,
@@ -101,6 +98,8 @@ export function AbschlagsplanEditorModal({
   open: boolean
   onClose: () => void
   gesamtNetto: number
+  /** Anzeige „Gesamt … €“ (Mock: Auftragswert brutto) */
+  gesamtBrutto?: number | null
   initial: Zahlungsplan | null
   onSave: (plan: Zahlungsplan) => void
   saving?: boolean
@@ -125,6 +124,10 @@ export function AbschlagsplanEditorModal({
   const dirty = open && !ratesEqual(rates, baseline)
   const summe = rates.reduce((s, r) => s + (Number(r.prozent) || 0), 0)
   const ok = summe === 100 && rates.length > 0
+  const anzeigeGesamt =
+    gesamtBrutto != null && gesamtBrutto > 0
+      ? gesamtBrutto
+      : Math.round(gesamtNetto * 1.19 * 100) / 100
 
   function upd(id: string, patch: Partial<EditorRate>) {
     if (frozen.has(id)) return
@@ -158,15 +161,26 @@ export function AbschlagsplanEditorModal({
       open={open}
       onClose={onClose}
       title="Abschlagsplan"
-      context="detail"
+      crumb={`${formatEurBetrag(anzeigeGesamt)} aufteilen >`}
       dirty={dirty}
-      confirmBusy={saving}
-      confirmDisabled={!ok || saving}
-      onConfirm={() => onSave(ratesToPlan(rates, initial, frozenIds))}
       size="lg"
+      footer={
+        <div className="zahlplan-editor-footer">
+          <MockBtn kind="ghost" onClick={onClose} disabled={saving}>
+            Abbrechen
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="check"
+            disabled={!ok || saving}
+            onClick={() => onSave(ratesToPlan(rates, initial, frozenIds))}
+          >
+            {saving ? 'Speichern…' : 'Plan speichern'}
+          </MockBtn>
+        </div>
+      }
     >
       <div className="zahlplan-editor-presets">
-        <span className="zahlplan-editor-presets__label">Vorlage:</span>
         {PRESETS.map((p) => (
           <button
             key={p.name}
@@ -181,13 +195,12 @@ export function AbschlagsplanEditorModal({
         ))}
         <div style={{ flex: 1 }} />
         <span className="zahlplan-editor-presets__gesamt">
-          Gesamt <b>{formatEurBetrag(gesamtNetto)}</b>
-          <span className="text-bw-text-muted"> netto</span>
+          Gesamt <b>{formatEurBetrag(anzeigeGesamt)}</b>
         </span>
       </div>
 
       {frozen.size > 0 ? (
-        <p style={{ margin: '0 0 10px', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', lineHeight: 1.45 }}>
+        <p className="zahlplan-editor-hint">
           Gestellte/bezahlte Raten sind fest. Offene Raten kannst du ändern.
         </p>
       ) : null}
@@ -201,7 +214,7 @@ export function AbschlagsplanEditorModal({
           <div />
         </div>
         {rates.map((r) => {
-          const betrag = Math.round(((gesamtNetto || 0) * (Number(r.prozent) || 0)) / 100)
+          const betrag = Math.round((anzeigeGesamt * (Number(r.prozent) || 0)) / 100)
           const isFrozen = frozen.has(r.id)
           return (
             <div key={r.id} className={cn('zahlplan-editor-row', isFrozen && 'is-frozen')}>
@@ -237,7 +250,10 @@ export function AbschlagsplanEditorModal({
                 style={{ height: 32, fontSize: 'var(--fs-meta)' }}
               />
               {isFrozen ? (
-                <span title="Eingefroren" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', padding: '0 4px' }}>
+                <span
+                  title="Eingefroren"
+                  style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', padding: '0 4px' }}
+                >
                   fest
                 </span>
               ) : (
@@ -247,8 +263,13 @@ export function AbschlagsplanEditorModal({
           )
         })}
         <div className="zahlplan-editor-foot">
-          <button type="button" className="pt-add" style={{ border: 'none', padding: 0, width: 'auto' }} onClick={add}>
-            <MockIcon ctx="btn" n="plus" size={13} /> Abschlag
+          <button
+            type="button"
+            className="pt-add"
+            style={{ border: 'none', padding: 0, width: 'auto' }}
+            onClick={add}
+          >
+            <MockIcon ctx="btn" n="plus" size={13} /> Abschlag hinzufügen
           </button>
           <div style={{ flex: 1 }} />
           <span className={cn('zahlplan-editor-summe', summe === 100 ? 'is-ok' : 'is-bad')}>

@@ -17,6 +17,8 @@ export type LeistungRow = {
   mengeLabel: string
   preisLabel: string
   preisValue: number
+  /** Stückpreis für Drawer „Einzelpreis“ (falls abweichend von Zeilensumme) */
+  einzelpreisLabel?: string | null
   status: LeistungRowStatus
   statusLabel: string
   /** Rohdaten für Drawer-Abschnitte */
@@ -24,10 +26,14 @@ export type LeistungRow = {
   gewerkName?: string | null
   handwerkerName?: string | null
   handwerkerId?: string | null
+  /** Anfrage-Status beim Partner (z. B. Angefragt) */
+  anfrageStatusLabel?: string | null
   zeitraumLabel?: string | null
   ekLabel?: string | null
   dokumentationEintraege?: { at?: string | null; text: string }[]
   abnahmeLabel?: string | null
+  /** True wenn offener Mangel zu dieser Leistung/Gewerk */
+  hatMangel?: boolean
 }
 
 export type LeistungMangelAnzeige = {
@@ -37,6 +43,7 @@ export type LeistungMangelAnzeige = {
   /** offen | überfällig | behoben */
   status: 'offen' | 'ueberfaellig' | 'behoben'
   statusLabel: string
+  gewerk?: string | null
 }
 
 export type LeistungDrawerAction = {

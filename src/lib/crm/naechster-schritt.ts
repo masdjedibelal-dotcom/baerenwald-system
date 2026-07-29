@@ -82,29 +82,34 @@ export function naechsterSchrittAuftrag(input: {
   status: string
   istStorniert: boolean
   istAbgeschlossen: boolean
+  maengelOffen?: number
 }): NaechsterSchrittHint | null {
   if (input.istStorniert || input.status === 'storniert') return null
+  const maengelHint =
+    input.maengelOffen != null && input.maengelOffen > 0
+      ? `${input.maengelOffen} Mängel offen`
+      : null
   if (input.istAbgeschlossen || input.status === 'abgeschlossen') {
     return {
-      label: 'Als Nächstes',
+      label: '→ Rechnung prüfen',
       hint: 'Auftrag erledigt — bei Bedarf Rechnung oder Dokumente nachziehen.',
     }
   }
   if (input.status === 'abnahme') {
     return {
-      label: 'Als Nächstes',
-      hint: 'Abnahme prüfen (Partner oft im Portal) — dann Abschlussbericht und Rechnung.',
+      label: '→ Abnahme abschließen',
+      hint: maengelHint ?? 'Abnahme prüfen — dann Abschlussbericht und Rechnung.',
     }
   }
   if (input.status === 'in_arbeit' || input.status === 'offen') {
     return {
-      label: 'Als Nächstes',
-      hint: 'Leistungen steuern; Bautagebuch/Abnahme macht der Partner vor Ort im Portal.',
+      label: '→ Leistungen dokumentieren',
+      hint: maengelHint ?? undefined,
     }
   }
   return {
-    label: 'Als Nächstes',
-    hint: 'Leistungen prüfen — Vor-Ort-Doku im Portal, danach Abschluss und Rechnung.',
+    label: '→ Leistungen dokumentieren',
+    hint: maengelHint ?? 'Leistungen prüfen — danach Abschluss und Rechnung.',
   }
 }
 
@@ -112,7 +117,10 @@ export function naechsterSchrittRechnung(input: {
   status: string
   ueberfaellig?: boolean
   belegTyp?: string | null
+  /** z. B. „fällig 03.06.2026“ — Mock Statusband */
+  faelligLabel?: string | null
 }): NaechsterSchrittHint | null {
+  const faelligHint = input.faelligLabel?.trim() || null
   if (input.belegTyp === 'gutschrift') {
     return {
       label: 'Als Nächstes',
@@ -122,25 +130,24 @@ export function naechsterSchrittRechnung(input: {
   if (input.status === 'storniert') return null
   if (input.status === 'bezahlt') {
     return {
-      label: 'Als Nächstes',
-      hint: 'Bezahlt — bei Bedarf Bewertung oder Unterlagen nachziehen.',
+      label: faelligHint ? `→ Abgeschlossen · ${faelligHint}` : '→ Abgeschlossen',
     }
   }
   if (input.ueberfaellig || input.status === 'ueberfaellig') {
     return {
-      label: 'Als Nächstes',
+      label: faelligHint ? `→ Mahnung senden · ${faelligHint}` : '→ Mahnung senden',
       hint: 'Überfällig — Mahnung senden oder Zahlung erfassen.',
     }
   }
   if (input.status === 'gesendet' || input.status === 'versendet') {
     return {
-      label: 'Als Nächstes',
-      hint: 'Auf Zahlung warten — oder als bezahlt markieren.',
+      label: faelligHint ? `→ Auf Zahlung warten · ${faelligHint}` : '→ Auf Zahlung warten',
+      hint: 'Oder als bezahlt markieren.',
     }
   }
   if (input.status === 'entwurf') {
     return {
-      label: 'Als Nächstes',
+      label: '→ Rechnung versenden',
       hint: 'Positionen prüfen — dann Rechnung versenden.',
     }
   }

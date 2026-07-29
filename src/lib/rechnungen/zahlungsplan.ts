@@ -201,6 +201,13 @@ export function rechnungFuerAbschlagZeile(
   )
 }
 
+/** Alle Belege zu einer Planzeile (inkl. Storno/Gutschrift) — für Anzahl in der Liste. */
+export function rechnungenZuAbschlagZeile<
+  T extends { zahlungsplan_abschlag_id?: string | null },
+>(zeileId: string, rechnungen: T[]): T[] {
+  return rechnungen.filter((r) => String(r.zahlungsplan_abschlag_id ?? '') === zeileId)
+}
+
 /** Letzte stornierte Rechnung zu einer Planzeile (Rate wieder „geplant“). */
 export function stornierteRechnungFuerAbschlagZeile(
   zeileId: string,

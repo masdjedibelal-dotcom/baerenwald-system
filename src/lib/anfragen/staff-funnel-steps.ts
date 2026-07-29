@@ -10,22 +10,24 @@ import { STAFF_FUNNEL_STEP_LABELS } from '@/lib/anfragen/staff-funnel-types'
 const BERATUNG_BEREICHE = new Set(['schimmel', 'anbau', 'baum_notfall'])
 
 export function needsBeratungPfad(state: StaffFunnelState): boolean {
-  if (state.situation === 'gewerbe') return true
+  if (state.situation === 'gewerbe' || state.anliegen === 'gewerbe' || state.anliegen === 'termin') {
+    return true
+  }
   if (state.bereiche.some((b) => BERATUNG_BEREICHE.has(b))) return true
   return false
 }
 
-function needsZugaenglichkeit(state: StaffFunnelState): boolean {
+export function needsZugaenglichkeit(state: StaffFunnelState): boolean {
   if (state.situation !== 'erneuern') return false
   return state.bereiche.some((b) => b === 'fassade' || b === 'dach')
 }
 
-function needsZustand(state: StaffFunnelState): boolean {
+export function needsZustand(state: StaffFunnelState): boolean {
   if (state.situation !== 'erneuern') return false
   return state.bereiche.some((b) => b === 'waende' || b === 'boden')
 }
 
-function needsGroesse(state: StaffFunnelState): boolean {
+export function needsGroesse(state: StaffFunnelState): boolean {
   if (state.situation === 'kaputt' || state.situation === 'gewerbe') return false
   if (state.situation === 'betreuung') {
     if (state.bereiche.length === 1 && state.bereiche[0] === 'hausmeister') return false
@@ -36,25 +38,84 @@ function needsGroesse(state: StaffFunnelState): boolean {
   return state.bereiche.some((b) => hatGroesseFeld(b))
 }
 
-function needsUmfang(state: StaffFunnelState): boolean {
+export function needsUmfang(state: StaffFunnelState): boolean {
   if (state.situation !== 'betreuung') return false
   if (state.bereiche.length === 1 && state.bereiche[0] === 'baum') return false
   return true
 }
 
-function needsBadAusstattung(state: StaffFunnelState): boolean {
+export function needsBadAusstattung(state: StaffFunnelState): boolean {
   return state.situation === 'erneuern' && state.bereiche.includes('bad')
 }
 
-function needsFachdetails(state: StaffFunnelState): boolean {
+export function needsFachdetails(state: StaffFunnelState): boolean {
   if (!state.situation || state.situation === 'gewerbe') return false
   return state.bereiche.some(
     (b) => fachdetailKeysForBereich(b, state.situation as SituationValue).length > 0
   )
 }
 
-function needsKundentyp(state: StaffFunnelState): boolean {
-  return !state.kundentyp?.trim()
+export function needsDringlichkeit(state: StaffFunnelState): boolean {
+  return state.situation === 'kaputt' || state.situation === 'notfall'
+}
+
+/** Welche dynamischen Website-Funnel-Blöcke im Staff-Create sichtbar sind. */
+export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
+  umfang: boolean
+  zugaenglichkeit: boolean
+  zustand: boolean
+  badAusstattung: boolean
+  groesse: boolean
+  fachdetails: boolean
+  dringlichkeit: boolean
+  beratung: boolean
+  any: boolean
+} {
+  const umfang = needsUmfang(state)
+  const zugaenglichkeit = needsZugaenglichkeit(state)
+  const zustand = needsZustand(state)
+  const badAusstattung = needsBadAusstattung(state)
+  const groesse = needsGroesse(state)
+  const fachdetails = needsFachdetails(state)
+  const dringlichkeit = needsDringlichkeit(state)
+  const beratung = needsBeratungPfad(state)
+  return {
+    umfang,
+    zugaenglichkeit,
+    zustand,
+    badAusstattung,
+    groesse,
+    fachdetails,
+    dringlichkeit,
+    beratung,
+    any:
+      umfang ||
+      zugaenglichkeit ||
+      zustand ||
+      badAusstattung ||
+      groesse ||
+      fachdetails ||
+      dringlichkeit ||
+      beratung,
+  }
+}
+
+/** Fachdetail-Keys (ohne bad_ausstattung — eigener Block). */
+export function staffFunnelFachdetailKeys(state: StaffFunnelState): string[] {
+  if (!state.situation || state.situation === 'gewerbe') return []
+  const keys = new Set<string>()
+  for (const b of state.bereiche) {
+    for (const k of fachdetailKeysForBereich(b, state.situation as SituationValue)) {
+      if (state.situation === 'erneuern' && k === 'bad_ausstattung') continue
+      keys.add(k)
+    }
+  }
+  return Array.from(keys)
+}
+
+export function staffFunnelGroesseBereiche(state: StaffFunnelState): string[] {
+  if (!needsGroesse(state)) return []
+  return state.bereiche.filter((b) => hatGroesseFeld(b))
 }
 
 /**
@@ -77,7 +138,7 @@ export function resolveStaffFunnelSteps(state: StaffFunnelState): StaffFunnelSte
     if (needsUmfang(state)) steps.push('umfang')
     if (needsGroesse(state)) steps.push('groesse')
     if (needsFachdetails(state)) steps.push('fachdetails')
-    if (needsKundentyp(state)) steps.push('kundentyp')
+    if (!state.kundentyp?.trim()) steps.push('kundentyp')
     if (needsBeratungPfad(state)) steps.push('beratung')
     else steps.push('preis')
     steps.push('crm_pruefen')
@@ -87,7 +148,7 @@ export function resolveStaffFunnelSteps(state: StaffFunnelState): StaffFunnelSte
   if (state.situation === 'kaputt') {
     if (needsFachdetails(state)) steps.push('fachdetails')
     steps.push('dringlichkeit')
-    if (needsKundentyp(state)) steps.push('kundentyp')
+    if (!state.kundentyp?.trim()) steps.push('kundentyp')
     steps.push('ort')
     if (needsBeratungPfad(state)) steps.push('beratung')
     else steps.push('preis')
@@ -95,13 +156,12 @@ export function resolveStaffFunnelSteps(state: StaffFunnelState): StaffFunnelSte
     return steps
   }
 
-  // erneuern (+ ggf. neubauen/notfall als erneuern-ähnlich)
   if (needsZugaenglichkeit(state)) steps.push('zugaenglichkeit')
   if (needsZustand(state)) steps.push('zustand')
   if (needsBadAusstattung(state)) steps.push('bad_ausstattung')
   if (needsGroesse(state)) steps.push('groesse')
   if (needsFachdetails(state)) steps.push('fachdetails')
-  if (needsKundentyp(state)) steps.push('kundentyp')
+  if (!state.kundentyp?.trim()) steps.push('kundentyp')
   steps.push('ort_zeitraum')
   if (needsBeratungPfad(state)) steps.push('beratung')
   else steps.push('preis')
@@ -120,7 +180,5 @@ export function bereicheForStaffSituation(situation: SituationValue | ''): Retur
   typeof bereicheFuerSituation
 > {
   if (!situation) return []
-  // Website-Betreuung: baum als eigener Bereich — CRM hat baumarbeiten unter garten;
-  // winterdienst statt winter
   return bereicheFuerSituation(situation)
 }

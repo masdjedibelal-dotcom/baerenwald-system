@@ -2,11 +2,9 @@
 
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Timeline, type TimelineItem } from '@/components/ui/timeline'
 import {
-  aktuelleMahnstufeNummer,
   buildRechnungMahnverlauf,
   naechsteZahlungserinnerungStufe,
   type RechnungMahnKontext,
@@ -40,7 +38,6 @@ export function RechnungMahnverlaufCard({
 }) {
   const stufen = buildRechnungMahnverlauf(rechnung)
   const naechste = naechsteZahlungserinnerungStufe(rechnung)
-  const aktuelle = aktuelleMahnstufeNummer(rechnung)
   const stufe1Mail = mahnMails[0] ?? null
   const stufe2Mail = mahnMails[1] ?? null
 
@@ -61,13 +58,6 @@ export function RechnungMahnverlaufCard({
       onLinkClick: mail && onMailAnsehen ? () => onMailAnsehen(mail.id) : undefined,
     }
   })
-
-  const statusHint =
-    aktuelle === 0
-      ? 'Noch keine Mahnung versendet'
-      : aktuelle === 3
-        ? 'Interne Warnung aktiv'
-        : `Aktuelle Mahnstufe ${aktuelle}`
 
   if (empty) {
     return (
@@ -93,57 +83,7 @@ export function RechnungMahnverlaufCard({
         ) : null
       }
     >
-      <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', marginBottom: 4 }}>
-        Alle Mahnstufen gehören zur Rechnung{' '}
-        <strong>{rechnung.rechnungsnummer?.trim() || '—'}</strong> — es werden keine separaten
-        Rechnungen angelegt.
-      </p>
-      <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginBottom: 14 }}>{statusHint}</p>
-
       <Timeline items={timelineItems} />
-
-      {mahnMails.length > 0 ? (
-        <div style={{ marginTop: 16 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 'var(--fs-meta)',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--text-4)',
-              marginBottom: 8,
-            }}
-          >
-            <MockIcon ctx="default" n="mail" size={13} />
-            Versandte Mahn-E-Mails
-          </div>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {mahnMails.map((m) => (
-              <li
-                key={m.id}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  fontSize: 'var(--fs-text)',
-                }}
-              >
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
-                  {m.betreff}
-                </span>
-                <span style={{ flexShrink: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                  {formatZeitpunkt(m.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </MockCard>
   )
 }

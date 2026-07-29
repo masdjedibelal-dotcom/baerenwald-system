@@ -569,3 +569,23 @@ export function detailHrefForPhase(phase: VorgangPhase, entityId: string, leadId
       return `/anfragen/${leadId}`
   }
 }
+
+/** Stift-Icon in der Liste: Leistungen — Ausnahme Angebot → direkt Bearbeiten (Wizard). */
+export function bearbeitenHrefForPhase(
+  phase: VorgangPhase,
+  entityId: string,
+  leadId: string
+): string {
+  switch (phase) {
+    case 'anfrage':
+      return `/anfragen/${leadId}?tab=leistungen`
+    case 'angebot':
+      return `/angebote/${entityId}?bearbeiten=1`
+    case 'auftrag':
+      return `/auftraege/${entityId}?tab=leistungen`
+    case 'rechnung':
+      return `/rechnungen/${entityId}?tab=leistungen`
+    default:
+      return `/anfragen/${leadId}?tab=leistungen`
+  }
+}

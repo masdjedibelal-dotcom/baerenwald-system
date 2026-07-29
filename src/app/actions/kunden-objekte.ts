@@ -43,6 +43,60 @@ export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[
   return (data ?? []) as KundenObjekt[]
 }
 
+export type KundenObjektListenStats = {
+  einheitenTotal: number
+  einheitenVermietet: number
+}
+
+/** Einheiten-/Vermietet-Zähler für Objekte-Liste (Mock-Spalten). */
+export async function fetchKundenObjektListenStats(
+  kundeId: string,
+  objektIds: string[]
+): Promise<Record<string, KundenObjektListenStats>> {
+  const kid = kundeId?.trim()
+  const ids = objektIds.map((x) => x.trim()).filter(Boolean)
+  if (!kid || ids.length === 0) return {}
+
+  const supabase = createClient()
+  const { data: owned } = await supabase
+    .from('kunden_objekte')
+    .select('id')
+    .eq('kunde_id', kid)
+    .in('id', ids)
+  const allowed = new Set((owned ?? []).map((r) => r.id as string))
+  if (allowed.size === 0) return {}
+
+  const { data: einheiten } = await supabase
+    .from('objekt_einheiten')
+    .select('id, kunde_objekt_id')
+    .in('kunde_objekt_id', Array.from(allowed))
+    .eq('aktiv', true)
+
+  const units = einheiten ?? []
+  const einheitIds = units.map((e) => e.id as string)
+  let vermietetSet = new Set<string>()
+  if (einheitIds.length > 0) {
+    const { data: bewohner } = await supabase
+      .from('einheit_bewohner')
+      .select('objekt_einheit_id')
+      .in('objekt_einheit_id', einheitIds)
+      .eq('aktiv', true)
+    vermietetSet = new Set(
+      (bewohner ?? []).map((b) => b.objekt_einheit_id as string).filter(Boolean)
+    )
+  }
+
+  const next: Record<string, KundenObjektListenStats> = {}
+  for (const id of Array.from(allowed)) {
+    const u = units.filter((e) => e.kunde_objekt_id === id)
+    next[id] = {
+      einheitenTotal: u.length,
+      einheitenVermietet: u.filter((x) => vermietetSet.has(x.id as string)).length,
+    }
+  }
+  return next
+}
+
 export async function createKundenObjekt(
   kundeId: string,
   input: KundenObjektInput
@@ -50,11 +104,14 @@ export async function createKundenObjekt(
   const err = validateKundenObjektInput(input)
   if (err) return { ok: false, message: err }
 
-  const hatKennung = await kundeHatOrgKennung(kundeId.trim())
-  if (!hatKennung) {
-    return {
-      ok: false,
-      message: 'Bitte zuerst eine Org-Kennung im Tab „Organisation“ hinterlegen.',
+  const wantsMelde = Boolean(input.melde_slug?.trim())
+  if (wantsMelde) {
+    const hatKennung = await kundeHatOrgKennung(kundeId.trim())
+    if (!hatKennung) {
+      return {
+        ok: false,
+        message: 'Bitte zuerst eine Org-Kennung unter Organisation hinterlegen.',
+      }
     }
   }
 

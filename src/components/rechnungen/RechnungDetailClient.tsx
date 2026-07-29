@@ -10,14 +10,11 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
-import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
-import { DetailSection } from '@/components/vorgang/DetailSection'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromRechnung } from '@/app/(dashboard)/kommunikation/actions'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
@@ -41,12 +38,11 @@ import {
   deleteRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
-import { RechnungDetailsTab } from '@/components/rechnungen/RechnungDetailsTab'
-import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
 import {
-  RechnungAuftragdetailsTab,
-  RechnungZahlplanTab,
-} from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
+  buildRechnungPhaseSheetProps,
+} from '@/components/rechnungen/RechnungDetailsTab'
+import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
+import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
@@ -54,11 +50,11 @@ import { Button } from '@/components/ui/Button'
 import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
 import { runDuplicateRechnung } from '@/lib/list-actions'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
 import { buildLeadVerlaufItems } from '@/lib/crm/verlauf'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
@@ -71,7 +67,6 @@ import {
   rechnungKorrekturModus,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import {
-  mahnstufeListenLabel,
   rechnungHatMahnverlauf,
 } from '@/lib/rechnungen/mahnverlauf'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -80,11 +75,9 @@ import { naechsterSchrittRechnung } from '@/lib/crm/naechster-schritt'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { loadHandwerkerBewertungZiele } from '@/app/(dashboard)/auftraege/handwerker-bewertung-actions'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
-import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
 import type {
@@ -224,7 +217,6 @@ export function RechnungDetailClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
-  const mailCompose = useKundenMailCompose()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -290,18 +282,18 @@ export function RechnungDetailClient({
     [pos]
   )
 
-  const vorgangFotos = useMemo(
-    () =>
-      collectVorgangFotos({
-        funnelDaten: lead?.funnel_daten,
-        angebotFotosRaw: angebotDetail?.fotos_urls,
-      }),
-    [lead?.funnel_daten, angebotDetail?.fotos_urls]
-  )
-
   const leadId = lead?.id ?? projektKontext?.lead?.id ?? null
   const notizenRows: LeadNotizRow[] = lead?.lead_notizen ?? []
   const dokumenteRows = lead?.lead_dokumente ?? []
+  const kundeTel =
+    detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kundeTel,
+    email: kundeEmail,
+    notiz: leadId ? { kind: 'lead', leadId } : null,
+    dokument: leadId ? { kind: 'lead', leadId } : null,
+    onSaved: () => refresh(),
+  })
 
   const timelineItems = useMemo(() => {
     const base = buildLeadVerlaufItems(timelineInitial ?? [], {
@@ -629,71 +621,147 @@ export function RechnungDetailClient({
     return null
   }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden, setStatus])
 
-  const secondaryAction = useMemo((): DetailActionDef | null => {
-    if ((detail.status === 'gesendet' || ueberfaellig) && ueberfaellig && belegTyp === 'rechnung') {
-      return {
-        label: 'Erinnerung',
-        icon: 'alert-triangle',
-        onClick: () => setErinnerungModalOpen(true),
-      }
-    }
-    if (detail.auftrag_id) {
-      return {
-        label: 'Zum Auftrag',
-        icon: 'briefcase',
-        onClick: () =>
-          router.replace(`/auftraege/${detail.auftrag_id}?from=rechnung:${detail.id}`),
-        href: `/auftraege/${detail.auftrag_id}?from=rechnung:${detail.id}`,
-      }
-    }
-    return null
-  }, [detail.status, detail.auftrag_id, detail.id, ueberfaellig, belegTyp, router])
+  const secondaryAction = null
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
   const rechnungStatus = rechnungStatusDisplay(detail.status, { ueberfaellig })
-  const headMeta = kundeName
+  const headMeta = useMemo(() => {
+    const parts: string[] = []
+    if (projektTitelAnzeige && projektTitelAnzeige !== '—') parts.push(projektTitelAnzeige)
+    if (detail.brutto != null) parts.push(formatEurBetrag(detail.brutto))
+    if (detail.faellig_am) parts.push(`fällig ${formatDatum(detail.faellig_am)}`)
+    return parts.join(' · ')
+  }, [projektTitelAnzeige, detail.brutto, detail.faellig_am])
   const headSub =
     detail.status === 'gesendet'
       ? gesendetDetailSubline(detail.gesendet_at, detail.updated_at)
       : undefined
 
-  const mahnLabel = mahnstufeListenLabel(detail)
-
   const stammdatenInhalt = (
     <RechnungStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
   )
 
-  const detailsInhalt = (
-    <>
-      <RechnungDetailsTab detail={detail} lead={lead} zahlungszielFallback={zahlungszielFallback} />
-      {ueberfaellig && !zeigtMahnverlauf ? (
-        <p style={{ marginTop: 10, fontSize: 'var(--fs-meta)', color: 'var(--danger, #c0392b)' }}>
-          Seit {tageUeberfaellig} Tag{tageUeberfaellig === 1 ? '' : 'en'} überfällig
-          {mahnLabel ? ` · ${mahnLabel}` : ''}.
-        </p>
-      ) : null}
-    </>
+  const artKurz = (() => {
+    const art = String(
+      (detail as { rechnung_art?: string | null }).rechnung_art ?? ''
+    ).toLowerCase()
+    if (belegTyp === 'gutschrift') return RECHNUNG_BELEG_TYP_LABELS.gutschrift
+    if (art === 'schluss') return 'Schlussrechnung'
+    if (art === 'abschlag') return 'Abschlag'
+    const blob = `${detail.rechnungsnummer ?? ''} ${detail.auftraege?.titel ?? ''}`.toLowerCase()
+    if (/schluss/.test(blob)) return 'Schlussrechnung'
+    if (/abschlag|anzahlung|teilrechnung/.test(blob)) return 'Abschlag'
+    return RECHNUNG_BELEG_TYP_LABELS.rechnung
+  })()
+
+  const phasenExtras = useMemo(() => {
+    const faelligTxt = detail.faellig_am ? `fällig ${formatDatum(detail.faellig_am)}` : null
+    const kopf = faelligTxt ? `${artKurz} - ${faelligTxt}` : artKurz
+    const sub = detail.bezahlt_at
+      ? `bezahlt am ${formatDatum(detail.bezahlt_at.slice(0, 10))}`
+      : ueberfaellig
+        ? 'überfällig'
+        : detail.status === 'gesendet'
+          ? 'gestellt'
+          : undefined
+    return {
+      rechnung: {
+        kopf,
+        sub,
+        betrag: detail.brutto != null ? formatEurKurz(detail.brutto) : null,
+        sheetCrumb: detail.rechnungsnummer?.trim()
+          ? `${detail.rechnungsnummer.trim()} >`
+          : null,
+        sheetTitle: 'Rechnung',
+        props: buildRechnungPhaseSheetProps(detail, {
+          zahlungszielFallback,
+          statusLabel: rechnungStatus.label,
+        }),
+      },
+    }
+  }, [
+    detail,
+    artKurz,
+    ueberfaellig,
+    zahlungszielFallback,
+    rechnungStatus.label,
+  ])
+
+  const uebersichtInhalt = (
+    <div className="space-y-6">
+      {stammdatenInhalt}
+      <VorgangPhasenVerlauf
+        kontext={projektKontext}
+        fromRef={{ kind: 'rechnung', id: detail.id }}
+        lead={lead}
+        extras={phasenExtras}
+        onSaved={() => refresh()}
+      />
+    </div>
   )
 
-  const leistungenInhalt = (
-    <LeistungenTab
-      phase="rechnung"
-      rows={leistungenFromAngebotPositionen(normalizeAngebotPositionen(detail.positionen ?? []), {
-        status: detail.status === 'bezahlt' ? 'bezahlt' : detail.status === 'gesendet' ? 'gestellt' : 'entwurf',
-        statusLabel:
-          detail.status === 'bezahlt'
-            ? 'Bezahlt'
-            : detail.status === 'gesendet'
-              ? 'Gestellt'
-              : 'Entwurf',
-      })}
-      onOpenDokument={openWizard}
-      emptyHint="Noch keine Positionen — im Rechnungs-Dokument anlegen."
-    />
-  )
+  const leistungenInhalt = (() => {
+    const pos = normalizeAngebotPositionen(detail.positionen ?? []).filter(
+      (p) => !istGewerkBeschreibungPosition(p)
+    )
+    const gestellt =
+      detail.status === 'gesendet' ||
+      detail.status === 'bezahlt' ||
+      detail.status === 'storniert'
+    const mwstSatz =
+      detail.mwst_satz != null && Number.isFinite(Number(detail.mwst_satz))
+        ? Number(detail.mwst_satz)
+        : 19
+    const summen = summenAusPositionen(pos, mwstSatz)
+    const netto =
+      detail.netto != null && Number.isFinite(Number(detail.netto))
+        ? Number(detail.netto)
+        : summen.nettoMin
+    const mwstBetrag =
+      detail.mwst_betrag != null && Number.isFinite(Number(detail.mwst_betrag))
+        ? Number(detail.mwst_betrag)
+        : summen.mwstBetragMin
+    const brutto =
+      detail.brutto != null && Number.isFinite(Number(detail.brutto))
+        ? Number(detail.brutto)
+        : netto + mwstBetrag
+    return (
+      <LeistungenTab
+        phase="rechnung"
+        rows={leistungenFromAngebotPositionen(
+          pos,
+          {
+            status:
+              detail.status === 'bezahlt'
+                ? 'bezahlt'
+                : detail.status === 'gesendet'
+                  ? 'gestellt'
+                  : 'entwurf',
+            statusLabel:
+              detail.status === 'bezahlt'
+                ? 'Bezahlt'
+                : detail.status === 'gesendet'
+                  ? 'Gestellt'
+                  : 'Entwurf',
+          },
+          { eigenleistungSubline: true }
+        )}
+        groupByGewerk
+        footerNettoMwst={{ netto, mwstSatz, mwstBetrag, brutto }}
+        onOpenDokument={gestellt ? handleKorrigieren : openWizard}
+        dokumentHint={
+          gestellt
+            ? 'Positionen sind gestellt — Änderungen über eine Rechnungskorrektur.'
+            : 'Positionen änderst du im Rechnungs-Dokument — nicht in dieser Tabelle.'
+        }
+        dokumentActionLabel={gestellt ? 'Rechnung korrigieren' : 'Dokument öffnen'}
+        emptyHint="Noch keine Positionen — im Rechnungs-Dokument anlegen."
+      />
+    )
+  })()
 
   const verlaufInhalt = (
-    <>
+    <div className="space-y-6">
       <VerlaufPanel items={timelineItems} />
       {belegTyp === 'rechnung' ? (
         <RechnungMahnverlaufCard
@@ -708,7 +776,7 @@ export function RechnungDetailClient({
           onMailAnsehen={(id) => setEmailPreviewId(id)}
         />
       ) : null}
-    </>
+    </div>
   )
 
   const dokumenteInhalt = (
@@ -735,26 +803,7 @@ export function RechnungDetailClient({
       id: 'uebersicht',
       label: entityDetailTabLabel('uebersicht'),
       icon: 'list-details',
-      render: () => (
-        <div className="space-y-6">
-          <PhaseCardsBlock
-            kontext={projektKontext}
-            fromRef={{ kind: 'rechnung', id: detail.id }}
-          />
-          {stammdatenInhalt}
-          {detailsInhalt}
-          <RechnungAuftragdetailsTab auftragDetail={auftragDetail} lead={lead} />
-          <ZugehoerigListe
-            kontext={projektKontext}
-            fromRef={{ kind: 'rechnung', id: detail.id }}
-          />
-          {vorgangFotos.length > 0 ? (
-            <DetailSection title="Fotos">
-              <VorgangFotosTab fotos={vorgangFotos} />
-            </DetailSection>
-          ) : null}
-        </div>
-      ),
+      render: () => uebersichtInhalt,
     },
     {
       id: 'leistungen',
@@ -769,9 +818,30 @@ export function RechnungDetailClient({
       icon: 'receipt',
       render: () => (
         <RechnungZahlplanTab
+          detail={detail}
           auftragDetail={auftragDetail}
           rechnungen={auftragRechnungen}
-          aktuelleRechnungId={detail.id}
+          fallbackTitel={projektTitelAnzeige}
+          onEditInvoice={(rechnungId) => {
+            startTransition(async () => {
+              const res = detail.auftrag_id
+                ? await loadRechnungWizardBootstrap(rechnungId, detail.auftrag_id)
+                : await loadRechnungWizardBootstrapStandalone(rechnungId)
+              if (!res.ok) {
+                toast.error(res.message)
+                return
+              }
+              setWizardBootstrap(res.bootstrap)
+              setWizardKey((k) => k + 1)
+              setWizardOpen(true)
+            })
+          }}
+          onOpenWizard={(bootstrap) => {
+            setWizardBootstrap(bootstrap)
+            setWizardKey((k) => k + 1)
+            setWizardOpen(true)
+          }}
+          onRefresh={() => refresh()}
         />
       ),
     },
@@ -791,12 +861,7 @@ export function RechnungDetailClient({
       label: entityDetailTabLabel('aktivitaet'),
       icon: 'history',
       count: timelineItems.length || undefined,
-      render: () => (
-        <div className="space-y-6">
-          {verlaufInhalt}
-          <ProjektHistorieTab kontext={projektKontext} />
-        </div>
-      ),
+      render: () => verlaufInhalt,
     },
   ]
 
@@ -806,8 +871,10 @@ export function RechnungDetailClient({
     <EntityDetailLayout
       phase="rechnung"
       projektKontext={projektKontext}
-      crumbBackHref="/vorgaenge?tab=rechnung"
-      crumbBackLabel="Zurück zu Vorgängen"
+      crumbBackHref="/vorgaenge?tab=rechnung&lifecycle=offen"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbSectionLabel="Rechnungen"
+      breadcrumbTitle={crumbTitle}
       className="space-y-4 pb-0"
       wiedervorlageDatum={detail.wiedervorlage_datum}
       wiedervorlageNotiz={detail.wiedervorlage_notiz}
@@ -816,53 +883,25 @@ export function RechnungDetailClient({
       onWiedervorlageSaved={() => refresh()}
       nextStepMetrics={[
         {
-          label: 'Betrag',
+          label: 'Rechnungsbetrag',
           value: detail.brutto != null ? formatEurBetrag(detail.brutto) : '—',
         },
         {
-          label: 'Positionen',
-          value: String(positionenCount),
-        },
-        {
-          label: 'Fällig',
-          value: detail.faellig_am ? formatDatum(detail.faellig_am) : '—',
+          label: 'Status',
+          value: rechnungStatus.label,
         },
       ]}
-      quickBar={[
-        {
-          id: 'call',
-          label: 'Anrufen',
-          icon: 'phone',
-          disabled: !detail.kunden?.telefon?.trim() && !lead?.kontakt_telefon?.trim(),
-          onClick: () => {
-            const tel =
-              detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
-            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
-          },
-        },
-        {
-          id: 'mail',
-          label: 'Mail',
-          icon: 'mail',
-          disabled: !kundeEmail,
-          onClick: () =>
-            mailCompose.openCompose(() => mailComposeContextFromRechnung(detail.id)),
-        },
-        { id: 'notiz', label: 'Notiz', icon: 'messages', onClick: () => setMainTab('akte') },
-        {
-          id: 'foto',
-          label: 'Foto',
-          icon: 'camera',
-          onClick: () => setMainTab('uebersicht'),
-        },
-      ]}
+      quickBar={quickBar}
       nextStep={naechsterSchrittRechnung({
         status: detail.status,
         ueberfaellig,
         belegTyp,
+        faelligLabel: detail.faellig_am
+          ? `fällig ${formatDatum(detail.faellig_am)}`
+          : null,
       })}
       head={{
-        title: crumbTitle && crumbTitle !== '—' ? crumbTitle : kundeName,
+        title: kundeName,
         sub: headSub,
         badges: (
           <StatusBadge
@@ -938,7 +977,7 @@ export function RechnungDetailClient({
         </ClientOnly>
       ) : null}
 
-      {mailCompose.modal}
+      {quickActionSheets}
 
       <Modal
         open={rechnungConfirm === 'gutschrift'}

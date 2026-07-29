@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -15,10 +14,7 @@ import {
   type RateDrawerRate,
 } from '@/components/vorgang/RateDrawer'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
-import {
-  saveAuftragZahlungsplan,
-  clearAuftragZahlungsplan,
-} from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
+import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
   createGutschriftFromRechnung,
   sendRechnung,
@@ -31,7 +27,9 @@ import {
   berechneZahlungsplan,
   emptyZahlungsplan,
   parseZahlungsplan,
+  rechnungDokumentBezeichnung,
   rechnungFuerAbschlagZeile,
+  rechnungenZuAbschlagZeile,
   zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
   type RechnungAbschlagLink,
@@ -42,7 +40,6 @@ import {
   aktuelleMahnstufeNummer,
   tageSeitFaelligkeitRechnung,
 } from '@/lib/rechnungen/mahnverlauf'
-import { zahlplanDarfGeloeschtWerden } from '@/lib/rechnungen/zahlplan-gates'
 import type {
   RechnungAuswahlZeile,
   RechnungWizardBootstrap,
@@ -66,6 +63,7 @@ type RateRow = RateDrawerRate & {
   badgeLabel: string
   badgeTone: StatusTone
   badgeStatus: string
+  belegCount?: number
 }
 
 function faelligUeberfaellig(faellig?: string | null): boolean {
@@ -116,6 +114,18 @@ function rateBadgeMeta(
   return { label: 'Geplant', tone: 'grau', status: 'geplant' }
 }
 
+function belegStatusLabel(r: RechnungAuswahlZeile): string {
+  const typ = String(r.beleg_typ ?? 'rechnung')
+  if (typ === 'gutschrift') return 'Gutschrift'
+  const st = String(r.status)
+  if (st === 'bezahlt') return 'Bezahlt'
+  if (st === 'storniert') return 'Storniert'
+  if (st === 'entwurf') return 'Entwurf'
+  if (faelligUeberfaellig(r.faellig_am)) return 'Überfällig'
+  if (st === 'gesendet' || st === 'versendet') return 'Gestellt'
+  return st || '—'
+}
+
 /**
  * Phase 7 — Zahlung-Tab: leer · Einzelrechnung · Abschlagsplan + RateDrawer.
  * Prefill nur aus `angebote.zahlungsplan` (nie `auftraege.zahlungsplan`).
@@ -128,6 +138,7 @@ export function VorgangZahlungTab({
   gesamtBruttoHint,
   rechnungen,
   aktuelleRechnungId,
+  fallbackTitel,
   onCreateInvoice,
   onEditInvoice,
   onOpenWizard,
@@ -142,6 +153,8 @@ export function VorgangZahlungTab({
   gesamtBruttoHint?: number | null
   rechnungen: RechnungAuswahlZeile[]
   aktuelleRechnungId?: string
+  /** Fallback-Bezeichnung (z. B. Projekt-/Abschlagstitel auf der Rechnung) */
+  fallbackTitel?: string | null
   onCreateInvoice?: (opts?: RechnungErstellenOpts) => void
   onEditInvoice?: (rechnungId: string) => void
   onOpenWizard?: (bootstrap: RechnungWizardBootstrap) => void
@@ -198,7 +211,10 @@ export function VorgangZahlungTab({
     (gesamtNetto > 0 ? Math.round(gesamtNetto * 1.19 * 100) / 100 : 0)
 
   const rows: RateRow[] = useMemo(() => {
-    if (hasPlan && kontext) {
+    // Rechnung-Detail: immer Belegzeilen (Mock-Tabelle), Plan-Editor bleibt am Auftrag
+    const usePlanRows = variant !== 'rechnung' && hasPlan && kontext
+
+    if (usePlanRows && kontext) {
       const naechsteId =
         kontext.zeilen.find((z) => zahlplanRateStatus(z.id, abschlagLinks) === 'geplant')?.id ??
         null
@@ -206,6 +222,15 @@ export function VorgangZahlungTab({
         const st = zahlplanRateStatus(z.id, abschlagLinks)
         const link = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
         const r = link?.id ? rechnungById.get(link.id) ?? null : null
+        const related = rechnungenZuAbschlagZeile(z.id, rechnungen)
+        const belege = related.map((x) => ({
+          id: x.id,
+          nummer: x.rechnungsnummer?.trim() || '—',
+          status: String(x.status),
+          statusLabel: belegStatusLabel(x),
+          belegTyp: x.beleg_typ ?? null,
+          brutto: x.brutto,
+        }))
         const badge = rateBadgeMeta(st, r)
         const betrag = st === 'geplant' || !r ? Number(z.brutto) || 0 : Number(r.brutto ?? 0) || 0
         const pct =
@@ -227,26 +252,27 @@ export function VorgangZahlungTab({
           prozent: pct,
           reNr: r?.rechnungsnummer?.trim() || null,
           rechnungId: r?.id ?? null,
+          belege,
           reklamation: r?.reklamation_am
             ? { datum: r.reklamation_am, grund: r.reklamation_grund }
             : null,
           isNext: z.id === naechsteId,
           sub:
             [
-              pct != null && !z.istSchluss ? `${pct} % der Auftragssumme` : null,
-              z.istSchluss ? 'Restbetrag' : null,
-              r?.rechnungsnummer?.trim() || null,
+              pct != null ? `${pct} % der Auftragssumme` : z.istSchluss ? 'Restbetrag' : null,
+              related.length === 1 ? r?.rechnungsnummer?.trim() || null : null,
             ]
               .filter(Boolean)
               .join(' · ') || 'Abschlag',
           badgeLabel: badge.label,
           badgeTone: badge.tone,
           badgeStatus: badge.status,
+          belegCount: related.length,
         }
       })
     }
 
-    // Einzelrechnung(en) ohne Plan
+    // Einzelrechnung(en) / Rechnung-Tab
     return rechnungen
       .filter((r) => String(r.status) !== 'storniert')
       .map((r) => {
@@ -257,26 +283,61 @@ export function VorgangZahlungTab({
               ? 'geplant'
               : 'gestellt'
         const badge = rateBadgeMeta(st, r)
+        const planTitel = r.zahlungsplan_abschlag_id
+          ? plan.zeilen.find((z) => z.id === r.zahlungsplan_abschlag_id)?.titel?.trim() || null
+          : null
+        const artTitel = rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
+        const isCurrent = r.id === aktuelleRechnungId
+        const label =
+          planTitel ||
+          (isCurrent ? fallbackTitel?.trim() || null : null) ||
+          (artTitel !== 'Rechnung' ? artTitel : null) ||
+          fallbackTitel?.trim() ||
+          r.rechnungsnummer?.trim() ||
+          'Rechnung'
+        const reNr = r.rechnungsnummer?.trim() || null
         return {
           id: r.id,
-          label: r.rechnungsnummer?.trim() || 'Rechnung',
+          label,
           status: st,
           betrag: Number(r.brutto ?? 0) || 0,
           faellig: r.faellig_am ? String(r.faellig_am).slice(0, 10) : null,
-          reNr: r.rechnungsnummer?.trim() || null,
+          reNr,
           rechnungId: r.id,
+          belege: [
+            {
+              id: r.id,
+              nummer: reNr || '—',
+              status: String(r.status),
+              statusLabel: belegStatusLabel(r),
+              belegTyp: r.beleg_typ ?? null,
+              brutto: r.brutto,
+            },
+          ],
           reklamation: r.reklamation_am
             ? { datum: r.reklamation_am, grund: r.reklamation_grund }
             : null,
-          sub: 'Gesamtbetrag des Auftrags',
+          sub: reNr || 'Gesamtbetrag',
           badgeLabel: badge.label,
           badgeTone: badge.tone,
           badgeStatus: badge.status,
+          belegCount: 1,
         }
       })
-  }, [hasPlan, kontext, abschlagLinks, rechnungById, rechnungen, gesamtNetto])
+  }, [
+    variant,
+    hasPlan,
+    kontext,
+    abschlagLinks,
+    rechnungById,
+    rechnungen,
+    gesamtNetto,
+    plan.zeilen,
+    aktuelleRechnungId,
+    fallbackTitel,
+  ])
 
-  const nurEinzel = !hasPlan && rows.length > 0
+  const nurEinzel = (!hasPlan || variant === 'rechnung') && rows.length === 1
   const empty = rows.length === 0
 
   const { bezahltBrutto, gestelltBrutto } = useMemo(() => {
@@ -289,16 +350,37 @@ export function VorgangZahlungTab({
     return { bezahltBrutto: bezahlt, gestelltBrutto: gestellt }
   }, [rows])
 
+  const invoiceSumBrutto = useMemo(
+    () => rows.reduce((s, r) => s + (r.status === 'geplant' ? 0 : r.betrag), 0),
+    [rows]
+  )
+
+  const totalBruttoResolved =
+    variant === 'rechnung'
+      ? invoiceSumBrutto || gesamtBruttoHint || 0
+      : totalBrutto || invoiceSumBrutto
+
   const pct =
-    totalBrutto > 0 ? Math.round((bezahltBrutto / Math.max(totalBrutto, bezahltBrutto)) * 100) : 0
-  const offen = Math.max(0, totalBrutto - bezahltBrutto)
+    totalBruttoResolved > 0
+      ? Math.round((bezahltBrutto / Math.max(totalBruttoResolved, bezahltBrutto)) * 100)
+      : 0
+  const offen = Math.max(0, totalBruttoResolved - bezahltBrutto)
   const naechste = rows.find((r) => r.isNext) ?? null
   const openRate = rows.find((r) => r.id === openRateId) ?? null
   const openRechnung = openRate?.rechnungId
     ? rechnungById.get(openRate.rechnungId) ?? null
     : null
   const openMahnungen = mahnungenFromRechnung(openRechnung)
-  const planLoeschGate = zahlplanDarfGeloeschtWerden(plan, abschlagLinks)
+  const frozenRateIds = useMemo(
+    () =>
+      plan.zeilen
+        .filter((z) => {
+          const st = zahlplanRateStatus(z.id, abschlagLinks)
+          return st === 'gestellt' || st === 'bezahlt'
+        })
+        .map((z) => z.id),
+    [plan.zeilen, abschlagLinks]
+  )
 
   function speichern(next: Zahlungsplan) {
     if (!auftragId) {
@@ -318,26 +400,6 @@ export function VorgangZahlungTab({
       setPlan(next)
       setEditorOpen(false)
       toast.success('Gespeichert')
-      onRefresh?.()
-      router.refresh()
-    })
-  }
-
-  function loeschenPlan() {
-    if (!auftragId) return
-    if (!planLoeschGate.ok) {
-      toast.error(planLoeschGate.message)
-      return
-    }
-    if (!window.confirm('Abschlagsplan wirklich löschen? Offene Raten entfallen.')) return
-    startTransition(async () => {
-      const res = await clearAuftragZahlungsplan(auftragId)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      setPlan(emptyZahlungsplan())
-      toast.success('Gelöscht')
       onRefresh?.()
       router.refresh()
     })
@@ -382,8 +444,7 @@ export function VorgangZahlungTab({
           })
         },
       })
-      const ueber = faelligUeberfaellig(rate.faellig)
-      if (ueber) {
+      if (faelligUeberfaellig(rate.faellig)) {
         const nextStufe = openMahnungen.length + 1
         ctas.push({
           id: 'mahnung',
@@ -400,33 +461,18 @@ export function VorgangZahlungTab({
           label: 'Reklamation erfassen',
           icon: 'alert-triangle',
           onClick: () => {
+            const grund = window.prompt(
+              'Reklamationsgrund (kurz):',
+              'Kunde beanstandet Position'
+            )
+            if (grund == null) return
             startTransition(async () => {
-              const res = await setRechnungReklamation(rechnungId, {
-                grund: 'Kunde beanstandet Position',
-              })
+              const res = await setRechnungReklamation(rechnungId, { grund })
               if (!res.ok) {
                 toast.error(res.message)
                 return
               }
-              toast.success('Reklamation erfasst — Rechnung als strittig markiert')
-              onRefresh?.()
-              router.refresh()
-            })
-          },
-        })
-      } else {
-        ctas.push({
-          id: 'reklamation-done',
-          label: 'Reklamation erledigt',
-          icon: 'check',
-          onClick: () => {
-            startTransition(async () => {
-              const res = await setRechnungReklamation(rechnungId, { clear: true })
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('Reklamation erledigt')
+              toast.success('Reklamation erfasst')
               onRefresh?.()
               router.refresh()
             })
@@ -444,18 +490,16 @@ export function VorgangZahlungTab({
             return
           }
           startTransition(async () => {
-            const res = auftragId
+            const boot = auftragId
               ? await loadWizardBootstrap(rechnungId, auftragId)
               : await loadRechnungWizardBootstrapStandalone(rechnungId)
-            if (!res.ok) {
-              toast.error(res.message)
-              return
+            if (boot.ok && onOpenWizard) {
+              onOpenWizard(boot.bootstrap)
+            } else if (!boot.ok) {
+              toast.error(boot.message)
+            } else {
+              router.push(`/rechnungen/${rechnungId}?tab=leistungen`)
             }
-            if (onOpenWizard) {
-              onOpenWizard(res.bootstrap)
-              return
-            }
-            router.push(`/rechnungen/${rechnungId}`)
           })
         },
       })
@@ -476,6 +520,20 @@ export function VorgangZahlungTab({
           })
         },
       })
+      ctas.push({
+        id: 'open',
+        label: 'Rechnung öffnen',
+        icon: 'eye',
+        onClick: () => {
+          setOpenRateId(null)
+          if (aktuelleRechnungId === rechnungId) {
+            router.push(`/rechnungen/${rechnungId}?tab=uebersicht`)
+            return
+          }
+          router.push(`/rechnungen/${rechnungId}`)
+        },
+      })
+      return ctas
     }
 
     if (rate.status === 'bezahlt' && rechnungId) {
@@ -524,9 +582,6 @@ export function VorgangZahlungTab({
           })
         },
       })
-    }
-
-    if (rechnungId) {
       ctas.push({
         id: 'open',
         label: 'Rechnung öffnen',
@@ -542,7 +597,7 @@ export function VorgangZahlungTab({
   }
 
   const interactive = !readOnly && variant !== 'angebot'
-  const canEditPlan = interactive && Boolean(auftragId)
+  const canEditPlan = interactive && variant === 'auftrag' && Boolean(auftragId)
 
   // ─── Leer ───
   if (empty) {
@@ -585,9 +640,11 @@ export function VorgangZahlungTab({
             open={editorOpen}
             onClose={() => setEditorOpen(false)}
             gesamtNetto={gesamtNetto}
+            gesamtBrutto={totalBrutto}
             initial={null}
             onSave={speichern}
             saving={pending}
+            frozenIds={frozenRateIds}
           />
         ) : null}
       </>
@@ -600,26 +657,14 @@ export function VorgangZahlungTab({
         title="Zahlung"
         icon="calculator"
         actions={
-          canEditPlan && hasPlan ? (
+          canEditPlan ? (
             <MockBtn
               sm
               kind="ghost"
               icon="pencil"
-              title="Zahlplan bearbeiten"
+              title="Abschlagsplan bearbeiten"
               onClick={() => setEditorOpen(true)}
-            >
-              Plan
-            </MockBtn>
-          ) : canEditPlan && !hasPlan ? (
-            <MockBtn sm kind="ghost" icon="plus" onClick={() => setEditorOpen(true)}>
-              Abschläge
-            </MockBtn>
-          ) : variant === 'rechnung' && auftragId ? (
-            <Link href={`/auftraege/${auftragId}?tab=zahlung`}>
-              <MockBtn sm kind="ghost" icon="external-link">
-                Im Auftrag
-              </MockBtn>
-            </Link>
+            />
           ) : variant === 'angebot' ? (
             <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>Vorschlag</span>
           ) : null
@@ -640,12 +685,16 @@ export function VorgangZahlungTab({
             {gestelltBrutto > 0 ? ` · ${formatEurBetrag(gestelltBrutto)} gestellt` : ''}
           </span>
           <b className="zahlplan-summary__right">
-            {formatEurBetrag(bezahltBrutto)} / {formatEurBetrag(totalBrutto || bezahltBrutto)}
+            {formatEurBetrag(bezahltBrutto)} / {formatEurBetrag(totalBruttoResolved || bezahltBrutto)}
           </b>
         </div>
-        <div className="zahlplan-bar" aria-hidden>
-          <div className="zahlplan-bar__fill" style={{ width: `${Math.min(100, pct)}%` }} />
-        </div>
+        {variant !== 'rechnung' ? (
+          <div className="zahlplan-bar" aria-hidden>
+            <div className="zahlplan-bar__fill" style={{ width: `${Math.min(100, pct)}%` }} />
+          </div>
+        ) : (
+          <div style={{ height: 8 }} aria-hidden />
+        )}
 
         {nurEinzel ? (
           <div className="zahlung-tab-hint">
@@ -670,9 +719,9 @@ export function VorgangZahlungTab({
 
         <div className="zahlplan-table-wrap">
           <div className="list-row head zahlplan-row zahlplan-row--simple">
-            <div>{nurEinzel ? 'Rechnung' : 'Abschlag'}</div>
-            <div style={{ textAlign: 'right' }}>Betrag</div>
+            <div>{variant === 'rechnung' || nurEinzel || !hasPlan ? 'Rechnung' : 'Abschlag'}</div>
             <div>Fällig</div>
+            <div style={{ textAlign: 'right' }}>Betrag</div>
             <div />
           </div>
           {rows.map((row) => {
@@ -708,13 +757,16 @@ export function VorgangZahlungTab({
                       label={row.badgeLabel}
                       tone={row.badgeTone}
                     />
+                    {(row.belegCount ?? 0) > 1 ? (
+                      <span className="zahlplan-row__count">{row.belegCount} Rechnungen</span>
+                    ) : null}
                   </span>
                   {row.sub ? <div className="zahlplan-row__pct">{row.sub}</div> : null}
                 </div>
-                <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
                 <div className="zahlplan-row__faellig">
                   {row.faellig ? formatDatum(String(row.faellig).slice(0, 10)) : '—'}
                 </div>
+                <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
                 <div className="zahlplan-row__menu">
                   <MockIcon ctx="btn" n="chevron-right" size={15} />
                 </div>
@@ -723,44 +775,32 @@ export function VorgangZahlungTab({
           })}
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 12,
-            fontSize: 'var(--fs-meta)',
-            color: 'var(--text-3)',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="zahlplan-foot">
           <span>
-            <b style={{ color: 'var(--text)' }}>{rows.length}</b>{' '}
-            {nurEinzel ? (rows.length === 1 ? 'Rechnung' : 'Rechnungen') : 'Abschläge'}
+            <b>{rows.length}</b>{' '}
+            {variant !== 'rechnung' && hasPlan && rows.length !== 1
+              ? 'Abschläge'
+              : variant !== 'rechnung' && hasPlan
+                ? 'Abschlag'
+                : rows.length === 1
+                  ? 'Rechnung'
+                  : 'Rechnungen'}
           </span>
-          <span style={{ display: 'flex', gap: 14, fontVariantNumeric: 'tabular-nums' }}>
+          <div className="zahlplan-foot__sums">
             <span>
-              Bezahlt <b style={{ color: 'var(--text)' }}>{formatEurBetrag(bezahltBrutto)}</b>
+              Bezahlt <b>{formatEurBetrag(bezahltBrutto)}</b>
             </span>
             {gestelltBrutto > 0 ? (
               <span>
-                Gestellt <b style={{ color: 'var(--text)' }}>{formatEurBetrag(gestelltBrutto)}</b>
+                Gestellt <b>{formatEurBetrag(gestelltBrutto)}</b>
               </span>
             ) : null}
-            <span>
-              Offen <b style={{ color: 'var(--text)' }}>{formatEurBetrag(offen)}</b>
+            <span className="zahlplan-foot__offen">
+              Offen <b>{formatEurBetrag(offen)}</b>
             </span>
-          </span>
+          </div>
         </div>
 
-        {canEditPlan && hasPlan && planLoeschGate.ok ? (
-          <div style={{ marginTop: 10 }}>
-            <MockBtn sm kind="ghost" icon="trash" disabled={pending} onClick={loeschenPlan}>
-              Plan löschen
-            </MockBtn>
-          </div>
-        ) : null}
       </MockCard>
 
       <RateDrawer
@@ -776,9 +816,11 @@ export function VorgangZahlungTab({
           open={editorOpen}
           onClose={() => setEditorOpen(false)}
           gesamtNetto={gesamtNetto}
+          gesamtBrutto={totalBrutto}
           initial={hasPlan ? plan : null}
           onSave={speichern}
           saving={pending}
+          frozenIds={frozenRateIds}
         />
       ) : null}
 

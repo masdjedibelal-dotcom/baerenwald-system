@@ -1129,7 +1129,6 @@ export function AngebotWizard({
   const wizard = (
     <>
       <DocumentCanvas
-        portal={false}
         title={wizardTitel}
         subtitle={subtitle || undefined}
         onClose={handleRequestClose}

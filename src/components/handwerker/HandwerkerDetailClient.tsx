@@ -14,7 +14,10 @@ import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/Han
 import {
   filterStandardComplianceTypen,
   standardDokumente,
+  dokumentFuerTyp,
+  complianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
+import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
@@ -22,6 +25,7 @@ import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -69,7 +73,7 @@ import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClien
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
 
-type HandwerkerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
+type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -455,7 +459,7 @@ export function HandwerkerDetailClient({
       },
       {
         onEdit: () => {
-          setTab('stammdaten')
+          setTab('uebersicht')
           beginEditKontakt()
         },
         onCopy: () => runDuplicateHandwerker(hw.id, router),
@@ -518,8 +522,151 @@ export function HandwerkerDetailClient({
     portalGesperrtPending,
   ])
 
+  const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
+
+  function formatGueltigKurz(iso: string | null | undefined): string | null {
+    if (!iso?.trim()) return null
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
+  }
+
   const uebersichtInhalt = (
-    <>
+    <div className="space-y-4">
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">Stammdaten</div>
+          <button
+            type="button"
+            className="qa-btn"
+            title="Stammdaten bearbeiten"
+            aria-label="Stammdaten bearbeiten"
+            onClick={beginEditKontakt}
+          >
+            <MockIcon ctx="default" n="pencil" size={14} />
+          </button>
+        </div>
+        <div className="card-b">
+          {editingKontakt ? (
+            <div className="props">
+              {err ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
+              <InlineEditField label="Betrieb" editing value={formFirma}>
+                <input
+                  className="input"
+                  value={formFirma}
+                  onChange={(e) => setFormFirma(e.target.value)}
+                  placeholder="Firmenname"
+                  autoFocus
+                />
+              </InlineEditField>
+              <InlineEditField label="Vorname (GF)" editing value={formVorname}>
+                <input
+                  className="input"
+                  value={formVorname}
+                  onChange={(e) => setFormVorname(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="Nachname (GF)" editing value={formNachname}>
+                <input
+                  className="input"
+                  value={formNachname}
+                  onChange={(e) => setFormNachname(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="Telefon" editing value={formTelefon}>
+                <input
+                  className="input"
+                  type="tel"
+                  value={formTelefon}
+                  onChange={(e) => setFormTelefon(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="E-Mail" editing value={formEmail}>
+                <input
+                  className="input"
+                  type="email"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="Einsatzgebiet" editing value={formAdresse}>
+                <input
+                  className="input"
+                  value={formAdresse}
+                  onChange={(e) => setFormAdresse(e.target.value)}
+                />
+              </InlineEditField>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button type="button" className="btn ghost sm" onClick={cancelEditStamm}>
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  className="btn primary sm"
+                  disabled={pending}
+                  onClick={saveHandwerkerStamm}
+                >
+                  Speichern
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="vgid">
+              <div className="vgid-name">{handwerkerDisplayName(hw)}</div>
+              <div className="vgid-meta">
+                {[gewerkNamen.join(' · ') || kategorie, hw.adresse?.trim() || null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+              {(hw.telefon?.trim() || hw.email?.trim()) && (
+                <div className="vgid-chips">
+                  {hw.telefon?.trim() ? (
+                    <a className="vgid-chip" href={`tel:${String(hw.telefon).replace(/\s/g, '')}`}>
+                      <MockIcon ctx="default" n="phone" size={14} />
+                      {hw.telefon.trim()}
+                    </a>
+                  ) : null}
+                  {hw.email?.trim() ? (
+                    <a className="vgid-chip" href={`mailto:${hw.email.trim()}`}>
+                      <MockIcon ctx="default" n="mail" size={14} />
+                      {hw.email.trim()}
+                    </a>
+                  ) : null}
+                </div>
+              )}
+              <div
+                className="vgid-portal"
+                style={{
+                  marginTop: 12,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--text-3)',
+                }}
+              >
+                <span>
+                  PORTAL ·{' '}
+                  <span style={{ color: istPortalGesperrt ? 'var(--text-4)' : 'var(--green)' }}>
+                    {istPortalGesperrt ? 'Gesperrt' : hasPortalAccount ? 'Aktiv' : 'Offen'}
+                  </span>
+                </span>
+                {!istPortalGesperrt ? (
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => void openPortalModal()}
+                  >
+                    Zugang zurücksetzen
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
       <div className="card">
@@ -594,7 +741,7 @@ export function HandwerkerDetailClient({
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 
   const stammdatenInhalt = (
@@ -792,22 +939,116 @@ export function HandwerkerDetailClient({
     />
   )
 
-  const dokumenteInhalt = (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="shield-check" size={16} />
-          Compliance
-        </div>
+  const complianceInhalt = (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <MockIcon ctx="nav" n="shield-check" size={16} style={{ color: 'var(--text-3)' }} />
+        <span
+          style={{
+            fontSize: 'var(--fs-meta)',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'var(--text-3)',
+          }}
+        >
+          Nachweise
+        </span>
+        <div style={{ flex: 1 }} />
         <ComplianceBadge status={hw.compliance_status} />
       </div>
-      <div className="card-b">
-        <HandwerkerComplianceUnterlagenTable
-          handwerkerId={hw.id}
-          dokumente={payload.dokumente}
-          typen={complianceTypenStandard}
-        />
+
+      {complianceTypenStandard.length === 0 ? (
+        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
+          Keine Compliance-Typen konfiguriert.
+        </p>
+      ) : (
+        <div className="listcard">
+          {complianceTypenStandard.map((typ) => {
+            const doc = dokumentFuerTyp(standardDokumente(payload.dokumente), typ.slug, {
+              handwerkerId: hw.id,
+              auftragId: null,
+            })
+            const st = complianceDokumentStatus(typ, doc)
+            const gueltig = formatGueltigKurz(doc?.gueltig_bis)
+            let sub = 'fehlt'
+            if (st === 'ok') sub = gueltig ? `gültig bis ${gueltig}` : 'geprüft'
+            else if (st === 'warnung') sub = gueltig ? `läuft ab ${gueltig}` : 'Prüfung ausstehend'
+            else if (st === 'abgelaufen') sub = gueltig ? `abgelaufen ${gueltig}` : 'abgelaufen'
+            const ok = st === 'ok'
+            return (
+              <div
+                key={typ.id}
+                className="list-row"
+                style={{
+                  gridTemplateColumns: '1fr 28px',
+                  alignItems: 'center',
+                  cursor: 'default',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div className="lc-title" style={{ fontWeight: 600 }}>
+                    {typ.bezeichnung}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--fs-meta)',
+                      color: 'var(--text-3)',
+                      marginTop: 2,
+                    }}
+                  >
+                    {sub}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <MockIcon
+                    ctx="default"
+                    n={ok ? 'check' : st === 'warnung' ? 'alert-triangle' : 'x'}
+                    size={16}
+                    style={{ color: ok ? 'var(--green)' : 'var(--text-4)' }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 20 }}>
+        <details>
+          <summary
+            style={{
+              cursor: 'pointer',
+              fontSize: 'var(--fs-meta)',
+              color: 'var(--text-3)',
+              marginBottom: 10,
+            }}
+          >
+            Unterlagen hochladen & bearbeiten
+          </summary>
+          <HandwerkerComplianceUnterlagenTable
+            handwerkerId={hw.id}
+            dokumente={payload.dokumente}
+            typen={complianceTypenStandard}
+          />
+        </details>
       </div>
+    </div>
+  )
+
+  const akteInhalt = (
+    <div className="space-y-4">
+      {stammdatenInhalt}
+      {notizenInhalt}
     </div>
   )
 
@@ -824,12 +1065,6 @@ export function HandwerkerDetailClient({
       render: () => uebersichtInhalt,
     },
     {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
       id: 'vorgaenge',
       label: 'Vorgänge',
       icon: 'folders',
@@ -837,29 +1072,45 @@ export function HandwerkerDetailClient({
       render: () => vorgaengeInhalt,
     },
     {
-      id: 'dokumente',
-      label: 'Dokumente',
-      icon: 'files',
+      id: 'compliance',
+      label: 'Compliance',
+      icon: 'shield-check',
       count: dokumenteAnzahl || undefined,
-      render: () => dokumenteInhalt,
+      render: () => complianceInhalt,
     },
     {
-      id: 'notizen',
-      label: 'Notizen',
-      icon: 'messages',
+      id: 'akte',
+      label: 'Akte',
+      icon: 'file-text',
       count: hw.notizen?.trim() ? 1 : undefined,
-      render: () => notizenInhalt,
+      render: () => akteInhalt,
     },
   ]
 
   return (
     <>
-      <MockDetailBackLink href="/handwerker" label="Zurück zu Partner" />
+      <MockDetailBackLink href="/handwerker" label="Zurück zu Handwerker" />
       <DetailHead
         title={handwerkerDisplayName(hw)}
+        titleBadges={<ComplianceBadge status={hw.compliance_status} />}
         badges={
           <>
-            <ComplianceBadge status={hw.compliance_status} />
+            {gewerkNamen.length > 0 ? (
+              <span>{gewerkNamen.join(' · ')}</span>
+            ) : kategorie ? (
+              <span>{kategorie}</span>
+            ) : null}
+            {bewertungGesamt != null && bewertungGesamt > 0 ? (
+              <span className="rating inline-flex items-center gap-1">
+                <MockIcon
+                  ctx="default"
+                  n="star-filled"
+                  size={12}
+                  className="text-[var(--yel-tx,#c9a227)]"
+                />
+                {formatHandwerkerBewertung(bewertungGesamt)}
+              </span>
+            ) : null}
             {istPortalGesperrt ? (
               <MockBadge kind="storniert">
                 <span className="inline-flex items-center gap-1">
@@ -868,45 +1119,39 @@ export function HandwerkerDetailClient({
                 </span>
               </MockBadge>
             ) : null}
-            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
-              <span className="inline-flex items-center gap-1">
-                <MockIcon
-                  ctx="default"
-                  n={hasPortalAccount ? 'plug' : 'circle-x'}
-                  size={10}
-                />
-                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
-              </span>
-            </MockBadge>
           </>
         }
-        meta={
-          bewertungGesamt != null && bewertungGesamt > 0 ? (
-            <span className="rating inline-flex items-center gap-1">
-              <MockIcon
-                ctx="default"
-                n="star-filled"
-                size={12}
-                className="text-[var(--yel-tx,#c9a227)]"
-              />
-              {formatHandwerkerBewertung(bewertungGesamt)}
-            </span>
-          ) : undefined
-        }
-        actions={
-          <DetailActionsBar
-            sheetTitle="Partner"
-            primary={{
-              label: 'Bearbeiten',
-              icon: 'pencil',
-              onClick: () => {
-                setTab('stammdaten')
-                beginEditKontakt()
-              },
-            }}
-            menuItems={handwerkerMenuItems}
-          />
-        }
+        actions={<DetailActionsBar sheetTitle="Handwerker" menuItems={handwerkerMenuItems} />}
+      />
+
+      <NextStepBar
+        step={{
+          label:
+            wirtschaftSnap.aktiveEinsaetze > 0
+              ? `→ ${wirtschaftSnap.aktiveEinsaetze} Einsätze aktiv`
+              : '→ Keine aktiven Einsätze',
+          hint:
+            wirtschaftSnap.offenesVolumen > 0
+              ? `${Math.round(wirtschaftSnap.offenesVolumen).toLocaleString('de-DE')} € offen`
+              : undefined,
+        }}
+        metrics={[
+          {
+            label: 'Volumen',
+            value: `${Math.round(payload.stats.volumen || wirtschaftSnap.umsatz).toLocaleString('de-DE')} €`,
+          },
+          {
+            label: 'Bewertung',
+            value:
+              bewertungGesamt != null && bewertungGesamt > 0
+                ? formatHandwerkerBewertung(bewertungGesamt)
+                : '—',
+          },
+          {
+            label: 'Annahmequote',
+            value: payload.stats.quote != null ? `${payload.stats.quote} %` : '—',
+          },
+        ]}
       />
 
       <DetailShell

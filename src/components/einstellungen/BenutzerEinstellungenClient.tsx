@@ -3,7 +3,6 @@
 import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/app-toast'
@@ -11,11 +10,10 @@ import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/act
 import {
   inviteBenutzer,
   loadBenutzerListe,
-  setBenutzerAktiv,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 
-const COLS = '42px 2fr 1.5fr 1fr 90px'
+const COLS = '42px 2fr 1.5fr 1fr'
 
 function Sec({
   title,
@@ -128,18 +126,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     })
   }
 
-  function removeUser(u: BenutzerZeile) {
-    startTransition(async () => {
-      const r = await setBenutzerAktiv(u.id, false)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Teammitglied entfernt')
-      await refresh()
-    })
-  }
-
   return (
     <>
       <Sec
@@ -159,7 +145,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               <div>Name</div>
               <div>E-Mail</div>
               <div>Rolle</div>
-              <div />
             </div>
             {rows.map((u, i) => {
               const initials = initialsFromName(u.name, u.email)
@@ -167,12 +152,21 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               return (
                 <div
                   key={u.id}
+                  role="button"
+                  tabIndex={0}
                   className="list-row"
                   style={{
                     gridTemplateColumns: COLS,
-                    cursor: 'default',
+                    cursor: 'pointer',
                     alignItems: 'center',
                     opacity: u.aktiv ? 1 : 0.55,
+                  }}
+                  onClick={() => openEdit(u)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openEdit(u)
+                    }
                   }}
                 >
                   <div className={`avatar ${color}`.trim()} aria-hidden>
@@ -189,56 +183,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                   </div>
                   <div>
                     <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} className="row-actions always">
-                    <MockEntityRowMenu
-                      items={[
-                        {
-                          icon: 'pencil',
-                          label: 'Bearbeiten',
-                          onClick: () => openEdit(u),
-                        },
-                        {
-                          icon: 'user',
-                          label: 'Rolle ändern',
-                          onClick: () => openEdit(u),
-                        },
-                        {
-                          icon: 'mail',
-                          label: 'Mail schreiben',
-                          onClick: () => {
-                            if (u.email) window.open(`mailto:${u.email}`)
-                          },
-                        },
-                        'sep' as const,
-                        ...(u.aktiv
-                          ? [
-                              {
-                                icon: 'trash' as const,
-                                label: 'Entfernen',
-                                danger: true as const,
-                                onClick: () => removeUser(u),
-                              },
-                            ]
-                          : [
-                              {
-                                icon: 'check' as const,
-                                label: 'Aktivieren',
-                                onClick: () => {
-                                  startTransition(async () => {
-                                    const r = await setBenutzerAktiv(u.id, true)
-                                    if (!r.ok) {
-                                      toast.error(r.message)
-                                      return
-                                    }
-                                    toast.success('Wieder aktiviert')
-                                    await refresh()
-                                  })
-                                },
-                              },
-                            ]),
-                      ]}
-                    />
                   </div>
                 </div>
               )

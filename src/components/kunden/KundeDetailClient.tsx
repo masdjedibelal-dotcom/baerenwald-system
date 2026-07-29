@@ -19,6 +19,7 @@ import { TypBadge } from '@/components/kunden/TypBadge'
 import {
   initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
+  istKundeGewerbeTyp,
   istKundeHausverwaltungTyp,
   istKundeNurGewerbeTyp,
   kundeDisplayName,
@@ -29,6 +30,7 @@ import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
+import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import type { Kunde, KundenObjekt } from '@/lib/types'
 import {
   kundeNeueAnfrageHref,
@@ -39,6 +41,8 @@ import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
+import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
@@ -117,14 +121,7 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-type KundeDetailTab =
-  | 'uebersicht'
-  | 'objekte'
-  | 'organisation'
-  | 'stammdaten'
-  | 'vorgaenge'
-  | 'dokumente'
-  | 'notizen'
+type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'akte'
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -268,12 +265,32 @@ export function KundeDetailClient({
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const zeigtObjekteTab = istKundeHausverwaltungTyp(kunde.typ)
+  const zeigtObjekteTab = istKundeGewerbeTyp(kunde.typ)
+
+  const wirtschaftSnap = useMemo(() => buildKundeWirtschaft(kunde, 'all'), [kunde])
+
+  const letzterKontaktLabel = useMemo(() => {
+    const mails = kunde.email_logs ?? []
+    const latest = mails[0]?.created_at
+    if (!latest) return '—'
+    const d = new Date(latest)
+    if (Number.isNaN(d.getTime())) return '—'
+    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+    return `${days[d.getDay()]} · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+  }, [kunde.email_logs])
+
+  const kundeSeitLabel = useMemo(() => {
+    const raw = kunde.created_at
+    if (!raw) return null
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return null
+    return `Kunde seit ${d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}`
+  }, [kunde.created_at])
 
   function beginEditKontakt() {
     setEditErr(null)
     setEditForm(buildEditFormFromKunde(kunde))
-    setTab('stammdaten')
+    setTab('uebersicht')
     setEditingKontakt(true)
   }
 
@@ -618,42 +635,62 @@ export function KundeDetailClient({
     </InlineEditSection>
   )
 
-  const fixedOverview = <KundeWirtschaftlicheUebersicht kunde={kunde} />
-
-  const tabStammdaten = (
-    <>
-      {kontaktCard}
+  const fixedOverview = (
+    <div className="space-y-4">
+      <EntityKundenStammdatenCard
+        kundeId={kunde.id}
+        kundeTyp={kunde.typ}
+        hideKundeLink
+        initial={{
+          name: kundeDisplayName(kunde),
+          telefon: kunde.telefon ?? '',
+          email: kunde.email ?? '',
+          plz: kunde.plz ?? '',
+          ort: kunde.ort ?? '',
+          strasse:
+            [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
+            kunde.adresse ||
+            '',
+        }}
+        onSaved={() => refresh()}
+      />
       {zusatzfelderCard}
-    </>
+      <KundeWirtschaftlicheUebersicht kunde={kunde} />
+      {editingKontakt ? (
+        <div className="card">
+          <div className="card-b">{kontaktCard}</div>
+        </div>
+      ) : null}
+    </div>
   )
 
   const tabObjekte = zeigtObjekteTab ? (
     <KundenObjekteCard
       kundeId={kunde.id}
       objekte={kundenObjekte}
+      verwaltungName={kundeDisplayName(kunde)}
       orgKennung={kunde.org_kennung}
       onChanged={() => refresh()}
     />
   ) : null
 
-  const tabNotizen = (
-    <KundenNotizenTab
-      kundeId={kunde.id}
-      notizen={kunde.kunden_notizen ?? []}
-      legacyNotiz={kunde.notizen}
-      onReload={() => refresh()}
-    />
-  )
-
-  const tabDokumenteInhalt = (
-    <KundenDokumenteTab
-      kundeId={kunde.id}
-      dokumente={kunde.kunden_dokumente ?? []}
-      auftraege={kunde.auftraege ?? []}
-      leads={kunde.leads ?? []}
-      rechnungen={rechnungen}
-      onReload={() => refresh()}
-    />
+  const tabAkte = (
+    <div className="space-y-4">
+      <KundenDokumenteTab
+        kundeId={kunde.id}
+        dokumente={kunde.kunden_dokumente ?? []}
+        auftraege={kunde.auftraege ?? []}
+        leads={kunde.leads ?? []}
+        rechnungen={rechnungen}
+        onReload={() => refresh()}
+      />
+      <KundenNotizenTab
+        kundeId={kunde.id}
+        notizen={kunde.kunden_notizen ?? []}
+        legacyNotiz={kunde.notizen}
+        onReload={() => refresh()}
+      />
+    </div>
   )
 
   const kundeLeadIds = useMemo(
@@ -790,10 +827,11 @@ export function KundeDetailClient({
       render: () => fixedOverview,
     },
     {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => tabStammdaten,
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      count: kundeVorgaengeCount || undefined,
+      render: () => tabVorgaenge,
     },
     ...(zeigtObjekteTab
       ? [
@@ -806,37 +844,16 @@ export function KundeDetailClient({
           },
         ]
       : []),
-    ...(zeigtOrganisationTab
-      ? [
-          {
-            id: 'organisation' as const,
-            label: 'Organisation & Portal',
-            icon: 'plug',
-            render: () => tabOrganisation,
-          },
-        ]
-      : []),
     {
-      id: 'vorgaenge',
-      label: 'Vorgänge',
-      icon: 'folders',
-      count: kundeVorgaengeCount || undefined,
-      render: () => tabVorgaenge,
-    },
-    {
-      id: 'dokumente',
-      label: 'Dokumente',
-      icon: 'files',
-      count: dokumenteCount || undefined,
-      render: () => tabDokumenteInhalt,
-    },
-    {
-      id: 'notizen',
-      label: 'Notizen',
-      icon: 'messages',
+      id: 'akte',
+      label: 'Akte',
+      icon: 'file-text',
       count:
-        (kunde.kunden_notizen?.length ?? 0) || (kunde.notizen?.trim() ? 1 : 0) || undefined,
-      render: () => tabNotizen,
+        dokumenteCount ||
+        (kunde.kunden_notizen?.length ?? 0) ||
+        (kunde.notizen?.trim() ? 1 : 0) ||
+        undefined,
+      render: () => tabAkte,
     },
   ]
 
@@ -845,9 +862,15 @@ export function KundeDetailClient({
       <MockDetailBackLink href="/kunden" label="Zurück zu Kunden" />
       <DetailHead
         title={kundeDisplayName(kunde)}
+        titleBadges={
+          wirtschaftSnap.aktiveVorgaenge > 0 ? (
+            <MockBadge kind="aktiv">In Arbeit</MockBadge>
+          ) : null
+        }
         badges={
           <>
             <TypBadge typ={kunde.typ} />
+            {kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null}
             {istSpam ? (
               <MockBadge kind="storniert">
                 <span className="inline-flex items-center gap-1">
@@ -856,36 +879,48 @@ export function KundeDetailClient({
                 </span>
               </MockBadge>
             ) : null}
-            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
-              <span className="inline-flex items-center gap-1">
-                <MockIcon
-                  ctx="default"
-                  n={hasPortalAccount ? 'plug' : 'circle-x'}
-                  size={10}
-                />
-                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
-              </span>
-            </MockBadge>
           </>
         }
         actions={
-          <DetailActionsBar
-            sheetTitle="Kunde"
-            primary={{
-              label: 'Bearbeiten',
-              icon: 'pencil',
-              onClick: beginEditKontakt,
-            }}
-            menuItems={kundeMenuItems}
-          />
+          <DetailActionsBar sheetTitle="Kunde" menuItems={kundeMenuItems} />
         }
       />
 
-      <DetailShell
-        groups={detailShellGroups}
-        value={tab}
-        onChange={(id) => setTab(id as KundeDetailTab)}
+      <NextStepBar
+        step={{
+          label:
+            wirtschaftSnap.aktiveVorgaenge > 0
+              ? `→ ${wirtschaftSnap.aktiveVorgaenge} Vorgänge in Arbeit`
+              : '→ Keine offenen Vorgänge',
+          hint:
+            wirtschaftSnap.offenerBetrag > 0
+              ? `${Math.round(wirtschaftSnap.offenerBetrag).toLocaleString('de-DE')} € offen`
+              : 'keine offenen Posten',
+        }}
+        metrics={[
+          {
+            label: 'Umsatz',
+            value: `${Math.round(wirtschaftSnap.umsatz).toLocaleString('de-DE')} €`,
+          },
+          { label: 'Vorgänge', value: String(kundeVorgaengeCount) },
+          { label: 'Letzter Kontakt', value: letzterKontaktLabel },
+        ]}
       />
+
+      {zeigtOrganisationTab && tab === 'organisation' ? (
+        <div className="space-y-3">
+          <button type="button" className="btn ghost sm" onClick={() => setTab('uebersicht')}>
+            ← Zurück zur Übersicht
+          </button>
+          {tabOrganisation}
+        </div>
+      ) : (
+        <DetailShell
+          groups={detailShellGroups}
+          value={tab}
+          onChange={(id) => setTab(id as KundeDetailTab)}
+        />
+      )}
 
       <Modal
         open={portalModalOpen}

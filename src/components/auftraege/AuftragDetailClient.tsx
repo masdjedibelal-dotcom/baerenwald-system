@@ -3,7 +3,6 @@
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
@@ -11,20 +10,25 @@ import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
+import { entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { runDuplicateAuftrag } from '@/lib/list-actions'
-import { AuftragAuftragdetailsTab, AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
+import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
+import {
+  gewichteterFortschrittProzent,
+  normalizeLeistungStatus,
+} from '@/lib/auftraege/auftrag-fortschritt-preis'
+import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
 import {
   VorgangZahlungTab,
   type RechnungErstellenOpts,
 } from '@/components/vorgang/VorgangZahlungTab'
-import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
-import { AuftragKundenUpdatePanel } from '@/components/auftraege/AuftragKundenUpdatePanel'
 import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
@@ -32,10 +36,9 @@ import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { naechsterSchrittAuftrag } from '@/lib/crm/naechster-schritt'
-import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
+import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -61,7 +64,6 @@ import {
   type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
-  loadProjektVertragBootstrap,
   loadNachtragBootstrap,
   type ProjektVertragWizardBootstrap,
 } from '@/app/(dashboard)/vertraege/wizard-actions'
@@ -70,7 +72,7 @@ import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-he
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
-import { auftragHatZahlungOffen, auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
+import { auftragHatZahlungOffen, auftragSummenAusPositionen, parseZahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -79,21 +81,10 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { VorgangFotosTab } from '@/components/crm/VorgangFotosTab'
-import { ProjektHistorieTab } from '@/components/crm/ProjektHistorieTab'
-import { ZugehoerigListe } from '@/components/vorgang/ZugehoerigListe'
-import { PhaseCardsBlock } from '@/components/vorgang/PhaseCard'
-import { DetailSection } from '@/components/vorgang/DetailSection'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import {
-  loadAbnahmeprotokolleListe,
-  type AbnahmeprotokollListeEintrag,
-} from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
-import { collectVorgangFotos } from '@/lib/vorgang/vorgang-fotos'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
-import { updateAuftragNotizen, updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
+import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
 import {
   loadAngebotKorrekturWizardBootstrap,
   loadNachtragAngebotBootstrap,
@@ -378,14 +369,28 @@ export function AuftragDetailClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { refresh, generation } = useCrmRefresh()
+  const { refresh } = useCrmRefresh()
   const isMobile = useIsMobile()
-  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const [detail, setDetail] = useState(initial)
   const [, startTransition] = useTransition()
 
+  const kundeTel =
+    detail.kunden?.telefon?.trim() || _leadDetail?.kontakt_telefon?.trim() || ''
+  const kundeEmail =
+    detail.kunden?.email?.trim() || _leadDetail?.kontakt_email?.trim() || ''
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kundeTel,
+    email: kundeEmail,
+    notiz: {
+      kind: 'auftrag',
+      auftragId: detail.id,
+      initial: detail.notizen ?? '',
+    },
+    dokument: { kind: 'auftrag', auftragId: detail.id },
+    onSaved: () => refresh(),
+  })
+
   const [mainTab, setMainTab] = useState<AuftragDetailTab>(AUFTRAG_DETAIL_DEFAULT_TAB)
-  const [abnahmenListe, setAbnahmenListe] = useState<AbnahmeprotokollListeEintrag[]>([])
   // vorOrtFocus entfernt — kein Tagebuch-/Vor-Ort-Segment mehr (Phase 6)
 
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
@@ -481,16 +486,6 @@ export function AuftragDetailClient({
     setVertragWizardOpen(true)
   }, [])
 
-  const openNachunternehmervertrag = useCallback(() => {
-    startTransition(async () => {
-      const res = await loadProjektVertragBootstrap(detail.id)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      openVertragWizard(res.bootstrap)
-    })
-  }, [detail.id, openVertragWizard])
 
   const startNachtragWizard = useCallback(
     (parentVertragId: string) => {
@@ -620,26 +615,7 @@ export function AuftragDetailClient({
     'Auftrag'
   const posCount = auftragPositionenFuerSumme(detail.auftrag_positionen).length
 
-  const vorgangFotos = useMemo(
-    () =>
-      collectVorgangFotos({
-        funnelDaten: _leadDetail?.funnel_daten ?? lead?.funnel_daten,
-        angebotFotosRaw: angebotDetail?.fotos_urls,
-      }),
-    [_leadDetail?.funnel_daten, lead?.funnel_daten, angebotDetail?.fotos_urls]
-  )
 
-  const kundeAdresse = useMemo(() => {
-    const ag = _leadDetail?.auftraggeber
-    if (ag) {
-      const str = [ag.strasse, ag.hausnummer].filter(Boolean).join(' ').trim()
-      const ort = [ag.plz, ag.ort].filter(Boolean).join(' ').trim()
-      return [str, ort].filter(Boolean).join(', ')
-    }
-    const str = [kunde?.strasse, kunde?.hausnummer].filter(Boolean).join(' ').trim()
-    const ort = [kunde?.plz, kunde?.ort].filter(Boolean).join(' ').trim()
-    return [str, ort].filter(Boolean).join(', ') || kunde?.adresse?.trim() || ''
-  }, [kunde, _leadDetail])
 
   const istBauprojekt = useMemo(
     () =>
@@ -663,16 +639,141 @@ export function AuftragDetailClient({
     fallback: detail.titel?.trim() || formatAuftragsNr(detail),
   })
   const headMeta = useMemo(() => {
-    if (_leadDetail) {
-      const hv = leadKontaktAnzeigeName(_leadDetail, '')
-      if (hv) return hv
+    const parts: string[] = []
+    if (projektName) parts.push(projektName)
+    if (detail.created_at) parts.push(`erstellt ${formatDatum(detail.created_at)}`)
+    return parts.filter(Boolean).join(' · ')
+  }, [projektName, detail.created_at])
+
+  const freigabeAusstehend = (_leadDetail?.org_freigabe_status ?? '').trim() === 'ausstehend'
+
+  const positionenAktiv = useMemo(
+    () => auftragPositionenFuerSumme(detail.auftrag_positionen),
+    [detail.auftrag_positionen]
+  )
+  const leistungenErledigt = useMemo(
+    () =>
+      positionenAktiv.filter((p) => normalizeLeistungStatus(p.leistung_status) === 'erledigt')
+        .length,
+    [positionenAktiv]
+  )
+  const fortschrittPct = useMemo(() => {
+    if (positionenAktiv.length) return gewichteterFortschrittProzent(positionenAktiv)
+    return auftragFortschritt(detail)
+  }, [positionenAktiv, detail])
+
+  const auftragWertLabel = useMemo(() => {
+    const ap = auftragPositionenFuerSumme(detail.auftrag_positionen)
+    let netto = 0
+    if (ap.length) {
+      netto = auftragSummenAusPositionen(auftragPositionenToAngebotPositionen(ap)).netto
+    } else {
+      const ang0 = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+      const raw = (ang0 as { positionen?: unknown } | null)?.positionen
+      netto = auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
     }
-    const name =
-      detail.kunden?.name?.trim() ||
-      [detail.kunden?.vorname, detail.kunden?.nachname].filter(Boolean).join(' ').trim() ||
-      null
-    return name
-  }, [detail.kunden, _leadDetail])
+    const brutto = netto > 0 ? netto * (1 + leistungenMwstSatz / 100) : 0
+    return formatEurKurz(brutto > 0 ? brutto : null)
+  }, [detail.auftrag_positionen, detail.angebote, leistungenMwstSatz])
+
+  const handwerkerKurz = useMemo(() => {
+    const list = handwerkerAusAuftrag(detail)
+    if (!list.length) return null
+    return list[0]?.firma?.trim() || list[0]?.name || null
+  }, [detail])
+
+  const auftragDatumRange = useMemo(() => {
+    const start = detail.start_datum ? formatDatum(detail.start_datum) : null
+    const end = detail.end_datum
+      ? formatDatum(detail.end_datum)
+      : detail.created_at
+        ? formatDatum(detail.created_at)
+        : null
+    if (start && detail.end_datum) return `${start}–${formatDatum(detail.end_datum)}`
+    if (start && end && start !== end) return `${start}–${end}`
+    if (start) return start
+    if (detail.created_at) return formatDatum(detail.created_at)
+    return null
+  }, [detail.start_datum, detail.end_datum, detail.created_at])
+
+  const phasenExtras = useMemo(() => {
+    const auftragKopfParts = [auftragDatumRange, handwerkerKurz].filter(Boolean)
+    const aktiveRe = (projektKontext?.rechnungen ?? []).filter(
+      (r) => String(r.status).toLowerCase() !== 'storniert'
+    )
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    const plan = parseZahlungsplan(
+      (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+    )
+    const geplant = plan?.zeilen?.length ?? 0
+    const gestellt = aktiveRe.length
+    let rechnungKopf: string | undefined
+    if (gestellt > 0 && geplant > 0) rechnungKopf = `${gestellt} von ${geplant} gestellt`
+    else if (gestellt > 0) rechnungKopf = `${gestellt} gestellt`
+
+    const statusParts = Array.from(
+      new Set(
+        aktiveRe
+          .map((r) => {
+            const s = String(r.status).toLowerCase()
+            if (s === 'bezahlt') return 'Bezahlt'
+            if (s === 'gesendet' || s === 'versendet') return 'Versendet'
+            if (s === 'entwurf') return 'Entwurf'
+            if (s === 'ueberfaellig' || s === 'überfällig') return 'Überfällig'
+            return null
+          })
+          .filter(Boolean)
+      )
+    ) as string[]
+
+    const reBetrag = aktiveRe.reduce((s, r) => s + (r.brutto ?? 0), 0)
+
+    return {
+      auftrag: {
+        kopf: auftragKopfParts.length
+          ? auftragKopfParts.join(' · ')
+          : undefined,
+        sub:
+          positionenAktiv.length > 0
+            ? `${leistungenErledigt} von ${positionenAktiv.length} Leistungen erledigt`
+            : undefined,
+        betrag: auftragWertLabel !== '—' ? auftragWertLabel : null,
+        props: [
+          { k: 'Titel', v: detail.titel?.trim() || projektName || '—' },
+          {
+            k: 'Zeitraum',
+            v: auftragDatumRange || (detail.created_at ? formatDatum(detail.created_at) : '—'),
+          },
+          { k: 'Status', v: auftragStatus.label },
+          ...(handwerkerKurz ? [{ k: 'Handwerker', v: handwerkerKurz }] : []),
+          {
+            k: 'Leistungen',
+            v: positionenAktiv.length
+              ? `${leistungenErledigt} von ${positionenAktiv.length} erledigt`
+              : '—',
+          },
+          { k: 'Auftragswert', v: auftragWertLabel },
+        ],
+      },
+      rechnung: {
+        kopf: rechnungKopf,
+        sub: statusParts.length ? statusParts.join(' · ') : undefined,
+        betrag: gestellt > 0 ? formatEurKurz(reBetrag) : null,
+      },
+    }
+  }, [
+    auftragDatumRange,
+    handwerkerKurz,
+    projektKontext?.rechnungen,
+    detail.angebote,
+    detail.titel,
+    detail.created_at,
+    positionenAktiv.length,
+    leistungenErledigt,
+    auftragWertLabel,
+    auftragStatus.label,
+    projektName,
+  ])
 
   const istAbgeschlossen = detail.status === 'abgeschlossen'
   const istStorniert = detail.status === 'storniert'
@@ -680,135 +781,62 @@ export function AuftragDetailClient({
   const nachtragCtaAktiv =
     istBauprojekt && hauptvertraegeFuerNachtrag.length > 0 && !istStorniert
 
-  /** Nur Aktionen, die nicht schon über Header-CTA oder Detail-Tabs erreichbar sind */
+  /** Mock ⋯: Abnahme · Abschlussbericht · Kopieren · Nachtrag · Löschen */
   const aktionenMenuItems = useMemo(() => {
-    const extras: EntityMenuItem[] = [
-      ...(detail.angebot_id
-        ? ([
-            {
-              icon: 'file-pencil',
-              label: 'Angebot korrigieren',
-              onClick: openAngebotKorrektur,
-            },
-            {
-              icon: 'file-plus',
-              label: 'Nachtrag erstellen',
-              onClick: openNachtragAngebot,
-            },
-          ] as EntityMenuItem[])
-        : []),
-      ...(istBauprojekt
-        ? ([
-            {
-              icon: 'file-pencil',
-              label: 'Nachunternehmervertrag',
-              onClick: () => openNachunternehmervertrag(),
-            },
-            ...(hauptvertraegeFuerNachtrag.length
-              ? [
-                  {
-                    icon: 'file-pencil',
-                    label: 'Nachträge (Abschluss)',
-                    onClick: () => goZuNachtragAbschluss(),
-                  },
-                ]
-              : []),
-          ] as EntityMenuItem[])
-        : []),
-      ...(String(detail.kostentraeger ?? '').trim() === 'versicherung'
-        ? ([
-            {
-              icon: 'shield-check',
-              label: 'Versicherungsakte erzeugen',
-              onClick: () => {
-                startTransition(async () => {
-                  const r = await erzeugeVersicherungsaktePdf(detail.id)
-                  if (!r.ok) toast.error(r.message)
-                  else {
-                    toast.success('Versicherungsakte erstellt')
-                    refresh()
-                  }
-                })
-              },
-            },
-          ] as EntityMenuItem[])
-        : []),
-      ...(!istAbgeschlossen && !istStorniert
-        ? ([
-            {
-              icon: 'x',
-              label: 'Auftrag stornieren',
-              danger: true,
-              onClick: () => {
-                if (
-                  !window.confirm(
-                    'Auftrag wirklich stornieren? Der Status wird auf „storniert“ gesetzt.'
-                  )
-                ) {
-                  return
-                }
-                startTransition(async () => {
-                  const r = await updateAuftragStatusFromUi(detail.id, 'storniert')
-                  if (!r.ok) {
-                    toast.error(r.message)
-                    return
-                  }
-                  toast.success('Auftrag storniert')
-                  refresh()
-                })
-              },
-            },
-          ] as EntityMenuItem[])
-        : []),
-    ]
-
-    return entityMenuToActionItems(
-      buildEntityMenu(
-        'auftrag',
-        {
-          name: projektName,
-          status: detail.status,
-          customer: {
-            name: detail.kunden?.name ?? undefined,
-          },
-        },
-        {
-          onCopy: () => runDuplicateAuftrag(detail.id, router),
-          onDelete: detail.lead_id
-            ? () => {
-                void deleteVorgang(detail.lead_id!).then((r) => {
-                  if (!r.ok) toast.error(r.message)
-                  else {
-                    toast.success('Vorgang gelöscht')
-                    router.push('/vorgaenge?tab=auftrag')
-                  }
-                })
+    const items: EntityMenuItem[] = []
+    if (!istAbgeschlossen && !istStorniert) {
+      items.push({
+        icon: 'clipboard-list',
+        label: 'Abnahme starten',
+        onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+      })
+    }
+    items.push({
+      icon: 'file-text',
+      label: 'Abschlussbericht erstellen',
+      onClick: () => router.push(`/auftraege/${detail.id}/abschluss`),
+    })
+    items.push({
+      icon: 'copy',
+      label: 'Kopieren',
+      onClick: () => runDuplicateAuftrag(detail.id, router),
+    })
+    if (detail.angebot_id) {
+      items.push({
+        icon: 'file-plus',
+        label: 'Nachtrag anlegen',
+        onClick: openNachtragAngebot,
+      })
+    }
+    if (detail.lead_id) {
+      items.push('sep')
+      items.push({
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () =>
+          confirmDelete(projektName, () => {
+            void deleteVorgang(detail.lead_id!).then((r) => {
+              if (!r.ok) toast.error(r.message)
+              else {
+                toast.success('Vorgang gelöscht')
+                router.push('/vorgaenge?tab=auftrag')
               }
-            : undefined,
-          deleteLabel: projektName,
-          extra: extras,
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+            })
+          }),
+      })
+    }
+    return entityMenuToActionItems(items, (n, size) =>
+      mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
     )
   }, [
-    detail.angebot_id,
     detail.id,
-    detail.kunden?.name,
-    detail.status,
-    detail.kostentraeger,
+    detail.angebot_id,
     detail.lead_id,
-    hauptvertraegeFuerNachtrag.length,
-    openAngebotKorrektur,
-    openNachtragAngebot,
-    goZuNachtragAbschluss,
-    openNachunternehmervertrag,
-    router,
-    refresh,
-    startTransition,
-    istBauprojekt,
     istAbgeschlossen,
     istStorniert,
+    openNachtragAngebot,
+    router,
     projektName,
   ])
 
@@ -827,16 +855,6 @@ export function AuftragDetailClient({
     <AuftragStammdatenCard
       detail={detail}
       lead={_leadDetail ?? null}
-      onSaved={() => refresh()}
-    />
-  )
-
-  const auftragdetailsInhalt = (
-    <AuftragAuftragdetailsTab
-      detail={detail}
-      lead={lead}
-      team={team}
-      editable={detail.status !== 'storniert'}
       onSaved={() => refresh()}
     />
   )
@@ -883,10 +901,6 @@ export function AuftragDetailClient({
       }),
     [detail.status, rechnungenListe, auftragNettoSumme]
   )
-
-  useEffect(() => {
-    void loadAbnahmeprotokolleListe(detail.id).then(setAbnahmenListe)
-  }, [detail.id, generation])
 
   useEffect(() => {
     const rawTab = searchParams.get('tab')
@@ -953,21 +967,13 @@ export function AuftragDetailClient({
 
   const uebersichtInhalt = (
     <div className="space-y-6">
-      <PhaseCardsBlock
-        kontext={projektKontext}
-        fromRef={{ kind: 'auftrag', id: detail.id }}
-      />
       {stammdatenInhalt}
-      {auftragdetailsInhalt}
-      {vorgangFotos.length > 0 ? (
-        <DetailSection title="Fotos">
-          <VorgangFotosTab fotos={vorgangFotos} />
-        </DetailSection>
-      ) : null}
-      <ZugehoerigListe
+      <VorgangPhasenVerlauf
         kontext={projektKontext}
-        abnahmen={abnahmenListe}
         fromRef={{ kind: 'auftrag', id: detail.id }}
+        lead={_leadDetail}
+        extras={phasenExtras}
+        onSaved={() => refresh()}
       />
     </div>
   )
@@ -1035,17 +1041,7 @@ export function AuftragDetailClient({
       label: entityDetailTabLabel('aktivitaet'),
       icon: 'history',
       count: timelineCount || undefined,
-      render: () => (
-        <div className="space-y-6">
-          <AuftragKundenUpdatePanel
-            detail={detail}
-            leadStatus={_leadDetail?.status ?? null}
-            onChanged={() => refresh()}
-          />
-          <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />
-          <ProjektHistorieTab kontext={projektKontext} />
-        </div>
-      ),
+      render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
     },
   ]
 
@@ -1054,63 +1050,43 @@ export function AuftragDetailClient({
       phase="auftrag"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=auftrag&lifecycle=offen"
-      crumbBackLabel="Zurück zu Vorgängen"
+      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbSectionLabel="Aufträge"
+      breadcrumbTitle={projektName}
       className="space-y-4 pb-0"
       wiedervorlageDatum={detail.wiedervorlage_datum}
       wiedervorlageNotiz={detail.wiedervorlage_notiz}
       wiedervorlageEntity="auftrag"
       wiedervorlageEntityId={detail.id}
       onWiedervorlageSaved={() => refresh()}
+      banner={
+        <AuftragNotfallBanner
+          istNotfall={Boolean(detail.ist_notfall)}
+          verguetung={detail.notfall_verguetung}
+        />
+      }
       nextStepMetrics={[
-        { label: 'Positionen', value: String(posCount) },
-        { label: 'Status', value: auftragStatus.label },
-        { label: 'Zahlung', value: zahlungOffen ? 'offen' : 'ok' },
+        {
+          label: 'Auftragswert',
+          value: auftragWertLabel !== '—' ? auftragWertLabel : '—',
+        },
+        { label: 'Fortschritt', value: `${fortschrittPct} %` },
+        { label: 'Leistungen', value: String(posCount) },
       ]}
-      quickBar={[
-        {
-          id: 'call',
-          label: 'Anrufen',
-          icon: 'phone',
-          disabled: !detail.kunden?.telefon?.trim() && !_leadDetail?.kontakt_telefon?.trim(),
-          onClick: () => {
-            const tel =
-              detail.kunden?.telefon?.trim() || _leadDetail?.kontakt_telefon?.trim() || ''
-            if (tel) window.open(`tel:${tel.replace(/\s/g, '')}`)
-          },
-        },
-        {
-          id: 'mail',
-          label: 'Mail',
-          icon: 'mail',
-          disabled: !detail.kunden?.email?.trim(),
-          onClick: () =>
-            mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id)),
-        },
-        {
-          id: 'notiz',
-          label: 'Notiz',
-          icon: 'messages',
-          onClick: () => setMainTab('akte'),
-        },
-        {
-          id: 'foto',
-          label: 'Foto',
-          icon: 'camera',
-          onClick: () => setMainTab('uebersicht'),
-        },
-      ]}
+      quickBar={quickBar}
       nextStep={naechsterSchrittAuftrag({
         status: detail.status,
         istStorniert,
         istAbgeschlossen,
       })}
+      onNextStepClick={() => setMainTab('leistungen')}
       head={{
-        title: projektName,
+        title: name,
+        titleBadges: freigabeAusstehend ? (
+          <StatusBadge status="termin" label="Wartet auf Freigabe" />
+        ) : null,
         badges: (
-          <>
-            <StatusBadge status={detail.status} label={auftragStatus.label} />
-            {zahlungOffen ? <StatusBadge status="gesendet" label="Zahlung offen" /> : null}
-          </>
+          <StatusBadge status={detail.status} label={auftragStatus.label} />
         ),
         meta: headMeta,
         actions: (
@@ -1148,10 +1124,6 @@ export function AuftragDetailClient({
         ),
       }}
     >
-      <AuftragNotfallBanner
-        istNotfall={Boolean(detail.ist_notfall)}
-        verguetung={detail.notfall_verguetung}
-      />
       {nachtragCtaAktiv ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <p className="text-[length:var(--fs-text)] text-muted">
@@ -1254,7 +1226,7 @@ export function AuftragDetailClient({
         onSaved={() => refresh()}
       />
 
-      {mailCompose.modal}
+      {quickActionSheets}
 
       {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
         <AngebotWizard

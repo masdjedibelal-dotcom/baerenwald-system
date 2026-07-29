@@ -20,6 +20,15 @@ export type RateDrawerReklamation = {
   grund?: string | null
 }
 
+export type RateDrawerBeleg = {
+  id: string
+  nummer: string
+  status: string
+  statusLabel: string
+  belegTyp?: string | null
+  brutto?: number | null
+}
+
 export type RateDrawerRate = {
   id: string
   label: string
@@ -30,6 +39,8 @@ export type RateDrawerRate = {
   reNr?: string | null
   rechnungId?: string | null
   reklamation?: RateDrawerReklamation | null
+  /** Alle Belege zu dieser Rate (Original + Korrekturen/Gutschriften) */
+  belege?: RateDrawerBeleg[]
 }
 
 export type RateDrawerCta = {
@@ -54,7 +65,7 @@ function sec(title: string, icon: string, body: ReactNode) {
 }
 
 /**
- * Phase 7 — RateDrawer: Lese-Abschnitte + Footer-CTAs (EditorSheet).
+ * Phase 7 — RateDrawer: Lese-Abschnitte + Footer-CTAs (EditorSheet rechts).
  * Spec §9 / Mock ZahlplanCard.
  */
 export function RateDrawer({
@@ -85,6 +96,10 @@ export function RateDrawer({
     r.status === 'gestellt' &&
     Boolean(r.faellig) &&
     new Date(String(r.faellig).slice(0, 10)) < new Date(new Date().toDateString())
+  const belege = r.belege ?? []
+  const aktivBeleg = belege.find((b) => b.id === r.rechnungId) ?? belege[0] ?? null
+  const crumbNr = (aktivBeleg?.nummer || r.reNr || '').trim()
+  const sheetCrumb = crumbNr ? `${crumbNr} >` : null
 
   const footer =
     ctas.length > 0 ? (
@@ -124,7 +139,7 @@ export function RateDrawer({
       open={open}
       onClose={onClose}
       title={r.label || 'Abschlag'}
-      subtitle={r.reNr || null}
+      crumb={sheetCrumb}
       footer={footer}
       size="lg"
     >
@@ -137,9 +152,7 @@ export function RateDrawer({
             <MockProp label="Anteil">{r.prozent} % der Auftragssumme</MockProp>
           ) : null}
           <MockProp label="Betrag">
-            <span style={{ color: 'var(--green)', fontWeight: 600 }}>
-              {formatEurBetrag(r.betrag)}
-            </span>
+            <span className="rate-drawer-betrag">{formatEurBetrag(r.betrag)}</span>
           </MockProp>
           <MockProp label="Fällig">
             {r.faellig ? formatDatum(String(r.faellig).slice(0, 10)) : '—'}
@@ -150,14 +163,45 @@ export function RateDrawer({
       {sec(
         'Rechnung',
         'file-invoice',
-        r.status === 'geplant' ? (
+        r.status === 'geplant' && belege.length === 0 ? (
           <div className="rate-drawer-empty">Noch nicht gestellt.</div>
+        ) : belege.length > 1 ? (
+          <div className="rate-drawer-belege">
+            <div className="rate-drawer-belege__count">{belege.length} Belege</div>
+            <ul className="rate-drawer-belege__list">
+              {belege.map((b) => (
+                <li key={b.id} className="rate-drawer-belege__row">
+                  <div className="rate-drawer-belege__main">
+                    <span className="rate-drawer-belege__nr">
+                      {b.nummer || '—'}
+                      {String(b.belegTyp ?? '') === 'gutschrift' ? ' · Gutschrift' : ''}
+                    </span>
+                    {b.brutto != null ? (
+                      <span className="rate-drawer-belege__brutto">
+                        {formatEurBetrag(b.brutto)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <StatusBadge status={b.status} label={b.statusLabel} />
+                </li>
+              ))}
+            </ul>
+            {r.status === 'bezahlt' ? (
+              <div className="rate-drawer-note">Bezahlt — Korrektur nur per Gutschrift.</div>
+            ) : r.status === 'gestellt' ? (
+              <div className="rate-drawer-note">Änderbar bis Zahlungseingang.</div>
+            ) : null}
+          </div>
         ) : (
           <>
             <div className="props">
-              <MockProp label="Nummer">{r.reNr || '—'}</MockProp>
+              <MockProp label="Nummer">{aktivBeleg?.nummer || r.reNr || '—'}</MockProp>
               <MockProp label="Status">
-                {r.status === 'bezahlt' ? 'Bezahlt' : 'Gestellt'}
+                {r.status === 'bezahlt'
+                  ? 'Bezahlt'
+                  : r.status === 'gestellt'
+                    ? 'Gestellt'
+                    : aktivBeleg?.statusLabel || '—'}
               </MockProp>
               <MockProp label="Änderbar">
                 {r.status === 'bezahlt' ? 'nur per Gutschrift' : 'direkt bearbeitbar'}
@@ -178,7 +222,7 @@ export function RateDrawer({
         r.status === 'bezahlt' ? (
           <div className="props">
             <MockProp label="Eingang">
-              <span style={{ color: 'var(--green)', fontWeight: 600 }}>Vollständig bezahlt</span>
+              <span className="rate-drawer-paid">✓ Vollständig bezahlt</span>
             </MockProp>
           </div>
         ) : (
@@ -212,24 +256,15 @@ export function RateDrawer({
             'Mahnungen',
             'alert-triangle',
             mahnungen.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div className="rate-drawer-mahnungen">
                 {mahnungen.map((m) => (
-                  <div
-                    key={m.stufe}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 9,
-                      padding: '8px 0',
-                      borderTop: '0.5px solid var(--border)',
-                    }}
-                  >
+                  <div key={m.stufe} className="rate-drawer-mahnung">
                     <StatusBadge
                       status="ueberfaellig"
                       label={`Stufe ${m.stufe}`}
                       tone="rot"
                     />
-                    <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                    <span>
                       gesendet {formatDatum(String(m.datum).slice(0, 10))}
                     </span>
                   </div>

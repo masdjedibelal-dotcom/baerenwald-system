@@ -26,6 +26,8 @@ export type EditorSheetProps = {
   title: string
   /** Optional Untertitel (z. B. Rechnungsnummer im RateDrawer) */
   subtitle?: string | null
+  /** Breadcrumb über dem Titel (Mock: „Elektrik >“) */
+  crumb?: string | null
   /** detail | canvas — Desktop immer Slide-over (Spec §6: keine Center-Modals) */
   context?: EditorSheetContext
   children: ReactNode
@@ -58,6 +60,7 @@ export function EditorSheet({
   onClose,
   title,
   subtitle,
+  crumb,
   context: _context = 'detail',
   children,
   dirty = false,
@@ -205,6 +208,8 @@ export function EditorSheet({
         'editor-sheet',
         `editor-sheet--${layout}`,
         size === 'lg' && 'editor-sheet--lg',
+        /* Fallback falls CSS-Build margin/justify droppt: Panel rechts ankern */
+        layout === 'slide' && 'absolute right-0 top-0 ml-auto',
         className
       )}
       role="dialog"
@@ -221,6 +226,14 @@ export function EditorSheet({
         className="editor-sheet__header"
         {...(layout === 'bottom' ? dragZoneProps : {})}
       >
+        <div className="editor-sheet__title-block">
+          {crumb ? <span className="editor-sheet__crumb">{crumb}</span> : null}
+          <h2 id={titleId} className="editor-sheet__title">
+            {title}
+          </h2>
+          {subtitle ? <p className="editor-sheet__subtitle">{subtitle}</p> : null}
+        </div>
+        <div className="editor-sheet__header-end">{end}</div>
         <button
           type="button"
           className="editor-sheet__icon-btn"
@@ -229,13 +242,6 @@ export function EditorSheet({
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
-        <div className="editor-sheet__title-block">
-          <h2 id={titleId} className="editor-sheet__title">
-            {title}
-          </h2>
-          {subtitle ? <p className="editor-sheet__subtitle">{subtitle}</p> : null}
-        </div>
-        <div className="editor-sheet__header-end">{end}</div>
       </header>
       <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
       {footer ? <div className="editor-sheet__footer">{footer}</div> : null}
@@ -248,6 +254,7 @@ export function EditorSheet({
         className={cn(
           'editor-sheet-overlay',
           `editor-sheet-overlay--${layout}`,
+          layout === 'slide' && 'justify-end',
           overlayClassName
         )}
         role="presentation"

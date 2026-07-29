@@ -16,7 +16,8 @@ import type { LeistungMangelAnzeige, LeistungRow } from '@/components/leistungen
 function mengeLabel(menge: number | null | undefined, einheit: string | null | undefined): string {
   const e = einheit?.trim() || ''
   const m = menge ?? 1
-  if (e.toLowerCase() === 'pauschal' || m === 1) return e || 'pauschal'
+  if (e.toLowerCase() === 'pauschal') return `${m} pauschal`
+  if (!e) return String(m)
   return `${m} ${e}`.trim()
 }
 
@@ -62,23 +63,28 @@ export function leistungenFromAngebotPositionen(
   statusFallback: { status: string; statusLabel: string } = {
     status: 'entwurf',
     statusLabel: 'Entwurf',
-  }
+  },
+  opts?: { eigenleistungSubline?: boolean }
 ): LeistungRow[] {
   return positionen.map((p) => {
     const name = p.leistung_name?.trim() || p.leistung?.trim() || 'Position'
     const preis = angebotPreis(p)
+    const hw = p.handwerker_name?.trim() || null
+    const subline = opts?.eigenleistungSubline
+      ? hw || 'Eigenleistung'
+      : p.gewerk_name?.trim() || null
     return {
       id: p.id,
       bezeichnung: name,
-      subline: p.gewerk_name?.trim() || null,
+      subline,
       mengeLabel: mengeLabel(p.menge, p.einheit),
       preisLabel: preis > 0 ? formatEurBetrag(preis) : '—',
       preisValue: preis,
       status: statusFallback.status,
       statusLabel: statusFallback.statusLabel,
       beschreibung: p.beschreibung?.trim() || null,
-      gewerkName: p.gewerk_name?.trim() || null,
-      handwerkerName: p.handwerker_name?.trim() || null,
+      gewerkName: p.gewerk_name?.trim() || 'Allgemein',
+      handwerkerName: hw,
       handwerkerId: p.handwerker_id ?? null,
     }
   })
@@ -92,32 +98,63 @@ export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): 
     .map((p) => {
       const st = normalizeLeistungStatus(p.leistung_status)
       const vk = Math.max(0, p.preis_fix ?? 0)
+      const menge = Math.max(1, p.menge ?? 1)
+      const einzel = menge > 0 ? Math.round((vk / menge) * 100) / 100 : vk
       const notizen = (p.auftrag_position_notizen ?? [])
         .map((n) => ({
           at: n.datum || n.created_at || null,
           text: (n.text ?? '').trim(),
         }))
         .filter((n) => n.text)
+      const hwName = p.handwerker?.name?.trim() || null
+      const hwStatus = String(p.handwerker_status ?? '').toLowerCase()
+      let anfrageStatusLabel: string | null = null
+      if (hwStatus.includes('anfrag') || hwStatus === 'pending' || hwStatus === 'wartend') {
+        anfrageStatusLabel = 'Angefragt'
+      } else if (hwStatus.includes('angenommen') || hwStatus === 'accepted') {
+        anfrageStatusLabel = 'Angenommen'
+      } else if (hwName) {
+        anfrageStatusLabel = 'Zugewiesen'
+      }
+
+      const statusLabel =
+        st === 'erledigt' ? 'Abgenommen' : leistungStatusLabel(st)
+
+      const subParts: string[] = []
+      if (hwName) subParts.push(hwName)
+      if (st === 'in_arbeit' && p.gestartet_am) {
+        subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
+      } else if (st === 'erledigt') {
+        subParts.push('dokumentiert · abgenommen')
+      } else if (st === 'offen' && !hwName) {
+        subParts.push('noch nicht zugewiesen')
+      }
+
       return {
         id: p.id,
         bezeichnung: p.leistung_name?.trim() || 'Leistung',
-        subline: p.gewerk_name?.trim() || null,
+        subline: subParts.length ? subParts.join(' · ') : p.gewerk_name?.trim() || null,
         mengeLabel: mengeLabel(p.menge, p.einheit),
         preisLabel: vk > 0 ? formatEurBetrag(vk) : '—',
         preisValue: vk,
-        status: st,
-        statusLabel: leistungStatusLabel(st),
+        einzelpreisLabel: einzel > 0 ? formatEurBetrag(einzel) : null,
+        status: st === 'erledigt' ? 'abgenommen' : st,
+        statusLabel,
         beschreibung: richTextToPlain(p.beschreibung) || null,
         gewerkName: p.gewerk_name?.trim() || null,
-        handwerkerName: p.handwerker?.name?.trim() || null,
+        handwerkerName: hwName,
         handwerkerId: p.handwerker_id,
+        anfrageStatusLabel,
         zeitraumLabel: formatZeitraumKurz(p) || null,
         ekLabel:
           p.preis_partner != null && p.preis_partner > 0
             ? formatEurBetrag(p.preis_partner)
             : null,
         dokumentationEintraege: notizen,
-        abnahmeLabel: st === 'erledigt' ? 'Zur Abnahme bereit' : null,
+        abnahmeLabel:
+          st === 'erledigt'
+            ? 'Abgenommen'
+            : 'Noch nicht abgenommen — Ergebnis und Notiz fließen ins Abnahmedokument.',
       }
     })
 }
@@ -130,8 +167,14 @@ function heuteYmd(): string {
 }
 
 /** Mängel für die Karte über der Tabelle (Frist + Status offen/überfällig/behoben). */
-export function maengelFuerLeistungenTab(maengel: AbnahmeMangel[]): LeistungMangelAnzeige[] {
+export function maengelFuerLeistungenTab(
+  maengel: AbnahmeMangel[],
+  punkte?: { id: string; gewerk?: string | null }[] | null
+): LeistungMangelAnzeige[] {
   const today = heuteYmd()
+  const gewerkByPunkt = new Map(
+    (punkte ?? []).map((p) => [p.id, (p.gewerk ?? '').trim() || null] as const)
+  )
   return maengel.map((m) => {
     const offen = isMangelOffen(m)
     const frist = m.frist?.trim()?.slice(0, 10) || null
@@ -152,7 +195,8 @@ export function maengelFuerLeistungenTab(maengel: AbnahmeMangel[]): LeistungMang
       text: m.beschreibung?.trim() || 'Mangel',
       frist,
       status,
-      statusLabel: frist ? `${statusLabel} · Frist ${formatDatum(frist)}` : statusLabel,
+      statusLabel,
+      gewerk: gewerkByPunkt.get(m.punkt_id) ?? null,
     }
   })
 }

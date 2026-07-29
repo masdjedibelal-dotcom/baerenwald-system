@@ -1,63 +1,81 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
-import { suggestMeldeSlugFromTitel } from '@/lib/org/slug'
+import { createObjektEinheit } from '@/app/actions/objektakte-actions'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
 
+type DraftEinheit = {
+  key: string
+  bezeichnung: string
+  flaeche: string
+}
+
+function parseStrasseNr(raw: string): { strasse: string; hausnummer: string } {
+  const t = raw.trim()
+  if (!t) return { strasse: '', hausnummer: '' }
+  const m = t.match(/^(.*?)[,\s]+(\d+\s*[a-zA-Z]?)$/)
+  if (m) return { strasse: m[1]!.trim(), hausnummer: m[2]!.trim() }
+  return { strasse: t, hausnummer: '' }
+}
+
+function formatStrasseNr(strasse: string | null | undefined, nr: string | null | undefined): string {
+  return [strasse?.trim(), nr?.trim()].filter(Boolean).join(' ')
+}
+
+/** Mock-Parität: Objekt anlegen — Objektdaten + Wohneinheiten. */
 export function KundenObjektModal({
   open,
   onClose,
   kundeId,
+  verwaltungName,
   editObjekt,
   onSaved,
 }: {
   open: boolean
   onClose: () => void
   kundeId: string
+  /** Anzeigename der Verwaltung (Kunde) */
+  verwaltungName?: string
   editObjekt?: KundenObjekt | null
   onSaved: (objekt: KundenObjekt) => void
 }) {
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
-  const [strasse, setStrasse] = useState('')
-  const [hausnummer, setHausnummer] = useState('')
+  const [strasseNr, setStrasseNr] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
-  const [meldeSlug, setMeldeSlug] = useState('')
-  const [meldeAktiv, setMeldeAktiv] = useState(true)
-  const [einheitenHinweis, setEinheitenHinweis] = useState('')
-  const [notizenIntern, setNotizenIntern] = useState('')
+  const [baujahr, setBaujahr] = useState('')
+  const [gesamtflaeche, setGesamtflaeche] = useState('')
+  const [einheiten, setEinheiten] = useState<DraftEinheit[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+
+  const isEdit = Boolean(editObjekt)
 
   useEffect(() => {
     if (!open) return
     if (editObjekt) {
       setTitel(editObjekt.titel ?? '')
-      setStrasse(editObjekt.strasse ?? '')
-      setHausnummer(editObjekt.hausnummer ?? '')
+      setStrasseNr(formatStrasseNr(editObjekt.strasse, editObjekt.hausnummer))
       setPlz(editObjekt.plz ?? '')
       setOrt(editObjekt.ort ?? '')
-      setMeldeSlug(editObjekt.melde_slug ?? '')
-      setMeldeAktiv(editObjekt.melde_aktiv !== false)
-      setEinheitenHinweis(editObjekt.einheiten_hinweis ?? '')
-      setNotizenIntern(editObjekt.notizen_intern ?? '')
+      setBaujahr('')
+      setGesamtflaeche('')
+      setEinheiten([])
     } else {
       setTitel('')
-      setStrasse('')
-      setHausnummer('')
+      setStrasseNr('')
       setPlz('')
       setOrt('')
-      setMeldeSlug('')
-      setMeldeAktiv(true)
-      setEinheitenHinweis('')
-      setNotizenIntern('')
+      setBaujahr('')
+      setGesamtflaeche('')
+      setEinheiten([])
     }
     setErr(null)
     setDirty(false)
@@ -68,25 +86,59 @@ export function KundenObjektModal({
     setDirty(true)
   }
 
-  function vorschlagSlug() {
-    const basis = titel.trim() || [strasse, hausnummer, plz].filter(Boolean).join(' ')
-    if (!basis) return
-    mark(setMeldeSlug, suggestMeldeSlugFromTitel(basis))
+  const flaecheSumme = useMemo(() => {
+    let sum = 0
+    for (const e of einheiten) {
+      const n = Number(String(e.flaeche).replace(',', '.'))
+      if (Number.isFinite(n)) sum += n
+    }
+    const g = Number(String(gesamtflaeche).replace(',', '.'))
+    if (Number.isFinite(g) && g > 0) return { min: 0, max: g }
+    return { min: 0, max: sum }
+  }, [einheiten, gesamtflaeche])
+
+  function addEinheit() {
+    mark(setEinheiten, [
+      ...einheiten,
+      { key: `e-${Date.now()}-${einheiten.length}`, bezeichnung: '', flaeche: '' },
+    ])
+  }
+
+  function patchEinheit(key: string, patch: Partial<DraftEinheit>) {
+    mark(
+      setEinheiten,
+      einheiten.map((e) => (e.key === key ? { ...e, ...patch } : e))
+    )
+  }
+
+  function removeEinheit(key: string) {
+    mark(
+      setEinheiten,
+      einheiten.filter((e) => e.key !== key)
+    )
   }
 
   function speichern() {
     setErr(null)
+    const { strasse, hausnummer } = parseStrasseNr(strasseNr)
+    const hinweisParts: string[] = []
+    if (baujahr.trim()) hinweisParts.push(`Baujahr: ${baujahr.trim()}`)
+    if (gesamtflaeche.trim()) hinweisParts.push(`Gesamtfläche: ${gesamtflaeche.trim()} m²`)
+
     const payload = {
       titel,
       strasse,
-      hausnummer,
+      hausnummer: hausnummer || null,
       plz,
       ort,
-      melde_slug: meldeSlug || null,
-      melde_aktiv: meldeAktiv,
-      einheiten_hinweis: einheitenHinweis || null,
-      notizen_intern: notizenIntern || null,
+      melde_slug: editObjekt?.melde_slug ?? null,
+      melde_aktiv: editObjekt?.melde_aktiv !== false,
+      einheiten_hinweis: hinweisParts.length
+        ? hinweisParts.join(' · ')
+        : editObjekt?.einheiten_hinweis ?? null,
+      notizen_intern: editObjekt?.notizen_intern ?? null,
     }
+
     startTransition(async () => {
       if (editObjekt) {
         const r = await updateKundenObjekt(editObjekt.id, kundeId, payload)
@@ -101,106 +153,191 @@ export function KundenObjektModal({
           hausnummer: hausnummer.trim() || null,
           plz: plz.trim() || null,
           ort: ort.trim() || null,
-          melde_slug: meldeSlug.trim() || null,
-          melde_aktiv: meldeAktiv,
-          einheiten_hinweis: einheitenHinweis.trim() || null,
-          notizen_intern: notizenIntern.trim() || null,
+          einheiten_hinweis: payload.einheiten_hinweis,
         })
         toast.success('Gespeichert')
         setDirty(false)
         onClose()
         return
       }
+
       const r = await createKundenObjekt(kundeId, payload)
       if (!r.ok) {
         setErr(r.message)
         return
       }
+
+      for (const e of einheiten) {
+        const bez = e.bezeichnung.trim()
+        if (!bez) continue
+        const fl = Number(String(e.flaeche).replace(',', '.'))
+        const cr = await createObjektEinheit(kundeId, r.objekt.id, {
+          bezeichnung: bez,
+          wohnflaeche_m2: Number.isFinite(fl) && fl > 0 ? fl : null,
+        })
+        if (!cr.ok) {
+          toast.error(cr.message)
+        }
+      }
+
       onSaved(r.objekt)
-      toast.success('Gespeichert')
+      toast.success('Objekt angelegt')
       setDirty(false)
       onClose()
     })
   }
 
+  const footer = (
+    <div className="kunde-create-footer">
+      <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
+        Abbrechen
+      </button>
+      <MockBtn kind="primary" icon="check" disabled={pending} onClick={speichern}>
+        {pending ? '…' : isEdit ? 'Speichern' : 'Objekt anlegen'}
+      </MockBtn>
+    </div>
+  )
+
   return (
     <EditorSheet
       open={open}
       onClose={onClose}
-      title={editObjekt ? 'Objekt' : 'Objekt'}
+      title={isEdit ? 'Objekt bearbeiten' : 'Objekt anlegen'}
+      crumb={isEdit ? 'Objekt >' : 'Neues Objekt >'}
       context="detail"
       dirty={dirty}
-      confirmBusy={pending}
-      onConfirm={speichern}
-      size="md"
+      size="lg"
+      footer={footer}
+      className="kunde-create-sheet"
     >
-      <div className="space-y-3">
-        <Input
-          label="Titel"
-          placeholder="z. B. WEG Musterstraße"
-          value={titel}
-          onChange={(e) => mark(setTitel, e.target.value)}
-          required
-        />
-        <div className="grid gap-3 sm:grid-cols-[1fr_100px]">
-          <Input
-            label="Straße"
-            value={strasse}
-            onChange={(e) => mark(setStrasse, e.target.value)}
-            required
-          />
-          <Input
-            label="Nr."
-            value={hausnummer}
-            onChange={(e) => mark(setHausnummer, e.target.value)}
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-          <Input label="PLZ" value={plz} onChange={(e) => mark(setPlz, e.target.value)} required />
-          <Input label="Ort" value={ort} onChange={(e) => mark(setOrt, e.target.value)} required />
-        </div>
+      <div className="kunde-create">
+        {err ? <p className="kunde-create__err">{err}</p> : null}
 
-        <div className="border-t border-bw-border pt-3">
-          <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text">Meldeformular</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1">
-              <Input
-                label="Melde-Slug"
-                placeholder="weg-musterstrasse"
-                value={meldeSlug}
-                onChange={(e) => mark(setMeldeSlug, e.target.value)}
-              />
-            </div>
-            <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={vorschlagSlug}>
-              Vorschlag
-            </Button>
-          </div>
-          <label className="mt-2 flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text">
+        <MockFormSection title="Objektdaten" icon="building">
+          <MockField label="Objektname" required full>
             <input
-              type="checkbox"
-              checked={meldeAktiv}
-              onChange={(e) => mark(setMeldeAktiv, e.target.checked)}
-              className="rounded border-bw-border"
+              className="input"
+              value={titel}
+              onChange={(e) => mark(setTitel, e.target.value)}
+              placeholder="z.B. Wohnanlage Lindenhof"
             />
-            Aktiv
-          </label>
-          <Input
-            label="Einheiten"
-            placeholder="Wohnung, Etage…"
-            value={einheitenHinweis}
-            onChange={(e) => mark(setEinheitenHinweis, e.target.value)}
-            className="mt-2"
-          />
-          <Textarea
-            label="Notizen"
-            rows={2}
-            value={notizenIntern}
-            onChange={(e) => mark(setNotizenIntern, e.target.value)}
-            className="mt-2"
-          />
-        </div>
+          </MockField>
+          <MockField label="Straße & Nr." required full>
+            <input
+              className="input"
+              value={strasseNr}
+              onChange={(e) => mark(setStrasseNr, e.target.value)}
+              placeholder="Lindenstraße 14"
+            />
+          </MockField>
+          <MockField label="PLZ" required>
+            <input
+              className="input"
+              value={plz}
+              onChange={(e) => mark(setPlz, e.target.value)}
+              placeholder="80802"
+              inputMode="numeric"
+            />
+          </MockField>
+          <MockField label="Ort" required>
+            <input
+              className="input"
+              value={ort}
+              onChange={(e) => mark(setOrt, e.target.value)}
+              placeholder="München"
+            />
+          </MockField>
+          <MockField label="Baujahr">
+            <input
+              className="input"
+              value={baujahr}
+              onChange={(e) => mark(setBaujahr, e.target.value)}
+              placeholder="1998"
+              inputMode="numeric"
+            />
+          </MockField>
+          <MockField label="Gesamtfläche (m²)">
+            <input
+              className="input"
+              value={gesamtflaeche}
+              onChange={(e) => mark(setGesamtflaeche, e.target.value)}
+              placeholder="1.240"
+              inputMode="decimal"
+            />
+          </MockField>
+          <MockField label="Verwaltung" full>
+            <input
+              className="input"
+              value={verwaltungName?.trim() || '—'}
+              readOnly
+              disabled
+            />
+          </MockField>
+        </MockFormSection>
 
-        {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
+        {!isEdit ? (
+          <div className="form-section">
+            <div
+              className="form-section-h"
+              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              <MockIcon ctx="default" n="building" size={13} />
+              <span style={{ flex: 1 }}>Wohneinheiten</span>
+              <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                {flaecheSumme.min} – {Math.round(flaecheSumme.max)} m²
+              </span>
+            </div>
+            {einheiten.length === 0 ? (
+              <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '4px 0 12px' }}>
+                Noch keine Einheiten — unten hinzufügen.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                {einheiten.map((e) => (
+                  <div
+                    key={e.key}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 100px 36px',
+                      gap: 8,
+                      alignItems: 'end',
+                    }}
+                  >
+                    <MockField label="Bezeichnung">
+                      <input
+                        className="input"
+                        value={e.bezeichnung}
+                        onChange={(ev) => patchEinheit(e.key, { bezeichnung: ev.target.value })}
+                        placeholder="WE 01"
+                      />
+                    </MockField>
+                    <MockField label="m²">
+                      <input
+                        className="input"
+                        value={e.flaeche}
+                        onChange={(ev) => patchEinheit(e.key, { flaeche: ev.target.value })}
+                        placeholder="72"
+                        inputMode="decimal"
+                      />
+                    </MockField>
+                    <button
+                      type="button"
+                      className="qa-btn"
+                      title="Entfernen"
+                      aria-label="Einheit entfernen"
+                      onClick={() => removeEinheit(e.key)}
+                    >
+                      <MockIcon ctx="default" n="x" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" className="btn ghost sm" onClick={addEinheit}>
+              + Wohneinheit hinzufügen
+            </button>
+          </div>
+        ) : null}
       </div>
     </EditorSheet>
   )

@@ -56,22 +56,26 @@ export function Sidebar({
   return (
     <nav className="sidebar" aria-label="Hauptnavigation">
       <div className="sidebar-top">
-        <button
-          type="button"
-          className="sidebar-toggle"
-          title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
-          aria-label="Sidebar umschalten"
-          aria-expanded={expanded}
-          onClick={toggleExpanded}
-        >
-          <MockIcon ctx="sidebar" n={expanded ? 'chevron-left' : 'chevron-right'} size={18} />
-        </button>
         <Link href="/" className="sidebar-brand" title="Bärenwald CRM">
           <div className="sidebar-logo">
             <BrandLogo variant="white" height={18} />
           </div>
           <span className="sidebar-brandname">Bärenwald</span>
         </Link>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
+          aria-label={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
+          aria-expanded={expanded}
+          onClick={toggleExpanded}
+        >
+          <MockIcon
+            ctx="sidebar"
+            n={expanded ? 'layout-sidebar-left-collapse' : 'layout-sidebar-left-expand'}
+            size={18}
+          />
+        </button>
       </div>
 
       <div className="sidebar-nav">

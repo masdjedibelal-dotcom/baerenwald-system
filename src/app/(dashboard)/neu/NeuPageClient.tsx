@@ -80,7 +80,7 @@ function NeuVorgangHost({
   if (artParam === 'handwerker' || artParam === 'partner') {
     return (
       <>
-        <div className="py-8 text-center text-sm text-bw-text-muted">Partner wird vorbereitet…</div>
+        <div className="py-8 text-center text-sm text-bw-text-muted">Handwerker wird vorbereitet…</div>
         <PartnerCreateSheet
           open={partnerSheetOpen}
           gewerkeOptionen={gewerkeOptionen}

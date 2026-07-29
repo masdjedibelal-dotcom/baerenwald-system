@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
 import { createClient } from '@/lib/supabase-server'
-import type { KalenderTermin, LeadKanal, LeadStatus } from '@/lib/types'
+import type { KalenderTermin, LeadDetail, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
@@ -143,6 +143,7 @@ export async function updateLeadBeschreibung(
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
@@ -652,6 +653,19 @@ export async function updateLeadPreisindikation(
   return { ok: true }
 }
 
+/** Leichtgewicht für Listen-⋯ / Split-over „Anfrage bearbeiten“. */
+export async function getAnfragePhaseEditLead(
+  leadId: string
+): Promise<{ ok: true; lead: LeadDetail } | { ok: false; message: string }> {
+  const id = leadId?.trim()
+  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
+  const supabase = createClient()
+  const { loadAnfrageDetail } = await import('@/lib/anfragen/load-anfrage-detail')
+  const lead = await loadAnfrageDetail(supabase, id)
+  if (!lead) return { ok: false, message: 'Anfrage nicht gefunden oder keine Berechtigung.' }
+  return { ok: true, lead }
+}
+
 export async function updateLeadKontakt(
   leadId: string,
   data: {
@@ -679,6 +693,7 @@ export async function updateLeadKontakt(
   if (error) return { ok: false, message: error.message }
   revalidatePath('/anfragen')
   revalidatePath(`/anfragen/${leadId}`)
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 

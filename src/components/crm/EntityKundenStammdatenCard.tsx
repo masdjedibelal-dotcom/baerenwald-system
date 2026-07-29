@@ -36,6 +36,8 @@ type Props = {
   eingegangen?: string | null
   onSaved?: () => void
   disabled?: boolean
+  /** Auf Kunden-Detail: kein Link „Kundenakte“ */
+  hideKundeLink?: boolean
 }
 
 /**
@@ -49,6 +51,7 @@ export function EntityKundenStammdatenCard({
   initial,
   onSaved,
   disabled,
+  hideKundeLink = false,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [draft, setDraft] = useState(initial)
@@ -181,7 +184,7 @@ export function EntityKundenStammdatenCard({
                     {draft.email.trim()}
                   </a>
                 ) : null}
-                {kundeId?.trim() ? (
+                {kundeId?.trim() && !hideKundeLink ? (
                   <Link
                     className="vgid-chip ghost"
                     href={`/kunden/${kundeId.trim()}`}
