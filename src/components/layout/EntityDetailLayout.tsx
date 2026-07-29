@@ -7,7 +7,7 @@ import {
   vorgangResolverBannerVisible,
 } from '@/components/vorgang/VorgangResolverBanner'
 import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
-import { WiedervorlageChip } from '@/components/vorgang/WiedervorlageChip'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
 import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorlage-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
@@ -33,6 +33,7 @@ export type EntityDetailLayoutProps = {
   nextStepMetrics?: unknown
   /** @deprecated ignoriert — Next-Step entfernt */
   onNextStepClick?: () => void
+  /** @deprecated WV-Pill entfernt — Props bleiben für Aufrufer-Kompatibilität */
   wiedervorlageDatum?: string | null
   wiedervorlageNotiz?: string | null
   wiedervorlageEntity?: WiedervorlageEntity
@@ -59,14 +60,9 @@ export type EntityDetailLayoutProps = {
 export function EntityDetailLayout({
   resolvedVorgang,
   head,
-  wiedervorlageDatum,
-  wiedervorlageNotiz,
-  wiedervorlageEntity,
-  wiedervorlageEntityId,
-  onWiedervorlageSaved,
-  wiedervorlageOpen,
-  onWiedervorlageOpenChange,
   quickBar,
+  crumbBackHref,
+  crumbBackLabel = 'Zurück zu den Suchergebnissen',
   banner,
   children,
   className,
@@ -83,21 +79,6 @@ export function EntityDetailLayout({
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
-  const badges = (
-    <>
-      <WiedervorlageChip
-        datum={wiedervorlageDatum}
-        notiz={wiedervorlageNotiz}
-        entity={wiedervorlageEntity}
-        entityId={wiedervorlageEntityId}
-        onSaved={onWiedervorlageSaved}
-        open={wiedervorlageOpen}
-        onOpenChange={onWiedervorlageOpenChange}
-      />
-      {head.badges}
-    </>
-  )
-
   return (
     <div
       className={cn(
@@ -108,24 +89,28 @@ export function EntityDetailLayout({
       )}
     >
       <div className={cn('detail-entity-sticky', scrolled && 'detail-entity-sticky--compact')}>
+        {!scrolled && crumbBackHref ? (
+          <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
+        ) : null}
         {!scrolled ? <AkteRueckwegChip /> : null}
         {showResolver && !scrolled ? (
           <VorgangResolverBanner resolved={resolvedVorgang!} />
         ) : null}
         <DetailHead
           title={head.title}
-          badges={scrolled ? undefined : badges}
+          badges={scrolled ? undefined : head.badges}
           titleBadges={
             scrolled ? (
               <>
                 {head.titleBadges}
-                {badges}
+                {head.badges}
               </>
             ) : (
               head.titleBadges
             )
           }
-          meta={scrolled ? undefined : head.meta}
+          meta={undefined}
+          sub={undefined}
           actions={head.actions}
           variant={head.variant}
           className={cn(head.className, scrolled && 'shrunk')}

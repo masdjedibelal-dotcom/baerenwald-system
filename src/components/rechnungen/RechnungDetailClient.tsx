@@ -853,7 +853,7 @@ export function RechnungDetailClient({
       phase="rechnung"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=rechnung&lifecycle=offen"
-      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Rechnungen"
       breadcrumbTitle={crumbTitle}
       className="space-y-4 pb-0"

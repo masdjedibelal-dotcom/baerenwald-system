@@ -57,6 +57,7 @@ export type VorgangZahlungVariant = 'auftrag' | 'angebot' | 'rechnung'
 type RateRow = RateDrawerRate & {
   zeileId?: string
   isNext?: boolean
+  istSchluss?: boolean
   sub?: string
   badgeLabel: string
   badgeTone: StatusTone
@@ -209,8 +210,8 @@ export function VorgangZahlungTab({
     (gesamtNetto > 0 ? Math.round(gesamtNetto * 1.19 * 100) / 100 : 0)
 
   const rows: RateRow[] = useMemo(() => {
-    // Rechnung-Detail: immer Belegzeilen (Mock-Tabelle), Plan-Editor bleibt am Auftrag
-    const usePlanRows = variant !== 'rechnung' && hasPlan && kontext
+    // Mit Zahlungsplan: immer Plan-Raten (auch auf Rechnung-Detail) — Gutschriften hängen als Belege
+    const usePlanRows = hasPlan && kontext
 
     if (usePlanRows && kontext) {
       const naechsteId =
@@ -221,14 +222,25 @@ export function VorgangZahlungTab({
         const link = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
         const r = link?.id ? rechnungById.get(link.id) ?? null : null
         const related = rechnungenZuAbschlagZeile(z.id, rechnungen)
-        const belege = related.map((x) => ({
-          id: x.id,
-          nummer: x.rechnungsnummer?.trim() || '—',
-          status: String(x.status),
-          statusLabel: belegStatusLabel(x),
-          belegTyp: x.beleg_typ ?? null,
-          brutto: x.brutto,
-        }))
+        const belege = related.map((x) => {
+          const typ = String(x.beleg_typ ?? 'rechnung')
+          const artTitel = rechnungDokumentBezeichnung(x.rechnung_art, x.abschlag_index)
+          const nr = x.rechnungsnummer?.trim() || '—'
+          const label =
+            typ === 'gutschrift'
+              ? `Gutschrift · ${nr}`
+              : artTitel !== 'Rechnung'
+                ? `${artTitel} · ${nr}`
+                : nr
+          return {
+            id: x.id,
+            nummer: label,
+            status: String(x.status),
+            statusLabel: belegStatusLabel(x),
+            belegTyp: x.beleg_typ ?? null,
+            brutto: x.brutto,
+          }
+        })
         const badge = rateBadgeMeta(st, r)
         const betrag = st === 'geplant' || !r ? Number(z.brutto) || 0 : Number(r.brutto ?? 0) || 0
         const pct =
@@ -255,6 +267,7 @@ export function VorgangZahlungTab({
             ? { datum: r.reklamation_am, grund: r.reklamation_grund }
             : null,
           isNext: z.id === naechsteId,
+          istSchluss: Boolean(z.istSchluss),
           sub:
             [
               pct != null ? `${pct} % der Auftragssumme` : z.istSchluss ? 'Restbetrag' : null,
@@ -270,60 +283,94 @@ export function VorgangZahlungTab({
       })
     }
 
-    // Einzelrechnung(en) / Rechnung-Tab
-    return rechnungen
-      .filter((r) => String(r.status) !== 'storniert')
-      .map((r) => {
-        const st: ZahlplanRateStatus =
-          String(r.status) === 'bezahlt'
-            ? 'bezahlt'
-            : String(r.status) === 'entwurf'
-              ? 'geplant'
-              : 'gestellt'
-        const badge = rateBadgeMeta(st, r)
-        const planTitel = r.zahlungsplan_abschlag_id
-          ? plan.zeilen.find((z) => z.id === r.zahlungsplan_abschlag_id)?.titel?.trim() || null
-          : null
-        const artTitel = rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
-        const isCurrent = r.id === aktuelleRechnungId
-        const label =
-          planTitel ||
-          (isCurrent ? fallbackTitel?.trim() || null : null) ||
-          (artTitel !== 'Rechnung' ? artTitel : null) ||
-          fallbackTitel?.trim() ||
-          r.rechnungsnummer?.trim() ||
-          'Rechnung'
-        const reNr = r.rechnungsnummer?.trim() || null
-        return {
+    // Ohne Plan: Belegzeilen — Gutschriften mit bezug unter Parent, nicht als Top-Level
+    const topLevel = rechnungen.filter((r) => {
+      if (String(r.status) === 'storniert') return false
+      if (String(r.beleg_typ ?? '') === 'gutschrift') return false
+      return true
+    })
+
+    return topLevel.map((r) => {
+      const st: ZahlplanRateStatus =
+        String(r.status) === 'bezahlt'
+          ? 'bezahlt'
+          : String(r.status) === 'entwurf'
+            ? 'geplant'
+            : 'gestellt'
+      const badge = rateBadgeMeta(st, r)
+      const planTitel = r.zahlungsplan_abschlag_id
+        ? plan.zeilen.find((z) => z.id === r.zahlungsplan_abschlag_id)?.titel?.trim() || null
+        : null
+      const artTitel = rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
+      const isCurrent = r.id === aktuelleRechnungId
+      const label =
+        planTitel ||
+        (artTitel !== 'Rechnung' ? artTitel : null) ||
+        (isCurrent ? fallbackTitel?.trim() || null : null) ||
+        r.rechnungsnummer?.trim() ||
+        'Rechnung'
+      const reNr = r.rechnungsnummer?.trim() || null
+      const children = rechnungen.filter(
+        (x) =>
+          String(x.bezug_rechnung_id ?? '') === r.id ||
+          (String(x.id) !== r.id &&
+            String(x.zahlungsplan_abschlag_id ?? '') === String(r.zahlungsplan_abschlag_id ?? '') &&
+            Boolean(r.zahlungsplan_abschlag_id) &&
+            String(x.beleg_typ ?? '') === 'gutschrift')
+      )
+      const belege = [
+        {
           id: r.id,
-          label,
-          status: st,
-          betrag: Number(r.brutto ?? 0) || 0,
-          faellig: r.faellig_am ? String(r.faellig_am).slice(0, 10) : null,
-          reNr,
-          rechnungId: r.id,
-          belege: [
-            {
-              id: r.id,
-              nummer: reNr || '—',
-              status: String(r.status),
-              statusLabel: belegStatusLabel(r),
-              belegTyp: r.beleg_typ ?? null,
-              brutto: r.brutto,
-            },
-          ],
-          reklamation: r.reklamation_am
-            ? { datum: r.reklamation_am, grund: r.reklamation_grund }
-            : null,
-          sub: reNr || 'Gesamtbetrag',
-          badgeLabel: badge.label,
-          badgeTone: badge.tone,
-          badgeStatus: badge.status,
-          belegCount: 1,
-        }
-      })
+          nummer: reNr || '—',
+          status: String(r.status),
+          statusLabel: belegStatusLabel(r),
+          belegTyp: r.beleg_typ ?? null,
+          brutto: r.brutto,
+        },
+        ...children.map((x) => ({
+          id: x.id,
+          nummer:
+            String(x.beleg_typ ?? '') === 'gutschrift'
+              ? `Gutschrift · ${x.rechnungsnummer?.trim() || '—'}`
+              : x.rechnungsnummer?.trim() || '—',
+          status: String(x.status),
+          statusLabel: belegStatusLabel(x),
+          belegTyp: x.beleg_typ ?? null,
+          brutto: x.brutto,
+        })),
+      ]
+      const planZeile = r.zahlungsplan_abschlag_id
+        ? plan.zeilen.find((z) => z.id === r.zahlungsplan_abschlag_id)
+        : null
+      const istSchluss =
+        String(r.rechnung_art ?? '') === 'schluss' ||
+        planZeile?.typ === 'rest' ||
+        Boolean(
+          planZeile &&
+            plan.zeilen.length > 0 &&
+            plan.zeilen[plan.zeilen.length - 1]?.id === planZeile.id
+        )
+      return {
+        id: r.id,
+        label,
+        status: st,
+        betrag: Number(r.brutto ?? 0) || 0,
+        faellig: r.faellig_am ? String(r.faellig_am).slice(0, 10) : null,
+        reNr,
+        rechnungId: r.id,
+        belege,
+        reklamation: r.reklamation_am
+          ? { datum: r.reklamation_am, grund: r.reklamation_grund }
+          : null,
+        istSchluss,
+        sub: reNr || 'Gesamtbetrag',
+        badgeLabel: badge.label,
+        badgeTone: badge.tone,
+        badgeStatus: badge.status,
+        belegCount: belege.length,
+      }
+    })
   }, [
-    variant,
     hasPlan,
     kontext,
     abschlagLinks,
@@ -335,8 +382,15 @@ export function VorgangZahlungTab({
     fallbackTitel,
   ])
 
-  const nurEinzel = (!hasPlan || variant === 'rechnung') && rows.length === 1
+  const nurEinzel = !hasPlan && rows.length === 1
   const empty = rows.length === 0
+
+  const abschlagRows = useMemo(() => rows.filter((r) => !r.istSchluss), [rows])
+  const abschlussRows = useMemo(() => rows.filter((r) => r.istSchluss), [rows])
+  const showGruppen =
+    (hasPlan || abschlussRows.length > 0) &&
+    (abschlagRows.length > 0 || abschlussRows.length > 0) &&
+    rows.length > 1
 
   const { bezahltBrutto, gestelltBrutto } = useMemo(() => {
     let bezahlt = 0
@@ -354,9 +408,17 @@ export function VorgangZahlungTab({
   )
 
   const totalBruttoResolved =
-    variant === 'rechnung'
-      ? invoiceSumBrutto || gesamtBruttoHint || 0
-      : totalBrutto || invoiceSumBrutto
+    hasPlan && totalBrutto > 0
+      ? totalBrutto
+      : variant === 'rechnung'
+        ? invoiceSumBrutto || gesamtBruttoHint || 0
+        : totalBrutto || invoiceSumBrutto
+
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({})
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
 
   const pct =
     totalBruttoResolved > 0
@@ -575,6 +637,120 @@ export function VorgangZahlungTab({
   const interactive = !readOnly && variant !== 'angebot'
   const canEditPlan = interactive && variant === 'auftrag' && Boolean(auftragId)
 
+  function renderRateRow(row: RateRow) {
+    const belege = row.belege ?? []
+    const hasBelege = belege.length > 0
+    const aktiv =
+      (row.rechnungId != null && row.rechnungId === aktuelleRechnungId) ||
+      belege.some((b) => b.id === aktuelleRechnungId)
+    const showAccordion = hasBelege && (showGruppen || belege.length > 1)
+    const expanded =
+      expandedIds[row.id] !== undefined
+        ? Boolean(expandedIds[row.id])
+        : showAccordion && (showGruppen || aktiv)
+
+    return (
+      <div key={row.id} className="zahlplan-rate">
+        <div
+          role="button"
+          tabIndex={0}
+          className={[
+            'list-row',
+            'zahlplan-row',
+            'zahlplan-row--simple',
+            'zahlung-row',
+            row.isNext ? 'zahlung-row--next' : '',
+            aktiv ? 'zahlung-row--next' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => setOpenRateId(row.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setOpenRateId(row.id)
+            }
+          }}
+        >
+          <div className="zahlplan-row__label">
+            <span className="zahlplan-row__title">
+              {showAccordion ? (
+                <button
+                  type="button"
+                  className="zahlplan-row__expand"
+                  aria-expanded={expanded}
+                  aria-label={expanded ? 'Belege einklappen' : 'Belege ausklappen'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleExpand(row.id)
+                  }}
+                >
+                  <MockIcon ctx="btn" n={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
+                </button>
+              ) : null}
+              <span className="zahlplan-row__name">{row.label}</span>
+              <StatusBadge status={row.badgeStatus} label={row.badgeLabel} tone={row.badgeTone} />
+              {(row.belegCount ?? 0) > 1 ? (
+                <span className="zahlplan-row__count">{row.belegCount} Belege</span>
+              ) : null}
+            </span>
+            {row.sub ? <div className="zahlplan-row__pct">{row.sub}</div> : null}
+          </div>
+          <div className="zahlplan-row__faellig">
+            {row.faellig ? (
+              <>
+                <span className="zahlplan-row__faellig-label">Fällig</span>
+                <span className="zahlplan-row__faellig-value">
+                  {formatDatum(String(row.faellig).slice(0, 10))}
+                </span>
+              </>
+            ) : (
+              <span className="zahlplan-row__faellig-value zahlplan-row__faellig-value--empty">—</span>
+            )}
+          </div>
+          <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
+          <div className="zahlplan-row__menu">
+            <MockIcon ctx="btn" n="chevron-right" size={15} />
+          </div>
+        </div>
+        {showAccordion && expanded ? (
+          <div className="zahlplan-belege" role="list">
+            {belege.map((b) => {
+              const belegAktiv = b.id === aktuelleRechnungId
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  role="listitem"
+                  className={[
+                    'zahlplan-beleg',
+                    belegAktiv ? 'zahlplan-beleg--aktiv' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (aktuelleRechnungId === b.id) {
+                      router.push(`/rechnungen/${b.id}?tab=uebersicht`)
+                      return
+                    }
+                    router.push(`/rechnungen/${b.id}`)
+                  }}
+                >
+                  <span className="zahlplan-beleg__nr">{b.nummer || '—'}</span>
+                  <StatusBadge status={b.status} label={b.statusLabel} />
+                  <span className="zahlplan-beleg__betrag">
+                    {b.brutto != null ? formatEurBetrag(b.brutto) : '—'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   // ─── Leer ───
   if (empty) {
     return (
@@ -699,83 +875,51 @@ export function VorgangZahlungTab({
 
         <div className="zahlplan-table-wrap">
           <div className="list-row head zahlplan-row zahlplan-row--simple zahlplan-row-head">
-            <div>{variant === 'rechnung' || nurEinzel || !hasPlan ? 'Rechnung' : 'Abschlag'}</div>
+            <div>
+              {showGruppen
+                ? 'Rate'
+                : variant === 'rechnung' || nurEinzel || !hasPlan
+                  ? 'Rechnung'
+                  : 'Abschlag'}
+            </div>
             <div>Fällig</div>
             <div style={{ textAlign: 'right' }}>Betrag</div>
             <div />
           </div>
-          {rows.map((row) => {
-            const aktiv = row.rechnungId && row.rechnungId === aktuelleRechnungId
-            return (
-              <div
-                key={row.id}
-                role="button"
-                tabIndex={0}
-                className={[
-                  'list-row',
-                  'zahlplan-row',
-                  'zahlplan-row--simple',
-                  'zahlung-row',
-                  row.isNext ? 'zahlung-row--next' : '',
-                  aktiv ? 'zahlung-row--next' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => setOpenRateId(row.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setOpenRateId(row.id)
-                  }
-                }}
-              >
-                <div className="zahlplan-row__label">
-                  <span className="zahlplan-row__title">
-                    <span className="zahlplan-row__name">{row.label}</span>
-                    <StatusBadge
-                      status={row.badgeStatus}
-                      label={row.badgeLabel}
-                      tone={row.badgeTone}
-                    />
-                    {(row.belegCount ?? 0) > 1 ? (
-                      <span className="zahlplan-row__count">{row.belegCount} Rechnungen</span>
-                    ) : null}
-                  </span>
-                  {row.sub ? <div className="zahlplan-row__pct">{row.sub}</div> : null}
+          {showGruppen ? (
+            <>
+              {abschlagRows.length > 0 ? (
+                <div className="zahlplan-gruppe">
+                  <div className="zahlplan-gruppe__h">Abschläge</div>
+                  {abschlagRows.map((row) => renderRateRow(row))}
                 </div>
-                <div className="zahlplan-row__faellig">
-                  {row.faellig ? (
-                    <>
-                      <span className="zahlplan-row__faellig-label">Fällig</span>
-                      <span className="zahlplan-row__faellig-value">
-                        {formatDatum(String(row.faellig).slice(0, 10))}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="zahlplan-row__faellig-value zahlplan-row__faellig-value--empty">
-                      —
-                    </span>
-                  )}
+              ) : null}
+              {abschlussRows.length > 0 ? (
+                <div className="zahlplan-gruppe">
+                  <div className="zahlplan-gruppe__h">Abschluss</div>
+                  {abschlussRows.map((row) => renderRateRow(row))}
                 </div>
-                <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
-                <div className="zahlplan-row__menu">
-                  <MockIcon ctx="btn" n="chevron-right" size={15} />
-                </div>
-              </div>
-            )
-          })}
+              ) : null}
+            </>
+          ) : (
+            rows.map((row) => renderRateRow(row))
+          )}
         </div>
 
         <div className="zahlplan-foot">
           <span>
             <b>{rows.length}</b>{' '}
-            {variant !== 'rechnung' && hasPlan && rows.length !== 1
-              ? 'Abschläge'
-              : variant !== 'rechnung' && hasPlan
-                ? 'Abschlag'
-                : rows.length === 1
-                  ? 'Rechnung'
-                  : 'Rechnungen'}
+            {showGruppen
+              ? rows.length === 1
+                ? 'Rate'
+                : 'Raten'
+              : variant !== 'rechnung' && hasPlan && rows.length !== 1
+                ? 'Abschläge'
+                : variant !== 'rechnung' && hasPlan
+                  ? 'Abschlag'
+                  : rows.length === 1
+                    ? 'Rechnung'
+                    : 'Rechnungen'}
           </span>
           <div className="zahlplan-foot__sums">
             <span>

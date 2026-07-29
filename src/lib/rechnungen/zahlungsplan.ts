@@ -203,9 +203,30 @@ export function rechnungFuerAbschlagZeile(
 
 /** Alle Belege zu einer Planzeile (inkl. Storno/Gutschrift) — für Anzahl in der Liste. */
 export function rechnungenZuAbschlagZeile<
-  T extends { zahlungsplan_abschlag_id?: string | null },
+  T extends {
+    id?: string
+    zahlungsplan_abschlag_id?: string | null
+    bezug_rechnung_id?: string | null
+  },
 >(zeileId: string, rechnungen: T[]): T[] {
-  return rechnungen.filter((r) => String(r.zahlungsplan_abschlag_id ?? '') === zeileId)
+  const direct = rechnungen.filter((r) => String(r.zahlungsplan_abschlag_id ?? '') === zeileId)
+  if (direct.length === 0) return []
+  const parentIds = new Set(
+    direct.map((r) => String(r.id ?? '')).filter(Boolean)
+  )
+  const viaBezug = rechnungen.filter((r) => {
+    const bezug = String(r.bezug_rechnung_id ?? '')
+    return Boolean(bezug) && parentIds.has(bezug)
+  })
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const r of [...direct, ...viaBezug]) {
+    const id = String(r.id ?? '')
+    if (id && seen.has(id)) continue
+    if (id) seen.add(id)
+    out.push(r)
+  }
+  return out
 }
 
 /** Letzte stornierte Rechnung zu einer Planzeile (Rate wieder „geplant“). */
@@ -633,17 +654,29 @@ export function istAbschlagPauschalPosition(p: AngebotPosition): boolean {
   return slug === 'abschlag' || leistung.startsWith('abschlag ') || leistung.startsWith('schlussrechnung')
 }
 
-/** Alte Entwürfe hatten nur eine Abschlag-Pauschalposition — Auftragspositionen wiederherstellen. */
+/** Alte Entwürfe hatten nur eine Abschlag-Pauschalposition — Auftragspositionen wiederherstellen.
+ * Bei echten Abschlag-/Schluss-Belegen die Pauschalposition behalten (Ratenbetrag). */
 export function rechnungPositionenMitAuftrag(
   gespeichert: AngebotPosition[],
-  auftragPositionen: AngebotPosition[]
+  auftragPositionen: AngebotPosition[],
+  opts?: { keepAbschlagPauschal?: boolean }
 ): AngebotPosition[] {
   const norm = normalizeAngebotPositionen(gespeichert)
   const auftrag = normalizeAngebotPositionen(auftragPositionen)
   if (!auftrag.length) return norm
   if (norm.length === 0) return auftrag
-  if (norm.length === 1 && istAbschlagPauschalPosition(norm[0]!)) return auftrag
-  if (norm.every(istAbschlagPauschalPosition)) return auftrag
+  if (opts?.keepAbschlagPauschal) return norm
+
+  const nurPauschal =
+    (norm.length === 1 && istAbschlagPauschalPosition(norm[0]!)) ||
+    (norm.length > 0 && norm.every(istAbschlagPauschalPosition))
+  if (nurPauschal) {
+    // Ratenbetrag ≠ Auftragssumme → bewusst Abschlag/Schluss, nicht aufblasen
+    const pauschalNetto = auftragSummenAusPositionen(norm).netto
+    const auftragNetto = auftragSummenAusPositionen(auftrag).netto
+    if (Math.abs(pauschalNetto - auftragNetto) > 0.05) return norm
+    return auftrag
+  }
   return norm
 }
 

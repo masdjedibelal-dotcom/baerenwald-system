@@ -623,7 +623,7 @@ export function AngebotDetailPageClient({
       phase="angebot"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
-      crumbBackLabel="Zurück zu den Vorgängen"
+      crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Angebote"
       breadcrumbTitle={kundeName}
       className="space-y-4 pb-0"

@@ -290,6 +290,9 @@ export async function createGutschriftFromRechnung(
       rechnungsdatum: new Date().toISOString().slice(0, 10),
       pdf_url: null,
       erstellt_von: user?.id ?? null,
+      zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
+      rechnung_art: orig.rechnung_art ?? null,
+      abschlag_index: orig.abschlag_index ?? null,
     },
     berechnung,
     {

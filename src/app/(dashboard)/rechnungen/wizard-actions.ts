@@ -629,10 +629,17 @@ export async function loadRechnungWizardBootstrap(
   const kRaw = rec.kunden
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
 
+  const rechnungArt = String(rec.rechnung_art ?? 'voll')
+  const abschlagZeileIdEarly = String(rec.zahlungsplan_abschlag_id ?? '').trim() || null
+  const keepAbschlagPauschal =
+    rechnungArt === 'abschlag' ||
+    rechnungArt === 'schluss' ||
+    Boolean(abschlagZeileIdEarly)
   const positionen = repairAngebotPositionen(
     rechnungPositionenMitAuftrag(
       (rec.positionen as AngebotPosition[]) ?? [],
-      basis.positionen
+      basis.positionen,
+      { keepAbschlagPauschal }
     )
   )
 
@@ -650,9 +657,8 @@ export async function loadRechnungWizardBootstrap(
     firm,
   })
 
-  const rechnungArt = String(rec.rechnung_art ?? 'voll')
   const modus = rechnungArt === 'abschlag' || rechnungArt === 'schluss' ? 'abschlag' : 'voll'
-  const abschlagZeileId = String(rec.zahlungsplan_abschlag_id ?? '').trim() || null
+  const abschlagZeileId = abschlagZeileIdEarly
 
   const meta: RechnungWizardMeta = {
     einleitung: String(rec.einleitung ?? '').trim() || metaDefaults.einleitung,

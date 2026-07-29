@@ -13674,6 +13674,86 @@ textarea.input:focus {
 .zahlplan-table-wrap {
   margin: 0 -16px;
 }
+.zahlplan-gruppe {
+  margin-top: 4px;
+}
+.zahlplan-gruppe + .zahlplan-gruppe {
+  margin-top: 10px;
+}
+.zahlplan-gruppe__h {
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.zahlplan-rate {
+  display: flex;
+  flex-direction: column;
+}
+.zahlplan-row__expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.zahlplan-row__expand:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+.zahlplan-belege {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px 8px 40px;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+}
+.zahlplan-beleg {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+.zahlplan-beleg:hover {
+  background: var(--bg);
+}
+.zahlplan-beleg--aktiv {
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.zahlplan-beleg__nr {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zahlplan-beleg__betrag {
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+}
 .zahlplan-foot {
   display: flex;
   justify-content: space-between;
