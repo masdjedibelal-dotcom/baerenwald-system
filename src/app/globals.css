@@ -191,7 +191,8 @@
       --placeholder-size: 13px;
       --list-search-h: 40px;
       --control-h: 44px;
-      --mobile-sticky-offset: calc(52px + env(safe-area-inset-top, 0px));
+      /* Listbar sticky innerhalb .page — Topbar ist außerhalb */
+      --mobile-sticky-offset: 0px;
     }
 
     body {

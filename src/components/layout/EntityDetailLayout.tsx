@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
 import {
   VorgangResolverBanner,
@@ -14,7 +14,6 @@ import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import { cn } from '@/lib/utils'
 
 export type EntityDetailLayoutProps = {
@@ -54,8 +53,7 @@ export type EntityDetailLayoutProps = {
 }
 
 /**
- * Vorgangs-Detail: kompakter Kopf · QuickBar (Mobil, nur oben) · Inhalt.
- * Beim Scrollen: nur Titel + Status sticky — Quickbar/Meta/Banner weg.
+ * Vorgangs-Detail: Hero (nicht sticky) · QuickBar scrollt mit · Tabs sticky · Cards darunter.
  */
 export function EntityDetailLayout({
   resolvedVorgang,
@@ -68,57 +66,30 @@ export function EntityDetailLayout({
   className,
 }: EntityDetailLayoutProps) {
   const isMobile = useIsMobile()
-  const { scrolled } = useMobileScrollChrome(isMobile)
-
-  useEffect(() => {
-    if (!isMobile) return
-    document.documentElement.classList.toggle('bw-detail-scrolled', scrolled)
-    return () => document.documentElement.classList.remove('bw-detail-scrolled')
-  }, [isMobile, scrolled])
 
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
   return (
-    <div
-      className={cn(
-        'detail-entity-page',
-        'detail-entity-page--chrome',
-        scrolled && 'detail-entity-page--scrolled',
-        className ?? 'pb-6'
-      )}
-    >
-      <div className={cn('detail-entity-sticky', scrolled && 'detail-entity-sticky--compact')}>
-        {!scrolled && crumbBackHref ? (
+    <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
+      <div className="detail-entity-hero">
+        {crumbBackHref ? (
           <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
         ) : null}
-        {!scrolled ? <AkteRueckwegChip /> : null}
-        {showResolver && !scrolled ? (
-          <VorgangResolverBanner resolved={resolvedVorgang!} />
-        ) : null}
+        <AkteRueckwegChip />
+        {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
         <DetailHead
           title={head.title}
-          badges={scrolled ? undefined : head.badges}
-          titleBadges={
-            scrolled ? (
-              <>
-                {head.titleBadges}
-                {head.badges}
-              </>
-            ) : (
-              head.titleBadges
-            )
-          }
+          badges={head.badges}
+          titleBadges={head.titleBadges}
           meta={undefined}
           sub={undefined}
           actions={head.actions}
           variant={head.variant}
-          className={cn(head.className, scrolled && 'shrunk')}
+          className={head.className}
         />
-        {!scrolled && banner ? <div className="detail-entity-banner">{banner}</div> : null}
-        {isMobile && !scrolled && quickBar?.length ? (
-          <DetailQuickBar actions={quickBar} />
-        ) : null}
+        {banner ? <div className="detail-entity-banner">{banner}</div> : null}
+        {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
       </div>
       <div className="detail-entity-body">{children}</div>
     </div>

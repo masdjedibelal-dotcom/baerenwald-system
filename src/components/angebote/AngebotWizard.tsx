@@ -846,10 +846,20 @@ export function AngebotWizard({
 
   async function handleCanvasClose() {
     if (draftDirty && !saving) {
-      try {
-        await persistDraft({ notify: false })
-      } catch {
-        /* X speichert best-effort (S9) */
+      /* S9: X speichert best-effort — ohne Validierungs-Toasts bei leerem Entwurf */
+      const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
+      const canSilentSave =
+        Boolean(kundeId) &&
+        Boolean(titelOk) &&
+        artikelA.length > 0 &&
+        !artikelA.some((z) => !z.bezeichnung.trim())
+      if (canSilentSave) {
+        try {
+          await persistDraft({ notify: false })
+        } catch {
+          /* ignore */
+        }
       }
     }
     onClose()

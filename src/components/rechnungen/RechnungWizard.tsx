@@ -934,7 +934,8 @@ export function RechnungWizard({
     : Math.max(0, displayBrutto - displayNetto)
   const anteil35a = berechneHinweis35aAnteil(
     positionenBerechnet,
-    schlussAbrechnung?.netto ?? berechnung.netto
+    schlussAbrechnung ? schlussAbrechnung.rest_netto : berechnung.netto,
+    schlussAbrechnung ? { vollNetto: schlussAbrechnung.netto } : undefined
   )
   const ustLabel = meta.reverse_charge_13b
     ? 'MwSt 0% (§13b)'

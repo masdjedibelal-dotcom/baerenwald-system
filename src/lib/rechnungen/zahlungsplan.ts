@@ -65,6 +65,7 @@ export type RechnungAbschlagLink = {
   mwst_betrag?: number | null
   rechnungsnummer?: string | null
   faellig_am?: string | null
+  beleg_typ?: string | null
 }
 
 export function emptyZahlungsplan(): Zahlungsplan {
@@ -249,17 +250,22 @@ export function zahlplanRateStatus(
 ): ZahlplanRateStatus {
   const r = rechnungFuerAbschlagZeile(zeileId, rechnungen)
   if (!r) return 'geplant'
-  if (r.status === 'bezahlt') return 'bezahlt'
+  const st = String(r.status)
+  if (st === 'entwurf') return 'geplant'
+  if (st === 'bezahlt') return 'bezahlt'
   return 'gestellt'
 }
 
-/** Gestellte/bezahlte Raten → Ist-Brutto für Rest-Berechnung der Schlussrate. */
+/** Gestellte/bezahlte Raten → Ist-Brutto für Rest-Berechnung der Schlussrate.
+ * Schlussrechnungen und Entwürfe fließen nicht ein (Brutto oft = volle Leistungssumme). */
 export function zahlplanAbgerechnetAusLinks(
   rechnungen: RechnungAbschlagLink[]
 ): Array<{ zeileId: string; brutto: number }> {
   const out: Array<{ zeileId: string; brutto: number }> = []
   for (const r of rechnungen) {
-    if (String(r.status) === 'storniert') continue
+    if (String(r.status) === 'storniert' || String(r.status) === 'entwurf') continue
+    if (String(r.beleg_typ ?? '') === 'gutschrift') continue
+    if (String(r.rechnung_art ?? '') === 'schluss') continue
     const id = r.zahlungsplan_abschlag_id?.trim()
     if (!id) continue
     const b = Number(r.brutto)
@@ -309,8 +315,9 @@ export function berechneZahlungsplan(
     let netto = 0
     let brutto = 0
 
-    if (billedBrutto != null) {
-      // Ist-Rechnung gilt — nicht neu aus % der aktuellen Auftragssumme ableiten
+    if (billedBrutto != null && !istSchluss) {
+      // Ist-Rechnung gilt für Abschläge — nicht neu aus % der aktuellen Auftragssumme ableiten.
+      // Schlussrate: immer echter Rest (DB-Brutto der Schlussrechnung ist oft die volle Leistungssumme).
       brutto = Math.round(billedBrutto * 100) / 100
       netto =
         ratio > 0

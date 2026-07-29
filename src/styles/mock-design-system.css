@@ -281,14 +281,14 @@
   /* !important: sonst überschreibt späteres `.btn { display: inline-flex }` den Hide */
   .topbar-cta { display: none !important; }
 
-  /* Eine Materialfläche: Topbar + Screen-Titel */
+  /* Eine Materialfläche: Topbar + Screen-Titel (außerhalb von .page → kein Sticky nötig) */
   .topbar-stack {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 25;
+    flex-shrink: 0;
     background: var(--card-mobile, #fafbfa);
     border-bottom: 0.5px solid var(--border);
-    box-shadow: 0 1px 0 rgba(22, 32, 27, 0.04);
+    box-shadow: 0 1px 0 rgba(22, 32, 27, 0.06);
   }
   .topbar-stack .topbar {
     position: static;
@@ -334,9 +334,12 @@
     white-space: nowrap;
   }
 
-  /* Listbar-Offset wenn Titelband vorhanden */
+  /*
+   * Listbar sticky steckt im scrollenden `.page` — Topbar liegt außerhalb.
+   * Daher Offset 0 (nicht Topbar-Höhe mitrechnen).
+   */
   .main:has(.mobile-screen-title) {
-    --mobile-sticky-offset: calc(96px + env(safe-area-inset-top, 0px));
+    --mobile-sticky-offset: 0px;
   }
 }
 /* Desktop: große Suchleiste in der Topbar-Mitte */
@@ -951,12 +954,12 @@ div.input input::placeholder {
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin: 0 0 12px;
-    padding: 8px 0 10px;
+    /* Full-bleed unter page-inner-Padding, damit Cards nicht durchscheinen */
+    margin: 0 -14px 12px;
+    padding: 8px 14px 10px;
     border-bottom: none;
-    background: color-mix(in srgb, var(--bg-mobile, #f1f2f1) 88%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--bg-mobile, #f1f2f1);
+    box-shadow: 0 1px 0 rgba(22, 32, 27, 0.06);
   }
   .listbar-chips {
     order: -1;
@@ -1959,6 +1962,21 @@ button.wv-chip:hover {
   box-shadow: none;
 }
 
+.detail-entity-hero {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 8px;
+}
+.detail-entity-body {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .detail-entity-hero {
+    background: transparent;
+  }
+}
+
 /* Phase 5c: Desktop FAB 96px; mobil Bottom-Nav (+Safe) + Sticky-CTA + 28px */
 .detail-entity-page--chrome {
   padding-bottom: 96px;
@@ -1974,44 +1992,83 @@ button.wv-chip:hover {
       var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 52px + 16px
     );
   }
+
+  /* Hero: kein Kasten, Frau-Hintergrund, scrollt mit — Tabs darunter sind sticky */
+  .detail-entity-hero {
+    position: relative;
+    z-index: 1;
+    margin: -14px -14px 12px;
+    padding: 12px 14px 16px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background-color: #e8ebe7;
+    background-image:
+      linear-gradient(
+        105deg,
+        rgba(241, 242, 241, 0.94) 0%,
+        rgba(241, 242, 241, 0.78) 42%,
+        rgba(241, 242, 241, 0.35) 72%,
+        rgba(241, 242, 241, 0.12) 100%
+      ),
+      url('/brand/detail-hero-woman.jpg');
+    background-size: cover;
+    background-position: 72% 28%;
+    background-repeat: no-repeat;
+  }
+  .detail-entity-hero .detail-head {
+    margin-bottom: 10px;
+    padding: 4px 0 8px;
+    border-bottom: none;
+    background: transparent;
+    box-shadow: none;
+  }
+  .detail-entity-hero .detail-head .dh-title {
+    font-size: var(--fs-head);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+  .detail-entity-hero .mock-detail-back {
+    margin-bottom: 8px;
+  }
+  .detail-entity-hero .detail-quickbar {
+    margin: 4px 0 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .detail-entity-hero .detail-quickbar__btn {
+    border: none;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: none;
+    color: var(--green-dark, var(--green));
+  }
+  .detail-entity-hero .detail-quickbar__btn:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  /* Legacy compact-Klassen (falls noch gesetzt) — wirkungslos, kein Sticky-Kopf mehr */
   .detail-entity-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: var(--bg, var(--card));
-    margin: 0 -4px;
-    padding: 0 4px 4px;
-    transition: padding 160ms ease, box-shadow 160ms ease;
+    position: static;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
   }
-  .detail-entity-sticky--compact {
-    box-shadow: 0 1px 0 var(--border);
-    padding-bottom: 2px;
-  }
+  .detail-entity-sticky--compact,
   .detail-entity-page--scrolled .detail-head .dh-title,
   .detail-head.shrunk .dh-title {
-    font-size: var(--fs-title, 15px);
+    /* no-op */
   }
   .detail-head.shrunk {
     padding-top: 2px;
     padding-bottom: 4px;
-  }
-  .detail-head.shrunk .dh-meta,
-  .detail-head.shrunk .qbar,
-  .detail-entity-page--scrolled .phase-strip,
-  .detail-entity-page--scrolled .mock-detail-back,
-  .detail-entity-page--scrolled .detail-quickbar,
-  .detail-entity-page--scrolled .detail-entity-banner {
-    display: none;
-  }
-  .detail-head.shrunk .dh-title-badges {
-    flex-shrink: 0;
-    max-width: 55%;
-    overflow: hidden;
-  }
-  .detail-head.shrunk .dh-title-badges .badge,
-  .detail-head.shrunk .dh-title-badges .wv-chip {
-    transform: scale(0.92);
-    transform-origin: right center;
   }
 }
 
@@ -5919,15 +5976,17 @@ button.wv-chip:hover {
   .dshell-tabs-mobile {
     position: sticky;
     top: 0;
-    z-index: 5;
+    z-index: 18;
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 0;
     overflow-x: auto;
-    padding: 0 4px;
-    background: var(--card);
+    margin: 0 -14px;
+    padding: 0 14px;
+    background: var(--bg-mobile, #f1f2f1);
     border-bottom: 0.5px solid var(--border);
+    box-shadow: 0 1px 0 rgba(22, 32, 27, 0.04);
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
@@ -6401,8 +6460,17 @@ a.hvk-h--link:hover { text-decoration: underline; }
     padding: 13px 14px;
     background: var(--card);
     border: 0.5px solid var(--border);
-    border-radius: 12px;
-    box-shadow: none;
+    border-radius: var(--r-lg, 16px);
+    box-shadow: var(--shadow-mobile, none);
+  }
+
+  /* SwipeRow sonst eckig (overflow:hidden ohne Radius) */
+  .listcard .swiperow {
+    border-radius: var(--r-lg, 16px);
+  }
+  .listcard .swiperow-body {
+    border-radius: var(--r-lg, 16px);
+    background: transparent;
   }
 
   
@@ -7117,10 +7185,11 @@ a.hvk-h--link:hover { text-decoration: underline; }
 
   
 .main {
-    grid-row: 1;
-    grid-template-rows: var(--topbar-h) 1fr;
-    padding-bottom: calc(var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 8px);
-  }
+  grid-row: 1;
+  /* auto: Topbar-Stack inkl. Screen-Titel — nicht auf --topbar-h clippen */
+  grid-template-rows: auto 1fr;
+  padding-bottom: calc(var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 8px);
+}
 
   
 .topbar { padding: 0 14px; position: static; background: transparent; border-bottom: none; }
@@ -7294,9 +7363,17 @@ a.hvk-h--link:hover { text-decoration: underline; }
     padding: 13px 44px 13px 14px;
     background: var(--card-mobile, var(--card));
     border: 0.5px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--r-lg, 16px);
     box-shadow: var(--shadow-mobile, none);
     margin-bottom: 0;
+  }
+
+  .listcard .swiperow {
+    border-radius: var(--r-lg, 16px);
+  }
+  .listcard .swiperow-body {
+    border-radius: var(--r-lg, 16px);
+    background: transparent;
   }
 
   
@@ -7364,7 +7441,7 @@ a.hvk-h--link:hover { text-decoration: underline; }
   padding: 13px 14px;
   margin: 0;
   border: 0.5px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-lg, 16px);
   background: var(--card-mobile, #fafbfa);
   box-shadow: var(--shadow-mobile);
 }
@@ -13704,10 +13781,25 @@ textarea.input:focus {
   border-radius: 6px;
   background: transparent;
   color: var(--text-3);
-  cursor: pointer;
   flex-shrink: 0;
+  pointer-events: none;
 }
-.zahlplan-row__expand:hover {
+.zahlung-row--accordion {
+  cursor: pointer;
+}
+.zahlplan-row__detail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.zahlplan-row__detail:hover {
   background: var(--bg-soft);
   color: var(--text);
 }
@@ -15421,6 +15513,95 @@ select:focus-visible {
   display: none;
 }
 @media (max-width: 768px) {
+  /*
+   * Positionen-Wizard mobil: Header / Speichern / Gesamtbetrag scrollen mit —
+   * kein Sticky-Chrome, mehr sichtbarer Positionsinhalt.
+   */
+  .document-canvas.wizard-flow {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .document-canvas.wizard-flow .document-canvas__header {
+    position: static;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .document-canvas.wizard-flow .document-canvas__title {
+    font-size: var(--fs-title);
+  }
+  .document-canvas.wizard-flow .document-canvas__body {
+    overflow: visible;
+    flex: none;
+    min-height: auto;
+    padding: 10px 12px 16px;
+  }
+  .document-canvas.wizard-flow .document-canvas__paper,
+  .document-canvas.wizard-flow .document-canvas__paper--doc {
+    padding: 10px 12px 14px;
+    border-radius: 12px;
+    min-height: 0;
+  }
+  .document-canvas.wizard-flow .document-canvas__meta {
+    border-radius: 12px;
+  }
+  .document-canvas.wizard-flow .document-canvas__meta-scroll {
+    overflow: visible;
+    flex: none;
+    padding: 10px 12px;
+  }
+  .document-canvas.wizard-flow .document-canvas__meta-sum {
+    position: static;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 10px 12px 12px;
+  }
+  .document-canvas.wizard-flow .dc-total {
+    position: static;
+    box-shadow: none;
+    padding: 10px 12px;
+  }
+  .document-canvas.wizard-flow .document-section-nav {
+    position: static;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .document-canvas.wizard-flow .document-canvas__footer-cta,
+  .document-canvas.wizard-flow .doccv-foot {
+    position: static;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 0.5px solid var(--app-separator, var(--border));
+    padding: 10px 12px;
+    background-color: var(--bw-material-bar, var(--card));
+  }
+  .document-canvas.wizard-flow .document-canvas__docbar {
+    position: static;
+    flex-shrink: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Positionen-Liste: etwas dichter, mehr sichtbare Zeilen */
+  .document-canvas.wizard-flow .pt2-row {
+    padding: 11px 12px;
+    min-height: 48px;
+  }
+  .document-canvas.wizard-flow .pt2-sub {
+    margin-bottom: 0;
+  }
+  .document-canvas.wizard-flow .postable2 {
+    gap: 6px;
+  }
+
   .document-canvas__footer-cta,
   .doccv-foot {
     display: flex;
@@ -15440,6 +15621,30 @@ select:focus-visible {
   body.kb-open .document-canvas__footer-cta,
   body.kb-open .doccv-foot {
     display: none;
+  }
+
+  /* Position bearbeiten / hinzufügen: Header+Footer mitscrollen */
+  .editor-sheet-overlay--bottom .editor-sheet--bottom,
+  .editor-sheet-overlay--over-wizard .editor-sheet--bottom {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    max-height: min(92vh, 100%);
+  }
+  .editor-sheet-overlay--bottom .editor-sheet__body,
+  .editor-sheet-overlay--over-wizard .editor-sheet__body {
+    overflow: visible;
+    flex: none;
+    min-height: auto;
+    padding: 12px 14px 16px;
+  }
+  .editor-sheet-overlay--bottom .editor-sheet__header,
+  .editor-sheet-overlay--over-wizard .editor-sheet__header,
+  .editor-sheet-overlay--bottom .editor-sheet__footer,
+  .editor-sheet-overlay--over-wizard .editor-sheet__footer {
+    position: static;
+    flex-shrink: 0;
   }
 }
 /* Mock `.crow` — CollapseRow in DocumentCanvas-Meta */

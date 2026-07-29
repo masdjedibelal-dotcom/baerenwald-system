@@ -28,9 +28,9 @@ export type DocumentCanvasProps = {
   document?: ReactNode
   /** Spec §6: Meta-Spalte (CollapseRow-Zeilen) */
   meta?: ReactNode
-  /** Sticky Summenblock unten in der Meta-Spalte */
+  /** Summenblock unten in der Meta-Spalte (mobil im Wizard mitscrollend) */
   metaSum?: ReactNode
-  /** Mobil: Sticky-Footer-CTA */
+  /** Mobil: Footer-CTA (im Positionswizard mitscrollend, nicht sticky) */
   footerCta?: ReactNode
   className?: string
   /** Portal fullscreen (default true) */
@@ -201,18 +201,25 @@ export function DocumentCanvas({
     }
   }, [open, mounted])
 
-  /* Spec §10 / §16: DocBar kompakt beim Scrollen */
+  /* Spec §10 / §16: DocBar kompakt beim Scrollen (Body oder Root bei Wizard-Mobil) */
   useEffect(() => {
     if (!open) return
     const body = bodyRef.current
-    if (!body) return
-    let lastY = body.scrollTop
+    const root = rootRef.current
+    if (!body && !root) return
+    let lastY = 0
     let ticking = false
+    const readY = () => {
+      const bodyY = body?.scrollTop ?? 0
+      const rootY = root?.scrollTop ?? 0
+      return bodyY > 0 ? bodyY : rootY
+    }
+    lastY = readY()
     const onScroll = () => {
       if (ticking) return
       ticking = true
       requestAnimationFrame(() => {
-        const y = body.scrollTop
+        const y = readY()
         const delta = y - lastY
         lastY = y
         if (y < 24) setBarCompact(false)
@@ -221,8 +228,12 @@ export function DocumentCanvas({
         ticking = false
       })
     }
-    body.addEventListener('scroll', onScroll, { passive: true })
-    return () => body.removeEventListener('scroll', onScroll)
+    body?.addEventListener('scroll', onScroll, { passive: true })
+    root?.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      body?.removeEventListener('scroll', onScroll)
+      root?.removeEventListener('scroll', onScroll)
+    }
   }, [open, mounted])
 
   if (!open || (portal && !mounted)) return null

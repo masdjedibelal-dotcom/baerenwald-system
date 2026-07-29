@@ -151,10 +151,13 @@ export type Hinweis35aAnteil = {
  * § 35a-Lohnanteil:
  * - Alles „Allgemein“ → gesamtes Rechnungsnetto als Lohnanteil
  * - Explizites Material → Rechnungsnetto abzüglich Material; Material wird ausgewiesen
+ * - Bei Teilrechnung/Schluss: `rechnungNetto` = Betrag dieser Rechnung (z. B. Rest nach Abschlag);
+ *   optional `vollNetto` skaliert ausgewiesenes Material anteilig
  */
 export function berechneHinweis35aAnteil(
   positionen: AngebotPosition[] | null | undefined,
-  rechnungNetto: number
+  rechnungNetto: number,
+  opts?: { vollNetto?: number | null }
 ): Hinweis35aAnteil {
   const netto = round2(Math.max(0, Number(rechnungNetto) || 0))
   let material = 0
@@ -168,6 +171,16 @@ export function berechneHinweis35aAnteil(
     material += (Number(p.material_netto) || 0) * m
   }
   material = round2(material)
+  const voll = Number(opts?.vollNetto)
+  if (
+    hatMaterial &&
+    material > 0 &&
+    Number.isFinite(voll) &&
+    voll > 0.02 &&
+    Math.abs(voll - netto) > 0.02
+  ) {
+    material = round2(material * (netto / voll))
+  }
   if (!hatMaterial || material <= 0) {
     return { lohn_netto: netto, material_netto: 0, hat_materialausweis: false }
   }
