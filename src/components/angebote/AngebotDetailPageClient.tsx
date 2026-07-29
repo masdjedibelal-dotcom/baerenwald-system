@@ -445,6 +445,7 @@ export function AngebotDetailPageClient({
           statusKey: statusEinfach,
         },
         {
+          onEdit: kannBearbeiten ? () => openWizardBearbeiten() : undefined,
           onCopy: () => runDuplicateAngebot(detail.id, router),
           onDelete: () => {
             startTransition(async () => {
@@ -487,7 +488,16 @@ export function AngebotDetailPageClient({
     }
 
     return items
-  }, [kundeName, detail.id, detail.lead_id, statusEinfach, auftragId, router, startTransition])
+  }, [
+    kundeName,
+    detail.id,
+    detail.lead_id,
+    statusEinfach,
+    auftragId,
+    router,
+    startTransition,
+    kannBearbeiten,
+  ])
 
   const primaryAction = useMemo((): DetailActionDef | null => {
     const cta = primaryCta('angebot', statusEinfach || detail.status)

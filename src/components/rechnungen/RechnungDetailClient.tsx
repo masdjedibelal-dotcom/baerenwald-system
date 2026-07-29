@@ -537,6 +537,12 @@ export function RechnungDetailClient({
           },
         },
         {
+          onEdit:
+            detail.status === 'storniert'
+              ? undefined
+              : detail.status === 'entwurf'
+                ? openWizard
+                : handleKorrigieren,
           onCopy: () => runDuplicateRechnung(detail.id, router),
           onDelete: rechnungDarfHardGeloeschtWerden(detail.status)
             ? () => {

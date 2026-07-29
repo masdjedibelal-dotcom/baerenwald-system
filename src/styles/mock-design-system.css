@@ -13854,6 +13854,10 @@ select:focus-visible {
 .editor-sheet-overlay--stack {
   z-index: 140;
 }
+/* Über Vollbild-Wizard / DocumentCanvas (z-index 400) — context="canvas" */
+.editor-sheet-overlay--over-wizard {
+  z-index: 500;
+}
 .editor-sheet-overlay--recessed {
   pointer-events: none;
   background: transparent;

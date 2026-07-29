@@ -78,7 +78,7 @@ export function EditorSheet({
   title,
   subtitle,
   crumb,
-  context: _context = 'detail',
+  context = 'detail',
   children,
   dirty = false,
   compose = false,
@@ -297,6 +297,8 @@ export function EditorSheet({
         className={cn(
           'editor-sheet-overlay',
           `editor-sheet-overlay--${layout}`,
+          /* Canvas/Wizard liegt bei z-index 400 — Sheet muss darüber (Position bearbeiten etc.) */
+          context === 'canvas' && 'editor-sheet-overlay--over-wizard',
           layout === 'slide' && 'justify-end',
           overlayClassName
         )}
