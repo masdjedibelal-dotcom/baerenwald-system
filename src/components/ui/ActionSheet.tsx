@@ -49,7 +49,7 @@ export function ActionSheet({
       />
 
       <div
-        className="z-modal fixed bottom-0 left-0 right-0 max-h-[min(85vh,640px)] animate-slide-up overflow-hidden rounded-t-2xl bg-white md:hidden"
+        className="z-modal fixed bottom-0 left-0 right-0 max-h-[min(85vh,640px)] animate-slide-up overflow-hidden rounded-t-2xl border-x border-t border-bw-border bg-white shadow-2xl md:hidden"
         role="dialog"
         aria-modal="true"
         aria-label={title}

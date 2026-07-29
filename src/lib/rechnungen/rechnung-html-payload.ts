@@ -22,6 +22,7 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import {
+  berechneHinweis35aAnteil,
   berechneRechnung,
   parseKleinunternehmerSetting,
   resolveRechnungHinweis35a,
@@ -73,6 +74,17 @@ function firmKontaktZeile(f: FirmenEinstellungen): string {
 function zahlungstext(firm: FirmenEinstellungen): string {
   const tage = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || 14)
   return `Zahlbar innerhalb von ${tage} Tagen nach Rechnungserhalt ohne Abzug.`
+}
+
+/** Kaputte Mehrfach-„ohne Abzug“-Fragmente aus älteren Daten bereinigen. */
+function sanitizeZahlungsbedingungen(raw: string | null | undefined, firm: FirmenEinstellungen): string {
+  const cur = (raw ?? '').trim()
+  if (!cur) return zahlungstext(firm)
+  return cur
+    .replace(/(?:\s*ohne Abzug\.?)+/gi, ' ohne Abzug.')
+    .replace(/\.\s*\./g, '.')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 type AngebotJoin = AngebotLeistungsumfangQuelle | AngebotLeistungsumfangQuelle[] | null | undefined
@@ -155,6 +167,8 @@ export function buildRechnungHtmlInput(
   const kostenaufstellung =
     istSchluss && privat ? null : summenKostenaufstellungAusPositionen(positionen)
 
+  const anteil35a = berechneHinweis35aAnteil(positionen, berechnung.netto)
+
   let schluss_abrechnung: AngebotHtmlInput['schluss_abrechnung'] = null
   if (istSchluss) {
     const schluss = berechneSchlussAbrechnung(positionen, opts?.vorherigeAbschlaege ?? [], {
@@ -222,7 +236,7 @@ export function buildRechnungHtmlInput(
   const hinweis35a = resolveRechnungHinweis35a(
     row.hinweis_35a,
     row.kunden.typ,
-    kostenaufstellung?.lohn_netto ?? 0,
+    anteil35a.lohn_netto,
     kleinunternehmer
   )
 
@@ -259,7 +273,7 @@ export function buildRechnungHtmlInput(
       projektTitel && projektTitel !== 'Rechnung' ? projektTitel : undefined,
     begruessung: angebotPdfBegruessung(anrede, anredeCtx),
     einleitung,
-    zahlungsbedingungen: row.zahlungsbedingungen?.trim() || zahlungstext(firm),
+    zahlungsbedingungen: sanitizeZahlungsbedingungen(row.zahlungsbedingungen, firm),
     hinweise: hinweiseParts.length ? hinweiseParts.join('\n\n') : null,
     positionen: mapAngebotPositionenToTemplateRows(positionen, gewerke),
     summen: {
@@ -273,6 +287,8 @@ export function buildRechnungHtmlInput(
       hinweis_35a: hinweis35a,
       hinweis_19: kleinunternehmer,
       hinweis_13b: Boolean(row.reverse_charge_13b),
+      lohn_netto_35a: anteil35a.lohn_netto,
+      material_netto_35a: anteil35a.hat_materialausweis ? anteil35a.material_netto : 0,
     },
     dokument_typ: 'einfach',
     rechnung_typ:

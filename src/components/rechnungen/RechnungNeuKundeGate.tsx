@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas, DocumentSection } from '@/components/surfaces/DocumentCanvas'
 import { DashedAddCard } from '@/components/surfaces/primitives'
@@ -22,19 +22,21 @@ export function RechnungNeuKundeGate({
   const [pickerOpen, setPickerOpen] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [opening, setOpening] = useState(false)
+  const openingRef = useRef(false)
 
   useEffect(() => {
     if (initialError?.trim()) toast.error(initialError.trim())
   }, [initialError])
 
   function goWizard(kundeId: string) {
+    openingRef.current = true
     setOpening(true)
     setPickerOpen(false)
     router.replace(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
   }
 
   function dismiss() {
-    if (opening) return
+    if (openingRef.current || opening) return
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return
@@ -84,6 +86,7 @@ export function RechnungNeuKundeGate({
         }}
         title="Rechnung"
         context="canvas"
+        manageHistory={false}
         onNeu={() => setCreateOpen(true)}
         onPick={(k: Kunde) => goWizard(k.id)}
       />

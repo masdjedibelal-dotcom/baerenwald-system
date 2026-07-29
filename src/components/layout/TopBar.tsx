@@ -83,7 +83,7 @@ function pathToBreadcrumbs(pathname: string): {
                   ? 'Vorschau'
                   : ''
 
-  // Detail-Routen: TopBar zeigt „Vorgänge › Anfrage“ statt „Anfragen › Anfragen“
+  // Vorgangs-Detail: kein Breadcrumb / kein Phasen-Titel — mehr Platz für Inhalt
   const isUuidLike = /^[0-9a-f-]{8,}$/i.test(segments[1] ?? '')
   const isVorgangDetail =
     ['anfragen', 'angebote', 'auftraege', 'rechnungen'].includes(section) &&
@@ -91,19 +91,7 @@ function pathToBreadcrumbs(pathname: string): {
     isUuidLike
 
   if (isVorgangDetail) {
-    const phaseTitle =
-      section === 'anfragen'
-        ? 'Anfrage'
-        : section === 'angebote'
-          ? 'Angebot'
-          : section === 'auftraege'
-            ? 'Auftrag'
-            : 'Rechnung'
-    return {
-      title: tailLabel || phaseTitle,
-      parents: [{ label: 'Vorgänge', href: '/vorgaenge' }],
-      cta: undefined,
-    }
+    return { title: '', parents: [], cta: undefined }
   }
 
   return {
@@ -149,7 +137,7 @@ export function TopBar({ user }: TopBarProps) {
       <div className="topbar-stack">
         <header className="topbar">
           {/* Desktop: Titel/Breadcrumbs. Mobil: nur Suche + Assistent + Profil. */}
-          <div className="topbar-title">
+          <div className={cn('topbar-title', !title && !parents.length && 'topbar-title--empty')}>
             {parentHref ? (
               <Link href={parentHref} aria-label="Zurück" className="topbar-back">
                 <ArrowLeft className="h-5 w-5" />
@@ -168,7 +156,7 @@ export function TopBar({ user }: TopBarProps) {
                 </span>
               )
             )}
-            <span className="topbar-title-text truncate">{title}</span>
+            {title ? <span className="topbar-title-text truncate">{title}</span> : null}
           </div>
 
           <TopBarSearch />
@@ -243,15 +231,17 @@ export function TopBar({ user }: TopBarProps) {
           </div>
         </header>
 
-        {/* Mobil: Screen-Titel unter der Suchleiste (nicht im Header) */}
-        <div className="mobile-screen-title">
-          {parentHref ? (
-            <Link href={parentHref} aria-label="Zurück" className="mobile-screen-title-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          ) : null}
-          <h1 className="mobile-screen-title-text">{title}</h1>
-        </div>
+        {/* Mobil: Screen-Titel nur wenn Inhalt (sonst leerer Streifen) */}
+        {title || parentHref ? (
+          <div className="mobile-screen-title">
+            {parentHref ? (
+              <Link href={parentHref} aria-label="Zurück" className="mobile-screen-title-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            ) : null}
+            {title ? <h1 className="mobile-screen-title-text">{title}</h1> : null}
+          </div>
+        ) : null}
       </div>
   )
 }

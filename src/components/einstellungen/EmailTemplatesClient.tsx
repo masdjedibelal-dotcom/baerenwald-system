@@ -124,12 +124,12 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
 
   return (
     <div className="space-y-4">
-      <Card title="System-E-Mails">
+      <Card title="System-E-Mails" className="einst-list-card">
         <EinstellungenListBody empty={templates.length === 0 ? 'Keine Templates konfiguriert.' : undefined}>
           {templates.map((t) => (
             <EinstellungenListItem key={t.id}>
               <div className="min-w-0 flex-1">
-                <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{t.name}</p>
+                <p className="einst-list-title">{t.name}</p>
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
               <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>

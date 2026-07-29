@@ -10,6 +10,7 @@ import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { splitDeutscherVollname } from '@/lib/kunde-namen'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 function telHref(tel: string) {
@@ -56,6 +57,7 @@ export function EntityKundenStammdatenCard({
   const [sheetOpen, setSheetOpen] = useState(false)
   const [draft, setDraft] = useState(initial)
   const [pending, startTransition] = useTransition()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (!sheetOpen) setDraft(initial)
@@ -146,7 +148,7 @@ export function EntityKundenStammdatenCard({
 
   return (
     <>
-      <div className="card">
+      <div className={cn('card', isMobile && 'stammdaten-card--mobile')}>
         <div className="card-h">
           <div className="card-title title">Stammdaten</div>
           {canEdit ? (
@@ -162,28 +164,14 @@ export function EntityKundenStammdatenCard({
           ) : null}
         </div>
         <div className="card-b">
-          <div className="vgid">
+          <div className={cn('vgid', isMobile && 'vgid--compact')}>
             <div className="vgid-name">{draft.name.trim() || '—'}</div>
             {metaParts.length > 0 ? (
               <div className="vgid-meta">{metaParts.join(' · ')}</div>
             ) : null}
 
-            {(draft.telefon.trim() ||
-              draft.email.trim() ||
-              kundeId?.trim()) && (
-              <div className="vgid-chips">
-                {draft.telefon.trim() ? (
-                  <a className="vgid-chip" href={telHref(draft.telefon)}>
-                    <MockIcon ctx="default" n="phone" size={14} />
-                    {draft.telefon.trim()}
-                  </a>
-                ) : null}
-                {draft.email.trim() ? (
-                  <a className="vgid-chip" href={`mailto:${draft.email.trim()}`}>
-                    <MockIcon ctx="default" n="mail" size={14} />
-                    {draft.email.trim()}
-                  </a>
-                ) : null}
+            {isMobile ? (
+              <div className="vgid-chips vgid-chips--compact">
                 {kundeId?.trim() && !hideKundeLink ? (
                   <Link
                     className="vgid-chip ghost"
@@ -194,13 +182,52 @@ export function EntityKundenStammdatenCard({
                   </Link>
                 ) : null}
               </div>
+            ) : (
+              (draft.telefon.trim() ||
+                draft.email.trim() ||
+                kundeId?.trim()) && (
+                <div className="vgid-chips">
+                  {draft.telefon.trim() ? (
+                    <a className="vgid-chip" href={telHref(draft.telefon)}>
+                      <MockIcon ctx="default" n="phone" size={14} />
+                      {draft.telefon.trim()}
+                    </a>
+                  ) : null}
+                  {draft.email.trim() ? (
+                    <a className="vgid-chip" href={`mailto:${draft.email.trim()}`}>
+                      <MockIcon ctx="default" n="mail" size={14} />
+                      {draft.email.trim()}
+                    </a>
+                  ) : null}
+                  {kundeId?.trim() && !hideKundeLink ? (
+                    <Link
+                      className="vgid-chip ghost"
+                      href={`/kunden/${kundeId.trim()}`}
+                    >
+                      <MockIcon ctx="default" n="user" size={14} />
+                      Kundenakte
+                    </Link>
+                  ) : null}
+                </div>
+              )
             )}
 
-            <StammdatenPortalZeile
-              kundeId={kundeId}
-              fallbackEmail={draft.email}
-              variant="vgid"
-            />
+            {!isMobile ? (
+              <StammdatenPortalZeile
+                kundeId={kundeId}
+                fallbackEmail={draft.email}
+                variant="vgid"
+              />
+            ) : kundeId?.trim() ? (
+              <details className="vgid-portal-fold">
+                <summary>Portal</summary>
+                <StammdatenPortalZeile
+                  kundeId={kundeId}
+                  fallbackEmail={draft.email}
+                  variant="vgid"
+                />
+              </details>
+            ) : null}
           </div>
         </div>
       </div>

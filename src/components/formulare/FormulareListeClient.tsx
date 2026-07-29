@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { DokumentPdfVorlagenSection } from '@/components/formulare/DokumentPdfVorlagenSection'
 import { FormularCreateSheet } from '@/components/formulare/FormularCreateSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import type { FormularListeZeile } from '@/app/(dashboard)/formulare/actions'
 import type { DokumentPdfMusterEintrag } from '@/lib/templates/dokument-pdf-muster'
 
@@ -22,34 +23,15 @@ function Sec({
   children: ReactNode
 }) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
+    <section className="formulare-sec">
+      <div className="formulare-sec__head">
         {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
-        >
-          {title}
-        </span>
+        <span className="formulare-sec__title">{title}</span>
         <div style={{ flex: 1 }} />
         {actions}
       </div>
       <div>{children}</div>
-    </div>
+    </section>
   )
 }
 
@@ -72,6 +54,7 @@ export function FormulareListeClient({
   dokumentVorlagen?: DokumentPdfMusterEintrag[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [rows] = useState(templates)
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -100,8 +83,11 @@ export function FormulareListeClient({
           </p>
         ) : (
           <>
-            <div className="listcard">
-              <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
+            <div
+              className="listcard listcard--cols"
+              style={{ ['--list-cols' as string]: COLS }}
+            >
+              <div className="list-row head" aria-hidden>
                 <div>Name</div>
                 <div>Typ</div>
                 <div>Genutzt</div>
@@ -109,55 +95,68 @@ export function FormulareListeClient({
               </div>
               {aktiv.map((f) => {
                 const fields = f.felder?.length ?? 0
+                const typ = typLabel(f)
+                const open = () => router.push(`/formulare/${f.id}/bearbeiten`)
                 return (
                   <div
                     key={f.id}
                     role="button"
                     tabIndex={0}
                     className="list-row"
-                    style={{
-                      gridTemplateColumns: COLS,
-                      cursor: 'pointer',
-                      alignItems: 'center',
-                    }}
-                    onClick={() => router.push(`/formulare/${f.id}/bearbeiten`)}
+                    style={{ cursor: 'pointer', alignItems: 'center' }}
+                    onClick={open}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        router.push(`/formulare/${f.id}/bearbeiten`)
+                        open()
                       }
                     }}
                   >
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 'var(--fs-text)',
-                          fontWeight: 500,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {f.name}
-                      </div>
-                      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
-                        {fields} Feld{fields === 1 ? '' : 'er'}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
-                      {typLabel(f)}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
-                      {f.genutzt}×
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
-                      <MockIcon ctx="default" n="chevron-right" size={16} />
-                    </div>
+                    {isMobile ? (
+                      <>
+                        <div className="lc-title">{f.name}</div>
+                        <div className="lc-pills">
+                          <span className="pill-tag">{typ}</span>
+                        </div>
+                        <div className="lc-sub">
+                          {fields} Feld{fields === 1 ? '' : 'er'} · {f.genutzt}× genutzt
+                        </div>
+                        <div className="row-actions" style={{ color: 'var(--text-4)' }}>
+                          <MockIcon ctx="default" n="chevron-right" size={16} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 'var(--fs-text)',
+                              fontWeight: 600,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {f.name}
+                          </div>
+                          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
+                            {fields} Feld{fields === 1 ? '' : 'er'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>{typ}</div>
+                        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
+                          {f.genutzt}×
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
+                          <MockIcon ctx="default" n="chevron-right" size={16} />
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })}
             </div>
-            <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
+            <p className="formulare-sec__count">
               {aktiv.length} Formular{aktiv.length === 1 ? '' : 'e'}
             </p>
           </>

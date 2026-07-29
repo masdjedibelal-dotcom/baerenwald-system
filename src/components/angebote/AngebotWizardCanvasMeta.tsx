@@ -73,13 +73,19 @@ export function TotBand({
   brutto,
   ustLabel = 'MwSt',
   showUst = true,
+  bereitsGezahlt,
+  restBrutto,
 }: {
   netto: number
   ust: number
   brutto: number
   ustLabel?: string
   showUst?: boolean
+  /** Schlussrechnung: Abschläge abziehen */
+  bereitsGezahlt?: Array<{ label: string; brutto: number }> | null
+  restBrutto?: number | null
 }) {
+  const hatAbzug = Boolean(bereitsGezahlt?.length && (restBrutto == null || restBrutto >= 0))
   return (
     <div className="totband">
       {showUst ? (
@@ -94,10 +100,24 @@ export function TotBand({
           </div>
         </>
       ) : null}
-      <div className="totband-t">
-        <span>{showUst ? 'Brutto' : 'Gesamt'}</span>
+      <div className={hatAbzug ? 'totband-r' : 'totband-t'}>
+        <span>{showUst ? (hatAbzug ? 'Brutto' : 'Brutto') : 'Gesamt'}</span>
         <span>{formatEurBetrag(brutto)}</span>
       </div>
+      {hatAbzug
+        ? bereitsGezahlt!.map((z) => (
+            <div key={z.label} className="totband-r">
+              <span>Bereits gezahlt · {z.label}</span>
+              <span>−{formatEurBetrag(z.brutto)}</span>
+            </div>
+          ))
+        : null}
+      {hatAbzug && restBrutto != null ? (
+        <div className="totband-t">
+          <span>Restsumme</span>
+          <span>{formatEurBetrag(restBrutto)}</span>
+        </div>
+      ) : null}
     </div>
   )
 }

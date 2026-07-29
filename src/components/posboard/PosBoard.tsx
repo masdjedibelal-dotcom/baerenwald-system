@@ -5,13 +5,14 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { PositionModal } from '@/components/posboard/PositionModal'
+import { PositionAddSheet, type PositionAddMode } from '@/components/posboard/PositionAddSheet'
 import type { PosAddKind } from '@/components/posboard/PosAddRow'
+import { guardSheetPointerFallthrough } from '@/lib/surfaces/editor-sheet-history'
 import {
   PosTable,
   type PosTableBadge,
   type PosTableGroup,
 } from '@/components/posboard/PosTable'
-import { KatalogPickModal } from '@/components/posboard/KatalogPickModal'
 import {
   PosBoardKiSuggestions,
   type PosBoardSuggestContext,
@@ -39,6 +40,8 @@ export type PosBoardProps = {
   positionen: PosBoardLine[]
   onChange?: (next: PosBoardLine[]) => void
   showUst?: boolean
+  /** Summenfuß unter der Tabelle — default: wie showUst */
+  showTotals?: boolean
   title?: string
   renderEditor?: (
     position: PosBoardLine,
@@ -101,6 +104,7 @@ export function PosBoard({
   positionen: positionenProp,
   onChange,
   showUst = true,
+  showTotals,
   title,
   renderEditor,
   lineOf,
@@ -126,7 +130,8 @@ export function PosBoard({
   const [gName, setGName] = useState('')
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [preislisteOpen, setPreislisteOpen] = useState(false)
-  const [katalogOpen, setKatalogOpen] = useState(false)
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [addSheetMode, setAddSheetMode] = useState<PositionAddMode>('preisliste')
   const [preislistePick, setPreislistePick] = useState('')
   const [preislisteTargetGewerk, setPreislisteTargetGewerk] = useState<string | null>(null)
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
@@ -172,7 +177,14 @@ export function PosBoard({
     return gewerkOf(positionen[positionen.length - 1])
   }
 
-  const addPosition = (gewerk: string) => {
+  const addPosition = (gewerk: string, draft?: {
+    name: string
+    beschreibung: string
+    menge: number
+    einheit: string
+    preis: number
+    ust: number
+  }) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np: PosBoardLine = makeNew
@@ -183,18 +195,39 @@ export function PosBoard({
           position_quelle: 'frei',
           variante_id: null,
           preisliste_id: null,
+          ...(draft
+            ? {
+                name: draft.name,
+                beschreibung: draft.beschreibung,
+                menge: draft.menge,
+                einheit: draft.einheit,
+                preis: draft.preis,
+                ust: draft.ust,
+              }
+            : {}),
         }
       : neuePosBoardLine({
           gewerk: gewerk || '',
           id,
           kind: 'position',
-          name: '',
+          name: draft?.name ?? '',
+          beschreibung: draft?.beschreibung ?? '',
+          menge: draft?.menge ?? 1,
+          einheit: draft?.einheit ?? 'Stück',
+          preis: draft?.preis ?? 0,
+          ust: draft?.ust ?? 19,
           position_quelle: 'frei',
           variante_id: null,
           preisliste_id: null,
         })
     onChange([...positionen, np])
-    setEditId(id)
+    setEditId(draft?.name?.trim() ? null : id)
+  }
+
+  const openAddSheet = (gewerk: string, mode: PositionAddMode = 'preisliste') => {
+    setPreislisteTargetGewerk(gewerk)
+    setAddSheetMode(mode)
+    setAddSheetOpen(true)
   }
 
   const addFreitext = (gewerk?: string) => {
@@ -296,18 +329,14 @@ export function PosBoard({
       position_quelle: 'katalog',
     })
     onChange([...positionen, np])
-    setEditId(id)
   }
 
   const onAddKind = (kind: PosAddKind, gewerk?: string) => {
     const target = gewerk?.trim() || defaultGewerk()
-    if (kind === 'position') addPosition(target)
-    else if (kind === 'freitext') addFreitext(target)
+    if (kind === 'position' || kind === 'preisliste') {
+      openAddSheet(target, 'preisliste')
+    } else if (kind === 'freitext') addFreitext(target)
     else if (kind === 'nachlass') addNachlass()
-    else if (kind === 'preisliste') {
-      setPreislisteTargetGewerk(target)
-      setKatalogOpen(true)
-    }
   }
 
   const addGewerk = () => {
@@ -331,7 +360,7 @@ export function PosBoard({
     setGewerkAddOpen(false)
     setGewerkAddPick('')
     setGewerkAddCustom('')
-    addPosition(name)
+    openAddSheet(name, 'preisliste')
   }
 
   const renameGewerk = (from: string, to: string) => {
@@ -513,7 +542,10 @@ export function PosBoard({
   const helpers = editP
     ? {
         onChange: (patch: Partial<PosBoardLine>) => update(editP.id, patch),
-        onClose: () => setEditId(null),
+        onClose: () => {
+          guardSheetPointerFallthrough()
+          setEditId(null)
+        },
         onRemove: () => remove(editP.id),
       }
     : null
@@ -581,7 +613,7 @@ export function PosBoard({
             gap: 10,
             padding: '10px 14px',
             marginBottom: 10,
-            background: 'var(--green-dark)',
+            background: '#5a615d',
             color: '#fff',
             borderRadius: 10,
             boxShadow: 'var(--shadow-pop)',
@@ -670,7 +702,7 @@ export function PosBoard({
             ? (id, menge) => update(id, { menge })
             : undefined
         }
-        showTotals={showUst !== false}
+        showTotals={showTotals ?? showUst !== false}
         netto={netto}
         ust={ust}
         brutto={brutto}
@@ -798,15 +830,34 @@ export function PosBoard({
           </div>
         </MockModal>
       ) : null}
-      {katalogOpen ? (
-        <KatalogPickModal
+      {addSheetOpen ? (
+        <PositionAddSheet
           open
+          initialMode={addSheetMode}
           preferredGewerkName={preislisteTargetGewerk}
+          gewerke={gewerkOptions}
+          showUst={showUst}
           onClose={() => {
-            setKatalogOpen(false)
+            setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)
           }}
-          onPick={addFromKatalog}
+          onPickKatalog={(r) => {
+            addFromKatalog(r)
+            setAddSheetOpen(false)
+            setPreislisteTargetGewerk(null)
+          }}
+          onAddFrei={(draft) => {
+            addPosition(draft.gewerk, {
+              name: draft.name,
+              beschreibung: draft.beschreibung,
+              menge: draft.menge,
+              einheit: draft.einheit,
+              preis: draft.preis,
+              ust: draft.ust,
+            })
+            setAddSheetOpen(false)
+            setPreislisteTargetGewerk(null)
+          }}
         />
       ) : null}
       {preislisteOpen ? (

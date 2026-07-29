@@ -21,9 +21,7 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
-import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
-import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -1029,7 +1027,6 @@ export function HandwerkerDetailClient({
 
   return (
     <>
-      <MockDetailBackLink href="/handwerker" label="Zurück zu Handwerker" />
       <DetailHead
         title={handwerkerDisplayName(hw)}
         titleBadges={<ComplianceBadge status={hw.compliance_status} />}
@@ -1062,36 +1059,6 @@ export function HandwerkerDetailClient({
           </>
         }
         actions={<DetailActionsBar sheetTitle="Handwerker" menuItems={handwerkerMenuItems} />}
-      />
-
-      <NextStepBar
-        step={{
-          label:
-            wirtschaftSnap.aktiveEinsaetze > 0
-              ? `→ ${wirtschaftSnap.aktiveEinsaetze} Einsätze aktiv`
-              : '→ Keine aktiven Einsätze',
-          hint:
-            wirtschaftSnap.offenesVolumen > 0
-              ? `${Math.round(wirtschaftSnap.offenesVolumen).toLocaleString('de-DE')} € offen`
-              : undefined,
-        }}
-        metrics={[
-          {
-            label: 'Volumen',
-            value: `${Math.round(payload.stats.volumen || wirtschaftSnap.umsatz).toLocaleString('de-DE')} €`,
-          },
-          {
-            label: 'Bewertung',
-            value:
-              bewertungGesamt != null && bewertungGesamt > 0
-                ? formatHandwerkerBewertung(bewertungGesamt)
-                : '—',
-          },
-          {
-            label: 'Annahmequote',
-            value: payload.stats.quote != null ? `${payload.stats.quote} %` : '—',
-          },
-        ]}
       />
 
       <DetailShell

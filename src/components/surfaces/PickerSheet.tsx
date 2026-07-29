@@ -20,6 +20,8 @@ export type PickerSheetProps = {
   searchPlacement?: 'top' | 'bottom'
   empty?: ReactNode
   className?: string
+  /** Siehe EditorSheet — aus bei Picker vor Navigation */
+  manageHistory?: boolean
 }
 
 /** Liste wählen + optional Neu (Header-+). */
@@ -35,6 +37,7 @@ export function PickerSheet({
   searchPlacement = 'bottom',
   empty,
   className,
+  manageHistory = true,
 }: PickerSheetProps) {
   const headerEnd = onNeu ? (
     <button
@@ -57,6 +60,7 @@ export function PickerSheet({
       headerEnd={headerEnd}
       className={className}
       bodyClassName="picker-sheet__body"
+      manageHistory={manageHistory}
     >
       {sourceChips && sourceChips.length > 0 ? (
         <div className="picker-sheet__chips" role="group" aria-label="Quelle">

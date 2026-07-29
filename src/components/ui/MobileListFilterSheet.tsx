@@ -47,6 +47,7 @@ export function MobileListFilterSheet({
     >
       <button type="button" className="mobile-filter-sheet__backdrop" aria-label="Schließen" onClick={onClose} />
       <div className="mobile-filter-sheet__panel">
+        <div className="sheet-grabber" aria-hidden />
         <header className="mobile-filter-sheet__header">
           <button type="button" onClick={onClose} className="mobile-filter-sheet__close" aria-label="Schließen">
             <X className="h-5 w-5" aria-hidden />

@@ -83,10 +83,20 @@ export type RechnungWizardBootstrap = {
   /** Bestand: von Auftrag übernommen oder manuell */
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /**
+   * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
+   * nur Mail → ohne Storno.
+   */
+  korrekturKontext?: {
+    originalStatus: string
+    originalNr: string
+    materialFingerprint: string
+  } | null
 }
 
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
-  return status === 'entwurf'
+  const s = (status ?? '').toLowerCase()
+  return s === 'entwurf' || s === 'gesendet' || s === 'bezahlt' || s === 'versendet'
 }
 
 function addDaysYmd(ymd: string, days: number): string {

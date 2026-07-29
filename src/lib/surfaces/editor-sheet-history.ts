@@ -12,6 +12,21 @@ type SheetEntry = {
 const stack: SheetEntry[] = []
 let suppressPop = 0
 let listening = false
+let fallthroughTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Nach Sheet-Close: Ghost-Clicks/Touches auf die Zeile darunter blockieren
+ * (sonst öffnet sich das Sheet sofort wieder — wirkt wie „lässt sich nicht schließen“).
+ */
+export function guardSheetPointerFallthrough(ms = 320) {
+  if (typeof document === 'undefined') return
+  if (fallthroughTimer) clearTimeout(fallthroughTimer)
+  document.body.style.pointerEvents = 'none'
+  fallthroughTimer = setTimeout(() => {
+    fallthroughTimer = null
+    document.body.style.pointerEvents = ''
+  }, ms)
+}
 
 function onWindowPopState() {
   if (suppressPop > 0) {

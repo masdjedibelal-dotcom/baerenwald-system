@@ -7,6 +7,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
 
 const COLS = '28px 1.6fr 1fr 120px 110px 70px'
@@ -41,16 +42,16 @@ function isImageDoc(name: string, url: string): boolean {
   return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(`${name} ${url}`)
 }
 
-/** Badge-Zähler: Lead-Uploads + Angebot-PDF (+ Projektfotos nur ohne Lead-Upload-UI). */
+/** Badge-Zähler: Lead-Uploads + Angebot-PDF (+ Projektfotos nur ohne Lead-Upload-UI) + Rechnungen. */
 export function anzahlAngebotAnhaenge(
   detail: AngebotDetail,
   leadDokumente?: LeadDokumentRow[] | null,
-  opts?: { includeFotos?: boolean }
+  opts?: { includeFotos?: boolean; rechnungenCount?: number }
 ): number {
   const uploads = Array.isArray(leadDokumente) ? leadDokumente.length : 0
   const fotos =
     opts?.includeFotos === false ? 0 : parseProjektFotos(detail.fotos_urls).length
-  return uploads + 1 + fotos
+  return uploads + 1 + fotos + (opts?.rechnungenCount ?? 0)
 }
 
 /**
@@ -61,11 +62,24 @@ export function AngebotAnhaengeTab({
   detail,
   leadId,
   dokumente = [],
+  rechnungen = [],
   onReload,
 }: {
   detail: AngebotDetail
   leadId?: string | null
   dokumente?: LeadDokumentRow[]
+  rechnungen?: {
+    id: string
+    created_at?: string | null
+    rechnungsnummer?: string | null
+    status?: string | null
+    rechnungsdatum?: string | null
+    gesendet_at?: string | null
+    pdf_url?: string | null
+    rechnung_art?: string | null
+    abschlag_index?: number | null
+    beleg_typ?: string | null
+  }[]
   onReload?: () => void
 }) {
   if (leadId?.trim() && onReload) {
@@ -81,6 +95,7 @@ export function AngebotAnhaengeTab({
             pdf_url: detail.pdf_url,
           },
         ]}
+        rechnungen={rechnungen}
         onReload={onReload}
       />
     )
@@ -91,6 +106,7 @@ export function AngebotAnhaengeTab({
 
 function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   const [view, setView] = useState<DocRow | null>(null)
+  const isMobile = useIsMobile()
   const erstellt = detail.updated_at || detail.created_at
   const pdfHref = detail.pdf_url?.trim() || `/api/angebote/${detail.id}/pdf`
 
@@ -122,7 +138,47 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   return (
     <>
       <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
-        {docs.length === 0 ? null : (
+        {docs.length === 0 ? null : isMobile ? (
+          <div className="dok-cards">
+            {docs.map((d) => (
+              <div
+                key={d.id}
+                className="dok-card dok-card--tappable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setView(d)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setView(d)
+                  }
+                }}
+              >
+                <div className="dok-card__icon" aria-hidden>
+                  <MockIcon ctx="row" n={d.isImage ? 'photo' : 'file-text'} size={18} />
+                </div>
+                <div className="dok-card__body">
+                  <div className="dok-card__top">
+                    <span className="dok-card__title">{d.name}</span>
+                    <div
+                      className="dok-card__actions"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
+                    </div>
+                  </div>
+                  <div className="dok-card__meta">
+                    {[d.beschreibung || null, formatDatum(d.created_at)].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="dok-card__foot">
+                    <span className="dok-card__tag dok-card__tag--muted">intern</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
           <div className="dok-list">
             <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
               <div />

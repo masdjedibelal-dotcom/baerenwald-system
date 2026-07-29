@@ -192,14 +192,18 @@ export async function loadProjektKontext(
   if (auftragId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, created_at')
+      .select(
+        'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
+      )
       .eq('auftrag_id', auftragId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   } else if (angebotId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select('id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, created_at')
+      .select(
+        'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
+      )
       .eq('angebot_id', angebotId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]

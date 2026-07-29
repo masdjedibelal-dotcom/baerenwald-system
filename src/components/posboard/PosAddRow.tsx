@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { AlignLeft, ListFilter, Percent, Plus } from 'lucide-react'
+import { AlignLeft, Percent, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type PosAddKind = 'position' | 'preisliste' | 'freitext' | 'nachlass'
@@ -13,15 +13,9 @@ const OPTIONS: {
   icon: ReactNode
 }[] = [
   {
-    kind: 'preisliste',
-    label: 'Aus Katalog',
-    sub: 'Leistung suchen',
-    icon: <ListFilter className="h-4 w-4" />,
-  },
-  {
     kind: 'position',
-    label: 'Manuell',
-    sub: 'Titel · Menge · Preis',
+    label: 'Position',
+    sub: 'Preisliste oder frei',
     icon: <Plus className="h-4 w-4" />,
   },
   {
@@ -38,7 +32,7 @@ const OPTIONS: {
   },
 ]
 
-/** Mock-Toolbar: 4 Möglichkeiten Positionen hinzuzufügen. */
+/** Toolbar: Position (Sheet) · Freitext · Nachlass. */
 export function PosAddRow({
   onAdd,
   disabledKinds,

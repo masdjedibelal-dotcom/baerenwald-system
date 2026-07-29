@@ -12,6 +12,7 @@ import {
   MockPager,
   MockSortHead,
 } from '@/components/mock-ui'
+import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
@@ -206,7 +207,6 @@ export function VorgaengeListeClient({
   const [fDatumVon, setFDatumVon] = useState('')
   const [fDatumBis, setFDatumBis] = useState('')
   const [lifecycle, setLifecycle] = useState<'offen' | 'erledigt'>('offen')
-  const [lifecycleOpen, setLifecycleOpen] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
@@ -611,18 +611,28 @@ export function VorgaengeListeClient({
   }, [router, selectedRows])
 
   const paginationResetKey = `${lifecycle}|${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
-  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
-    filtered,
-    12,
-    paginationResetKey
-  )
+  const {
+    pageItems,
+    infiniteItems,
+    hasMore,
+    loadMore,
+    visibleCount,
+    pageIndex,
+    totalPages,
+    total,
+    pageSize,
+    setPageIndex,
+  } = useListPage(filtered, 12, paginationResetKey)
 
   function openDetail(href: string) {
     router.push(href)
   }
 
+  const isMobile = useIsMobile()
+  const displayItems = isMobile ? infiniteItems : pageItems
+
   const allPageSelected =
-    pageItems.length > 0 && pageItems.every((v) => selected[rowKey(v)])
+    displayItems.length > 0 && displayItems.every((v) => selected[rowKey(v)])
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
 
@@ -637,8 +647,6 @@ export function VorgaengeListeClient({
     })
     setSelected(n)
   }
-
-  const isMobile = useIsMobile()
 
   const filterFooter = (
     <>
@@ -792,6 +800,32 @@ export function VorgaengeListeClient({
         <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
+          leading={
+            <div className="segment-toggle segment-toggle--listbar" role="group" aria-label="Lebenszyklus">
+              <button
+                type="button"
+                className={cn(
+                  'segment-toggle-btn',
+                  lifecycle === 'offen' && 'segment-toggle-btn--active'
+                )}
+                onClick={() => setLifecycleFilter('offen')}
+              >
+                Offen
+                <span className="segment-toggle-count">{lifecycleCounts.offen}</span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'segment-toggle-btn',
+                  lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+                )}
+                onClick={() => setLifecycleFilter('erledigt')}
+              >
+                Erledigt
+                <span className="segment-toggle-count">{lifecycleCounts.erledigt}</span>
+              </button>
+            </div>
+          }
           items={[
             {
               icon: 'filter',
@@ -799,15 +833,6 @@ export function VorgaengeListeClient({
               hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
               active: activeFilterCount > 0,
               onSelect: () => setFilterOpen(true),
-            },
-            {
-              icon: 'refresh',
-              label: 'Offen / Erledigt',
-              hint:
-                lifecycle === 'offen'
-                  ? `Offen ${lifecycleCounts.offen}`
-                  : `Erledigt ${lifecycleCounts.erledigt}`,
-              onSelect: () => setLifecycleOpen(true),
             },
             {
               icon: 'layout',
@@ -922,43 +947,6 @@ export function VorgaengeListeClient({
           {filterFields}
         </MockModal>
       )}
-
-      <MockModal
-        open={lifecycleOpen}
-        onClose={() => setLifecycleOpen(false)}
-        icon="refresh"
-        title="Offen / Erledigt"
-        sub="Lebenszyklus der Liste"
-        size="sm"
-        footer={
-          <MockBtn kind="primary" onClick={() => setLifecycleOpen(false)}>
-            Fertig
-          </MockBtn>
-        }
-      >
-        <div className="segment-toggle segment-toggle--stack" role="group" aria-label="Lebenszyklus">
-          <button
-            type="button"
-            className={cn(
-              'segment-toggle-btn',
-              lifecycle === 'offen' && 'segment-toggle-btn--active'
-            )}
-            onClick={() => setLifecycleFilter('offen')}
-          >
-            Offen {lifecycleCounts.offen}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'segment-toggle-btn',
-              lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-            )}
-            onClick={() => setLifecycleFilter('erledigt')}
-          >
-            Erledigt {lifecycleCounts.erledigt}
-          </button>
-        </div>
-      </MockModal>
 
       {selectedCount > 0 ? (
         <div className="bulkbar">
@@ -1170,7 +1158,7 @@ export function VorgaengeListeClient({
           <div />
         </div>
 
-        {pageItems.length === 0 ? (
+        {displayItems.length === 0 ? (
           <MockEmpty
             icon="folder-open"
             title={lifecycle === 'erledigt' ? 'Keine erledigten Vorgänge' : 'Keine offenen Vorgänge'}
@@ -1196,7 +1184,7 @@ export function VorgaengeListeClient({
             }
           />
         ) : (
-          pageItems.map((v) => {
+          displayItems.map((v) => {
             const key = rowKey(v)
             const kind = statusKind(v)
             const label = statusLabel(v)
@@ -1302,7 +1290,7 @@ export function VorgaengeListeClient({
             )
           })
         )}
-        {pageItems.length > 0 ? (
+        {displayItems.length > 0 ? (
           <div className="vg-row vg-row--aggregate" aria-label="Aggregat">
             <div className="vg-check" />
             <div className="vg-kunde" style={{ gridColumn: '1 / -1' }}>
@@ -1319,14 +1307,24 @@ export function VorgaengeListeClient({
       </div>
       </PullToRefresh>
 
-      <MockPager
-        pageIndex={pageIndex}
-        totalPages={totalPages}
-        total={total}
-        pageSize={pageSize}
-        unit="Vorgänge"
-        onPageChange={(p) => setPageIndex(p - 1)}
-      />
+      {isMobile ? (
+        <ListInfiniteSentinel
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+          shown={visibleCount}
+          total={total}
+          unit="Vorgänge"
+        />
+      ) : (
+        <MockPager
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          unit="Vorgänge"
+          onPageChange={(p) => setPageIndex(p - 1)}
+        />
+      )}
     </div>
   )
 }

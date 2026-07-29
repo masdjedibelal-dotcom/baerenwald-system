@@ -1,6 +1,7 @@
 /** Wann eine Rechnung wie korrigiert wird. */
 
-import type { RechnungStatus } from '@/lib/types'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import type { AngebotPosition, RechnungStatus } from '@/lib/types'
 
 export type RechnungKorrekturModus = 'direkt' | 'storno_neu' | 'gesperrt'
 
@@ -9,6 +10,73 @@ export function rechnungKorrekturModus(status: RechnungStatus | string | null | 
   if (s === 'entwurf') return 'direkt'
   if (s === 'gesendet' || s === 'bezahlt') return 'storno_neu'
   return 'gesperrt'
+}
+
+/** Snapshot der belegrelevanten Felder — Diff entscheidet über Storno-Gutschrift. */
+export type RechnungMaterialSnapshot = {
+  positionen: AngebotPosition[] | unknown
+  reverse_charge_13b?: boolean | null
+  hinweis_35a?: boolean | null
+  rechnungsdatum?: string | null
+  leistungszeitraum_von?: string | null
+  leistungszeitraum_bis?: string | null
+  faellig_am?: string | null
+  zahlungsbedingungen?: string | null
+  einleitung?: string | null
+  hinweise?: string | null
+}
+
+function normText(v: string | null | undefined): string {
+  return String(v ?? '').trim().replace(/\s+/g, ' ')
+}
+
+function positionenFinger(positionen: AngebotPosition[] | unknown): unknown {
+  return normalizeAngebotPositionen((positionen as AngebotPosition[]) ?? []).map((p) => ({
+    leistung: normText(p.leistung),
+    beschreibung: normText(p.beschreibung),
+    menge: Number(p.menge) || 0,
+    einheit: normText(p.einheit),
+    lohn_netto: Number(p.lohn_netto) || 0,
+    material_netto: Number(p.material_netto) || 0,
+    vk_netto: Number(p.vk_netto) || 0,
+    gesamt_min: Number(p.gesamt_min) || 0,
+    gesamt_max: Number(p.gesamt_max) || 0,
+    mwst_satz: p.mwst_satz ?? null,
+    gewerk_slug: normText(p.gewerk_slug ?? p.gewerk_id),
+  }))
+}
+
+export function rechnungMaterialFingerprint(s: RechnungMaterialSnapshot): string {
+  return JSON.stringify({
+    positionen: positionenFinger(s.positionen),
+    reverse_charge_13b: Boolean(s.reverse_charge_13b),
+    hinweis_35a: Boolean(s.hinweis_35a),
+    rechnungsdatum: normText(s.rechnungsdatum).slice(0, 10),
+    leistungszeitraum_von: normText(s.leistungszeitraum_von).slice(0, 10),
+    leistungszeitraum_bis: normText(s.leistungszeitraum_bis).slice(0, 10),
+    faellig_am: normText(s.faellig_am).slice(0, 10),
+    zahlungsbedingungen: normText(s.zahlungsbedingungen),
+    einleitung: normText(s.einleitung),
+    hinweise: normText(s.hinweise),
+  })
+}
+
+export function rechnungMaterialGeaendert(
+  vorher: RechnungMaterialSnapshot,
+  nachher: RechnungMaterialSnapshot
+): boolean {
+  return rechnungMaterialFingerprint(vorher) !== rechnungMaterialFingerprint(nachher)
+}
+
+/** Gesendet/bezahlt + materielle Änderung → Storno-Gutschrift + neue RE. */
+export function rechnungBrauchtStornoBeiAenderung(
+  status: RechnungStatus | string | null | undefined,
+  vorher: RechnungMaterialSnapshot,
+  nachher: RechnungMaterialSnapshot
+): boolean {
+  const modus = rechnungKorrekturModus(status)
+  if (modus !== 'storno_neu') return false
+  return rechnungMaterialGeaendert(vorher, nachher)
 }
 
 export function rechnungDarfHardGeloeschtWerden(status: RechnungStatus | string | null | undefined): boolean {

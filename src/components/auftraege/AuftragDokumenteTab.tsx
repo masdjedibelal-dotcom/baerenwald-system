@@ -8,6 +8,7 @@ import {
   updateAuftragDokumentMeta,
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
@@ -15,17 +16,20 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   abschlussdokumentZeile,
   angebotAusAuftragDetail,
   angebotDokumentZeile,
   angebotHandwerkerAusAuftragDetail,
+  dokumentTypLabel,
   handwerkerDokumentZeilen,
   rechnungDokumentZeilen,
-  sortDokumentZeilenNachDatum,
+  sortDokumentZeilen,
   timelineDokumentZeilen,
   vertragDokumentZeilen,
   type AuftragDokumentZeile,
+  type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
@@ -34,6 +38,19 @@ import { cn, formatDatum } from '@/lib/utils'
 
 export type { AuftragDokumentZeile }
 export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
+
+function freigabeLabel(row: AuftragDokumentZeile): string {
+  if (row.fuerKunde) return 'Kunde'
+  if (row.quelle === 'vertrag' || row.quelle === 'handwerker') return 'Partner'
+  return 'intern'
+}
+
+function isFotoRow(row: AuftragDokumentZeile): boolean {
+  return (
+    /\.(jpe?g|png|webp|gif)$/i.test(row.name) ||
+    Boolean(row.beschreibung?.toLowerCase().includes('foto'))
+  )
+}
 
 export function AuftragDokumenteTab({
   detail,
@@ -53,7 +70,10 @@ export function AuftragDokumenteTab({
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [hwSignedUrls, setHwSignedUrls] = useState<Record<string, string>>({})
+  const [sortKey, setSortKey] = useState<DokumentSortKey>('datum')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const fileRef = useRef<HTMLInputElement>(null)
+  const isMobile = useIsMobile()
 
   const handwerkerZeilen = useMemo(
     () => handwerkerDokumentZeilen(angebotHandwerkerAusAuftragDetail(detail)),
@@ -76,7 +96,7 @@ export function AuftragDokumenteTab({
     }
   }, [handwerkerZeilen])
 
-  const zeilen = useMemo(() => {
+  const zeilenRaw = useMemo(() => {
     const rows = [
       ...timelineDokumentZeilen(detail),
       ...rechnungDokumentZeilen(rechnungen),
@@ -99,8 +119,22 @@ export function AuftragDokumenteTab({
     }
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
-    return sortDokumentZeilenNachDatum(rows)
+    return rows
   }, [detail, rechnungen, vertraege, handwerkerZeilen])
+
+  const zeilen = useMemo(
+    () => sortDokumentZeilen(zeilenRaw, sortKey, sortDir),
+    [zeilenRaw, sortKey, sortDir]
+  )
+
+  function toggleSort(key: DokumentSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    setSortDir(key === 'name' || key === 'typ' ? 'asc' : 'desc')
+  }
 
   async function uploadFiles(files: FileList | File[]) {
     const list = Array.from(files).slice(0, 5)
@@ -194,206 +228,285 @@ export function AuftragDokumenteTab({
 
   const busy = uploading || pending
 
+  function rowHref(row: AuftragDokumentZeile): string | null | undefined {
+    if (row.storagePath && hwSignedUrls[row.storagePath]) return hwSignedUrls[row.storagePath]
+    return row.href
+  }
+
+  function rowPdfReady(row: AuftragDokumentZeile): boolean {
+    return !row.storagePath || Boolean(hwSignedUrls[row.storagePath])
+  }
+
+  function openEdit(row: AuftragDokumentZeile) {
+    setEditRow(row)
+    setEditName(row.name)
+    setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
+  }
+
+  function renderFreigabe(row: AuftragDokumentZeile, compact?: boolean) {
+    const ev = row.timelineId ? timelineById.get(row.timelineId) : null
+    const readOnly = row.quelle !== 'timeline' || !row.timelineId
+    if (readOnly) {
+      return (
+        <span
+          className={cn(
+            'dok-card__tag',
+            row.fuerKunde ? 'dok-card__tag--kunde' : 'dok-card__tag--muted'
+          )}
+        >
+          {freigabeLabel(row)}
+        </span>
+      )
+    }
+    return (
+      <div className={cn('flex flex-wrap gap-1', compact && 'dok-card__freigabe')}>
+        <button
+          type="button"
+          className={cn(
+            'dok-freigabe-pill',
+            row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-inaktiv'
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (ev) toggleFreigabe(ev, true)
+          }}
+          disabled={pending}
+        >
+          Kunde
+        </button>
+        <button
+          type="button"
+          className={cn(
+            'dok-freigabe-pill',
+            !row.fuerKunde ? 'dok-freigabe-intern' : 'dok-freigabe-inaktiv'
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (ev) toggleFreigabe(ev, false)
+          }}
+          disabled={pending}
+        >
+          intern
+        </button>
+      </div>
+    )
+  }
+
+  function renderActions(row: AuftragDokumentZeile) {
+    const readOnly = row.quelle !== 'timeline' || !row.timelineId
+    if (readOnly) return null
+    return (
+      <div className="dok-card__actions" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="icon-btn" title="Bearbeiten" onClick={() => openEdit(row)}>
+          <MockIcon ctx="row" n="pencil" size={15} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn text-status-cancel-text"
+          title="Löschen"
+          onClick={() => removeRow(row)}
+        >
+          <MockIcon ctx="row" n="trash" size={15} />
+        </button>
+      </div>
+    )
+  }
+
+  function renderNameLink(row: AuftragDokumentZeile, className?: string) {
+    const href = rowHref(row)
+    const ready = rowPdfReady(row)
+    if (ready && href) {
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(className, 'hover:text-bw-link')}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.name}
+        </a>
+      )
+    }
+    return <span className={className}>{row.name}</span>
+  }
+
+  function metaLine(row: AuftragDokumentZeile): string {
+    const parts: string[] = [dokumentTypLabel(row.quelle)]
+    if (row.datum) parts.push(formatDatum(row.datum))
+    if (row.beschreibung && row.beschreibung !== '—') parts.push(row.beschreibung)
+    return parts.join(' · ')
+  }
+
+  function renderMobileCard(row: AuftragDokumentZeile) {
+    const href = rowHref(row)
+    const ready = rowPdfReady(row)
+    const openable = Boolean(ready && href)
+
+    return (
+      <div
+        key={row.id}
+        className={cn('dok-card', openable && 'dok-card--tappable')}
+        role={openable ? 'link' : undefined}
+        tabIndex={openable ? 0 : undefined}
+        onClick={() => {
+          if (openable && href) window.open(href, '_blank', 'noopener,noreferrer')
+        }}
+        onKeyDown={(e) => {
+          if (!openable || !href) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            window.open(href, '_blank', 'noopener,noreferrer')
+          }
+        }}
+      >
+        <div className="dok-card__icon" aria-hidden>
+          <MockIcon ctx="row" n={isFotoRow(row) ? 'photo' : 'file-text'} size={18} />
+        </div>
+        <div className="dok-card__body">
+          <div className="dok-card__top">
+            {renderNameLink(row, 'dok-card__title')}
+            {renderActions(row)}
+          </div>
+          {metaLine(row) ? <div className="dok-card__meta">{metaLine(row)}</div> : null}
+          <div className="dok-card__foot">{renderFreigabe(row, true)}</div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderDeskRow(row: AuftragDokumentZeile) {
+    return (
+      <div key={row.id} className="list-row" style={{ cursor: 'default' }}>
+        <MockIcon
+          ctx="row"
+          n={isFotoRow(row) ? 'photo' : 'file-text'}
+          size={18}
+          className="text-bw-text-muted"
+        />
+        <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
+          {renderNameLink(row)}
+        </div>
+        <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
+          {dokumentTypLabel(row.quelle)}
+          {row.beschreibung && row.beschreibung !== '—' ? ` · ${row.beschreibung}` : ''}
+        </div>
+        <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
+          {row.datum ? formatDatum(row.datum) : '—'}
+        </div>
+        <div>{renderFreigabe(row)}</div>
+        <div className="inline-flex justify-end gap-0.5">{renderActions(row)}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="auftrag-dok-panel pb-4">
-      <div className="mb-3 flex flex-wrap gap-2">
-        <a
-          className="btn ghost sm"
-          href={`/api/auftraege/${detail.id}/regiebericht-lebenszyklus`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Regiebericht PDF
-        </a>
-        <a
-          className="btn ghost sm"
-          href={`/api/auftraege/${detail.id}/bautagebuch-lebenszyklus`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Bautagebuch PDF
-        </a>
-      </div>
       <Card
         className="dshell-framed"
         collapsible={false}
         title={`Dokumente · ${zeilen.length}`}
         action={
-          <button
-            type="button"
-            className="btn primary sm inline-flex gap-1.5"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-          >
-            <MockIcon ctx="btn" n="upload" size={15} />
-            Datei hochladen
-          </button>
+          isMobile ? undefined : (
+            <button
+              type="button"
+              className="btn primary sm inline-flex gap-1.5"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              <MockIcon ctx="btn" n="upload" size={15} />
+              Datei hochladen
+            </button>
+          )
         }
       >
-        <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
-          Projekt-Dokumente (Angebot, Rechnungen, interne Uploads). Partner-Compliance-Nachweise findest
-          du im Tab <span className="font-medium text-bw-text">Compliance</span>.
-        </p>
+        {!isMobile ? (
+          <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
+            Projekt-Dokumente (Angebot, Rechnungen, Uploads). Partner-Compliance findest du im Tab{' '}
+            <span className="font-medium text-bw-text">Compliance</span>.
+          </p>
+        ) : null}
 
-        <input
-          ref={fileRef}
-          type="file"
-          className="sr-only"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          multiple
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files)
-            e.target.value = ''
-          }}
-        />
+        {!isMobile ? (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              className="sr-only"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              multiple
+              onChange={(e) => {
+                if (e.target.files?.length) void uploadFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
 
-        <div
-          className={cn(
-            'dok-upload-zone',
-            dragOver && 'dok-upload-zone-active',
-            busy && 'pointer-events-none opacity-60'
-          )}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setDragOver(false)
-            if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
-          }}
-          onClick={() => fileRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click()
-          }}
-        >
-          <MockIcon ctx="btn" n="cloud-upload" size={18} />
-          {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
-        </div>
+            <div
+              className={cn(
+                'dok-upload-zone',
+                dragOver && 'dok-upload-zone-active',
+                busy && 'pointer-events-none opacity-60'
+              )}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
+              }}
+              onClick={() => fileRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click()
+              }}
+            >
+              <MockIcon ctx="btn" n="cloud-upload" size={18} />
+              {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
+            </div>
+          </>
+        ) : null}
+
+        {zeilen.length > 0 ? (
+          <div className="dok-sort" role="toolbar" aria-label="Sortierung">
+            <span className="dok-sort__label">Sortieren</span>
+            {(
+              [
+                { key: 'datum', label: 'Datum' },
+                { key: 'name', label: 'Name' },
+                { key: 'typ', label: 'Typ' },
+              ] as const
+            ).map(({ key, label }) => (
+              <MockChip key={key} active={sortKey === key} onClick={() => toggleSort(key)}>
+                {label}
+                {sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </MockChip>
+            ))}
+          </div>
+        ) : null}
 
         {zeilen.length === 0 ? (
-          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Dokumente.</p>
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+            {isMobile
+              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
+              : 'Noch keine Dokumente.'}
+          </p>
+        ) : isMobile ? (
+          <div className="dok-cards">{zeilen.map(renderMobileCard)}</div>
         ) : (
           <div className="dok-list">
             <div className="list-row head" aria-hidden>
               <div />
               <div>Name</div>
-              <div>Beschreibung</div>
+              <div>Typ</div>
               <div>Datum</div>
               <div>Freigabe</div>
               <div />
             </div>
-            {zeilen.map((row) => {
-              const ev = row.timelineId ? timelineById.get(row.timelineId) : null
-              const readOnly = row.quelle !== 'timeline' || !row.timelineId
-              const href =
-                row.storagePath && hwSignedUrls[row.storagePath]
-                  ? hwSignedUrls[row.storagePath]!
-                  : row.href
-              const pdfReady = !row.storagePath || Boolean(hwSignedUrls[row.storagePath])
-              const isFoto =
-                /\.(jpe?g|png|webp|gif)$/i.test(row.name) ||
-                row.beschreibung?.toLowerCase().includes('foto')
-              return (
-                <div key={row.id} className="list-row" style={{ cursor: 'default' }}>
-                  <MockIcon ctx="row"
-                    n={isFoto ? 'photo' : 'file-text'}
-                    size={18}
-                    className="text-bw-text-muted"
-                  />
-                  <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
-                    {pdfReady && href ? (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-bw-link"
-                      >
-                        {row.name}
-                      </a>
-                    ) : (
-                      row.name
-                    )}
-                  </div>
-                  <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {row.beschreibung && row.beschreibung !== '—' ? row.beschreibung : '—'}
-                  </div>
-                  <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
-                    {row.datum ? formatDatum(row.datum) : '—'}
-                  </div>
-                  <div>
-                    {readOnly ? (
-                      <span
-                        className={cn(
-                          'text-[length:var(--fs-meta)]',
-                          row.fuerKunde ? 'text-bw-primary' : 'text-bw-text-muted'
-                        )}
-                      >
-                        {row.fuerKunde
-                          ? 'Kunde'
-                          : row.quelle === 'vertrag' || row.quelle === 'handwerker'
-                            ? 'Partner'
-                            : 'intern'}
-                      </span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          className={cn(
-                            'dok-freigabe-pill',
-                            row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-inaktiv'
-                          )}
-                          onClick={() => ev && toggleFreigabe(ev, true)}
-                          disabled={pending}
-                        >
-                          Kunde
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            'dok-freigabe-pill',
-                            !row.fuerKunde ? 'dok-freigabe-intern' : 'dok-freigabe-inaktiv'
-                          )}
-                          onClick={() => ev && toggleFreigabe(ev, false)}
-                          disabled={pending}
-                        >
-                          intern
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="inline-flex justify-end gap-0.5">
-                    {!readOnly ? (
-                      <>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          title="Bearbeiten"
-                          onClick={() => {
-                            setEditRow(row)
-                            setEditName(row.name)
-                            setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
-                          }}
-                        >
-                          <MockIcon ctx="row" n="pencil" size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn text-status-cancel-text"
-                          title="Löschen"
-                          onClick={() => removeRow(row)}
-                        >
-                          <MockIcon ctx="row" n="trash" size={15} />
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
+            {zeilen.map(renderDeskRow)}
           </div>
         )}
       </Card>
@@ -410,7 +523,12 @@ export function AuftragDokumenteTab({
       >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-          <Textarea label="Beschreibung" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3} />
+          <Textarea
+            label="Beschreibung"
+            value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)}
+            rows={3}
+          />
         </div>
       </EditorSheet>
     </div>

@@ -19,19 +19,22 @@ export type ListbarActionItem = {
 }
 
 /**
- * Mobil: ein Filter-Icon → ActionSheet mit Aktionen.
+ * Mobil: optional `leading` (z. B. Offen/Erledigt) + Filter-Icon → ActionSheet.
  * Desktop: `desktop` unverändert (Segment, Filter, Export, …).
  */
 export function ListbarActionsMenu({
   items,
   activeHint,
   desktop,
+  leading,
   title = 'Aktionen',
 }: {
   items: ListbarActionItem[]
   /** Badge am Icon (z. B. aktive Filteranzahl) */
   activeHint?: number
   desktop: ReactNode
+  /** Mobil links neben dem Filter-Icon (z. B. Segment-Toggle) */
+  leading?: ReactNode
   title?: string
 }) {
   const isMobile = useIsMobile()
@@ -63,6 +66,7 @@ export function ListbarActionsMenu({
     <div className="listbar-actions">
       <div className="listbar-actions-desktop">{desktop}</div>
       <div className="listbar-actions-mobile">
+        {leading ? <div className="listbar-actions-leading">{leading}</div> : null}
         <button
           ref={anchorRef}
           type="button"

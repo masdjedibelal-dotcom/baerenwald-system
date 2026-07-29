@@ -14,13 +14,11 @@ import {
   type RateDrawerRate,
 } from '@/components/vorgang/RateDrawer'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
-import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
+import { saveAuftragZahlungsplan, erfasseExterneAbschlagZahlung } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
-  createGutschriftFromRechnung,
   sendRechnung,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
-import { setRechnungReklamation } from '@/app/(dashboard)/rechnungen/reklamation-actions'
 import { loadRechnungWizardBootstrap as loadWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -413,7 +411,7 @@ export function VorgangZahlungTab({
     if (rate.status === 'geplant') {
       ctas.push({
         id: 'invoice',
-        label: 'Rechnung erstellen',
+        label: 'Erstellen',
         icon: 'file-invoice',
         primary: true,
         onClick: () => {
@@ -421,68 +419,81 @@ export function VorgangZahlungTab({
           onCreateInvoice?.(rate.zeileId ? { zeileId: rate.zeileId } : { voll: true })
         },
       })
-      return ctas
-    }
-
-    if (rate.status === 'gestellt' && rechnungId) {
-      ctas.push({
-        id: 'paid',
-        label: 'Als bezahlt markieren',
-        icon: 'check',
-        primary: true,
-        onClick: () => {
-          startTransition(async () => {
-            const res = await updateRechnungStatus(rechnungId, 'bezahlt')
-            if (!res.ok) {
-              toast.error(res.message)
+      if (variant === 'auftrag' && auftragId && rate.zeileId) {
+        ctas.push({
+          id: 'extern-bezahlt',
+          label: 'Bereits bezahlt',
+          icon: 'check',
+          onClick: () => {
+            const raw = window.prompt(
+              `Betrag brutto für „${rate.label}“ (leer = Planbetrag ${formatEurBetrag(rate.betrag)}):`,
+              String(rate.betrag || '')
+            )
+            if (raw == null) return
+            const parsed = raw.trim() === '' ? rate.betrag : Number(String(raw).replace(',', '.'))
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+              toast.error('Ungültiger Betrag')
               return
             }
-            toast.success('Als bezahlt markiert (ohne Kunden-Mail)')
-            setOpenRateId(null)
-            onRefresh?.()
-            router.refresh()
-          })
-        },
-      })
-      if (faelligUeberfaellig(rate.faellig)) {
-        const nextStufe = openMahnungen.length + 1
-        ctas.push({
-          id: 'mahnung',
-          label: `Mahnung senden (Stufe ${Math.min(nextStufe, 3)})`,
-          icon: 'alert-triangle',
-          onClick: () => {
-            setMahnungRechnungId(rechnungId)
-          },
-        })
-      }
-      if (!rate.reklamation) {
-        ctas.push({
-          id: 'reklamation',
-          label: 'Reklamation erfassen',
-          icon: 'alert-triangle',
-          onClick: () => {
-            const grund = window.prompt(
-              'Reklamationsgrund (kurz):',
-              'Kunde beanstandet Position'
-            )
-            if (grund == null) return
             startTransition(async () => {
-              const res = await setRechnungReklamation(rechnungId, { grund })
+              const res = await erfasseExterneAbschlagZahlung({
+                auftragId,
+                zeileId: rate.zeileId!,
+                brutto: parsed,
+              })
               if (!res.ok) {
                 toast.error(res.message)
                 return
               }
-              toast.success('Reklamation erfasst')
+              toast.success('Externe Zahlung erfasst — Rate als bezahlt hinterlegt')
+              setOpenRateId(null)
               onRefresh?.()
               router.refresh()
             })
           },
         })
       }
+      return ctas
+    }
+
+    if ((rate.status === 'gestellt' || rate.status === 'bezahlt') && rechnungId) {
+      if (rate.status === 'gestellt') {
+        ctas.push({
+          id: 'paid',
+          label: 'Zahlung bestätigen',
+          icon: 'check',
+          primary: true,
+          onClick: () => {
+            startTransition(async () => {
+              const res = await updateRechnungStatus(rechnungId, 'bezahlt')
+              if (!res.ok) {
+                toast.error(res.message)
+                return
+              }
+              toast.success('Als bezahlt markiert (ohne Kunden-Mail)')
+              setOpenRateId(null)
+              onRefresh?.()
+              router.refresh()
+            })
+          },
+        })
+        if (faelligUeberfaellig(rate.faellig)) {
+          const nextStufe = openMahnungen.length + 1
+          ctas.push({
+            id: 'mahnung',
+            label: `Mahnung ${Math.min(nextStufe, 3)}`,
+            icon: 'alert-triangle',
+            onClick: () => {
+              setMahnungRechnungId(rechnungId)
+            },
+          })
+        }
+      }
       ctas.push({
         id: 'edit',
-        label: 'Rechnung bearbeiten',
+        label: 'Bearbeiten',
         icon: 'pencil',
+        primary: rate.status === 'bezahlt',
         onClick: () => {
           setOpenRateId(null)
           if (onEditInvoice) {
@@ -503,26 +514,48 @@ export function VorgangZahlungTab({
           })
         },
       })
-      ctas.push({
-        id: 'resend',
-        label: 'Nochmal versenden',
-        icon: 'send',
-        onClick: () => {
-          startTransition(async () => {
-            const res = await sendRechnung(rechnungId)
-            if (!res.ok) {
-              toast.error(res.message)
-              return
-            }
-            toast.success('Rechnung erneut versendet')
-            onRefresh?.()
-            router.refresh()
-          })
-        },
-      })
+      if (rate.status === 'gestellt') {
+        ctas.push({
+          id: 'resend',
+          label: 'Senden',
+          icon: 'send',
+          onClick: () => {
+            startTransition(async () => {
+              const res = await sendRechnung(rechnungId)
+              if (!res.ok) {
+                toast.error(res.message)
+                return
+              }
+              toast.success('Rechnung erneut versendet')
+              onRefresh?.()
+              router.refresh()
+            })
+          },
+        })
+      }
+      if (rate.status === 'bezahlt') {
+        ctas.push({
+          id: 'reset',
+          label: 'Zurücksetzen',
+          icon: 'history',
+          onClick: () => {
+            startTransition(async () => {
+              const res = await updateRechnungStatus(rechnungId, 'gesendet')
+              if (!res.ok) {
+                toast.error(res.message)
+                return
+              }
+              toast.success('Zahlung zurückgesetzt')
+              setOpenRateId(null)
+              onRefresh?.()
+              router.refresh()
+            })
+          },
+        })
+      }
       ctas.push({
         id: 'open',
-        label: 'Rechnung öffnen',
+        label: 'Öffnen',
         icon: 'eye',
         onClick: () => {
           setOpenRateId(null)
@@ -534,63 +567,6 @@ export function VorgangZahlungTab({
         },
       })
       return ctas
-    }
-
-    if (rate.status === 'bezahlt' && rechnungId) {
-      ctas.push({
-        id: 'credit',
-        label: 'Korrigieren (Gutschrift)',
-        icon: 'file-pencil',
-        primary: true,
-        onClick: () => {
-          setOpenRateId(null)
-          startTransition(async () => {
-            const res = await createGutschriftFromRechnung(rechnungId)
-            if (!res.ok) {
-              toast.error(res.message)
-              return
-            }
-            toast.success('Gutschrift erstellt')
-            const boot = auftragId
-              ? await loadWizardBootstrap(res.id, auftragId)
-              : await loadRechnungWizardBootstrapStandalone(res.id)
-            if (boot.ok && onOpenWizard) {
-              onOpenWizard(boot.bootstrap)
-            } else {
-              router.push(`/rechnungen/${res.id}`)
-            }
-            onRefresh?.()
-            router.refresh()
-          })
-        },
-      })
-      ctas.push({
-        id: 'reset',
-        label: 'Zahlung zurücksetzen',
-        icon: 'history',
-        onClick: () => {
-          startTransition(async () => {
-            const res = await updateRechnungStatus(rechnungId, 'gesendet')
-            if (!res.ok) {
-              toast.error(res.message)
-              return
-            }
-            toast.success('Zahlung zurückgesetzt')
-            setOpenRateId(null)
-            onRefresh?.()
-            router.refresh()
-          })
-        },
-      })
-      ctas.push({
-        id: 'open',
-        label: 'Rechnung öffnen',
-        icon: 'eye',
-        onClick: () => {
-          setOpenRateId(null)
-          router.push(`/rechnungen/${rechnungId}`)
-        },
-      })
     }
 
     return ctas
@@ -680,13 +656,17 @@ export function VorgangZahlungTab({
         ) : null}
 
         <div className="zahlplan-summary">
-          <span className="zahlplan-summary__left">
+          <div className="zahlplan-summary__primary">
+            <b className="zahlplan-summary__paid">{formatEurBetrag(bezahltBrutto)}</b>
+            <span className="zahlplan-summary__of">
+              {' '}
+              von {formatEurBetrag(totalBruttoResolved || bezahltBrutto)}
+            </span>
+          </div>
+          <div className="zahlplan-summary__meta">
             {pct} % bezahlt
             {gestelltBrutto > 0 ? ` · ${formatEurBetrag(gestelltBrutto)} gestellt` : ''}
-          </span>
-          <b className="zahlplan-summary__right">
-            {formatEurBetrag(bezahltBrutto)} / {formatEurBetrag(totalBruttoResolved || bezahltBrutto)}
-          </b>
+          </div>
         </div>
         {variant !== 'rechnung' ? (
           <div className="zahlplan-bar" aria-hidden>
@@ -718,7 +698,7 @@ export function VorgangZahlungTab({
         ) : null}
 
         <div className="zahlplan-table-wrap">
-          <div className="list-row head zahlplan-row zahlplan-row--simple">
+          <div className="list-row head zahlplan-row zahlplan-row--simple zahlplan-row-head">
             <div>{variant === 'rechnung' || nurEinzel || !hasPlan ? 'Rechnung' : 'Abschlag'}</div>
             <div>Fällig</div>
             <div style={{ textAlign: 'right' }}>Betrag</div>
@@ -750,8 +730,8 @@ export function VorgangZahlungTab({
                 }}
               >
                 <div className="zahlplan-row__label">
-                  <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                    {row.label}
+                  <span className="zahlplan-row__title">
+                    <span className="zahlplan-row__name">{row.label}</span>
                     <StatusBadge
                       status={row.badgeStatus}
                       label={row.badgeLabel}
@@ -764,7 +744,18 @@ export function VorgangZahlungTab({
                   {row.sub ? <div className="zahlplan-row__pct">{row.sub}</div> : null}
                 </div>
                 <div className="zahlplan-row__faellig">
-                  {row.faellig ? formatDatum(String(row.faellig).slice(0, 10)) : '—'}
+                  {row.faellig ? (
+                    <>
+                      <span className="zahlplan-row__faellig-label">Fällig</span>
+                      <span className="zahlplan-row__faellig-value">
+                        {formatDatum(String(row.faellig).slice(0, 10))}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="zahlplan-row__faellig-value zahlplan-row__faellig-value--empty">
+                      —
+                    </span>
+                  )}
                 </div>
                 <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
                 <div className="zahlplan-row__menu">

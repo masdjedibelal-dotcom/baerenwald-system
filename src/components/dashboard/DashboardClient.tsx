@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { DashboardZeitraumFilterBar } from '@/components/dashboard/DashboardZeitraumFilterBar'
+import { DashboardLazyMount } from '@/components/dashboard/DashboardLazyMount'
 import {
   gewerkColor,
   type DashboardZeitraumFilter,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 export type DashboardKpi = {
@@ -361,6 +363,7 @@ export function DashboardClient({
   rankingKunden: RankingZeile[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()
@@ -379,67 +382,62 @@ export function DashboardClient({
 
   return (
     <div className="dashboard-page min-w-0 overflow-x-hidden">
-      <div
-        className="mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3"
-      >
+      <header className="dash-hero mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>{dateStr}</div>
-          <div
-            style={{
-              fontSize: 'var(--fs-head)',
-              fontWeight: 650,
-              letterSpacing: '-0.02em',
-              marginTop: 2,
-            }}
-          >
+          <div className="text-[length:var(--fs-text)] text-[var(--text-3)]">{dateStr}</div>
+          <div className="mt-0.5 text-[length:var(--fs-head)] font-semibold tracking-tight">
             {greeting}, {vorname}
           </div>
         </div>
         <DashboardZeitraumFilterBar filter={zeitraumFilter} />
-      </div>
+      </header>
 
-      <div className="kpi-grid" style={{ marginBottom: 22 }}>
-        {(kpis ?? []).map((k) => (
-          <button
-            key={k.label}
-            type="button"
-            className="kpi-card"
-            onClick={() => router.push(k.href)}
-          >
-            <div className="kpi-ico">
-              <MockIcon ctx="default" n={k.icon} size={19} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div className="kpi-val">{k.value}</div>
-              <div className="kpi-label">{k.label}</div>
-            </div>
-          </button>
-        ))}
-      </div>
+      <section className="dash-sec" aria-label="Heute">
+        <div className="kpi-grid">
+          {(kpis ?? []).map((k) => (
+            <button
+              key={k.label}
+              type="button"
+              className="kpi-card"
+              onClick={() => router.push(k.href)}
+            >
+              <div className="kpi-ico">
+                <MockIcon ctx="default" n={k.icon} size={isMobile ? 15 : 19} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="kpi-val">{k.value}</div>
+                <div className="kpi-label">{k.label}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
 
-      <div className="mb-[22px]">
+      <section className="dash-sec" aria-label="Marketing">
         <DashboardMarketingCard data={marketing} />
-      </div>
+      </section>
 
-      <div
-        className="mb-[22px] grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))' }}
-      >
-        <UmsatzBarChart months={umsatzMonate} />
-        <VertriebsFunnel
-          stufen={funnel.stufen}
-          conversionGesamt={funnel.conversionGesamt}
-          dropoffs={funnel.dropoffs}
-        />
-      </div>
-
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))' }}
-      >
-        <GewerkUmsatzCard zeilen={gewerk.zeilen} gesamt={gewerk.gesamt} />
-        <TopRankingCard handwerker={rankingHandwerker} kunden={rankingKunden} />
-      </div>
+      <section className="dash-sec dash-sec--zahlen" aria-label="Auswertung">
+        <h2 className="dash-sec__title">Auswertung</h2>
+        <div className="dash-zahlen">
+          <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
+            <UmsatzBarChart months={umsatzMonate} />
+          </DashboardLazyMount>
+          <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
+            <VertriebsFunnel
+              stufen={funnel.stufen}
+              conversionGesamt={funnel.conversionGesamt}
+              dropoffs={funnel.dropoffs}
+            />
+          </DashboardLazyMount>
+          <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
+            <GewerkUmsatzCard zeilen={gewerk.zeilen} gesamt={gewerk.gesamt} />
+          </DashboardLazyMount>
+          <DashboardLazyMount minHeight={isMobile ? 220 : 280}>
+            <TopRankingCard handwerker={rankingHandwerker} kunden={rankingKunden} />
+          </DashboardLazyMount>
+        </div>
+      </section>
     </div>
   )
 }

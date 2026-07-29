@@ -132,12 +132,18 @@ export function DocumentCanvas({
     }
   }, [open, mounted, portal, manageHistory, handleClose])
 
+  /* Body scroll lock + focus trap — Escape schließt nicht, solange ein EditorSheet offen ist */
   useEffect(() => {
     if (!open || !mounted) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const el = rootRef.current
-    const release = el ? trapFocus(el, () => handleClose()) : undefined
+    const release = el
+      ? trapFocus(el, () => {
+          if (editorSheetStackDepth() > 0) return
+          handleClose()
+        })
+      : undefined
     return () => {
       document.body.style.overflow = prev
       release?.()
@@ -241,7 +247,7 @@ export function DocumentCanvas({
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
-        <div className="document-canvas__title-block min-w-0 flex-1 text-center">
+        <div className="document-canvas__title-block min-w-0 flex-1">
           <h1 className="document-canvas__title">{title}</h1>
           {subtitle ? (
             <p className="document-canvas__subtitle m-0 truncate text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
@@ -264,25 +270,22 @@ export function DocumentCanvas({
               {saveBusy ? '…' : saveLabel}
             </button>
           ) : (
-            <>
-              <button
-                type="button"
-                className={cn(
-                  'editor-sheet__confirm hidden md:flex',
-                  saveFlash && 'bw-motion-save-ok'
-                )}
-                disabled={interactionLocked}
-                onClick={handleSave}
-                aria-label="Speichern"
-                title="Speichern"
-              >
-                <Check className="h-5 w-5" aria-hidden />
-              </button>
-              <span className="editor-sheet__header-end md:hidden" aria-hidden />
-            </>
+            <button
+              type="button"
+              className={cn(
+                'editor-sheet__confirm',
+                saveFlash && 'bw-motion-save-ok'
+              )}
+              disabled={interactionLocked}
+              onClick={handleSave}
+              aria-label="Speichern"
+              title="Speichern"
+            >
+              <Check className="h-5 w-5" aria-hidden />
+            </button>
           )
         ) : (
-          <span className="editor-sheet__header-end" />
+          <span className="editor-sheet__header-end" aria-hidden />
         )}
       </header>
       <div

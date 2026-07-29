@@ -6,11 +6,16 @@ import {
   insertLeadDokument,
 } from "@/app/(dashboard)/anfragen/dokumente-actions";
 import { toast } from "@/components/ui/app-toast";
+import {
+  rechnungIstAlsAkteUnterlage,
+} from "@/lib/auftraege/auftrag-dokumente-helpers";
+import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan";
 import type { LeadDokumentRow } from "@/lib/types";
 import { MockDokumenteCard } from "@/components/mock-ui/MockDetailCards";
 import { MockIcon } from "@/components/mock-ui/MockIcon";
 import { MockBtn } from "@/components/mock-ui/MockPrimitives";
 import { MockModal } from "@/components/mock-ui/MockModal";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { cn } from "@/lib/utils";
 
 type AngebotKurz = {
@@ -20,13 +25,26 @@ type AngebotKurz = {
   pdf_url?: string | null;
 };
 
+type RechnungKurz = {
+  id: string;
+  created_at?: string | null;
+  rechnungsnummer?: string | null;
+  status?: string | null;
+  rechnungsdatum?: string | null;
+  gesendet_at?: string | null;
+  pdf_url?: string | null;
+  rechnung_art?: string | null;
+  abschlag_index?: number | null;
+  beleg_typ?: string | null;
+};
+
 type DocRow = {
   id: string;
   name: string;
   href: string;
   created_at: string;
   groesse_bytes: number | null;
-  quelle: "upload" | "angebot";
+  quelle: "upload" | "angebot" | "rechnung";
   dokumentId?: string;
   beschreibung: string;
   freigabe: boolean;
@@ -71,11 +89,13 @@ export function AnfrageDokumenteTab({
   leadId,
   dokumente,
   angebote,
+  rechnungen = [],
   onReload,
 }: {
   leadId: string;
   dokumente: LeadDokumentRow[];
   angebote: AngebotKurz[];
+  rechnungen?: RechnungKurz[];
   onReload: () => void;
 }) {
   const [meta, setMeta] = useState<
@@ -87,6 +107,7 @@ export function AnfrageDokumenteTab({
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const docs = useMemo((): DocRow[] => {
     const rows: DocRow[] = dokumente.map((d) => {
@@ -122,10 +143,37 @@ export function AnfrageDokumenteTab({
       });
     }
 
+    for (const r of rechnungen) {
+      if (!rechnungIstAlsAkteUnterlage(r)) continue;
+      const id = `rechnung-${r.id}`;
+      const m = meta[id];
+      const st = (r.status ?? "").toLowerCase();
+      const art =
+        (r.beleg_typ ?? "").toLowerCase() === "gutschrift"
+          ? "Gutschrift"
+          : rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index);
+      const defaultName = r.rechnungsnummer?.trim() || art;
+      rows.push({
+        id,
+        name: m?.name?.trim() || defaultName,
+        href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
+        created_at:
+          m?.created_at ||
+          r.gesendet_at ||
+          r.rechnungsdatum ||
+          r.created_at ||
+          new Date().toISOString(),
+        groesse_bytes: null,
+        quelle: "rechnung",
+        beschreibung: m?.beschreibung?.trim() || `${art} · ${st || "—"}`,
+        freigabe: m?.freigabe ?? (st === "gesendet" || st === "bezahlt" || st === "versendet"),
+      });
+    }
+
     return rows.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
-  }, [dokumente, angebote, meta]);
+  }, [dokumente, angebote, rechnungen, meta]);
 
   const upd = (id: string, patch: Partial<{ name: string; beschreibung: string; freigabe: boolean; created_at: string }>) => {
     setMeta((prev) => {
@@ -208,50 +256,139 @@ export function AnfrageDokumenteTab({
   return (
     <>
       <MockDokumenteCard count={docs.length}>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
+        {!isMobile ? (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                if (e.target.files?.length) void uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
 
-        <div
-          className={cn(
-            "dok-upload-zone",
-            dragOver && "dok-upload-zone-active",
-            busy && "pointer-events-none opacity-60",
-          )}
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              inputRef.current?.click();
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files);
-          }}
-        >
-          <MockIcon ctx="btn" n="cloud-upload" size={18} />
-          {uploading ? "Wird hochgeladen…" : "Dateien hier ablegen oder klicken"}
-        </div>
+            <div
+              className={cn(
+                "dok-upload-zone",
+                dragOver && "dok-upload-zone-active",
+                busy && "pointer-events-none opacity-60",
+              )}
+              role="button"
+              tabIndex={0}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files);
+              }}
+            >
+              <MockIcon ctx="btn" n="cloud-upload" size={18} />
+              {uploading ? "Wird hochgeladen…" : "Dateien hier ablegen oder klicken"}
+            </div>
+          </>
+        ) : null}
 
-        {docs.length === 0 ? null : (
+        {docs.length === 0 ? (
+          isMobile ? (
+            <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+              Noch keine Dokumente. Über „Dokument“ oben hochladen.
+            </p>
+          ) : null
+        ) : isMobile ? (
+          <div className="dok-cards">
+            {docs.map((d) => {
+              const sizeLabel = formatBytes(d.groesse_bytes);
+              const isFoto = isImageDoc(d.name, d.href);
+              const quelleLabel =
+                d.quelle === "angebot"
+                  ? "Angebot"
+                  : d.quelle === "rechnung"
+                    ? "Rechnung"
+                    : "Upload";
+              const meta = [
+                quelleLabel,
+                formatDatum(d.created_at),
+                sizeLabel,
+                d.beschreibung.trim() || null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <div
+                  key={d.id}
+                  className="dok-card dok-card--tappable"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openView(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openView(d);
+                    }
+                  }}
+                >
+                  <div className="dok-card__icon" aria-hidden>
+                    <MockIcon ctx="row" n={isFoto ? "photo" : "file-text"} size={18} />
+                  </div>
+                  <div className="dok-card__body">
+                    <div className="dok-card__top">
+                      <span className="dok-card__title">{d.name}</span>
+                      <div
+                        className="dok-card__actions"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <MockBtn
+                          sm
+                          kind="ghost"
+                          icon="eye"
+                          title="Ansehen"
+                          onClick={() => openView(d)}
+                        />
+                        {d.quelle === "upload" ? (
+                          <MockBtn
+                            sm
+                            kind="ghost"
+                            icon="trash"
+                            title="Löschen"
+                            disabled={busy}
+                            onClick={() => removeDoc(d)}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                    {meta ? <div className="dok-card__meta">{meta}</div> : null}
+                    <div className="dok-card__foot">
+                      <span
+                        className={cn(
+                          "dok-card__tag",
+                          d.freigabe ? "dok-card__tag--kunde" : "dok-card__tag--muted",
+                        )}
+                      >
+                        {d.freigabe ? "Kunde" : "intern"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div className="dok-list">
             <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
               <div />
@@ -292,7 +429,7 @@ export function AnfrageDokumenteTab({
                   ) : (
                     <div
                       style={{
-                        fontSize: 'var(--fs-text)',
+                        fontSize: "var(--fs-text)",
                         fontWeight: 500,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -319,7 +456,7 @@ export function AnfrageDokumenteTab({
                   ) : (
                     <div
                       style={{
-                        fontSize: 'var(--fs-meta)',
+                        fontSize: "var(--fs-meta)",
                         color: "var(--text-3)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -342,10 +479,10 @@ export function AnfrageDokumenteTab({
                           created_at: new Date(e.target.value).toISOString(),
                         });
                       }}
-                      style={{ height: 30, fontSize: 'var(--fs-meta)' }}
+                      style={{ height: 30, fontSize: "var(--fs-meta)" }}
                     />
                   ) : (
-                    <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-3)" }}>
+                    <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-3)" }}>
                       {formatDatum(d.created_at)}
                     </div>
                   )}
@@ -355,7 +492,7 @@ export function AnfrageDokumenteTab({
                       alignItems: "center",
                       gap: 6,
                       cursor: "pointer",
-                      fontSize: 'var(--fs-meta)',
+                      fontSize: "var(--fs-meta)",
                     }}
                   >
                     <input

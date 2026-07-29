@@ -3,7 +3,11 @@
 import { useState, useTransition } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { EinstellungenListBody, EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
+import {
+  EinstellungenListBody,
+  EinstellungenListItem,
+  EinstellungenListMeta,
+} from '@/components/einstellungen/EinstellungenUi'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
@@ -67,6 +71,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
     <div className="space-y-4">
       <Card
         title="Compliance-Dokumenttypen"
+        className="einst-list-card"
         action={
           <Button type="button" variant="primary" className="sm" onClick={() => setModal(true)}>
             + Neuer Typ
@@ -75,9 +80,9 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
       >
         <EinstellungenListBody empty={rows.length === 0 ? 'Noch keine Dokumenttypen.' : undefined}>
           {rows.map((t) => (
-            <li key={t.id} className="space-y-3 py-3 first:pt-0 last:pb-0">
+            <EinstellungenListItem key={t.id} className="einst-list-item--stack">
               <div>
-                <p className="text-[13.5px] font-medium text-bw-text">{t.bezeichnung}</p>
+                <p className="einst-list-title">{t.bezeichnung}</p>
                 <EinstellungenListMeta>
                   {[
                     t.compliance_ebene === 'meister'
@@ -207,7 +212,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
                 />
               </div>
             </div>
-            </li>
+            </EinstellungenListItem>
           ))}
         </EinstellungenListBody>
       </Card>

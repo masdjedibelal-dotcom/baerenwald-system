@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Bottom-Nav Spec §3: Dashboard · Vorgänge | + | Kunden · Mehr
+ * Mobil: nur Icons (Labels als aria-label) — schlankere Leiste.
  */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'
@@ -28,9 +29,10 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
           key={item.href}
           href={item.href}
           className={cn('bottomnav-item', navItemIsActive(item, pathname) && 'active')}
+          aria-label={item.label}
+          title={item.label}
         >
-          <MockIcon ctx="sidebar" n={item.iconName} size={22} />
-          <span>{item.label}</span>
+          <MockIcon ctx="sidebar" n={item.iconName} size={20} />
         </Link>
       ))}
 
@@ -38,10 +40,11 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
         type="button"
         className="bottomnav-cta"
         aria-label="Neu erstellen"
+        title="Neu erstellen"
         onClick={() => onNeuOpen?.()}
       >
         <span className="bottomnav-cta-fab">
-          <MockIcon ctx="sidebar" n="plus" size={26} />
+          <MockIcon ctx="sidebar" n="plus" size={22} />
         </span>
       </button>
 
@@ -50,15 +53,20 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
           key={item.href}
           href={item.href}
           className={cn('bottomnav-item', navItemIsActive(item, pathname) && 'active')}
+          aria-label={item.label}
+          title={item.label}
         >
-          <MockIcon ctx="sidebar" n={item.iconName} size={22} />
-          <span>{item.label}</span>
+          <MockIcon ctx="sidebar" n={item.iconName} size={20} />
         </Link>
       ))}
 
-      <Link href="/mehr" className={cn('bottomnav-item', mehrActive && 'active')}>
-        <MockIcon ctx="sidebar" n="dots" size={22} />
-        <span>Mehr</span>
+      <Link
+        href="/mehr"
+        className={cn('bottomnav-item', mehrActive && 'active')}
+        aria-label="Mehr"
+        title="Mehr"
+      >
+        <MockIcon ctx="sidebar" n="dots" size={20} />
       </Link>
     </nav>
   )

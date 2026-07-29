@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import { cn } from '@/lib/utils'
 
 export type DetailActionDef = {
@@ -102,6 +104,8 @@ export function DetailActionsBar({
 }: Props) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+  const isMobile = useIsMobile()
+  const { hideChrome } = useMobileScrollChrome(isMobile)
 
   const cleanMenuItems = useMemo(
     () => withoutPrimaryDuplicate(menuItems, primary?.label),
@@ -163,7 +167,14 @@ export function DetailActionsBar({
   const mobileBar =
     mounted && (primary || mobileMenuItems.length > 0)
       ? createPortal(
-          <div className="detail-mobile-action-bar md:hidden" role="toolbar" aria-label="Aktionen">
+          <div
+            className={cn(
+              'detail-mobile-action-bar md:hidden',
+              hideChrome && 'detail-mobile-action-bar--hidden'
+            )}
+            role="toolbar"
+            aria-label="Aktionen"
+          >
             <div className="detail-mobile-action-bar__inner">
               {primary ? (
                 <ActionControl action={primary} size="md" className="detail-mobile-action-bar__primary" />

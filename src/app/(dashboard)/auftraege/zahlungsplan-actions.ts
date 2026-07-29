@@ -7,14 +7,21 @@ import {
   parseZahlungsplan,
   auftragSummenAusPositionen,
   validateZahlungsplanGegenGesamt,
+  berechneZahlungsplan,
+  rechnungArtFuerZeile,
+  abschlagBereitsAbgerechnet,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
-import type { AuftragPosition } from '@/lib/types'
+import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 import {
   zahlplanDarfGeloeschtWerden,
   zahlplanMergeMitEinfrieren,
 } from '@/lib/rechnungen/zahlplan-gates'
+import {
+  createRechnungEntwurf,
+  updateRechnungStatus,
+} from '@/app/(dashboard)/rechnungen/actions'
 
 /**
  * Spec Q2: Unverbindlicher Zahlplan-Vorschlag liegt auf `angebote.zahlungsplan`.
@@ -196,4 +203,167 @@ export async function loadAuftragZahlungsplan(auftragId: string): Promise<Zahlun
     .eq('id', angebotId)
     .maybeSingle()
   return parseZahlungsplan(data?.zahlungsplan)
+}
+
+/**
+ * Externe / bereits erfolgte Zahlung für eine Planzeile erfassen.
+ * Legt eine kurze Rechnung an (Status bezahlt) und verknüpft sie mit der Zeile —
+ * bestehende Plan-IDs bleiben, Rest-/Schlussberechnung berücksichtigt den Betrag.
+ */
+export async function erfasseExterneAbschlagZahlung(input: {
+  auftragId: string
+  zeileId: string
+  /** Optional Brutto-Override; sonst Planbetrag der Zeile */
+  brutto?: number | null
+  notiz?: string | null
+}): Promise<{ ok: true; rechnungId: string } | { ok: false; message: string }> {
+  const auftragId = input.auftragId?.trim()
+  const zeileId = input.zeileId?.trim()
+  if (!auftragId || !zeileId) {
+    return { ok: false, message: 'Auftrag oder Rate fehlt.' }
+  }
+
+  const supabase = createClient()
+  const { data: auf, error: aufErr } = await supabase
+    .from('auftraege')
+    .select('id, kunde_id, angebot_id, titel, start_datum, end_datum')
+    .eq('id', auftragId)
+    .maybeSingle()
+
+  if (aufErr || !auf) return { ok: false, message: aufErr?.message ?? 'Auftrag nicht gefunden.' }
+  const kundeId = auf.kunde_id ? String(auf.kunde_id) : ''
+  if (!kundeId) return { ok: false, message: 'Kein Kunde am Auftrag.' }
+
+  const angRef = await angebotIdForAuftrag(supabase, auftragId)
+  if (!angRef.ok) return angRef
+
+  const { data: angRow } = await supabase
+    .from('angebote')
+    .select('zahlungsplan')
+    .eq('id', angRef.angebotId)
+    .maybeSingle()
+
+  const plan = parseZahlungsplan(angRow?.zahlungsplan)
+  if (!plan?.zeilen?.length) {
+    return { ok: false, message: 'Kein Abschlagsplan — bitte zuerst Plan anlegen.' }
+  }
+  const zeile = plan.zeilen.find((z) => z.id === zeileId)
+  if (!zeile) return { ok: false, message: 'Planzeile nicht gefunden.' }
+
+  const { data: rechnungen } = await supabase
+    .from('rechnungen')
+    .select(
+      'id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, faellig_am, beleg_typ'
+    )
+    .eq('auftrag_id', auftragId)
+
+  const links = (rechnungen ?? []).map((r) => ({
+    id: r.id as string,
+    status: r.status as string | null,
+    zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id as string | null,
+    rechnung_art: r.rechnung_art as string | null,
+    abschlag_index: r.abschlag_index as number | null,
+    brutto: r.brutto as number | null,
+    faellig_am: r.faellig_am as string | null,
+  }))
+
+  if (abschlagBereitsAbgerechnet(zeileId, links)) {
+    return {
+      ok: false,
+      message: 'Für diese Rate existiert bereits eine gestellte/bezahlte Rechnung.',
+    }
+  }
+
+  const { data: auftragPosRows } = await supabase
+    .from('auftrag_positionen')
+    .select('*')
+    .eq('auftrag_id', auftragId)
+    .order('sort_order', { ascending: true })
+
+  let gesamtNetto = 0
+  if (auftragPosRows?.length) {
+    const asAngebot = auftragPositionenToAngebotPositionen(auftragPosRows as AuftragPosition[])
+    gesamtNetto = auftragSummenAusPositionen(asAngebot).netto
+  }
+
+  const kontext = berechneZahlungsplan(
+    plan,
+    gesamtNetto,
+    19,
+    links
+      .filter((l) => l.zahlungsplan_abschlag_id && (l.status === 'gesendet' || l.status === 'bezahlt'))
+      .map((l) => ({
+        zeileId: String(l.zahlungsplan_abschlag_id),
+        brutto: Number(l.brutto) || 0,
+      }))
+  )
+  const berechnet = kontext.zeilen.find((z) => z.id === zeileId)
+  if (!berechnet) return { ok: false, message: 'Rate konnte nicht berechnet werden.' }
+
+  const bruttoOverride =
+    input.brutto != null && Number.isFinite(Number(input.brutto)) && Number(input.brutto) > 0
+      ? Math.round(Number(input.brutto) * 100) / 100
+      : null
+  const brutto = bruttoOverride ?? berechnet.brutto
+  if (!(brutto > 0)) return { ok: false, message: 'Betrag muss größer 0 sein.' }
+
+  const netto = Math.round((brutto / 1.19) * 100) / 100
+  const heute = new Date().toISOString().slice(0, 10)
+  const art = rechnungArtFuerZeile(berechnet)
+  const notiz = (input.notiz ?? '').trim() || 'Extern erfasst — bereits bezahlt (ohne Versand).'
+
+  const position: AngebotPosition = {
+    id: crypto.randomUUID(),
+    gewerk_id: '',
+    gewerk_name: 'Abschlag',
+    leistung: berechnet.titel || 'Abschlag',
+    beschreibung: notiz,
+    lohn_netto: netto,
+    material_netto: 0,
+    gesamt_min: netto,
+    gesamt_max: netto,
+    menge: 1,
+    einheit: 'pauschal',
+    preis_typ: 'fix',
+  }
+
+  const created = await createRechnungEntwurf({
+    angebot_id: angRef.angebotId,
+    auftrag_id: auftragId,
+    kunde_id: kundeId,
+    positionen: [position],
+    leistungszeitraum_von: (auf.start_datum as string | null) ?? heute,
+    leistungszeitraum_bis: (auf.end_datum as string | null) ?? heute,
+    faellig_am: heute,
+    rechnungsdatum: heute,
+    einleitung: `Bereits bezahlter Abschlag „${berechnet.titel}“ (extern erfasst).`,
+    hinweise: notiz,
+    rechnung_art: art,
+    abschlag_index: berechnet.index,
+    zahlungsplan_abschlag_id: zeileId,
+  })
+  if (!created.ok) return created
+
+  const paid = await updateRechnungStatus(created.id, 'bezahlt')
+  if (!paid.ok) {
+    return {
+      ok: false,
+      message: `Rechnung angelegt, Status bezahlt fehlgeschlagen: ${paid.message}`,
+    }
+  }
+
+  // Als „gestellt“ markieren, damit Plan sie als abgerechnet erkennt (bezahlt zählt bereits)
+  await supabase
+    .from('rechnungen')
+    .update({
+      gesendet_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', created.id)
+    .is('gesendet_at', null)
+
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath(`/rechnungen/${created.id}`)
+  revalidatePath('/vorgaenge')
+  return { ok: true, rechnungId: created.id }
 }

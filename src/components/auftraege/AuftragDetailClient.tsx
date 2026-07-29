@@ -37,7 +37,6 @@ import {
 } from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
-import { naechsterSchrittAuftrag } from '@/lib/crm/naechster-schritt'
 import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
@@ -112,6 +111,7 @@ function AuftragNotizenPanel({
 }) {
   const [val, setVal] = useState(initial)
   const [pending, startTransition] = useTransition()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     setVal(initial)
@@ -128,6 +128,32 @@ function AuftragNotizenPanel({
       toast.success('Notizen gespeichert')
       onSaved()
     })
+  }
+
+  const text = initial.trim()
+
+  if (isMobile) {
+    return (
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="messages" size={16} />
+            Notizen
+          </div>
+        </div>
+        <div className="card-b">
+          {text ? (
+            <p className="akte-notiz-readonly whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text">
+              {text}
+            </p>
+          ) : (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              Noch keine Notizen. Über „Notiz“ oben hinzufügen.
+            </p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -1065,21 +1091,7 @@ export function AuftragDetailClient({
           verguetung={detail.notfall_verguetung}
         />
       }
-      nextStepMetrics={[
-        {
-          label: 'Auftragswert',
-          value: auftragWertLabel !== '—' ? auftragWertLabel : '—',
-        },
-        { label: 'Fortschritt', value: `${fortschrittPct} %` },
-        { label: 'Leistungen', value: String(posCount) },
-      ]}
       quickBar={quickBar}
-      nextStep={naechsterSchrittAuftrag({
-        status: detail.status,
-        istStorniert,
-        istAbgeschlossen,
-      })}
-      onNextStepClick={() => setMainTab('leistungen')}
       head={{
         title: name,
         titleBadges: freigabeAusstehend ? (

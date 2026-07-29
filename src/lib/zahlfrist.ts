@@ -52,9 +52,12 @@ export function patchZahlungsbedingungenMitZahlfrist(
   if (!cur) return neu
 
   const ersetzt = cur
-    .replace(/Zahlbar innerhalb von \d+ Tagen nach Rechnungserhalt ohne Abzug\.?/gi, neu)
-    .replace(/Zahlbar bis [^\n]+ ohne Abzug\.?/gi, neu)
+    .replace(/Zahlbar innerhalb von \d+ Tagen nach Rechnungserhalt(?:\s*ohne Abzug\.?)*/gi, neu)
+    .replace(/Zahlbar bis [^\n]+?(?:\s*ohne Abzug\.?)+/gi, neu)
     .replace(/zahlbar innerhalb von \d+ Tagen nach Rechnungserhalt\.?/gi, neu)
+    // Doppelte „ohne Abzug“-Fragmente aufräumen (ältere kaputte Strings)
+    .replace(/(?:\s*ohne Abzug\.?)+/gi, ' ohne Abzug.')
+    .replace(/\.\s*\./g, '.')
 
   if (ersetzt !== cur) return ersetzt.trim()
   if (cur.includes('Zahlungsplan')) {

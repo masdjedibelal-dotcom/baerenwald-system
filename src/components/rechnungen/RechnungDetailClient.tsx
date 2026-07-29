@@ -19,7 +19,6 @@ import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
   createGutschriftFromRechnung,
-  korrigiereRechnung,
   nehmeRechnungStornoZurueck,
   sendRechnung,
   sendZahlungsbestaetigung,
@@ -71,7 +70,6 @@ import {
 } from '@/lib/rechnungen/mahnverlauf'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
-import { naechsterSchrittRechnung } from '@/lib/crm/naechster-schritt'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { loadHandwerkerBewertungZiele } from '@/app/(dashboard)/auftraege/handwerker-bewertung-actions'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
@@ -227,9 +225,7 @@ export function RechnungDetailClient({
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null)
-  const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | 'korrigieren' | null>(
-    null
-  )
+  const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | null>(null)
 
   useEffect(() => {
     setDetail(initial)
@@ -368,29 +364,7 @@ export function RechnungDetailClient({
       toast.error('Diese Rechnung kann nicht korrigiert werden.')
       return
     }
-    if (modus === 'direkt') {
-      openWizard()
-      return
-    }
-    setRechnungConfirm('korrigieren')
-  }
-
-  function ausfuehrenKorrigieren() {
-    setRechnungConfirm(null)
-    startTransition(async () => {
-      const r = await korrigiereRechnung(detail.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      if (r.mode === 'direkt') {
-        openWizard()
-        return
-      }
-      toast.success('Storno angelegt — neue Rechnung als Entwurf')
-      router.push(`/rechnungen/${r.neuId}`)
-      refresh()
-    })
+    openWizard()
   }
 
   function handleSenden() {
@@ -760,7 +734,7 @@ export function RechnungDetailClient({
             ? 'Positionen sind gestellt — Änderungen über eine Rechnungskorrektur.'
             : 'Positionen änderst du im Rechnungs-Dokument — nicht in dieser Tabelle.'
         }
-        dokumentActionLabel={gestellt ? 'Rechnung korrigieren' : 'Dokument öffnen'}
+        dokumentActionLabel={gestellt ? 'Bearbeiten' : 'Dokument öffnen'}
         emptyHint="Noch keine Positionen — im Rechnungs-Dokument anlegen."
       />
     )
@@ -790,6 +764,7 @@ export function RechnungDetailClient({
       detail={detail}
       leadId={leadId}
       dokumente={dokumenteRows}
+      rechnungen={auftragRechnungen}
       onReload={() => refresh()}
     />
   )
@@ -887,25 +862,7 @@ export function RechnungDetailClient({
       wiedervorlageEntity="rechnung"
       wiedervorlageEntityId={detail.id}
       onWiedervorlageSaved={() => refresh()}
-      nextStepMetrics={[
-        {
-          label: 'Rechnungsbetrag',
-          value: detail.brutto != null ? formatEurBetrag(detail.brutto) : '—',
-        },
-        {
-          label: 'Status',
-          value: rechnungStatus.label,
-        },
-      ]}
       quickBar={quickBar}
-      nextStep={naechsterSchrittRechnung({
-        status: detail.status,
-        ueberfaellig,
-        belegTyp,
-        faelligLabel: detail.faellig_am
-          ? `fällig ${formatDatum(detail.faellig_am)}`
-          : null,
-      })}
       head={{
         title: kundeName,
         sub: headSub,
@@ -1004,28 +961,6 @@ export function RechnungDetailClient({
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Es entsteht ein Gutschrift-Beleg (negative Beträge). Die Originalrechnung wird als
           storniert markiert.
-        </p>
-      </Modal>
-
-      <Modal
-        open={rechnungConfirm === 'korrigieren'}
-        onClose={() => setRechnungConfirm(null)}
-        title="Rechnung korrigieren?"
-        size="sm"
-        footer={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setRechnungConfirm(null)}>
-              Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={ausfuehrenKorrigieren} disabled={pending}>
-              Fortfahren
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Es wird eine Storno-Gutschrift erstellt und eine neue Rechnung mit neuer Nummer als
-          Entwurf angelegt.
         </p>
       </Modal>
     </EntityDetailLayout>

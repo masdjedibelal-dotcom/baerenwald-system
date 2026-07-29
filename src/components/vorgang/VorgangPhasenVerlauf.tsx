@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, Pencil } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
   angebotNrAnzeige,
@@ -65,7 +66,8 @@ function hasRealAngebotNummer(a: ProjektKontext['angebote'][number] | undefined)
 }
 
 /**
- * Mock „Verlauf des Vorgangs“ — vier Phasen-Zeilen (.vgp-*), Sheet 560px / Bottom.
+ * Mock „Verlauf des Vorgangs“ —
+ * Desktop: vertikale Timeline · Mobil: horizontale Strip-Karten (aktuell zuerst sichtbar).
  */
 export function VorgangPhasenVerlauf({
   kontext,
@@ -84,8 +86,11 @@ export function VorgangPhasenVerlauf({
 }) {
   void _onSaved
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [readKind, setReadKind] = useState<PhaseKind | null>(null)
   const [showEarlier, setShowEarlier] = useState(false)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const currentCardRef = useRef<HTMLDivElement>(null)
 
   const withFrom = (pathname: string, extra?: Record<string, string>) => {
     if (fromRef) return hrefWithAkteFrom(pathname, fromRef, extra)
@@ -103,7 +108,7 @@ export function VorgangPhasenVerlauf({
 
   const currentIdx = rows.findIndex((r) => r.state === 'current')
   const collapseFrom =
-    fromRef?.kind === 'auftrag' || fromRef?.kind === 'rechnung'
+    !isMobile && (fromRef?.kind === 'auftrag' || fromRef?.kind === 'rechnung')
       ? Math.max(0, currentIdx)
       : 0
   const earlierCount = collapseFrom
@@ -111,6 +116,19 @@ export function VorgangPhasenVerlauf({
     showEarlier || earlierCount <= 0 ? rows : rows.slice(collapseFrom)
 
   const active = rows.find((r) => r.kind === readKind) ?? null
+
+  /* Mobil: aktuelle Phase als erstes im Strip sichtbar (Timeline-Reihenfolge bleibt) */
+  useEffect(() => {
+    if (!isMobile || currentIdx < 0) return
+    const scroller = stripRef.current
+    const card = currentCardRef.current
+    if (!scroller || !card) return
+    const frame = window.requestAnimationFrame(() => {
+      const left = Math.max(0, card.offsetLeft - 14)
+      scroller.scrollTo({ left, behavior: 'smooth' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [isMobile, currentIdx, rows])
 
   function openRow(row: PhaseRowModel) {
     if (row.state === 'open') return
@@ -140,67 +158,117 @@ export function VorgangPhasenVerlauf({
           <div className="card-title title">Verlauf des Vorgangs</div>
         </div>
         <div className="card-b">
-          {earlierCount > 0 && !showEarlier ? (
-            <button
-              type="button"
-              className="vgp-earlier"
-              onClick={() => setShowEarlier(true)}
+          {isMobile ? (
+            <div
+              ref={stripRef}
+              className="vgp-strip"
+              role="list"
+              aria-label="Phasenverlauf"
             >
-              <ChevronRight size={14} aria-hidden />
-              {earlierCount} frühere Phasen anzeigen
-            </button>
-          ) : null}
-          {earlierCount > 0 && showEarlier ? (
-            <button
-              type="button"
-              className="vgp-earlier"
-              onClick={() => setShowEarlier(false)}
-            >
-              Frühere Phasen ausblenden
-            </button>
-          ) : null}
-          <div className="vgp-list" role="list">
-            {visibleRows.map((row, i) => {
-              const isLast = i === visibleRows.length - 1
-              const clickable = row.state !== 'open'
-              return (
-                <div
-                  key={row.kind}
-                  role="listitem"
-                  className={cn('vgp', row.state, isLast && 'last')}
-                >
-                  <button
-                    type="button"
-                    className="vgp-head"
-                    disabled={!clickable}
-                    onClick={() => openRow(row)}
-                    aria-label={`${row.label}: ${row.kopf}`}
+              {rows.map((row, i) => {
+                const clickable = row.state !== 'open'
+                return (
+                  <div
+                    key={row.kind}
+                    ref={row.state === 'current' ? currentCardRef : undefined}
+                    role="listitem"
+                    className={cn('vgp-strip-item', row.state)}
                   >
-                    <span className="vgp-rail" aria-hidden>
-                      <span className="vgp-dot" />
-                    </span>
-                    <span className="vgp-body">
-                      <span className="vgp-top">
-                        <span className="vgp-label">{row.label}</span>
-                        <span
-                          className={cn('vgp-kopf', row.state === 'open' && 'vgp-leer')}
-                        >
-                          {row.kopf}
-                        </span>
-                        {row.betrag ? (
-                          <span className="vgp-betrag">{row.betrag}</span>
-                        ) : null}
+                    {i > 0 ? <span className="vgp-strip-rail" aria-hidden /> : null}
+                    <button
+                      type="button"
+                      className="vgp-strip-card"
+                      disabled={!clickable}
+                      onClick={() => openRow(row)}
+                      aria-current={row.state === 'current' ? 'step' : undefined}
+                      aria-label={`${row.label}: ${row.kopf}`}
+                    >
+                      <span className="vgp-strip-dot" aria-hidden />
+                      <span className="vgp-strip-label">{row.label}</span>
+                      <span
+                        className={cn(
+                          'vgp-strip-kopf',
+                          row.state === 'open' && 'vgp-leer'
+                        )}
+                      >
+                        {row.kopf}
                       </span>
-                      {row.sub ? <span className="vgp-sub">{row.sub}</span> : null}
-                    </span>
-                    {clickable ? (
-                      <ChevronRight className="vgp-chv" size={16} aria-hidden />
-                    ) : null}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+                      {row.betrag ? (
+                        <span className="vgp-strip-betrag">{row.betrag}</span>
+                      ) : null}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <>
+              {earlierCount > 0 && !showEarlier ? (
+                <button
+                  type="button"
+                  className="vgp-earlier"
+                  onClick={() => setShowEarlier(true)}
+                >
+                  <ChevronRight size={14} aria-hidden />
+                  {earlierCount} frühere Phasen anzeigen
+                </button>
+              ) : null}
+              {earlierCount > 0 && showEarlier ? (
+                <button
+                  type="button"
+                  className="vgp-earlier"
+                  onClick={() => setShowEarlier(false)}
+                >
+                  Frühere Phasen ausblenden
+                </button>
+              ) : null}
+              <div className="vgp-list" role="list">
+                {visibleRows.map((row, i) => {
+                  const isLast = i === visibleRows.length - 1
+                  const clickable = row.state !== 'open'
+                  return (
+                    <div
+                      key={row.kind}
+                      role="listitem"
+                      className={cn('vgp', row.state, isLast && 'last')}
+                    >
+                      <button
+                        type="button"
+                        className="vgp-head"
+                        disabled={!clickable}
+                        onClick={() => openRow(row)}
+                        aria-label={`${row.label}: ${row.kopf}`}
+                      >
+                        <span className="vgp-rail" aria-hidden>
+                          <span className="vgp-dot" />
+                        </span>
+                        <span className="vgp-body">
+                          <span className="vgp-top">
+                            <span className="vgp-label">{row.label}</span>
+                            <span
+                              className={cn(
+                                'vgp-kopf',
+                                row.state === 'open' && 'vgp-leer'
+                              )}
+                            >
+                              {row.kopf}
+                            </span>
+                            {row.betrag ? (
+                              <span className="vgp-betrag">{row.betrag}</span>
+                            ) : null}
+                          </span>
+                          {row.sub ? <span className="vgp-sub">{row.sub}</span> : null}
+                        </span>
+                        {clickable ? (
+                          <ChevronRight className="vgp-chv" size={16} aria-hidden />
+                        ) : null}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

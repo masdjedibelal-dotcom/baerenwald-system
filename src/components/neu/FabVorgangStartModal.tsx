@@ -95,13 +95,28 @@ export function FabVorgangStartModal({
     router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kid)}`)
   }
 
+  function loadAuftraegeForKunde(kid: string) {
+    setKundeId(kid)
+    setStep(2)
+    setLoadingAuftraege(true)
+    startTransition(async () => {
+      const r = await listAuftraegeFuerKunde(kid)
+      setLoadingAuftraege(false)
+      if (!r.ok) {
+        toast.error(r.message)
+        setStep(1)
+        return
+      }
+      setAuftraege(r.auftraege)
+    })
+  }
+
   function onKundePick(k: Kunde) {
-    setKundeId(k.id)
     if (art === 'angebot') {
       startAngebot(k.id)
       return
     }
-    startRechnung(null, k.id)
+    loadAuftraegeForKunde(k.id)
   }
 
   const kundeVorausgewaehlt = Boolean(initialKundeId?.trim())
@@ -114,6 +129,7 @@ export function FabVorgangStartModal({
         onClose={() => !pending && onClose()}
         title={pickerTitle}
         context="canvas"
+        manageHistory={false}
         onNeu={() => setCreateOpen(true)}
         onPick={onKundePick}
       />
@@ -131,6 +147,7 @@ export function FabVorgangStartModal({
           }}
           title="Vorgang"
           context="canvas"
+          manageHistory={false}
           empty={loadingAuftraege ? <p className="picker-sheet__empty">Lädt…</p> : undefined}
         >
           <ul className="picker-sheet__rows">
@@ -167,7 +184,7 @@ export function FabVorgangStartModal({
           setCreateOpen(false)
           if (!id) return
           if (art === 'angebot') startAngebot(id)
-          else startRechnung(null, id)
+          else loadAuftraegeForKunde(id)
         }}
       />
     </>

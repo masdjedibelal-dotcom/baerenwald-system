@@ -1051,6 +1051,7 @@ export function AngebotWizard({
         positionen={posBoardLines}
         onChange={onPosBoardChange}
         showUst
+        showTotals={false}
         gewerke={gewerkNamen}
         preislisten={preislisten}
         hideAddGewerk={dokumentTyp === 'einfach'}

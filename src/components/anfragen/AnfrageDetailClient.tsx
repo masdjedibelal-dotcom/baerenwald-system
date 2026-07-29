@@ -15,7 +15,7 @@ import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
-import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
@@ -29,7 +29,7 @@ import { toast } from '@/components/ui/app-toast'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
-import { naechsterSchrittAnfrage } from '@/lib/crm/naechster-schritt'
+import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
@@ -326,8 +326,13 @@ export function AnfrageDetailClient({
   }, [lead.lead_dokumente])
 
   const dokumenteCount = useMemo(
-    () => dokumenteRows.length + angeboteListe.length,
-    [dokumenteRows.length, angeboteListe.length]
+    () =>
+      dokumenteRows.length +
+      angeboteListe.length +
+      (projektKontext?.rechnungen ?? []).filter((r) =>
+        rechnungIstAlsAkteUnterlage(r)
+      ).length,
+    [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen]
   )
 
   const leadEmail =
@@ -417,9 +422,6 @@ export function AnfrageDetailClient({
     if (href) router.push(`${href}#angebot-versand-kunde`)
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
-  const canAcceptAngebot =
-    Boolean(angebotFlowSnapshot?.angebotId) && !auftragId
-
   const matrixCta = primaryCta('anfrage', lead.status)
 
   const primaryCtaAction = useCallback(() => {
@@ -458,7 +460,6 @@ export function AnfrageDetailClient({
           onCopy: () => runDuplicateAnfrage(lead.id, router),
           onStatus: (k) => setStatusModalKind(k),
           onAngeboteVerwalten: () => setAngebotAuswahlOpen(true),
-          onWiedervorlage: () => setWvOpen(true),
           onZusammenfuehren: () => setZusammenfuehrenOpen(true),
           onPortal: kundeId
             ? () => {
@@ -512,17 +513,6 @@ export function AnfrageDetailClient({
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
   const kundeTitel = useMemo(() => kundenName(lead), [lead])
-  const budgetLabel = useMemo(
-    () =>
-      resolveLeadPreisAnzeige(
-        lead.kanal,
-        lead.budget_ca,
-        lead.preis_min,
-        lead.preis_max,
-        lead.funnel_daten
-      ),
-    [lead]
-  )
 
   const noShowTerminHinweis = useMemo(
     () =>
@@ -620,6 +610,7 @@ export function AnfrageDetailClient({
               leadId={lead.id}
               dokumente={dokumenteRows}
               angebote={angeboteListe}
+              rechnungen={projektKontext?.rechnungen ?? []}
               onReload={() => refresh()}
             />
           }
@@ -651,28 +642,7 @@ export function AnfrageDetailClient({
       onWiedervorlageSaved={() => refresh()}
       wiedervorlageOpen={wvOpen}
       onWiedervorlageOpenChange={setWvOpen}
-      nextStepMetrics={[
-        ...(budgetLabel !== '—'
-          ? [{ label: 'Budget', value: budgetLabel }]
-          : []),
-        { label: 'Angebote', value: String(angeboteListe.length) },
-      ]}
       quickBar={quickBar}
-      nextStep={
-        !hasAngebote && !auftragId && lead.status !== 'abgebrochen'
-          ? {
-              label: '→ Angebot erstellen',
-              hint: lead.created_at
-                ? `eingegangen ${formatDatum(lead.created_at)}`
-                : 'Bedarf prüfen, dann Angebot erstellen.',
-            }
-          : naechsterSchrittAnfrage({
-              status: lead.status,
-              hasAngebote,
-              canAcceptAngebot,
-              hasAuftrag: Boolean(auftragId),
-            })
-      }
       head={{
         title: kundeTitel,
         badges: (() => {

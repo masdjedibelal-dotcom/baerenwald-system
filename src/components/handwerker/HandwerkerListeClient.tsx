@@ -1,10 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   MockBtn,
   MockChip,
@@ -15,6 +14,7 @@ import {
   MockSortHead,
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
+import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -25,6 +25,8 @@ import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammd
 import { cn } from '@/lib/utils'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 
@@ -242,6 +244,26 @@ export function HandwerkerListeClient({
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
   const allSelected = filtered.length > 0 && filtered.every((h) => selected[h.id])
+
+  const selectedRows = useMemo(
+    () => filtered.filter((h) => selected[h.id]),
+    [filtered, selected]
+  )
+
+  const bulkOpen = useCallback(() => {
+    const row = selectedRows[0]
+    if (row) router.push(`/handwerker/${row.id}`)
+  }, [router, selectedRows])
+
+  const bulkExport = useCallback(() => {
+    runMockListExport(
+      exportToCSV,
+      selectedRows.map(handwerkerExportRow),
+      EXPORT_FIELDS,
+      'handwerker-auswahl'
+    )
+  }, [exportToCSV, selectedRows])
+
   const colDefs = selectMode ? HW_COLS_SELECT : HW_COLS
   const { gridTemplateColumns, startResize } = useResizableColumns(
     selectMode ? 'crm.cols.handwerker.select.v1' : 'crm.cols.handwerker.v1',
@@ -250,14 +272,26 @@ export function HandwerkerListeClient({
   const resizeOffset = selectMode ? 1 : 0
 
   const paginationResetKey = `${gewerkChip}|${query}|${fName}|${nurZuPruefen}|${sortCol}|${sortDir}`
-  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
-    filtered,
-    10,
-    paginationResetKey
-  )
+  const {
+    pageItems,
+    infiniteItems,
+    hasMore,
+    loadMore,
+    visibleCount,
+    pageIndex,
+    totalPages,
+    total,
+    pageSize,
+    setPageIndex,
+  } = useListPage(filtered, 12, paginationResetKey)
+
+  function openDetail(id: string) {
+    router.push(`/handwerker/${id}`)
+  }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
   const isMobile = useIsMobile()
+  const displayItems = isMobile ? infiniteItems : pageItems
 
   const filterFooter = (
     <>
@@ -322,7 +356,7 @@ export function HandwerkerListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips">
+        <div className="listbar-chips" role="group" aria-label="Gewerke">
           {gewerkChipOptions.map((o) => (
             <MockChip
               key={o.value}
@@ -374,29 +408,28 @@ export function HandwerkerListeClient({
                 icon="filter"
                 kind={activeFilterCount ? 'primary' : 'ghost'}
                 sm
+                title={
+                  activeFilterCount
+                    ? `Filter & Suchen (${activeFilterCount})`
+                    : 'Filter & Suchen'
+                }
                 onClick={() => setFilterOpen(true)}
-              >
-                <span className="listbar-btn-label">
-                  Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
-                </span>
-              </MockBtn>
+              />
               <MockBtn
                 icon="checks"
                 kind={selectMode ? 'primary' : 'ghost'}
                 sm
+                title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
                 onClick={() => {
                   setSelectMode((m) => !m)
                   setSelected({})
                 }}
-              >
-                <span className="listbar-btn-label">
-                  {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
-                </span>
-              </MockBtn>
+              />
               <MockBtn
                 icon="download"
                 kind="ghost"
                 sm
+                title="CSV exportieren"
                 onClick={() =>
                   runMockListExport(
                     exportToCSV,
@@ -405,9 +438,7 @@ export function HandwerkerListeClient({
                     'handwerker'
                   )
                 }
-              >
-                <span className="listbar-btn-label">Export</span>
-              </MockBtn>
+              />
             </>
           }
         />
@@ -449,6 +480,32 @@ export function HandwerkerListeClient({
         </MockModal>
       )}
 
+      {selectedCount > 0 ? (
+        <div className="bulkbar">
+          <span>
+            <b>{selectedCount}</b> ausgewählt
+          </span>
+          <div style={{ flex: 1 }} />
+          {selectedCount === 1 ? (
+            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
+              Öffnen
+            </MockBtn>
+          ) : null}
+          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
+            Export
+          </MockBtn>
+          <MockBtn
+            kind="ghost"
+            sm
+            className="qa-btn"
+            icon="x"
+            onClick={() => setSelected({})}
+            title="Auswahl aufheben"
+          />
+        </div>
+      ) : null}
+
+      <PullToRefresh onRefresh={() => router.refresh()}>
       <div
         className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
@@ -537,7 +594,7 @@ export function HandwerkerListeClient({
           </MockSortHead>
         </div>
 
-        {pageItems.length === 0 ? (
+        {displayItems.length === 0 ? (
           <MockEmpty
             icon="tool"
             title={rows.length === 0 ? 'Keine Partner' : 'Keine Treffer'}
@@ -555,7 +612,7 @@ export function HandwerkerListeClient({
             }
           />
         ) : (
-          pageItems.map((h) => {
+          displayItems.map((h) => {
             const gewerke = h.gewerk_namen ?? []
             const gewerkeFallback = gewerke.length === 0 ? gewerkeStr(h) : ''
             const pills =
@@ -564,15 +621,24 @@ export function HandwerkerListeClient({
                 : gewerkeFallback
                   ? gewerkeFallback.split(/[·,]/).map((g) => g.trim()).filter(Boolean).slice(0, 3)
                   : []
-            return (
-              <Link
-                key={h.id}
-                href={`/handwerker/${h.id}`}
+            const tel = h.telefon?.trim() || ''
+            const mail = h.email?.trim() || ''
+            const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
+            const call = tel
+              ? () => {
+                  window.location.href = `tel:${tel}`
+                }
+              : undefined
+            const row = (
+              <div
+                role="button"
+                tabIndex={0}
                 className={cn('list-row', selected[h.id] && 'sel')}
-                onClick={(e) => {
-                  if (selectMode) {
+                onClick={() => (selectMode ? toggleSel(h.id) : openDetail(h.id))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    toggleSel(h.id)
+                    selectMode ? toggleSel(h.id) : openDetail(h.id)
                   }
                 }}
               >
@@ -603,10 +669,12 @@ export function HandwerkerListeClient({
                     <span style={{ color: 'var(--text-3)' }}>—</span>
                   )}
                 </div>
-                <div style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                  {h.telefon?.trim() || '—'}
+                {isMobile ? <div className="lc-sub">{contactSub}</div> : null}
+                <div className="lc-desk" style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                  {tel || '—'}
                 </div>
                 <div
+                  className="lc-desk"
                   style={{
                     color: 'var(--text-2)',
                     overflow: 'hidden',
@@ -614,29 +682,50 @@ export function HandwerkerListeClient({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {h.email?.trim() || '—'}
+                  {mail || '—'}
                 </div>
-                <div style={{ textAlign: 'center' }}>
+                <div className="lc-desk" style={{ textAlign: 'center' }}>
                   <span className="rating" style={{ color: 'var(--text-4)' }}>
                     <MockIcon ctx="default" n="star-filled" size={12} />
                     —
                   </span>
                 </div>
                 <div className="lc-status">{handwerkerStatusBadge(h)}</div>
-              </Link>
+              </div>
+            )
+            return (
+              <SwipeRow
+                key={h.id}
+                disabled={!isMobile || selectMode}
+                onSwipeRight={isMobile && !selectMode ? call : undefined}
+                rightLabel="Anrufen"
+              >
+                {row}
+              </SwipeRow>
             )
           })
         )}
       </div>
+      </PullToRefresh>
 
-      <MockPager
-        pageIndex={pageIndex}
-        totalPages={totalPages}
-        total={total}
-        pageSize={pageSize}
-        unit="Partner"
-        onPageChange={(p) => setPageIndex(p - 1)}
-      />
+      {isMobile ? (
+        <ListInfiniteSentinel
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+          shown={visibleCount}
+          total={total}
+          unit="Partner"
+        />
+      ) : (
+        <MockPager
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          unit="Partner"
+          onPageChange={(p) => setPageIndex(p - 1)}
+        />
+      )}
     </div>
   )
 }

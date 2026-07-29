@@ -1,10 +1,7 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { usePathname } from 'next/navigation'
+import { useEffect, type ReactNode } from 'react'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
-import { MockDetailCrumb } from '@/components/mock-ui/MockDetailCrumb'
-import { NextStepBar, type NextStepMetric } from '@/components/crm/NaechsterSchrittBanner'
 import {
   VorgangResolverBanner,
   vorgangResolverBannerVisible,
@@ -14,50 +11,54 @@ import { WiedervorlageChip } from '@/components/vorgang/WiedervorlageChip'
 import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
 import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorlage-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
-import type { NaechsterSchrittHint } from '@/lib/crm/naechster-schritt'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
-import { getDetailRouteMeta } from '@/lib/detail-route-meta'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import { cn } from '@/lib/utils'
 
 export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
   /** @deprecated Display-Phase — Prop bleibt für Aufrufer */
   phase?: VorgangPhase | null
-  /** Phasen-Strip AN→AG→AU→RE — im Mock nicht im Header; Verlauf übernimmt das */
+  /** @deprecated Phasen-Strip — nicht mehr im Header */
   projektKontext?: ProjektKontext | null
   head: DetailHeadProps
-  /** Status→Aktion-Hinweis unter dem Kopf */
-  nextStep?: NaechsterSchrittHint | null
-  nextStepMetrics?: NextStepMetric[]
+  /**
+   * @deprecated Next-Step-Card ist entfernt (Mobil + Desktop) und wird nicht wieder gerendert.
+   * Props bleiben nur, damit bestehende Aufrufer typechecken — Werte werden ignoriert.
+   */
+  nextStep?: unknown
+  /** @deprecated ignoriert — Next-Step entfernt */
+  nextStepMetrics?: unknown
+  /** @deprecated ignoriert — Next-Step entfernt */
   onNextStepClick?: () => void
   wiedervorlageDatum?: string | null
   wiedervorlageNotiz?: string | null
-  /** Phase 10: Chip editierbar machen */
   wiedervorlageEntity?: WiedervorlageEntity
   wiedervorlageEntityId?: string | null
   onWiedervorlageSaved?: () => void
   wiedervorlageOpen?: boolean
   onWiedervorlageOpenChange?: (open: boolean) => void
   quickBar?: QuickBarAction[]
+  /** @deprecated Breadcrumb entfernt */
   breadcrumbTitle?: ReactNode
   crumbBackHref?: string
   crumbBackLabel?: string
   crumbSectionLabel?: string
-  /** Kontext-Band zwischen Kopf und NextStep (z. B. Notfall) */
+  /** Kontext-Band (z. B. Notfall) */
   banner?: ReactNode
   children: ReactNode
   className?: string
 }
 
-/** Vorgangs-Detail: Zurück · Kopf · NextStep · QuickBar · Inhalt (ohne Header-Phasenkette). */
+/**
+ * Vorgangs-Detail: kompakter Kopf · QuickBar (Mobil, nur oben) · Inhalt.
+ * Beim Scrollen: nur Titel + Status sticky — Quickbar/Meta/Banner weg.
+ */
 export function EntityDetailLayout({
   resolvedVorgang,
   head,
-  nextStep,
-  nextStepMetrics,
-  onNextStepClick,
   wiedervorlageDatum,
   wiedervorlageNotiz,
   wiedervorlageEntity,
@@ -66,34 +67,19 @@ export function EntityDetailLayout({
   wiedervorlageOpen,
   onWiedervorlageOpenChange,
   quickBar,
-  breadcrumbTitle,
-  crumbBackHref,
-  crumbBackLabel,
-  crumbSectionLabel,
   banner,
   children,
   className,
 }: EntityDetailLayoutProps) {
-  const pathname = usePathname() ?? '/'
-  const routeMeta = getDetailRouteMeta(pathname)
   const isMobile = useIsMobile()
-  const [scrolled, setScrolled] = useState(false)
+  const { scrolled } = useMobileScrollChrome(isMobile)
 
   useEffect(() => {
-    if (!isMobile) {
-      setScrolled(false)
-      return
-    }
-    const onScroll = () => setScrolled(window.scrollY > 40)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isMobile])
+    if (!isMobile) return
+    document.documentElement.classList.toggle('bw-detail-scrolled', scrolled)
+    return () => document.documentElement.classList.remove('bw-detail-scrolled')
+  }, [isMobile, scrolled])
 
-  const backHref = crumbBackHref ?? routeMeta.backHref ?? '/vorgaenge'
-  const backLabel = crumbBackLabel ?? 'Zurück zu den Vorgängen'
-  const sectionLabel = crumbSectionLabel ?? routeMeta.sectionLabel ?? 'Vorgänge'
-  const crumbEntity = breadcrumbTitle ?? head.title
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
@@ -122,28 +108,32 @@ export function EntityDetailLayout({
       )}
     >
       <div className={cn('detail-entity-sticky', scrolled && 'detail-entity-sticky--compact')}>
-        <MockDetailCrumb
-          backHref={backHref}
-          backLabel={backLabel}
-          sectionLabel={sectionLabel}
-          entityTitle={crumbEntity}
-        />
-        <AkteRueckwegChip />
-        {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
+        {!scrolled ? <AkteRueckwegChip /> : null}
+        {showResolver && !scrolled ? (
+          <VorgangResolverBanner resolved={resolvedVorgang!} />
+        ) : null}
         <DetailHead
-          {...head}
-          badges={badges}
+          title={head.title}
+          badges={scrolled ? undefined : badges}
+          titleBadges={
+            scrolled ? (
+              <>
+                {head.titleBadges}
+                {badges}
+              </>
+            ) : (
+              head.titleBadges
+            )
+          }
+          meta={scrolled ? undefined : head.meta}
+          actions={head.actions}
+          variant={head.variant}
           className={cn(head.className, scrolled && 'shrunk')}
         />
-        {banner ? <div className="detail-entity-banner">{banner}</div> : null}
-        {!showResolver ? (
-          <NextStepBar
-            step={nextStep ?? null}
-            metrics={nextStepMetrics}
-            onStepClick={onNextStepClick}
-          />
+        {!scrolled && banner ? <div className="detail-entity-banner">{banner}</div> : null}
+        {isMobile && !scrolled && quickBar?.length ? (
+          <DetailQuickBar actions={quickBar} />
         ) : null}
-        {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
       </div>
       <div className="detail-entity-body">{children}</div>
     </div>

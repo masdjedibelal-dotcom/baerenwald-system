@@ -17,6 +17,9 @@
     --bg: #ffffff;
     --bg-soft: #f6f7f6;
     --card: #ffffff;
+    /* Mobil: Page leicht getönt, Cards leicht abgesetzt (kein Weiß-auf-Weiß) */
+    --bg-mobile: #f1f2f1;
+    --card-mobile: #fafbfa;
     /* Grau-Rahmen (kein Schwarz/rgba-Schwarz) */
     --border: #e5e3df;
     --border-strong: #d6d3ce;
@@ -80,6 +83,7 @@
     --control-h: 40px;
     --list-search-h: 30px;
     --placeholder-size: 12px;
+    --mobile-sticky-offset: 0px;
 
     /* Sidebar chrome (Mock) */
     --sidebar-hover: rgba(255, 255, 255, 0.08);
@@ -147,8 +151,8 @@
     --app-separator: var(--border);
     --app-grouped: var(--bg-soft);
 
-    /* Mock Bottom-Nav: 60px + Safe Area */
-    --mobile-bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
+    /* Mock Bottom-Nav: Icons-only ~48px + Safe Area */
+    --mobile-bottom-nav-height: calc(48px + env(safe-area-inset-bottom, 0px));
 
     /*
      * Vorgang-Detail Apple Spec §0 — semantische Materials.
@@ -175,6 +179,24 @@
     --type-subhead: calc(0.8125rem * var(--app-font-scale, 1));
     --type-footnote: calc(0.8125rem * var(--app-font-scale, 1));
     --type-caption1: calc(0.75rem * var(--app-font-scale, 1));
+  }
+
+  /* Mobil: Typo eine Stufe größer (App-Feeling statt Desktop-CRM) */
+  @media (max-width: 767px) {
+    :root {
+      --fs-meta: 13px;
+      --fs-text: 15px;
+      --fs-title: 17px;
+      --fs-head: 22px;
+      --placeholder-size: 13px;
+      --list-search-h: 40px;
+      --control-h: 44px;
+      --mobile-sticky-offset: calc(52px + env(safe-area-inset-top, 0px));
+    }
+
+    body {
+      font-size: var(--fs-text);
+    }
   }
 
   @media (prefers-color-scheme: dark) {

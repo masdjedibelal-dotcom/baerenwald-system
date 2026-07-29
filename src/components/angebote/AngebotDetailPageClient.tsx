@@ -40,6 +40,7 @@ import {
 } from '@/app/(dashboard)/angebote/actions'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
 import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotZahlungTab } from '@/components/angebote/AngebotZahlungTab'
@@ -79,7 +80,6 @@ import {
   darfAngebotAnKundeSenden,
   hatAngebotHandwerker,
 } from '@/lib/angebote/angebot-handwerker-flow'
-import { naechsterSchrittAngebot } from '@/lib/crm/naechster-schritt'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 
@@ -381,10 +381,14 @@ export function AngebotDetailPageClient({
 
   const anhaengeCount = useMemo(() => {
     const hasLead = Boolean(detail.lead_id ?? lead?.id)
+    const rechnungenCount = (projektKontext?.rechnungen ?? []).filter((r) =>
+      rechnungIstAlsAkteUnterlage(r)
+    ).length
     return anzahlAngebotAnhaenge(detail, dokumenteRows, {
       includeFotos: !hasLead,
+      rechnungenCount,
     })
-  }, [detail, dokumenteRows, lead?.id])
+  }, [detail, dokumenteRows, lead?.id, projektKontext?.rechnungen])
 
   const projektTitel = useMemo(
     () =>
@@ -539,6 +543,7 @@ export function AngebotDetailPageClient({
       detail={detail}
       leadId={detail.lead_id ?? lead?.id ?? null}
       dokumente={dokumenteRows}
+      rechnungen={projektKontext?.rechnungen ?? []}
       onReload={() => refresh()}
     />
   )
@@ -627,25 +632,7 @@ export function AngebotDetailPageClient({
       wiedervorlageEntity="angebot"
       wiedervorlageEntityId={detail.id}
       onWiedervorlageSaved={() => refresh()}
-      nextStepMetrics={[
-        {
-          label: 'Angebotssumme',
-          value: formatEurBetrag(summenMail.bruttoMin),
-        },
-        {
-          label: 'Positionen',
-          value: String(positionenAnzeigeCount),
-        },
-      ]}
       quickBar={quickBar}
-      nextStep={naechsterSchrittAngebot({
-        statusEinfach,
-        hasAuftrag: Boolean(auftragId),
-        needsPartnerFirst:
-          hatAngebotHandwerker(detail.angebot_handwerker) &&
-          !darfAngebotAnKundeSenden(detail.angebot_handwerker ?? [], detail.status),
-        gueltigBisLabel: formatDatum(gueltigBisYmd) || gueltigBisYmd,
-      })}
       head={{
         title: kundeName,
         sub: headSub,

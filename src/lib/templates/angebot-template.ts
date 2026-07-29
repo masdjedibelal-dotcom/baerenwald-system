@@ -66,6 +66,10 @@ export type AngebotPdfRechtshinweise = {
   hinweis_35a: boolean
   hinweis_19: boolean
   hinweis_13b: boolean
+  /** §35a-Betrag im Hinweistext (auch ohne Kostenaufstellungs-Block) */
+  lohn_netto_35a?: number
+  /** Explizites Material, das vom Lohnanteil abgezogen wurde */
+  material_netto_35a?: number
 }
 
 export type AngebotHtmlInput = {
@@ -358,14 +362,24 @@ function rechtshinweisePlain(
 ): string {
   if (!rh) return ''
   const parts: string[] = []
-  const lohn = ka?.lohn_netto ?? 0
+  const lohn =
+    rh.lohn_netto_35a != null && rh.lohn_netto_35a > 0
+      ? rh.lohn_netto_35a
+      : ka?.lohn_netto ?? 0
+  const material =
+    rh.material_netto_35a != null && rh.material_netto_35a > 0
+      ? rh.material_netto_35a
+      : 0
   const pStyle = `margin:0 0 8px;font-size:8pt;color:${TEXT_PRIMARY};line-height:1.55;text-align:left;font-weight:400;`
   if (rh.hinweis_35a) {
+    const betrag = lohn > 0 ? ` in Höhe von ${euro(lohn)}` : ''
+    const materialHinweis =
+      material > 0
+        ? ` (Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${euro(material)}; inkl. Anfahrt und Maschinenkosten, soweit enthalten)`
+        : ` (inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten)`
     parts.push(
       `<p style="${pStyle}">
-        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil${
-          lohn > 0 ? ` in Höhe von ${euro(lohn)}` : ''
-        } kann bei der Einkommensteuer geltend gemacht werden.
+        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil${betrag}${materialHinweis} kann bei der Einkommensteuer geltend gemacht werden.
       </p>`
     )
   }

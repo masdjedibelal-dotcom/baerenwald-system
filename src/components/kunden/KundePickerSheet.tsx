@@ -11,6 +11,9 @@ import type { Kunde } from '@/lib/types'
 /**
  * N4 / Spec §14: Kundenwahl als Combobox (kein natives Select, kein Listen-Picker-Sheet).
  * Lädt bis 200 Kunden; bei >15 greift Combobox-Tipp-Filter (Threshold).
+ *
+ * Nach onPick wird absichtlich nicht onClose() aufgerufen — der Caller schließt
+ * bzw. navigiert (sonst frisst dismiss/history.back() die Wizard-URL).
  */
 export function KundePickerSheet({
   open,
@@ -19,6 +22,7 @@ export function KundePickerSheet({
   onNeu,
   title = 'Kunde',
   context = 'canvas',
+  manageHistory = true,
 }: {
   open: boolean
   onClose: () => void
@@ -26,6 +30,7 @@ export function KundePickerSheet({
   onNeu?: () => void
   title?: string
   context?: EditorSheetContext
+  manageHistory?: boolean
 }) {
   const [rows, setRows] = useState<Kunde[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,10 +62,7 @@ export function KundePickerSheet({
   function pickValue(id: string) {
     setValue(id)
     const k = byId.get(id)
-    if (k) {
-      onPick(k)
-      onClose()
-    }
+    if (k) onPick(k)
   }
 
   return (
@@ -70,6 +72,7 @@ export function KundePickerSheet({
       title={title}
       context={context}
       size="md"
+      manageHistory={manageHistory}
       headerEnd={
         onNeu ? (
           <button type="button" className="editor-sheet__confirm-text" onClick={onNeu}>

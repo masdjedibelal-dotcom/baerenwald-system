@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
+  createGutschriftFromRechnung,
   createRechnungEntwurf,
   sendRechnung,
   updateRechnungEntwurf,
@@ -26,6 +27,11 @@ import {
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import {
+  rechnungMaterialFingerprint,
+  rechnungBrauchtStornoBeiAenderung,
+  type RechnungMaterialSnapshot,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import {
   abschlagTextKontextFromWizard,
   defaultAbschlagMailBetreff,
@@ -81,6 +87,54 @@ export type SaveRechnungWizardDraftPayload = {
   versandZeileId?: string | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+}
+
+function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterialSnapshot {
+  return {
+    positionen: rec.positionen,
+    reverse_charge_13b: Boolean(rec.reverse_charge_13b),
+    hinweis_35a: Boolean(rec.hinweis_35a),
+    rechnungsdatum: String(rec.rechnungsdatum ?? ''),
+    leistungszeitraum_von: String(rec.leistungszeitraum_von ?? ''),
+    leistungszeitraum_bis: String(rec.leistungszeitraum_bis ?? ''),
+    faellig_am: String(rec.faellig_am ?? ''),
+    zahlungsbedingungen: String(rec.zahlungsbedingungen ?? ''),
+    einleitung: String(rec.einleitung ?? ''),
+    hinweise: String(rec.hinweise ?? ''),
+  }
+}
+
+function materialSnapshotFromWizardPayload(
+  positionen: AngebotPosition[],
+  meta: RechnungWizardMeta
+): RechnungMaterialSnapshot {
+  return {
+    positionen,
+    reverse_charge_13b: meta.reverse_charge_13b,
+    hinweis_35a: meta.hinweis_35a,
+    rechnungsdatum: meta.rechnungsdatum,
+    leistungszeitraum_von: meta.leistungszeitraum_von,
+    leistungszeitraum_bis: meta.leistungszeitraum_bis,
+    faellig_am: meta.faellig_am,
+    zahlungsbedingungen: meta.zahlungsbedingungen,
+    einleitung: meta.einleitung,
+    hinweise: meta.hinweise,
+  }
+}
+
+function korrekturKontextFromRec(
+  rec: Record<string, unknown>,
+  snapshot?: RechnungMaterialSnapshot
+): NonNullable<RechnungWizardBootstrap['korrekturKontext']> | null {
+  const status = String(rec.status ?? '').toLowerCase()
+  if (status !== 'gesendet' && status !== 'bezahlt' && status !== 'versendet') return null
+  return {
+    originalStatus: status,
+    originalNr: String(rec.rechnungsnummer ?? '').trim() || 'Rechnung',
+    materialFingerprint: rechnungMaterialFingerprint(
+      snapshot ?? materialSnapshotFromRec(rec)
+    ),
+  }
 }
 
 async function positionenAusAuftrag(
@@ -654,6 +708,10 @@ export async function loadRechnungWizardBootstrap(
         rec.ist_wiederkehrend === true || basis.ist_wiederkehrend,
       wiederkehr_turnus:
         (rec.wiederkehr_turnus as string | null) ?? basis.wiederkehr_turnus,
+      korrekturKontext: korrekturKontextFromRec(
+        rec,
+        materialSnapshotFromWizardPayload(positionen, meta)
+      ),
     },
   }
 }
@@ -760,6 +818,10 @@ export async function loadRechnungWizardBootstrapStandalone(
       zahlungsplan: null,
       abschlag: null,
       gesamtNetto: berechnung.netto,
+      korrekturKontext: korrekturKontextFromRec(
+        rec,
+        materialSnapshotFromWizardPayload(positionen, meta)
+      ),
     },
   }
 }
@@ -935,6 +997,85 @@ export async function saveRechnungWizardDraft(
   }
 
   if (input.rechnungId) {
+    const supabaseCheck = createClient()
+    const { data: existingRec } = await supabaseCheck
+      .from('rechnungen')
+      .select(
+        'id, status, rechnungsnummer, positionen, reverse_charge_13b, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis, faellig_am, zahlungsbedingungen, einleitung, hinweise, beleg_typ, angebot_id, auftrag_id'
+      )
+      .eq('id', input.rechnungId)
+      .maybeSingle()
+
+    const existingStatus = String(existingRec?.status ?? 'entwurf').toLowerCase()
+    const belegTyp = String(
+      (existingRec as { beleg_typ?: string } | null)?.beleg_typ ?? 'rechnung'
+    ).toLowerCase()
+
+    if (belegTyp === 'gutschrift' && existingStatus !== 'entwurf') {
+      return { ok: false, message: 'Versendete Gutschriften können nicht mehr bearbeitet werden.' }
+    }
+
+    if (
+      existingRec &&
+      (existingStatus === 'gesendet' ||
+        existingStatus === 'bezahlt' ||
+        existingStatus === 'versendet')
+    ) {
+      const vorher = materialSnapshotFromRec(existingRec as Record<string, unknown>)
+      const nachher = materialSnapshotFromWizardPayload(positionenFuerBeleg, input.meta)
+      const brauchtStorno = rechnungBrauchtStornoBeiAenderung(existingStatus, vorher, nachher)
+
+      if (!brauchtStorno) {
+        const { error: mailErr } = await supabaseCheck
+          .from('rechnungen')
+          .update({
+            mail_einleitung: input.meta.mail_einleitung?.trim() || null,
+            mail_betreff: input.meta.mail_betreff?.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', input.rechnungId)
+        if (mailErr) return { ok: false, message: mailErr.message }
+        revalidatePath('/rechnungen')
+        revalidatePath(`/rechnungen/${input.rechnungId}`)
+        revalidateAuftragPfad(input.auftrag_id)
+        return {
+          ok: true,
+          rechnungId: input.rechnungId,
+          rechnungsnummer: String(existingRec.rechnungsnummer ?? ''),
+        }
+      }
+
+      const gutschrift = await createGutschriftFromRechnung(input.rechnungId)
+      if (!gutschrift.ok) return gutschrift
+
+      const created = await createRechnungEntwurf({
+        angebot_id: input.angebot_id ?? (existingRec.angebot_id as string | null) ?? null,
+        auftrag_id: input.auftrag_id ?? (existingRec.auftrag_id as string | null) ?? null,
+        kunde_id: input.kunde_id,
+        ...payload,
+        ist_wiederkehrend: input.ist_wiederkehrend,
+        wiederkehr_turnus: input.wiederkehr_turnus,
+      })
+      if (!created.ok) return created
+
+      const { data: nr } = await supabaseCheck
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', created.id)
+        .maybeSingle()
+
+      revalidatePath('/rechnungen')
+      revalidatePath(`/rechnungen/${input.rechnungId}`)
+      revalidatePath(`/rechnungen/${gutschrift.id}`)
+      revalidatePath(`/rechnungen/${created.id}`)
+      revalidateAuftragPfad(input.auftrag_id)
+      return {
+        ok: true,
+        rechnungId: created.id,
+        rechnungsnummer: String(nr?.rechnungsnummer ?? ''),
+      }
+    }
+
     const upd = await updateRechnungEntwurf(input.rechnungId, {
       kunde_id: input.kunde_id,
       ...payload,

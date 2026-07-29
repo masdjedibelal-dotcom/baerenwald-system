@@ -5,10 +5,8 @@ import { Suspense, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
@@ -166,7 +164,6 @@ export function ObjektAkteDetailClient({
 
   return (
     <div className="space-y-4 pb-6">
-      <MockDetailBackLink href={`/kunden/${kunde.id}`} label={`Zurück zu ${kunde.name}`} />
       <DetailHead
         title={objekt.titel}
         titleBadges={
@@ -185,21 +182,6 @@ export function ObjektAkteDetailClient({
             Aushang PDF
           </a>
         }
-      />
-
-      <NextStepBar
-        step={{
-          label: `→ ${einheiten.length} Wohneinheiten`,
-          hint: `${vermietet} vermietet`,
-        }}
-        metrics={[
-          { label: 'Einheiten', value: String(einheiten.length) },
-          { label: 'Vermietet', value: String(vermietet) },
-          {
-            label: 'Fläche',
-            value: flaecheGesamt > 0 ? `${Math.round(flaecheGesamt)} m²` : '—',
-          },
-        ]}
       />
 
       <DetailShell

@@ -1,7 +1,6 @@
 'use client'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from 'react'
@@ -41,7 +40,6 @@ import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import { NextStepBar } from '@/components/crm/NaechsterSchrittBanner'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
@@ -859,18 +857,14 @@ export function KundeDetailClient({
 
   return (
     <div className="space-y-4 pb-6">
-      <MockDetailBackLink href="/kunden" label="Zurück zu Kunden" />
       <DetailHead
         title={kundeDisplayName(kunde)}
         titleBadges={
-          wirtschaftSnap.aktiveVorgaenge > 0 ? (
-            <MockBadge kind="aktiv">In Arbeit</MockBadge>
-          ) : null
-        }
-        badges={
           <>
             <TypBadge typ={kunde.typ} />
-            {kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null}
+            {wirtschaftSnap.aktiveVorgaenge > 0 ? (
+              <MockBadge kind="aktiv">In Arbeit</MockBadge>
+            ) : null}
             {istSpam ? (
               <MockBadge kind="storniert">
                 <span className="inline-flex items-center gap-1">
@@ -881,30 +875,10 @@ export function KundeDetailClient({
             ) : null}
           </>
         }
+        badges={kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null}
         actions={
           <DetailActionsBar sheetTitle="Kunde" menuItems={kundeMenuItems} />
         }
-      />
-
-      <NextStepBar
-        step={{
-          label:
-            wirtschaftSnap.aktiveVorgaenge > 0
-              ? `→ ${wirtschaftSnap.aktiveVorgaenge} Vorgänge in Arbeit`
-              : '→ Keine offenen Vorgänge',
-          hint:
-            wirtschaftSnap.offenerBetrag > 0
-              ? `${Math.round(wirtschaftSnap.offenerBetrag).toLocaleString('de-DE')} € offen`
-              : 'keine offenen Posten',
-        }}
-        metrics={[
-          {
-            label: 'Umsatz',
-            value: `${Math.round(wirtschaftSnap.umsatz).toLocaleString('de-DE')} €`,
-          },
-          { label: 'Vorgänge', value: String(kundeVorgaengeCount) },
-          { label: 'Letzter Kontakt', value: letzterKontaktLabel },
-        ]}
       />
 
       {zeigtOrganisationTab && tab === 'organisation' ? (

@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -170,26 +171,35 @@ export function RateDrawer({
             <div className="rate-drawer-belege__count">{belege.length} Belege</div>
             <ul className="rate-drawer-belege__list">
               {belege.map((b) => (
-                <li key={b.id} className="rate-drawer-belege__row">
-                  <div className="rate-drawer-belege__main">
-                    <span className="rate-drawer-belege__nr">
-                      {b.nummer || '—'}
-                      {String(b.belegTyp ?? '') === 'gutschrift' ? ' · Gutschrift' : ''}
-                    </span>
-                    {b.brutto != null ? (
-                      <span className="rate-drawer-belege__brutto">
-                        {formatEurBetrag(b.brutto)}
+                <li key={b.id}>
+                  <Link
+                    href={`/rechnungen/${b.id}`}
+                    className="rate-drawer-belege__row rate-drawer-belege__row--link"
+                  >
+                    <div className="rate-drawer-belege__main">
+                      <span className="rate-drawer-belege__nr">
+                        {b.nummer || '—'}
+                        {String(b.belegTyp ?? '') === 'gutschrift' ? ' · Gutschrift' : ''}
                       </span>
-                    ) : null}
-                  </div>
-                  <StatusBadge status={b.status} label={b.statusLabel} />
+                      {b.brutto != null ? (
+                        <span className="rate-drawer-belege__brutto">
+                          {formatEurBetrag(b.brutto)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <StatusBadge status={b.status} label={b.statusLabel} />
+                  </Link>
                 </li>
               ))}
             </ul>
             {r.status === 'bezahlt' ? (
-              <div className="rate-drawer-note">Bezahlt — Korrektur nur per Gutschrift.</div>
+              <div className="rate-drawer-note">
+                Bezahlt — Positionsänderungen erzeugen Storno + neue Rechnung.
+              </div>
             ) : r.status === 'gestellt' ? (
-              <div className="rate-drawer-note">Änderbar bis Zahlungseingang.</div>
+              <div className="rate-drawer-note">
+                Versendet — nur Mail ohne Storno; Positionsänderungen mit Storno.
+              </div>
             ) : null}
           </div>
         ) : (
@@ -204,12 +214,14 @@ export function RateDrawer({
                     : aktivBeleg?.statusLabel || '—'}
               </MockProp>
               <MockProp label="Änderbar">
-                {r.status === 'bezahlt' ? 'nur per Gutschrift' : 'direkt bearbeitbar'}
+                {r.status === 'bezahlt' || r.status === 'gestellt'
+                  ? 'über Bearbeiten'
+                  : 'direkt bearbeitbar'}
               </MockProp>
             </div>
             <div className="rate-drawer-note">
-              {r.status === 'bezahlt'
-                ? 'Bezahlt — Korrektur nur per Gutschrift.'
+              {r.status === 'bezahlt' || r.status === 'gestellt'
+                ? 'Positionsänderungen erzeugen Storno + neue Rechnung; nur Mail ohne Storno.'
                 : 'Änderbar bis Zahlungseingang.'}
             </div>
           </>

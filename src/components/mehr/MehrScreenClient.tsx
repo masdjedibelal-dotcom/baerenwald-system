@@ -48,9 +48,7 @@ export function MehrScreenClient({
           <div className="mehr-profile-role">{userRole}</div>
         </div>
         <Link href="/einstellungen/profil" className="mehr-profile-link">
-          <MockBtn sm icon="settings" kind="ghost">
-            Profil
-          </MockBtn>
+          <MockBtn sm icon="settings" kind="ghost" title="Profil" aria-label="Profil" />
         </Link>
       </div>
 

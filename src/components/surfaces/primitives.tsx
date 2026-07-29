@@ -118,6 +118,7 @@ export function DocActionBar({
           title={a.label}
         >
           {a.icon}
+          <span className="doc-action-bar__lbl">{a.label}</span>
         </button>
       ))}
     </div>

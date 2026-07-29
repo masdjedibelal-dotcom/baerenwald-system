@@ -12,6 +12,7 @@ import {
   MockSortHead,
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
+import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
@@ -26,6 +27,7 @@ import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
+import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
@@ -249,11 +251,18 @@ export function KundenListeClient({
   const resizeOffset = selectMode ? 1 : 0
 
   const paginationResetKey = `${typFilter}|${query}|${fName}|${sortCol}|${sortDir}`
-  const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
-    filtered,
-    10,
-    paginationResetKey
-  )
+  const {
+    pageItems,
+    infiniteItems,
+    hasMore,
+    loadMore,
+    visibleCount,
+    pageIndex,
+    totalPages,
+    total,
+    pageSize,
+    setPageIndex,
+  } = useListPage(filtered, 12, paginationResetKey)
 
   function openDetail(id: string) {
     router.push(`/kunden/${id}`)
@@ -261,6 +270,7 @@ export function KundenListeClient({
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
   const isMobile = useIsMobile()
+  const displayItems = isMobile ? infiniteItems : pageItems
 
   const filterFooter = (
     <>
@@ -320,7 +330,7 @@ export function KundenListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips">
+        <div className="listbar-chips" role="group" aria-label="Kundentyp">
           {(
             [
               ['alle', 'Alle', typCounts.alle],
@@ -387,34 +397,37 @@ export function KundenListeClient({
                 icon="filter"
                 kind={activeFilterCount ? 'primary' : 'ghost'}
                 sm
+                title={
+                  activeFilterCount
+                    ? `Filter & Suchen (${activeFilterCount})`
+                    : 'Filter & Suchen'
+                }
                 onClick={() => setFilterOpen(true)}
-              >
-                <span className="listbar-btn-label">
-                  Filter &amp; Suchen{activeFilterCount ? ` (${activeFilterCount})` : ''}
-                </span>
-              </MockBtn>
+              />
               <MockBtn
                 icon="checks"
                 kind={selectMode ? 'primary' : 'ghost'}
                 sm
+                title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
                 onClick={() => {
                   setSelectMode((m) => !m)
                   setSelected({})
                 }}
-              >
-                <span className="listbar-btn-label">
-                  {selectMode ? `Auswahl (${selectedCount})` : 'Auswählen'}
-                </span>
-              </MockBtn>
+              />
               {selectMode && selectedCount === 2 ? (
-                <MockBtn icon="users" kind="primary" sm onClick={() => setMergeListOpen(true)}>
-                  <span className="listbar-btn-label">Zusammenführen</span>
-                </MockBtn>
+                <MockBtn
+                  icon="users"
+                  kind="primary"
+                  sm
+                  title="Zusammenführen"
+                  onClick={() => setMergeListOpen(true)}
+                />
               ) : null}
               <MockBtn
                 icon="download"
                 kind="ghost"
                 sm
+                title="CSV exportieren"
                 onClick={() =>
                   runMockListExport(
                     exportToCSV,
@@ -423,9 +436,7 @@ export function KundenListeClient({
                     'kunden'
                   )
                 }
-              >
-                <span className="listbar-btn-label">Export</span>
-              </MockBtn>
+              />
             </>
           }
         />
@@ -565,7 +576,7 @@ export function KundenListeClient({
           </MockSortHead>
         </div>
 
-        {pageItems.length === 0 ? (
+        {displayItems.length === 0 ? (
           <MockEmpty
             icon="users"
             title={kunden.length === 0 ? 'Noch keine Kunden' : 'Keine Treffer'}
@@ -587,64 +598,97 @@ export function KundenListeClient({
             }
           />
         ) : (
-          pageItems.map((k) => (
-            <div
-              key={k.id}
-              role="button"
-              tabIndex={0}
-              className={cn('list-row', selected[k.id] && 'sel')}
-              onClick={() => (selectMode ? toggleSel(k.id) : openDetail(k.id))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  selectMode ? toggleSel(k.id) : openDetail(k.id)
+          displayItems.map((k) => {
+            const tel = k.telefon?.trim() || ''
+            const mail = k.email?.trim() || ''
+            const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
+            const call = tel
+              ? () => {
+                  window.location.href = `tel:${tel}`
                 }
-              }}
-            >
-              {selectMode ? (
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(k.id)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[k.id] && 'on')}>
-                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
-              ) : null}
-              <div className="lc-title" style={{ fontWeight: 600 }}>
-                {kundeListenName(k)}
-              </div>
-              <div className="lc-pills">
-                <span className="pill-tag">{kundeTypLabel(k.typ)}</span>
-              </div>
-              <div style={{ color: 'var(--text-2)' }}>{k.telefon?.trim() || '—'}</div>
+              : undefined
+            const row = (
               <div
-                style={{
-                  color: 'var(--text-2)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                role="button"
+                tabIndex={0}
+                className={cn('list-row', selected[k.id] && 'sel')}
+                onClick={() => (selectMode ? toggleSel(k.id) : openDetail(k.id))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    selectMode ? toggleSel(k.id) : openDetail(k.id)
+                  }
                 }}
               >
-                {k.email?.trim() || '—'}
+                {selectMode ? (
+                  <div
+                    className="vg-check"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSel(k.id)
+                    }}
+                  >
+                    <span className={cn('vg-box', selected[k.id] && 'on')}>
+                      {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="lc-title" style={{ fontWeight: 600 }}>
+                  {kundeListenName(k)}
+                </div>
+                <div className="lc-pills">
+                  <span className="pill-tag">{kundeTypLabel(k.typ)}</span>
+                </div>
+                {isMobile ? <div className="lc-sub">{contactSub}</div> : null}
+                <div className="lc-desk" style={{ color: 'var(--text-2)' }}>
+                  {tel || '—'}
+                </div>
+                <div
+                  className="lc-desk"
+                  style={{
+                    color: 'var(--text-2)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {mail || '—'}
+                </div>
               </div>
-            </div>
-          ))
+            )
+            return (
+              <SwipeRow
+                key={k.id}
+                disabled={!isMobile || selectMode}
+                onSwipeRight={isMobile && !selectMode ? call : undefined}
+                rightLabel="Anrufen"
+              >
+                {row}
+              </SwipeRow>
+            )
+          })
         )}
       </div>
       </PullToRefresh>
 
-      <MockPager
-        pageIndex={pageIndex}
-        totalPages={totalPages}
-        total={total}
-        pageSize={pageSize}
-        unit="Kunden"
-        onPageChange={(p) => setPageIndex(p - 1)}
-      />
+      {isMobile ? (
+        <ListInfiniteSentinel
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+          shown={visibleCount}
+          total={total}
+          unit="Kunden"
+        />
+      ) : (
+        <MockPager
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          unit="Kunden"
+          onPageChange={(p) => setPageIndex(p - 1)}
+        />
+      )}
 
       <Modal
         open={mergeListOpen && Boolean(listMergePair)}

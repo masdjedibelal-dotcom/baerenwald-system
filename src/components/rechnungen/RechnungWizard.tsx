@@ -45,6 +45,7 @@ import type {
 } from '@/lib/angebote/angebot-ki-types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
+  berechneHinweis35aAnteil,
   berechneRechnung,
   parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
@@ -64,6 +65,9 @@ import type {
   RechnungWizardBootstrap,
   RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
+import {
+  rechnungMaterialFingerprint,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import {
   berechneSchlussAbrechnung,
   berechneZahlungsplan,
@@ -227,6 +231,7 @@ export function RechnungWizard({
   const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
+  const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
   const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
@@ -556,6 +561,38 @@ export function RechnungWizard({
     }
   }
 
+  const korrekturMaterialDirty = useMemo(() => {
+    if (!korrekturKontext) return false
+    const m = {
+      ...meta,
+      einleitung,
+      mail_einleitung: einleitung,
+      mail_betreff: mailBetreff.trim() || defaultBetreff,
+      faellig_am: rFaellig,
+    }
+    const fp = rechnungMaterialFingerprint({
+      positionen: positionenBerechnet,
+      reverse_charge_13b: m.reverse_charge_13b,
+      hinweis_35a: m.hinweis_35a,
+      rechnungsdatum: m.rechnungsdatum,
+      leistungszeitraum_von: m.leistungszeitraum_von,
+      leistungszeitraum_bis: m.leistungszeitraum_bis,
+      faellig_am: m.faellig_am,
+      zahlungsbedingungen: m.zahlungsbedingungen,
+      einleitung: m.einleitung,
+      hinweise: m.hinweise,
+    })
+    return fp !== korrekturKontext.materialFingerprint
+  }, [
+    korrekturKontext,
+    positionenBerechnet,
+    meta,
+    einleitung,
+    mailBetreff,
+    defaultBetreff,
+    rFaellig,
+  ])
+
   const draftSnapshot = useMemo(
     () =>
       JSON.stringify({
@@ -670,9 +707,14 @@ export function RechnungWizard({
           toast.error(res.message)
           return null
         }
+        const switched = Boolean(korrekturKontext && res.rechnungId !== rechnungId)
         setRechnungId(res.rechnungId)
         setVersandRechnungId(res.rechnungId)
         if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
+        if (switched) {
+          setKorrekturKontext(null)
+          toast.success('Storno angelegt — Korrektur als neue Rechnung gespeichert')
+        }
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
@@ -705,6 +747,7 @@ export function RechnungWizard({
       rechnungsart,
       defaultBetreff,
       wiederkehr,
+      korrekturKontext,
     ]
   )
 
@@ -878,9 +921,21 @@ export function RechnungWizard({
 
   if (!mounted) return null
 
-  const displayBrutto = rBrutto
-  const displayNetto = hasPlan && selBerechnet ? selBerechnet.netto : netto
-  const displayMwst = Math.max(0, displayBrutto - displayNetto)
+  const displayBrutto = schlussAbrechnung
+    ? schlussAbrechnung.rest_brutto
+    : rBrutto
+  const displayNetto = schlussAbrechnung
+    ? schlussAbrechnung.rest_netto
+    : hasPlan && selBerechnet
+      ? selBerechnet.netto
+      : netto
+  const displayMwst = schlussAbrechnung
+    ? schlussAbrechnung.rest_mwst
+    : Math.max(0, displayBrutto - displayNetto)
+  const anteil35a = berechneHinweis35aAnteil(
+    positionenBerechnet,
+    schlussAbrechnung?.netto ?? berechnung.netto
+  )
   const ustLabel = meta.reverse_charge_13b
     ? 'MwSt 0% (§13b)'
     : berechnung.mwst_satz === 0
@@ -967,8 +1022,10 @@ export function RechnungWizard({
               set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
               label: '§35a EStG-Hinweis ausweisen',
               sub:
-                berechnung.lohn_netto > 0
-                  ? `Lohnkostenanteil ${formatEurBetrag(berechnung.lohn_netto)} — steuerlich begünstigt`
+                anteil35a.lohn_netto > 0
+                  ? anteil35a.hat_materialausweis
+                    ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
+                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} — steuerlich begünstigt`
                   : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
             },
             {
@@ -1011,13 +1068,39 @@ export function RechnungWizard({
         </div>
       ) : null}
 
+      {korrekturKontext ? (
+        <div className="nachtrags-band" role="status">
+          <MockIcon ctx="default" n={korrekturMaterialDirty ? 'alert-triangle' : 'info-circle'} size={16} />
+          <span>
+            {korrekturMaterialDirty ? (
+              <>
+                <b>Korrektur von {korrekturKontext.originalNr}</b>
+                <br />
+                Beim Speichern/Versand wird die bisherige Rechnung storniert (Gutschrift) und die
+                Storno-PDF zusammen mit der neuen Rechnung in der E-Mail angehängt.
+              </>
+            ) : (
+              <>
+                <b>Bereits versendet ({korrekturKontext.originalNr})</b>
+                <br />
+                Nur Mail-Text ändern — ohne Storno. Sobald Positionen oder Belegdaten geändert
+                werden, entsteht automatisch eine Korrektur mit Storno.
+              </>
+            )}
+          </span>
+        </div>
+      ) : null}
+
       {rateLocked && selBerechnet ? (
         <div className="nachtrags-band" role="status">
           <MockIcon ctx="default" n="info-circle" size={16} />
           <span>
             {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} · {selBerechnet.titel}
             {' — '}
-            {formatEurBetrag(selBerechnet.brutto)} brutto
+            {formatEurBetrag(
+              schlussAbrechnung ? schlussAbrechnung.rest_brutto : selBerechnet.brutto
+            )}{' '}
+            {schlussAbrechnung ? 'Restsumme brutto' : 'brutto'}
           </span>
         </div>
       ) : null}
@@ -1027,6 +1110,7 @@ export function RechnungWizard({
         positionen={posBoardLines}
         onChange={onPosBoardChange}
         showUst
+        showTotals={false}
         gewerke={gewerkNamen}
         preislisten={preislisten}
         badgeOf={(p) =>
@@ -1051,10 +1135,23 @@ export function RechnungWizard({
       />
 
       <TotBand
-        netto={displayNetto}
-        ust={displayMwst}
-        brutto={displayBrutto}
-        ustLabel={ustLabel}
+        netto={schlussAbrechnung?.netto ?? displayNetto}
+        ust={schlussAbrechnung?.mwst_betrag ?? displayMwst}
+        brutto={schlussAbrechnung?.brutto ?? displayBrutto}
+        ustLabel={
+          schlussAbrechnung
+            ? `MwSt ${schlussAbrechnung.mwst_prozent}%`
+            : ustLabel
+        }
+        bereitsGezahlt={
+          schlussAbrechnung?.bereits_gezahlt_brutto
+            ? schlussAbrechnung.bereits_gezahlt.map((z) => ({
+                label: z.label,
+                brutto: z.brutto,
+              }))
+            : null
+        }
+        restBrutto={schlussAbrechnung?.rest_brutto ?? null}
       />
 
       {steuernBlock}
@@ -1097,7 +1194,7 @@ export function RechnungWizard({
                 ))}
               </ul>
               <div className="rw-preview-card__sum">
-                <span>Rechnungsbetrag</span>
+                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
                 <b>{formatEurBetrag(displayBrutto)}</b>
               </div>
               {rFaellig ? (
@@ -1145,10 +1242,29 @@ export function RechnungWizard({
 
   const metaSum = (
     <div className="dc-re-sum">
-      <div className="dc-re-sum__row">
-        <span>Rechnungsbetrag</span>
-        <b>{formatEurBetrag(displayBrutto)}</b>
-      </div>
+      {schlussAbrechnung && schlussAbrechnung.bereits_gezahlt_brutto > 0 ? (
+        <>
+          <div className="dc-re-sum__row dc-re-sum__row--muted">
+            <span>Gesamt brutto</span>
+            <span>{formatEurBetrag(schlussAbrechnung.brutto)}</span>
+          </div>
+          {schlussAbrechnung.bereits_gezahlt.map((z) => (
+            <div key={z.label} className="dc-re-sum__row dc-re-sum__row--muted">
+              <span>Abzgl. {z.label}</span>
+              <span>−{formatEurBetrag(z.brutto)}</span>
+            </div>
+          ))}
+          <div className="dc-re-sum__row">
+            <span>Restsumme</span>
+            <b>{formatEurBetrag(schlussAbrechnung.rest_brutto)}</b>
+          </div>
+        </>
+      ) : (
+        <div className="dc-re-sum__row">
+          <span>Rechnungsbetrag</span>
+          <b>{formatEurBetrag(displayBrutto)}</b>
+        </div>
+      )}
       <div className="dc-re-sum__faellig">
         {rFaellig ? `fällig ${formatDateDe(rFaellig)}` : 'Fälligkeit offen'}
       </div>

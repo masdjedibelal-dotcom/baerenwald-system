@@ -19,6 +19,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import {
+  guardSheetPointerFallthrough,
   pushEditorSheetHistory,
   releaseEditorSheetHistory,
   restoreEditorSheetHistoryAfterDirtyPop,
@@ -66,6 +67,11 @@ export type EditorSheetProps = {
   size?: 'md' | 'lg'
   /** Sticky Footer-CTAs (LeistungDrawer / RateDrawer) — Aktionen nur hier */
   footer?: ReactNode
+  /**
+   * Browser-History für Back-to-Close (default true).
+   * Aus bei Pickern vor einer Navigation — sonst frisst history.back() die neue URL.
+   */
+  manageHistory?: boolean
 }
 
 /**
@@ -93,11 +99,13 @@ export function EditorSheet({
   overlayClassName,
   size = 'md',
   footer,
+  manageHistory = true,
 }: EditorSheetProps) {
   const isMobile = useIsMobile()
   const [mounted, setMounted] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const sheetId = `editor-sheet:${titleId}`
   const historyPushed = useRef(false)
@@ -107,14 +115,19 @@ export function EditorSheet({
   onCloseRef.current = onClose
   const onDismissAttemptRef = useRef(onDismissAttempt)
   onDismissAttemptRef.current = onDismissAttempt
+  const onConfirmRef = useRef(onConfirm)
+  onConfirmRef.current = onConfirm
 
   const finishClose = useCallback(() => {
     setDiscardOpen(false)
     const stillPushed = historyPushed.current
     historyPushed.current = false
-    releaseEditorSheetHistory(sheetId, { historyStillPushed: stillPushed })
+    if (manageHistory) {
+      releaseEditorSheetHistory(sheetId, { historyStillPushed: stillPushed })
+    }
+    guardSheetPointerFallthrough()
     onCloseRef.current()
-  }, [sheetId])
+  }, [sheetId, manageHistory])
 
   const requestClose = useCallback(() => {
     onDismissAttemptRef.current?.()
@@ -133,9 +146,17 @@ export function EditorSheet({
       return
     }
     historyPushed.current = false
-    releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
+    if (manageHistory) {
+      releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
+    }
+    guardSheetPointerFallthrough()
     onCloseRef.current()
-  }, [sheetId])
+  }, [sheetId, manageHistory])
+
+  const handleConfirm = useCallback(() => {
+    guardSheetPointerFallthrough()
+    onConfirmRef.current?.()
+  }, [])
 
   // Spec §6 / Phase 2: nie center — Desktop Slide, Mobil Bottom
   const layout: 'bottom' | 'slide' = isMobile ? 'bottom' : 'slide'
@@ -155,7 +176,7 @@ export function EditorSheet({
 
   /* S10: History-Entry — Stack, damit Split-over → Split-over kein Fremd-Discard auslöst */
   useEffect(() => {
-    if (!open || !mounted) return
+    if (!open || !mounted || !manageHistory) return
     pushEditorSheetHistory(sheetId, handleHistoryPop)
     historyPushed.current = true
     return () => {
@@ -166,12 +187,12 @@ export function EditorSheet({
         releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
       }
     }
-  }, [open, mounted, sheetId, handleHistoryPop])
+  }, [open, mounted, sheetId, handleHistoryPop, manageHistory])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || !manageHistory) return
     updateEditorSheetHistoryPop(sheetId, handleHistoryPop)
-  }, [open, sheetId, handleHistoryPop])
+  }, [open, sheetId, handleHistoryPop, manageHistory])
 
   /* Body scroll lock + focus trap */
   useEffect(() => {
@@ -186,17 +207,24 @@ export function EditorSheet({
     }
   }, [open, mounted, requestClose])
 
-  /* S7: visualViewport */
+  /* S7: visualViewport — Overlay anpassen bei Tastatur, Panel nicht auf Fullscreen ziehen */
   useEffect(() => {
     if (!open || !isMobile) return
-    const root = rootRef.current
+    const overlay = overlayRef.current
     const vv = window.visualViewport
-    if (!root || !vv) return
+    if (!overlay || !vv) return
     const sync = () => {
-      root.style.height = `${vv.height}px`
-      root.style.top = `${vv.offsetTop}px`
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      root.style.setProperty('--keyboard-inset', `${kb}px`)
+      overlay.style.setProperty('--keyboard-inset', `${kb}px`)
+      if (kb > 40) {
+        overlay.style.top = `${vv.offsetTop}px`
+        overlay.style.height = `${vv.height}px`
+        overlay.style.bottom = 'auto'
+      } else {
+        overlay.style.top = ''
+        overlay.style.height = ''
+        overlay.style.bottom = ''
+      }
     }
     sync()
     vv.addEventListener('resize', sync)
@@ -204,9 +232,10 @@ export function EditorSheet({
     return () => {
       vv.removeEventListener('resize', sync)
       vv.removeEventListener('scroll', sync)
-      root.style.height = ''
-      root.style.top = ''
-      root.style.removeProperty('--keyboard-inset')
+      overlay.style.height = ''
+      overlay.style.top = ''
+      overlay.style.bottom = ''
+      overlay.style.removeProperty('--keyboard-inset')
     }
   }, [open, isMobile])
 
@@ -222,7 +251,7 @@ export function EditorSheet({
           type="button"
           className="editor-sheet__confirm-text"
           disabled={confirmDisabled || confirmBusy}
-          onClick={onConfirm}
+          onClick={handleConfirm}
         >
           {confirmBusy ? '…' : composeLabel}
         </button>
@@ -231,7 +260,7 @@ export function EditorSheet({
           type="button"
           className="editor-sheet__confirm"
           disabled={confirmDisabled || confirmBusy}
-          onClick={onConfirm}
+          onClick={handleConfirm}
           aria-label="Speichern"
           title="Speichern"
         >
@@ -265,14 +294,6 @@ export function EditorSheet({
         className="editor-sheet__header"
         {...(layout === 'bottom' ? dragZoneProps : {})}
       >
-        <div className="editor-sheet__title-block">
-          {crumb ? <span className="editor-sheet__crumb">{crumb}</span> : null}
-          <h2 id={titleId} className="editor-sheet__title">
-            {title}
-          </h2>
-          {subtitle ? <p className="editor-sheet__subtitle">{subtitle}</p> : null}
-        </div>
-        <div className="editor-sheet__header-end">{end}</div>
         <button
           type="button"
           className="editor-sheet__icon-btn"
@@ -281,6 +302,14 @@ export function EditorSheet({
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
+        <div className="editor-sheet__title-block">
+          {crumb ? <span className="editor-sheet__crumb">{crumb}</span> : null}
+          <h2 id={titleId} className="editor-sheet__title">
+            {title}
+          </h2>
+          {subtitle ? <p className="editor-sheet__subtitle">{subtitle}</p> : null}
+        </div>
+        <div className="editor-sheet__header-end">{end}</div>
       </header>
       <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
       {footer ? (
@@ -294,6 +323,7 @@ export function EditorSheet({
   return createPortal(
     <EditorSheetApiContext.Provider value={api}>
       <div
+        ref={overlayRef}
         className={cn(
           'editor-sheet-overlay',
           `editor-sheet-overlay--${layout}`,

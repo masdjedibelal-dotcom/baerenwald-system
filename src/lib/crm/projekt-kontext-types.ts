@@ -27,6 +27,10 @@ export type ProjektRechnungKurz = {
   rechnungsdatum: string
   auftrag_id: string | null
   rechnung_art?: string | null
+  abschlag_index?: number | null
+  beleg_typ?: string | null
+  pdf_url?: string | null
+  gesendet_at?: string | null
   created_at?: string | null
 }
 

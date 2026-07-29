@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, Info, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronRight, Info, MoreHorizontal } from 'lucide-react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -115,6 +116,7 @@ export function LeistungenTab({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [visibleCols, setVisibleCols] = useState<Record<ColId, boolean>>(DEFAULT_VISIBLE)
   const [colsOpen, setColsOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     setVisibleCols(loadVisible())
@@ -234,6 +236,111 @@ export function LeistungenTab({
 
   const selectedCount = selectedIds.size
 
+  function openRow(row: LeistungRow) {
+    setActiveId(row.id)
+  }
+
+  function rowStatusKind(row: LeistungRow) {
+    return row.hatMangel || row.statusLabel.toLowerCase().includes('mangel')
+      ? 'ueberfaellig'
+      : row.status
+  }
+
+  function renderMobileCard(row: LeistungRow) {
+    const selected = selectedIds.has(row.id)
+    const showStatus = isAuftrag || (!isRechnung && visibleCols.status)
+    const showSub = Boolean(row.subline) && (isAuftrag || isRechnung || !groupGewerk)
+    const showPreis = isRechnung || !isAuftrag || visibleCols.preis
+    const showMenge = isRechnung || (!isAuftrag && visibleCols.menge)
+    const handwerker = row.handwerkerName?.trim()
+
+    return (
+      <div
+        key={row.id}
+        className={cn('lt-card', selected && 'sel', allowBulk && 'lt-card--bulk')}
+        role="button"
+        tabIndex={0}
+        onClick={() => openRow(row)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            openRow(row)
+          }
+        }}
+      >
+        {allowBulk ? (
+          <div
+            className="lt-card__chk"
+            onClick={(e) => toggleOne(row.id, e)}
+            role="checkbox"
+            aria-checked={selected}
+          >
+            <span className={cn('lt-box', selected && 'on')}>
+              {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
+            </span>
+          </div>
+        ) : null}
+        <div className="lt-card__body">
+          <div className="lt-card__head">
+            <span className="lt-card__title">{row.bezeichnung}</span>
+            {showStatus ? (
+              <StatusBadge status={rowStatusKind(row)} label={row.statusLabel} />
+            ) : null}
+          </div>
+          {showSub ? <div className="lt-card__sub">{row.subline}</div> : null}
+          <div className="lt-card__meta">
+            <div className="lt-card__meta-left">
+              {isAuftrag && handwerker ? (
+                <span>{handwerker}</span>
+              ) : (
+                <>
+                  {showMenge ? <span>{row.mengeLabel}</span> : null}
+                  {!groupGewerk && row.gewerkName?.trim() ? (
+                    <span className="lt-card__dim">{row.gewerkName.trim()}</span>
+                  ) : null}
+                </>
+              )}
+            </div>
+            <div className="lt-card__meta-right">
+              {showPreis ? <span className="lt-card__price">{row.preisLabel}</span> : null}
+              <ChevronRight className="lt-card__chev h-4 w-4" aria-hidden />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderMobileList() {
+    return (
+      <div className="lt-mobile">
+        {allowBulk ? (
+          <div className="lt-mobile-bulk-head">
+            <div className="lt-chk" onClick={toggleAll} role="checkbox" aria-checked={selectedCount === rows.length}>
+              <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
+                {selectedCount === rows.length && rows.length > 0 ? (
+                  <Check className="h-2.5 w-2.5" aria-hidden />
+                ) : null}
+              </span>
+            </div>
+            <span>Alle auswählen</span>
+          </div>
+        ) : null}
+        {gewerkGroups
+          ? gewerkGroups.map((g) => (
+              <section key={g.name} className="lt-mobile-gewerk" aria-label={g.name}>
+                <div className="lt-mobile-gewerk__head">
+                  <span className="lt-mobile-gewerk__name">{g.name}</span>
+                  <span className="lt-mobile-gewerk__count">{g.items.length}</span>
+                </div>
+                <div className="lt-mobile-gewerk__cards">{g.items.map(renderMobileCard)}</div>
+              </section>
+            ))
+          : rows.map(renderMobileCard)}
+      </div>
+    )
+  }
+
   function renderRow(row: LeistungRow) {
     const selected = selectedIds.has(row.id)
     return (
@@ -242,11 +349,11 @@ export function LeistungenTab({
         className={cn('lt-row', selected && 'sel')}
         role="button"
         tabIndex={0}
-        onClick={() => setActiveId(row.id)}
+        onClick={() => openRow(row)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            setActiveId(row.id)
+            openRow(row)
           }
         }}
       >
@@ -266,17 +373,13 @@ export function LeistungenTab({
           if (id === 'bezeichnung') {
             const showStatus = isAuftrag || (!isRechnung && visibleCols.status)
             const showSub = Boolean(row.subline) && (isAuftrag || isRechnung || !groupGewerk)
-            const statusKind =
-              row.hatMangel || row.statusLabel.toLowerCase().includes('mangel')
-                ? 'ueberfaellig'
-                : row.status
             return (
               <div key={id} className="lt-main">
                 <div className="lt-name">
                   <span className="lt-nametext">{row.bezeichnung}</span>
                   {showStatus ? (
                     <span className={cn('lt-status-inline', !isAuftrag && 'lt-status-mobile')}>
-                      <StatusBadge status={statusKind} label={row.statusLabel} />
+                      <StatusBadge status={rowStatusKind(row)} label={row.statusLabel} />
                     </span>
                   ) : null}
                 </div>
@@ -413,7 +516,7 @@ export function LeistungenTab({
   }
 
   return (
-    <div className="lt-root space-y-3">
+    <div className={cn('lt-root space-y-3', isMobile && 'lt-root--mobile-cards')}>
       <LeistungenMaengelCard maengel={maengel} />
 
       {isRechnung || isAuftrag ? (
@@ -457,43 +560,47 @@ export function LeistungenTab({
         </div>
       ) : null}
 
-      <div className="lt-wrap">
-        <div className="lt" style={{ ['--lt-cols' as string]: cols }}>
-          <div className="lt-row head" role="row">
-            {allowBulk ? (
-              <div className="lt-chk" onClick={toggleAll} role="columnheader">
-                <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
-                  {selectedCount === rows.length && rows.length > 0 ? (
-                    <Check className="h-2.5 w-2.5" aria-hidden />
-                  ) : null}
-                </span>
-              </div>
-            ) : null}
-            {deskCols.map((id) => (
-              <div
-                key={id}
-                className={cn(
-                  (id === 'menge' || id === 'preis' || id === 'ek') && 'num'
-                )}
-              >
-                {COL_LABELS[id]}
-              </div>
-            ))}
-          </div>
-
-          {gewerkGroups
-            ? gewerkGroups.map((g) => (
-                <div key={g.name} className="lt-group">
-                  <div className="lt-grouphead">
-                    <span className="g-name">{g.name.toUpperCase()}</span>
-                    <span className="g-meta">{g.items.length}</span>
-                  </div>
-                  {g.items.map(renderRow)}
+      {isMobile ? (
+        renderMobileList()
+      ) : (
+        <div className="lt-wrap">
+          <div className="lt" style={{ ['--lt-cols' as string]: cols }}>
+            <div className="lt-row head" role="row">
+              {allowBulk ? (
+                <div className="lt-chk" onClick={toggleAll} role="columnheader">
+                  <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
+                    {selectedCount === rows.length && rows.length > 0 ? (
+                      <Check className="h-2.5 w-2.5" aria-hidden />
+                    ) : null}
+                  </span>
                 </div>
-              ))
-            : rows.map(renderRow)}
+              ) : null}
+              {deskCols.map((id) => (
+                <div
+                  key={id}
+                  className={cn(
+                    (id === 'menge' || id === 'preis' || id === 'ek') && 'num'
+                  )}
+                >
+                  {COL_LABELS[id]}
+                </div>
+              ))}
+            </div>
+
+            {gewerkGroups
+              ? gewerkGroups.map((g) => (
+                  <div key={g.name} className="lt-group">
+                    <div className="lt-grouphead">
+                      <span className="g-name">{g.name.toUpperCase()}</span>
+                      <span className="g-meta">{g.items.length}</span>
+                    </div>
+                    {g.items.map(renderRow)}
+                  </div>
+                ))
+              : rows.map(renderRow)}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="lt-foot">
         <div className="lt-foot-n">
