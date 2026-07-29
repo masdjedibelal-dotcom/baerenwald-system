@@ -928,6 +928,33 @@ export function AuftragDetailClient({
     [detail.status, rechnungenListe, auftragNettoSumme]
   )
 
+  /** Offener RE-Entwurf → Primary „Bearbeiten“ statt erneut „Erstellen“. */
+  const offenerRechnungEntwurfId = useMemo(() => {
+    const draft = rechnungenListe.find((r) => {
+      if (String(r.status) !== 'entwurf') return false
+      if (String(r.beleg_typ ?? '') === 'gutschrift') return false
+      return true
+    })
+    return draft?.id ?? null
+  }, [rechnungenListe])
+
+  const openRechnungBearbeiten = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const { loadRechnungWizardBootstrap } = await import(
+          '@/app/(dashboard)/rechnungen/wizard-actions'
+        )
+        const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        openRechnungWizard(res.bootstrap)
+      })
+    },
+    [detail.id, openRechnungWizard]
+  )
+
   useEffect(() => {
     const rawTab = searchParams.get('tab')
     const hasExplicitTab = rawTab !== null && rawTab.trim() !== ''
@@ -966,19 +993,7 @@ export function AuftragDetailClient({
       rechnungen={rechnungenListe}
       onCreateInvoice={openRechnungErstellen}
       onOpenWizard={openRechnungWizard}
-      onEditInvoice={(rechnungId) => {
-        startTransition(async () => {
-          const { loadRechnungWizardBootstrap } = await import(
-            '@/app/(dashboard)/rechnungen/wizard-actions'
-          )
-          const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
-          if (!res.ok) {
-            toast.error(res.message)
-            return
-          }
-          openRechnungWizard(res.bootstrap)
-        })
-      }}
+      onEditInvoice={openRechnungBearbeiten}
       onRefresh={() => refresh()}
     />
   )
@@ -1111,6 +1126,13 @@ export function AuftragDetailClient({
                 rechnungBezahlt: !zahlungOffen && detail.status === 'abgeschlossen',
               })
               if (!cta) return null
+              if (cta.id === 'rechnung_erstellen' && offenerRechnungEntwurfId) {
+                return {
+                  label: 'Rechnung bearbeiten',
+                  icon: 'pencil',
+                  onClick: () => openRechnungBearbeiten(offenerRechnungEntwurfId),
+                }
+              }
               const onClick = () => {
                 if (cta.id === 'abnahme_starten') {
                   router.push(`/auftraege/${detail.id}/abnahme/erstellen`)

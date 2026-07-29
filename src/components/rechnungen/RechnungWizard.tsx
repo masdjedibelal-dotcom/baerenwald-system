@@ -935,7 +935,12 @@ export function RechnungWizard({
   const anteil35a = berechneHinweis35aAnteil(
     positionenBerechnet,
     schlussAbrechnung ? schlussAbrechnung.rest_netto : berechnung.netto,
-    schlussAbrechnung ? { vollNetto: schlussAbrechnung.netto } : undefined
+    {
+      ...(schlussAbrechnung ? { vollNetto: schlussAbrechnung.netto } : {}),
+      rechnungBrutto: schlussAbrechnung
+        ? schlussAbrechnung.rest_brutto
+        : berechnung.brutto,
+    }
   )
   const ustLabel = meta.reverse_charge_13b
     ? 'MwSt 0% (§13b)'
@@ -1026,7 +1031,7 @@ export function RechnungWizard({
                 anteil35a.lohn_netto > 0
                   ? anteil35a.hat_materialausweis
                     ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
-                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} — steuerlich begünstigt`
+                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
                   : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
             },
             {

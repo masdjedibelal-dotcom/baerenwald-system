@@ -139,27 +139,36 @@ export function abschlag35aEur(lohnNetto: number): number {
 }
 
 export type Hinweis35aAnteil = {
-  /** Steuerlich begünstigter Lohnanteil (netto) */
+  /**
+   * Ausgewiesener §35a-Betrag:
+   * - Allgemein (kein Materialsplit) → Brutto dieser Rechnung (inkl. USt, BMF)
+   * - Mit Materialsplit → Lohnanteil netto (Rechnungsnetto abzgl. Material)
+   */
   lohn_netto: number
   /** Explizit als Material markierte Positionen (netto) */
   material_netto: number
   /** Mindestens eine Position ist explizit „Material“ */
   hat_materialausweis: boolean
+  /** true = `lohn_netto` ist Brutto (Allgemein-Fall) */
+  ist_brutto: boolean
 }
 
 /**
  * § 35a-Lohnanteil:
- * - Alles „Allgemein“ → gesamtes Rechnungsnetto als Lohnanteil
+ * - Alles „Allgemein“ → Rechnungsbrutto als Lohnanteil (Arbeitskosten inkl. USt)
  * - Explizites Material → Rechnungsnetto abzüglich Material; Material wird ausgewiesen
- * - Bei Teilrechnung/Schluss: `rechnungNetto` = Betrag dieser Rechnung (z. B. Rest nach Abschlag);
- *   optional `vollNetto` skaliert ausgewiesenes Material anteilig
+ * - Bei Teilrechnung/Schluss: `rechnungNetto`/`rechnungBrutto` = Betrag dieser Rechnung
+ *   (z. B. Rest nach Abschlag); optional `vollNetto` skaliert Material anteilig
  */
 export function berechneHinweis35aAnteil(
   positionen: AngebotPosition[] | null | undefined,
   rechnungNetto: number,
-  opts?: { vollNetto?: number | null }
+  opts?: { vollNetto?: number | null; rechnungBrutto?: number | null }
 ): Hinweis35aAnteil {
   const netto = round2(Math.max(0, Number(rechnungNetto) || 0))
+  const bruttoOpt = Number(opts?.rechnungBrutto)
+  const brutto =
+    Number.isFinite(bruttoOpt) && bruttoOpt >= 0 ? round2(bruttoOpt) : netto
   let material = 0
   let hatMaterial = false
   for (const p of Array.isArray(positionen) ? positionen : []) {
@@ -182,12 +191,19 @@ export function berechneHinweis35aAnteil(
     material = round2(material * (netto / voll))
   }
   if (!hatMaterial || material <= 0) {
-    return { lohn_netto: netto, material_netto: 0, hat_materialausweis: false }
+    const ausweis = brutto > 0 ? brutto : netto
+    return {
+      lohn_netto: ausweis,
+      material_netto: 0,
+      hat_materialausweis: false,
+      ist_brutto: Math.abs(ausweis - netto) > 0.02,
+    }
   }
   return {
     lohn_netto: round2(Math.max(0, netto - material)),
     material_netto: material,
     hat_materialausweis: true,
+    ist_brutto: false,
   }
 }
 
@@ -235,7 +251,7 @@ export function formatHinweis35aRechnung(
   }
   return (
     `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € ` +
-    `(inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) ` +
+    `(inkl. USt sowie Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) ` +
     `kann bei der Einkommensteuer geltend gemacht werden.`
   )
 }

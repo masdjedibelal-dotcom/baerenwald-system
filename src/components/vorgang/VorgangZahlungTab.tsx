@@ -488,23 +488,77 @@ export function VorgangZahlungTab({
     })
   }
 
+  function openRechnungBearbeiten(rechnungId: string) {
+    setOpenRateId(null)
+    if (onEditInvoice) {
+      onEditInvoice(rechnungId)
+      return
+    }
+    startTransition(async () => {
+      const boot = auftragId
+        ? await loadWizardBootstrap(rechnungId, auftragId)
+        : await loadRechnungWizardBootstrapStandalone(rechnungId)
+      if (boot.ok && onOpenWizard) {
+        onOpenWizard(boot.bootstrap)
+      } else if (!boot.ok) {
+        toast.error(boot.message)
+      } else {
+        router.push(`/rechnungen/${rechnungId}?tab=leistungen`)
+      }
+    })
+  }
+
+  /** Vorhandener nicht-stornierter Beleg (Entwurf zuerst) → Bearbeiten statt Erstellen. */
+  function editableBelegId(rate: RateRow): string | null {
+    const belege = rate.belege ?? []
+    const draft = belege.find(
+      (b) => b.status === 'entwurf' && String(b.belegTyp ?? '') !== 'gutschrift'
+    )
+    if (draft) return draft.id
+    if (rate.rechnungId) {
+      const r = rechnungById.get(rate.rechnungId)
+      if (
+        r &&
+        String(r.status) !== 'storniert' &&
+        String(r.beleg_typ ?? '') !== 'gutschrift'
+      ) {
+        return rate.rechnungId
+      }
+    }
+    const active = belege.find(
+      (b) => b.status !== 'storniert' && String(b.belegTyp ?? '') !== 'gutschrift'
+    )
+    return active?.id ?? null
+  }
+
   function buildCtas(rate: RateRow): RateDrawerCta[] {
     if (readOnly || variant === 'angebot') return []
     const ctas: RateDrawerCta[] = []
     const rechnungId = rate.rechnungId
 
     if (rate.status === 'geplant') {
-      ctas.push({
-        id: 'invoice',
-        label: 'Erstellen',
-        icon: 'file-invoice',
-        primary: true,
-        onClick: () => {
-          setOpenRateId(null)
-          onCreateInvoice?.(rate.zeileId ? { zeileId: rate.zeileId } : { voll: true })
-        },
-      })
-      if (variant === 'auftrag' && auftragId && rate.zeileId) {
+      const editId = editableBelegId(rate)
+      if (editId) {
+        ctas.push({
+          id: 'edit',
+          label: 'Bearbeiten',
+          icon: 'pencil',
+          primary: true,
+          onClick: () => openRechnungBearbeiten(editId),
+        })
+      } else {
+        ctas.push({
+          id: 'invoice',
+          label: 'Erstellen',
+          icon: 'file-invoice',
+          primary: true,
+          onClick: () => {
+            setOpenRateId(null)
+            onCreateInvoice?.(rate.zeileId ? { zeileId: rate.zeileId } : { voll: true })
+          },
+        })
+      }
+      if (variant === 'auftrag' && auftragId && rate.zeileId && !editId) {
         ctas.push({
           id: 'extern-bezahlt',
           label: 'Bereits bezahlt',
@@ -579,25 +633,7 @@ export function VorgangZahlungTab({
         label: 'Bearbeiten',
         icon: 'pencil',
         primary: rate.status === 'bezahlt',
-        onClick: () => {
-          setOpenRateId(null)
-          if (onEditInvoice) {
-            onEditInvoice(rechnungId)
-            return
-          }
-          startTransition(async () => {
-            const boot = auftragId
-              ? await loadWizardBootstrap(rechnungId, auftragId)
-              : await loadRechnungWizardBootstrapStandalone(rechnungId)
-            if (boot.ok && onOpenWizard) {
-              onOpenWizard(boot.bootstrap)
-            } else if (!boot.ok) {
-              toast.error(boot.message)
-            } else {
-              router.push(`/rechnungen/${rechnungId}?tab=leistungen`)
-            }
-          })
-        },
+        onClick: () => openRechnungBearbeiten(rechnungId),
       })
       if (rate.status === 'gestellt') {
         ctas.push({

@@ -169,6 +169,7 @@ export function buildRechnungHtmlInput(
 
   let schluss_abrechnung: AngebotHtmlInput['schluss_abrechnung'] = null
   let schlussRestNetto: number | null = null
+  let schlussRestBrutto: number | null = null
   let schlussVollNetto: number | null = null
   if (istSchluss) {
     const schluss = berechneSchlussAbrechnung(positionen, opts?.vorherigeAbschlaege ?? [], {
@@ -178,6 +179,7 @@ export function buildRechnungHtmlInput(
     schlussVollNetto = schluss.netto
     if (schluss.bereits_gezahlt_brutto > 0) {
       schlussRestNetto = schluss.rest_netto
+      schlussRestBrutto = schluss.rest_brutto
     }
     if (schluss.bereits_gezahlt_brutto > 0 || privat) {
       schluss_abrechnung = {
@@ -195,13 +197,16 @@ export function buildRechnungHtmlInput(
     }
   }
 
-  // §35a: Betrag dieser Rechnung (Abschlag = Rechnungsnetto; Schluss = Rest nach Abzügen)
+  // §35a: Allgemein = Brutto dieser Rechnung; bei Materialsplit = Netto abzgl. Material
   const anteil35a = berechneHinweis35aAnteil(
     positionen,
     schlussRestNetto ?? berechnung.netto,
-    schlussRestNetto != null && schlussVollNetto != null
-      ? { vollNetto: schlussVollNetto }
-      : undefined
+    {
+      ...(schlussRestNetto != null && schlussVollNetto != null
+        ? { vollNetto: schlussVollNetto }
+        : {}),
+      rechnungBrutto: schlussRestBrutto ?? berechnung.brutto,
+    }
   )
 
   const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden)
