@@ -12,9 +12,7 @@ import { toast } from '@/components/ui/app-toast'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
 
-/**
- * Portal-first Bautagebuch-Eintrag: Titel · Text · Fotos · optional Leistung · intern Stunden.
- */
+/** Portal-first Bautagebuch-Eintrag: Titel · Text · Fotos · Leistung. */
 export function CrmPositionEintragModal({
   open,
   onClose,
@@ -35,8 +33,6 @@ export function CrmPositionEintragModal({
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotoPath, setFotoPath] = useState('')
-  const [stundenIntern, setStundenIntern] = useState('')
-  const [showIntern, setShowIntern] = useState(false)
 
   const sortedPos = useMemo(
     () =>
@@ -56,8 +52,6 @@ export function CrmPositionEintragModal({
     setTitel('')
     setBeschreibung('')
     setFotoPath('')
-    setStundenIntern('')
-    setShowIntern(false)
   }, [open, initialPositionId])
 
   async function uploadFoto(file: File) {
@@ -88,14 +82,6 @@ export function CrmPositionEintragModal({
       return
     }
     const text = [titel.trim(), beschreibung.trim()].filter(Boolean).join('\n\n')
-    const stdRaw = stundenIntern.trim().replace(',', '.')
-    const std = stdRaw ? Number(stdRaw) : null
-    const zeitStd =
-      std != null && Number.isFinite(std) && std > 0 ? Math.floor(std) : null
-    const zeitMin =
-      std != null && Number.isFinite(std) && std > 0
-        ? Math.round((std - Math.floor(std)) * 60)
-        : null
 
     startTransition(async () => {
       const r = await createCrmPositionEintrag({
@@ -105,8 +91,8 @@ export function CrmPositionEintragModal({
         quelle: 'vor_ort',
         rueckdatiertGrund: null,
         ereignisZeit: null,
-        zeitStd,
-        zeitMin,
+        zeitStd: null,
+        zeitMin: null,
         fotoStoragePath: fotoPath.trim() || null,
       })
       if (!r.ok) {
@@ -119,7 +105,7 @@ export function CrmPositionEintragModal({
     })
   }
 
-  const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath || stundenIntern.trim())
+  const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath)
 
   useKiAssistDraftConsumer(open, 'text', (d) => {
     if (d.type !== 'text') return
@@ -204,38 +190,14 @@ export function CrmPositionEintragModal({
             value={positionId}
             onChange={(e) => setPositionId(e.target.value)}
           >
-            <option value="">Ohne Bezug (optional)</option>
+            <option value="">Ohne Bezug</option>
             {sortedPos.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.leistung_name?.trim() || 'Leistung'}
               </option>
             ))}
           </select>
-          <span className="lt-field-opt">Optional — Soft-Bezug zur Position</span>
         </label>
-
-        <div>
-          <button
-            type="button"
-            className="lt-field-opt"
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-            onClick={() => setShowIntern((v) => !v)}
-          >
-            {showIntern ? '▾ Intern · Stunden' : '▸ Intern · Stunden'}
-          </button>
-          {showIntern ? (
-            <label className="mt-2 block">
-              <span className="lt-field-lbl">Stunden (nur intern)</span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={stundenIntern}
-                onChange={(e) => setStundenIntern(e.target.value)}
-                placeholder="z. B. 2,5"
-              />
-            </label>
-          ) : null}
-        </div>
       </div>
     </EditorSheet>
   )

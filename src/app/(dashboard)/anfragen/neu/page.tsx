@@ -17,6 +17,11 @@ function NeueAnfrageWizardHost() {
 
   function close() {
     setOpen(false)
+    // Deep-Link-Host: zurück wenn möglich, sonst Vorgänge
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
     router.replace('/vorgaenge?tab=anfrage')
   }
 

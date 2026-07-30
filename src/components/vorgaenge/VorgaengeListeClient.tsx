@@ -28,7 +28,7 @@ import {
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
-import { createAnfrageHref } from '@/lib/crm/create-entry'
+import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
@@ -1168,7 +1168,7 @@ export function VorgaengeListeClient({
             }
             action={
               lifecycle === 'offen' ? (
-                <MockBtn kind="primary" icon="plus" onClick={() => router.push(createAnfrageHref())}>
+                <MockBtn kind="primary" icon="plus" onClick={() => openFabCreate('anfrage')}>
                   Neue Anfrage
                 </MockBtn>
               ) : (
@@ -1195,6 +1195,7 @@ export function VorgaengeListeClient({
               else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
+            const edit = () => openDetail(v.detailHref)
             const row = (
               <div
                 className={cn(
@@ -1276,10 +1277,19 @@ export function VorgaengeListeClient({
               <SwipeRow
                 key={key}
                 disabled={!isMobile}
-                onSwipeLeft={isMobile ? del : undefined}
-                onSwipeRight={isMobile ? copy : undefined}
-                leftLabel="Löschen"
-                rightLabel="Kopieren"
+                leftActions={
+                  isMobile
+                    ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
+                    : undefined
+                }
+                rightActions={
+                  isMobile
+                    ? [
+                        { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
+                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
+                      ]
+                    : undefined
+                }
               >
                 {row}
               </SwipeRow>
@@ -1287,17 +1297,18 @@ export function VorgaengeListeClient({
           })
         )}
         {displayItems.length > 0 ? (
-          <div className="vg-row vg-row--aggregate" aria-label="Aggregat">
-            <div className="vg-check" />
-            <div className="vg-kunde" style={{ gridColumn: '1 / -1' }}>
-              <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                {filtered.length} Vorgänge · Summe{' '}
-                {filtered
-                  .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
-                  .toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
-                {selectedCount > 0 ? ` · Auswahl ${selectedCount}` : ''}
-              </span>
-            </div>
+          <div className="vg-aggregate" aria-label="Zusammenfassung">
+            <span>
+              {filtered.length} Vorgänge · Summe{' '}
+              {filtered
+                .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
+                .toLocaleString('de-DE', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  maximumFractionDigits: 0,
+                })}
+              {selectedCount > 0 ? ` · Auswahl ${selectedCount}` : ''}
+            </span>
           </div>
         ) : null}
       </div>

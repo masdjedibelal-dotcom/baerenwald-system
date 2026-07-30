@@ -1,7 +1,7 @@
 /**
  * Kanonische Create-Entry-Pfade fürs CRM.
- * FAB öffnet Kunde/Handwerker/Rechnung als Overlay auf der aktuellen Seite
- * (`openFabCreate` / `FabCreateHost`) — ohne weiße `/neu`-Zwischenseite.
+ * FAB öffnet Anfrage/Kunde/Handwerker/Angebot/Rechnung als Overlay auf der aktuellen Seite
+ * (`openFabCreate` / `FabCreateHost`) — ohne weiße `/neu`- bzw. `/anfragen/neu`-Zwischenseite.
  * Deep-Links `/neu?art=` bleiben für Copilot/Bookmarks.
  *
  * Naming:
@@ -28,7 +28,7 @@ export type CrmCreateArt =
   | 'handwerker'
   | 'partner'
 
-/** Anfrage = Staff-Funnel (wie Website). */
+/** Deep-Link / Bookmark. FAB öffnet Anfrage als Overlay (`openFabCreate('anfrage')`). */
 export function createAnfrageHref(kundeId?: string | null): string {
   const kid = kundeId?.trim()
   return kid ? `/anfragen/neu?kunde_id=${encodeURIComponent(kid)}` : '/anfragen/neu'

@@ -80,7 +80,6 @@ import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { TodosPanel } from '@/components/todos/TodosPanel'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
@@ -217,7 +216,7 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet' | 'todos'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
@@ -225,7 +224,6 @@ const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'zahlung',
   'akte',
   'aktivitaet',
-  'todos',
 ])
 
 const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
@@ -338,7 +336,7 @@ function resolveAuftragDetailTabFromQuery(
   ) {
     return 'aktivitaet'
   }
-  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'todos'
+  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'uebersicht'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
   return AUFTRAG_DETAIL_DEFAULT_TAB
 }
@@ -1010,23 +1008,6 @@ export function AuftragDetailClient({
       icon: 'history',
       count: timelineCount || undefined,
       render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
-    },
-    {
-      id: 'todos',
-      label: entityDetailTabLabel('todos'),
-      icon: 'clipboard-list',
-      render: () => (
-        <TodosPanel
-          compact
-          filter={{ auftragId: detail.id }}
-          lockedLinks={{
-            auftragId: detail.id,
-            leadId: detail.lead_id ?? null,
-            kundeId: detail.kunde_id ?? null,
-            label: detail.titel?.trim() || formatAuftragsNr(detail) || 'Auftrag',
-          }}
-        />
-      ),
     },
   ]
 

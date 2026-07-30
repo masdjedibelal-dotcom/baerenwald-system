@@ -18,9 +18,8 @@ import {
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
 import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { TodosPanel } from '@/components/todos/TodosPanel'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
@@ -68,7 +67,7 @@ import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClien
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
 
-type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'todos' | 'compliance' | 'akte'
+type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -798,18 +797,6 @@ export function HandwerkerDetailClient({
     </Suspense>
   )
 
-  const todosInhalt = (
-    <TodosPanel
-      compact
-      title="To-dos"
-      filter={{ handwerkerId: hw.id }}
-      lockedLinks={{
-        handwerkerId: hw.id,
-        label: handwerkerDisplayName(hw),
-      }}
-    />
-  )
-
   const appendNotiz = useCallback(() => {
     const text = notizDraft.trim()
     if (!text) return
@@ -918,12 +905,6 @@ export function HandwerkerDetailClient({
       render: () => vorgaengeInhalt,
     },
     {
-      id: 'todos',
-      label: 'To-dos',
-      icon: 'clipboard-list',
-      render: () => todosInhalt,
-    },
-    {
       id: 'compliance',
       label: 'Compliance',
       icon: 'shield-check',
@@ -940,11 +921,13 @@ export function HandwerkerDetailClient({
   ]
 
   return (
-    <>
-      <DetailHead
-        title={handwerkerDisplayName(hw)}
-        titleBadges={<ComplianceBadge status={hw.compliance_status} />}
-        badges={
+    <EntityDetailLayout
+      crumbBackHref="/handwerker"
+      crumbBackLabel="Zurück zur Liste"
+      head={{
+        title: handwerkerDisplayName(hw),
+        titleBadges: <ComplianceBadge status={hw.compliance_status} />,
+        badges: (
           <>
             {gewerkNamen.length > 0 ? (
               <span>{gewerkNamen.join(' · ')}</span>
@@ -971,11 +954,11 @@ export function HandwerkerDetailClient({
               </MockBadge>
             ) : null}
           </>
-        }
-        titleTrailing={<PortalLoginIconButton handwerkerId={hw.id} label="Partner-Portal öffnen" />}
-        actions={<DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />}
-      />
-
+        ),
+        titleTrailing: <PortalLoginIconButton handwerkerId={hw.id} label="Partner-Portal öffnen" />,
+        actions: <DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />,
+      }}
+    >
       <DetailShell
         groups={detailShellGroups}
         value={tab}
@@ -1045,6 +1028,6 @@ export function HandwerkerDetailClient({
         art={vorgangArt}
         onClose={() => setVorgangArt(null)}
       />
-    </>
+    </EntityDetailLayout>
   )
 }

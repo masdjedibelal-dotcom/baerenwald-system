@@ -549,7 +549,7 @@ export function RechnungDetailClient({
         onOpenDokument={gestellt ? handleKorrigieren : openWizard}
         dokumentHint={
           gestellt
-            ? 'Positionen sind gestellt — Änderungen über eine Rechnungskorrektur.'
+            ? null
             : 'Positionen änderst du im Rechnungs-Dokument — nicht in dieser Tabelle.'
         }
         dokumentActionLabel={gestellt ? 'Bearbeiten' : 'Dokument öffnen'}

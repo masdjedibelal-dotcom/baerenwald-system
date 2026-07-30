@@ -42,7 +42,7 @@ export function buildDashboardKpiSnapshot(input: {
     (s, m) => s + (Number(m?.offen) || 0) + (Number(m?.abgeschlossen) || 0),
     0
   )
-  lines.push('', '## Umsatzverlauf (letzte 12 Monate, Auftragssummen netto)')
+  lines.push('', '## Umsatzverlauf (letzte 6 Monate, Auftragssummen netto)')
   lines.push(`- Summe gesamt: ${formatEurBetrag(umsatzTotal)}`)
   for (const m of months) {
     const offen = Number(m?.offen) || 0

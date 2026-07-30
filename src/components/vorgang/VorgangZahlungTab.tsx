@@ -602,7 +602,7 @@ export function VorgangZahlungTab({
       if (rate.status === 'gestellt') {
         ctas.push({
           id: 'paid',
-          label: 'Zahlung bestätigen',
+          label: 'Zahlung',
           icon: 'check',
           primary: true,
           onClick: () => {
@@ -959,18 +959,20 @@ export function VorgangZahlungTab({
         ) : null}
 
         <div className="zahlplan-table-wrap">
-          <div className="list-row head zahlplan-row zahlplan-row--simple zahlplan-row-head">
-            <div>
-              {showGruppen
-                ? 'Rate'
-                : variant === 'rechnung' || nurEinzel || !hasPlan
-                  ? 'Rechnung'
-                  : 'Abschlag'}
+          {!isMobile ? (
+            <div className="list-row head zahlplan-row zahlplan-row--simple zahlplan-row-head">
+              <div>
+                {showGruppen
+                  ? 'Rate'
+                  : variant === 'rechnung' || nurEinzel || !hasPlan
+                    ? 'Rechnung'
+                    : 'Abschlag'}
+              </div>
+              <div>Fällig</div>
+              <div style={{ textAlign: 'right' }}>Betrag</div>
+              <div />
             </div>
-            <div>Fällig</div>
-            <div style={{ textAlign: 'right' }}>Betrag</div>
-            <div />
-          </div>
+          ) : null}
           {showGruppen ? (
             <>
               {abschlagRows.length > 0 ? (

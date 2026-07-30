@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
@@ -173,7 +174,7 @@ function regionLabel(lead: LeadDetail): string {
 /**
  * Angebots-Wizard — DocumentCanvas 1:1 Mock:
  * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Anschreiben),
- * DocBar Vorschau · Senden · PDF · Verwerfen, mobil Sticky Speichern.
+ * DocBar Vorschau · Senden · PDF|Speichern · Verwerfen; mobil Speichern in DocBar (kein Footer-CTA).
  */
 export function AngebotWizard({
   lead,
@@ -355,6 +356,7 @@ export function AngebotWizard({
       ? 'Angebot korrigieren'
       : 'Angebot erstellen'
   const [saving, setSaving] = useState(false)
+  const isMobile = useIsMobile()
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
@@ -1063,25 +1065,28 @@ export function AngebotWizard({
           onClick: () => setSheet('senden'),
           icon: <MockIcon ctx="default" n="send" size={20} />,
         },
-        {
-          id: 'pdf',
-          label: 'PDF',
-          onClick: () => void openPdf(),
-          icon: <MockIcon ctx="default" n="download" size={20} />,
-        },
+        isMobile
+          ? {
+              id: 'save',
+              label: saving ? 'Speichern…' : 'Speichern',
+              onClick: () => {
+                if (saving) return
+                void persistDraft({ notify: true })
+              },
+              icon: <MockIcon ctx="default" n="device-floppy" size={20} />,
+            }
+          : {
+              id: 'pdf',
+              label: 'PDF',
+              onClick: () => void openPdf(),
+              icon: <MockIcon ctx="default" n="download" size={20} />,
+            },
       ]}
     />
   )
 
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
-      {istNachtrag ? (
-        <div className="nachtrags-band" role="status">
-          <MockIcon ctx="default" n="info-circle" size={16} />
-          <span>Erweitert den bestehenden Auftrag — ersetzt ihn nicht.</span>
-        </div>
-      ) : null}
-
       <PosBoard
         title={`Positionen · ${positionenKopf}`}
         positionen={posBoardLines}
@@ -1178,7 +1183,7 @@ export function AngebotWizard({
         document={documentColumn}
         meta={metaColumn}
         metaSum={metaSum}
-        footerCta={footerCta}
+        footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
       />

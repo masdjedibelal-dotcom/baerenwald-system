@@ -199,18 +199,20 @@ export type UmsatzMonat = {
   abgeschlossen: number
 }
 
-/** Letzte 12 Kalendermonate inkl. aktueller Monat. */
-export function buildUmsatzverlauf12m(
+/** Letzte `monateCount` Kalendermonate inkl. aktueller Monat (default 6). */
+export function buildUmsatzverlauf(
   auftraege: Array<{
     status: string
     created_at: string
     angebote?: unknown
     auftrag_positionen?: AngebotPosition[] | null
   }>,
+  monateCount = 6,
   now = new Date()
 ): UmsatzMonat[] {
+  const n = Math.max(1, Math.floor(monateCount))
   const months: UmsatzMonat[] = []
-  for (let i = 11; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
@@ -233,6 +235,14 @@ export function buildUmsatzverlauf12m(
   }
 
   return months
+}
+
+/** @deprecated Nutze buildUmsatzverlauf(..., 12) */
+export function buildUmsatzverlauf12m(
+  auftraege: Parameters<typeof buildUmsatzverlauf>[0],
+  now = new Date()
+): UmsatzMonat[] {
+  return buildUmsatzverlauf(auftraege, 12, now)
 }
 
 export type GewerkUmsatzZeile = {

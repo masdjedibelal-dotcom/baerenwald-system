@@ -14,7 +14,7 @@ import {
   buildGewerkUmsatz,
   buildHandwerkerRanking,
   buildKundenRanking,
-  buildUmsatzverlauf12m,
+  buildUmsatzverlauf,
   buildVertriebsFunnel,
   countUniqueVorgaengeByLead,
   getDashboardZeitraumRange,
@@ -220,13 +220,14 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     },
   ]
 
-  // Umsatzverlauf: immer letzte 12 Monate (unabhängig vom KPI-Filter), Auftragssummen
-  const umsatzMonate = buildUmsatzverlauf12m(
+  // Umsatzverlauf: immer letzte 6 Monate (unabhängig vom KPI-Filter), Auftragssummen
+  const umsatzMonate = buildUmsatzverlauf(
     auftraege.map((a) => ({
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
       angebote: a.angebote as never,
-    }))
+    })),
+    6
   )
 
   const angeboteAngenommen = angeboteZ.filter((a) => {

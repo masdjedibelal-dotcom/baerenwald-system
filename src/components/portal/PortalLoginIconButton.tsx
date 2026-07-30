@@ -63,7 +63,7 @@ export function PortalLoginIconButton({
       disabled={busy}
       onClick={() => void open()}
     >
-      <MockIcon ctx="btn" n="external-link" size={18} />
+      <MockIcon ctx="row" n={hid ? 'users' : 'user'} size={18} />
     </button>
   )
 }

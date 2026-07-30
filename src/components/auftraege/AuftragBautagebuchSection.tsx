@@ -79,7 +79,7 @@ export function AuftragBautagebuchSection({
           <MockIcon ctx="empty" n="camera" size={28} />
           <p>Noch keine Einträge.</p>
           <p className="bt-feed-empty__hint">
-            Einträge erscheinen im Kundenportal. Leistung und Stunden sind optional.
+            Einträge erscheinen im Kundenportal.
           </p>
         </div>
       ) : (

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
@@ -218,36 +219,60 @@ export function KalenderClient() {
   const monthCells = useMemo(() => buildMonthCells(cursor), [cursor])
 
   const nav = (
-    <div className="toolbar">
-      <MockBtn sm icon="chevron-left" onClick={navPrev} title="Zurück" />
-      <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, padding: '0 8px' }}>{titleText}</div>
-      <MockBtn sm icon="chevron-right" onClick={navNext} title="Weiter" />
-      <MockBtn sm onClick={goToday}>
+    <div className="cal-toolbar toolbar">
+      <div className="cal-toolbar__nav">
+        <MockBtn sm icon="chevron-left" className="cal-toolbar__arrow" onClick={navPrev} title="Zurück" />
+        <div className="cal-toolbar__title">{titleText}</div>
+        <MockBtn sm icon="chevron-right" className="cal-toolbar__arrow" onClick={navNext} title="Weiter" />
+      </div>
+      <MockBtn sm className="cal-toolbar__heute" onClick={goToday}>
         Heute
       </MockBtn>
-      <MockBtn sm kind="primary" icon="plus" onClick={() => openNeu()}>
-        Neuer Termin
-      </MockBtn>
-      <div style={{ flex: 1 }} />
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          padding: 2,
-          background: 'var(--card)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 6,
-        }}
+      <MockBtn
+        sm
+        kind="primary"
+        icon="plus"
+        className="cal-toolbar__add"
+        onClick={() => openNeu()}
+        title="Neuer Termin"
+        aria-label="Neuer Termin"
       >
-        <MockBtn sm kind={view === 'tag' ? 'primary' : 'ghost'} onClick={() => setView('tag')}>
-          Tag
-        </MockBtn>
-        <MockBtn sm kind={view === 'woche' ? 'primary' : 'ghost'} onClick={() => setView('woche')}>
-          Woche
-        </MockBtn>
-        <MockBtn sm kind={view === 'monat' ? 'primary' : 'ghost'} onClick={() => setView('monat')}>
-          Monat
-        </MockBtn>
+        <span className="cal-toolbar__add-lbl">Neuer Termin</span>
+      </MockBtn>
+      <div className="cal-toolbar__views" role="group" aria-label="Ansicht">
+        <button
+          type="button"
+          className={cn('cal-toolbar__view', view === 'tag' && 'is-active')}
+          onClick={() => setView('tag')}
+          title="Tag"
+          aria-label="Tag"
+          aria-pressed={view === 'tag'}
+        >
+          <MockIcon ctx="btn" n="calendar" size={15} />
+          <span className="cal-toolbar__view-lbl">Tag</span>
+        </button>
+        <button
+          type="button"
+          className={cn('cal-toolbar__view', view === 'woche' && 'is-active')}
+          onClick={() => setView('woche')}
+          title="Woche"
+          aria-label="Woche"
+          aria-pressed={view === 'woche'}
+        >
+          <MockIcon ctx="btn" n="layout" size={15} />
+          <span className="cal-toolbar__view-lbl">Woche</span>
+        </button>
+        <button
+          type="button"
+          className={cn('cal-toolbar__view', view === 'monat' && 'is-active')}
+          onClick={() => setView('monat')}
+          title="Monat"
+          aria-label="Monat"
+          aria-pressed={view === 'monat'}
+        >
+          <MockIcon ctx="btn" n="calendar-event" size={15} />
+          <span className="cal-toolbar__view-lbl">Monat</span>
+        </button>
       </div>
     </div>
   )

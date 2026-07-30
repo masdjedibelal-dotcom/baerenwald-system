@@ -2,18 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
-import { Combobox, COMBOBOX_OPTION_THRESHOLD } from '@/components/ui/Combobox'
+import { Combobox } from '@/components/ui/Combobox'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import { cn } from '@/lib/utils'
 import type { EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import type { Kunde } from '@/lib/types'
 
 /**
- * N4 / Spec §14: Kundenwahl als Combobox (kein natives Select, kein Listen-Picker-Sheet).
- * Lädt bis 200 Kunden; bei >15 greift Combobox-Tipp-Filter (Threshold).
- *
- * Nach onPick wird absichtlich nicht onClose() aufgerufen — der Caller schließt
- * bzw. navigiert (sonst frisst dismiss/history.back() die Wizard-URL).
+ * Kundenwahl als Overlay (kein weißer Host).
+ * Erste Frage: Bestand | Neu → Combobox oder Neu-Button.
  */
 export function KundePickerSheet({
   open,
@@ -35,10 +34,12 @@ export function KundePickerSheet({
   const [rows, setRows] = useState<Kunde[]>([])
   const [loading, setLoading] = useState(false)
   const [value, setValue] = useState('')
+  const [modus, setModus] = useState<'bestand' | 'neu'>('bestand')
 
   useEffect(() => {
     if (!open) return
     setValue('')
+    setModus('bestand')
     setLoading(true)
     void listKundenFuerCombobox()
       .then((r) => setRows(r.kunden))
@@ -73,19 +74,33 @@ export function KundePickerSheet({
       context={context}
       size="md"
       manageHistory={manageHistory}
-      headerEnd={
-        onNeu ? (
-          <button type="button" className="editor-sheet__confirm-text" onClick={onNeu}>
-            Neu
-          </button>
-        ) : null
-      }
     >
-      <div className="space-y-3">
-        {loading ? (
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Kunden werden geladen…</p>
-        ) : (
-          <>
+      <div className="kunde-pick space-y-4">
+        <div>
+          <p className="kunde-pick__q">Kunde auswählen</p>
+          <div className="hw-anfrage-seg" role="group" aria-label="Neu oder Bestand">
+            <button
+              type="button"
+              className={cn('hw-anfrage-seg-btn', modus === 'bestand' && 'is-active')}
+              onClick={() => setModus('bestand')}
+            >
+              Bestand
+            </button>
+            <button
+              type="button"
+              className={cn('hw-anfrage-seg-btn', modus === 'neu' && 'is-active')}
+              onClick={() => setModus('neu')}
+              disabled={!onNeu}
+            >
+              Neu
+            </button>
+          </div>
+        </div>
+
+        {modus === 'bestand' ? (
+          loading ? (
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">Kunden werden geladen…</p>
+          ) : (
             <Combobox
               label="Kunde"
               options={options}
@@ -94,14 +109,24 @@ export function KundePickerSheet({
               placeholder="Kunde wählen oder tippen…"
               emptyLabel="Keine Treffer"
             />
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-              {options.length > COMBOBOX_OPTION_THRESHOLD
-                ? `${options.length} Kunden — tippen zum Filtern (Combobox >${COMBOBOX_OPTION_THRESHOLD}).`
-                : options.length === 0
-                  ? 'Noch keine Kunden — „Neu“ anlegen.'
-                  : `${options.length} Kunden.`}
-            </p>
-          </>
+          )
+        ) : (
+          <div className="pos-add-row">
+            <button
+              type="button"
+              className="pos-add-btn"
+              disabled={!onNeu}
+              onClick={() => onNeu?.()}
+            >
+              <span className="icon-wrap">
+                <MockIcon ctx="default" n="user-plus" size={16} />
+              </span>
+              <span className="lbl-block">
+                <span>Neuen Kunden anlegen</span>
+                <span className="sub">Stammdaten erfassen</span>
+              </span>
+            </button>
+          </div>
         )}
       </div>
     </EditorSheet>

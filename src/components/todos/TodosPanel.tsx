@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
+import { Plus } from 'lucide-react'
 import {
   listTodos,
-  saveTodo,
   setTodoErledigt,
   type TodoListFilter,
 } from '@/app/(dashboard)/kalender/todo-actions'
@@ -45,6 +44,12 @@ function linkLabel(t: CrmTodo): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
+type ViewMode = 'offen' | 'erledigt'
+
+/**
+ * To-dos im Stil Apple Erinnerungen: Kartenliste, + oben rechts,
+ * Filter Offen | Erledigt, Abhaken → durchgestrichen und aus Offen weg.
+ */
 export function TodosPanel({
   filter,
   lockedLinks,
@@ -60,32 +65,30 @@ export function TodosPanel({
 }) {
   const [todos, setTodos] = useState<CrmTodo[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [showDone, setShowDone] = useState(false)
-  const [quick, setQuick] = useState('')
+  const [view, setView] = useState<ViewMode>('offen')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<CrmTodo | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [leavingIds, setLeavingIds] = useState<Set<string>>(() => new Set())
+  const [, startTransition] = useTransition()
 
   const load = useCallback(async () => {
     setLoadErr(null)
     const res = await listTodos({
       ...filter,
-      erledigt: showDone ? 'all' : false,
+      erledigt: view === 'erledigt',
     })
     if (!res.ok) {
       setLoadErr(res.message)
       return
     }
     setTodos(res.todos)
-  }, [filter, showDone])
+    setLeavingIds(new Set())
+  }, [filter, view])
 
   useEffect(() => {
     void load()
   }, [load])
-
-  const open = useMemo(() => todos.filter((t) => !t.erledigt), [todos])
-  const done = useMemo(() => todos.filter((t) => t.erledigt), [todos])
 
   function openNew() {
     setEditing(null)
@@ -97,163 +100,139 @@ export function TodosPanel({
     setEditorOpen(true)
   }
 
-  function addQuick() {
-    const titel = quick.trim()
-    if (!titel) return
-    startTransition(async () => {
-      const res = await saveTodo({
-        titel,
-        kunde_id: lockedLinks?.kundeId ?? null,
-        lead_id: lockedLinks?.leadId ?? null,
-        auftrag_id: lockedLinks?.auftragId ?? null,
-        handwerker_id: lockedLinks?.handwerkerId ?? null,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      setQuick('')
-      await load()
-    })
-  }
-
   function toggle(t: CrmTodo) {
+    const nextDone = !t.erledigt
     setBusyId(t.id)
+
+    if (view === 'offen' && nextDone) {
+      setLeavingIds((prev) => new Set(prev).add(t.id))
+      setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, erledigt: true } : x)))
+    } else if (view === 'erledigt' && !nextDone) {
+      setLeavingIds((prev) => new Set(prev).add(t.id))
+      setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, erledigt: false } : x)))
+    } else {
+      setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, erledigt: nextDone } : x)))
+    }
+
     startTransition(async () => {
-      const res = await setTodoErledigt(t.id, !t.erledigt)
+      const res = await setTodoErledigt(t.id, nextDone)
       setBusyId(null)
       if (!res.ok) {
         toast.error(res.message)
+        await load()
+        return
+      }
+      if (view === 'offen' && nextDone) {
+        window.setTimeout(() => {
+          setTodos((prev) => prev.filter((x) => x.id !== t.id))
+          setLeavingIds((prev) => {
+            const n = new Set(prev)
+            n.delete(t.id)
+            return n
+          })
+        }, 320)
+        return
+      }
+      if (view === 'erledigt' && !nextDone) {
+        window.setTimeout(() => {
+          setTodos((prev) => prev.filter((x) => x.id !== t.id))
+          setLeavingIds((prev) => {
+            const n = new Set(prev)
+            n.delete(t.id)
+            return n
+          })
+        }, 320)
         return
       }
       await load()
     })
   }
 
+  const emptyLabel =
+    view === 'erledigt' ? 'Keine erledigten To-dos' : 'Keine offenen To-dos'
+
   return (
     <div className={cn('todos-panel', compact && 'todos-panel--compact')}>
-      {!compact ? (
-        <div className="todos-panel__head">
-          <h2 className="todos-panel__title">{title}</h2>
+      <div className="todos-panel__head">
+        {!compact ? <h2 className="todos-panel__title">{title}</h2> : <span />}
+        <div className="todos-panel__head-actions">
           {showFilterChips ? (
             <div className="todos-panel__chips" role="group" aria-label="Filter">
               <button
                 type="button"
-                className={cn('chip', !showDone && 'on')}
-                onClick={() => setShowDone(false)}
+                className={cn('chip', view === 'offen' && 'on')}
+                onClick={() => setView('offen')}
               >
                 Offen
               </button>
               <button
                 type="button"
-                className={cn('chip', showDone && 'on')}
-                onClick={() => setShowDone(true)}
+                className={cn('chip', view === 'erledigt' && 'on')}
+                onClick={() => setView('erledigt')}
               >
-                Alle
+                Erledigt
               </button>
             </div>
           ) : null}
+          <button
+            type="button"
+            className="todos-panel__add"
+            onClick={openNew}
+            aria-label="To-do hinzufügen"
+            title="Hinzufügen"
+          >
+            <Plus className="h-5 w-5" aria-hidden />
+          </button>
         </div>
-      ) : null}
-
-      <div className="todo-quick">
-        <input
-          className="todo-quick__input"
-          value={quick}
-          onChange={(e) => setQuick(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              addQuick()
-            }
-          }}
-          placeholder="Neues To-do…"
-          aria-label="Neues To-do"
-          disabled={pending}
-        />
-        <button
-          type="button"
-          className="todo-quick__add"
-          disabled={pending || !quick.trim()}
-          onClick={addQuick}
-        >
-          Hinzufügen
-        </button>
       </div>
 
       {loadErr ? <p className="text-[length:var(--fs-meta)] text-[var(--red-tx)]">{loadErr}</p> : null}
 
-      <ul className="todo-list" aria-label="Offene To-dos">
-        {open.length === 0 ? (
-          <li className="todo-empty">Keine offenen To-dos</li>
-        ) : (
-          open.map((t) => {
-            const frist = formatFrist(t.faellig_am)
-            const link = linkLabel(t)
-            return (
-              <li key={t.id}>
-                <button type="button" className="todo-row" onClick={() => openEdit(t)}>
-                  <TodoCheckButton
-                    erledigt={false}
-                    busy={busyId === t.id}
-                    onToggle={() => toggle(t)}
-                  />
-                  <div className="todo-row__main">
-                    <div className="todo-row__title">
-                      <TodoPrioFlag prioritaet={t.prioritaet} />
-                      <span>{t.titel}</span>
-                    </div>
-                    {(frist || link) && (
-                      <div className="todo-row__meta">
-                        {frist ? (
-                          <span className={cn(isOverdue(t.faellig_am, false) && 'todo-row__overdue')}>
-                            {frist}
-                          </span>
-                        ) : null}
-                        {frist && link ? <span aria-hidden> · </span> : null}
-                        {link ? <span>{link}</span> : null}
+      <div className="todo-card">
+        <ul className="todo-list" aria-label={view === 'erledigt' ? 'Erledigte To-dos' : 'Offene To-dos'}>
+          {todos.length === 0 ? (
+            <li className="todo-empty">{emptyLabel}</li>
+          ) : (
+            todos.map((t) => {
+              const frist = formatFrist(t.faellig_am)
+              const link = linkLabel(t)
+              const leaving = leavingIds.has(t.id)
+              const done = t.erledigt
+              return (
+                <li
+                  key={t.id}
+                  className={cn('todo-card__item', leaving && 'todo-card__item--leaving')}
+                >
+                  <button type="button" className={cn('todo-row', done && 'todo-row--done')} onClick={() => openEdit(t)}>
+                    <TodoCheckButton
+                      erledigt={done}
+                      busy={busyId === t.id}
+                      onToggle={() => toggle(t)}
+                    />
+                    <div className="todo-row__main">
+                      <div className="todo-row__title">
+                        <TodoPrioFlag prioritaet={t.prioritaet} />
+                        <span>{t.titel}</span>
                       </div>
-                    )}
-                  </div>
-                  <ChevronRight className="todo-row__chev h-4 w-4" aria-hidden />
-                </button>
-              </li>
-            )
-          })
-        )}
-      </ul>
-
-      {showDone && done.length > 0 ? (
-        <div className="todo-done-block">
-          <div className="todo-done-block__label">Erledigt</div>
-          <ul className="todo-list">
-            {done.map((t) => (
-              <li key={t.id}>
-                <button type="button" className="todo-row todo-row--done" onClick={() => openEdit(t)}>
-                  <TodoCheckButton
-                    erledigt
-                    busy={busyId === t.id}
-                    onToggle={() => toggle(t)}
-                  />
-                  <div className="todo-row__main">
-                    <div className="todo-row__title">
-                      <span>{t.titel}</span>
+                      {(frist || link) && !done ? (
+                        <div className="todo-row__meta">
+                          {frist ? (
+                            <span className={cn(isOverdue(t.faellig_am, false) && 'todo-row__overdue')}>
+                              {frist}
+                            </span>
+                          ) : null}
+                          {frist && link ? <span aria-hidden> · </span> : null}
+                          {link ? <span>{link}</span> : null}
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {!compact ? (
-        <div className="todos-panel__foot">
-          <button type="button" className="btn ghost sm" onClick={openNew}>
-            Details hinzufügen…
-          </button>
-        </div>
-      ) : null}
+                  </button>
+                </li>
+              )
+            })
+          )}
+        </ul>
+      </div>
 
       <TodoEditorSheet
         open={editorOpen}

@@ -102,7 +102,6 @@ export function PositionAddSheet({
   const [mode, setMode] = useState<PositionAddMode>(initialMode)
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState<KatalogPosition[]>([])
-  const [q, setQ] = useState('')
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [picked, setPicked] = useState<{
@@ -125,7 +124,6 @@ export function PositionAddSheet({
   useEffect(() => {
     if (!open) return
     setMode(initialMode)
-    setQ('')
     setExpandedId(null)
     setPicked(null)
     setMenge('1')
@@ -171,16 +169,11 @@ export function PositionAddSheet({
   }, [rows])
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
     return rows.filter((p) => {
       if (gewerkFilter && p.gewerk_id !== gewerkFilter) return false
-      if (!needle) return true
-      const hay = `${p.titel} ${p.kategorie} ${p.gewerk_name ?? ''} ${p.varianten
-        .map((v) => v.variante)
-        .join(' ')}`.toLowerCase()
-      return hay.includes(needle)
+      return true
     })
-  }, [rows, q, gewerkFilter])
+  }, [rows, gewerkFilter])
 
   const grouped = useMemo(() => {
     const m = new Map<string, KatalogPosition[]>()
@@ -445,14 +438,6 @@ export function PositionAddSheet({
 
       {mode === 'preisliste' ? (
         <div className="space-y-3">
-          <input
-            className="sel w-full"
-            placeholder="Leistung suchen…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            autoFocus
-          />
-
           {katalogGewerke.length > 0 ? (
             <div className="picker-sheet__chips" role="group" aria-label="Gewerk">
               <button

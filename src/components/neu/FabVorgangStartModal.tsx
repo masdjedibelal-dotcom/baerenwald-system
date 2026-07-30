@@ -1,26 +1,17 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PickerSheet } from '@/components/surfaces/PickerSheet'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { KundeModal } from '@/components/kunden/KundeModal'
-import { toast } from '@/components/ui/app-toast'
-import {
-  listAuftraegeFuerKunde,
-  type FabKundeAuftragZeile,
-} from '@/app/(dashboard)/neu/fab-neu-actions'
-import { formatDatum } from '@/lib/utils'
 import type { Kunde } from '@/lib/types'
-import { fachbegriff } from '@/lib/crm/fachbegriffe'
 
 export type FabVorgangArt = 'anfrage' | 'angebot' | 'rechnung'
 
 /**
  * FAB-Zwischenschritt auf der aktuellen Seite (kein weißer `/neu`-Host).
- * Anfrage: direkt Funnel.
- * Angebot / Rechnung: KundePicker → danach Wizard-URL.
+ * Anfrage läuft über FabCreateHost → AnfrageWizard.
+ * Angebot / Rechnung: KundePicker → direkt Wizard-URL (ohne Vorgang-Zwischenschritt).
  */
 export function FabVorgangStartModal({
   open,
@@ -34,44 +25,20 @@ export function FabVorgangStartModal({
   initialKundeId?: string | null
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [kundeId, setKundeId] = useState<string | null>(null)
-  const [step, setStep] = useState<1 | 2>(1)
-  const [auftraege, setAuftraege] = useState<FabKundeAuftragZeile[]>([])
-  const [loadingAuftraege, setLoadingAuftraege] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
-    if (!open || art !== 'anfrage') return
-    const kid = initialKundeId?.trim()
-    router.push(kid ? `/anfragen/neu?kunde_id=${encodeURIComponent(kid)}` : '/anfragen/neu')
-    onClose()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei open/art/kunde
-  }, [open, art, initialKundeId, router])
-
-  useEffect(() => {
     if (!open || !art || art === 'anfrage') return
-    const kid = initialKundeId?.trim() || null
-    setKundeId(kid)
-    setAuftraege([])
     setCreateOpen(false)
+    const kid = initialKundeId?.trim()
     if (art === 'rechnung' && kid) {
-      setStep(2)
-      setLoadingAuftraege(true)
-      startTransition(async () => {
-        const r = await listAuftraegeFuerKunde(kid)
-        setLoadingAuftraege(false)
-        if (!r.ok) {
-          toast.error(r.message)
-          setStep(1)
-          return
-        }
-        setAuftraege(r.auftraege)
-      })
+      startRechnung(kid)
       return
     }
-    setStep(1)
-    setLoadingAuftraege(false)
+    if (art === 'angebot' && kid) {
+      startAngebot(kid)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei open/art/kunde
   }, [open, art, initialKundeId])
 
   if (!art || art === 'anfrage') return null
@@ -81,35 +48,9 @@ export function FabVorgangStartModal({
     router.push(`/angebote/neu?kunde_id=${encodeURIComponent(kid)}`)
   }
 
-  function startRechnung(withAuftragId: string | null, kid = kundeId) {
-    if (!kid) {
-      toast.error('Kunde wählen.')
-      return
-    }
+  function startRechnung(kid: string) {
     onClose()
-    if (withAuftragId) {
-      router.push(
-        `/rechnungen/neu?kunde_id=${encodeURIComponent(kid)}&auftrag_id=${encodeURIComponent(withAuftragId)}&neu=1`
-      )
-      return
-    }
     router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kid)}`)
-  }
-
-  function loadAuftraegeForKunde(kid: string) {
-    setKundeId(kid)
-    setStep(2)
-    setLoadingAuftraege(true)
-    startTransition(async () => {
-      const r = await listAuftraegeFuerKunde(kid)
-      setLoadingAuftraege(false)
-      if (!r.ok) {
-        toast.error(r.message)
-        setStep(1)
-        return
-      }
-      setAuftraege(r.auftraege)
-    })
   }
 
   function onKundePick(k: Kunde) {
@@ -117,65 +58,23 @@ export function FabVorgangStartModal({
       startAngebot(k.id)
       return
     }
-    loadAuftraegeForKunde(k.id)
+    startRechnung(k.id)
   }
 
-  const kundeVorausgewaehlt = Boolean(initialKundeId?.trim())
   const pickerTitle = art === 'angebot' ? 'Angebot' : 'Rechnung'
+  const showPicker = open && !createOpen && !initialKundeId?.trim()
 
   return (
     <>
       <KundePickerSheet
-        open={open && step === 1 && !createOpen}
-        onClose={() => !pending && onClose()}
+        open={showPicker}
+        onClose={onClose}
         title={pickerTitle}
         context="canvas"
         manageHistory={false}
         onNeu={() => setCreateOpen(true)}
         onPick={onKundePick}
       />
-
-      {art === 'rechnung' ? (
-        <PickerSheet
-          open={open && step === 2 && !createOpen}
-          onClose={() => {
-            if (pending) return
-            if (!kundeVorausgewaehlt) {
-              setStep(1)
-              return
-            }
-            onClose()
-          }}
-          title="Vorgang"
-          context="canvas"
-          manageHistory={false}
-          empty={loadingAuftraege ? <p className="picker-sheet__empty">Lädt…</p> : undefined}
-        >
-          <ul className="picker-sheet__rows">
-            <li>
-              <button type="button" className="picker-sheet__row" onClick={() => startRechnung(null)}>
-                <span className="picker-sheet__row-title">Ohne Vorgang</span>
-                <span className="picker-sheet__row-meta" title={fachbegriff('ohne_vorgang')}>
-                  Direktrechnung
-                </span>
-              </button>
-            </li>
-            {auftraege.map((a) => (
-              <li key={a.id}>
-                <button type="button" className="picker-sheet__row" onClick={() => startRechnung(a.id)}>
-                  <span className="picker-sheet__row-title">
-                    {a.titel?.trim() || `Auftrag ${a.id.slice(0, 8).toUpperCase()}`}
-                  </span>
-                  <span className="picker-sheet__row-meta">
-                    {a.status}
-                    {a.created_at ? ` · ${formatDatum(a.created_at)}` : ''}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </PickerSheet>
-      ) : null}
 
       <KundeModal
         open={createOpen}
@@ -185,7 +84,7 @@ export function FabVorgangStartModal({
           setCreateOpen(false)
           if (!id) return
           if (art === 'angebot') startAngebot(id)
-          else loadAuftraegeForKunde(id)
+          else startRechnung(id)
         }}
       />
     </>

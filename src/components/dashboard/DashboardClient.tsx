@@ -37,11 +37,34 @@ function initials(name: string): string {
   return (name.slice(0, 2) || '?').toUpperCase()
 }
 
-function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
+function UmsatzLineChart({ months }: { months: UmsatzMonat[] }) {
   const safeMonths = Array.isArray(months) ? months : []
-  const totals = safeMonths.map((m) => (Number(m?.offen) || 0) + (Number(m?.abgeschlossen) || 0))
-  const max = totals.length ? Math.max(1, ...totals) : 1
-  const total = totals.reduce((s, n) => s + n, 0)
+  const offenVals = safeMonths.map((m) => Number(m?.offen) || 0)
+  const doneVals = safeMonths.map((m) => Number(m?.abgeschlossen) || 0)
+  const max = Math.max(1, ...offenVals, ...doneVals)
+  const total = offenVals.reduce((s, n) => s + n, 0) + doneVals.reduce((s, n) => s + n, 0)
+
+  const W = 360
+  const H = 148
+  const padL = 6
+  const padR = 6
+  const padT = 10
+  const padB = 26
+  const innerW = W - padL - padR
+  const innerH = H - padT - padB
+  const n = safeMonths.length
+
+  function xAt(i: number) {
+    if (n <= 1) return padL + innerW / 2
+    return padL + (i / (n - 1)) * innerW
+  }
+  function yAt(v: number) {
+    return padT + innerH - (v / max) * innerH
+  }
+  function linePath(vals: number[]) {
+    if (!vals.length) return ''
+    return vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(' ')
+  }
 
   return (
     <div className="card">
@@ -50,50 +73,99 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
           <MockIcon ctx="emphasis" n="activity" size={16} />
           Umsatzverlauf
         </div>
-        <div className="flex items-center gap-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--green)' }} />
-            Abgeschlossen
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--border)]" />
-            Offen
-          </span>
-        </div>
       </div>
       <div className="card-b">
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
             {formatEurBetrag(total)}
           </div>
-          <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">Netto · Auftragssummen · letzte 12 Monate</div>
+          <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+            Netto · Auftragssummen · letzte 6 Monate
+          </div>
         </div>
-        <div className="flex h-40 items-end gap-1.5 sm:gap-2">
-          {safeMonths.map((m) => {
-            const offen = Number(m?.offen) || 0
-            const abgeschlossen = Number(m?.abgeschlossen) || 0
-            const sum = offen + abgeschlossen
-            const h = Math.max(sum > 0 ? 8 : 2, Math.round((sum / max) * 100))
-            const doneH = sum > 0 ? Math.round((abgeschlossen / sum) * h) : 0
-            const openH = h - doneH
-            return (
-              <div key={m.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                <div
-                  className="flex w-full max-w-[28px] flex-col justify-end overflow-hidden rounded-t-md"
-                  style={{ height: h }}
-                  title={`${m.label}: ${formatEurBetrag(sum)}`}
+        <div className="w-full">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="h-40 w-full"
+            role="img"
+            aria-label="Umsatzverlauf Liniendiagramm"
+          >
+            {/* Hilfslinien */}
+            {[0.25, 0.5, 0.75, 1].map((t) => (
+              <line
+                key={t}
+                x1={padL}
+                x2={W - padR}
+                y1={yAt(max * t)}
+                y2={yAt(max * t)}
+                stroke="var(--border)"
+                strokeWidth={0.5}
+                strokeDasharray="3 3"
+              />
+            ))}
+            <path
+              d={linePath(offenVals)}
+              fill="none"
+              stroke="var(--border-2, #c5c9ce)"
+              strokeWidth={2.25}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d={linePath(doneVals)}
+              fill="none"
+              stroke="var(--green)"
+              strokeWidth={2.25}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {safeMonths.map((m, i) => (
+              <g key={m.key}>
+                <circle
+                  cx={xAt(i)}
+                  cy={yAt(offenVals[i]!)}
+                  r={3}
+                  fill="var(--card, #fff)"
+                  stroke="var(--border-2, #c5c9ce)"
+                  strokeWidth={1.5}
                 >
-                  {openH > 0 ? (
-                    <div style={{ height: openH, background: 'var(--border-2, #e5e7eb)' }} />
-                  ) : null}
-                  {doneH > 0 ? (
-                    <div style={{ height: doneH, background: 'var(--green)' }} />
-                  ) : null}
-                </div>
-                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{m.label}</span>
-              </div>
-            )
-          })}
+                  <title>{`${m.label} Offen: ${formatEurBetrag(offenVals[i]!)}`}</title>
+                </circle>
+                <circle
+                  cx={xAt(i)}
+                  cy={yAt(doneVals[i]!)}
+                  r={3}
+                  fill="var(--card, #fff)"
+                  stroke="var(--green)"
+                  strokeWidth={1.5}
+                >
+                  <title>{`${m.label} Abgeschlossen: ${formatEurBetrag(doneVals[i]!)}`}</title>
+                </circle>
+                <text
+                  x={xAt(i)}
+                  y={H - 6}
+                  textAnchor="middle"
+                  className="fill-[var(--text-3)]"
+                  style={{ fontSize: 11 }}
+                >
+                  {m.label}
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
+        <div className="mt-1 flex items-center gap-4 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: 'var(--green)' }} />
+            Abgeschlossen
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block h-0.5 w-3 rounded-full"
+              style={{ background: 'var(--border-2, #c5c9ce)' }}
+            />
+            Offen
+          </span>
         </div>
       </div>
     </div>
@@ -109,6 +181,7 @@ function VertriebsFunnel({
   conversionGesamt: number
   dropoffs: { after: string; lost: number; rate: number }[]
 }) {
+  const isMobile = useIsMobile()
   const safeStufen = Array.isArray(stufen) ? stufen : []
   const safeDropoffs = Array.isArray(dropoffs) ? dropoffs : []
   const maxCount = Math.max(1, ...safeStufen.map((s) => Number(s.count) || 0), 1)
@@ -137,23 +210,44 @@ function VertriebsFunnel({
           const isWorst = worst && drop && worst.after === drop.after && drop.rate === worst.rate
           return (
             <div key={s.key}>
-              <div
-                className="relative flex items-center justify-between rounded-lg px-3 py-2.5 text-white"
-                style={{
-                  width: `${width}%`,
-                  minWidth: '40%',
-                  background: s.color,
-                }}
-              >
-                <span className="text-[length:var(--fs-text)] font-medium">{s.label}</span>
-                <span className="text-[length:var(--fs-text)] font-semibold tabular-nums">
-                  {s.count} <span className="font-normal opacity-80">· {s.rate}%</span>
-                </span>
-              </div>
+              {isMobile ? (
+                <div className="vfunnel-row">
+                  <span className="vfunnel-label">{s.label}</span>
+                  <div className="vfunnel-track">
+                    <div
+                      className="vfunnel-bar"
+                      style={{
+                        width: `${width}%`,
+                        background: s.color,
+                      }}
+                    >
+                      <span className="vfunnel-nums tabular-nums">
+                        {s.count}
+                        <span className="vfunnel-pct"> · {s.rate}%</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="relative flex items-center justify-between rounded-lg px-3 py-2.5 text-white"
+                  style={{
+                    width: `${width}%`,
+                    minWidth: '40%',
+                    background: s.color,
+                  }}
+                >
+                  <span className="text-[length:var(--fs-text)] font-medium">{s.label}</span>
+                  <span className="text-[length:var(--fs-text)] font-semibold tabular-nums">
+                    {s.count} <span className="font-normal opacity-80">· {s.rate}%</span>
+                  </span>
+                </div>
+              )}
               {showDrop ? (
                 <div
                   className={cn(
                     'mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium',
+                    isMobile && 'vfunnel-drop',
                     isWorst
                       ? 'bg-red-50 text-red-700'
                       : 'bg-[var(--bg-2)] text-[var(--text-3)]'
@@ -465,7 +559,7 @@ export function DashboardClient({
         </div>
         <div className="dash-zahlen">
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
-            <UmsatzBarChart months={umsatzMonate} />
+            <UmsatzLineChart months={umsatzMonate} />
           </DashboardLazyMount>
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
             <VertriebsFunnel

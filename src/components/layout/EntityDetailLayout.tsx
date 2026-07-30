@@ -73,16 +73,23 @@ export function EntityDetailLayout({
   return (
     <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
       <div className="detail-entity-hero">
-        {crumbBackHref ? (
-          <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
-        ) : null}
+        <div className="detail-entity-toprow">
+          {crumbBackHref ? (
+            <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
+          ) : (
+            <span className="detail-entity-toprow__spacer" aria-hidden />
+          )}
+          <div className="detail-entity-toprow__actions">
+            <span id="detail-entity-top-overflow" className="detail-entity-top-overflow" />
+          </div>
+        </div>
         <AkteRueckwegChip />
         {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
         <DetailHead
           title={head.title}
           badges={head.badges}
           titleBadges={head.titleBadges}
-          titleTrailing={head.titleTrailing}
+          titleTrailing={isMobile ? undefined : head.titleTrailing}
           meta={undefined}
           sub={undefined}
           actions={head.actions}

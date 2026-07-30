@@ -331,20 +331,7 @@ export function AnfrageDokumenteTab({
               const editing = editId === d.id;
               const sizeLabel = formatBytes(d.groesse_bytes);
               const isFoto = isImageDoc(d.name, d.href);
-              const quelleLabel =
-                d.quelle === "angebot"
-                  ? "Angebot"
-                  : d.quelle === "rechnung"
-                    ? "Rechnung"
-                    : "Upload";
-              const subMeta = [
-                quelleLabel,
-                formatDatum(d.created_at),
-                sizeLabel,
-                d.freigabe ? "Kunde" : "intern",
-              ]
-                .filter(Boolean)
-                .join(" · ");
+              const beschreibung = d.beschreibung?.trim() || '';
               return (
                 <div
                   key={d.id}
@@ -371,6 +358,7 @@ export function AnfrageDokumenteTab({
                     ctx="row"
                     n={isFoto ? "photo" : "file-text"}
                     size={18}
+                    className="dok-list__icon"
                     style={{ color: "var(--text-3)" }}
                   />
                   {editing ? (
@@ -390,7 +378,9 @@ export function AnfrageDokumenteTab({
                           <span className="dok-list__name-size"> · {sizeLabel}</span>
                         ) : null}
                       </div>
-                      {subMeta ? <div className="dok-list__sub">{subMeta}</div> : null}
+                      {beschreibung ? (
+                        <div className="dok-list__sub">{beschreibung}</div>
+                      ) : null}
                     </div>
                   )}
                   {editing ? (
@@ -445,7 +435,10 @@ export function AnfrageDokumenteTab({
                       onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
                       style={{ accentColor: "var(--green)", margin: 0 }}
                     />
-                    <span style={{ color: d.freigabe ? "var(--green)" : "var(--text-3)" }}>
+                    <span
+                      className={d.freigabe ? "is-kunde" : undefined}
+                      style={{ color: d.freigabe ? "var(--green)" : "var(--text-3)" }}
+                    >
                       {d.freigabe ? "Kunde" : "intern"}
                     </span>
                   </label>
@@ -479,10 +472,11 @@ export function AnfrageDokumenteTab({
                         icon="trash"
                         title="Löschen"
                         disabled={busy}
+                        className="dok-list__action--extra"
                         onClick={() => removeDoc(d)}
                       />
                     ) : (
-                      <span style={{ width: 28 }} />
+                      <span className="dok-list__action--extra" style={{ width: 28 }} />
                     )}
                   </div>
                 </div>

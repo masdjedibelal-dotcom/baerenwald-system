@@ -361,6 +361,7 @@ export function KundenDokumenteTab({
               const editing = editId === d.id
               const sizeLabel = formatBytes(d.groesse_bytes)
               const isFoto = isImageDoc(d.name, d.href)
+              const beschreibung = d.beschreibung?.trim() || ''
               return (
                 <div
                   key={d.id}
@@ -375,6 +376,7 @@ export function KundenDokumenteTab({
                     ctx="row"
                     n={isFoto ? 'photo' : 'file-text'}
                     size={18}
+                    className="dok-list__icon"
                     style={{ color: 'var(--text-3)' }}
                   />
                   {editing ? (
@@ -386,48 +388,32 @@ export function KundenDokumenteTab({
                       autoFocus
                     />
                   ) : (
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {d.name}
-                      {sizeLabel ? (
-                        <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>
-                          {' '}
-                          · {sizeLabel}
-                        </span>
-                      ) : null}
+                    <div className="dok-list__main min-w-0">
+                      <div className="dok-list__name">
+                        {d.name}
+                        {sizeLabel ? (
+                          <span className="dok-list__name-size"> · {sizeLabel}</span>
+                        ) : null}
+                      </div>
+                      {beschreibung ? <div className="dok-list__sub">{beschreibung}</div> : null}
                     </div>
                   )}
                   {editing ? (
                     <input
-                      className="txt"
+                      className="txt dok-list__cell--desk"
                       value={d.beschreibung}
                       onChange={(e) => upd(d.id, { beschreibung: e.target.value })}
                       placeholder="Beschreibung…"
                       style={{ height: 30 }}
                     />
                   ) : (
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        color: 'var(--text-3)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                    <div className="dok-list__cell--desk dok-list__desc">
                       {d.beschreibung || <span style={{ color: 'var(--text-4)' }}>—</span>}
                     </div>
                   )}
                   {editing ? (
                     <input
-                      className="txt"
+                      className="txt dok-list__cell--desk"
                       type="date"
                       defaultValue={d.created_at.slice(0, 10)}
                       onChange={(e) => {
@@ -439,11 +425,12 @@ export function KundenDokumenteTab({
                       style={{ height: 30, fontSize: 12 }}
                     />
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    <div className="dok-list__cell--desk dok-list__date">
                       {formatDatum(d.created_at)}
                     </div>
                   )}
                   <label
+                    className="dok-list__freigabe"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -458,11 +445,17 @@ export function KundenDokumenteTab({
                       onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
                       style={{ accentColor: 'var(--green)', margin: 0 }}
                     />
-                    <span style={{ color: d.freigabe ? 'var(--green)' : 'var(--text-3)' }}>
+                    <span
+                      className={d.freigabe ? 'is-kunde' : undefined}
+                      style={{ color: d.freigabe ? 'var(--green)' : 'var(--text-3)' }}
+                    >
                       {d.freigabe ? 'Kunde' : 'intern'}
                     </span>
                   </label>
-                  <div style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}>
+                  <div
+                    className="dok-list__actions"
+                    style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
+                  >
                     {editing ? (
                       <MockBtn
                         sm
@@ -487,10 +480,11 @@ export function KundenDokumenteTab({
                         icon="trash"
                         title="Löschen"
                         disabled={busy}
+                        className="dok-list__action--extra"
                         onClick={() => removeDoc(d)}
                       />
                     ) : (
-                      <span style={{ width: 28 }} />
+                      <span className="dok-list__action--extra" style={{ width: 28 }} />
                     )}
                   </div>
                 </div>

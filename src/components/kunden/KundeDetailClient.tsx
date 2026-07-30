@@ -41,7 +41,7 @@ import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
@@ -63,7 +63,6 @@ import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
-import { TodosPanel } from '@/components/todos/TodosPanel'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
 const QUELLE_LABELS: Record<string, string> = {
@@ -121,7 +120,7 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'todos' | 'akte'
+type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'akte'
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -722,16 +721,6 @@ export function KundeDetailClient({
     </Suspense>
   )
 
-  const tabTodos = (
-    <TodosPanel
-      compact
-      title="To-dos"
-      showFilterChips
-      filter={{ kundeId: kunde.id }}
-      lockedLinks={{ kundeId: kunde.id, label: kundeDisplayName(kunde) }}
-    />
-  )
-
   const tabOrganisation = zeigtOrganisationTab ? (
     <KundenOrganisationTab kunde={kunde} onSaved={() => refresh()} />
   ) : null
@@ -749,12 +738,6 @@ export function KundeDetailClient({
       icon: 'folders',
       count: kundeVorgaengeCount || undefined,
       render: () => tabVorgaenge,
-    },
-    {
-      id: 'todos',
-      label: 'To-dos',
-      icon: 'clipboard-list',
-      render: () => tabTodos,
     },
     ...(zeigtObjekteTab
       ? [
@@ -781,10 +764,12 @@ export function KundeDetailClient({
   ]
 
   return (
-    <div className="space-y-4 pb-6">
-      <DetailHead
-        title={kundeDisplayName(kunde)}
-        titleBadges={
+    <EntityDetailLayout
+      crumbBackHref="/kunden"
+      crumbBackLabel="Zurück zur Liste"
+      head={{
+        title: kundeDisplayName(kunde),
+        titleBadges: (
           <>
             <TypBadge typ={kunde.typ} />
             {wirtschaftSnap.aktiveVorgaenge > 0 ? (
@@ -799,12 +784,12 @@ export function KundeDetailClient({
               </MockBadge>
             ) : null}
           </>
-        }
-        badges={kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null}
-        titleTrailing={<PortalLoginIconButton kundeId={kunde.id} label="Kundenportal öffnen" />}
-        actions={<DetailActionsBar sheetTitle="Kunde" menuItems={[]} />}
-      />
-
+        ),
+        badges: kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null,
+        titleTrailing: <PortalLoginIconButton kundeId={kunde.id} label="Kundenportal öffnen" />,
+        actions: <DetailActionsBar sheetTitle="Kunde" menuItems={[]} />,
+      }}
+    >
       {zeigtOrganisationTab && tab === 'organisation' ? (
         <div className="space-y-3">
           <button type="button" className="btn ghost sm" onClick={() => setTab('uebersicht')}>
@@ -948,6 +933,6 @@ export function KundeDetailClient({
           </p>
         ) : null}
       </Modal>
-    </div>
+    </EntityDetailLayout>
   )
 }

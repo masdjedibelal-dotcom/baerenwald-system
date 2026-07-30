@@ -83,14 +83,14 @@ function pathToBreadcrumbs(pathname: string): {
                   ? 'Vorschau'
                   : ''
 
-  // Vorgangs-Detail: kein Breadcrumb / kein Phasen-Titel — mehr Platz für Inhalt
+  // Detail-Chrome: kein TopBar-Titel/Zurück — Hero hat MockDetailBackLink
   const isUuidLike = /^[0-9a-f-]{8,}$/i.test(segments[1] ?? '')
-  const isVorgangDetail =
-    ['anfragen', 'angebote', 'auftraege', 'rechnungen'].includes(section) &&
+  const isEntityDetail =
+    ['anfragen', 'angebote', 'auftraege', 'rechnungen', 'kunden', 'handwerker'].includes(section) &&
     segments.length >= 2 &&
     isUuidLike
 
-  if (isVorgangDetail) {
+  if (isEntityDetail) {
     return { title: '', parents: [], cta: undefined }
   }
 

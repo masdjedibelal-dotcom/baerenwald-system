@@ -11,6 +11,7 @@ import {
 } from '@/components/neu/FabVorgangStartModal'
 import { KalenderTerminEditorSheet } from '@/components/kalender/KalenderTerminEditorSheet'
 import { TodoEditorSheet } from '@/components/todos/TodoEditorSheet'
+import { AnfrageWizard } from '@/components/anfragen/AnfrageWizard'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 
 export type FabOverlayArt =
@@ -18,6 +19,7 @@ export type FabOverlayArt =
   | 'handwerker'
   | 'rechnung'
   | 'angebot'
+  | 'anfrage'
   | 'termin'
   | 'todo'
 
@@ -28,6 +30,7 @@ const FAB_ARTS = new Set<FabOverlayArt>([
   'handwerker',
   'rechnung',
   'angebot',
+  'anfrage',
   'termin',
   'todo',
 ])
@@ -44,7 +47,8 @@ export function openFabCreate(art: FabOverlayArt) {
 type GewerkOpt = { id: string; name: string; slug: string }
 
 /**
- * Shell-Host für FAB-Create: Sheet/Picker auf der aktuellen Seite.
+ * Shell-Host für FAB-Create: Sheet/Picker/Funnel auf der aktuellen Seite.
+ * Anfrage: Staff-Funnel Overlay (kein /anfragen/neu).
  * Angebot/Rechnung: Kunde wählen → Wizard-URL.
  * Kunde/Handwerker: Create-Sheet → Detail nach Speichern.
  * Termin / To-do: EditorSheet auf der aktuellen Seite.
@@ -97,6 +101,15 @@ export function FabCreateHost() {
         onSaved={(id) => {
           setArt(null)
           if (id) router.push(`/handwerker/${id}`)
+        }}
+      />
+
+      <AnfrageWizard
+        open={art === 'anfrage'}
+        onClose={() => setArt(null)}
+        onSuccess={(id) => {
+          setArt(null)
+          if (id) router.push(`/anfragen/${id}`)
         }}
       />
 

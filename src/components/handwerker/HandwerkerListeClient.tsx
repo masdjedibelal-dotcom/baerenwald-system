@@ -626,6 +626,7 @@ export function HandwerkerListeClient({
             const mail = h.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
             const copy = () => runDuplicateHandwerker(h.id, router)
+            const edit = () => openDetail(h.id)
             const row = (
               <div
                 role="button"
@@ -694,8 +695,14 @@ export function HandwerkerListeClient({
               <SwipeRow
                 key={h.id}
                 disabled={!isMobile || selectMode}
-                onSwipeRight={isMobile && !selectMode ? copy : undefined}
-                rightLabel="Kopieren"
+                rightActions={
+                  isMobile && !selectMode
+                    ? [
+                        { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
+                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
+                      ]
+                    : undefined
+                }
               >
                 {row}
               </SwipeRow>

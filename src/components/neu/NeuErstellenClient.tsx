@@ -15,7 +15,6 @@ import {
   istKundeNurGewerbeTyp,
 } from '@/lib/kunde-stammdaten'
 import {
-  createAnfrageHref,
   createAngebotHref,
   createRechnungHref,
 } from '@/lib/crm/create-entry'
@@ -263,7 +262,7 @@ export function NeuErstellenClient({
                   active={false}
                   icon={o.ic}
                   onClick={() => {
-                    if (o.v === 'anfrage') router.push(createAnfrageHref())
+                    if (o.v === 'anfrage') openFabCreate('anfrage')
                     else if (o.v === 'angebot') router.push(createAngebotHref())
                     else if (o.v === 'rechnung') router.push(createRechnungHref())
                   }}

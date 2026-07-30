@@ -3,12 +3,11 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, cn } from '@/lib/utils'
 import type { ZahlplanRateStatus } from '@/lib/rechnungen/zahlungsplan'
 
 export type RateDrawerMahnung = {
@@ -91,47 +90,41 @@ export function RateDrawer({
   }
 
   const r = rate
-  const haupt = ctas.find((c) => c.primary) ?? null
-  const rest = ctas.filter((c) => c !== haupt)
-  const ueberfaellig =
-    r.status === 'gestellt' &&
-    Boolean(r.faellig) &&
-    new Date(String(r.faellig).slice(0, 10)) < new Date(new Date().toDateString())
   const belege = r.belege ?? []
   const aktivBeleg = belege.find((b) => b.id === r.rechnungId) ?? belege[0] ?? null
   const crumbNr = (aktivBeleg?.nummer || r.reNr || '').trim()
   const sheetCrumb = crumbNr ? `${crumbNr} >` : null
+  const ueberfaellig =
+    r.status === 'gestellt' &&
+    Boolean(r.faellig) &&
+    new Date(String(r.faellig).slice(0, 10)) < new Date(new Date().toDateString())
 
   const footer =
     ctas.length > 0 ? (
-      <div className="rate-drawer-cta">
-        {haupt ? (
-          <MockBtn
-            kind="primary"
-            icon={haupt.icon}
-            disabled={haupt.disabled}
-            onClick={haupt.onClick}
-          >
-            {haupt.label}
-          </MockBtn>
-        ) : null}
-        {rest.map((c) => (
-          <MockBtn
+      <div
+        className="rate-drawer-cta rate-drawer-cta--tiles"
+        role="toolbar"
+        aria-label="Aktionen"
+      >
+        {ctas.map((c) => (
+          <button
             key={c.id}
-            kind="ghost"
-            icon={c.icon}
+            type="button"
+            className={cn('rate-drawer-cta__tile', c.primary && 'is-primary')}
             disabled={c.disabled}
             onClick={c.onClick}
           >
-            {c.label}
-          </MockBtn>
+            {c.icon ? <MockIcon ctx="btn" n={c.icon} size={18} /> : null}
+            <span className="rate-drawer-cta__lbl">{c.label}</span>
+          </button>
         ))}
       </div>
     ) : (
-      <div className="rate-drawer-cta">
-        <MockBtn kind="primary" onClick={onClose}>
-          Schließen
-        </MockBtn>
+      <div className="rate-drawer-cta rate-drawer-cta--tiles">
+        <button type="button" className="rate-drawer-cta__tile is-primary" onClick={onClose}>
+          <MockIcon ctx="btn" n="x" size={18} />
+          <span className="rate-drawer-cta__lbl">Schließen</span>
+        </button>
       </div>
     )
 

@@ -231,7 +231,7 @@ export function LeistungenTab({
   const hint =
     dokumentHint ??
     (phase === 'rechnung'
-      ? 'Positionen sind gestellt — Änderungen über eine Rechnungskorrektur.'
+      ? null
       : phase === 'angebot'
         ? 'Positionen änderst du im Dokument — nicht in dieser Tabelle.'
         : phase === 'anfrage'

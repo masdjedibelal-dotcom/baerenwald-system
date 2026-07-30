@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useRouter } from 'next/navigation'
 import {
   AngebotKiAssistentButton,
@@ -74,14 +75,10 @@ import type {
   RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  rechnungMaterialFingerprint,
-} from '@/lib/rechnungen/rechnung-korrektur'
-import {
   berechneSchlussAbrechnung,
   berechneZahlungsplan,
   emptyZahlungsplan,
   neueZahlungsplanZeile,
-  softWarnGestellteRechnungenGegenVk,
   zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
@@ -239,7 +236,7 @@ export function RechnungWizard({
   const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
   const [abschlussBusy, setAbschlussBusy] = useState(false)
   const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlung' | 'versand' | null
+    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | null
   >(null)
   useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
     applyKiDokumentTextDraft(d, { setText: setEinleitung })
@@ -261,6 +258,7 @@ export function RechnungWizard({
   const [rechnungsnummer, setRechnungsnummer] = useState(
     bootstrap.rechnungsnummer?.trim() || ''
   )
+  const isMobile = useIsMobile()
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
   const [hintsOpen, setHintsOpen] = useState(true)
@@ -459,25 +457,6 @@ export function RechnungWizard({
     [plan, vkNettoPlan, defaultMwst, bootstrap.rechnungenAbschlag]
   )
 
-  const vkSoftWarn = useMemo(() => {
-    if (!hatAuftrag) return { warn: false as const }
-    const vkNetto = bootstrap.gesamtNetto ?? bootstrap.abschlag?.gesamtNetto ?? netto
-    return softWarnGestellteRechnungenGegenVk({
-      bestehende: bootstrap.rechnungenAbschlag ?? [],
-      gesamtNetto: vkNetto,
-      mwstSatz: defaultMwst,
-      ausserRechnungId: rechnungId,
-    })
-  }, [
-    hatAuftrag,
-    bootstrap.gesamtNetto,
-    bootstrap.abschlag?.gesamtNetto,
-    bootstrap.rechnungenAbschlag,
-    netto,
-    defaultMwst,
-    rechnungId,
-  ])
-
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
   const selRate = plan.zeilen.find((z) => z.id === aktivRate) ?? null
   const selBerechnet = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
@@ -605,38 +584,6 @@ export function RechnungWizard({
       zahlungsbedingungen: zb,
     }
   }
-
-  const korrekturMaterialDirty = useMemo(() => {
-    if (!korrekturKontext) return false
-    const m = {
-      ...meta,
-      einleitung,
-      mail_einleitung: einleitung,
-      mail_betreff: mailBetreff.trim() || defaultBetreff,
-      faellig_am: rFaellig,
-    }
-    const fp = rechnungMaterialFingerprint({
-      positionen: positionenBerechnet,
-      reverse_charge_13b: m.reverse_charge_13b,
-      hinweis_35a: m.hinweis_35a,
-      rechnungsdatum: m.rechnungsdatum,
-      leistungszeitraum_von: m.leistungszeitraum_von,
-      leistungszeitraum_bis: m.leistungszeitraum_bis,
-      faellig_am: m.faellig_am,
-      zahlungsbedingungen: m.zahlungsbedingungen,
-      einleitung: m.einleitung,
-      hinweise: m.hinweise,
-    })
-    return fp !== korrekturKontext.materialFingerprint
-  }, [
-    korrekturKontext,
-    positionenBerechnet,
-    meta,
-    einleitung,
-    mailBetreff,
-    defaultBetreff,
-    rFaellig,
-  ])
 
   const draftSnapshot = useMemo(
     () =>
@@ -1111,54 +1058,6 @@ export function RechnungWizard({
 
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
-      {vkSoftWarn.warn ? (
-        <div className="nachtrags-band" role="status">
-          <MockIcon ctx="default" n="alert-triangle" size={16} />
-          <span>
-            <b>{vkSoftWarn.message}</b>
-            <br />
-            Speichern kann blockiert werden, wenn die Summe die Auftragssumme überschreitet.
-          </span>
-        </div>
-      ) : null}
-
-      {korrekturKontext ? (
-        <div className="nachtrags-band" role="status">
-          <MockIcon ctx="default" n={korrekturMaterialDirty ? 'alert-triangle' : 'info-circle'} size={16} />
-          <span>
-            {korrekturMaterialDirty ? (
-              <>
-                <b>Korrektur von {korrekturKontext.originalNr}</b>
-                <br />
-                Beim Speichern/Versand wird die bisherige Rechnung storniert (Gutschrift) und die
-                Storno-PDF zusammen mit der neuen Rechnung in der E-Mail angehängt.
-              </>
-            ) : (
-              <>
-                <b>Bereits versendet ({korrekturKontext.originalNr})</b>
-                <br />
-                Nur Mail-Text ändern — ohne Storno. Sobald Positionen oder Belegdaten geändert
-                werden, entsteht automatisch eine Korrektur mit Storno.
-              </>
-            )}
-          </span>
-        </div>
-      ) : null}
-
-      {rateLocked && selBerechnet ? (
-        <div className="nachtrags-band" role="status">
-          <MockIcon ctx="default" n="info-circle" size={16} />
-          <span>
-            {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} · {selBerechnet.titel}
-            {' — '}
-            {formatEurBetrag(
-              schlussAbrechnung ? schlussAbrechnung.rest_brutto : selBerechnet.brutto
-            )}{' '}
-            {schlussAbrechnung ? 'Restsumme brutto' : 'brutto'}
-          </span>
-        </div>
-      ) : null}
-
       <PosBoard
         title={`Positionen · ${hatAuftrag ? `Auftrag ${auftragLabel}` : 'Direktrechnung'} · ${kundeName}`}
         positionen={posBoardLines}
@@ -1208,59 +1107,6 @@ export function RechnungWizard({
         restBrutto={schlussAbrechnung?.rest_brutto ?? null}
       />
 
-      <section className="document-section">
-        <h2 className="document-section__label">Vorschau</h2>
-        {activeVersandId ? (
-          <RechnungWizardPdfPreview
-            rechnungId={activeVersandId}
-            kundeName={kundeName}
-          />
-        ) : (
-          <div className="rw-preview-card">
-            <div className="rw-preview-card__banner">
-              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
-              {rTitel ? ` · ${rTitel}` : ''}
-            </div>
-            <div className="rw-preview-card__body">
-              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
-                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
-              </p>
-              <ul className="rw-preview-card__pos">
-                {positionenBerechnet.slice(0, 6).map((p, i) => (
-                  <li key={`${p.leistung}-${i}`}>
-                    <span>
-                      {p.leistung}
-                      {p.menge != null
-                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
-                        : ''}
-                    </span>
-                    <b>
-                      {formatEurBetrag(
-                        (p.vk_netto ??
-                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
-                          (p.menge ?? 1) *
-                          1.19
-                      )}
-                    </b>
-                  </li>
-                ))}
-              </ul>
-              <div className="rw-preview-card__sum">
-                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
-                <b>{formatEurBetrag(displayBrutto)}</b>
-              </div>
-              {rFaellig ? (
-                <div className="rw-preview-card__faellig">
-                  Fällig am {formatDateDe(rFaellig)}
-                </div>
-              ) : null}
-            </div>
-            <div className="rw-preview-card__foot">
-              Bärenwald · an {kundeName}
-            </div>
-          </div>
-        )}
-      </section>
     </div>
   )
 
@@ -1345,8 +1191,7 @@ export function RechnungWizard({
           id: 'preview',
           label: 'Vorschau',
           onClick: () => {
-            const el = document.getElementById('rw-vorschau')
-            el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            void persistDraft().then(() => setSheet('vorschau'))
           },
           icon: <MockIcon ctx="default" n="file-text" size={20} />,
         },
@@ -1355,6 +1200,17 @@ export function RechnungWizard({
           label: 'Senden',
           onClick: () => setSheet('versand'),
           icon: <MockIcon ctx="default" n="send" size={20} />,
+        },
+        {
+          id: 'save',
+          label: saving ? 'Speichern…' : 'Speichern',
+          onClick: () => {
+            if (saving || (hasPlan && !planOk)) return
+            void persistDraft().then((id) => {
+              if (id) toast.success('Entwurf gespeichert')
+            })
+          },
+          icon: <MockIcon ctx="default" n="device-floppy" size={20} />,
         },
       ]}
     />
@@ -1378,14 +1234,10 @@ export function RechnungWizard({
         busyLabel="Wird versendet…"
         onDiscard={() => onClose()}
         docActions={docActions}
-        document={
-          <div id="rw-vorschau" className="contents">
-            {documentColumn}
-          </div>
-        }
+        document={documentColumn}
         meta={metaColumn}
         metaSum={metaSum}
-        footerCta={footerCta}
+        footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
       />
@@ -1677,12 +1529,69 @@ export function RechnungWizard({
       </EditorSheet>
 
       <EditorSheet
+        open={sheet === 'vorschau'}
+        onClose={closeSheet}
+        title="Vorschau"
+        context="canvas"
+        size="lg"
+      >
+        {activeVersandId ? (
+          <RechnungWizardPdfPreview
+            rechnungId={activeVersandId}
+            kundeName={kundeName}
+          />
+        ) : (
+          <div className="rw-preview-card">
+            <div className="rw-preview-card__banner">
+              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
+              {rTitel ? ` · ${rTitel}` : ''}
+            </div>
+            <div className="rw-preview-card__body">
+              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
+                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
+              </p>
+              <ul className="rw-preview-card__pos">
+                {positionenBerechnet.slice(0, 6).map((p, i) => (
+                  <li key={`${p.leistung}-${i}`}>
+                    <span>
+                      {p.leistung}
+                      {p.menge != null
+                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
+                        : ''}
+                    </span>
+                    <b>
+                      {formatEurBetrag(
+                        (p.vk_netto ??
+                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
+                          (p.menge ?? 1) *
+                          1.19
+                      )}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+              <div className="rw-preview-card__sum">
+                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
+                <b>{formatEurBetrag(displayBrutto)}</b>
+              </div>
+              {rFaellig ? (
+                <div className="rw-preview-card__faellig">
+                  Fällig am {formatDateDe(rFaellig)}
+                </div>
+              ) : null}
+            </div>
+            <div className="rw-preview-card__foot">
+              Bärenwald · an {kundeName}
+            </div>
+          </div>
+        )}
+      </EditorSheet>
+
+      <EditorSheet
         open={sheet === 'versand'}
         onClose={closeSheet}
         title="Versand"
         context="canvas"
-        compose
-        composeLabel={saving ? '…' : 'Senden'}
         onConfirm={() => void handleFinish(true)}
         confirmDisabled={saving || (hasPlan && !planOk)}
         confirmBusy={saving}
@@ -1817,23 +1726,6 @@ export function RechnungWizard({
               </label>
             </div>
           ) : null}
-          <div className="full" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <MockBtn
-              kind="ghost"
-              disabled={saving || (hasPlan && !planOk)}
-              onClick={() => void handleFinish(false)}
-            >
-              Nur erstellen
-            </MockBtn>
-            <MockBtn
-              kind="primary"
-              icon="send"
-              disabled={saving || (hasPlan && !planOk)}
-              onClick={() => void handleFinish(true)}
-            >
-              Erstellen und versenden
-            </MockBtn>
-          </div>
           <div className="full">
             <RechnungWizardMailPreview
               rechnungId={activeVersandId}

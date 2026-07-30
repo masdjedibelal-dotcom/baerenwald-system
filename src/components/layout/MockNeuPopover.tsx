@@ -1,17 +1,13 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openFabCreate, type FabOverlayArt } from '@/components/neu/FabCreateHost'
-import { createAnfrageHref } from '@/lib/crm/create-entry'
 
-type NeuItem =
-  | { ic: string; label: string; desc: string; href: string }
-  | { ic: string; label: string; desc: string; overlay: FabOverlayArt }
+type NeuItem = { ic: string; label: string; desc: string; overlay: FabOverlayArt }
 
-/** FAB: Overlay für Kunde/HW/Angebot/Rechnung; Fullpage nur Anfrage-Funnel. */
+/** FAB: Overlay auf aktueller Seite (kein /anfragen/neu-Host). */
 const VORGANG_ITEMS: NeuItem[] = [
-  { ic: 'inbox', label: 'Anfrage', desc: 'Neuer Kundenbedarf', href: createAnfrageHref() },
+  { ic: 'inbox', label: 'Anfrage', desc: 'Neuer Kundenbedarf', overlay: 'anfrage' },
   { ic: 'file-invoice', label: 'Angebot', desc: 'Positionen & Preis', overlay: 'angebot' },
   { ic: 'receipt', label: 'Rechnung', desc: 'Abschlag oder Schluss', overlay: 'rechnung' },
 ]
@@ -27,17 +23,11 @@ const PLAN_ITEMS: NeuItem[] = [
 ]
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const router = useRouter()
-
   if (!open) return null
 
   function go(item: NeuItem) {
     onClose()
-    if ('overlay' in item) {
-      openFabCreate(item.overlay)
-      return
-    }
-    router.push(item.href)
+    openFabCreate(item.overlay)
   }
 
   return (

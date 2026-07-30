@@ -96,7 +96,7 @@ function hasMenuContent(items: ActionsMenuItem[]): boolean {
 
 /**
  * Desktop: Primary (+ optional Secondary / ⋯ nur wenn Items).
- * Mobil: Sticky-Bar — Primary zentriert wenn allein; mit Menü Primär + ⋯.
+ * Mobil: Sticky-Bar nur Primär; ⋯ oben rechts neben Zurück.
  */
 export function DetailActionsBar({
   primary,
@@ -105,7 +105,15 @@ export function DetailActionsBar({
   sheetTitle = 'Aktionen',
 }: Props) {
   const [mounted, setMounted] = useState(false)
+  const [topActionsEl, setTopActionsEl] = useState<HTMLElement | null>(null)
   useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    if (!mounted || !isMobile) {
+      setTopActionsEl(null)
+      return
+    }
+    setTopActionsEl(document.getElementById('detail-entity-top-overflow'))
+  }, [mounted, isMobile])
   const isMobile = useIsMobile()
   const { hideChrome } = useMobileScrollChrome(isMobile)
 
@@ -130,7 +138,7 @@ export function DetailActionsBar({
   const showOverflow = hasMenuContent(mobileMenuItems)
   const alonePrimary = Boolean(primary) && !showOverflow && !secondary
 
-  const menuTrigger = (compact: boolean, items: ActionsMenuItem[]) => (
+  const menuTrigger = (compact: boolean, items: ActionsMenuItem[], className?: string) => (
     <ActionsMenu
       sheetTitle={sheetTitle}
       items={items}
@@ -139,12 +147,13 @@ export function DetailActionsBar({
           type="button"
           className={cn(
             'qa-btn inline-flex items-center justify-center',
-            compact && 'detail-mobile-action-bar__more'
+            compact && 'detail-top-more',
+            className
           )}
           aria-label="Weitere Aktionen"
-          title="Aktionen"
+          title="Weitere"
         >
-          <MockIcon ctx="btn" n="dots" size={compact ? 20 : 18} />
+          <MockIcon ctx="row" n="dots" size={compact ? 20 : 18} />
         </button>
       }
     />
@@ -174,41 +183,29 @@ export function DetailActionsBar({
     </div>
   )
 
+  const mobileTopOverflow =
+    mounted && isMobile && showOverflow && topActionsEl
+      ? createPortal(menuTrigger(true, mobileMenuItems), topActionsEl)
+      : null
+
   const mobileBar =
-    mounted && (primary || showOverflow)
+    mounted && isMobile && primary
       ? createPortal(
           <div
             className={cn(
               'detail-mobile-action-bar md:hidden',
               hideChrome && 'detail-mobile-action-bar--hidden',
-              alonePrimary && 'detail-mobile-action-bar--solo'
+              'detail-mobile-action-bar--solo'
             )}
             role="toolbar"
             aria-label="Aktionen"
           >
-            <div
-              className={cn(
-                'detail-mobile-action-bar__inner',
-                alonePrimary && 'detail-mobile-action-bar__inner--solo'
-              )}
-            >
-              {primary ? (
-                <ActionControl
-                  action={primary}
-                  size="md"
-                  className={cn(
-                    'detail-mobile-action-bar__primary',
-                    alonePrimary && 'detail-mobile-action-bar__primary--solo'
-                  )}
-                />
-              ) : showOverflow ? (
-                <div className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--empty" />
-              ) : null}
-              {showOverflow ? (
-                <div className="detail-mobile-action-bar__overflow">
-                  {menuTrigger(true, mobileMenuItems)}
-                </div>
-              ) : null}
+            <div className="detail-mobile-action-bar__inner detail-mobile-action-bar__inner--solo">
+              <ActionControl
+                action={primary}
+                size="md"
+                className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--solo"
+              />
             </div>
           </div>,
           document.body
@@ -218,6 +215,7 @@ export function DetailActionsBar({
   return (
     <>
       {desktop}
+      {mobileTopOverflow}
       {mobileBar}
     </>
   )

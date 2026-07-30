@@ -252,11 +252,30 @@ export function AuftragDokumenteTab({
         <span
           className={cn(
             'dok-card__tag',
-            row.fuerKunde ? 'dok-card__tag--kunde' : 'dok-card__tag--muted'
+            row.fuerKunde ? 'dok-card__tag--kunde' : 'dok-card__tag--muted',
+            row.fuerKunde && 'is-kunde'
           )}
         >
           {freigabeLabel(row)}
         </span>
+      )
+    }
+    if (isMobile) {
+      return (
+        <button
+          type="button"
+          className={cn(
+            'dok-freigabe-pill',
+            row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-intern'
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (ev) toggleFreigabe(ev, !row.fuerKunde)
+          }}
+          disabled={pending}
+        >
+          {freigabeLabel(row)}
+        </button>
       )
     }
     return (
@@ -294,21 +313,41 @@ export function AuftragDokumenteTab({
   }
 
   function renderActions(row: AuftragDokumentZeile) {
-    const readOnly = row.quelle !== 'timeline' || !row.timelineId
-    if (readOnly) return null
+    const href = rowHref(row)
+    const ready = rowPdfReady(row)
+    const canEdit = row.quelle === 'timeline' && Boolean(row.timelineId)
     return (
-      <div className="dok-card__actions" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="icon-btn" title="Bearbeiten" onClick={() => openEdit(row)}>
-          <MockIcon ctx="row" n="pencil" size={15} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn text-status-cancel-text"
-          title="Löschen"
-          onClick={() => removeRow(row)}
-        >
-          <MockIcon ctx="row" n="trash" size={15} />
-        </button>
+      <div className="dok-list__actions inline-flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+        {ready && href ? (
+          <button
+            type="button"
+            className="icon-btn"
+            title="Ansehen"
+            onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
+          >
+            <MockIcon ctx="row" n="eye" size={15} />
+          </button>
+        ) : null}
+        {canEdit ? (
+          <>
+            <button
+              type="button"
+              className="icon-btn dok-list__action--extra"
+              title="Bearbeiten"
+              onClick={() => openEdit(row)}
+            >
+              <MockIcon ctx="row" n="pencil" size={15} />
+            </button>
+            <button
+              type="button"
+              className="icon-btn text-status-cancel-text dok-list__action--extra"
+              title="Löschen"
+              onClick={() => removeRow(row)}
+            >
+              <MockIcon ctx="row" n="trash" size={15} />
+            </button>
+          </>
+        ) : null}
       </div>
     )
   }
@@ -333,16 +372,15 @@ export function AuftragDokumenteTab({
   }
 
   function metaLine(row: AuftragDokumentZeile): string {
-    const parts: string[] = [dokumentTypLabel(row.quelle)]
-    if (row.datum) parts.push(formatDatum(row.datum))
-    if (row.beschreibung && row.beschreibung !== '—') parts.push(row.beschreibung)
-    return parts.join(' · ')
+    if (row.beschreibung && row.beschreibung !== '—') return row.beschreibung
+    return ''
   }
 
   function renderDeskRow(row: AuftragDokumentZeile) {
     const href = rowHref(row)
     const ready = rowPdfReady(row)
     const openable = Boolean(ready && href)
+    const sub = metaLine(row)
     return (
       <div
         key={row.id}
@@ -365,13 +403,13 @@ export function AuftragDokumenteTab({
           ctx="row"
           n={isFotoRow(row) ? 'photo' : 'file-text'}
           size={18}
-          className="text-bw-text-muted"
+          className="dok-list__icon text-bw-text-muted"
         />
         <div className="dok-list__main min-w-0">
           <div className="dok-list__name truncate text-[length:var(--fs-text)] font-medium text-bw-text">
             {renderNameLink(row)}
           </div>
-          <div className="dok-list__sub">{metaLine(row)}</div>
+          {sub ? <div className="dok-list__sub">{sub}</div> : null}
         </div>
         <div className="dok-list__cell--desk min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
           {dokumentTypLabel(row.quelle)}
@@ -383,12 +421,7 @@ export function AuftragDokumenteTab({
         <div className="dok-list__freigabe" onClick={(e) => e.stopPropagation()}>
           {renderFreigabe(row)}
         </div>
-        <div
-          className="dok-list__actions inline-flex justify-end gap-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {renderActions(row)}
-        </div>
+        {renderActions(row)}
       </div>
     )
   }

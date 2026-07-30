@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -60,6 +61,9 @@ export function EntityKundenStammdatenCard({
     region || null,
   ].filter(Boolean) as string[]
 
+  const showKundeLink = Boolean(kundeId?.trim() && !hideKundeLink)
+  const showPortalIcon = Boolean(kundeId?.trim())
+
   return (
     <div className={cn('card', isMobile && 'stammdaten-card--mobile')}>
       <div className="card-h">
@@ -73,16 +77,25 @@ export function EntityKundenStammdatenCard({
           ) : null}
 
           {isMobile ? (
-            <div className="vgid-chips vgid-chips--compact">
-              {kundeId?.trim() && !hideKundeLink ? (
-                <Link className="vgid-chip ghost" href={`/kunden/${kundeId.trim()}`}>
-                  <MockIcon ctx="default" n="user" size={14} />
-                  Kundenakte
-                </Link>
-              ) : null}
-            </div>
+            showKundeLink || showPortalIcon ? (
+              <div className="vgid-chips vgid-chips--compact">
+                {showKundeLink ? (
+                  <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
+                    <MockIcon ctx="default" n="user" size={14} />
+                    Kundenakte
+                  </Link>
+                ) : null}
+                {showPortalIcon ? (
+                  <PortalLoginIconButton
+                    kundeId={kundeId}
+                    label="Kundenportal öffnen"
+                    className="vgid-portal-icon"
+                  />
+                ) : null}
+              </div>
+            ) : null
           ) : (
-            (draft.telefon.trim() || draft.email.trim() || kundeId?.trim()) && (
+            (draft.telefon.trim() || draft.email.trim() || showKundeLink) && (
               <div className="vgid-chips">
                 {draft.telefon.trim() ? (
                   <a className="vgid-chip" href={telHref(draft.telefon)}>
@@ -96,8 +109,8 @@ export function EntityKundenStammdatenCard({
                     {draft.email.trim()}
                   </a>
                 ) : null}
-                {kundeId?.trim() && !hideKundeLink ? (
-                  <Link className="vgid-chip ghost" href={`/kunden/${kundeId.trim()}`}>
+                {showKundeLink ? (
+                  <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
                     <MockIcon ctx="default" n="user" size={14} />
                     Kundenakte
                   </Link>
@@ -112,15 +125,6 @@ export function EntityKundenStammdatenCard({
               fallbackEmail={draft.email}
               variant="vgid"
             />
-          ) : kundeId?.trim() ? (
-            <details className="vgid-portal-fold">
-              <summary>Portal</summary>
-              <StammdatenPortalZeile
-                kundeId={kundeId}
-                fallbackEmail={draft.email}
-                variant="vgid"
-              />
-            </details>
           ) : null}
         </div>
       </div>

@@ -604,6 +604,7 @@ export function KundenListeClient({
             const mail = k.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
             const copy = () => runDuplicateKunde(k.id, router)
+            const edit = () => openDetail(k.id)
             const row = (
               <div
                 role="button"
@@ -657,8 +658,14 @@ export function KundenListeClient({
               <SwipeRow
                 key={k.id}
                 disabled={!isMobile || selectMode}
-                onSwipeRight={isMobile && !selectMode ? copy : undefined}
-                rightLabel="Kopieren"
+                rightActions={
+                  isMobile && !selectMode
+                    ? [
+                        { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
+                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
+                      ]
+                    : undefined
+                }
               >
                 {row}
               </SwipeRow>
