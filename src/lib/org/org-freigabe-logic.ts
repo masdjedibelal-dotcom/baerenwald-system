@@ -1,6 +1,12 @@
 /**
  * Org-Freigabe: Berechnung an EINER Stelle, Ergebnis am Angebot persistiert (V2).
- * Objekt überschreibt Org (A5). Unter Schwelle → Info + Auto-Auftrag (A2).
+ * Objekt überschreibt Org (A5).
+ *
+ * Einfache Regel (kein Kleinreparatur-Pfad):
+ * - Immer Angebot (außer Akut-Direkt ohne Angebot).
+ * - Freigabe-System aktiv (freigabe|direkt) + unter Schwelle → Info + Auto-Auftrag ohne Annahme.
+ * - Über Schwelle → Freigabe/Annahme abwarten.
+ * - System nicht aktiv → nur Angebot, auf Annahme warten.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -262,6 +268,16 @@ export async function syncOrgFreigabeNachAngebot(input: {
       })
       .eq('id', leadId)
 
+    const regeln = resolveEffektiveFreigabeRegeln(org, objekt)
+    // Freigabe/Schwellen-System aktiv? Sonst: nur Angebot, auf Annahme warten (kein Auto-Auftrag).
+    const systemAktiv =
+      regeln.freigabe_modus === 'freigabe' || regeln.freigabe_modus === 'direkt'
+    if (!systemAktiv) {
+      return { ok: true, status: 'nicht_noetig', erforderlich: false }
+    }
+
+    // Aktiv + unter Schwelle (oder Modus „direkt“): Info an HV + Auftrag ohne manuelle Annahme.
+    // Immer zuvor Angebot (außer Akut-Direktpfad ohne Angebot).
     await sendOrgAngebotInfoOnce({
       leadId,
       angebotId,

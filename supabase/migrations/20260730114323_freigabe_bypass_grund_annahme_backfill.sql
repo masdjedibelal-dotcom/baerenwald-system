@@ -15,7 +15,7 @@ where exists (
   where h.angebot_id = a.id
     and lower(trim(h.status)) = 'akzeptiert'
 )
-and lower(trim(coalesce(a.status, ''))) not in (
+and lower(trim(coalesce(a.status::text, ''))) not in (
   'handwerker_akzeptiert',
   'kunde_akzeptiert',
   'beauftragt',

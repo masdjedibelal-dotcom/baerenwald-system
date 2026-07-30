@@ -24,7 +24,6 @@ type Props = {
     | 'freigabe_modus'
     | 'freigabe_schwelle_eur'
     | 'notfall_direkt'
-    | 'kleinreparaturen_ohne_angebot'
   >
   onSaved?: () => void
 }
@@ -42,9 +41,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
     kunde.freigabe_schwelle_eur != null ? String(Math.round(Number(kunde.freigabe_schwelle_eur))) : '500'
   )
   const [notfallDirekt, setNotfallDirekt] = useState(kunde.notfall_direkt !== false)
-  const [kleinreparaturen, setKleinreparaturen] = useState(
-    kunde.kleinreparaturen_ohne_angebot === true
-  )
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -58,7 +54,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         : '500'
     )
     setNotfallDirekt(kunde.notfall_direkt !== false)
-    setKleinreparaturen(kunde.kleinreparaturen_ohne_angebot === true)
   }, [kunde])
 
   const meldeBasisLink = orgKennung.trim() ? buildMeldeLink(orgKennung) : null
@@ -81,7 +76,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         freigabe_modus: freigabeModus,
         freigabe_schwelle_eur: schwelleNum,
         notfall_direkt: notfallDirekt,
-        kleinreparaturen_ohne_angebot: kleinreparaturen,
+        kleinreparaturen_ohne_angebot: false,
       })
       if (!r.ok) {
         setErr(r.message)
@@ -290,13 +285,11 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             freigabe_modus: freigabeModus,
             freigabe_schwelle_eur: schwelle,
             notfall_direkt: notfallDirekt,
-            kleinreparaturen_ohne_angebot: kleinreparaturen,
           }}
           onChange={(next) => {
             setFreigabeModus(next.freigabe_modus)
             setSchwelle(next.freigabe_schwelle_eur)
             setNotfallDirekt(next.notfall_direkt)
-            setKleinreparaturen(next.kleinreparaturen_ohne_angebot)
           }}
         />
 
