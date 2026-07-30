@@ -106,6 +106,8 @@ export function DetailActionsBar({
 }: Props) {
   const [mounted, setMounted] = useState(false)
   const [topActionsEl, setTopActionsEl] = useState<HTMLElement | null>(null)
+  const isMobile = useIsMobile()
+  const { hideChrome } = useMobileScrollChrome(isMobile)
   useEffect(() => setMounted(true), [])
   useEffect(() => {
     if (!mounted || !isMobile) {
@@ -114,8 +116,6 @@ export function DetailActionsBar({
     }
     setTopActionsEl(document.getElementById('detail-entity-top-overflow'))
   }, [mounted, isMobile])
-  const isMobile = useIsMobile()
-  const { hideChrome } = useMobileScrollChrome(isMobile)
 
   const cleanMenuItems = useMemo(
     () => withoutPrimaryDuplicate(menuItems, primary?.label),
