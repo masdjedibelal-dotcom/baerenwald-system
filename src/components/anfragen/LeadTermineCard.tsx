@@ -467,7 +467,7 @@ function TerminNotizenBlock({
         </p>
         <button
           type="button"
-          className="btn ghost sm inline-flex items-center gap-1"
+          className="btn primary sm inline-flex items-center gap-1"
           onClick={() => setAddOpen(true)}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />

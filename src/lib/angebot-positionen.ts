@@ -269,6 +269,23 @@ export function normalizeAngebotPosition(
   if (einkaufspreis != null && einkaufspreis > 0) out.einkaufspreis = einkaufspreis
   if (handwerker_id) out.handwerker_id = handwerker_id
   if (handwerker_name) out.handwerker_name = handwerker_name
+
+  const verguetungRaw = String(r.verguetung ?? '').toLowerCase().trim()
+  const isRegie =
+    verguetungRaw === 'aufwand' ||
+    r.regieSchein === true ||
+    (notiz_extern != null &&
+      (/regieschein/i.test(notiz_extern) || /nach aufwand/i.test(notiz_extern)))
+  if (isRegie) {
+    out.verguetung = 'aufwand'
+    const gesch = num(r.geschaetzt_std)
+    out.geschaetzt_std = gesch > 0 ? gesch : menge
+    const satz = num(r.stundensatz)
+    out.stundensatz = satz > 0 ? satz : gesamtStueck > 0 ? gesamtStueck : null
+  } else if (verguetungRaw === 'festpreis') {
+    out.verguetung = 'festpreis'
+  }
+
   return out
 }
 

@@ -38,17 +38,17 @@ function KundeModalFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="kunde-create-footer">
+      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
+        {pending ? '…' : isCreate ? 'Kunde anlegen' : 'Speichern'}
+      </MockBtn>
       <button
         type="button"
-        className="btn ghost"
+        className="btn secondary"
         onClick={() => requestClose?.()}
         disabled={pending}
       >
         Abbrechen
       </button>
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : isCreate ? 'Kunde anlegen' : 'Speichern'}
-      </MockBtn>
     </div>
   )
 }
@@ -412,10 +412,7 @@ export function KundeModal({
         title="Kunden zusammenführen"
         size="sm"
         footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
-              Abbrechen
-            </Button>
+          <div className="kunde-create-footer">
             <Button
               type="button"
               loading={pending}
@@ -425,6 +422,9 @@ export function KundeModal({
               }}
             >
               Zusammenführen
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
+              Abbrechen
             </Button>
           </div>
         }

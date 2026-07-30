@@ -405,9 +405,9 @@
   color: var(--sf-text-2);
 }
 
-/* DocBar Verwerfen mit Label */
+/* DocBar: Anlegen + Verwerfen */
 .staff-funnel .document-canvas__docbar {
-  justify-content: center;
+  justify-content: space-evenly;
   background: var(--card, #fff);
 }
 
@@ -420,6 +420,16 @@
   min-width: 64px;
   padding: 8px 12px;
   color: var(--text-3);
+}
+
+.staff-funnel .doc-action-bar__btn:not(.doc-action-bar__btn--danger) {
+  color: var(--green, #1a7f4e);
+}
+
+.staff-funnel .doc-action-bar__btn:not(.doc-action-bar__btn--danger) .doc-action-bar__lbl {
+  color: inherit;
+  opacity: 1;
+  font-weight: 600;
 }
 
 .staff-funnel .doc-action-bar__lbl {

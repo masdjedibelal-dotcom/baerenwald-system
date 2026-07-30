@@ -15,6 +15,7 @@ import { Check, X } from 'lucide-react'
 import { ActionSheet } from '@/components/ui/ActionSheet'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { trapFocus } from '@/lib/a11y/focus-trap'
@@ -264,7 +265,7 @@ export function EditorSheet({
           aria-label="Speichern"
           title="Speichern"
         >
-          <Check className="h-5 w-5" aria-hidden />
+          <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
         </button>
       )
     ) : null)

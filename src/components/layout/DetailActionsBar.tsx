@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
@@ -16,6 +16,16 @@ export type DetailActionDef = {
   disabled?: boolean
   /** Link statt Button (Desktop + Mobil) */
   href?: string
+  /** Kompakt-Label (Scroll) — default: letztes Wort = Verb */
+  shortLabel?: string
+}
+
+/** „Angebot erstellen“ → „Erstellen“ */
+export function ctaVerbLabel(label: string): string {
+  const parts = label.trim().split(/\s+/).filter(Boolean)
+  const verb = parts[parts.length - 1] ?? label
+  if (!verb) return label
+  return verb.charAt(0).toUpperCase() + verb.slice(1)
 }
 
 type Props = {
@@ -34,15 +44,22 @@ function ActionControl({
   action,
   className,
   size = 'sm',
+  compact = false,
 }: {
   action: DetailActionDef
   className?: string
   size?: 'sm' | 'md'
+  compact?: boolean
 }) {
+  const displayLabel = compact
+    ? (action.shortLabel?.trim() || ctaVerbLabel(action.label))
+    : action.label
+  const iconSize = compact ? 15 : size === 'md' ? 16 : 14
+
   const inner = (
     <>
-      {action.icon ? <MockIcon ctx="btn" n={action.icon} size={size === 'md' ? 16 : 14} /> : null}
-      <span className="min-w-0 truncate">{action.label}</span>
+      {action.icon ? <ActionIcon n={action.icon} size={iconSize} /> : null}
+      <span className="detail-mobile-action-bar__label min-w-0 truncate">{displayLabel}</span>
     </>
   )
 
@@ -55,6 +72,7 @@ function ActionControl({
           size === 'md' ? 'h-11 px-4 text-[length:var(--fs-title)]' : 'sm',
           className
         )}
+        aria-label={action.label}
       >
         {inner}
       </a>
@@ -96,7 +114,7 @@ function hasMenuContent(items: ActionsMenuItem[]): boolean {
 
 /**
  * Desktop: Primary (+ optional Secondary / ⋯ nur wenn Items).
- * Mobil: Sticky-Bar nur Primär; ⋯ oben rechts neben Zurück.
+ * Mobil: Floating Glass-CTA; Scroll → kompakt (Icon + Verb).
  */
 export function DetailActionsBar({
   primary,
@@ -107,7 +125,7 @@ export function DetailActionsBar({
   const [mounted, setMounted] = useState(false)
   const [topActionsEl, setTopActionsEl] = useState<HTMLElement | null>(null)
   const isMobile = useIsMobile()
-  const { hideChrome } = useMobileScrollChrome(isMobile)
+  const { scrolled } = useMobileScrollChrome(isMobile)
   useEffect(() => setMounted(true), [])
   useEffect(() => {
     if (!mounted || !isMobile) {
@@ -127,7 +145,7 @@ export function DetailActionsBar({
     const item: ActionsMenuItem = {
       label: secondary.label,
       icon: secondary.icon ? (
-        <MockIcon ctx="btn" n={secondary.icon} size={16} />
+        <ActionIcon n={secondary.icon} size={16} />
       ) : undefined,
       onClick: secondary.onClick,
     }
@@ -153,7 +171,7 @@ export function DetailActionsBar({
           aria-label="Weitere Aktionen"
           title="Weitere"
         >
-          <MockIcon ctx="row" n="dots" size={compact ? 20 : 18} />
+          <ActionIcon n="dots" size={compact ? 20 : 18} />
         </button>
       }
     />
@@ -163,23 +181,25 @@ export function DetailActionsBar({
     <div
       className={cn(
         'detail-actions-desktop hidden items-center gap-2 md:flex',
-        alonePrimary ? 'justify-center w-full' : 'justify-end'
+        alonePrimary ? 'justify-center w-full' : 'justify-between w-full'
       )}
     >
-      {secondary ? (
-        <button
-          type="button"
-          className="btn ghost sm inline-flex shrink-0 gap-1.5"
-          onClick={secondary.onClick}
-          disabled={secondary.disabled}
-          aria-label={secondary.label}
-        >
-          {secondary.icon ? <MockIcon ctx="btn" n={secondary.icon} size={14} /> : null}
-          {secondary.label}
-        </button>
-      ) : null}
       {primary ? <ActionControl action={primary} /> : null}
-      {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
+      <div className="flex items-center gap-2">
+        {secondary ? (
+          <button
+            type="button"
+            className="btn secondary sm inline-flex shrink-0 gap-1.5"
+            onClick={secondary.onClick}
+            disabled={secondary.disabled}
+            aria-label={secondary.label}
+          >
+            {secondary.icon ? <ActionIcon n={secondary.icon} size={14} /> : null}
+            {secondary.label}
+          </button>
+        ) : null}
+        {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
+      </div>
     </div>
   )
 
@@ -194,7 +214,7 @@ export function DetailActionsBar({
           <div
             className={cn(
               'detail-mobile-action-bar md:hidden',
-              hideChrome && 'detail-mobile-action-bar--hidden',
+              scrolled && 'detail-mobile-action-bar--compact',
               'detail-mobile-action-bar--solo'
             )}
             role="toolbar"
@@ -204,6 +224,7 @@ export function DetailActionsBar({
               <ActionControl
                 action={primary}
                 size="md"
+                compact={scrolled}
                 className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--solo"
               />
             </div>

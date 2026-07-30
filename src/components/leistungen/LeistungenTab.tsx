@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronRight, Info, MoreHorizontal } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Check, ChevronRight, Info } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Button } from '@/components/ui/Button'
@@ -20,8 +20,6 @@ export type LeistungenTabBulkAction = {
   label: string
   onClick: (selectedIds: string[]) => void
 }
-
-const LS_KEY = 'crm.cols.leistungen.v1'
 
 type ColId = 'bezeichnung' | 'menge' | 'preis' | 'status' | 'gewerk' | 'handwerker' | 'ek'
 
@@ -84,28 +82,9 @@ function rowStatusKindStatic(row: LeistungRow) {
     : row.status
 }
 
-function loadVisible(): Record<ColId, boolean> {
-  if (typeof window === 'undefined') return { ...DEFAULT_VISIBLE }
-  try {
-    const raw = window.localStorage.getItem(LS_KEY)
-    if (!raw) return { ...DEFAULT_VISIBLE }
-    const parsed = JSON.parse(raw) as Partial<Record<ColId, boolean>>
-    const next = { ...DEFAULT_VISIBLE }
-    for (const id of ALL_COLS) {
-      if (typeof parsed[id] === 'boolean') next[id] = parsed[id]!
-    }
-    // Kernspalten bleiben immer anwählbar, Default an — Nutzer darf ausblenden außer Bezeichnung
-    next.bezeichnung = true
-    return next
-  } catch {
-    return { ...DEFAULT_VISIBLE }
-  }
-}
-
 /**
  * Spec §7 / Phase 6 — eine read-only Leistungen-Tabelle für alle Phasen.
  * Positionen ändern = zuständiges Dokument öffnen (Callback), nicht inline editieren.
- * N4: Spalten-⋯ mit localStorage-Persistenz.
  */
 export function LeistungenTab({
   phase,
@@ -147,27 +126,8 @@ export function LeistungenTab({
   const allowBulk = isAuftrag && (bulkActions?.length ?? 0) > 0
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [visibleCols, setVisibleCols] = useState<Record<ColId, boolean>>(DEFAULT_VISIBLE)
-  const [colsOpen, setColsOpen] = useState(false)
+  const visibleCols = DEFAULT_VISIBLE
   const isMobile = useIsMobile()
-
-  useEffect(() => {
-    setVisibleCols(loadVisible())
-  }, [])
-
-  function persistCols(next: Record<ColId, boolean>) {
-    setVisibleCols(next)
-    try {
-      window.localStorage.setItem(LS_KEY, JSON.stringify(next))
-    } catch {
-      /* ignore quota */
-    }
-  }
-
-  function toggleCol(id: ColId) {
-    if (id === 'bezeichnung') return
-    persistCols({ ...visibleCols, [id]: !visibleCols[id] })
-  }
 
   const activeRow = useMemo(
     () => (activeId ? rows.find((r) => r.id === activeId) ?? null : null),
@@ -279,7 +239,7 @@ export function LeistungenTab({
 
   function renderMobileCard(row: LeistungRow) {
     const selected = selectedIds.has(row.id)
-    const showStatus = isAuftrag || (!isRechnung && visibleCols.status)
+    const showStatus = !isAuftrag && !isRechnung && visibleCols.status
     const showSub = Boolean(row.subline) && (isAuftrag || isRechnung || !groupGewerk)
     const showPreis = isRechnung || !isAuftrag || visibleCols.preis
     const showMenge = isRechnung || (!isAuftrag && visibleCols.menge)
@@ -417,7 +377,7 @@ export function LeistungenTab({
         ) : null}
         {deskCols.map((id) => {
           if (id === 'bezeichnung') {
-            const showStatus = isAuftrag || (!isRechnung && visibleCols.status)
+            const showStatus = !isAuftrag && !isRechnung && visibleCols.status
             const showSub = Boolean(row.subline) && (isAuftrag || isRechnung || !groupGewerk)
             return (
               <div key={id} className="lt-main">
@@ -509,45 +469,6 @@ export function LeistungenTab({
     )
   }
 
-  const toolbar = isAuftrag ? null : (
-    <div className="lt-toolbar">
-      <button
-        type="button"
-        className="lt-cols-btn"
-        aria-label="Spalten"
-        aria-expanded={colsOpen}
-        title="Spalten"
-        onClick={() => setColsOpen((o) => !o)}
-      >
-        <MoreHorizontal className="h-4 w-4" aria-hidden />
-      </button>
-      {colsOpen ? (
-        <div className="lt-cols-pop" role="menu" aria-label="Sichtbare Spalten">
-          <div className="lt-cols-pop__title">Spalten</div>
-          {(isRechnung ? (['bezeichnung', 'menge', 'preis'] as ColId[]) : ALL_COLS).map((id) => (
-            <label key={id} className="lt-cols-pop__row">
-              <input
-                type="checkbox"
-                checked={isRechnung ? true : visibleCols[id]}
-                disabled={id === 'bezeichnung' || isRechnung}
-                onChange={() => toggleCol(id)}
-              />
-              <span>
-                {COL_LABELS[id]}
-                {OPTIONAL_COLS.includes(id) ? (
-                  <span className="lt-cols-pop__opt"> optional</span>
-                ) : null}
-              </span>
-            </label>
-          ))}
-          <button type="button" className="lt-cols-pop__done" onClick={() => setColsOpen(false)}>
-            Fertig
-          </button>
-        </div>
-      ) : null}
-    </div>
-  )
-
   if (!rows.length) {
     return (
       <div className="lt-root space-y-3">
@@ -584,7 +505,6 @@ export function LeistungenTab({
                 {openDocLabel}
               </Button>
             ) : null}
-            {toolbar}
           </div>
         </div>
       ) : null}
@@ -598,10 +518,7 @@ export function LeistungenTab({
               {openDocLabel}
             </Button>
           ) : null}
-          {!isRechnung ? toolbar : null}
         </div>
-      ) : toolbar && !isRechnung && !isAuftrag ? (
-        <div className="lt-hint lt-hint--bare">{toolbar}</div>
       ) : null}
 
       {allowBulk && selectedCount > 0 ? (

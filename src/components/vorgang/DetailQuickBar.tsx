@@ -1,6 +1,6 @@
 'use client'
 
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { cn } from '@/lib/utils'
 
 export type QuickBarAction = {
@@ -30,7 +30,7 @@ export function DetailQuickBar({
           disabled={a.disabled}
           onClick={a.onClick}
         >
-          <MockIcon ctx="default" n={a.icon} size={18} />
+          <ActionIcon n={a.icon} size={18} />
           <span>{a.label}</span>
         </button>
       ))}

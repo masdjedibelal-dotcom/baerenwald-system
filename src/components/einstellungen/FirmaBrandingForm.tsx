@@ -421,12 +421,12 @@ export function FirmaBrandingForm({
         size="lg"
         footer={
           <div className="kunde-create-footer">
-            <button type="button" className="btn ghost" onClick={() => setSheetOpen(false)}>
-              Abbrechen
-            </button>
             <MockBtn kind="primary" icon="check" disabled={pending} onClick={saveStamm}>
               Speichern
             </MockBtn>
+            <button type="button" className="btn secondary" onClick={() => setSheetOpen(false)}>
+              Abbrechen
+            </button>
           </div>
         }
       >

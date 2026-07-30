@@ -184,25 +184,24 @@ export function TodoEditorSheet({
       onConfirm={save}
       manageHistory={false}
       footer={
-        <div className="flex w-full items-center gap-2">
-          {!isNew ? (
-            <button type="button" className="btn ghost danger" disabled={pending} onClick={remove}>
-              Löschen
-            </button>
-          ) : (
-            <button type="button" className="btn ghost" disabled={pending} onClick={onClose}>
-              Abbrechen
-            </button>
-          )}
+        <div className="flex w-full items-center justify-between gap-2">
           <button
             type="button"
             className="btn primary"
             disabled={pending || !titel.trim()}
             onClick={save}
-            style={{ marginLeft: 'auto' }}
           >
             {pending ? 'Speichern…' : 'Speichern'}
           </button>
+          {!isNew ? (
+            <button type="button" className="btn ghost danger" disabled={pending} onClick={remove}>
+              Löschen
+            </button>
+          ) : (
+            <button type="button" className="btn secondary" disabled={pending} onClick={onClose}>
+              Abbrechen
+            </button>
+          )}
         </div>
       }
     >

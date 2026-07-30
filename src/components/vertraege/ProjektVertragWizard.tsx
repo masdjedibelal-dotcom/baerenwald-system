@@ -270,7 +270,7 @@ export function ProjektVertragWizard({
           id: 'save',
           label: 'Speichern',
           onClick: () => void persistDraft({ notify: true }),
-          icon: <Save className="h-5 w-5" aria-hidden />,
+          icon: <Save size={20} strokeWidth={1.75} aria-hidden />,
         },
         {
           id: 'pdf',
@@ -279,7 +279,7 @@ export function ProjektVertragWizard({
             if (step < pdfStep) void handleWeiter()
             else void handlePdfErzeugen()
           },
-          icon: <FileText className="h-5 w-5" aria-hidden />,
+          icon: <FileText size={20} strokeWidth={1.75} aria-hidden />,
         },
       ]}
     />

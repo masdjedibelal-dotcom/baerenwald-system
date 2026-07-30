@@ -164,7 +164,7 @@ export function ObjektKontakteSection({
         title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
         icon="user"
         actions={
-          <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
             Hinzufügen
           </MockBtn>
         }

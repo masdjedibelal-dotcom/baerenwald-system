@@ -67,7 +67,7 @@ export function RahmenvertragWizard({
               id: 'pdf',
               label: pdfUrl ? 'PDF' : 'PDF erzeugen',
               onClick: () => void handlePdfErzeugen(),
-              icon: <FileText className="h-5 w-5" aria-hidden />,
+              icon: <FileText size={20} strokeWidth={1.75} aria-hidden />,
             },
           ]}
         />

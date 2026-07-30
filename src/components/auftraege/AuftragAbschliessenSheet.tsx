@@ -87,13 +87,10 @@ export function AuftragAbschliessenSheet({
 
   function speichernMitAbnahme() {
     startTransition(async () => {
+      const ausPunkten = maengelAusPunkten(punkte)
+      const hatMaengel = ausPunkten.length > 0 || Boolean(maengelFrei.trim())
       const meta = emptyAbnahmeProtokollMeta({
-        abnahme_ergebnis: 'abgenommen',
-        uebergabe_ort: 'Baustelle',
-        projektbezeichnung: 'Abnahme',
-        vertreter_an: 'Auftragnehmer',
-        unterschrift_ort_datum_an: `Baustelle, ${heuteYmd()}`,
-        unterschrift_ort_datum_ag: `Baustelle, ${heuteYmd()}`,
+        abnahme_ergebnis: hatMaengel ? 'mit_vorbehalt' : 'abgenommen',
       })
       const extraNote = [notizen.trim(), maengelFrei.trim() ? `Mängel:\n${maengelFrei.trim()}` : '']
         .filter(Boolean)
@@ -102,7 +99,7 @@ export function AuftragAbschliessenSheet({
         auftragId,
         abnahmeDatum: heuteYmd(),
         punkte,
-        maengel: maengelAusPunkten(punkte),
+        maengel: ausPunkten,
         notizen: extraNote || null,
         meta,
       })
@@ -183,7 +180,7 @@ export function AuftragAbschliessenSheet({
             loading={pending}
             onClick={speichernMitAbnahme}
           >
-            Speichern & abschließen
+            {pending ? 'Protokoll wird erstellt…' : 'Speichern & abschließen'}
           </Button>
         </div>
       }

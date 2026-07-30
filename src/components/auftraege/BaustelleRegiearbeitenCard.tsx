@@ -102,7 +102,7 @@ export function BaustelleRegiearbeitenCard({
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           {regiearbeiten.length} Regiearbeit{regiearbeiten.length === 1 ? '' : 'en'}
         </p>
-        <Button type="button" variant="secondary" size="sm" className="gap-1" onClick={openCreate}>
+        <Button type="button" variant="primary" size="sm" className="gap-1" onClick={openCreate}>
           <Plus className="h-3.5 w-3.5" />
           Hinzufügen
         </Button>
@@ -149,11 +149,11 @@ export function BaustelleRegiearbeitenCard({
             value={form.material}
             onChange={(e) => setForm((f) => ({ ...f, material: e.target.value }))}
           />
-          <div className="flex gap-2">
+          <div className="flex justify-between gap-2">
             <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
               Speichern
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>
               Abbrechen
             </Button>
           </div>

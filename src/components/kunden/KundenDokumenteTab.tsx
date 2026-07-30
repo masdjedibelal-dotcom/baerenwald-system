@@ -13,6 +13,7 @@ import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 type DocRow = {
@@ -37,7 +38,7 @@ type ViewState = {
   beschreibung: string
 }
 
-const COLS = '28px 1.6fr 1fr 120px 110px 70px'
+const COLS = 'minmax(0, 1fr) auto'
 
 function formatBytes(n: number | null | undefined): string | null {
   if (n == null || n <= 0) return null
@@ -98,6 +99,7 @@ export function KundenDokumenteTab({
   rechnungen: NonNullable<KundeDetailPayload['rechnungen']>
   onReload: () => void
 }) {
+  const isMobile = useIsMobile()
   const [meta, setMeta] = useState<
     Record<string, { name?: string; beschreibung: string; freigabe: boolean; created_at?: string }>
   >({})
@@ -304,157 +306,118 @@ export function KundenDokumenteTab({
   return (
     <>
       <MockDokumenteCard count={docs.length}>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files)
-            e.target.value = ''
-          }}
-        />
+        {!isMobile ? (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                if (e.target.files?.length) void uploadFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
 
-        <div
-          className={cn(
-            'dok-upload-zone',
-            dragOver && 'dok-upload-zone-active',
-            busy && 'pointer-events-none opacity-60'
-          )}
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              inputRef.current?.click()
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setDragOver(false)
-            if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
-          }}
-        >
-          <MockIcon ctx="btn" n="cloud-upload" size={18} />
-          {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
-        </div>
-
-        {docs.length === 0 ? null : (
-          <div className="dok-list">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Beschreibung</div>
-              <div>Datum</div>
-              <div>Freigabe</div>
-              <div />
+            <div
+              className={cn(
+                'dok-upload-zone',
+                dragOver && 'dok-upload-zone-active',
+                busy && 'pointer-events-none opacity-60'
+              )}
+              role="button"
+              tabIndex={0}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  inputRef.current?.click()
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files)
+              }}
+            >
+              <MockIcon ctx="btn" n="cloud-upload" size={18} />
+              {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
             </div>
+          </>
+        ) : null}
+
+        {docs.length === 0 ? (
+          <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+            {isMobile
+              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
+              : 'Noch keine Dokumente.'}
+          </p>
+        ) : (
+          <div className="dok-list dok-list--kunde">
             {docs.map((d) => {
               const editing = editId === d.id
               const sizeLabel = formatBytes(d.groesse_bytes)
-              const isFoto = isImageDoc(d.name, d.href)
               const beschreibung = d.beschreibung?.trim() || ''
+              const subline =
+                beschreibung ||
+                [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
               return (
                 <div
                   key={d.id}
-                  className="list-row"
+                  className={cn('list-row', !editing && 'dok-list__row--openable')}
                   style={{
                     gridTemplateColumns: COLS,
-                    cursor: 'default',
-                    alignItems: editing ? 'start' : 'center',
+                    cursor: editing ? 'default' : 'pointer',
+                    alignItems: 'center',
+                  }}
+                  role={editing ? undefined : 'button'}
+                  tabIndex={editing ? undefined : 0}
+                  onClick={() => {
+                    if (!editing) openView(d)
+                  }}
+                  onKeyDown={(e) => {
+                    if (editing) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openView(d)
+                    }
                   }}
                 >
-                  <MockIcon
-                    ctx="row"
-                    n={isFoto ? 'photo' : 'file-text'}
-                    size={18}
-                    className="dok-list__icon"
-                    style={{ color: 'var(--text-3)' }}
-                  />
                   {editing ? (
-                    <input
-                      className="txt"
-                      value={d.name}
-                      onChange={(e) => upd(d.id, { name: e.target.value })}
-                      style={{ height: 30 }}
-                      autoFocus
-                    />
+                    <div
+                      className="dok-list__main min-w-0"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="txt"
+                        value={d.name}
+                        onChange={(e) => upd(d.id, { name: e.target.value })}
+                        style={{ height: 30 }}
+                        autoFocus
+                      />
+                    </div>
                   ) : (
                     <div className="dok-list__main min-w-0">
                       <div className="dok-list__name">
                         {d.name}
-                        {sizeLabel ? (
-                          <span className="dok-list__name-size"> · {sizeLabel}</span>
+                        {subline ? (
+                          <span className="dok-list__name-size"> · {subline}</span>
                         ) : null}
                       </div>
-                      {beschreibung ? <div className="dok-list__sub">{beschreibung}</div> : null}
                     </div>
                   )}
-                  {editing ? (
-                    <input
-                      className="txt dok-list__cell--desk"
-                      value={d.beschreibung}
-                      onChange={(e) => upd(d.id, { beschreibung: e.target.value })}
-                      placeholder="Beschreibung…"
-                      style={{ height: 30 }}
-                    />
-                  ) : (
-                    <div className="dok-list__cell--desk dok-list__desc">
-                      {d.beschreibung || <span style={{ color: 'var(--text-4)' }}>—</span>}
-                    </div>
-                  )}
-                  {editing ? (
-                    <input
-                      className="txt dok-list__cell--desk"
-                      type="date"
-                      defaultValue={d.created_at.slice(0, 10)}
-                      onChange={(e) => {
-                        if (!e.target.value) return
-                        upd(d.id, {
-                          created_at: new Date(e.target.value).toISOString(),
-                        })
-                      }}
-                      style={{ height: 30, fontSize: 12 }}
-                    />
-                  ) : (
-                    <div className="dok-list__cell--desk dok-list__date">
-                      {formatDatum(d.created_at)}
-                    </div>
-                  )}
-                  <label
-                    className="dok-list__freigabe"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      cursor: 'pointer',
-                      fontSize: 11.5,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={d.freigabe}
-                      onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
-                      style={{ accentColor: 'var(--green)', margin: 0 }}
-                    />
-                    <span
-                      className={d.freigabe ? 'is-kunde' : undefined}
-                      style={{ color: d.freigabe ? 'var(--green)' : 'var(--text-3)' }}
-                    >
-                      {d.freigabe ? 'Kunde' : 'intern'}
-                    </span>
-                  </label>
                   <div
                     className="dok-list__actions"
                     style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {editing ? (
                       <MockBtn
@@ -464,15 +427,7 @@ export function KundenDokumenteTab({
                         title="Fertig"
                         onClick={() => setEditId(null)}
                       />
-                    ) : (
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="eye"
-                        title="Ansehen"
-                        onClick={() => openView(d)}
-                      />
-                    )}
+                    ) : null}
                     {d.quelle === 'upload' ? (
                       <MockBtn
                         sm
@@ -480,12 +435,9 @@ export function KundenDokumenteTab({
                         icon="trash"
                         title="Löschen"
                         disabled={busy}
-                        className="dok-list__action--extra"
                         onClick={() => removeDoc(d)}
                       />
-                    ) : (
-                      <span className="dok-list__action--extra" style={{ width: 28 }} />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )

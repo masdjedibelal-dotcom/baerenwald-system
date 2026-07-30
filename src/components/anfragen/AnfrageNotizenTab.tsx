@@ -181,7 +181,7 @@ export function AnfrageNotizenTab({
             onChange={setVal}
             onSubmit={speichern}
             disabled={pending}
-            placeholder="Notiz schreiben…  (Enter senden · Shift+Enter neue Zeile)"
+            placeholder="Notiz schreiben"
           />
         ) : null}
       </MockCard>

@@ -46,7 +46,7 @@ export function MockBtn({
   disabled,
   className,
 }: {
-  kind?: 'primary' | 'ghost' | 'danger' | ''
+  kind?: 'primary' | 'ghost' | 'secondary' | 'danger' | ''
   sm?: boolean
   icon?: string
   onClick?: () => void

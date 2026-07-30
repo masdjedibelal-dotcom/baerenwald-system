@@ -34,6 +34,17 @@ export type LeistungRow = {
   abnahmeLabel?: string | null
   /** True wenn offener Mangel zu dieser Leistung/Gewerk */
   hatMangel?: boolean
+  /** True wenn Regie / nach Aufwand */
+  istRegie?: boolean
+  /** Handwerker-Updates aus position_eintraege (Regie/BT) */
+  handwerkerUpdates?: {
+    at?: string | null
+    text: string
+    zeitLabel?: string | null
+    fotoCount?: number
+  }[]
+  /** Erfasste Regie-Zeit (Soll/Ist-Label) */
+  regieSollIstLabel?: string | null
 }
 
 export type LeistungMangelAnzeige = {

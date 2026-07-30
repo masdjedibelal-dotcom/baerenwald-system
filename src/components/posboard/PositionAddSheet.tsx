@@ -15,6 +15,8 @@ import {
 } from '@/lib/katalog/katalog-types'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
+import { Toggle } from '@/components/ui/Toggle'
 import { cn } from '@/lib/utils'
 import type { KatalogPickResult } from '@/components/posboard/KatalogPickModal'
 
@@ -28,6 +30,8 @@ export type FreiePositionDraft = {
   preis: number
   ust: number
   gewerk: string
+  /** Regie / nach Aufwand */
+  regie?: boolean
 }
 
 export type FreitextDraft = {
@@ -50,6 +54,7 @@ const emptyFrei = (gewerk: string): FreiePositionDraft => ({
   preis: 0,
   ust: 19,
   gewerk: gewerk.trim() || 'Allgemein',
+  regie: false,
 })
 
 const emptyFreitext = (gewerk: string): FreitextDraft => ({
@@ -585,7 +590,6 @@ export function PositionAddSheet({
               value={frei.name}
               onChange={(e) => setFrei((f) => ({ ...f, name: e.target.value }))}
               placeholder="z.B. Wandfliesen verlegen"
-              autoFocus
             />
           </div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>
@@ -598,8 +602,22 @@ export function PositionAddSheet({
               placeholder="Details zur Leistung…"
             />
           </div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <Toggle
+              checked={Boolean(frei.regie)}
+              label={REGIE_BADGE_LABEL}
+              hint="Nur Schätzung — Final kommt vom Handwerker (Bautagebuch Pflicht)"
+              onChange={(on) =>
+                setFrei((f) => ({
+                  ...f,
+                  regie: on,
+                  einheit: on ? (f.einheit === 'h' || f.einheit === 'Std.' ? f.einheit : 'h') : f.einheit,
+                }))
+              }
+            />
+          </div>
           <div className="field">
-            <div className="field-label">Menge</div>
+            <div className="field-label">{frei.regie ? 'Geschätzte Stunden' : 'Menge'}</div>
             <div style={{ display: 'flex', gap: 4 }}>
               <input
                 className="txt"
@@ -619,6 +637,7 @@ export function PositionAddSheet({
                 value={frei.einheit}
                 onChange={(e) => setFrei((f) => ({ ...f, einheit: e.target.value }))}
                 style={{ width: 100 }}
+                disabled={Boolean(frei.regie)}
               >
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
@@ -629,9 +648,9 @@ export function PositionAddSheet({
             </div>
           </div>
           <div className="field">
-            <div className="field-label">Einzelpreis (netto)</div>
+            <div className="field-label">{frei.regie ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}</div>
             <div className="txt-prefix">
-              <span className="prefix">€</span>
+              <span className="prefix">{frei.regie ? '€/h' : '€'}</span>
               <input
                 className="txt"
                 type="number"
@@ -691,7 +710,6 @@ export function PositionAddSheet({
               value={freitext.name}
               onChange={(e) => setFreitext((f) => ({ ...f, name: e.target.value }))}
               placeholder="z. B. Wichtiger Hinweis"
-              autoFocus
             />
           </div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>
@@ -716,7 +734,6 @@ export function PositionAddSheet({
               value={nachlass.name}
               onChange={(e) => setNachlass((n) => ({ ...n, name: e.target.value }))}
               placeholder="Nachlass"
-              autoFocus
             />
           </div>
           <div className="field">
@@ -792,7 +809,6 @@ export function PositionAddSheet({
                 if (e.target.value.trim()) setGewerkPick('')
               }}
               placeholder="z.B. Trockenbau · 1. OG"
-              autoFocus={!stammdatenGewerke.length}
             />
           </div>
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted">

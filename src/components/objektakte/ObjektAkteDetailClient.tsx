@@ -46,6 +46,12 @@ export function ObjektAkteDetailClient({
     [akte.einheiten]
   )
 
+  const einheitenAnzahl = useMemo(() => {
+    if (einheiten.length > 0) return einheiten.length
+    const m = objekt.einheiten_hinweis?.match(/\d+/)
+    return m ? Number(m[0]) : 0
+  }, [einheiten.length, objekt.einheiten_hinweis])
+
   const vermietet = useMemo(() => {
     const occupied = new Set(
       akte.bewohner.filter((b) => b.aktiv !== false).map((b) => b.objekt_einheit_id)
@@ -76,15 +82,10 @@ export function ObjektAkteDetailClient({
           <div className="vgid">
             <div className="vgid-name">{objekt.titel}</div>
             {adresse ? <div className="vgid-meta">{adresse}</div> : null}
-            {objekt.einheiten_hinweis?.trim() ? (
-              <div className="vgid-meta" style={{ marginTop: 4 }}>
-                {objekt.einheiten_hinweis.trim()}
-              </div>
-            ) : null}
             <div className="vgid-chips" style={{ marginTop: 10 }}>
               <span className="vgid-chip ghost">
                 <MockIcon ctx="default" n="building" size={14} />
-                {einheiten.length} Einheiten
+                {einheitenAnzahl} Einheiten
               </span>
               <span className="vgid-chip ghost">
                 <MockIcon ctx="default" n="users" size={14} />

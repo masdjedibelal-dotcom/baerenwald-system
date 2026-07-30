@@ -745,14 +745,14 @@ export function RechnungDetailClient({
         title="Gutschrift anlegen?"
         size="sm"
         footer={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setRechnungConfirm(null)}>
-              Abbrechen
-            </Button>
+          <div className="kunde-create-footer">
             <Button type="button" variant="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
               Gutschrift erstellen
             </Button>
-          </>
+            <Button type="button" variant="secondary" onClick={() => setRechnungConfirm(null)}>
+              Abbrechen
+            </Button>
+          </div>
         }
       >
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">

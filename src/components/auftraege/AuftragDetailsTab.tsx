@@ -11,6 +11,7 @@ import {
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
+import { TagebuchAnfordernSheet } from '@/components/auftraege/TagebuchAnfordernSheet'
 import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
@@ -141,6 +142,7 @@ export function AuftragLeistungenTab({
   onOpenDokument,
   vertragNachtragVerfuegbar = false,
   onVertragNachtragErstellen,
+  initialLeistungenView = 'leistungen',
 }: {
   detail: AuftragDetail
   lead?: AuftragLeadSnap | null
@@ -153,15 +155,22 @@ export function AuftragLeistungenTab({
   onOpenDokument?: () => void
   vertragNachtragVerfuegbar?: boolean
   onVertragNachtragErstellen?: () => void
+  /** Deep-Link z. B. ?tab=bautagebuch */
+  initialLeistungenView?: 'leistungen' | 'bautagebuch'
 }) {
   const [, startTransition] = useTransition()
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
+  const [anfordernOpen, setAnfordernOpen] = useState(false)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
   const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
-    'leistungen'
+    initialLeistungenView
   )
+
+  useEffect(() => {
+    setLeistungenView(initialLeistungenView)
+  }, [initialLeistungenView])
 
   const istAbgeschlossen = detail.status === 'abgeschlossen' || detail.status === 'storniert'
   const disabled = istAbgeschlossen || !editable
@@ -176,21 +185,36 @@ export function AuftragLeistungenTab({
   }, [detail.auftrag_positionen])
 
   const footerNettoMwst = useMemo(() => {
+    const pos = (detail.auftrag_positionen ?? []).filter(
+      (p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt'
+    )
+    const zeitMap: Record<string, number> = {}
+    for (const e of bautagebuchEintraege) {
+      const pid = e.position_id?.trim()
+      if (!pid) continue
+      zeitMap[pid] = (zeitMap[pid] ?? 0) + (Number(e.zeit_minuten) || 0)
+    }
     const netto = auftragSummenAusPositionen(
-      auftragPositionenToAngebotPositionen(
-        (detail.auftrag_positionen ?? []).filter(
-          (p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt'
-        )
-      )
+      auftragPositionenToAngebotPositionen(pos, { regieZeitMinutenByPositionId: zeitMap })
     ).netto
     const satz = Math.max(0, mwstSatz)
     const mwstBetrag = Math.round(netto * (satz / 100) * 100) / 100
     return { netto, mwstSatz: satz, mwstBetrag }
-  }, [detail.auftrag_positionen, mwstSatz])
+  }, [detail.auftrag_positionen, mwstSatz, bautagebuchEintraege])
 
   const rows = useMemo(() => {
-    return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [])
-  }, [detail.auftrag_positionen])
+    return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [], {
+      eintraege: bautagebuchEintraege.map((e) => ({
+        position_id: e.position_id,
+        typ: e.typ,
+        beschreibung: e.beschreibung,
+        zeit_minuten: e.zeit_minuten,
+        created_at: e.created_at,
+        erfasst_von: e.erfasst_von,
+        fotoCount: e.eintrag_fotos?.length ?? 0,
+      })),
+    })
+  }, [detail.auftrag_positionen, bautagebuchEintraege])
 
   useEffect(() => {
     let cancelled = false
@@ -304,6 +328,7 @@ export function AuftragLeistungenTab({
           eintraege={bautagebuchEintraege}
           disabled={disabled}
           onAdd={() => openTagebuch(null)}
+          onAnfordern={() => setAnfordernOpen(true)}
         />
       )}
 
@@ -331,6 +356,15 @@ export function AuftragLeistungenTab({
         positionen={detail.auftrag_positionen ?? []}
         initialPositionId={tagebuchPositionId}
         onSaved={() => onSaved?.()}
+      />
+
+      <TagebuchAnfordernSheet
+        open={anfordernOpen}
+        onClose={() => setAnfordernOpen(false)}
+        auftragId={detail.id}
+        auftragHandwerker={detail.auftrag_handwerker ?? []}
+        positionen={detail.auftrag_positionen ?? []}
+        onSent={() => onSaved?.()}
       />
     </div>
   )

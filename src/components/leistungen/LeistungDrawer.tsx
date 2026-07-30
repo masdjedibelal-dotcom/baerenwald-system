@@ -85,13 +85,22 @@ export function LeistungDrawer({
       <Section title="Position" icon="file-text">
         <div className="props">
           {row.gewerkName ? <DetailProp label="Gewerk">{row.gewerkName}</DetailProp> : null}
-          <DetailProp label="Menge">{row.mengeLabel}</DetailProp>
-          <DetailProp label="Einzelpreis">
+          {row.istRegie ? (
+            <DetailProp label="Vergütung">nach Aufwand — Final über Bautagebuch</DetailProp>
+          ) : null}
+          <DetailProp label={row.istRegie ? 'Schätzung' : 'Menge'}>{row.mengeLabel}</DetailProp>
+          <DetailProp label={row.istRegie ? 'Stundensatz' : 'Einzelpreis'}>
             {row.einzelpreisLabel ?? row.preisLabel}
           </DetailProp>
           <DetailProp label="Gesamt">
             <span className="ldr-gesamt">{row.preisLabel}</span>
           </DetailProp>
+          {row.istRegie ? (
+            <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+              Handwerker muss Start-/Ende-Fotos, Stunden sowie Titel und Beschreibung im Portal
+              führen (Pflicht).
+            </p>
+          ) : null}
         </div>
       </Section>
 
@@ -108,6 +117,54 @@ export function LeistungDrawer({
           ) : null}
         </div>
       </Section>
+
+      {row.istRegie || (row.handwerkerUpdates && row.handwerkerUpdates.length > 0) ? (
+        <Section title="Handwerker-Updates" icon="camera">
+          {row.regieSollIstLabel ? (
+            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+              {row.regieSollIstLabel}
+              {row.istRegie
+                ? ' — Grundlage für die Rechnung (nach Prüfung).'
+                : null}
+            </p>
+          ) : row.istRegie ? (
+            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+              Noch keine Zeiten aus dem Bautagebuch — Rechnung nutzt die Schätzung, bis Updates
+              vorliegen.
+            </p>
+          ) : null}
+          {(row.handwerkerUpdates ?? []).length === 0 ? (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Keine Einträge.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(row.handwerkerUpdates ?? []).map((u, i) => (
+                <li
+                  key={`${u.at ?? i}-${i}`}
+                  className="rounded-md border border-bw-border bg-bw-card px-3 py-2 text-[length:var(--fs-text)]"
+                >
+                  <div className="font-medium text-bw-text">{u.text}</div>
+                  <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+                    {[
+                      u.at ? formatDatumKurz(u.at) : null,
+                      u.zeitLabel ? `${u.zeitLabel} Std.` : null,
+                      u.fotoCount && u.fotoCount > 0 ? `${u.fotoCount} Foto(s)` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      ) : null}
     </EditorSheet>
   )
+}
+
+function formatDatumKurz(iso: string): string {
+  const d = iso.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return iso.slice(0, 16)
+  const [y, m, day] = d.split('-')
+  return `${day}.${m}.${y}`
 }

@@ -75,6 +75,7 @@ export function TotBand({
   showUst = true,
   bereitsGezahlt,
   restBrutto,
+  className,
 }: {
   netto: number
   ust: number
@@ -84,10 +85,11 @@ export function TotBand({
   /** Schlussrechnung: Abschläge abziehen */
   bereitsGezahlt?: Array<{ label: string; brutto: number }> | null
   restBrutto?: number | null
+  className?: string
 }) {
   const hatAbzug = Boolean(bereitsGezahlt?.length && (restBrutto == null || restBrutto >= 0))
   return (
-    <div className="totband">
+    <div className={cn('totband', className)}>
       {showUst ? (
         <>
           <div className="totband-r">

@@ -53,7 +53,7 @@ function HandwerkerPickRow({
           {h.verfuegbar ? 'Verfügbar' : 'Im Einsatz'}
         </span>
       </div>
-      <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={onAdd}>
+      <Button type="button" variant="primary" size="sm" disabled={disabled} onClick={onAdd}>
         Hinzufügen
       </Button>
     </div>

@@ -8,17 +8,23 @@ import {
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type RegieZeitByPosition = Record<string, number>
+export type RegieBeschreibungByPosition = Record<string, string>
 
 /**
  * Auftragspositionen → Angebot-Positionsformat für Rechnungseditor.
  * Regie: Menge/Preis aus Bautagebuch-Zeiten wenn vorhanden; sonst Stundensatz-Schätzung.
+ * Partner-Texte aus BT optional in `beschreibung` (prüfbar vor Versand).
  * notiz_extern trägt Soll/Ist + Regieschein-Hinweis (CRM-intern „Regie“).
  */
 export function auftragPositionenToAngebotPositionen(
   positionen: AuftragPosition[],
-  opts?: { regieZeitMinutenByPositionId?: RegieZeitByPosition }
+  opts?: {
+    regieZeitMinutenByPositionId?: RegieZeitByPosition
+    regieBeschreibungByPositionId?: RegieBeschreibungByPosition
+  }
 ): AngebotPosition[] {
   const zeitMap = opts?.regieZeitMinutenByPositionId ?? {}
+  const textMap = opts?.regieBeschreibungByPositionId ?? {}
 
   return [...positionen]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -27,6 +33,7 @@ export function auftragPositionenToAngebotPositionen(
       const erfasstMin = zeitMap[p.id] ?? 0
       const stundensatz = Number(p.stundensatz) || 0
       const geschStd = Number(p.geschaetzt_std) || 0
+      const partnerText = textMap[p.id]?.trim() || ''
 
       let menge = Math.max(p.menge ?? 1, 0.0001)
       let lineNetto = Math.round((p.preis_fix ?? 0) * 100) / 100
@@ -73,6 +80,13 @@ export function auftragPositionenToAngebotPositionen(
             .join(' · ')
         : undefined
 
+      const baseBesch = p.beschreibung?.trim() || ''
+      const beschreibung = isRegie
+        ? [partnerText || null, baseBesch && partnerText !== baseBesch ? baseBesch : null]
+            .filter(Boolean)
+            .join('\n\n') || baseBesch
+        : baseBesch
+
       return {
         id: p.id || neuePositionsId(),
         gewerk_id: '',
@@ -81,7 +95,7 @@ export function auftragPositionenToAngebotPositionen(
         gewerk_block_key: p.gewerk_block_key ?? undefined,
         leistung: p.leistung_name?.trim() || 'Leistung',
         leistung_name: p.leistung_name,
-        beschreibung: p.beschreibung?.trim() || '',
+        beschreibung,
         lohn_netto: lohn > 0 ? lohn / menge : stueck,
         material_netto: material > 0 ? material / menge : 0,
         vk_netto: stueck,
@@ -94,6 +108,49 @@ export function auftragPositionenToAngebotPositionen(
         handwerker_id: p.handwerker_id ?? undefined,
         handwerker_name: p.handwerker?.name ?? undefined,
         notiz_extern: regieNotiz || undefined,
+        verguetung: isRegie ? 'aufwand' : 'festpreis',
+        ...(isRegie
+          ? {
+              geschaetzt_std: geschStd > 0 ? geschStd : null,
+              stundensatz: stundensatz > 0 ? stundensatz : stueck > 0 ? stueck : null,
+            }
+          : {}),
       } satisfies AngebotPosition
     })
+}
+
+/** Texte aus Partner-Bautagebuch-Einträgen für Rechnungszeilen aggregieren. */
+export function aggregateRegieBeschreibungFromEintraege(
+  eintraege: Array<{
+    position_id?: string | null
+    beschreibung?: string | null
+    zeit_minuten?: number | null
+    typ?: string | null
+    created_at?: string | null
+  }>
+): RegieBeschreibungByPosition {
+  const byPos = new Map<string, string[]>()
+  const sorted = [...eintraege].sort((a, b) =>
+    String(a.created_at ?? '').localeCompare(String(b.created_at ?? ''))
+  )
+  for (const e of sorted) {
+    const pid = e.position_id?.trim()
+    if (!pid) continue
+    const text = e.beschreibung?.trim()
+    if (!text) continue
+    const zeit = Number(e.zeit_minuten) || 0
+    const zeitLabel =
+      zeit > 0
+        ? ` (${Math.floor(zeit / 60)}:${String(zeit % 60).padStart(2, '0')} Std.)`
+        : ''
+    const line = `• ${text}${zeitLabel}`
+    const list = byPos.get(pid) ?? []
+    list.push(line)
+    byPos.set(pid, list)
+  }
+  const out: RegieBeschreibungByPosition = {}
+  Array.from(byPos.entries()).forEach(([pid, lines]) => {
+    out[pid] = lines.join('\n')
+  })
+  return out
 }

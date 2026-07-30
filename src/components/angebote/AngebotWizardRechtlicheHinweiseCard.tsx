@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
@@ -77,18 +76,7 @@ export function AngebotWizardRechtlicheHinweiseCard({
   )
 
   if (embedded) {
-    return (
-      <div className="full">
-        <p className="wizard-inline-hint mb-3">
-          Steuer- und Bankdaten kommen aus den{' '}
-          <Link href="/einstellungen" className="text-bw-primary underline">
-            Firmeneinstellungen
-          </Link>
-          .
-        </p>
-        {taxToggles}
-      </div>
-    )
+    return <div className="full">{taxToggles}</div>
   }
 
   const form = (
@@ -150,17 +138,7 @@ export function AngebotWizardRechtlicheHinweiseCard({
 
   return (
     <Card title="Steuerliche Hinweise">
-      <p className="wizard-inline-hint mb-3 hidden md:block">
-        Steuer- und Bankdaten kommen aus den{' '}
-        <Link href="/einstellungen" className="text-bw-primary underline">
-          Firmeneinstellungen
-        </Link>{' '}
-        (USt-IdNr., Steuernummer, IBAN, BIC). Hinweise optional ein- oder ausblenden.
-      </p>
       <MobileEditableBlock sheetTitle="Steuerliche Hinweise" overview={overview}>
-        <p className="wizard-inline-hint mb-3 md:hidden">
-          Steuer- und Bankdaten kommen aus den Firmeneinstellungen.
-        </p>
         {form}
       </MobileEditableBlock>
     </Card>

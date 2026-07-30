@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, Pencil } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { DocActionBar } from '@/components/surfaces/primitives'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
@@ -93,8 +95,6 @@ export function StaffFunnelWizard({
   const [error, setError] = useState<string | null>(null)
   const [bekannterKunde, setBekannterKunde] = useState<Kunde | null>(null)
   const [kundeOpen, setKundeOpen] = useState(false)
-  const [kanalOpen, setKanalOpen] = useState(false)
-  const [kundentypOpen, setKundentypOpen] = useState(false)
   const [weitereOpen, setWeitereOpen] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -105,8 +105,6 @@ export function StaffFunnelWizard({
     setBekannterKunde(null)
     setError(null)
     setKundeOpen(!defaultKundeId)
-    setKanalOpen(false)
-    setKundentypOpen(false)
     setWeitereOpen(false)
   }, [open, defaultKundeId])
 
@@ -244,13 +242,11 @@ export function StaffFunnelWizard({
 
   const kundeLabel = useMemo(() => {
     const n = staffFunnelKontaktName(state)
-    if (n) return n
-    if (bekannterKunde?.name) return bekannterKunde.name
-    return 'noch nicht erfasst'
+    const name = n || bekannterKunde?.name || 'noch nicht erfasst'
+    const typ = KUNDENTYP_OPTIONS.find((o) => o.value === state.kundentyp)?.label
+    return typ ? `${name} · ${typ}` : name
   }, [state, bekannterKunde])
 
-  const kundentypLabel =
-    KUNDENTYP_OPTIONS.find((o) => o.value === state.kundentyp)?.label || '—'
   const kanalLabel = KANAL_LABELS[state.kanal] ?? state.kanal
   const subtitle = `${kanalLabel} · ${heuteDe()}`
 
@@ -269,10 +265,23 @@ export function StaffFunnelWizard({
       title="Anfrage erfassen"
       subtitle={subtitle}
       onClose={onClose}
-      onSave={() => void submit()}
-      saveLabel="Anfrage anlegen"
-      saveBusy={loading}
       onDiscard={onClose}
+      saveBusy={loading}
+      docActions={
+        <DocActionBar
+          actions={[
+            {
+              id: 'anlegen',
+              label: loading ? 'Anlegen…' : 'Anfrage anlegen',
+              onClick: () => {
+                if (loading) return
+                void submit()
+              },
+              icon: <ActionIcon n="check" size={20} />,
+            },
+          ]}
+        />
+      }
       className="staff-funnel staff-funnel--mock"
     >
       <div className="sf-mock">
@@ -554,7 +563,7 @@ export function StaffFunnelWizard({
             className={cn('sf-acc-head', weitereOpen && 'open')}
             onClick={() => setWeitereOpen((o) => !o)}
           >
-            <span>Budget & Zeitraum</span>
+            <span>Budget, Zeitraum & Herkunft</span>
             <ChevronDown className="h-4 w-4" aria-hidden />
           </button>
           {weitereOpen ? (
@@ -574,6 +583,17 @@ export function StaffFunnelWizard({
                     options={ZEITRAUM_ERNEUERN_OPTIONS}
                     value={state.zeitraum}
                     onChange={(v) => patch({ zeitraum: v })}
+                  />
+                </MockField>
+                <MockField label="Herkunft" full>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={STAFF_KANAL.map((k) => ({
+                      value: k,
+                      label: KANAL_LABELS[k] ?? k,
+                    }))}
+                    value={state.kanal}
+                    onChange={(v) => patch({ kanal: v as LeadKanal })}
                   />
                 </MockField>
               </MockFormSection>
@@ -603,6 +623,14 @@ export function StaffFunnelWizard({
                       bekannterKunde={bekannterKunde}
                       onKundeIdChange={(id) => patch({ kundeId: id })}
                       onKundeGewaehlt={applyKunde}
+                    />
+                  </MockField>
+                  <MockField label="Kundentyp" full>
+                    <StaffChoiceGrid
+                      columns={2}
+                      options={KUNDENTYP_OPTIONS}
+                      value={state.kundentyp}
+                      onChange={(v) => patch({ kundentyp: v })}
                     />
                   </MockField>
                   {state.anliegen === 'hausverwaltung' || state.kundentyp === 'verwaltung' ? (
@@ -658,57 +686,6 @@ export function StaffFunnelWizard({
                     />
                   </MockField>
                 </MockFormSection>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              className="sf-meta-row"
-              onClick={() => setKundentypOpen((o) => !o)}
-            >
-              <MockIcon ctx="default" n="users" size={16} />
-              <span className="sf-meta-k">Kundentyp</span>
-              <span className="sf-meta-v">{kundentypLabel}</span>
-              <Pencil className="h-3.5 w-3.5 sf-meta-edit" aria-hidden />
-            </button>
-            {kundentypOpen ? (
-              <div className="sf-meta-expand">
-                <StaffChoiceGrid
-                  columns={2}
-                  options={KUNDENTYP_OPTIONS}
-                  value={state.kundentyp}
-                  onChange={(v) => {
-                    patch({ kundentyp: v })
-                    setKundentypOpen(false)
-                  }}
-                />
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              className="sf-meta-row"
-              onClick={() => setKanalOpen((o) => !o)}
-            >
-              <MockIcon ctx="default" n="phone" size={16} />
-              <span className="sf-meta-k">Herkunft</span>
-              <span className="sf-meta-v">{kanalLabel}</span>
-              <Pencil className="h-3.5 w-3.5 sf-meta-edit" aria-hidden />
-            </button>
-            {kanalOpen ? (
-              <div className="sf-meta-expand">
-                <StaffChoiceGrid
-                  columns={2}
-                  options={STAFF_KANAL.map((k) => ({
-                    value: k,
-                    label: KANAL_LABELS[k] ?? k,
-                  }))}
-                  value={state.kanal}
-                  onChange={(v) => {
-                    patch({ kanal: v as LeadKanal })
-                    setKanalOpen(false)
-                  }}
-                />
               </div>
             ) : null}
           </div>

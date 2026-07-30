@@ -125,6 +125,10 @@ export async function syncAngebotPositionenZuAuftrag(input: {
         preis_fix: row.preis_fix,
         lohn_fix: row.lohn_fix,
         material_fix: row.material_fix,
+        typ: row.typ ?? 'lv',
+        verguetung: row.verguetung ?? 'festpreis',
+        geschaetzt_std: row.geschaetzt_std ?? null,
+        stundensatz: row.stundensatz ?? null,
         aenderung_typ: null,
       }
 

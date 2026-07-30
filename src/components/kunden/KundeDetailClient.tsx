@@ -44,6 +44,8 @@ import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
@@ -155,7 +157,6 @@ export function KundeDetailClient({
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
-  const [hasPortalAccount, setHasPortalAccount] = useState(false)
 
   useKiAssistDraftConsumer(portalModalOpen, ['mail', 'text'], (d) => {
     applyKiMailOrTextDraft(d, {
@@ -177,7 +178,6 @@ export function KundeDetailClient({
       const hint = await getPortalLoginHint(initialKunde.id)
       if (hint.ok) {
         setPortalLink(hint.loginLink)
-        setHasPortalAccount(hint.hasAuthAccount)
       } else {
         setPortalLink(buildPortalLoginLink())
       }
@@ -680,22 +680,26 @@ export function KundeDetailClient({
   ) : null
 
   const tabAkte = (
-    <div className="space-y-4">
-      <KundenDokumenteTab
-        kundeId={kunde.id}
-        dokumente={kunde.kunden_dokumente ?? []}
-        auftraege={kunde.auftraege ?? []}
-        leads={kunde.leads ?? []}
-        rechnungen={rechnungen}
-        onReload={() => refresh()}
-      />
-      <KundenNotizenTab
-        kundeId={kunde.id}
-        notizen={kunde.kunden_notizen ?? []}
-        legacyNotiz={kunde.notizen}
-        onReload={() => refresh()}
-      />
-    </div>
+    <VorgangAkteTab
+      dateien={
+        <KundenDokumenteTab
+          kundeId={kunde.id}
+          dokumente={kunde.kunden_dokumente ?? []}
+          auftraege={kunde.auftraege ?? []}
+          leads={kunde.leads ?? []}
+          rechnungen={rechnungen}
+          onReload={() => refresh()}
+        />
+      }
+      notizen={
+        <KundenNotizenTab
+          kundeId={kunde.id}
+          notizen={kunde.kunden_notizen ?? []}
+          legacyNotiz={kunde.notizen}
+          onReload={() => refresh()}
+        />
+      }
+    />
   )
 
   const kundeLeadIds = useMemo(
@@ -763,10 +767,19 @@ export function KundeDetailClient({
     },
   ]
 
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kunde.telefon,
+    email: kunde.email,
+    notiz: { kind: 'kunde', kundeId: kunde.id },
+    dokument: { kind: 'kunde', kundeId: kunde.id },
+    onSaved: () => refresh(),
+  })
+
   return (
     <EntityDetailLayout
       crumbBackHref="/kunden"
       crumbBackLabel="Zurück zur Liste"
+      quickBar={quickBar}
       head={{
         title: kundeDisplayName(kunde),
         titleBadges: (
@@ -811,12 +824,12 @@ export function KundeDetailClient({
         title="Kundenportal-Link versenden"
         size="lg"
         footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
-              Abbrechen
-            </Button>
+          <div className="kunde-create-footer">
             <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
               Senden
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+              Abbrechen
             </Button>
           </div>
         }
@@ -915,12 +928,12 @@ export function KundeDetailClient({
         title="Kunden zusammenführen"
         size="sm"
         footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
-              Abbrechen
-            </Button>
+          <div className="kunde-create-footer">
             <Button type="button" loading={pending} onClick={() => executeMerge()}>
               Zusammenführen
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
+              Abbrechen
             </Button>
           </div>
         }
@@ -933,6 +946,8 @@ export function KundeDetailClient({
           </p>
         ) : null}
       </Modal>
+
+      {quickActionSheets}
     </EntityDetailLayout>
   )
 }

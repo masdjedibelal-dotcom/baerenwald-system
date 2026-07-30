@@ -81,10 +81,14 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
       (zeitByPos.get(e.position_id) ?? 0) + (Number(e.zeit_minuten) || 0)
     )
   }
+  const { aggregateRegieBeschreibungFromEintraege } = await import(
+    '@/lib/auftraege/auftrag-positionen-rechnung'
+  )
+  const textByPos = aggregateRegieBeschreibungFromEintraege(eintraege)
 
   const rechnungPos: AngebotPosition[] = []
   for (const p of positionen ?? []) {
-    const isAufwand = String(p.verguetung) === 'aufwand'
+    const isAufwand = String(p.verguetung) === 'aufwand' || String(p.typ) === 'regie'
     const minuten = zeitByPos.get(String(p.id)) ?? 0
     if (String(p.typ) === 'regie' && minuten <= 0 && String(p.leistung_status) !== 'erledigt') {
       continue
@@ -96,12 +100,19 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
         : Number(p.preis_vk ?? p.lohn_vk ?? p.preis_partner) || 0
     if (satz <= 0) continue
     const menge = isAufwand ? Math.max(std, 0.25) : Number(p.menge) || 1
+    const partnerText = textByPos[String(p.id)]?.trim() || ''
+    const baseBesch = String(p.beschreibung ?? '').trim()
+    const beschreibung = isAufwand
+      ? [partnerText || null, baseBesch && partnerText !== baseBesch ? baseBesch : null]
+          .filter(Boolean)
+          .join('\n\n') || baseBesch
+      : baseBesch
 
     rechnungPos.push(
       posFromLebenszyklus({
         id: String(p.id),
         leistung: String(p.leistung_name),
-        beschreibung: p.beschreibung,
+        beschreibung: beschreibung || null,
         menge,
         einheit: isAufwand ? 'Std' : String(p.einheit ?? 'Psch'),
         einzelNetto: satz,

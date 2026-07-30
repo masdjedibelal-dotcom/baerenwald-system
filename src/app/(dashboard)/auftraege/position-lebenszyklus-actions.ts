@@ -359,6 +359,29 @@ export async function createCrmPositionEintrag(
     },
   })
 
+  // Tagebuch-Einträge sind sofort im Kundenportal sichtbar (keine Freigabe)
+  if (['weitere_arbeit', 'notiz', 'fortschritt', 'ergebnis', 'start'].includes(input.typ)) {
+    try {
+      const { publishPositionEintragFuerKunde } = await import(
+        '@/lib/auftraege/publish-position-eintrag-kunde'
+      )
+      await publishPositionEintragFuerKunde({
+        eintragId: eintrag.id,
+        auftragId: String(pos.auftrag_id),
+        typ: input.typ,
+        beschreibung: input.beschreibung?.trim() || null,
+        leistungName: (pos.leistung_name as string | null)?.trim() || null,
+        erstelltVon: auth.userId,
+        handwerkerId: (pos.handwerker_id as string | null) ?? null,
+      })
+    } catch (e) {
+      console.warn(
+        '[createCrmPositionEintrag] Kunden-Publish fehlgeschlagen',
+        e instanceof Error ? e.message : e
+      )
+    }
+  }
+
   revalidateAuftrag(String(pos.auftrag_id))
   return { ok: true, eintragId: eintrag.id, positionId }
 }

@@ -61,7 +61,7 @@ type ViewState = {
   beschreibung: string;
 };
 
-const COLS = "28px 1.6fr 1fr 120px 110px 70px";
+const COLS = "minmax(0, 1fr) auto auto";
 
 function formatBytes(n: number | null | undefined): string | null {
   if (n == null || n <= 0) return null;
@@ -319,19 +319,10 @@ export function AnfrageDokumenteTab({
           </p>
         ) : (
           <div className="dok-list">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Beschreibung</div>
-              <div>Datum</div>
-              <div>Freigabe</div>
-              <div />
-            </div>
             {docs.map((d) => {
               const editing = editId === d.id;
               const sizeLabel = formatBytes(d.groesse_bytes);
-              const isFoto = isImageDoc(d.name, d.href);
-              const beschreibung = d.beschreibung?.trim() || '';
+              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
               return (
                 <div
                   key={d.id}
@@ -339,7 +330,7 @@ export function AnfrageDokumenteTab({
                   style={{
                     gridTemplateColumns: COLS,
                     cursor: editing ? "default" : "pointer",
-                    alignItems: editing ? "start" : "center",
+                    alignItems: "center",
                   }}
                   role={editing ? undefined : "button"}
                   tabIndex={editing ? undefined : 0}
@@ -354,97 +345,46 @@ export function AnfrageDokumenteTab({
                     }
                   }}
                 >
-                  <MockIcon
-                    ctx="row"
-                    n={isFoto ? "photo" : "file-text"}
-                    size={18}
-                    className="dok-list__icon"
-                    style={{ color: "var(--text-3)" }}
-                  />
                   {editing ? (
-                    <input
-                      className="txt"
-                      value={d.name}
-                      onChange={(e) => upd(d.id, { name: e.target.value })}
-                      style={{ height: 30 }}
-                      autoFocus
+                    <div
+                      className="dok-list__main min-w-0"
                       onClick={(e) => e.stopPropagation()}
-                    />
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="txt"
+                        value={d.name}
+                        onChange={(e) => upd(d.id, { name: e.target.value })}
+                        style={{ height: 30 }}
+                        autoFocus
+                      />
+                    </div>
                   ) : (
                     <div className="dok-list__main min-w-0">
                       <div className="dok-list__name">
                         {d.name}
-                        {sizeLabel ? (
-                          <span className="dok-list__name-size"> · {sizeLabel}</span>
+                        {meta ? (
+                          <span className="dok-list__name-size"> · {meta}</span>
                         ) : null}
                       </div>
-                      {beschreibung ? (
-                        <div className="dok-list__sub">{beschreibung}</div>
-                      ) : null}
-                    </div>
-                  )}
-                  {editing ? (
-                    <input
-                      className="txt dok-list__cell--desk"
-                      value={d.beschreibung}
-                      onChange={(e) => upd(d.id, { beschreibung: e.target.value })}
-                      placeholder="Beschreibung…"
-                      style={{ height: 30 }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <div className="dok-list__cell--desk dok-list__desc">
-                      {d.beschreibung || (
-                        <span style={{ color: "var(--text-4)" }}>—</span>
-                      )}
-                    </div>
-                  )}
-                  {editing ? (
-                    <input
-                      className="txt dok-list__cell--desk"
-                      type="date"
-                      defaultValue={d.created_at.slice(0, 10)}
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        upd(d.id, {
-                          created_at: new Date(e.target.value).toISOString(),
-                        });
-                      }}
-                      style={{ height: 30, fontSize: "var(--fs-meta)" }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <div className="dok-list__cell--desk dok-list__date">
-                      {formatDatum(d.created_at)}
                     </div>
                   )}
                   <label
                     className="dok-list__freigabe"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      cursor: "pointer",
-                      fontSize: "var(--fs-meta)",
-                    }}
+                    style={{ cursor: "pointer" }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={d.freigabe}
                       onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
-                      style={{ accentColor: "var(--green)", margin: 0 }}
                     />
-                    <span
-                      className={d.freigabe ? "is-kunde" : undefined}
-                      style={{ color: d.freigabe ? "var(--green)" : "var(--text-3)" }}
-                    >
+                    <span className={d.freigabe ? "is-kunde" : undefined}>
                       {d.freigabe ? "Kunde" : "intern"}
                     </span>
                   </label>
                   <div
                     className="dok-list__actions"
-                    style={{ display: "flex", gap: 0, justifyContent: "flex-end" }}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
@@ -475,9 +415,7 @@ export function AnfrageDokumenteTab({
                         className="dok-list__action--extra"
                         onClick={() => removeDoc(d)}
                       />
-                    ) : (
-                      <span className="dok-list__action--extra" style={{ width: 28 }} />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

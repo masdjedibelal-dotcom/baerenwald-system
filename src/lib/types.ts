@@ -380,6 +380,15 @@ export type AngebotPosition = {
   kostenart?: 'leistung' | 'anfahrt'
   /** PDF: Ausführung über Fachbetrieb (aus Gewerk.ausfuehrung) */
   ist_fachbetrieb?: boolean
+  /**
+   * festpreis = feste Menge×Preis · aufwand = Regie (Stunden×Satz, Final vom Handwerker).
+   * Sync → auftrag_positionen.verguetung / typ=regie
+   */
+  verguetung?: 'festpreis' | 'aufwand' | string | null
+  /** Bei Regie: geschätzte Stunden (oft = menge) */
+  geschaetzt_std?: number | null
+  /** Bei Regie: €/h netto (oft = vk_netto) */
+  stundensatz?: number | null
 }
 
 export type RechnungPosition = AngebotPosition
@@ -1059,9 +1068,23 @@ export type KalenderTermin = {
   id: string
   lead_id: string | null
   auftrag_id: string | null
+  kunde_id?: string | null
   titel: string
   beschreibung: string | null
-  typ: 'besichtigung' | 'beginn' | 'abnahme' | 'sonstiges' | 'intern'
+  /** Kategorie-Slug (z. B. vor_ort, abnahme) — Legacy: besichtigung, beginn, intern */
+  typ:
+    | 'besichtigung'
+    | 'beginn'
+    | 'abnahme'
+    | 'sonstiges'
+    | 'intern'
+    | 'vor_ort'
+    | 'kundentermin'
+    | 'projekttermin'
+    | 'aufmass'
+    | 'kundengespraech'
+    | 'allgemein'
+    | 'privat'
   datum: string
   uhrzeit_von: string | null
   uhrzeit_bis: string | null

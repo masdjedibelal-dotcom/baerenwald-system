@@ -1,39 +1,45 @@
 'use client'
 
-import { useEffect, useId, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useState, useTransition } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Combobox } from '@/components/ui/Combobox'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteKalenderTermin,
+  loadTerminLinkAdresse,
   saveKalenderTermin,
 } from '@/app/(dashboard)/kalender/actions'
-import type { KalenderTermin } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { searchVorgaengeFuerTodo } from '@/app/(dashboard)/kalender/todo-actions'
+import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
+import {
+  formatTerminAdresse,
+  parseTerminAdresse,
+  TERMIN_KATEGORIE_OPTIONS,
+  terminKategorieFarbe,
+  terminKategorieLabel,
+  terminTypToKategorie,
+  type TerminKategorie,
+  type TerminKatFarbe,
+} from '@/lib/kalender/termin-kategorien'
+import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import type { KalenderTermin, Kunde } from '@/lib/types'
 
-/** Mock-Farben: green / blue / yellow */
-type MockKat = 'green' | 'blue' | 'yellow'
+export type MockKat = TerminKatFarbe
 
-const KAT_OPTIONS: { value: MockKat; label: string; typ: KalenderTermin['typ'] }[] = [
-  { value: 'green', label: 'Vor-Ort / Arbeit', typ: 'besichtigung' },
-  { value: 'blue', label: 'Kontakt / Kickoff', typ: 'sonstiges' },
-  { value: 'yellow', label: 'Abnahme', typ: 'abnahme' },
-]
-
-export function typToKat(typ: KalenderTermin['typ']): MockKat {
-  if (typ === 'abnahme') return 'yellow'
-  if (typ === 'sonstiges' || typ === 'intern') return 'blue'
-  return 'green'
+/** @deprecated — nutze terminTypToKategorie / terminKategorieFarbe */
+export function typToKat(typ: KalenderTermin['typ'] | string): MockKat {
+  return terminKategorieFarbe(terminTypToKategorie(typ))
 }
 
-function katToTyp(kat: MockKat): KalenderTermin['typ'] {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.typ ?? 'besichtigung'
-}
-
+/** @deprecated — nutze terminKategorieLabel */
 export function katLabel(kat: MockKat): string {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.label ?? 'Vor-Ort / Arbeit'
+  if (kat === 'green') return 'Vor-Ort Termin'
+  if (kat === 'yellow') return 'Abnahme'
+  return 'Allgemein'
 }
 
 function ymd(d: Date): string {
@@ -54,6 +60,17 @@ function normalizeTimeInput(t: string): string | null {
   if (/^\d{2}:\d{2}$/.test(v)) return `${v}:00`
   if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v
   return v
+}
+
+function applyAdresseParts(
+  setStrasse: (v: string) => void,
+  setHausnummer: (v: string) => void,
+  setPlz: (v: string) => void,
+  parts: { strasse: string; hausnummer: string; plz: string }
+) {
+  setStrasse(parts.strasse)
+  setHausnummer(parts.hausnummer)
+  setPlz(parts.plz)
 }
 
 export type KalenderTerminEditorPrefill = {
@@ -81,59 +98,158 @@ export function KalenderTerminEditorSheet({
   const formId = useId()
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
-  const [kat, setKat] = useState<MockKat>('green')
+  const [kategorie, setKategorie] = useState<TerminKategorie>('vor_ort')
   const [datum, setDatum] = useState('')
   const [von, setVon] = useState('09:00')
   const [bis, setBis] = useState('10:00')
-  const [ort, setOrt] = useState('')
+  const [strasse, setStrasse] = useState('')
+  const [hausnummer, setHausnummer] = useState('')
+  const [plz, setPlz] = useState('')
   const [desc, setDesc] = useState('')
+  const [kundeId, setKundeId] = useState('')
+  const [vorgangKey, setVorgangKey] = useState('')
+  const [leadId, setLeadId] = useState<string | null>(null)
+  const [auftragId, setAuftragId] = useState<string | null>(null)
+  const [kundeOpts, setKundeOpts] = useState<{ value: string; label: string; sub?: string }[]>([])
+  const [kundenById, setKundenById] = useState<Map<string, Kunde>>(new Map())
+  const [vorgangOpts, setVorgangOpts] = useState<{ value: string; label: string; sub?: string }[]>(
+    []
+  )
 
   useEffect(() => {
     if (!open) return
     if (termin) {
       setTitel(termin.titel)
-      setKat(typToKat(termin.typ))
+      setKategorie(terminTypToKategorie(termin.typ))
       setDatum(termin.datum.slice(0, 10))
       setVon(formatHm(termin.uhrzeit_von) || '09:00')
       setBis(formatHm(termin.uhrzeit_bis) || '10:00')
-      setOrt(termin.adresse ?? '')
+      const parsed = parseTerminAdresse(termin.adresse)
+      setStrasse(parsed.strasse)
+      setHausnummer(parsed.hausnummer)
+      setPlz(parsed.plz)
       setDesc(termin.beschreibung ?? '')
-      return
-    }
-    const d = prefill?.day ?? new Date()
-    setTitel('')
-    setKat('green')
-    setDatum(ymd(d))
-    const sh = prefill?.startHour
-    if (sh != null) {
-      const vonStr = `${String(Math.floor(sh)).padStart(2, '0')}:${sh % 1 ? '30' : '00'}`
-      const bisH = sh + 1
-      const bisStr = `${String(Math.floor(bisH)).padStart(2, '0')}:${bisH % 1 ? '30' : '00'}`
-      setVon(vonStr)
-      setBis(bisStr)
+      setKundeId(termin.kunde_id ?? '')
+      setLeadId(termin.lead_id)
+      setAuftragId(termin.auftrag_id)
+      if (termin.auftrag_id) setVorgangKey(`a:${termin.auftrag_id}`)
+      else if (termin.lead_id) setVorgangKey(`l:${termin.lead_id}`)
+      else setVorgangKey('')
     } else {
-      setVon('09:00')
-      setBis('10:00')
+      const d = prefill?.day ?? new Date()
+      setTitel('')
+      setKategorie('vor_ort')
+      setDatum(ymd(d))
+      const sh = prefill?.startHour
+      if (sh != null) {
+        const vonStr = `${String(Math.floor(sh)).padStart(2, '0')}:${sh % 1 ? '30' : '00'}`
+        const bisH = sh + 1
+        const bisStr = `${String(Math.floor(bisH)).padStart(2, '0')}:${bisH % 1 ? '30' : '00'}`
+        setVon(vonStr)
+        setBis(bisStr)
+      } else {
+        setVon('09:00')
+        setBis('10:00')
+      }
+      setStrasse('')
+      setHausnummer('')
+      setPlz('')
+      setDesc('')
+      setKundeId('')
+      setVorgangKey('')
+      setLeadId(null)
+      setAuftragId(null)
     }
-    setOrt('')
-    setDesc('')
+
+    void listKundenFuerCombobox().then((r) => {
+      setKundenById(new Map(r.kunden.map((k) => [k.id, k])))
+      setKundeOpts(
+        r.kunden.map((k) => ({
+          value: k.id,
+          label: kundeDisplayName(k),
+          sub: [k.plz, k.ort].filter(Boolean).join(' ') || undefined,
+        }))
+      )
+    })
+    void searchVorgaengeFuerTodo().then((r) => {
+      if (r.ok) setVorgangOpts(r.options)
+    })
   }, [open, termin, prefill])
 
   const isNew = !termin
 
+  const kategorieOptions = useMemo(
+    () => TERMIN_KATEGORIE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  )
+
+  async function fillAdresseFromLink(opts: {
+    kundeId?: string | null
+    leadId?: string | null
+    auftragId?: string | null
+  }) {
+    const res = await loadTerminLinkAdresse(opts)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    applyAdresseParts(setStrasse, setHausnummer, setPlz, {
+      strasse: res.strasse,
+      hausnummer: res.hausnummer,
+      plz: res.plz,
+    })
+    if (!titel.trim()) setTitel(res.label)
+  }
+
+  function onKundeChange(id: string) {
+    setKundeId(id)
+    if (!id) return
+    const k = kundenById.get(id)
+    if (k) {
+      applyAdresseParts(setStrasse, setHausnummer, setPlz, {
+        strasse: k.strasse?.trim() || '',
+        hausnummer: k.hausnummer?.trim() || '',
+        plz: k.plz?.trim() || '',
+      })
+      if (!titel.trim()) setTitel(kundeDisplayName(k))
+      return
+    }
+    void fillAdresseFromLink({ kundeId: id })
+  }
+
+  function onVorgangChange(key: string) {
+    setVorgangKey(key)
+    if (key.startsWith('a:')) {
+      const id = key.slice(2)
+      setAuftragId(id)
+      setLeadId(null)
+      void fillAdresseFromLink({ auftragId: id })
+    } else if (key.startsWith('l:')) {
+      const id = key.slice(2)
+      setLeadId(id)
+      setAuftragId(null)
+      void fillAdresseFromLink({ leadId: id })
+    } else {
+      setLeadId(null)
+      setAuftragId(null)
+    }
+  }
+
   function save() {
     startTransition(async () => {
+      const adresse = formatTerminAdresse({ strasse, hausnummer, plz }) || null
       const res = await saveKalenderTermin({
         id: termin?.id,
         titel,
-        typ: katToTyp(kat),
+        typ: kategorie,
         datum,
         uhrzeit_von: normalizeTimeInput(von),
         uhrzeit_bis: normalizeTimeInput(bis),
-        adresse: ort.trim() || null,
+        adresse,
         beschreibung: desc.trim() || null,
-        lead_id: termin?.lead_id ?? null,
-        auftrag_id: termin?.auftrag_id ?? null,
+        lead_id: leadId,
+        auftrag_id: auftragId,
+        kunde_id: kundeId || null,
         zugewiesen_an: termin?.zugewiesen_an ?? null,
         erledigt: termin?.erledigt ?? false,
       })
@@ -193,21 +309,13 @@ export function KalenderTerminEditorSheet({
           />
         </div>
         <div className="full">
-          <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">
-            Kategorie
-          </div>
-          <div className="seg">
-            {KAT_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={cn(kat === o.value && 'on')}
-                onClick={() => setKat(o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          <Select
+            label="Kategorie"
+            value={kategorie}
+            options={kategorieOptions}
+            onChange={(e) => setKategorie(e.target.value as TerminKategorie)}
+            required
+          />
         </div>
         <Input
           type="date"
@@ -219,24 +327,68 @@ export function KalenderTerminEditorSheet({
         <div />
         <Input type="time" label="Von" value={von} onChange={(e) => setVon(e.target.value)} />
         <Input type="time" label="Bis" value={bis} onChange={(e) => setBis(e.target.value)} />
+
         <div className="full">
-          <Input
-            label="Ort"
-            value={ort}
-            onChange={(e) => setOrt(e.target.value)}
-            placeholder="Stadtteil / Adresse"
+          <Combobox
+            label="Kunde (optional)"
+            value={kundeId}
+            options={[{ value: '', label: 'Kein Kunde' }, ...kundeOpts]}
+            onChange={onKundeChange}
+            placeholder="Kunde suchen…"
+            emptyLabel="Kein Kunde"
           />
         </div>
-        {!isNew ? (
-          <div className="full">
-            <Textarea
-              label="Beschreibung"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={2}
+        <div className="full">
+          <Combobox
+            label="Vorgang (optional)"
+            value={vorgangKey}
+            options={[{ value: '', label: 'Kein Vorgang' }, ...vorgangOpts]}
+            onChange={onVorgangChange}
+            placeholder="Anfrage oder Auftrag…"
+            emptyLabel="Kein Vorgang"
+            hint="Übernimmt die Anschrift vom verknüpften Kunden bzw. Vorgang."
+          />
+        </div>
+
+        <div className="full">
+          <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">
+            Adresse
+          </div>
+          <div className="form-grid" style={{ margin: 0 }}>
+            <div className="full">
+              <Input
+                label="Straße"
+                value={strasse}
+                onChange={(e) => setStrasse(e.target.value)}
+                placeholder="Musterstraße"
+                autoComplete="street-address"
+              />
+            </div>
+            <Input
+              label="Hausnummer"
+              value={hausnummer}
+              onChange={(e) => setHausnummer(e.target.value)}
+              placeholder="12"
+            />
+            <Input
+              label="PLZ"
+              value={plz}
+              onChange={(e) => setPlz(e.target.value)}
+              placeholder="80331"
+              inputMode="numeric"
+              autoComplete="postal-code"
             />
           </div>
-        ) : null}
+        </div>
+
+        <div className="full">
+          <Textarea
+            label="Beschreibung"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={2}
+          />
+        </div>
         {!isNew ? (
           <div className="full pt-2">
             <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
@@ -248,3 +400,5 @@ export function KalenderTerminEditorSheet({
     </EditorSheet>
   )
 }
+
+export { terminKategorieLabel, terminTypToKategorie }

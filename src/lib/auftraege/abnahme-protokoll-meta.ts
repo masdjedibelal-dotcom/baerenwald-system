@@ -23,6 +23,14 @@ export type AbnahmeProtokollMeta = {
   unterschrift_ort_datum_an: string
   unterschrift_ort_datum_ag: string
   unterschrift_ort_datum_anwesend: string
+  /** Portal: Partner hat Protokoll bestätigt (ohne Mail). */
+  handwerker_bestaetigt_at?: string | null
+  handwerker_bestaetigt_von?: string | null
+  /** Optional Signatur-Data-URLs oder Storage-Pfade */
+  signature_kunde_url?: string | null
+  signature_hw_url?: string | null
+  kunde_unterschrift_name?: string | null
+  hw_unterschrift_name?: string | null
 }
 
 export const ABNAHME_ERGEBNIS_LABEL: Record<AbnahmeErgebnis, string> = {
@@ -60,6 +68,12 @@ export function emptyAbnahmeProtokollMeta(
     unterschrift_ort_datum_an: '',
     unterschrift_ort_datum_ag: '',
     unterschrift_ort_datum_anwesend: '',
+    handwerker_bestaetigt_at: null,
+    handwerker_bestaetigt_von: null,
+    signature_kunde_url: null,
+    signature_hw_url: null,
+    kunde_unterschrift_name: null,
+    hw_unterschrift_name: null,
     ...partial,
   }
 }
@@ -95,5 +109,23 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
     unterschrift_ort_datum_an: String(o.unterschrift_ort_datum_an ?? '').trim(),
     unterschrift_ort_datum_ag: String(o.unterschrift_ort_datum_ag ?? '').trim(),
     unterschrift_ort_datum_anwesend: String(o.unterschrift_ort_datum_anwesend ?? '').trim(),
+    handwerker_bestaetigt_at: o.handwerker_bestaetigt_at
+      ? String(o.handwerker_bestaetigt_at).trim() || null
+      : null,
+    handwerker_bestaetigt_von: o.handwerker_bestaetigt_von
+      ? String(o.handwerker_bestaetigt_von).trim() || null
+      : null,
+    signature_kunde_url: o.signature_kunde_url
+      ? String(o.signature_kunde_url).trim() || null
+      : null,
+    signature_hw_url: o.signature_hw_url
+      ? String(o.signature_hw_url).trim() || null
+      : null,
+    kunde_unterschrift_name: o.kunde_unterschrift_name
+      ? String(o.kunde_unterschrift_name).trim() || null
+      : null,
+    hw_unterschrift_name: o.hw_unterschrift_name
+      ? String(o.hw_unterschrift_name).trim() || null
+      : null,
   })
 }

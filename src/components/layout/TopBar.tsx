@@ -8,6 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { TopBarSearch } from '@/components/layout/TopBarSearch'
+import { CrmNotificationsBell } from '@/components/notifications/CrmNotificationsBell'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -62,6 +63,10 @@ function pathToBreadcrumbs(pathname: string): {
 
   const subTitle = SUB_LABELS[section]?.[segments[1] ?? '']
   if (subTitle && segments.length === 2) {
+    // Einstellungen: Tab-Nav ersetzt Zurück zum Hub (mobil kein topbar-back)
+    if (section === 'einstellungen') {
+      return { title: subTitle, parents: [], cta: meta?.cta }
+    }
     return { title: subTitle, parents: [{ label: sectionLabel, href: sectionHref }] }
   }
 
@@ -92,6 +97,15 @@ function pathToBreadcrumbs(pathname: string): {
 
   if (isEntityDetail) {
     return { title: '', parents: [], cta: undefined }
+  }
+
+  // Einstellungen-Unterseiten (z. B. Vorlagen bearbeiten): Tab-Shell, kein Hub-Zurück
+  if (section === 'einstellungen' && segments.length >= 2) {
+    return {
+      title: tailLabel || subTitle || sectionLabel,
+      parents: [],
+      cta: undefined,
+    }
   }
 
   return {
@@ -177,6 +191,8 @@ export function TopBar({ user }: TopBarProps) {
               <MockIcon ctx="btn" n="sparkles" size={14} />
               <span className="topbar-cta-label">Assistent</span>
             </button>
+
+            <CrmNotificationsBell />
 
             <button
               ref={avatarRef}

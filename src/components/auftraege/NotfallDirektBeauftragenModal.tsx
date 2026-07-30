@@ -160,12 +160,12 @@ export function NotfallDirektBeauftragenModal({
           placeholder={'Eine Zeile pro Punkt\nz. B. Leckage abdichten\nz. B. Trocknung vorbereiten'}
         />
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
+        <div className="flex justify-between gap-2 pt-2">
           <Button type="button" onClick={submit} loading={pending}>
             Beauftragen
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
+            Abbrechen
           </Button>
         </div>
       </div>

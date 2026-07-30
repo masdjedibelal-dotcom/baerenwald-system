@@ -9,6 +9,7 @@ import {
 } from '@/components/angebote/AngebotKiAssistent'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { DocActionBar } from '@/components/surfaces/primitives'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
@@ -21,7 +22,6 @@ import {
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
@@ -180,6 +180,9 @@ export function RechnungWizard({
   const [step, setStep] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
+  const [rechnungTitel, setRechnungTitel] = useState(
+    () => bootstrap.projektTitel?.trim() || ''
+  )
   const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
     normalizeVorgangWiederkehr({
       ist_wiederkehrend: bootstrap.ist_wiederkehrend,
@@ -236,9 +239,9 @@ export function RechnungWizard({
   const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
   const [abschlussBusy, setAbschlussBusy] = useState(false)
   const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | null
+    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | null
   >(null)
-  useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
+  useKiAssistDraftConsumer(sheet === 'versand', 'text', (d) => {
     applyKiDokumentTextDraft(d, { setText: setEinleitung })
   })
   useKiAssistDraftConsumer(sheet === 'versand', ['mail', 'text'], (d) => {
@@ -249,8 +252,8 @@ export function RechnungWizard({
   })
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
-  const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
-  const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
+  const zahlfrist: ZahlfristSeg = zahlfristInit.seg
+  const zahlfristDatum = zahlfristInit.datum
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
@@ -484,10 +487,10 @@ export function RechnungWizard({
   ])
   const rTitel =
     hasPlan && selRate
-      ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.titel}`
+      ? `${rechnungTitel || auftragLabel} — ${selRate.titel}`
       : istDirektrechnung
-        ? bootstrap.projektTitel?.trim() || `Rechnung · ${kundeName}`
-        : `${bootstrap.projektTitel || auftragLabel} — ${
+        ? rechnungTitel.trim() || `Rechnung · ${kundeName}`
+        : `${rechnungTitel || auftragLabel} — ${
             rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
           }`
   const rBrutto = hasPlan && selBerechnet ? selBerechnet.brutto : brutto
@@ -547,23 +550,6 @@ export function RechnungWizard({
       }
     }
     goToSection(next)
-  }
-
-  function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
-    setZahlfrist(seg)
-    const nextDatum = seg === 'datum' ? datum : faelligAmFromZahlfrist(seg, datum)
-    if (seg === 'datum') setZahlfristDatum(nextDatum)
-    else setZahlfristDatum(nextDatum)
-    const faellig = faelligAmFromZahlfrist(seg, nextDatum)
-    setMeta((m) => ({
-      ...m,
-      faellig_am: faellig,
-      zahlungsbedingungen: patchZahlungsbedingungenMitZahlfrist(
-        m.zahlungsbedingungen,
-        seg,
-        nextDatum
-      ),
-    }))
   }
 
   function buildMetaForSave(): RechnungWizardMeta {
@@ -944,7 +930,7 @@ export function RechnungWizard({
       : `MwSt ${berechnung.mwst_satz}%`
 
   const dokumentCrowValue = [
-    rechnungsnummer.trim() || 'Entwurf',
+    rechnungTitel.trim() || rechnungsnummer.trim() || 'Entwurf',
     selBerechnet?.istSchluss || rechnungsart === 'schluss'
       ? 'Schlussrechnung'
       : hasPlan || rechnungsart === 'abschlag'
@@ -969,20 +955,23 @@ export function RechnungWizard({
 
   const versandCrowValue = mailTo[0]?.trim() || 'Kundenportal'
 
+  const abschlussCrowValue = !abschlussHint?.showBlock
+    ? null
+    : [
+        abschlussHint.hasBericht ? 'PDF vorhanden' : 'Noch nicht erstellt',
+        abschlussMitVersand ? 'mit Versand' : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+
   const wizardTitel =
     selBerechnet?.istSchluss
       ? 'Schlussrechnung'
       : rateLocked && selBerechnet
         ? 'Abschlagsrechnung'
-        : 'Rechnung erstellen'
+        : 'Rechnung'
 
-  const wizardSubtitle = [
-    rechnungsnummer.trim() || null,
-    bootstrap.projektTitel?.trim() || auftragLabel,
-    kundeName,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const wizardSubtitle = kundeName?.trim() || undefined
 
   function onKundePick(k: Kunde) {
     setKunde({
@@ -1059,7 +1048,12 @@ export function RechnungWizard({
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
       <PosBoard
-        title={`Positionen · ${hatAuftrag ? `Auftrag ${auftragLabel}` : 'Direktrechnung'} · ${kundeName}`}
+        title={
+          rechnungTitel.trim() ||
+          (hasPlan && selRate?.titel?.trim()) ||
+          (istDirektrechnung ? 'Rechnung' : auftragLabel) ||
+          'Rechnung'
+        }
         positionen={posBoardLines}
         onChange={onPosBoardChange}
         showUst
@@ -1077,7 +1071,7 @@ export function RechnungWizard({
             label="Mit KI"
             dokumentLabel="Rechnung"
             leadKurz={kiLeadKurz}
-            titel={bootstrap.projektTitel || rTitel}
+            titel={rechnungTitel || rTitel}
             beschreibung={einleitung}
             positionen={kiKontextPositionen}
             preislisten={kiKontextPreislisten}
@@ -1088,6 +1082,7 @@ export function RechnungWizard({
       />
 
       <TotBand
+        className="totband--green"
         netto={schlussAbrechnung?.netto ?? displayNetto}
         ust={schlussAbrechnung?.mwst_betrag ?? displayMwst}
         brutto={schlussAbrechnung?.brutto ?? displayBrutto}
@@ -1115,11 +1110,13 @@ export function RechnungWizard({
       <div className="document-section__label" style={{ marginBottom: 10 }}>
         Rechnungsdaten
       </div>
-      <MetaCrowButton
-        label={hatAuftrag ? 'Auftrag' : 'Kunde'}
-        value={hatAuftrag ? auftragLabel : kundeName}
-        onClick={() => setSheet(hatAuftrag ? 'dokument' : 'kunde')}
-      />
+      {!hatAuftrag ? (
+        <MetaCrowButton
+          label="Kunde"
+          value={kundeName}
+          onClick={() => setSheet('kunde')}
+        />
+      ) : null}
       <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
@@ -1130,42 +1127,18 @@ export function RechnungWizard({
         value={zahlplanCrowValue}
         onClick={() => setSheet('zahlung')}
       />
+      {abschlussHint?.showBlock ? (
+        <MetaCrowButton
+          label="Abschlussbericht"
+          value={abschlussCrowValue || 'Anhang'}
+          onClick={() => setSheet('abschluss')}
+        />
+      ) : null}
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
         onClick={() => setSheet('versand')}
       />
-    </div>
-  )
-
-  const metaSum = (
-    <div className="dc-re-sum">
-      {schlussAbrechnung && schlussAbrechnung.bereits_gezahlt_brutto > 0 ? (
-        <>
-          <div className="dc-re-sum__row dc-re-sum__row--muted">
-            <span>Gesamt brutto</span>
-            <span>{formatEurBetrag(schlussAbrechnung.brutto)}</span>
-          </div>
-          {schlussAbrechnung.bereits_gezahlt.map((z) => (
-            <div key={z.label} className="dc-re-sum__row dc-re-sum__row--muted">
-              <span>Abzgl. {z.label}</span>
-              <span>−{formatEurBetrag(z.brutto)}</span>
-            </div>
-          ))}
-          <div className="dc-re-sum__row">
-            <span>Restsumme</span>
-            <b>{formatEurBetrag(schlussAbrechnung.rest_brutto)}</b>
-          </div>
-        </>
-      ) : (
-        <div className="dc-re-sum__row">
-          <span>Rechnungsbetrag</span>
-          <b>{formatEurBetrag(displayBrutto)}</b>
-        </div>
-      )}
-      <div className="dc-re-sum__faellig">
-        {rFaellig ? `fällig ${formatDateDe(rFaellig)}` : 'Fälligkeit offen'}
-      </div>
     </div>
   )
 
@@ -1193,13 +1166,13 @@ export function RechnungWizard({
           onClick: () => {
             void persistDraft().then(() => setSheet('vorschau'))
           },
-          icon: <MockIcon ctx="default" n="file-text" size={20} />,
+          icon: <ActionIcon n="file-text" size={20} />,
         },
         {
           id: 'send',
           label: 'Senden',
           onClick: () => setSheet('versand'),
-          icon: <MockIcon ctx="default" n="send" size={20} />,
+          icon: <ActionIcon n="send" size={20} />,
         },
         {
           id: 'save',
@@ -1210,7 +1183,7 @@ export function RechnungWizard({
               if (id) toast.success('Entwurf gespeichert')
             })
           },
-          icon: <MockIcon ctx="default" n="device-floppy" size={20} />,
+          icon: <ActionIcon n="device-floppy" size={20} />,
         },
       ]}
     />
@@ -1236,7 +1209,6 @@ export function RechnungWizard({
         docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
-        metaSum={metaSum}
         footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
@@ -1286,15 +1258,19 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
-        headerEnd={
-          <KiAssistIconButton
-            scope="dokument"
-            extraHint="Rechnung-Einleitung / Anschreiben (kundensichtbar)."
-            draftInput={einleitung || null}
-          />
-        }
       >
         <div className="form-grid form-grid--sheet">
+          <MockField label="Rechnungstitel" full>
+            <input
+              className="input"
+              value={rechnungTitel}
+              onChange={(e) => {
+                setRechnungTitel(e.target.value)
+                setDraftDirty(true)
+              }}
+              placeholder="z.B. Badsanierung München"
+            />
+          </MockField>
           {hatAuftrag && !rateLocked ? (
             <div className="full">
               <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
@@ -1364,21 +1340,6 @@ export function RechnungWizard({
               }
             />
           </MockField>
-          <div className="full">
-            <KiAssistFieldLabel
-              label="Einleitung (Anschreiben)"
-              scope="dokument"
-              extraHint="Rechnung-Anschreiben für Kunde (PDF + Mail)."
-              draftInput={einleitung || null}
-            >
-              <textarea
-                className="input ta"
-                rows={5}
-                value={einleitung}
-                onChange={(e) => setEinleitung(e.target.value)}
-              />
-            </KiAssistFieldLabel>
-          </div>
         </div>
       </EditorSheet>
 
@@ -1389,26 +1350,6 @@ export function RechnungWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung" full>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <MockZahlfristSeg
-                value={zahlfrist}
-                onChange={(v) => applyZahlfrist(v)}
-                aria-label="Zahlungsziel / Zahlfrist"
-              />
-              {zahlfrist === 'datum' ? (
-                <div style={{ width: 180 }}>
-                  <input
-                    type="date"
-                    className="input"
-                    value={zahlfristDatum}
-                    onChange={(e) => applyZahlfrist('datum', e.target.value)}
-                  />
-                </div>
-              ) : null}
-            </div>
-          </MockField>
-
           {!hatAuftrag ? (
             <div className="full card" style={{ padding: 16 }}>
               <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
@@ -1588,6 +1529,119 @@ export function RechnungWizard({
       </EditorSheet>
 
       <EditorSheet
+        open={sheet === 'abschluss'}
+        onClose={closeSheet}
+        title="Abschlussbericht"
+        context="canvas"
+      >
+        <div className="form-grid form-grid--sheet">
+          <div className="full" style={{ display: 'grid', gap: 12 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 'var(--fs-meta)',
+                color: 'var(--bw-text-muted, #6b7280)',
+              }}
+            >
+              Anhang für den Kunden
+              {abschlussHint?.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <MockBtn
+                kind="primary"
+                disabled={saving || abschlussBusy || !bootstrap.auftragId}
+                onClick={() => {
+                  const aid = bootstrap.auftragId?.trim()
+                  if (!aid) return
+                  setAbschlussBusy(true)
+                  void createAbschlussberichtPdf(aid)
+                    .then((r) => {
+                      if (!r.ok) {
+                        toast.error(r.message)
+                        return
+                      }
+                      setAbschlussHint({
+                        showBlock: true,
+                        hasBericht: true,
+                        berichtUrl: r.publicUrl,
+                      })
+                      setAbschlussMitVersand(true)
+                      toast.success('Abschlussbericht erstellt')
+                    })
+                    .finally(() => setAbschlussBusy(false))
+                }}
+              >
+                {abschlussBusy
+                  ? '…'
+                  : abschlussHint?.hasBericht
+                    ? 'PDF neu erzeugen'
+                    : 'PDF erzeugen'}
+              </MockBtn>
+            </div>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                cursor: 'pointer',
+                fontSize: 'var(--fs-text)',
+              }}
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={abschlussMitVersand}
+                disabled={saving}
+                onChange={(e) => setAbschlussMitVersand(e.target.checked)}
+              />
+              <span>
+                <span style={{ fontWeight: 500 }}>Mit Rechnung versenden</span>
+                <span
+                  style={{
+                    display: 'block',
+                    marginTop: 2,
+                    fontSize: 'var(--fs-meta)',
+                    color: 'var(--bw-text-muted, #6b7280)',
+                  }}
+                >
+                  Fehlt noch ein PDF, wird es beim Senden automatisch erzeugt.
+                </span>
+              </span>
+            </label>
+            <div
+              className="full"
+              style={{
+                border: '1px solid var(--bw-border, #e5e7eb)',
+                borderRadius: 10,
+                overflow: 'hidden',
+                minHeight: 280,
+                background: 'var(--bw-bg, #f9fafb)',
+              }}
+            >
+              {abschlussHint?.berichtUrl ? (
+                <iframe
+                  title="Abschlussbericht Vorschau"
+                  src={abschlussHint.berichtUrl}
+                  style={{ width: '100%', height: 420, border: 0, display: 'block' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    fontSize: 'var(--fs-meta)',
+                    color: 'var(--bw-text-muted, #6b7280)',
+                  }}
+                >
+                  Noch keine Vorschau — zuerst PDF erzeugen.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </EditorSheet>
+
+      <EditorSheet
         open={sheet === 'versand'}
         onClose={closeSheet}
         title="Versand"
@@ -1595,11 +1649,15 @@ export function RechnungWizard({
         onConfirm={() => void handleFinish(true)}
         confirmDisabled={saving || (hasPlan && !planOk)}
         confirmBusy={saving}
+        headerEnd={
+          <KiAssistIconButton
+            scope="mail"
+            extraHint="Betreff und Anschreiben für den Rechnungsversand."
+            draftInput={`${mailBetreff || defaultBetreff}\n\n${einleitung}`.trim() || null}
+          />
+        }
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Rechnungstitel" full>
-            <input className="input" value={rTitel} readOnly />
-          </MockField>
           <EmailPillsField
             label="An"
             required
@@ -1628,104 +1686,21 @@ export function RechnungWizard({
               onChange={(e) => setMailBetreff(e.target.value)}
             />
           </KiAssistFieldLabel>
-          {abschlussHint?.showBlock ? (
-            <div
-              className="full"
-              style={{
-                border: '1px solid var(--bw-border, #e5e7eb)',
-                borderRadius: 10,
-                padding: '12px 14px',
-                display: 'grid',
-                gap: 10,
-              }}
+          <div className="full">
+            <KiAssistFieldLabel
+              label="Einleitung"
+              scope="dokument"
+              extraHint="Anschreiben in der Mail und auf der Rechnung."
+              draftInput={einleitung || null}
             >
-              <div style={{ fontWeight: 600, fontSize: 'var(--fs-text)' }}>Abschlussbericht</div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 'var(--fs-meta)',
-                  color: 'var(--bw-text-muted, #6b7280)',
-                }}
-              >
-                Optional mit der Rechnung an den Kunden senden
-                {abschlussHint.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <MockBtn
-                  kind="ghost"
-                  disabled={saving || abschlussBusy || !bootstrap.auftragId}
-                  onClick={() => {
-                    const aid = bootstrap.auftragId?.trim()
-                    if (!aid) return
-                    setAbschlussBusy(true)
-                    void createAbschlussberichtPdf(aid)
-                      .then((r) => {
-                        if (!r.ok) {
-                          toast.error(r.message)
-                          return
-                        }
-                        setAbschlussHint({
-                          showBlock: true,
-                          hasBericht: true,
-                          berichtUrl: r.publicUrl,
-                        })
-                        setAbschlussMitVersand(true)
-                        toast.success('Abschlussbericht erstellt')
-                        window.open(r.publicUrl, '_blank', 'noopener,noreferrer')
-                      })
-                      .finally(() => setAbschlussBusy(false))
-                  }}
-                >
-                  {abschlussBusy
-                    ? '…'
-                    : abschlussHint.hasBericht
-                      ? 'Neu erzeugen'
-                      : 'PDF erzeugen'}
-                </MockBtn>
-                {abschlussHint.berichtUrl ? (
-                  <MockBtn
-                    kind="ghost"
-                    disabled={saving}
-                    onClick={() =>
-                      window.open(abschlussHint.berichtUrl!, '_blank', 'noopener,noreferrer')
-                    }
-                  >
-                    Vorschau
-                  </MockBtn>
-                ) : null}
-              </div>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  cursor: 'pointer',
-                  fontSize: 'var(--fs-text)',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={abschlussMitVersand}
-                  disabled={saving}
-                  onChange={(e) => setAbschlussMitVersand(e.target.checked)}
-                />
-                <span>
-                  <span style={{ fontWeight: 500 }}>Mit Rechnung versenden</span>
-                  <span
-                    style={{
-                      display: 'block',
-                      marginTop: 2,
-                      fontSize: 'var(--fs-meta)',
-                      color: 'var(--bw-text-muted, #6b7280)',
-                    }}
-                  >
-                    Fehlt noch ein PDF, wird es beim Senden automatisch erzeugt.
-                  </span>
-                </span>
-              </label>
-            </div>
-          ) : null}
+              <textarea
+                className="input ta"
+                rows={5}
+                value={einleitung}
+                onChange={(e) => setEinleitung(e.target.value)}
+              />
+            </KiAssistFieldLabel>
+          </div>
           <div className="full">
             <RechnungWizardMailPreview
               rechnungId={activeVersandId}
@@ -1735,7 +1710,7 @@ export function RechnungWizard({
               rechnungsnummer={previewNr}
               brutto={displayBrutto}
               faelligAm={rFaellig}
-              projektTitel={bootstrap.projektTitel || rTitel}
+              projektTitel={rechnungTitel || rTitel}
               empfaengerHint={mailTo[0] || kundeEmail || kundeName}
             />
           </div>

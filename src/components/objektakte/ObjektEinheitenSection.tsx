@@ -27,17 +27,17 @@ function EinheitFormFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="kunde-create-footer">
+      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
+        {pending ? '…' : 'Speichern'}
+      </MockBtn>
       <button
         type="button"
-        className="btn ghost"
+        className="btn secondary"
         onClick={() => requestClose?.()}
         disabled={pending}
       >
         Abbrechen
       </button>
-      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
-        {pending ? '…' : 'Speichern'}
-      </MockBtn>
     </div>
   )
 }
@@ -177,7 +177,7 @@ export function ObjektEinheitenSection({
           Einheiten
         </span>
         <div style={{ flex: 1 }} />
-        <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
+        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
           Einheit
         </MockBtn>
       </div>

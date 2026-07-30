@@ -3,41 +3,13 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  createHandwerker,
-  insertPartnerDokument,
-} from '@/app/(dashboard)/handwerker/actions'
+import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { VERSICHERUNG_TYP_SLUG } from '@/lib/handwerker-versicherung'
 import { toast } from '@/components/ui/app-toast'
 
 type GewerkOpt = { id: string; name: string; slug: string }
-
-const GEWERBEANMELDUNG_TYP = 'gewerbeanmeldung'
-
-/** MM/YYYY oder YYYY-MM-DD → ISO-Datum (Monatsende). */
-function parseVersicherungBis(raw: string): string | null {
-  const t = raw.trim()
-  if (!t) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t
-  const m = t.match(/^(\d{1,2})[./](\d{4})$/)
-  if (!m) return null
-  const month = Number(m[1])
-  const year = Number(m[2])
-  if (month < 1 || month > 12) return null
-  const lastDay = new Date(year, month, 0).getDate()
-  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-}
-
-function buildNotizen(notiz: string, stundensatz: string): string | null {
-  const parts: string[] = []
-  const satz = stundensatz.trim().replace(',', '.')
-  if (satz) parts.push(`Stundensatz: ${satz} €/h`)
-  if (notiz.trim()) parts.push(notiz.trim())
-  return parts.length ? parts.join('\n\n') : null
-}
 
 function PartnerCreateFooter({
   pending,
@@ -49,17 +21,17 @@ function PartnerCreateFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="hw-create-footer">
+      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
+        {pending ? '…' : 'Handwerker anlegen'}
+      </MockBtn>
       <button
         type="button"
-        className="btn ghost"
+        className="btn secondary"
         onClick={() => requestClose?.()}
         disabled={pending}
       >
         Abbrechen
       </button>
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : 'Handwerker anlegen'}
-      </MockBtn>
     </div>
   )
 }
@@ -82,12 +54,8 @@ export function PartnerCreateSheet({
   const [pending, startTransition] = useTransition()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')
-  const [einsatzgebiet, setEinsatzgebiet] = useState('')
   const [tel, setTel] = useState('')
   const [mail, setMail] = useState('')
-  const [stundensatz, setStundensatz] = useState('')
-  const [versicherungBis, setVersicherungBis] = useState('')
-  const [gewerbeanmeldung, setGewerbeanmeldung] = useState(true)
   const [notizen, setNotizen] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -96,12 +64,8 @@ export function PartnerCreateSheet({
     if (!open) return
     setFirma('')
     setGewerkSlug('')
-    setEinsatzgebiet('')
     setTel('')
     setMail('')
-    setStundensatz('')
-    setVersicherungBis('')
-    setGewerbeanmeldung(true)
     setNotizen('')
     setErr(null)
     setDirty(false)
@@ -126,10 +90,6 @@ export function PartnerCreateSheet({
       setErr('Telefon ist Pflicht.')
       return
     }
-    if (versicherungBis.trim() && !parseVersicherungBis(versicherungBis)) {
-      setErr('Versicherung: Bitte MM/JJJJ oder JJJJ-MM-TT angeben.')
-      return
-    }
 
     startTransition(async () => {
       const r = await createHandwerker({
@@ -140,7 +100,7 @@ export function PartnerCreateSheet({
         telefon: tel.trim() || null,
         whatsapp: null,
         webseite: null,
-        adresse: einsatzgebiet.trim() || null,
+        adresse: null,
         gewerke: [gewerkSlug],
         subkategorie: null,
         ist_fachbetrieb: true,
@@ -149,34 +109,12 @@ export function PartnerCreateSheet({
         ustid: null,
         iban: null,
         aktiv: true,
-        notizen: buildNotizen(notizen, stundensatz),
+        notizen: notizen.trim() || null,
       })
       if (!r.ok) {
         setErr(r.message)
         toast.error(r.message)
         return
-      }
-
-      const gueltigBis = parseVersicherungBis(versicherungBis)
-      if (gueltigBis) {
-        await insertPartnerDokument({
-          handwerker_id: r.id,
-          typ: VERSICHERUNG_TYP_SLUG,
-          bezeichnung: 'Betriebshaftpflichtversicherung',
-          gueltig_bis: gueltigBis,
-          datei_url: null,
-          notizen: 'Bei Anlage erfasst',
-        })
-      }
-      if (gewerbeanmeldung) {
-        await insertPartnerDokument({
-          handwerker_id: r.id,
-          typ: GEWERBEANMELDUNG_TYP,
-          bezeichnung: 'Gewerbeanmeldung / Gewerbeschein',
-          gueltig_bis: null,
-          datei_url: null,
-          notizen: 'vorgelegt und geprüft',
-        })
       }
 
       toast.success('Handwerker angelegt')
@@ -217,7 +155,7 @@ export function PartnerCreateSheet({
               autoComplete="organization"
             />
           </MockField>
-          <MockField label="Gewerk" required>
+          <MockField label="Gewerk" required full>
             <select
               className="input"
               value={gewerkSlug}
@@ -231,14 +169,6 @@ export function PartnerCreateSheet({
                 </option>
               ))}
             </select>
-          </MockField>
-          <MockField label="Einsatzgebiet">
-            <input
-              className="input"
-              value={einsatzgebiet}
-              onChange={(e) => mark(() => setEinsatzgebiet(e.target.value))}
-              placeholder="München-Süd"
-            />
           </MockField>
         </MockFormSection>
 
@@ -265,44 +195,7 @@ export function PartnerCreateSheet({
           </MockField>
         </MockFormSection>
 
-        <MockFormSection title="Konditionen & Compliance" icon="refresh">
-          <MockField label="Stundensatz (€)">
-            <div className="txt-prefix">
-              <span className="prefix">€/h</span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={stundensatz}
-                onChange={(e) => mark(() => setStundensatz(e.target.value))}
-                placeholder="65"
-              />
-            </div>
-          </MockField>
-          <MockField label="Versicherung gültig bis">
-            <input
-              className="input"
-              value={versicherungBis}
-              onChange={(e) => mark(() => setVersicherungBis(e.target.value))}
-              placeholder="12/2026"
-            />
-          </MockField>
-          <MockField label="Gewerbeanmeldung" full>
-            <div className="hw-create__switch-row">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={gewerbeanmeldung}
-                className={gewerbeanmeldung ? 'switch on' : 'switch'}
-                onClick={() => mark(() => setGewerbeanmeldung((v) => !v))}
-                title={
-                  gewerbeanmeldung
-                    ? 'Gewerbeanmeldung: vorgelegt und geprüft'
-                    : 'Gewerbeanmeldung: nicht geprüft'
-                }
-              />
-              <span className="hw-create__switch-label">vorgelegt und geprüft</span>
-            </div>
-          </MockField>
+        <MockFormSection title="Notiz" icon="messages">
           <MockField
             label="Interne Notiz"
             full

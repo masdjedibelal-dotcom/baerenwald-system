@@ -87,6 +87,7 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
   const beschreibungRaw = (p.beschreibung || '').trim()
   const displayName = name || beschreibungRaw || '(ohne Bezeichnung)'
   const varianteId = p.variante_id || p.leistung_id || null
+  const isRegie = String(p.verguetung ?? '').toLowerCase() === 'aufwand'
   return {
     id: p.id,
     gewerk: p.gewerk_name?.trim() || p.gewerk_id || POS_BOARD_DEFAULT_GEWERK,
@@ -105,6 +106,8 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
         : varianteId
           ? 'katalog'
           : 'frei',
+    notizExtern: p.notiz_extern,
+    regieSchein: isRegie,
   }
 }
 
@@ -123,6 +126,7 @@ export function posBoardLineToAngebotPosition(
     leistung: line.name,
     kostenverteilung,
   })
+  const isRegie = Boolean(line.regieSchein)
   return {
     ...(base ?? {}),
     id: line.id,
@@ -149,6 +153,16 @@ export function posBoardLineToAngebotPosition(
     preis_typ: 'fix',
     einkaufspreis: base?.einkaufspreis,
     kostenverteilung,
+    verguetung: isRegie ? 'aufwand' : 'festpreis',
+    ...(isRegie
+      ? {
+          geschaetzt_std: m,
+          stundensatz: vk,
+          notiz_extern: line.notizExtern?.trim() || 'nach Aufwand',
+        }
+      : line.notizExtern?.trim()
+        ? { notiz_extern: line.notizExtern.trim() }
+        : {}),
   }
 }
 

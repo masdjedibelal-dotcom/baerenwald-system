@@ -3,20 +3,29 @@ import 'server-only'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerBautagebuchAnfrage } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
-import { buildPartnerAuftragPortalUrl } from '@/lib/portal-utils'
+import {
+  notifyPartnerUnified,
+  partnerVorgangLink,
+} from '@/lib/partner/notify-partner-unified'
+import { buildPartnerVorgangPortalUrl } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function sendHandwerkerBautagebuchAnfrage(input: {
   auftragId: string
   handwerkerId: string
   notiz?: string | null
+  positionIds?: string[] | null
   angefordertVonUserId?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+}): Promise<{ ok: true; anfrageId: string } | { ok: false; message: string }> {
   const auftragId = input.auftragId.trim()
   const handwerkerId = input.handwerkerId.trim()
   if (!auftragId || !handwerkerId) {
     return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
   }
+
+  const positionIds = Array.from(
+    new Set((input.positionIds ?? []).map((id) => id.trim()).filter(Boolean))
+  )
 
   const [{ data: hw, error: hwErr }, { data: auftrag, error: aErr }] = await Promise.all([
     supabaseAdmin
@@ -38,45 +47,115 @@ export async function sendHandwerkerBautagebuchAnfrage(input: {
 
   const notiz = input.notiz?.trim() || null
 
-  const { error: insErr } = await supabaseAdmin.from('partner_bautagebuch_anfragen').insert({
+  const insertPayload: Record<string, unknown> = {
     auftrag_id: auftragId,
     handwerker_id: handwerkerId,
     notiz,
     angefordert_von: input.angefordertVonUserId ?? null,
-  })
+  }
+  if (positionIds.length) insertPayload.position_ids = positionIds
+
+  const { data: inserted, error: insErr } = await supabaseAdmin
+    .from('partner_bautagebuch_anfragen')
+    .insert(insertPayload)
+    .select('id')
+    .single()
 
   if (insErr) {
     if (/partner_bautagebuch_anfragen_offen_uq/i.test(insErr.message)) {
-      return { ok: false, message: 'Für diesen Partner liegt bereits eine offene Tagebuch-Anforderung vor.' }
+      return {
+        ok: false,
+        message: 'Für diesen Partner liegt bereits eine offene Tagebuch-Anforderung vor.',
+      }
+    }
+    if (/position_ids/i.test(insErr.message)) {
+      const retry = await supabaseAdmin
+        .from('partner_bautagebuch_anfragen')
+        .insert({
+          auftrag_id: auftragId,
+          handwerker_id: handwerkerId,
+          notiz,
+          angefordert_von: input.angefordertVonUserId ?? null,
+        })
+        .select('id')
+        .single()
+      if (retry.error) {
+        return { ok: false, message: retry.error.message }
+      }
+      return finishSend({
+        anfrageId: String(retry.data.id),
+        auftragId,
+        handwerkerId,
+        hwName: (hw.name as string)?.trim() || 'Partner',
+        hwEmail,
+        auftragTitel: (auftrag.titel as string)?.trim() || 'Auftrag',
+        notiz,
+        positionIds,
+      })
     }
     return { ok: false, message: insErr.message }
   }
 
+  return finishSend({
+    anfrageId: String(inserted.id),
+    auftragId,
+    handwerkerId,
+    hwName: (hw.name as string)?.trim() || 'Partner',
+    hwEmail,
+    auftragTitel: (auftrag.titel as string)?.trim() || 'Auftrag',
+    notiz,
+    positionIds,
+  })
+}
+
+async function finishSend(opts: {
+  anfrageId: string
+  auftragId: string
+  handwerkerId: string
+  hwName: string
+  hwEmail: string
+  auftragTitel: string
+  notiz: string | null
+  positionIds: string[]
+}): Promise<{ ok: true; anfrageId: string } | { ok: false; message: string }> {
+  const relativeLink = `${partnerVorgangLink(opts.auftragId)}&focus=bautagebuch&anfrage=${encodeURIComponent(opts.anfrageId)}`
+  const portalLink = `${buildPartnerVorgangPortalUrl(opts.auftragId)}&focus=bautagebuch&anfrage=${encodeURIComponent(opts.anfrageId)}`
+
   const branding = await getMailBranding(supabaseAdmin)
-  const portalLink = buildPartnerAuftragPortalUrl(auftragId)
   const tpl = mailHandwerkerBautagebuchAnfrage(
     {
-      name: (hw.name as string)?.trim() || 'Partner',
-      auftragTitel: (auftrag.titel as string)?.trim() || 'Auftrag',
+      name: opts.hwName,
+      auftragTitel: opts.auftragTitel,
       portalLink,
-      notiz,
+      notiz: opts.notiz,
     },
     branding
   )
 
   const mailRes = await sendMail({
     typ: 'handwerker_bautagebuch_anfrage',
-    an: [hwEmail],
+    an: [opts.hwEmail],
     cc: [],
     bcc: [],
     betreff: tpl.betreff,
     html: tpl.html,
-    auftragId,
+    auftragId: opts.auftragId,
   })
 
   if (!mailRes.success) {
     return { ok: false, message: mailRes.error ?? 'E-Mail-Versand fehlgeschlagen.' }
   }
 
-  return { ok: true }
+  // Portal-Glocke: „Bitte Update geben“ — Portal muss Deep-Link focus=bautagebuch auswerten
+  await notifyPartnerUnified({
+    handwerkerId: opts.handwerkerId,
+    typ: 'erinnerung',
+    projektName: opts.auftragTitel,
+    link: relativeLink,
+    auftragId: opts.auftragId,
+    positionIds: opts.positionIds.length ? opts.positionIds : undefined,
+    leistungName: 'Bitte Update geben — Bautagebuch',
+  })
+
+  return { ok: true, anfrageId: opts.anfrageId }
 }

@@ -41,7 +41,73 @@ type Props = {
   className?: string
 }
 
-const COLS = 'minmax(0, 1.6fr) 140px 110px 28px'
+function MeldeLinksCard({ orgSlug }: { orgSlug: string }) {
+  const meldeLink = buildMeldeLink(orgSlug)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void import('qrcode').then((QRCode) =>
+      QRCode.toDataURL(meldeLink, {
+        width: 180,
+        margin: 2,
+        color: { dark: '#1A3D2B', light: '#FFFFFF' },
+      }).then((url) => {
+        if (!cancelled) setQrDataUrl(url)
+      })
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [meldeLink])
+
+  function kopieren() {
+    void navigator.clipboard.writeText(meldeLink).then(
+      () => toast.success('Melde-Link kopiert'),
+      () => toast.error('Kopieren fehlgeschlagen')
+    )
+  }
+
+  return (
+    <MockCard title="Links" icon="link" className="objekte-links-card">
+      <div className="objekte-links-card__row">
+        <div className="objekte-links-card__label">Melde-Link</div>
+        <div className="objekte-links-card__linkbox">
+          <span className="objekte-links-card__url" title={meldeLink}>
+            {meldeLink}
+          </span>
+          <MockBtn sm kind="ghost" icon="copy" title="Link kopieren" onClick={kopieren} />
+          <a
+            href={meldeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn ghost sm icon"
+            aria-label="Link öffnen"
+            title="Link öffnen"
+          >
+            <MockIcon ctx="btn" n="external-link" size={14} />
+          </a>
+        </div>
+      </div>
+
+      <div className="objekte-links-card__qr">
+        <div className="objekte-links-card__label">QR-Code Hausverwaltung</div>
+        {qrDataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={qrDataUrl}
+            alt="QR-Code Melde-Link Hausverwaltung"
+            width={140}
+            height={140}
+            className="objekte-links-card__qr-img"
+          />
+        ) : (
+          <div className="objekte-links-card__qr-placeholder">QR wird erzeugt…</div>
+        )}
+      </div>
+    </MockCard>
+  )
+}
 
 export function KundenObjekteCard({
   kundeId,
@@ -151,7 +217,7 @@ export function KundenObjekteCard({
           options={selectOptions}
         />
       </div>
-      <Button type="button" variant="secondary" size="sm" className="shrink-0 gap-1.5" onClick={openNeu}>
+      <Button type="button" variant="primary" size="sm" className="shrink-0 gap-1.5" onClick={openNeu}>
         <Plus className="h-4 w-4" aria-hidden />
         Objekt hinzufügen
       </Button>
@@ -183,34 +249,17 @@ export function KundenObjekteCard({
 
   return (
     <div className={cn('objekte-tab', className)}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
-        >
-          Objekte
-        </span>
+      <div className="objekte-tab__head">
+        <span className="objekte-tab__title">Objekte</span>
         <div style={{ flex: 1 }} />
-        <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
+        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
           Objekt
         </MockBtn>
       </div>
 
       {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
+
+      {orgSlug ? <MeldeLinksCard orgSlug={orgSlug} /> : null}
 
       {liste.length === 0 ? (
         <MockEmpty
@@ -224,98 +273,52 @@ export function KundenObjekteCard({
           }
         />
       ) : (
-        <div className="listcard">
-          <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-            <div>Objekt</div>
-            <div>Einheiten</div>
-            <div>Miete</div>
-            <div />
-          </div>
+        <div className="objekte-cards">
           {liste.map((o) => {
-            const str = kundenObjektStrasseZeile(o)
-            const ortZeile = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
-            const sub = [str, ortZeile].filter(Boolean).join(' · ') || '—'
+            const strasse = kundenObjektStrasseZeile(o) || '—'
             const st = statsById[o.id]
-            const einheitenLabel =
+            const einheitenAnzahl =
               st && st.einheitenTotal > 0
-                ? `${st.einheitenVermietet}/${st.einheitenTotal} vermietet`
-                : o.einheiten_hinweis?.trim() || '—'
-            const mieteLabel = '—'
+                ? st.einheitenTotal
+                : (() => {
+                    const m = o.einheiten_hinweis?.match(/\d+/)
+                    return m ? Number(m[0]) : null
+                  })()
 
             return (
-              <div
+              <button
                 key={o.id}
-                role="button"
-                tabIndex={0}
-                className={cn('list-row', selectedId === o.id && 'sel')}
-                style={{ gridTemplateColumns: COLS, alignItems: 'center' }}
+                type="button"
+                className={cn('card objekte-card', selectedId === o.id && 'is-sel')}
                 onClick={() => openAkte(o)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openAkte(o)
-                  }
-                }}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   if (pending) return
                   if (confirm(`Objekt „${o.titel}“ löschen?`)) entfernen(o)
                 }}
               >
-                <div style={{ minWidth: 0 }}>
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {o.titel}
+                <div className="objekte-card__body">
+                  <div className="objekte-card__main">
+                    <div className="objekte-card__name">{o.titel}</div>
+                    <div className="objekte-card__sub" title={strasse}>
+                      {strasse}
+                    </div>
+                    {einheitenAnzahl != null ? (
+                      <div className="objekte-card__meta">{einheitenAnzahl}</div>
+                    ) : null}
                   </div>
-                  <div
-                    className="lc-sub"
-                    style={{
-                      color: 'var(--text-3)',
-                      fontSize: 'var(--fs-meta)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={sub}
-                  >
-                    {sub}
-                  </div>
+                  <MockIcon
+                    ctx="default"
+                    n="chevron-right"
+                    size={16}
+                    className="objekte-card__chevron"
+                  />
                 </div>
-                <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>{einheitenLabel}</div>
-                <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>{mieteLabel}</div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
-                  <MockIcon ctx="default" n="chevron-right" size={16} />
-                </div>
-              </div>
+              </button>
             )
           })}
         </div>
       )}
-
-      {orgSlug && liste.some((o) => o.melde_slug?.trim()) ? (
-        <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
-          Melde-Links:{' '}
-          {liste
-            .filter((o) => o.melde_slug?.trim())
-            .slice(0, 2)
-            .map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                className="btn ghost sm"
-                style={{ marginRight: 4 }}
-                onClick={() => {
-                  const url = buildMeldeLink(orgSlug, o.melde_slug!)
-                  void navigator.clipboard.writeText(url).then(
-                    () => toast.success('Melde-Link kopiert'),
-                    () => toast.error('Kopieren fehlgeschlagen')
-                  )
-                }}
-              >
-                {o.titel}
-              </button>
-            ))}
-        </p>
-      ) : null}
 
       {modal}
     </div>

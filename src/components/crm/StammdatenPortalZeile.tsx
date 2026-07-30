@@ -1,144 +1,165 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { getPortalLoginHint } from '@/app/actions/kunden'
+import { getPartnerPortalLoginHint } from '@/app/(dashboard)/handwerker/actions'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
-import { formatDatum } from '@/lib/utils'
-
-export type PortalZugangState = 'aktiv' | 'eingeladen' | 'nicht_registriert'
-
-const INVITE_KEY = (id: string) => `bw-portal-invite:${id}`
+import { openPortalAsKunde, openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { cn } from '@/lib/utils'
 
 /**
- * Portal-Zeile der Stammdaten-Identitätskarte (`.vgid-portal`).
- * Zustände: aktiv · eingeladen · nicht registriert (offen).
+ * Einheitliche Portal-Zeile in Stammdaten (Kunde · Handwerker · Vorgang):
+ * - Aktiv: grüner Dot + „Portal aktiv“ · rechts Login (Icon + Label)
+ * - Nicht registriert: roter Dot + „Noch nicht registriert“ · rechts „Einladen“
  */
 export function StammdatenPortalZeile({
   kundeId,
+  handwerkerId,
   fallbackEmail,
-  variant = 'vgid',
+  gesperrt = false,
+  /** Handwerker: Eltern öffnet Partner-Einladungs-Modal */
+  onInvite,
 }: {
   kundeId?: string | null
+  handwerkerId?: string | null
   fallbackEmail?: string | null
-  /** @deprecated immer vgid in Stammdaten */
+  gesperrt?: boolean
+  onInvite?: () => void
+  /** @deprecated */
   editing?: boolean
+  /** @deprecated */
   variant?: 'field' | 'vgid'
 }) {
-  const id = kundeId?.trim() || null
-  const [state, setState] = useState<PortalZugangState | null>(null)
-  const [invitedAt, setInvitedAt] = useState<string | null>(null)
+  const kid = kundeId?.trim() || null
+  const hid = handwerkerId?.trim() || null
+  const isCrmAdmin = useIsCrmAdmin()
+  const [registered, setRegistered] = useState<boolean | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [loginBusy, setLoginBusy] = useState(false)
 
   useEffect(() => {
-    if (!id) {
-      setState(null)
+    if (!kid && !hid) {
+      setRegistered(null)
       return
     }
     let cancelled = false
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(INVITE_KEY(id)) : null
-    if (stored) setInvitedAt(stored)
-
-    void getPortalLoginHint(id).then((hint) => {
+    void (async () => {
+      if (hid) {
+        const hint = await getPartnerPortalLoginHint(hid)
+        if (cancelled) return
+        setRegistered(hint.ok ? Boolean(hint.hasAuthAccount) : false)
+        return
+      }
+      const hint = await getPortalLoginHint(kid!)
       if (cancelled) return
-      if (!hint.ok) {
-        setState(stored ? 'eingeladen' : 'nicht_registriert')
-        return
-      }
-      if (hint.hasAuthAccount) {
-        setState('aktiv')
-        return
-      }
-      setState(stored ? 'eingeladen' : 'nicht_registriert')
-    })
+      setRegistered(hint.ok ? Boolean(hint.hasAuthAccount) : false)
+    })()
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [kid, hid])
 
-  if (!id || variant === 'field') {
-    // field-Variante entfällt in der Identitätskarte — nur vgid
-    if (!id) return null
-  }
-  if (!id) return null
-
-  const statusText =
-    state === 'aktiv'
-      ? 'Aktiv'
-      : state === 'eingeladen'
-        ? invitedAt
-          ? `Eingeladen ${formatDatum(invitedAt)} · noch nicht angemeldet`
-          : 'Eingeladen · noch nicht angemeldet'
-        : state === 'nicht_registriert'
-          ? 'Nicht registriert'
-          : '…'
-
-  const primaryAction =
-    state === 'aktiv'
-      ? { label: 'Zugang zurücksetzen', onClick: () => openInvite() }
-      : state === 'eingeladen'
-        ? { label: 'Erneut senden', onClick: () => openInvite() }
-        : state === 'nicht_registriert'
-          ? { label: 'Einladung senden', onClick: () => openInvite() }
-          : null
+  if (!kid && !hid) return null
 
   function openInvite() {
+    if (onInvite) {
+      onInvite()
+      return
+    }
     if (!fallbackEmail?.trim()) {
-      toast.error('Keine E-Mail — Portal-Link nicht möglich.')
+      toast.error('Keine E-Mail — Portal-Einladung nicht möglich.')
       return
     }
     setModalOpen(true)
   }
 
+  async function openLogin() {
+    if (loginBusy || (!kid && !hid)) return
+    setLoginBusy(true)
+    const popup = window.open('about:blank', '_blank')
+    try {
+      const r = hid ? await openPortalAsHandwerker(hid) : await openPortalAsKunde(kid!)
+      if (!r.ok) {
+        popup?.close()
+        toast.error(r.message)
+        return
+      }
+      if (popup) popup.location.href = r.url
+      else window.location.assign(r.url)
+    } catch {
+      popup?.close()
+      toast.error('Portal konnte nicht geöffnet werden.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
+  const statusLabel = gesperrt
+    ? 'Portal gesperrt'
+    : registered === true
+      ? 'Portal aktiv'
+      : registered === false
+        ? 'Noch nicht registriert'
+        : '…'
+
+  const dotClass = gesperrt
+    ? 'd is-off'
+    : registered === true
+      ? 'd is-on'
+      : registered === false
+        ? 'd is-off'
+        : 'd'
+
+  const showInvite = !gesperrt && registered === false
+  const showLogin = !gesperrt && registered === true && isCrmAdmin
+
   return (
     <>
       <div className="vgid-portal">
-        <span className="k">Portal</span>
-        <span
-          className={
-            state === 'aktiv' ? 'd is-on' : state === 'eingeladen' ? 'd is-warn' : 'd'
-          }
-          aria-hidden
-        />
-        <span className="t">{statusText}</span>
-        {state && primaryAction ? (
+        <span className={cn(dotClass)} aria-hidden />
+        <span className="t">{statusLabel}</span>
+        {showInvite ? (
           <span className="a">
-            <button type="button" className="btn ghost sm" onClick={primaryAction.onClick}>
-              <MockIcon
-                ctx="default"
-                n={state === 'aktiv' ? 'refresh' : 'send'}
-                size={14}
-              />
-              {primaryAction.label}
+            <button
+              type="button"
+              className="vgid-portal__invite"
+              onClick={openInvite}
+              aria-label="Portal-Einladung senden"
+              title="Portal-Einladung erneut senden"
+            >
+              <MockIcon ctx="default" n="send" size={15} />
+              <span>Einladen</span>
             </button>
-            {state === 'aktiv' ? (
-              <Link href={`/kunden/${id}`} className="btn ghost sm" title="Als Kunde ansehen">
-                <MockIcon ctx="default" n="external-link" size={14} />
-                Als Kunde ansehen
-              </Link>
-            ) : null}
+          </span>
+        ) : null}
+        {showLogin ? (
+          <span className="a">
+            <button
+              type="button"
+              className="vgid-portal__login"
+              onClick={() => void openLogin()}
+              disabled={loginBusy}
+              aria-label={hid ? 'Partner-Portal Login' : 'Kundenportal Login'}
+              title={hid ? 'Als Partner im Portal anmelden' : 'Als Kunde im Portal anmelden'}
+            >
+              <MockIcon ctx="default" n="log-in" size={18} />
+              <span>Login</span>
+            </button>
           </span>
         ) : null}
       </div>
-      <KundenportalLinkVersendenModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        kundeId={id}
-        fallbackEmail={fallbackEmail}
-        onSent={() => {
-          const now = new Date().toISOString()
-          try {
-            localStorage.setItem(INVITE_KEY(id), now)
-          } catch {
-            /* ignore */
-          }
-          setInvitedAt(now)
-          setState((s) => (s === 'aktiv' ? 'aktiv' : 'eingeladen'))
-          setModalOpen(false)
-        }}
-      />
+      {kid ? (
+        <KundenportalLinkVersendenModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          kundeId={kid}
+          fallbackEmail={fallbackEmail}
+          onSent={() => setModalOpen(false)}
+        />
+      ) : null}
     </>
   )
 }

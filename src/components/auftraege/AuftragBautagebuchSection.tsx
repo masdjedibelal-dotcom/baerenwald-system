@@ -45,10 +45,12 @@ export function AuftragBautagebuchSection({
   eintraege,
   disabled,
   onAdd,
+  onAnfordern,
 }: {
   eintraege: BautagebuchListenEintrag[]
   disabled?: boolean
   onAdd: () => void
+  onAnfordern?: () => void
 }) {
   const sorted = [...eintraege].sort((a, b) => {
     const ta = a.ereignis_zeit || a.created_at || ''
@@ -68,9 +70,16 @@ export function AuftragBautagebuchSection({
           </p>
         </div>
         {!disabled ? (
-          <Button type="button" variant="primary" size="sm" onClick={onAdd}>
-            + Eintrag
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onAnfordern ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onAnfordern}>
+                Anfordern
+              </Button>
+            ) : null}
+            <Button type="button" variant="primary" size="sm" onClick={onAdd}>
+              + Eintrag
+            </Button>
+          </div>
         ) : null}
       </div>
 

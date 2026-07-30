@@ -822,6 +822,11 @@ export function AuftragDetailClient({
       onOpenDokument={openAngebotKorrektur}
       vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
       onVertragNachtragErstellen={openNachtragErstellen}
+      initialLeistungenView={
+        vorOrtAbschnittFromQuery(searchParams.get('tab')) === 'bautagebuch'
+          ? 'bautagebuch'
+          : 'leistungen'
+      }
     />
   )
 

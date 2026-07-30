@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 import { deleteKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { TodosPanel } from '@/components/todos/TodosPanel'
-import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
+import { kalenderTypLabel } from '@/lib/kalender-styles'
 import {
   kalenderTerminEndeVergangen,
 } from '@/lib/kalender/termin-no-show-hint'
@@ -413,7 +413,10 @@ export function KalenderClient() {
     editing &&
     !editing.erledigt &&
     kalenderTerminEndeVergangen(editing) &&
-    (editing.typ === 'besichtigung' || editing.lead_id)
+    (editing.typ === 'besichtigung' ||
+      editing.typ === 'vor_ort' ||
+      editing.typ === 'aufmass' ||
+      editing.lead_id)
 
   return (
     <div>
@@ -505,11 +508,9 @@ export function KalenderClient() {
                   }}
                 />
                 {katLabel(detailKat)}
-                {editing.typ === 'beginn' || editing.typ === 'intern' ? (
-                  <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                    · {KALENDER_TYP_LABEL[editing.typ]}
-                  </span>
-                ) : null}
+                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                  · {kalenderTypLabel(editing.typ)}
+                </span>
               </div>
             </div>
             {detailZeit ? (
@@ -520,7 +521,7 @@ export function KalenderClient() {
             ) : null}
             {editing.adresse?.trim() ? (
               <div className="prop">
-                <div className="prop-l">Ort</div>
+                <div className="prop-l">Adresse</div>
                 <div className="prop-v">{editing.adresse}</div>
               </div>
             ) : null}

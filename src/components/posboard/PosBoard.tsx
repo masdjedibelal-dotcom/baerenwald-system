@@ -190,6 +190,7 @@ export function PosBoard({
     einheit: string
     preis: number
     ust: number
+    regieSchein?: boolean
   }) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
@@ -209,6 +210,8 @@ export function PosBoard({
                 einheit: draft.einheit,
                 preis: draft.preis,
                 ust: draft.ust,
+                regieSchein: draft.regieSchein,
+                notizExtern: draft.regieSchein ? 'nach Aufwand' : undefined,
               }
             : {}),
         }
@@ -225,6 +228,8 @@ export function PosBoard({
           position_quelle: 'frei',
           variante_id: null,
           preisliste_id: null,
+          regieSchein: draft?.regieSchein,
+          notizExtern: draft?.regieSchein ? 'nach Aufwand' : undefined,
         })
     onChange([...positionen, np])
     setEditId(draft?.name?.trim() ? null : id)
@@ -610,11 +615,12 @@ export function PosBoard({
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 10,
-            textTransform: title ? undefined : 'none',
-            letterSpacing: title ? undefined : 0,
-            fontSize: title ? undefined : 14,
-            fontWeight: title ? undefined : 600,
-            color: title ? undefined : 'var(--text)',
+            /* Dokumenttitel (Angebot/Rechnung), kein Section-Label „Positionen“ */
+            textTransform: 'none',
+            letterSpacing: 0,
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--text)',
           }}
         >
           <span className="posboard-sec-h__title">{title || null}</span>
@@ -740,14 +746,22 @@ export function PosBoard({
           {groups.length === 0 ? (
             <p className="posboard-empty-hint">Noch keine Positionen.</p>
           ) : null}
-          <button
-            type="button"
-            className="posboard-add-fab"
-            onClick={() => openAddSheet(defaultGewerk(), 'preisliste')}
-          >
-            <MockIcon ctx="btn" n="plus" size={18} />
-            Position hinzufügen
-          </button>
+          <div className="posboard-add-fabs">
+            <button
+              type="button"
+              className="posboard-add-fab"
+              onClick={() => openAddSheet(defaultGewerk(), 'preisliste')}
+            >
+              <MockIcon ctx="btn" n="plus" size={18} />
+              Position hinzufügen
+            </button>
+            {!hideAddGewerk ? (
+              <button type="button" className="posboard-add-fab posboard-add-fab--secondary" onClick={addGewerk}>
+                <MockIcon ctx="btn" n="folder-open" size={18} />
+                Gewerk hinzufügen
+              </button>
+            ) : null}
+          </div>
         </>
       ) : null}
       {editP && helpers
@@ -896,6 +910,7 @@ export function PosBoard({
               einheit: draft.einheit,
               preis: draft.preis,
               ust: draft.ust,
+              regieSchein: Boolean(draft.regie),
             })
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)

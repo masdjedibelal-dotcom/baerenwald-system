@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, X } from 'lucide-react'
+import { Check, Trash2, X } from 'lucide-react'
 import { ActionSheet } from '@/components/ui/ActionSheet'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
@@ -277,7 +278,7 @@ export function DocumentCanvas({
               disabled={interactionLocked}
               onClick={handleSave}
             >
-              <Check className="h-4 w-4" aria-hidden />
+              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
               {saveBusy ? '…' : saveLabel}
             </button>
           ) : (
@@ -292,7 +293,7 @@ export function DocumentCanvas({
               aria-label="Speichern"
               title="Speichern"
             >
-              <Check className="h-5 w-5" aria-hidden />
+              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
             </button>
           )
         ) : (
@@ -338,7 +339,7 @@ export function DocumentCanvas({
               aria-label="Verwerfen"
               title="Verwerfen"
             >
-              <TrashIcon />
+              <Trash2 size={22} strokeWidth={ACTION_ICON_STROKE} aria-hidden />
               <span className="doc-action-bar__lbl">Verwerfen</span>
             </button>
           ) : null}
@@ -377,20 +378,6 @@ export function DocumentCanvas({
 
   if (!portal) return ui
   return createPortal(ui, document.body)
-}
-
-function TrashIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M3 6h18M8 6V4h8v2m-1 0v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6h10Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 export function DocumentSection({

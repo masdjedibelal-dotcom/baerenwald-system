@@ -7,10 +7,9 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
 
-const COLS = '28px 1.6fr 1fr 120px 110px 70px'
+const COLS = 'minmax(0, 1fr) auto auto'
 
 type DocRow = {
   id: string
@@ -106,7 +105,6 @@ export function AngebotAnhaengeTab({
 
 function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   const [view, setView] = useState<DocRow | null>(null)
-  const isMobile = useIsMobile()
   const erstellt = detail.updated_at || detail.created_at
   const pdfHref = detail.pdf_url?.trim() || `/api/angebote/${detail.id}/pdf`
 
@@ -138,99 +136,42 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   return (
     <>
       <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
-        {docs.length === 0 ? null : isMobile ? (
-          <div className="dok-cards">
-            {docs.map((d) => (
-              <div
-                key={d.id}
-                className="dok-card dok-card--tappable"
-                role="button"
-                tabIndex={0}
-                onClick={() => setView(d)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setView(d)
-                  }
-                }}
-              >
-                <div className="dok-card__icon" aria-hidden>
-                  <MockIcon ctx="row" n={d.isImage ? 'photo' : 'file-text'} size={18} />
-                </div>
-                <div className="dok-card__body">
-                  <div className="dok-card__top">
-                    <span className="dok-card__title">{d.name}</span>
-                    <div
-                      className="dok-card__actions"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
+        {docs.length === 0 ? null : (
+          <div className="dok-list">
+            {docs.map((d) => {
+              const meta = [d.beschreibung || null, formatDatum(d.created_at)]
+                .filter(Boolean)
+                .join(' · ')
+              return (
+                <div
+                  key={d.id}
+                  className="list-row dok-list__row--openable"
+                  style={{ gridTemplateColumns: COLS, cursor: 'pointer', alignItems: 'center' }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setView(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setView(d)
+                    }
+                  }}
+                >
+                  <div className="dok-list__main min-w-0">
+                    <div className="dok-list__name">
+                      {d.name}
+                      {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
                     </div>
                   </div>
-                  <div className="dok-card__meta">
-                    {[d.beschreibung || null, formatDatum(d.created_at)].filter(Boolean).join(' · ')}
+                  <span className="dok-list__freigabe">
+                    <span>intern</span>
+                  </span>
+                  <div className="dok-list__actions" onClick={(e) => e.stopPropagation()}>
+                    <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
                   </div>
-                  <div className="dok-card__foot">
-                    <span className="dok-card__tag dok-card__tag--muted">intern</span>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="dok-list">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Beschreibung</div>
-              <div>Datum</div>
-              <div>Freigabe</div>
-              <div />
-            </div>
-            {docs.map((d) => (
-              <div
-                key={d.id}
-                className="list-row"
-                style={{ gridTemplateColumns: COLS, cursor: 'default', alignItems: 'center' }}
-              >
-                <MockIcon
-                  ctx="row"
-                  n={d.isImage ? 'photo' : 'file-text'}
-                  size={18}
-                  style={{ color: 'var(--text-3)' }}
-                />
-                <div
-                  style={{
-                    fontSize: 'var(--fs-text)',
-                    fontWeight: 500,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {d.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--text-3)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {d.beschreibung || <span style={{ color: 'var(--text-4)' }}>—</span>}
-                </div>
-                <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                  {formatDatum(d.created_at)}
-                </div>
-                <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>intern</span>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </MockDokumenteCard>

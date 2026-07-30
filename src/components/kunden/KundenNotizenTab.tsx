@@ -9,6 +9,7 @@ import { formatTimelineStamp } from '@/lib/utils'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 function notizAutor(n: KundenNotizRow): string {
   const name = n.user_profiles?.name?.trim()
@@ -37,6 +38,7 @@ export function KundenNotizenTab({
   legacyNotiz?: string | null
   onReload: () => void
 }) {
+  const isMobile = useIsMobile()
   const [val, setVal] = useState('')
   const [pending, startTransition] = useTransition()
 
@@ -106,17 +108,26 @@ export function KundenNotizenTab({
         }}
       >
         {notes.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
-            Noch keine Notizen — schreibe die erste unten.
+          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+            {isMobile
+              ? 'Noch keine Notizen. Über „Notiz“ oben hinzufügen.'
+              : 'Noch keine Notizen — schreibe die erste unten.'}
           </div>
         ) : (
           notes.map((n) => (
-            <div key={n.id} className="note" style={{ position: 'relative', paddingRight: n.deletable ? 36 : undefined }}>
+            <div
+              key={n.id}
+              className="note"
+              style={{
+                position: 'relative',
+                paddingRight: !isMobile && n.deletable ? 36 : undefined,
+              }}
+            >
               <div className="meta">
                 {n.autor}
                 {n.time ? ` · ${n.time}` : ''}
               </div>
-              {n.deletable ? (
+              {!isMobile && n.deletable ? (
                 <div style={{ position: 'absolute', top: 4, right: 4 }}>
                   <MockBtn
                     sm
@@ -134,13 +145,15 @@ export function KundenNotizenTab({
         )}
       </div>
 
-      <MockNotizComposer
-        value={val}
-        onChange={setVal}
-        onSubmit={speichern}
-        disabled={pending}
-        placeholder="Notiz schreiben…  (Enter senden · Shift+Enter neue Zeile)"
-      />
+      {!isMobile ? (
+        <MockNotizComposer
+          value={val}
+          onChange={setVal}
+          onSubmit={speichern}
+          disabled={pending}
+          placeholder="Notiz schreiben"
+        />
+      ) : null}
     </MockCard>
   )
 }

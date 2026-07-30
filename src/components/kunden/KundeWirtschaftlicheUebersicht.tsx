@@ -154,21 +154,6 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
           )}
         </div>
       </div>
-
-      <div className="kw-count-row">
-        <div className="card kw-count">
-          <div className="kw-count-label">Neue Anfragen</div>
-          <div className="kw-count-val">{snap.anfragen}</div>
-        </div>
-        <div className="card kw-count">
-          <div className="kw-count-label">Angebote</div>
-          <div className="kw-count-val">{snap.angebote}</div>
-        </div>
-        <div className="card kw-count">
-          <div className="kw-count-label">Aufträge</div>
-          <div className="kw-count-val">{snap.auftraege}</div>
-        </div>
-      </div>
     </div>
   )
 }

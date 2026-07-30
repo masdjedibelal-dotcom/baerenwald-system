@@ -8,7 +8,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import type { LeadDokumentRow, Rechnung } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 
-const COLS = '28px 1.6fr 1fr 120px 110px 70px'
+const COLS = 'minmax(0, 1fr) auto auto'
 
 function pdfName(detail: Rechnung): string {
   const nr = detail.rechnungsnummer?.trim() || `RE-${detail.id.slice(0, 8).toUpperCase()}`
@@ -88,29 +88,22 @@ export function RechnungDokumenteTab({
   return (
     <MockDokumenteCard>
       <div className="dok-list">
-        <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-          <div />
-          <div>Name</div>
-          <div>Beschreibung</div>
-          <div>Datum</div>
-          <div>Freigabe</div>
-          <div />
-        </div>
         <div className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
-          <MockIcon ctx="row" n="file-text" size={18} />
-          <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium text-bw-text">
-            <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="hover:text-bw-link">
-              {name}
-            </a>
+          <div className="dok-list__main min-w-0">
+            <div className="dok-list__name">
+              <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="hover:text-bw-link">
+                {name}
+              </a>
+              <span className="dok-list__name-size">
+                {' '}
+                · Rechnungs-PDF{datum ? ` · ${datum}` : ''}
+              </span>
+            </div>
           </div>
-          <div className="min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
-            Rechnungs-PDF
-          </div>
-          <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
-            {datum}
-          </div>
-          <div className="text-[length:var(--fs-meta)] text-bw-text-muted">—</div>
-          <div className="flex justify-end gap-1">
+          <span className="dok-list__freigabe">
+            <span>—</span>
+          </span>
+          <div className="dok-list__actions">
             <MockBtn
               sm
               kind="ghost"

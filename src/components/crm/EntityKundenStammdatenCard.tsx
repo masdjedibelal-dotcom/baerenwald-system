@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -62,7 +61,6 @@ export function EntityKundenStammdatenCard({
   ].filter(Boolean) as string[]
 
   const showKundeLink = Boolean(kundeId?.trim() && !hideKundeLink)
-  const showPortalIcon = Boolean(kundeId?.trim())
 
   return (
     <div className={cn('card', isMobile && 'stammdaten-card--mobile')}>
@@ -77,21 +75,12 @@ export function EntityKundenStammdatenCard({
           ) : null}
 
           {isMobile ? (
-            showKundeLink || showPortalIcon ? (
+            showKundeLink ? (
               <div className="vgid-chips vgid-chips--compact">
-                {showKundeLink ? (
-                  <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
-                    <MockIcon ctx="default" n="user" size={14} />
-                    Kundenakte
-                  </Link>
-                ) : null}
-                {showPortalIcon ? (
-                  <PortalLoginIconButton
-                    kundeId={kundeId}
-                    label="Kundenportal öffnen"
-                    className="vgid-portal-icon"
-                  />
-                ) : null}
+                <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
+                  <MockIcon ctx="default" n="user" size={14} />
+                  Kundenakte
+                </Link>
               </div>
             ) : null
           ) : (
@@ -119,13 +108,11 @@ export function EntityKundenStammdatenCard({
             )
           )}
 
-          {!isMobile ? (
-            <StammdatenPortalZeile
-              kundeId={kundeId}
-              fallbackEmail={draft.email}
-              variant="vgid"
-            />
-          ) : null}
+          <StammdatenPortalZeile
+            kundeId={kundeId}
+            fallbackEmail={draft.email}
+            variant="vgid"
+          />
         </div>
       </div>
     </div>

@@ -1,32 +1,36 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
-import { toast } from '@/components/ui/app-toast'
-import {
-  deletePartnerDokument,
-  signPartnerDokumentUrl,
-} from '@/app/(dashboard)/handwerker/actions'
+import { Button } from '@/components/ui/Button'
 import {
   complianceDokumentStatus,
-  dokumentFuerTyp,
   standardDokumente,
   type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
+import { signPartnerDokumentUrl } from '@/app/(dashboard)/handwerker/actions'
+import { toast } from '@/components/ui/app-toast'
 
 function statusMeta(status: ComplianceDokumentStatus): {
   label: string
   tone: 'ok' | 'warn' | 'bad'
 } {
-  if (status === 'ok') return { label: 'Vorhanden', tone: 'ok' }
-  if (status === 'warnung') return { label: 'Läuft bald ab', tone: 'warn' }
+  if (status === 'ok') return { label: 'Gültig', tone: 'ok' }
+  if (status === 'warnung') return { label: 'Bald fällig', tone: 'warn' }
   if (status === 'abgelaufen') return { label: 'Abgelaufen', tone: 'bad' }
   return { label: 'Fehlt', tone: 'bad' }
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const s = String(value).slice(0, 10)
+  const [y, m, d] = s.split('-')
+  if (y && m && d) return `${d}.${m}.${y}`
+  return s
 }
 
 export function HandwerkerComplianceUnterlagenTable({
@@ -39,19 +43,20 @@ export function HandwerkerComplianceUnterlagenTable({
   typen: ComplianceDokumentTyp[]
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [sheetTyp, setSheetTyp] = useState<ComplianceDokumentTyp | null>(null)
-  const standardDocs = useMemo(() => standardDokumente(dokumente), [dokumente])
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
-  const sheetDoc = useMemo(() => {
-    if (!sheetTyp) return null
-    return (
-      dokumentFuerTyp(standardDocs, sheetTyp.slug, {
-        handwerkerId,
-        auftragId: null,
-      }) ?? null
-    )
-  }, [sheetTyp, standardDocs, handwerkerId])
+  const hochgeladen = useMemo(() => standardDokumente(dokumente), [dokumente])
+
+  function openAdd() {
+    setEditDoc(null)
+    setSheetOpen(true)
+  }
+
+  function openEdit(doc: PartnerDokument) {
+    setEditDoc(doc)
+    setSheetOpen(true)
+  }
 
   async function openDatei(stored: string | null | undefined) {
     const r = await signPartnerDokumentUrl(stored)
@@ -62,146 +67,190 @@ export function HandwerkerComplianceUnterlagenTable({
     window.open(r.url, '_blank', 'noopener,noreferrer')
   }
 
-  function removeDoc(docId: string, titel: string) {
-    if (!confirm(`„${titel}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deletePartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Gelöscht')
-        router.refresh()
-      }
-    })
-  }
-
-  if (typen.length === 0) {
-    return (
-      <p className="text-[13px] text-[var(--text-3)]">Keine Compliance-Typen konfiguriert.</p>
-    )
-  }
+  const editTyp =
+    editDoc != null
+      ? typen.find((t) => t.slug === editDoc.typ) ?? {
+          id: `fallback-${editDoc.typ}`,
+          slug: editDoc.typ,
+          bezeichnung: editDoc.bezeichnung || editDoc.typ,
+          beschreibung: null,
+          pflicht_fuer_fachbetriebe: false,
+          erneuerung_monate: null,
+          sort_order: 9999,
+          mehrfach_erlaubt: editDoc.typ === 'individuell',
+        }
+      : null
 
   return (
-    <>
-      <div className="hw-compliance-table-wrap">
-        <table className="hw-compliance-table">
-          <thead>
-            <tr>
-              <th>Unterlage</th>
-              <th>Status</th>
-              <th>Gültig bis</th>
-              <th className="hw-compliance-actions-h">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {typen.map((typ) => {
-              const doc = dokumentFuerTyp(standardDocs, typ.slug, {
-                handwerkerId,
-                auftragId: null,
-              })
-              const st = complianceDokumentStatus(typ, doc)
-              const meta = statusMeta(st)
-              const gueltigLabel = doc?.gueltig_bis
-                ? formatDatum(String(doc.gueltig_bis).slice(0, 10))
-                : null
-
-              return (
-                <tr key={typ.id}>
-                  <td>
-                    <button
-                      type="button"
-                      className="hw-compliance-name-btn"
-                      onClick={() => setSheetTyp(typ)}
-                    >
-                      <div className="hw-compliance-name">{typ.bezeichnung}</div>
-                      {doc?.notizen?.trim() || typ.beschreibung ? (
-                        <div className="hw-compliance-desc">
-                          {doc?.notizen?.trim() || typ.beschreibung}
-                        </div>
-                      ) : null}
-                      {doc?.datei_url ? (
-                        <div className="hw-compliance-file-hint">Datei vorhanden</div>
-                      ) : null}
-                    </button>
-                  </td>
-                  <td>
-                    <span
-                      className={cn(
-                        'hw-compliance-status',
-                        meta.tone === 'ok' && 'is-ok',
-                        meta.tone === 'warn' && 'is-warn',
-                        meta.tone === 'bad' && 'is-bad'
-                      )}
-                    >
-                      {meta.label}
-                    </span>
-                  </td>
-                  <td>
-                    {gueltigLabel ? (
-                      <span className="hw-compliance-date-text">{gueltigLabel}</span>
-                    ) : (
-                      <span className="hw-compliance-muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="hw-compliance-actions">
-                      {doc ? (
-                        <>
-                          <button
-                            type="button"
-                            className="btn ghost sm"
-                            disabled={pending}
-                            onClick={() => void openDatei(doc.datei_url)}
-                          >
-                            <MockIcon ctx="btn" n="eye" size={14} />
-                            Ansehen
-                          </button>
-                          <button
-                            type="button"
-                            className="btn ghost sm"
-                            disabled={pending}
-                            onClick={() => setSheetTyp(typ)}
-                          >
-                            <MockIcon ctx="btn" n="pencil" size={14} />
-                            Bearbeiten
-                          </button>
-                          <button
-                            type="button"
-                            className="btn ghost sm hw-compliance-danger"
-                            disabled={pending}
-                            onClick={() => removeDoc(doc.id, typ.bezeichnung)}
-                          >
-                            <MockIcon ctx="btn" n="trash" size={14} />
-                            Löschen
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn ghost sm"
-                          disabled={pending}
-                          onClick={() => setSheetTyp(typ)}
-                        >
-                          <MockIcon ctx="btn" n="upload" size={14} />
-                          Hochladen
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 'var(--fs-text)',
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Unterlagen
+          </h2>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 'var(--fs-meta)',
+              color: 'var(--text-3)',
+            }}
+          >
+            Hochgeladene Nachweise und Dokumente dieses Handwerkers.
+          </p>
+        </div>
+        <Button type="button" variant="primary" size="sm" onClick={openAdd}>
+          <MockIcon ctx="btn" n="plus" size={14} />
+          Hinzufügen
+        </Button>
       </div>
 
+      {hochgeladen.length === 0 ? (
+        <div
+          className="rounded-xl px-4 py-10 text-center"
+          style={{
+            border: '1px dashed var(--border)',
+            background: 'var(--bg-2, var(--surface-2, transparent))',
+          }}
+        >
+          <MockIcon ctx="nav" n="file" size={28} style={{ color: 'var(--text-3)', opacity: 0.55 }} />
+          <p
+            style={{
+              margin: '12px 0 0',
+              fontSize: 'var(--fs-text)',
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Noch nichts hochgeladen
+          </p>
+          <p style={{ margin: '6px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+            Lade die erste Unterlage hoch — optional mit Vorlage aus dem Katalog.
+          </p>
+          <div style={{ marginTop: 16 }}>
+            <Button type="button" variant="primary" onClick={openAdd}>
+              <MockIcon ctx="btn" n="plus" size={14} />
+              Jetzt hochladen
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {hochgeladen.map((doc) => {
+            const typMeta = typen.find((t) => t.slug === doc.typ)
+            const st = complianceDokumentStatus(
+              typMeta ?? {
+                id: doc.typ,
+                slug: doc.typ,
+                bezeichnung: doc.bezeichnung || doc.typ,
+                beschreibung: null,
+                pflicht_fuer_fachbetriebe: false,
+                erneuerung_monate: null,
+                sort_order: 0,
+              },
+              doc
+            )
+            const meta = statusMeta(st)
+            return (
+              <li
+                key={doc.id}
+                className="rounded-xl p-4"
+                style={{
+                  border: '0.5px solid var(--border)',
+                  background: 'var(--surface, var(--bg))',
+                }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate"
+                      style={{
+                        margin: 0,
+                        fontSize: 'var(--fs-text)',
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                      }}
+                    >
+                      {doc.bezeichnung || typMeta?.bezeichnung || doc.typ}
+                    </p>
+                    {typMeta?.bezeichnung &&
+                    doc.bezeichnung &&
+                    doc.bezeichnung !== typMeta.bezeichnung ? (
+                      <p
+                        className="truncate"
+                        style={{
+                          margin: '2px 0 0',
+                          fontSize: 'var(--fs-meta)',
+                          color: 'var(--text-3)',
+                        }}
+                      >
+                        {typMeta.bezeichnung}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={cn(
+                      'hw-compliance-status',
+                      meta.tone === 'ok' && 'is-ok',
+                      meta.tone === 'warn' && 'is-warn',
+                      meta.tone === 'bad' && 'is-bad'
+                    )}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
+                <div
+                  className="mt-3 flex flex-wrap gap-x-3 gap-y-1"
+                  style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
+                >
+                  <span>Hochgeladen {formatDate(doc.hochgeladen_am)}</span>
+                  {doc.gueltig_bis ? <span>Gültig bis {formatDate(doc.gueltig_bis)}</span> : null}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  {doc.datei_url ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void openDatei(doc.datei_url)}
+                    >
+                      <MockIcon ctx="btn" n="eye" size={14} />
+                      Ansehen
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(doc)}>
+                    Bearbeiten
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
       <PartnerDokumentEditorSheet
-        open={!!sheetTyp}
-        onClose={() => setSheetTyp(null)}
+        open={sheetOpen}
+        onClose={() => {
+          setSheetOpen(false)
+          setEditDoc(null)
+        }}
         handwerkerId={handwerkerId}
-        typ={sheetTyp}
-        existing={sheetDoc}
-        onSaved={() => router.refresh()}
+        typ={editTyp}
+        typen={typen}
+        allowTypPick={!editDoc}
+        existing={editDoc}
+        onSaved={() => {
+          setSheetOpen(false)
+          setEditDoc(null)
+          router.refresh()
+        }}
       />
-    </>
+    </div>
   )
 }

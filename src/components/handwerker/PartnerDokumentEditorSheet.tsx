@@ -1,11 +1,12 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useRef, useState } from 'react'
+import { useTransition } from '@/components/ui/action-busy'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -16,9 +17,21 @@ import {
 } from '@/app/(dashboard)/handwerker/actions'
 import { createClient } from '@/lib/supabase'
 import { partnerDokumentStatusLabel } from '@/lib/handwerker/partner-dokument-status'
+import { INDIVIDUELL_TYP_SLUG } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 
 const BUCKET = 'partner-dokumente'
+
+const EIGENE_UNTERLAGE: ComplianceDokumentTyp = {
+  id: 'individuell-fallback',
+  slug: INDIVIDUELL_TYP_SLUG,
+  bezeichnung: 'Eigene Unterlage',
+  beschreibung: null,
+  pflicht_fuer_fachbetriebe: false,
+  erneuerung_monate: null,
+  sort_order: 9999,
+  mehrfach_erlaubt: true,
+}
 
 function safeFileName(name: string): string {
   return name.replace(/[^\w.\-äöüÄÖÜß]+/gi, '_').slice(0, 120) || 'datei'
@@ -52,13 +65,13 @@ function SheetFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </Button>
       <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="primary" loading={pending} disabled={!canSave} onClick={onSave}>
+          ✓ Speichern
+        </Button>
         {existing?.datei_url ? (
           <Button type="button" variant="secondary" disabled={pending} onClick={onView}>
-            <MockIcon ctx="btn" n="eye" size={14} />
+            <ActionIcon n="eye" size={14} />
             Ansehen
           </Button>
         ) : null}
@@ -70,27 +83,29 @@ function SheetFooter({
             disabled={pending}
             onClick={onDelete}
           >
-            <MockIcon ctx="btn" n="trash" size={14} />
+            <ActionIcon n="trash" size={14} />
             Löschen
           </Button>
         ) : null}
-        <Button type="button" variant="primary" loading={pending} disabled={!canSave} onClick={onSave}>
-          ✓ Speichern
-        </Button>
       </div>
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+        Abbrechen
+      </Button>
     </div>
   )
 }
 
 /**
  * Compliance-Unterlage hochladen / bearbeiten — EditorSheet Split-over.
- * CRM und Partner-Uploads: gleiche Felder; bei bestehendem Doc nur noch bearbeiten / löschen / ansehen.
+ * Beim Neu-Upload optional Vorlage aus dem Katalog wählen oder leer lassen (eigene Unterlage).
  */
 export function PartnerDokumentEditorSheet({
   open,
   onClose,
   handwerkerId,
   typ,
+  typen = [],
+  allowTypPick = false,
   existing,
   onSaved,
 }: {
@@ -98,6 +113,9 @@ export function PartnerDokumentEditorSheet({
   onClose: () => void
   handwerkerId: string
   typ: ComplianceDokumentTyp | null
+  typen?: ComplianceDokumentTyp[]
+  /** Neu-Upload: Vorlage wählbar oder leer = selbst hochladen */
+  allowTypPick?: boolean
   existing: PartnerDokument | null
   onSaved?: () => void
 }) {
@@ -107,20 +125,77 @@ export function PartnerDokumentEditorSheet({
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [gueltigBis, setGueltigBis] = useState('')
+  const [selectedSlug, setSelectedSlug] = useState('')
   const [dirty, setDirty] = useState(false)
 
+  const pickOptions = useMemo(
+    () => [
+      { value: '', label: 'Ohne Vorlage — selbst hochladen' },
+      ...typen
+        .filter((t) => t.slug !== INDIVIDUELL_TYP_SLUG)
+        .map((t) => ({ value: t.slug, label: t.bezeichnung })),
+    ],
+    [typen]
+  )
+
+  const effectiveTyp = useMemo((): ComplianceDokumentTyp | null => {
+    if (existing) {
+      return (
+        typ ??
+        typen.find((t) => t.slug === existing.typ) ?? {
+          ...EIGENE_UNTERLAGE,
+          slug: existing.typ,
+          bezeichnung: existing.bezeichnung || existing.typ,
+        }
+      )
+    }
+    if (allowTypPick) {
+      if (!selectedSlug) return EIGENE_UNTERLAGE
+      return typen.find((t) => t.slug === selectedSlug) ?? EIGENE_UNTERLAGE
+    }
+    return typ
+  }, [existing, typ, typen, allowTypPick, selectedSlug])
+
   useEffect(() => {
-    if (!open || !typ) return
+    if (!open) return
     setFile(null)
-    setTitel(existing?.bezeichnung?.trim() || typ.bezeichnung)
-    setBeschreibung(existing?.notizen?.trim() || typ.beschreibung?.trim() || '')
-    setGueltigBis(defaultGueltigBis(typ, existing))
     setDirty(false)
     if (fileRef.current) fileRef.current.value = ''
-  }, [open, typ, existing])
+
+    if (existing) {
+      const t =
+        typ ??
+        typen.find((x) => x.slug === existing.typ) ?? {
+          ...EIGENE_UNTERLAGE,
+          slug: existing.typ,
+          bezeichnung: existing.bezeichnung || existing.typ,
+        }
+      setSelectedSlug(existing.typ)
+      setTitel(existing.bezeichnung?.trim() || t.bezeichnung)
+      setBeschreibung(existing.notizen?.trim() || t.beschreibung?.trim() || '')
+      setGueltigBis(defaultGueltigBis(t, existing))
+      return
+    }
+
+    setSelectedSlug(typ?.slug && typ.slug !== INDIVIDUELL_TYP_SLUG ? typ.slug : '')
+    const initial = typ && typ.slug !== INDIVIDUELL_TYP_SLUG ? typ : EIGENE_UNTERLAGE
+    setTitel(initial.bezeichnung === EIGENE_UNTERLAGE.bezeichnung ? '' : initial.bezeichnung)
+    setBeschreibung(initial.beschreibung?.trim() || '')
+    setGueltigBis(defaultGueltigBis(initial, null))
+  }, [open, typ, existing, typen])
+
+  useEffect(() => {
+    if (!open || existing || !allowTypPick) return
+    const t = selectedSlug
+      ? typen.find((x) => x.slug === selectedSlug) ?? EIGENE_UNTERLAGE
+      : EIGENE_UNTERLAGE
+    setTitel(selectedSlug ? t.bezeichnung : '')
+    setBeschreibung(t.beschreibung?.trim() || '')
+    setGueltigBis(defaultGueltigBis(t, null))
+  }, [selectedSlug, open, existing, allowTypPick, typen])
 
   const isEdit = Boolean(existing)
-  const canSave = Boolean(typ && titel.trim() && (isEdit || file || existing?.datei_url))
+  const canSave = Boolean(effectiveTyp && titel.trim() && (isEdit || file || existing?.datei_url))
 
   function markDirty() {
     setDirty(true)
@@ -137,8 +212,8 @@ export function PartnerDokumentEditorSheet({
   }
 
   function removeDoc() {
-    if (!existing || !typ) return
-    if (!confirm(`„${existing.bezeichnung || typ.bezeichnung}“ wirklich löschen?`)) return
+    if (!existing || !effectiveTyp) return
+    if (!confirm(`„${existing.bezeichnung || effectiveTyp.bezeichnung}“ wirklich löschen?`)) return
     startTransition(async () => {
       const r = await deletePartnerDokument(existing.id, handwerkerId)
       if (!r.ok) {
@@ -153,7 +228,7 @@ export function PartnerDokumentEditorSheet({
   }
 
   function speichern() {
-    if (!typ || !titel.trim()) {
+    if (!effectiveTyp || !titel.trim()) {
       toast.error('Bitte Titel angeben.')
       return
     }
@@ -162,11 +237,14 @@ export function PartnerDokumentEditorSheet({
       return
     }
 
+    const mehrfach =
+      Boolean(effectiveTyp.mehrfach_erlaubt) || effectiveTyp.slug === INDIVIDUELL_TYP_SLUG
+
     startTransition(async () => {
       try {
         if (file) {
           const supabase = createClient()
-          const path = `${handwerkerId}/${typ.slug}-${Date.now()}-${safeFileName(file.name)}`
+          const path = `${handwerkerId}/${effectiveTyp.slug}-${Date.now()}-${safeFileName(file.name)}`
           const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
             upsert: false,
             contentType: file.type || undefined,
@@ -176,17 +254,18 @@ export function PartnerDokumentEditorSheet({
           const ins = await replacePartnerDokumentForTyp({
             handwerker_id: handwerkerId,
             auftrag_id: null,
-            typ: typ.slug,
+            typ: effectiveTyp.slug,
             bezeichnung: titel.trim(),
             gueltig_bis: gueltigBis.trim() || null,
             datei_url: path,
             notizen: beschreibung.trim() || null,
+            mehrfach,
           })
           if (!ins.ok) {
             await supabase.storage.from(BUCKET).remove([path])
             throw new Error(ins.message)
           }
-          toast.success(isEdit ? 'Unterlage aktualisiert' : `${typ.bezeichnung} hochgeladen`)
+          toast.success(isEdit ? 'Unterlage aktualisiert' : `${effectiveTyp.bezeichnung} hochgeladen`)
         } else if (existing) {
           const r = await updatePartnerDokument(existing.id, handwerkerId, {
             bezeichnung: titel.trim(),
@@ -208,7 +287,8 @@ export function PartnerDokumentEditorSheet({
     })
   }
 
-  if (!typ) return null
+  if (!open) return null
+  if (!allowTypPick && !effectiveTyp && !existing) return null
 
   const partnerHint =
     existing &&
@@ -219,12 +299,18 @@ export function PartnerDokumentEditorSheet({
         ? 'Vorhanden — bearbeiten, ersetzen oder löschen'
         : null
 
+  const crumbLabel = allowTypPick && !existing
+    ? selectedSlug
+      ? effectiveTyp?.bezeichnung ?? 'Unterlage'
+      : 'Eigene Unterlage'
+    : effectiveTyp?.bezeichnung ?? 'Unterlage'
+
   return (
     <EditorSheet
       open={open}
       onClose={onClose}
       title={isEdit ? 'Unterlage bearbeiten' : 'Unterlage hochladen'}
-      crumb={`${typ.bezeichnung} >`}
+      crumb={`${crumbLabel} >`}
       context="detail"
       dirty={dirty}
       size="md"
@@ -249,9 +335,29 @@ export function PartnerDokumentEditorSheet({
           </p>
         ) : (
           <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Nachweis aus dem CRM oder vom Partner — Datei, Titel, Beschreibung und Gültigkeit.
+            Optional Vorlage wählen oder leer lassen und eigene Datei hochladen.
           </p>
         )}
+
+        {allowTypPick && !existing ? (
+          <Select
+            label="Vorlage"
+            value={selectedSlug}
+            options={pickOptions}
+            disabled={pending}
+            onChange={(e) => {
+              setSelectedSlug(e.target.value)
+              markDirty()
+            }}
+            hint="Aus dem Katalog oder ohne Vorlage selbst hochladen."
+          />
+        ) : null}
+
+        {effectiveTyp?.beschreibung && selectedSlug ? (
+          <p className="m-0 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+            {effectiveTyp.beschreibung}
+          </p>
+        ) : null}
 
         <div className="form-field">
           <label className="form-field-label">
@@ -260,7 +366,7 @@ export function PartnerDokumentEditorSheet({
           {existing?.datei_url && !file ? (
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <button type="button" className="btn ghost sm" onClick={() => void openDatei()}>
-                <MockIcon ctx="btn" n="file" size={14} />
+                <ActionIcon n="file" size={14} />
                 Aktuelle Datei öffnen
               </button>
               <span className="text-[length:var(--fs-meta)] text-bw-text-muted">

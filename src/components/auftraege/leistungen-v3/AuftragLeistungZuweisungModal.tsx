@@ -330,9 +330,6 @@ export function AuftragLeistungZuweisungModal({
                 <label className="hw-anfrage-field">
                   <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
                   <div className="hw-anfrage-date-field">
-                    <span className="hw-anfrage-date-icon" aria-hidden>
-                      <MockIcon ctx="btn" n="calendar" size={15} />
-                    </span>
                     <input
                       type="date"
                       className="input"
@@ -345,15 +342,32 @@ export function AuftragLeistungZuweisungModal({
                       }}
                       disabled={pending}
                     />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending}
+                      aria-label="Kalender öffnen"
+                      onClick={(e) => {
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                          input?.click()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
                   </div>
                 </label>
                 {zeitModus === 'zeitraum' ? (
                   <label className="hw-anfrage-field">
                     <span className="hw-anfrage-label">Bis</span>
                     <div className="hw-anfrage-date-field">
-                      <span className="hw-anfrage-date-icon" aria-hidden>
-                        <MockIcon ctx="btn" n="calendar" size={15} />
-                      </span>
                       <input
                         type="date"
                         className="input"
@@ -365,6 +379,26 @@ export function AuftragLeistungZuweisungModal({
                         }}
                         disabled={pending}
                       />
+                      <button
+                        type="button"
+                        className="hw-anfrage-date-icon"
+                        tabIndex={-1}
+                        disabled={pending}
+                        aria-label="Kalender öffnen"
+                        onClick={(e) => {
+                          const input = (e.currentTarget.parentElement?.querySelector(
+                            'input[type="date"]'
+                          ) ?? null) as HTMLInputElement | null
+                          try {
+                            input?.showPicker?.()
+                          } catch {
+                            input?.focus()
+                            input?.click()
+                          }
+                        }}
+                      >
+                        <MockIcon ctx="btn" n="calendar" size={15} />
+                      </button>
                     </div>
                   </label>
                 ) : null}

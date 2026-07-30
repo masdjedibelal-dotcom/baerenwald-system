@@ -600,6 +600,7 @@ export async function anfrageHandwerkerBautagebuchEintrag(input: {
   auftragId: string
   handwerkerId: string
   notiz?: string | null
+  positionIds?: string[] | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId.trim())
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -612,15 +613,19 @@ export async function anfrageHandwerkerBautagebuchEintrag(input: {
     auftragId: input.auftragId.trim(),
     handwerkerId: input.handwerkerId.trim(),
     notiz: input.notiz,
+    positionIds: input.positionIds,
     angefordertVonUserId: gate.userId,
   })
   if (!res.ok) return res
 
+  const posCount = (input.positionIds ?? []).filter(Boolean).length
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId.trim(),
     typ: 'mail_handwerker',
     titel: 'Tagebucheintrag angefordert',
-    beschreibung: 'Partner per E-Mail zur Bautagebuch-Dokumentation aufgefordert.',
+    beschreibung: posCount
+      ? `Partner zur Bautagebuch-Dokumentation aufgefordert (${posCount} Leistung${posCount === 1 ? '' : 'en'}).`
+      : 'Partner per E-Mail und Portal zur Bautagebuch-Dokumentation aufgefordert.',
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
   })

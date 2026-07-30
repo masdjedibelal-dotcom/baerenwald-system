@@ -1,12 +1,14 @@
 'use client'
 
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Toggle } from '@/components/ui/Toggle'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
 import { richTextToEditablePlain } from '@/lib/rich-text'
+import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 
 const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
   { value: 'allgemein', label: 'Allgemein' },
@@ -198,7 +200,35 @@ export function PositionModal({
               })}
             </div>
           </Field>
-          <Field label="Menge">
+          <Field
+            label="Vergütung"
+            full
+            hint={
+              p.regieSchein
+                ? 'Im Angebot nur Schätzung (Stunden × Satz). Finaler Aufwand kommt vom Handwerker über Bautagebuch (Start-/Ende-Fotos, Stunden, Titel, Beschreibung — Pflicht).'
+                : 'Festpreis: Menge × Einzelpreis. Für Aufwand/Regie Schalter aktivieren.'
+            }
+          >
+            <Toggle
+              checked={Boolean(p.regieSchein)}
+              label={REGIE_BADGE_LABEL}
+              hint="Stunden & Stundensatz statt Festpreis"
+              onChange={(on) => {
+                if (on) {
+                  const einheit =
+                    p.einheit === 'h' || p.einheit === 'Std.' ? p.einheit : 'h'
+                  onChange({
+                    regieSchein: true,
+                    einheit,
+                    notizExtern: p.notizExtern?.trim() || 'nach Aufwand',
+                  })
+                } else {
+                  onChange({ regieSchein: false })
+                }
+              }}
+            />
+          </Field>
+          <Field label={p.regieSchein ? 'Geschätzte Stunden' : 'Menge'}>
             <div style={{ display: 'flex', gap: 4 }}>
               <input
                 className="txt"
@@ -217,6 +247,7 @@ export function PositionModal({
                 value={p.einheit}
                 onChange={(e) => onChange({ einheit: e.target.value })}
                 style={{ width: 100 }}
+                disabled={Boolean(p.regieSchein)}
               >
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
@@ -226,9 +257,9 @@ export function PositionModal({
               </select>
             </div>
           </Field>
-          <Field label="Einzelpreis (netto)">
+          <Field label={p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}>
             <div className="txt-prefix">
-              <span className="prefix">€</span>
+              <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
               <input
                 className="txt"
                 type="number"

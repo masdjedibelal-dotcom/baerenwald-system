@@ -234,6 +234,7 @@ export function dokumentZeilenToAngebotPositionen(
         kostenart,
         kostenverteilung,
       })
+      const isRegie = Boolean(z.regieSchein)
       out.push({
         id: z.id,
         gewerk_id: z.gewerk_id ?? '',
@@ -260,6 +261,16 @@ export function dokumentZeilenToAngebotPositionen(
         mwst_satz: z.mwstSatz as number,
         vk_netto: stueck,
         kostenart,
+        verguetung: isRegie ? 'aufwand' : 'festpreis',
+        ...(isRegie
+          ? {
+              geschaetzt_std: m,
+              stundensatz: stueck,
+              notiz_extern: z.notizExtern?.trim() || 'nach Aufwand',
+            }
+          : z.notizExtern?.trim()
+            ? { notiz_extern: z.notizExtern.trim() }
+            : {}),
         ...(kostenart !== 'anfahrt' ? { kostenverteilung } : {}),
         ...(z.preisliste_id ? { leistung_id: z.preisliste_id } : {}),
         ...(z.fachbetriebHinweisAnzeigen !== undefined
@@ -353,16 +364,18 @@ export function angebotPositionenToDokumentZeilen(
     const kostenart: KostenartZeile =
       p.kostenart === 'anfahrt' || p.gewerk_slug === GEWERK_SLUG_ANFAHRT ? 'anfahrt' : 'leistung'
     const notizExtern = p.notiz_extern?.trim() || undefined
-    const regieSchein = Boolean(
-      notizExtern &&
-        (/regieschein/i.test(notizExtern) || /nach aufwand/i.test(notizExtern))
-    )
+    const regieSchein =
+      String(p.verguetung ?? '').toLowerCase() === 'aufwand' ||
+      Boolean(
+        notizExtern &&
+          (/regieschein/i.test(notizExtern) || /nach aufwand/i.test(notizExtern))
+      )
     out.push({
       id: p.id,
       typ: 'artikel',
       bezeichnung: leistung || besch || 'Position',
       positionBeschreibung: besch && besch !== leistung ? besch : undefined,
-      notizExtern,
+      notizExtern: regieSchein ? notizExtern || 'nach Aufwand' : notizExtern,
       regieSchein,
       menge: m,
       einheit: p.einheit || 'Stk.',

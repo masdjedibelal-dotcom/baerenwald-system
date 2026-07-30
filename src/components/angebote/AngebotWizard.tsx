@@ -17,7 +17,6 @@ import {
   type GewerkHandwerkerZuweisung,
 } from '@/components/angebote/AngebotWizardHandwerkerStep'
 import {
-  DcTotalBlock,
   MetaCrowButton,
   TotBand,
 } from '@/components/angebote/AngebotWizardCanvasMeta'
@@ -28,6 +27,7 @@ import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { applyKiDokumentTextDraft, applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { DocActionBar } from '@/components/surfaces/primitives'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -126,9 +126,8 @@ type WizardSheetId =
   | 'kunde'
   | 'dokument'
   | 'zahlung'
-  | 'anschreiben'
+  | 'versand'
   | 'vorschau'
-  | 'senden'
   | null
 
 /** Bestehende HW-Zuweisung aus Bootstrap-Positionen (handwerker_id pro Gewerk). */
@@ -173,7 +172,7 @@ function regionLabel(lead: LeadDetail): string {
 
 /**
  * Angebots-Wizard — DocumentCanvas 1:1 Mock:
- * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Anschreiben),
+ * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Versand),
  * DocBar Vorschau · Senden · PDF|Speichern · Verwerfen; mobil Speichern in DocBar (kein Footer-CTA).
  */
 export function AngebotWizard({
@@ -275,18 +274,21 @@ export function AngebotWizard({
   const [mounted, setMounted] = useState(false)
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
+  /** Neu: Typ zuerst wählen — entscheidet über Gewerke im PosBoard. */
+  const needsTypGate = !bootstrap?.angebotId && !istAuftragKorrektur && !istNachtrag
+  const [typConfirmed, setTypConfirmed] = useState(!needsTypGate)
   const [sheet, setSheet] = useState<WizardSheetId>(() => {
     const s = Number(initialStep)
     if (s === 4) return 'vorschau'
-    if (s === 5) return 'senden'
+    if (s === 5) return 'versand'
     if (focusField === 'titel' || focusField === 'beschreibung') return 'dokument'
     return null
   })
-  const anschreibenFieldRef = useRef<'einleitung' | 'schluss'>('einleitung')
-  useKiAssistDraftConsumer(sheet === 'anschreiben', 'text', (d) => {
+  const versandTextFieldRef = useRef<'einleitung' | 'schluss'>('einleitung')
+  useKiAssistDraftConsumer(sheet === 'versand', 'text', (d) => {
     applyKiDokumentTextDraft(d, {
       setText: (v) => {
-        if (anschreibenFieldRef.current === 'schluss') {
+        if (versandTextFieldRef.current === 'schluss') {
           setMeta((m) => ({ ...m, schluss: v }))
         } else {
           setMeta((m) => ({ ...m, einleitung: v }))
@@ -350,11 +352,7 @@ export function AngebotWizard({
   const [zahlungsplan] = useState<Zahlungsplan | null>(() => bootstrap?.zahlungsplan ?? null)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
-  const wizardTitel = istNachtrag
-    ? 'Nachtrag erstellen'
-    : istAuftragKorrektur
-      ? 'Angebot korrigieren'
-      : 'Angebot erstellen'
+  const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const isMobile = useIsMobile()
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
@@ -371,7 +369,7 @@ export function AngebotWizard({
   useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
     applyKiDokumentTextDraft(d, { setText: setProjektbeschreibung })
   })
-  useKiAssistDraftConsumer(sheet === 'senden', ['mail', 'text'], (d) => {
+  useKiAssistDraftConsumer(sheet === 'versand', ['mail', 'text'], (d) => {
     applyKiMailOrTextDraft(d, {
       setBetreff: setMailBetreff,
       setBody: () => {},
@@ -650,10 +648,12 @@ export function AngebotWizard({
     [zahlfristSeg, zahlfristDatum]
   )
 
-  const positionenKopf =
-    dokumentTyp === 'projekt'
-      ? meta.leistungsumfang.trim() || meta.titel.trim() || projekt
-      : projekt
+  /** PosBoard-Titel = Angebotstitel (wie Rechnungstitel), kein „Positionen · …“. */
+  const angebotTitel =
+    meta.titel.trim() ||
+    (dokumentTyp === 'projekt'
+      ? meta.leistungsumfang.trim() || projekt
+      : projekt)
 
   useEffect(() => {
     setMounted(true)
@@ -1043,12 +1043,9 @@ export function AngebotWizard({
     .filter(Boolean)
     .join(' · ')
 
-  const anschreibenCrowValue =
-    (meta.einleitung || '').trim().slice(0, 42) ||
-    (meta.schluss || '').trim().slice(0, 42) ||
-    'Texte ergänzen'
+  const versandCrowValue = mailTo[0]?.trim() || email?.trim() || 'Empfänger ergänzen'
 
-  const subtitle = [name, region].filter((x) => x && x !== '—').join(' · ')
+  const wizardSubtitle = name?.trim() && name !== '—' ? name.trim() : undefined
 
   const docActions = (
     <DocActionBar
@@ -1057,13 +1054,13 @@ export function AngebotWizard({
           id: 'preview',
           label: 'Vorschau',
           onClick: () => void openVorschauSheet(),
-          icon: <MockIcon ctx="default" n="file-text" size={20} />,
+          icon: <ActionIcon n="file-text" size={20} />,
         },
         {
           id: 'send',
           label: 'Senden',
-          onClick: () => setSheet('senden'),
-          icon: <MockIcon ctx="default" n="send" size={20} />,
+          onClick: () => setSheet('versand'),
+          icon: <ActionIcon n="send" size={20} />,
         },
         isMobile
           ? {
@@ -1073,13 +1070,13 @@ export function AngebotWizard({
                 if (saving) return
                 void persistDraft({ notify: true })
               },
-              icon: <MockIcon ctx="default" n="device-floppy" size={20} />,
+              icon: <ActionIcon n="device-floppy" size={20} />,
             }
           : {
               id: 'pdf',
               label: 'PDF',
               onClick: () => void openPdf(),
-              icon: <MockIcon ctx="default" n="download" size={20} />,
+              icon: <ActionIcon n="download" size={20} />,
             },
       ]}
     />
@@ -1088,7 +1085,7 @@ export function AngebotWizard({
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
       <PosBoard
-        title={`Positionen · ${positionenKopf}`}
+        title={angebotTitel || 'Angebot'}
         positionen={posBoardLines}
         onChange={onPosBoardChange}
         showUst
@@ -1097,6 +1094,15 @@ export function AngebotWizard({
         preislisten={preislisten}
         hideAddGewerk={dokumentTyp === 'einfach'}
         suggestContext={istAuftragKorrektur ? null : posSuggestContext}
+        badgeOf={(p) =>
+          p.regieSchein
+            ? { kind: 'warn', icon: 'paperclip', label: 'nach Aufwand' }
+            : p.kind === 'freitext'
+              ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
+              : p.kind === 'nachlass'
+                ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
+                : null
+        }
         headerAction={
           istAuftragKorrektur ? undefined : (
             <AngebotKiAssistentButton
@@ -1116,6 +1122,7 @@ export function AngebotWizard({
       />
 
       <TotBand
+        className="totband--green"
         netto={mailSummen.nettoMin}
         ust={mailSummen.mwstBetragMin}
         brutto={mailSummen.bruttoMin}
@@ -1138,21 +1145,11 @@ export function AngebotWizard({
         onClick={() => setSheet('zahlung')}
       />
       <MetaCrowButton
-        label="Anschreiben"
-        value={anschreibenCrowValue}
-        onClick={() => setSheet('anschreiben')}
+        label="Versand"
+        value={versandCrowValue}
+        onClick={() => setSheet('versand')}
       />
     </div>
-  )
-
-  const metaSum = (
-    <DcTotalBlock
-      netto={mailSummen.nettoMin}
-      ust={mailSummen.mwstBetragMin}
-      brutto={mailSummen.bruttoMin}
-      ustLabel={ustLabel}
-      hint={istNachtrag ? 'Nachtrag · Summe der neuen Positionen' : undefined}
-    />
   )
 
   const footerCta = (
@@ -1172,7 +1169,7 @@ export function AngebotWizard({
     <>
       <DocumentCanvas
         title={wizardTitel}
-        subtitle={subtitle || undefined}
+        subtitle={wizardSubtitle}
         onClose={handleRequestClose}
         onSave={() => void persistDraft({ notify: true })}
         saveBusy={saving}
@@ -1182,7 +1179,6 @@ export function AngebotWizard({
         docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
-        metaSum={metaSum}
         footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
@@ -1238,31 +1234,9 @@ export function AngebotWizard({
       >
         <div className="form-grid form-grid--sheet">
           {!istAuftragKorrektur ? (
-            <>
-              <div className="full">
-                <div className="doctype-row">
-                  <label
-                    className={`doctype-radio-opt${dokumentTyp === 'einfach' ? ' on' : ''}`}
-                    onClick={() => setDokumentTyp('einfach')}
-                  >
-                    <span className="dot" />
-                    <MockIcon ctx="default" n="file-text" size={16} />
-                    <span className="lbl">Einfach</span>
-                  </label>
-                  <label
-                    className={`doctype-radio-opt${dokumentTyp === 'projekt' ? ' on' : ''}`}
-                    onClick={() => setDokumentTyp('projekt')}
-                  >
-                    <span className="dot" />
-                    <MockIcon ctx="default" n="checklist" size={16} />
-                    <span className="lbl">Komplex</span>
-                  </label>
-                </div>
-              </div>
-              <div className="full">
-                <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
-              </div>
-            </>
+            <div className="full">
+              <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
+            </div>
           ) : null}
           <MockField label="Angebotstitel" full>
             <input
@@ -1424,65 +1398,6 @@ export function AngebotWizard({
       </EditorSheet>
 
       <EditorSheet
-        open={sheet === 'anschreiben'}
-        onClose={closeSheet}
-        title="Anschreiben"
-        context="canvas"
-        headerEnd={
-          <KiAssistIconButton
-            scope="dokument"
-            extraHint="Angebot-Anschreiben (Einleitung/Schluss) für den Kunden auf dem PDF."
-            draftInput={
-              anschreibenFieldRef.current === 'schluss'
-                ? meta.schluss || null
-                : meta.einleitung || null
-            }
-          />
-        }
-      >
-        <div className="form-grid form-grid--sheet space-y-4">
-          <KiAssistFieldLabel
-            label="Einleitung"
-            scope="dokument"
-            extraHint="Angebot-Einleitung (kundensichtbar auf PDF)."
-            draftInput={meta.einleitung || null}
-            onBeforeOpen={() => {
-              anschreibenFieldRef.current = 'einleitung'
-            }}
-          >
-            <textarea
-              className="input ta"
-              rows={5}
-              value={meta.einleitung}
-              onFocus={() => {
-                anschreibenFieldRef.current = 'einleitung'
-              }}
-              onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
-            />
-          </KiAssistFieldLabel>
-          <KiAssistFieldLabel
-            label="Schlusstext"
-            scope="dokument"
-            extraHint="Angebot-Schlusstext (kundensichtbar auf PDF)."
-            draftInput={meta.schluss || null}
-            onBeforeOpen={() => {
-              anschreibenFieldRef.current = 'schluss'
-            }}
-          >
-            <textarea
-              className="input ta"
-              rows={4}
-              value={meta.schluss}
-              onFocus={() => {
-                anschreibenFieldRef.current = 'schluss'
-              }}
-              onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
-            />
-          </KiAssistFieldLabel>
-        </div>
-      </EditorSheet>
-
-      <EditorSheet
         open={sheet === 'vorschau'}
         onClose={closeSheet}
         title="Vorschau"
@@ -1497,15 +1412,25 @@ export function AngebotWizard({
       </EditorSheet>
 
       <EditorSheet
-        open={sheet === 'senden'}
+        open={sheet === 'versand'}
         onClose={closeSheet}
-        title="Senden"
+        title="Versand"
         context="canvas"
         compose
         composeLabel={saving ? '…' : 'Senden'}
         onConfirm={() => void handleFinishVersenden()}
         confirmDisabled={saving}
         confirmBusy={saving}
+        headerEnd={
+          <KiAssistIconButton
+            scope="mail"
+            extraHint="Betreff und Anschreiben für den Angebotsversand."
+            draftInput={
+              `${mailBetreff || defaultMailBetreff}\n\n${meta.einleitung}\n\n${meta.schluss}`.trim() ||
+              null
+            }
+          />
+        }
         footer={
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {istAuftragKorrektur ? (
@@ -1524,7 +1449,7 @@ export function AngebotWizard({
           </div>
         }
       >
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div className="form-grid form-grid--sheet">
           <EmailPillsField
             label="An"
             required
@@ -1535,10 +1460,10 @@ export function AngebotWizard({
             disabled={saving}
           />
           <EmailPillsField
-            label="CC"
+            label="Cc"
             emails={mailCc}
             onChange={setMailCc}
-            placeholder="weitere@beispiel.de"
+            placeholder="optional"
             hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={saving}
           />
@@ -1546,67 +1471,127 @@ export function AngebotWizard({
             label="Betreff"
             scope="mail"
             extraHint="Mail-Betreff für den Angebotsversand an den Kunden."
-            draftInput={mailBetreff || null}
-            required
+            draftInput={mailBetreff || defaultMailBetreff || null}
           >
             <input
-              className="txt"
-              value={mailBetreff}
+              className="input"
+              value={mailBetreff || defaultMailBetreff}
               onChange={(e) => setMailBetreff(e.target.value)}
               disabled={saving}
-              placeholder={defaultMailBetreff}
             />
           </KiAssistFieldLabel>
-          <div className="wz-overview">
-            <div>
-              <span className="k">Gültig bis</span>
-              <b>{meta.gueltig_bis ? formatDatum(meta.gueltig_bis) : '—'}</b>
-            </div>
-            <div>
-              <span className="k">Zahlfrist</span>
-              <b>{zahlfristText}</b>
-            </div>
-            <div>
-              <span className="k">Gesamt</span>
-              <b>{formatEurBetrag(mailSummen.bruttoMin)} brutto</b>
-            </div>
+          <div className="full">
+            <KiAssistFieldLabel
+              label="Einleitung"
+              scope="dokument"
+              extraHint="Anschreiben in der Mail und auf dem Angebot."
+              draftInput={meta.einleitung || null}
+              onBeforeOpen={() => {
+                versandTextFieldRef.current = 'einleitung'
+              }}
+            >
+              <textarea
+                className="input ta"
+                rows={5}
+                value={meta.einleitung}
+                onFocus={() => {
+                  versandTextFieldRef.current = 'einleitung'
+                }}
+                onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
+              />
+            </KiAssistFieldLabel>
           </div>
-          <AngebotWizardMailPreview
-            angebotId={angebotId}
-            betreff={mailBetreff.trim() || undefined}
-            einleitung={meta.einleitung}
-            schluss={meta.schluss}
-            leistungsumfang={meta.leistungsumfang.trim() || projekt}
-            empfaengerHint={mailTo[0] || email || undefined}
-          />
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--fs-meta)',
-              color: 'var(--text-3)',
-              display: 'flex',
-              gap: 6,
-              alignItems: 'flex-start',
-            }}
-          >
-            <MockIcon ctx="default" n="info-circle" size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-            <span>
-              {istAuftragKorrektur ? (
-                <>
-                  <strong>Senden</strong> = korrigiertes Angebot per Mail.{' '}
-                  <strong>Übernehmen</strong> = ohne Kunden-Mail.
-                </>
-              ) : (
-                <>Mit „Senden“ geht das Angebot per Mail. „Erstellen“ speichert ohne Versand.</>
-              )}
-            </span>
-          </p>
+          <div className="full">
+            <KiAssistFieldLabel
+              label="Schlusstext"
+              scope="dokument"
+              extraHint="Schlusstext in der Mail und auf dem Angebot."
+              draftInput={meta.schluss || null}
+              onBeforeOpen={() => {
+                versandTextFieldRef.current = 'schluss'
+              }}
+            >
+              <textarea
+                className="input ta"
+                rows={4}
+                value={meta.schluss}
+                onFocus={() => {
+                  versandTextFieldRef.current = 'schluss'
+                }}
+                onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
+              />
+            </KiAssistFieldLabel>
+          </div>
+          <div className="full">
+            <AngebotWizardMailPreview
+              angebotId={angebotId}
+              betreff={mailBetreff.trim() || defaultMailBetreff}
+              einleitung={meta.einleitung}
+              schluss={meta.schluss}
+              leistungsumfang={meta.leistungsumfang.trim() || projekt}
+              empfaengerHint={mailTo[0] || email || undefined}
+            />
+          </div>
         </div>
       </EditorSheet>
     </>
   )
 
-  return createPortal(wizard, document.body)
+  return createPortal(
+    !typConfirmed ? (
+      <EditorSheet
+        open
+        onClose={onClose}
+        title="Angebotstyp"
+        context="canvas"
+        manageHistory={false}
+      >
+        <p
+          style={{
+            margin: '0 0 14px',
+            fontSize: 'var(--fs-meta)',
+            color: 'var(--text-3)',
+            lineHeight: 1.45,
+          }}
+        >
+          Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst.
+        </p>
+        <div className="doctype-row doctype-row--stack">
+          <button
+            type="button"
+            className="doctype-radio-opt doctype-radio-opt--block"
+            onClick={() => {
+              setDokumentTyp('einfach')
+              setTypConfirmed(true)
+            }}
+          >
+            <span className="dot" />
+            <span className="doctype-radio-opt__copy">
+              <span className="lbl">Einfach</span>
+              <span className="hint">Nur Positionen — ohne Gewerk-Abschnitte</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="doctype-radio-opt doctype-radio-opt--block"
+            onClick={() => {
+              setDokumentTyp('projekt')
+              setTypConfirmed(true)
+            }}
+          >
+            <span className="dot" />
+            <span className="doctype-radio-opt__copy">
+              <span className="lbl">Komplex</span>
+              <span className="hint">Mit Gewerken — z. B. Sanitär, Elektro, Maler</span>
+            </span>
+          </button>
+        </div>
+      </EditorSheet>
+    ) : (
+      wizard
+    ),
+    document.body
+  )
 }
 
 

@@ -11,7 +11,7 @@ type ScrollChrome = {
 
 /**
  * Mobil-Chrome: kompakter Kopf ab ~40px,
- * hide-on-scroll-down für Sticky-CTA / Bottom-Leisten.
+ * hideChrome = Scroll nach unten (Legacy; Detail-CTA nutzt `scrolled` für Glass-Kompakt).
  */
 export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
   const [scrolled, setScrolled] = useState(false)

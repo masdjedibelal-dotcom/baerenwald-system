@@ -8,7 +8,7 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { cn } from '@/lib/utils'
 
 const AXIS_LOCK = 10
@@ -180,7 +180,7 @@ export function SwipeRow({
                 runAction(a)
               }}
             >
-              <MockIcon ctx="btn" n={a.icon} size={16} />
+              <ActionIcon n={a.icon} size={16} />
             </button>
           ))}
         </div>
@@ -202,7 +202,7 @@ export function SwipeRow({
                 runAction(a)
               }}
             >
-              <MockIcon ctx="btn" n={a.icon} size={16} />
+              <ActionIcon n={a.icon} size={16} />
             </button>
           ))}
         </div>

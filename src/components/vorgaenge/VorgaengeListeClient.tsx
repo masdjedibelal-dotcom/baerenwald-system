@@ -58,15 +58,6 @@ const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'status', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
 ]
 
-const COL_LABELS: Record<DataColId, string> = {
-  kunde: 'Kunde',
-  titel: 'Vorgang',
-  phase: 'Phase',
-  wert: 'Wert',
-  datum: 'Datum',
-  status: 'Status',
-}
-
 function phaseChipLabel(p: (typeof VORGANG_FILTERS)[number]): string {
   if (p === 'alle') return 'Alle'
   if (p === 'bestand') return 'Wartung & Pflege'
@@ -215,15 +206,14 @@ export function VorgaengeListeClient({
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
-  const [visibleCols, setVisibleCols] = useState<Record<DataColId, boolean>>({
+  const visibleCols: Record<DataColId, boolean> = {
     kunde: true,
     titel: true,
     phase: true,
     wert: true,
     datum: true,
     status: true,
-  })
-  const [columnsOpen, setColumnsOpen] = useState(false)
+  }
   const [flashKeys, setFlashKeys] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('datum')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
@@ -830,11 +820,6 @@ export function VorgaengeListeClient({
               onSelect: () => setFilterOpen(true),
             },
             {
-              icon: 'layout',
-              label: 'Spalten',
-              onSelect: () => setColumnsOpen(true),
-            },
-            {
               icon: 'download',
               label: 'CSV exportieren',
               onSelect: () =>
@@ -880,13 +865,6 @@ export function VorgaengeListeClient({
                     : 'Filter & Suchen'
                 }
                 onClick={() => setFilterOpen(true)}
-              />
-              <MockBtn
-                icon="layout"
-                kind="ghost"
-                sm
-                title="Spalten"
-                onClick={() => setColumnsOpen(true)}
               />
               <MockBtn
                 icon="download"
@@ -1024,36 +1002,6 @@ export function VorgaengeListeClient({
             : selectedCount === 1
               ? 'Der ausgewählte Vorgang wird unwiderruflich gelöscht.'
               : `${selectedCount} ausgewählte Vorgänge werden unwiderruflich gelöscht.`}
-        </div>
-      </MockModal>
-
-      <MockModal
-        open={columnsOpen}
-        onClose={() => setColumnsOpen(false)}
-        icon="filter"
-        title="Spalten"
-        sub="Sichtbare Spalten wählen"
-        size="sm"
-        footer={
-          <MockBtn kind="primary" onClick={() => setColumnsOpen(false)}>
-            Fertig
-          </MockBtn>
-        }
-      >
-        <div className="space-y-2">
-          {DATA_COL_IDS.map((id) => (
-            <label key={id} className="flex items-center gap-2 text-[length:var(--fs-text)]">
-              <input
-                type="checkbox"
-                checked={visibleCols[id]}
-                disabled={id === 'kunde' || id === 'titel'}
-                onChange={() =>
-                  setVisibleCols((prev) => ({ ...prev, [id]: !prev[id] }))
-                }
-              />
-              {COL_LABELS[id]}
-            </label>
-          ))}
         </div>
       </MockModal>
 

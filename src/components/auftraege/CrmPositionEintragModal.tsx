@@ -129,11 +129,11 @@ export function CrmPositionEintragModal({
       }
       footer={
         <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
           <Button type="button" variant="primary" loading={pending} onClick={speichern}>
             Speichern
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
+            Abbrechen
           </Button>
         </div>
       }

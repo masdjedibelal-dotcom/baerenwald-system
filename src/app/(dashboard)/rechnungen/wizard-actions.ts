@@ -10,7 +10,10 @@ import {
   updateRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
-import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import {
+  aggregateRegieBeschreibungFromEintraege,
+  auftragPositionenToAngebotPositionen,
+} from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -196,11 +199,13 @@ async function positionenAusAuftrag(
       .filter((p) => String(p.typ ?? '').toLowerCase() === 'regie' || p.verguetung === 'aufwand')
       .map((p) => p.id)
     const regieZeitMinutenByPositionId: Record<string, number> = {}
+    const regieBeschreibungByPositionId: Record<string, string> = {}
     if (regieIds.length) {
       const { data: eintraege } = await supabase
         .from('position_eintraege')
-        .select('position_id, zeit_minuten')
+        .select('position_id, zeit_minuten, beschreibung, typ, created_at')
         .in('position_id', regieIds)
+        .order('created_at', { ascending: true })
       for (const e of eintraege ?? []) {
         const pid = String((e as { position_id?: string }).position_id ?? '')
         if (!pid) continue
@@ -208,9 +213,24 @@ async function positionenAusAuftrag(
           (regieZeitMinutenByPositionId[pid] ?? 0) +
           (Number((e as { zeit_minuten?: number | null }).zeit_minuten) || 0)
       }
+      Object.assign(
+        regieBeschreibungByPositionId,
+        aggregateRegieBeschreibungFromEintraege(
+          (eintraege ?? []) as Array<{
+            position_id?: string | null
+            beschreibung?: string | null
+            zeit_minuten?: number | null
+            typ?: string | null
+            created_at?: string | null
+          }>
+        )
+      )
     }
     positionen = sanitizeAngebotPositionenForExport(
-      auftragPositionenToAngebotPositionen(auftragPos, { regieZeitMinutenByPositionId }),
+      auftragPositionenToAngebotPositionen(auftragPos, {
+        regieZeitMinutenByPositionId,
+        regieBeschreibungByPositionId,
+      }),
       gewerke
     )
   } else {

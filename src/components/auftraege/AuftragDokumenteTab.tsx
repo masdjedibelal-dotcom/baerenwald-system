@@ -46,13 +46,6 @@ function freigabeLabel(row: AuftragDokumentZeile): string {
   return 'intern'
 }
 
-function isFotoRow(row: AuftragDokumentZeile): boolean {
-  return (
-    /\.(jpe?g|png|webp|gif)$/i.test(row.name) ||
-    Boolean(row.beschreibung?.toLowerCase().includes('foto'))
-  )
-}
-
 export function AuftragDokumenteTab({
   detail,
   rechnungen = [],
@@ -244,7 +237,7 @@ export function AuftragDokumenteTab({
     setEditDesc(row.beschreibung === '—' ? '' : row.beschreibung)
   }
 
-  function renderFreigabe(row: AuftragDokumentZeile, compact?: boolean) {
+  function renderFreigabe(row: AuftragDokumentZeile) {
     const ev = row.timelineId ? timelineById.get(row.timelineId) : null
     const readOnly = row.quelle !== 'timeline' || !row.timelineId
     if (readOnly) {
@@ -260,55 +253,22 @@ export function AuftragDokumenteTab({
         </span>
       )
     }
-    if (isMobile) {
-      return (
-        <button
-          type="button"
-          className={cn(
-            'dok-freigabe-pill',
-            row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-intern'
-          )}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (ev) toggleFreigabe(ev, !row.fuerKunde)
-          }}
-          disabled={pending}
-        >
-          {freigabeLabel(row)}
-        </button>
-      )
-    }
     return (
-      <div className={cn('flex flex-wrap gap-1', compact && 'dok-card__freigabe')}>
-        <button
-          type="button"
-          className={cn(
-            'dok-freigabe-pill',
-            row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-inaktiv'
-          )}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (ev) toggleFreigabe(ev, true)
-          }}
-          disabled={pending}
-        >
-          Kunde
-        </button>
-        <button
-          type="button"
-          className={cn(
-            'dok-freigabe-pill',
-            !row.fuerKunde ? 'dok-freigabe-intern' : 'dok-freigabe-inaktiv'
-          )}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (ev) toggleFreigabe(ev, false)
-          }}
-          disabled={pending}
-        >
-          intern
-        </button>
-      </div>
+      <button
+        type="button"
+        className={cn(
+          'dok-freigabe-pill',
+          row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-intern',
+          row.fuerKunde && 'is-kunde'
+        )}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (ev) toggleFreigabe(ev, !row.fuerKunde)
+        }}
+        disabled={pending}
+      >
+        {freigabeLabel(row)}
+      </button>
     )
   }
 
@@ -371,16 +331,17 @@ export function AuftragDokumenteTab({
     return <span className={className}>{row.name}</span>
   }
 
-  function metaLine(row: AuftragDokumentZeile): string {
-    if (row.beschreibung && row.beschreibung !== '—') return row.beschreibung
-    return ''
-  }
-
   function renderDeskRow(row: AuftragDokumentZeile) {
     const href = rowHref(row)
     const ready = rowPdfReady(row)
     const openable = Boolean(ready && href)
-    const sub = metaLine(row)
+    const meta = [
+      dokumentTypLabel(row.quelle),
+      row.datum ? formatDatum(row.datum) : null,
+      row.beschreibung && row.beschreibung !== '—' ? row.beschreibung : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
     return (
       <div
         key={row.id}
@@ -399,24 +360,11 @@ export function AuftragDokumenteTab({
           }
         }}
       >
-        <MockIcon
-          ctx="row"
-          n={isFotoRow(row) ? 'photo' : 'file-text'}
-          size={18}
-          className="dok-list__icon text-bw-text-muted"
-        />
         <div className="dok-list__main min-w-0">
-          <div className="dok-list__name truncate text-[length:var(--fs-text)] font-medium text-bw-text">
+          <div className="dok-list__name">
             {renderNameLink(row)}
+            {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
           </div>
-          {sub ? <div className="dok-list__sub">{sub}</div> : null}
-        </div>
-        <div className="dok-list__cell--desk min-w-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
-          {dokumentTypLabel(row.quelle)}
-          {row.beschreibung && row.beschreibung !== '—' ? ` · ${row.beschreibung}` : ''}
-        </div>
-        <div className="dok-list__cell--desk whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-bw-text-muted">
-          {row.datum ? formatDatum(row.datum) : '—'}
         </div>
         <div className="dok-list__freigabe" onClick={(e) => e.stopPropagation()}>
           {renderFreigabe(row)}
@@ -522,14 +470,6 @@ export function AuftragDokumenteTab({
           </p>
         ) : (
           <div className="dok-list">
-            <div className="list-row head" aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Typ</div>
-              <div>Datum</div>
-              <div>Freigabe</div>
-              <div />
-            </div>
             {zeilen.map(renderDeskRow)}
           </div>
         )}
@@ -563,11 +503,11 @@ function DokumentEditFooter({ pending, onSave }: { pending: boolean; onSave: () 
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </Button>
       <Button type="button" variant="primary" loading={pending} onClick={onSave}>
         ✓ Speichern
+      </Button>
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+        Abbrechen
       </Button>
     </div>
   )

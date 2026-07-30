@@ -9,6 +9,7 @@ import {
   normalizeAbnahmeProtokollMeta,
   type AbnahmeProtokollMeta,
 } from '@/lib/auftraege/abnahme-protokoll-meta'
+import { resolveAbnahmeProtokollMetaForSave } from '@/lib/auftraege/abnahme-protokoll-html-payload'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
@@ -446,9 +447,21 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
         ? input.maengel
         : mergeMaengelFromPunkte(input.punkte, existing?.maengel ?? []),
   })
-  const meta = input.meta
-    ? normalizeAbnahmeProtokollMeta(input.meta)
-    : existing?.meta ?? null
+
+  const detail = await loadAuftragDetail(input.auftragId)
+  if (!detail?.kunden) return { ok: false, message: 'Auftrag/Kunde nicht gefunden' }
+  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
+
+  // Stammdaten + KI-Freitexte (Leistungsumfang / Hinweis) vor PDF
+  const meta = await resolveAbnahmeProtokollMetaForSave(detail, firm, {
+    meta: input.meta ?? null,
+    previousMeta: existing?.meta ?? null,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    notizen: input.notizen,
+    abnahmeDatum: input.abnahmeDatum,
+  })
+
   const built = await buildPdfBuffer({
     auftragId: input.auftragId,
     abnahmeDatum: input.abnahmeDatum,
@@ -473,7 +486,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     notizen: input.notizen?.trim() || null,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
-    ...(meta ? { meta } : {}),
+    meta,
     pdf_url: stored.publicUrl,
     protokoll_typ: protokollTyp,
     updated_at: new Date().toISOString(),

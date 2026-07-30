@@ -5,13 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'rea
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
-import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
   filterStandardComplianceTypen,
@@ -23,7 +23,10 @@ import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailS
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
-import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { MockDokumenteCard, MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -43,6 +46,7 @@ import {
   updateHandwerkerNotizen,
   getPartnerPortalLoginHint,
   setHandwerkerPortalGesperrt,
+  signPartnerDokumentUrl,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
@@ -139,6 +143,7 @@ export function HandwerkerDetailClient({
   vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const hw = payload.handwerker as Handwerker
   const slugToName = useMemo(
     () => new Map(gewerkeSlugs.map((g) => [g.slug.toLowerCase(), g.name])),
@@ -173,7 +178,6 @@ export function HandwerkerDetailClient({
   const [portalBetreff, setPortalBetreff] = useState('')
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
-  const [hasPortalAccount, setHasPortalAccount] = useState(false)
   const [vorgangArt, setVorgangArt] = useState<FabVorgangArt | null>(null)
   const [portalGesperrtPending, setPortalGesperrtPending] = useState(false)
   const [istPortalGesperrt, setIstPortalGesperrt] = useState(Boolean(hw.ist_portal_gesperrt))
@@ -267,7 +271,6 @@ export function HandwerkerDetailClient({
       const hint = await getPartnerPortalLoginHint(hw.id)
       if (hint.ok) {
         setPortalLink(hint.loginLink)
-        setHasPortalAccount(hint.hasAuthAccount)
       } else {
         setPortalLink(buildPartnerDashboardLink())
       }
@@ -480,10 +483,7 @@ export function HandwerkerDetailClient({
                   onChange={(e) => setFormAdresse(e.target.value)}
                 />
               </InlineEditField>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button type="button" className="btn ghost sm" onClick={cancelEditStamm}>
-                  Abbrechen
-                </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'space-between' }}>
                 <button
                   type="button"
                   className="btn primary sm"
@@ -491,6 +491,9 @@ export function HandwerkerDetailClient({
                   onClick={saveHandwerkerStamm}
                 >
                   Speichern
+                </button>
+                <button type="button" className="btn secondary sm" onClick={cancelEditStamm}>
+                  Abbrechen
                 </button>
               </div>
             </div>
@@ -518,34 +521,12 @@ export function HandwerkerDetailClient({
                   ) : null}
                 </div>
               )}
-              <div
-                className="vgid-portal"
-                style={{
-                  marginTop: 12,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 'var(--fs-meta)',
-                  color: 'var(--text-3)',
-                }}
-              >
-                <span>
-                  PORTAL ·{' '}
-                  <span style={{ color: istPortalGesperrt ? 'var(--text-4)' : 'var(--green)' }}>
-                    {istPortalGesperrt ? 'Gesperrt' : hasPortalAccount ? 'Aktiv' : 'Offen'}
-                  </span>
-                </span>
-                {!istPortalGesperrt ? (
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={() => void openPortalModal()}
-                  >
-                    Zugang zurücksetzen
-                  </button>
-                ) : null}
-              </div>
+              <StammdatenPortalZeile
+                handwerkerId={hw.id}
+                fallbackEmail={hw.email}
+                gesperrt={istPortalGesperrt}
+                onInvite={() => void openPortalModal()}
+              />
             </div>
           )}
         </div>
@@ -812,77 +793,84 @@ export function HandwerkerDetailClient({
           ? [{ autor: 'Notiz', text: notizen.trim() }]
           : []
       }
+      emptyHint={
+        isMobile
+          ? 'Noch keine Notizen. Über „Notiz“ oben hinzufügen.'
+          : undefined
+      }
       composer={
-        <MockNotizComposer
-          value={notizDraft}
-          onChange={setNotizDraft}
-          onSubmit={appendNotiz}
-          placeholder="Notiz schreiben… (Enter senden · Shift+Enter neue Zeile)"
-        />
+        isMobile ? undefined : (
+          <MockNotizComposer
+            value={notizDraft}
+            onChange={setNotizDraft}
+            onSubmit={appendNotiz}
+            placeholder="Notiz schreiben"
+          />
+        )
       }
     />
   )
 
-  const complianceInhalt = (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        <MockIcon ctx="nav" n="shield-check" size={16} style={{ color: 'var(--text-3)' }} />
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
-        >
-          Unterlagen
-        </span>
-        <div style={{ flex: 1 }} />
-        <ComplianceBadge status={hw.compliance_status} />
-      </div>
-
-      <p
-        style={{
-          margin: '0 0 14px',
-          fontSize: 'var(--fs-meta)',
-          color: 'var(--text-3)',
-          lineHeight: 1.45,
-        }}
-      >
-        Nachweise aus dem CRM oder vom Partner. Hochladen öffnet ein Sheet mit Datei, Titel,
-        Beschreibung und Gültigkeit — vorhandene Unterlagen kannst du ansehen, bearbeiten oder
-        löschen.
-      </p>
-
-      {complianceTypenStandard.length === 0 ? (
-        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
-          Keine Compliance-Typen konfiguriert.
+  const akteDateien = (
+    <MockDokumenteCard count={dokumenteAnzahl}>
+      {dokumenteAnzahl === 0 ? (
+        <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+          {isMobile
+            ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
+            : 'Noch keine Dokumente — Unterlagen im Tab Compliance pflegen.'}
         </p>
       ) : (
-        <HandwerkerComplianceUnterlagenTable
-          handwerkerId={hw.id}
-          dokumente={payload.dokumente}
-          typen={complianceTypenStandard}
-        />
+        <div className="dok-list space-y-1">
+          {standardDokumente(payload.dokumente).map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              className="list-row dok-list__row--openable w-full text-left"
+              style={{
+                gridTemplateColumns: 'minmax(0, 1fr) auto',
+                cursor: 'pointer',
+                alignItems: 'center',
+              }}
+              onClick={() => {
+                void (async () => {
+                  const r = await signPartnerDokumentUrl(d.datei_url)
+                  if (!r.ok) {
+                    toast.error(r.message)
+                    return
+                  }
+                  window.open(r.url, '_blank', 'noopener,noreferrer')
+                })()
+              }}
+            >
+              <span className="dok-list__main min-w-0">
+                <span className="dok-list__name">
+                  {d.bezeichnung?.trim() || d.typ || 'Dokument'}
+                  {d.gueltig_bis ? (
+                    <span className="dok-list__name-size">
+                      {' '}
+                      · gültig bis {String(d.gueltig_bis).slice(0, 10)}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">Öffnen</span>
+            </button>
+          ))}
+        </div>
       )}
-    </div>
+    </MockDokumenteCard>
+  )
+
+  const complianceInhalt = (
+    <HandwerkerComplianceUnterlagenTable
+      handwerkerId={hw.id}
+      dokumente={payload.dokumente}
+      typen={complianceTypenStandard}
+    />
   )
 
   const akteInhalt = (
-    <div className="space-y-4">
-      {stammdatenInhalt}
-      {notizenInhalt}
-    </div>
+    <VorgangAkteTab dateien={akteDateien} notizen={notizenInhalt} />
   )
 
   const vorgaengeCount = useMemo(
@@ -915,18 +903,28 @@ export function HandwerkerDetailClient({
       id: 'akte',
       label: 'Akte',
       icon: 'file-text',
-      count: hw.notizen?.trim() ? 1 : undefined,
+      count:
+        dokumenteAnzahl + (hw.notizen?.trim() ? 1 : 0) || undefined,
       render: () => akteInhalt,
     },
   ]
+
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: hw.telefon,
+    email: hw.email,
+    notiz: { kind: 'handwerker', handwerkerId: hw.id, initial: hw.notizen ?? '' },
+    dokument: { kind: 'handwerker', handwerkerId: hw.id },
+    onSaved: () => router.refresh(),
+  })
 
   return (
     <EntityDetailLayout
       crumbBackHref="/handwerker"
       crumbBackLabel="Zurück zur Liste"
+      quickBar={quickBar}
       head={{
         title: handwerkerDisplayName(hw),
-        titleBadges: <ComplianceBadge status={hw.compliance_status} />,
+        titleBadges: undefined,
         badges: (
           <>
             {gewerkNamen.length > 0 ? (
@@ -971,12 +969,12 @@ export function HandwerkerDetailClient({
         title="Handwerker-Link versenden"
         size="lg"
         footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
-              Abbrechen
-            </Button>
+          <div className="kunde-create-footer">
             <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
               Senden
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+              Abbrechen
             </Button>
           </div>
         }
@@ -1028,6 +1026,8 @@ export function HandwerkerDetailClient({
         art={vorgangArt}
         onClose={() => setVorgangArt(null)}
       />
+
+      {quickActionSheets}
     </EntityDetailLayout>
   )
 }

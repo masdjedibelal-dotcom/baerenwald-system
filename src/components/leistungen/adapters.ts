@@ -6,12 +6,29 @@ import {
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { formatZeitraumKurz } from '@/components/auftraege/leistungen-v3/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import {
+  formatRegieSollIst,
+  formatStundenColon,
+  istRegiePosition,
+  REGIE_BADGE_LABEL,
+} from '@/lib/auftraege/regie-display'
+import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { richTextToPlain } from '@/lib/rich-text'
 import { formatDatum } from '@/lib/utils'
 import type { AbnahmeMangel } from '@/lib/auftraege/abnahme-protokoll-types'
 import { isMangelOffen, mangelStatusLabel } from '@/lib/auftraege/abnahme-maengel-helpers'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 import type { LeistungMangelAnzeige, LeistungRow } from '@/components/leistungen/types'
+
+export type LeistungEintragLite = {
+  position_id?: string | null
+  typ?: string | null
+  beschreibung?: string | null
+  zeit_minuten?: number | null
+  created_at?: string | null
+  erfasst_von?: string | null
+  fotoCount?: number
+}
 
 function mengeLabel(menge: number | null | undefined, einheit: string | null | undefined): string {
   const e = einheit?.trim() || ''
@@ -70,14 +87,20 @@ export function leistungenFromAngebotPositionen(
     const name = p.leistung_name?.trim() || p.leistung?.trim() || 'Position'
     const preis = angebotPreis(p)
     const hw = p.handwerker_name?.trim() || null
-    const subline = opts?.eigenleistungSubline
+    const isRegie = istRegiePosition(p)
+    const baseSub = opts?.eigenleistungSubline
       ? hw || 'Eigenleistung'
       : p.gewerk_name?.trim() || null
+    const subline = isRegie
+      ? [REGIE_BADGE_LABEL, baseSub].filter(Boolean).join(' · ')
+      : baseSub
     return {
       id: p.id,
       bezeichnung: name,
       subline,
-      mengeLabel: mengeLabel(p.menge, p.einheit),
+      mengeLabel: isRegie
+        ? `geschätzt ${mengeLabel(p.geschaetzt_std ?? p.menge, p.einheit || 'h')}`
+        : mengeLabel(p.menge, p.einheit),
       preisLabel: preis > 0 ? formatEurBetrag(preis) : '—',
       preisValue: preis,
       status: statusFallback.status,
@@ -86,12 +109,25 @@ export function leistungenFromAngebotPositionen(
       gewerkName: p.gewerk_name?.trim() || 'Allgemein',
       handwerkerName: hw,
       handwerkerId: p.handwerker_id ?? null,
+      istRegie: isRegie,
     }
   })
 }
 
 /** Auftrag: AuftragPosition[]. */
-export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): LeistungRow[] {
+export function leistungenFromAuftragPositionen(
+  positionen: AuftragPosition[],
+  opts?: { eintraege?: LeistungEintragLite[] }
+): LeistungRow[] {
+  const eintraegeByPos = new Map<string, LeistungEintragLite[]>()
+  for (const e of opts?.eintraege ?? []) {
+    const pid = e.position_id?.trim()
+    if (!pid) continue
+    const list = eintraegeByPos.get(pid) ?? []
+    list.push(e)
+    eintraegeByPos.set(pid, list)
+  }
+
   return [...positionen]
     .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -120,8 +156,50 @@ export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): 
       const statusLabel =
         st === 'erledigt' ? 'Abgenommen' : leistungStatusLabel(st)
 
-      // Subline nur Fortschritt — Handwerker/Zuweisung erscheinen in Spalte bzw. Mobile-Dot
+      const isRegie = istRegiePosition(p)
+      const posEintraege = eintraegeByPos.get(p.id) ?? []
+      const erfasstMin = posEintraege.reduce(
+        (s, e) => s + (Number(e.zeit_minuten) || 0),
+        0
+      )
+      const handwerkerUpdates = posEintraege
+        .filter((e) => {
+          const von = String(e.erfasst_von ?? '')
+          return (
+            von.includes('partner') ||
+            von.includes('eigenbetrieb') ||
+            Boolean(e.beschreibung?.trim()) ||
+            (Number(e.zeit_minuten) || 0) > 0
+          )
+        })
+        .map((e) => {
+          const zeit = Number(e.zeit_minuten) || 0
+          const typ = eintragTypLabel(e.typ)
+          const text = e.beschreibung?.trim() || typ || 'Update'
+          return {
+            at: e.created_at ?? null,
+            text,
+            zeitLabel: zeit > 0 ? formatStundenColon(zeit) : null,
+            fotoCount: e.fotoCount ?? 0,
+          }
+        })
+
+      const stundensatz = Number(p.stundensatz) || 0
+      const erfasstNetto =
+        isRegie && erfasstMin > 0 && stundensatz > 0
+          ? Math.round((erfasstMin / 60) * stundensatz * 100) / 100
+          : null
+      const sollIst = isRegie
+        ? formatRegieSollIst({
+            geschaetztStd: p.geschaetzt_std ?? null,
+            erfasstMinuten: erfasstMin || null,
+          })
+        : null
+
+      // Subline: Regie + Ist wenn vorhanden
       const subParts: string[] = []
+      if (isRegie) subParts.push(REGIE_BADGE_LABEL)
+      if (sollIst) subParts.push(sollIst)
       if (st === 'in_arbeit' && p.gestartet_am) {
         subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
       } else if (st === 'erledigt') {
@@ -132,10 +210,27 @@ export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): 
         id: p.id,
         bezeichnung: p.leistung_name?.trim() || 'Leistung',
         subline: subParts.length ? subParts.join(' · ') : p.gewerk_name?.trim() || null,
-        mengeLabel: mengeLabel(p.menge, p.einheit),
-        preisLabel: vk > 0 ? formatEurBetrag(vk) : '—',
-        preisValue: vk,
-        einzelpreisLabel: einzel > 0 ? formatEurBetrag(einzel) : null,
+        mengeLabel: isRegie
+          ? erfasstMin > 0
+            ? `erfasst ${formatStundenColon(erfasstMin)} Std.`
+            : `geschätzt ${mengeLabel(p.geschaetzt_std ?? p.menge, p.einheit || 'h')}`
+          : mengeLabel(p.menge, p.einheit),
+        preisLabel:
+          erfasstNetto != null && erfasstNetto > 0
+            ? formatEurBetrag(erfasstNetto)
+            : vk > 0
+              ? formatEurBetrag(vk)
+              : '—',
+        preisValue: erfasstNetto != null && erfasstNetto > 0 ? erfasstNetto : vk,
+        einzelpreisLabel: isRegie
+          ? stundensatz > 0
+            ? `${formatEurBetrag(stundensatz)}/h`
+            : einzel > 0
+              ? `${formatEurBetrag(einzel)}/h`
+              : null
+          : einzel > 0
+            ? formatEurBetrag(einzel)
+            : null,
         status: st === 'erledigt' ? 'abgenommen' : st,
         statusLabel,
         beschreibung: richTextToPlain(p.beschreibung) || null,
@@ -153,6 +248,9 @@ export function leistungenFromAuftragPositionen(positionen: AuftragPosition[]): 
           st === 'erledigt'
             ? 'Abgenommen'
             : 'Noch nicht abgenommen — Ergebnis und Notiz fließen ins Abnahmedokument.',
+        istRegie: isRegie,
+        handwerkerUpdates,
+        regieSollIstLabel: sollIst,
       }
     })
 }

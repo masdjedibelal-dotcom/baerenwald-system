@@ -161,7 +161,7 @@ export function ObjektBewohnerSection({
         title={liste.length ? `Bewohner · ${liste.length}` : 'Bewohner'}
         icon="users"
         actions={
-          <MockBtn sm kind="ghost" icon="plus" onClick={openNeu} disabled={einheiten.length === 0}>
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeu} disabled={einheiten.length === 0}>
             Hinzufügen
           </MockBtn>
         }
