@@ -17,6 +17,11 @@ import type {
  * - Storno-Regel: neueste nicht-stornierte Entität gewinnt (Rechnung > Auftrag > Angebot > Anfrage)
  * - Actor-Priorität: freigabe > handwerker > kunde > bw
  * - Output-Shape: `ResolvedVorgang` in `@/lib/vorgang/types`
+ *
+ * A7 Parität: Fixtures in `shared/crm-vorgang/resolve-vorgang.fixtures.json`
+ * (+ Kopie `resolve-vorgang.fixtures.json` hier) — Portal und CRM byte-identisch halten.
+ * Fine-Stages: `mapAngebotStatusEinfach` (status_einfach vor Legacy-status).
+ * Rechnungs-Gewinn: `isPhaseWinningRechnung` (Voll/Schluss, keine Abschläge als Stamm).
  */
 
 /** Actor-Priorität (höher = wichtiger). */

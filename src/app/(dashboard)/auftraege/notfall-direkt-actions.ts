@@ -169,6 +169,8 @@ export async function notfallDirektBeauftragen(
       .update({
         hv_meldung_status: 'notmassnahme',
         vorgang_phase: 'in_bearbeitung',
+        org_freigabe_status: 'nicht_noetig',
+        freigabe_bypass_grund: 'akut',
         updated_at: new Date().toISOString(),
       })
       .eq('id', leadId)
@@ -204,7 +206,8 @@ export async function notfallDirektBeauftragen(
   // Platzhalter-Menge 1 — tatsächliche Stunden kommen aus dem Bautagebuch / Rechnung.
   const menge = 1
   const beschreibungTeile = [
-    'Notfall nach Aufwand — Stundensatz vereinbart, Stunden über Bautagebuch, Abrechnung per Rechnung.',
+    'Notfall / Akut nach Aufwand — Regieposition.',
+    `Verrechnung: Stundensatz ${stundensatz.toFixed(2)} € netto/h; tatsächliche Stunden über Bautagebuch; Abrechnung per Rechnung (nach Aufwand).`,
   ]
   if (matPct != null && matPct > 0) {
     beschreibungTeile.push(`Materialaufschlag ${matPct} %.`)
@@ -317,6 +320,46 @@ export async function notfallDirektBeauftragen(
     positionIds: [positionId],
     aenderungTyp: 'neu',
   })
+
+  // A3: HV nur zur Information (kein Freigabe-Request)
+  if (kundeId) {
+    const { data: hv } = await supabaseAdmin
+      .from('kunden')
+      .select('id, name, email, org_anzeigename, portal_modus')
+      .eq('id', kundeId)
+      .maybeSingle()
+    const hvEmail = (hv as { email?: string | null } | null)?.email?.trim()
+    if (hvEmail && (hv as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
+      const { getMailBranding } = await import('@/lib/get-mail-branding')
+      const { mailOrgNotfallDirektInfo } = await import('@/lib/email/meldung-mail-templates')
+      const { sendMail } = await import('@/lib/mail-service')
+      const { buildPortalLoginLink } = await import('@/lib/portal-utils')
+      const branding = await getMailBranding(supabaseAdmin)
+      const orgName =
+        (hv as { org_anzeigename?: string; name?: string }).org_anzeigename?.trim() ||
+        (hv as { name?: string }).name?.trim() ||
+        'Auftraggeber'
+      const tpl = mailOrgNotfallDirektInfo(
+        {
+          orgName,
+          objektTitel: titel,
+          stundensatz,
+          portalLink: buildPortalLoginLink(),
+        },
+        branding
+      )
+      void sendMail({
+        typ: 'org_notfall_info',
+        an: hvEmail,
+        anName: orgName,
+        betreff: tpl.betreff,
+        html: tpl.html,
+        leadId: leadId ?? undefined,
+        kundeId,
+        auftragId,
+      })
+    }
+  }
 
   revalidatePath(`/auftraege/${auftragId}`)
   if (leadId) revalidatePath(`/anfragen/${leadId}`)

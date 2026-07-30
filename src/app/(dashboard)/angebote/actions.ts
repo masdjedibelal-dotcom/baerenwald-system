@@ -489,11 +489,14 @@ export async function createAngebot(
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
-    void syncAngebotMitOrgFreigabe({
+    const freigabeSync = await syncAngebotMitOrgFreigabe({
       leadId: input.lead_id,
       angebotId: id,
       betragEur: summen.nettoMax,
     })
+    if (!freigabeSync.ok) {
+      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
+    }
 
     const { data: leadRow } = await supabase
       .from('leads')
@@ -784,11 +787,14 @@ export async function updateAngebot(
   if (leadId) {
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
-    void syncAngebotMitOrgFreigabe({
+    const freigabeSync = await syncAngebotMitOrgFreigabe({
       leadId,
       angebotId,
       betragEur: summen.nettoMax,
     })
+    if (!freigabeSync.ok) {
+      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
+    }
   }
 
   if (!opts?.asSystem) {
@@ -1283,8 +1289,8 @@ export async function loescheHandwerkerAnfrage(input: {
 }
 
 /**
- * CRM: Handwerker-Anfrage im Namen des Partners annehmen (status → akzeptiert).
- * Parallele Anfragen zum selben Gewerk werden auf „ersetzt“ gesetzt.
+ * CRM: Handwerker-Anfrage im Namen des Partners annehmen (kanonisch status → akzeptiert).
+ * Parallele Anfragen zum selben Gewerk → ersetzt; Timeline + Intern-Mail wie Token/Portal.
  */
 export async function crmBestaetigeHandwerkerAnfrage(input: {
   angebotId: string
@@ -1303,100 +1309,15 @@ export async function crmBestaetigeHandwerkerAnfrage(input: {
     return { ok: false, message: 'Angebot oder Zuweisung fehlt.' }
   }
 
-  const { data: zu, error: zErr } = await supabase
-    .from('angebot_handwerker')
-    .select(
-      `
-      id,
-      angebot_id,
-      gewerk_id,
-      handwerker_id,
-      status,
-      antwort_at,
-      handwerker(name),
-      gewerke(name),
-      angebote(id, lead_id)
-    `
-    )
-    .eq('id', zuweisungId)
-    .eq('angebot_id', angebotId)
-    .maybeSingle()
-
-  if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
-
-  const st = String(zu.status ?? '').toLowerCase()
-  if (st === 'akzeptiert') {
-    return { ok: true }
-  }
-  if (st === 'abgelehnt' || st === 'ersetzt') {
-    return { ok: false, message: 'Abgelehnte oder ersetzte Anfragen können nicht bestätigt werden.' }
-  }
-  if (zu.antwort_at) {
-    return { ok: false, message: 'Anfrage wurde bereits beantwortet.' }
-  }
-
-  const now = new Date().toISOString()
-  const notiz =
-    input.notiz?.trim() ||
-    'Vom CRM im Namen des Partners bestätigt.'
-
-  const { error: upErr } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .update({
-      status: 'akzeptiert',
-      antwort_at: now,
-      antwort_notiz: notiz,
-      ablehnung_grund: null,
-    })
-    .eq('id', zuweisungId)
-
-  if (upErr) return { ok: false, message: upErr.message }
-
-  const angebot = Array.isArray(zu.angebote) ? zu.angebote[0] : zu.angebote
-  const leadId = (angebot as { lead_id?: string | null } | null)?.lead_id ?? null
-  const hw = Array.isArray(zu.handwerker) ? zu.handwerker[0] : zu.handwerker
-  const gw = Array.isArray(zu.gewerke) ? zu.gewerke[0] : zu.gewerke
-  const handwerkerName = (hw as { name?: string } | null)?.name?.trim() || 'Handwerker'
-  const gewerkName = (gw as { name?: string } | null)?.name?.trim() || 'Gewerk'
-
-  if (zu.gewerk_id) {
-    const { data: parallel } = await supabaseAdmin
-      .from('angebot_handwerker')
-      .select('id, handwerker_id, status, handwerker(name)')
-      .eq('angebot_id', angebotId)
-      .eq('gewerk_id', zu.gewerk_id)
-      .neq('id', zuweisungId)
-
-    for (const other of parallel ?? []) {
-      const otherSt = String(other.status ?? '').toLowerCase()
-      if (otherSt === 'akzeptiert' || otherSt === 'abgelehnt' || otherSt === 'ersetzt') continue
-      await supabaseAdmin
-        .from('angebot_handwerker')
-        .update({ status: 'ersetzt', antwort_at: now })
-        .eq('id', other.id)
-
-      if (leadId) {
-        const otherHw = Array.isArray(other.handwerker) ? other.handwerker[0] : other.handwerker
-        await insertLeadTimelineEvent(supabaseAdmin, {
-          lead_id: leadId,
-          angebot_id: angebotId,
-          typ: 'handwerker',
-          titel: 'Handwerker nicht gewählt',
-          beschreibung: `${(otherHw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${gewerkName}`,
-        })
-      }
-    }
-  }
-
-  if (leadId) {
-    await insertLeadTimelineEvent(supabaseAdmin, {
-      lead_id: leadId,
-      angebot_id: angebotId,
-      typ: 'handwerker',
-      titel: 'Handwerker-Anfrage CRM-bestätigt',
-      beschreibung: `${handwerkerName} · ${gewerkName}`,
-    })
-  }
+  const { acceptHandwerkerZuweisung } = await import('@/lib/angebote/handwerker-annahme')
+  const r = await acceptHandwerkerZuweisung({
+    zuweisungId,
+    angebotId,
+    antwort: 'akzeptiert',
+    notiz: input.notiz,
+    quelle: 'crm',
+  })
+  if (!r.ok) return { ok: false, message: r.message }
 
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/angebote')
@@ -2349,7 +2270,10 @@ export async function createAuftragFromAngebot(
   const gewerkNamen = Array.from(new Set(pos.map((p) => p.gewerk_name).filter(Boolean)))
   const titel = `${gewerkNamen.join(', ')} — ${angebot.kunden.name}`.slice(0, 240)
 
-  const hwRows = (angebot.angebot_handwerker ?? []).filter((h) => h.status === 'akzeptiert')
+  const { isHwZuweisungAkzeptiertLenient } = await import('@/lib/angebote/handwerker-annahme')
+  const hwRows = (angebot.angebot_handwerker ?? []).filter((h) =>
+    isHwZuweisungAkzeptiertLenient(h.status)
+  )
 
   const kundenToken = randomBytes(32).toString('hex')
 

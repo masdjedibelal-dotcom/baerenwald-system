@@ -319,6 +319,10 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
     | 'notfall_direkt'
   > | null = null
   let lead: Lead | null = null
+  let objektOverride: {
+    freigabe_schwelle_eur?: number | null
+    notfall_direkt?: boolean | null
+  } | null = null
 
   if (auf.kunde_id) {
     const { data: k } = await supabaseAdmin
@@ -333,11 +337,22 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
   if (auf.lead_id) {
     const { data: l } = await supabaseAdmin.from('leads').select('*').eq('id', auf.lead_id).maybeSingle()
     lead = l as Lead | null
+    if (lead?.kunde_objekt_id) {
+      const { data: o } = await supabaseAdmin
+        .from('kunden_objekte')
+        .select('freigabe_schwelle_eur, notfall_direkt')
+        .eq('id', lead.kunde_objekt_id)
+        .maybeSingle()
+      objektOverride = o as typeof objektOverride
+    }
   }
 
   const freigabeNoetig =
     org && lead
-      ? orgFreigabeErforderlich(org, lead, betrag, { folgearbeit: true })
+      ? orgFreigabeErforderlich(org, lead, betrag, {
+          folgearbeit: true,
+          objekt: objektOverride,
+        })
       : betrag > 500
 
   if (!freigabeNoetig || betrag <= 0) {

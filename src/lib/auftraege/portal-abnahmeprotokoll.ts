@@ -160,10 +160,41 @@ export async function createPortalAbnahmeNachSignatur(
     handwerkerId,
     typ: 'erinnerung',
     projektName,
-    leistungName: 'Abnahmeprotokoll bereit — bitte bestätigen',
+    leistungName: 'Abnahmedokument verfügbar',
     link: partnerAbnahmeLink(auftragId, protokollId),
     auftragId,
   })
+
+  // Q8: Sofort sichtbar für Kunde + an_kunde_gesendet_at
+  const now = new Date().toISOString()
+  await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .update({ an_kunde_gesendet_at: now })
+    .eq('id', protokollId)
+
+  await insertAuftragTimelineEvent({
+    auftrag_id: auftragId,
+    typ: 'abnahme',
+    titel: 'Abnahmeprotokoll signiert',
+    beschreibung: 'Abnahmedokument verfügbar — Unterlagen für Verwaltung und Mieter.',
+    sichtbar_fuer_kunde: true,
+    fuer_kunde_freigegeben: true,
+    freigegeben_at: now,
+  })
+
+  // A6: Unterlagen HV + Mieter + Notify „Abnahmedokument verfügbar“
+  try {
+    const { verteileAbnahmeAnUnterlagen } = await import(
+      '@/lib/auftraege/abnahme-unterlagen-verteilung'
+    )
+    await verteileAbnahmeAnUnterlagen({
+      auftragId,
+      pdfUrl: saved.publicUrl,
+      protokollId,
+    })
+  } catch (e) {
+    console.warn('verteileAbnahmeAnUnterlagen:', e)
+  }
 
   return {
     ok: true,

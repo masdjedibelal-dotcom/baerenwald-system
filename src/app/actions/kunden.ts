@@ -68,7 +68,8 @@ function applyHausverwaltungDefaults(
   if (opts?.isCreate) {
     payload.freigabe_modus = 'freigabe'
     payload.freigabe_schwelle_eur = 500
-    payload.notfall_direkt = false
+    // Explizit true: Akut/Notfall → Direktauftrag (kein NULL-Drift mit „unset = an“)
+    payload.notfall_direkt = true
     payload.kleinreparaturen_ohne_angebot = false
   }
 }

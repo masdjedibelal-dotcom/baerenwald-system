@@ -112,6 +112,10 @@ export type KundenObjekt = {
   einheiten_hinweis?: string | null
   notizen_intern?: string | null
   created_by?: 'crm' | 'portal' | null
+  /** Override Org-Schwelle; null = erben */
+  freigabe_schwelle_eur?: number | null
+  /** Override Org-Notfall-Direkt; null = erben */
+  notfall_direkt?: boolean | null
 }
 
 export type KundenNotizRow = {
@@ -213,6 +217,8 @@ export type Lead = {
   einladung_token?: string | null
   einladung_status?: EinladungStatus | null
   org_freigabe_status?: OrgFreigabeStatus | null
+  /** Q5: schwelle | akut wenn nicht_noetig durch Bypass */
+  freigabe_bypass_grund?: 'schwelle' | 'akut' | null
   service_modus?: ServiceModus | null
   /** HV-Plattform: Meldungs-Workflow-Status */
   hv_meldung_status?: string | null
@@ -470,6 +476,9 @@ export type Angebot = {
     | 'ersetzt'
     | string
     | null
+  /** V2: Freigabe-Erforderlich-Snapshot (CRM berechnet, Portal liest) */
+  org_freigabe_erforderlich?: boolean | null
+  org_freigabe_berechnet_at?: string | null
   /** Erster / letzter Versand an Kunde */
   gesendet_am?: string | null
   /** Automatische Nachfass-Mail */

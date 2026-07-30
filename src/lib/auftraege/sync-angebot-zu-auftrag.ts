@@ -215,8 +215,10 @@ export async function syncAngebotPositionenZuAuftrag(input: {
     }
   }
 
-  const hwRows = (input.angebotHandwerker ?? []).filter(
-    (h) => (h.status ?? '').toLowerCase() === 'akzeptiert' || hasHwUebernommen(h)
+  const { isHwZuweisungAkzeptiertLenient } = await import('@/lib/angebote/handwerker-annahme')
+  // V1: Auftrag nur mit kanonischer HW-Zusage (status akzeptiert); hw_status uebernommen ≠ Annahme
+  const hwRows = (input.angebotHandwerker ?? []).filter((h) =>
+    isHwZuweisungAkzeptiertLenient(h.status)
   )
   for (const h of hwRows) {
     if (!h.handwerker_id || !h.gewerk_id) continue
@@ -238,8 +240,4 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   provisionProjektvertragFireAndForget(auftragId)
 
   return { ok: true, neu, aktualisiert, entfernt }
-}
-
-function hasHwUebernommen(h: AngebotHandwerkerRow): boolean {
-  return (h.hw_status ?? '').toLowerCase() === 'uebernommen'
 }

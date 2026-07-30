@@ -215,6 +215,91 @@ export function mailOrgFreigabeAngefordert(
   }
 }
 
+/** Unter Schwelle / Notfall: Angebot nur zur Information — kein Freigabe-Request. */
+export function mailOrgAngebotZurInfo(
+  data: {
+    orgName: string
+    objektTitel: string
+    betragEur: number
+    portalLink: string
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const betreff = `Angebot zur Information — ${data.objektTitel.trim() || 'Objekt'}`
+  const body = `
+    <p>Guten Tag,</p>
+    <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
+      data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+    )}</strong> vor.</p>
+    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Der Auftrag wird automatisch angelegt — diese Mail dient nur der Information.</p>
+  `
+  return {
+    betreff,
+    html: mailHtmlBase(body, 'Angebot zur Information', b, undefined, {
+      anrede: 'sie',
+      portalAudience: 'organisation',
+      portalLink: data.portalLink,
+    }),
+  }
+}
+
+/** Notfall-Direktauftrag: HV nur Info inkl. Regie-Stundensatz. */
+export function mailOrgNotfallDirektInfo(
+  data: {
+    orgName: string
+    objektTitel: string
+    stundensatz: number
+    portalLink: string
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const betreff = `Notfall beauftragt — ${data.objektTitel.trim() || 'Objekt'}`
+  const body = `
+    <p>Guten Tag,</p>
+    <p>für <strong>${esc(data.objektTitel)}</strong> wurde ein <strong>Notfall-/Akuteinsatz</strong> direkt beauftragt (keine Freigabe nötig).</p>
+    <p>Regieposition: Verrechnung nach Aufwand zu <strong>${esc(
+      data.stundensatz.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+    )}/h</strong> netto; Stunden über Bautagebuch, Abrechnung per Rechnung.</p>
+  `
+  return {
+    betreff,
+    html: mailHtmlBase(body, 'Notfall beauftragt', b, undefined, {
+      anrede: 'sie',
+      portalAudience: 'organisation',
+      portalLink: data.portalLink,
+    }),
+  }
+}
+
+/** Abnahmeprotokoll liegt in den Unterlagen. */
+export function mailOrgAbnahmeDokument(
+  data: {
+    orgName: string
+    objektTitel: string
+    portalLink: string
+    abschlussberichtUrl?: string | null
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const betreff = `Abnahmedokument verfügbar — ${data.objektTitel.trim() || 'Objekt'}`
+  const bericht = data.abschlussberichtUrl?.trim()
+    ? `<p>Optionaler Abschlussbericht: <a href="${esc(data.abschlussberichtUrl.trim())}">Bericht öffnen</a></p>`
+    : ''
+  const body = `
+    <p>Guten Tag,</p>
+    <p>für <strong>${esc(data.objektTitel)}</strong> liegt das <strong>Abnahmeprotokoll</strong> in den Unterlagen bereit.</p>
+    ${bericht}
+  `
+  return {
+    betreff,
+    html: mailHtmlBase(body, 'Abnahmedokument verfügbar', b, undefined, {
+      anrede: 'sie',
+      portalAudience: 'organisation',
+      portalLink: data.portalLink,
+    }),
+  }
+}
+
 export function mailOrgFreigabeErgebnis(
   data: {
     orgName: string

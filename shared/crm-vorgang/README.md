@@ -15,6 +15,7 @@
 1. **Regeländerung** an `resolveVorgang()` → JSON **in beiden Repos** identisch aktualisieren.
 2. **CI/Test** in beiden Repos lädt dieselbe Datei → Drift schlägt sofort an.
 3. **Kein Shared-Package** — nur diese JSON-Datei kopieren (byte-identisch).
+4. CRM: `src/lib/vorgang/fixtures.ts` lädt die Build-Kopie; Test: `npm run test:crm-vorgang`.
 
 ### CRM-Repo (beim Checkout-Audit, Schritt 2)
 

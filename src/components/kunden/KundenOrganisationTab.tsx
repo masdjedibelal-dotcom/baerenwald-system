@@ -41,7 +41,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   const [schwelle, setSchwelle] = useState(
     kunde.freigabe_schwelle_eur != null ? String(Math.round(Number(kunde.freigabe_schwelle_eur))) : '500'
   )
-  const [notfallDirekt, setNotfallDirekt] = useState(kunde.notfall_direkt === true)
+  const [notfallDirekt, setNotfallDirekt] = useState(kunde.notfall_direkt !== false)
   const [kleinreparaturen, setKleinreparaturen] = useState(
     kunde.kleinreparaturen_ohne_angebot === true
   )
@@ -57,7 +57,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         ? String(Math.round(Number(kunde.freigabe_schwelle_eur)))
         : '500'
     )
-    setNotfallDirekt(kunde.notfall_direkt === true)
+    setNotfallDirekt(kunde.notfall_direkt !== false)
     setKleinreparaturen(kunde.kleinreparaturen_ohne_angebot === true)
   }, [kunde])
 

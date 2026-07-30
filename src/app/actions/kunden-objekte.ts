@@ -13,7 +13,7 @@ import type { KundenObjekt } from '@/lib/types'
 
 function objektDbPayload(input: KundenObjektInput): Record<string, unknown> {
   const slug = input.melde_slug?.trim() ? normalizeOrgSlug(input.melde_slug) : null
-  return {
+  const payload: Record<string, unknown> = {
     titel: input.titel.trim(),
     strasse: input.strasse?.trim() || null,
     hausnummer: input.hausnummer?.trim() || null,
@@ -24,6 +24,16 @@ function objektDbPayload(input: KundenObjektInput): Record<string, unknown> {
     einheiten_hinweis: input.einheiten_hinweis?.trim() || null,
     notizen_intern: input.notizen_intern?.trim() || null,
   }
+  if (input.freigabe_schwelle_eur !== undefined) {
+    payload.freigabe_schwelle_eur =
+      input.freigabe_schwelle_eur != null && Number.isFinite(Number(input.freigabe_schwelle_eur))
+        ? Number(input.freigabe_schwelle_eur)
+        : null
+  }
+  if (input.notfall_direkt !== undefined) {
+    payload.notfall_direkt = input.notfall_direkt
+  }
+  return payload
 }
 
 export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[]> {
