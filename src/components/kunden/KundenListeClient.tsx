@@ -274,15 +274,14 @@ export function KundenListeClient({
   const displayItems = isMobile ? infiniteItems : pageItems
 
   const filterFooter = (
-    <>
-      <MockBtn kind="ghost" onClick={resetFilters}>
+    <div className="sheet-footer-actions">
+      <MockBtn kind="secondary" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
-      <div style={{ flex: 1 }} />
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
         Anwenden ({filtered.length})
       </MockBtn>
-    </>
+    </div>
   )
 
   const filterFields = (
@@ -459,7 +458,7 @@ export function KundenListeClient({
             </button>
           }
           footer={
-            <button type="button" className="btn primary w-full" onClick={() => setFilterOpen(false)}>
+            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
             </button>
           }
@@ -511,7 +510,10 @@ export function KundenListeClient({
 
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        className={cn(
+          'listcard listcard--scroll listcard--cols',
+          (isMobile || selectMode) && 'vg-selectmode'
+        )}
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
@@ -603,9 +605,48 @@ export function KundenListeClient({
             const tel = k.telefon?.trim() || ''
             const mail = k.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
+            const typLabel = kundeTypLabel(k.typ)
             const copy = () => runDuplicateKunde(k.id, router)
             const edit = () => openDetail(k.id)
-            const row = (
+            const row = isMobile ? (
+              <div
+                role="button"
+                tabIndex={0}
+                className={cn('vg-row', selected[k.id] && 'sel')}
+                onClick={() => openDetail(k.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDetail(k.id)
+                  }
+                }}
+              >
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(k.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[k.id] && 'on')}>
+                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
+                <div className="vg-vorgang">
+                  <div className="t" title={kundeListenName(k)}>
+                    {kundeListenName(k)}
+                  </div>
+                </div>
+                <div className="vg-status">
+                  <span className="pill-tag">{typLabel}</span>
+                </div>
+                <div className="vg-kunde">
+                  <span className="vg-kunde__name" title={contactSub}>
+                    {contactSub}
+                  </span>
+                </div>
+              </div>
+            ) : (
               <div
                 role="button"
                 tabIndex={0}
@@ -635,9 +676,8 @@ export function KundenListeClient({
                   {kundeListenName(k)}
                 </div>
                 <div className="lc-pills">
-                  <span className="pill-tag">{kundeTypLabel(k.typ)}</span>
+                  <span className="pill-tag">{typLabel}</span>
                 </div>
-                {isMobile ? <div className="lc-sub">{contactSub}</div> : null}
                 <div className="lc-desk" style={{ color: 'var(--text-2)' }}>
                   {tel || '—'}
                 </div>
@@ -657,9 +697,9 @@ export function KundenListeClient({
             return (
               <SwipeRow
                 key={k.id}
-                disabled={!isMobile || selectMode}
+                disabled={!isMobile}
                 rightActions={
-                  isMobile && !selectMode
+                  isMobile
                     ? [
                         { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
                         { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },

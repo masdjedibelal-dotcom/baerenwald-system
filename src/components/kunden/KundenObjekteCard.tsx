@@ -18,7 +18,6 @@ import {
   kundenObjektStrasseZeile,
 } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
-import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
@@ -30,8 +29,6 @@ type Props = {
   kundeId: string
   objekte: KundenObjekt[]
   verwaltungName?: string
-  /** Org-Kennung für Melde-Links */
-  orgKennung?: string | null
   /** Anfrage/Wizard: aktuell gewähltes Objekt */
   selectedId?: string | null
   onSelect?: (objektId: string | null) => void
@@ -41,79 +38,10 @@ type Props = {
   className?: string
 }
 
-function MeldeLinksCard({ orgSlug }: { orgSlug: string }) {
-  const meldeLink = buildMeldeLink(orgSlug)
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    void import('qrcode').then((QRCode) =>
-      QRCode.toDataURL(meldeLink, {
-        width: 180,
-        margin: 2,
-        color: { dark: '#1A3D2B', light: '#FFFFFF' },
-      }).then((url) => {
-        if (!cancelled) setQrDataUrl(url)
-      })
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [meldeLink])
-
-  function kopieren() {
-    void navigator.clipboard.writeText(meldeLink).then(
-      () => toast.success('Melde-Link kopiert'),
-      () => toast.error('Kopieren fehlgeschlagen')
-    )
-  }
-
-  return (
-    <MockCard title="Links" icon="link" className="objekte-links-card">
-      <div className="objekte-links-card__row">
-        <div className="objekte-links-card__label">Melde-Link</div>
-        <div className="objekte-links-card__linkbox">
-          <span className="objekte-links-card__url" title={meldeLink}>
-            {meldeLink}
-          </span>
-          <MockBtn sm kind="ghost" icon="copy" title="Link kopieren" onClick={kopieren} />
-          <a
-            href={meldeLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn ghost sm icon"
-            aria-label="Link öffnen"
-            title="Link öffnen"
-          >
-            <MockIcon ctx="btn" n="external-link" size={14} />
-          </a>
-        </div>
-      </div>
-
-      <div className="objekte-links-card__qr">
-        <div className="objekte-links-card__label">QR-Code Hausverwaltung</div>
-        {qrDataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={qrDataUrl}
-            alt="QR-Code Melde-Link Hausverwaltung"
-            width={140}
-            height={140}
-            className="objekte-links-card__qr-img"
-          />
-        ) : (
-          <div className="objekte-links-card__qr-placeholder">QR wird erzeugt…</div>
-        )}
-      </div>
-    </MockCard>
-  )
-}
-
 export function KundenObjekteCard({
   kundeId,
   objekte,
   verwaltungName,
-  orgKennung,
   selectedId,
   onSelect,
   onChanged,
@@ -155,8 +83,6 @@ export function KundenObjekteCard({
       cancelled = true
     }
   }, [liste, variant, kundeId])
-
-  const orgSlug = orgKennung?.trim().toLowerCase() || null
 
   const selectOptions = useMemo(
     () => [
@@ -258,8 +184,6 @@ export function KundenObjekteCard({
       </div>
 
       {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
-
-      {orgSlug ? <MeldeLinksCard orgSlug={orgSlug} /> : null}
 
       {liste.length === 0 ? (
         <MockEmpty

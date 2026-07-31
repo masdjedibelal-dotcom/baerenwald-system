@@ -490,22 +490,17 @@ export function AuftragLeistungZuweisungModal({
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Noch kein Handwerker gewählt.</p>
           )}
 
-          <div className="pos-add-row">
-            <button
-              type="button"
-              className="pos-add-btn"
-              disabled={pending}
-              onClick={() => setPickerOpen(true)}
-            >
-              <span className="icon-wrap">
-                <MockIcon ctx="default" n="search" size={16} />
-              </span>
-              <span className="lbl-block">
-                <span>Handwerker suchen</span>
-                <span className="sub">Gewerk filtern & auswählen</span>
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            className="pos-add-btn w-full"
+            disabled={pending}
+            onClick={() => setPickerOpen(true)}
+          >
+            <span className="icon-wrap">
+              <MockIcon ctx="default" n="search" size={16} />
+            </span>
+            <span>Handwerker suchen</span>
+          </button>
         </div>
       </EditorSheet>
 

@@ -377,15 +377,13 @@ export function StatusModal({
   )
 
   const formFooter = (
-    <div className="flex w-full items-center gap-2">
-      <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+    <div className="sheet-footer-actions">
+      <Button type="button" variant="secondary" onClick={onClose}>
         Abbrechen
       </Button>
-      <div className="flex-1" />
       <Button
         type="button"
         variant={meta.danger ? 'danger' : 'primary'}
-        size="sm"
         loading={saving}
         className="inline-flex gap-1.5"
         onClick={() => void handleSave()}
@@ -397,10 +395,16 @@ export function StatusModal({
   )
 
   return (
-    <EditorSheet open={open} onClose={onClose} title={meta.title} context="detail" size="lg">
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title={meta.title}
+      context="detail"
+      size="lg"
+      footer={formFooter}
+    >
       <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">{sub}</p>
       {formBody}
-      <div className="mt-4 border-t border-[var(--app-separator)] pt-3">{formFooter}</div>
     </EditorSheet>
   )
 }

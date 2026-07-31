@@ -1,10 +1,8 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { toast } from '@/components/ui/app-toast'
 import { KiChatComposer } from '@/components/assistent/KiChatComposer'
@@ -75,10 +73,11 @@ export function AngebotKiAssistentButton({
   const [open, setOpen] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [ergebnis, setErgebnis] = useState<AngebotKiErgebnis | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
 
-  function generieren() {
-    startTransition(async () => {
+  async function generieren() {
+    setPending(true)
+    try {
       const res = await angebotKiGenerate({
         prompt,
         scope: 'positionen',
@@ -94,7 +93,9 @@ export function AngebotKiAssistentButton({
         return
       }
       setErgebnis(res.ergebnis)
-    })
+    } finally {
+      setPending(false)
+    }
   }
 
   function togglePos(id: string) {
@@ -118,21 +119,19 @@ export function AngebotKiAssistentButton({
       positionen: selected.filter((p) => p.rolle === 'leistung'),
     }
     onApply(payload)
-    startTransition(async () => {
-      await angebotKiLernen({
-        scope: 'positionen',
-        prompt,
-        gewerk_slug: payload.positionen[0]?.gewerk_slug ?? null,
-        kontext: {
-          leadKurz: leadKurz ?? null,
-          titel: titel ?? null,
-          positionenCount: positionen.length,
-          dokumentLabel,
-        },
-        ergebnis: {
-          positionen: selected,
-        },
-      })
+    void angebotKiLernen({
+      scope: 'positionen',
+      prompt,
+      gewerk_slug: payload.positionen[0]?.gewerk_slug ?? null,
+      kontext: {
+        leadKurz: leadKurz ?? null,
+        titel: titel ?? null,
+        positionenCount: positionen.length,
+        dokumentLabel,
+      },
+      ergebnis: {
+        positionen: selected,
+      },
     })
     toast.success('Übernommen — KI lernt aus dieser Annahme')
     setOpen(false)
@@ -169,7 +168,7 @@ export function AngebotKiAssistentButton({
                 kind="primary"
                 icon="sparkles"
                 disabled={pending || !prompt.trim()}
-                onClick={generieren}
+                onClick={() => void generieren()}
               >
                 {pending ? 'Generiert…' : 'Generieren'}
               </MockBtn>
@@ -187,32 +186,30 @@ export function AngebotKiAssistentButton({
         }
       >
         <div className="angebot-ki space-y-4">
-          {!ergebnis ? (
+          {pending && !ergebnis ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-8" aria-live="polite">
+              <span className="page-loading__spinner page-loading__spinner--sm" aria-hidden />
+              <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
+                KI generiert Vorschläge…
+              </p>
+            </div>
+          ) : null}
+          {!ergebnis && !pending ? (
             <MockField
               label="Prompt"
               hint="Beschreib konkret, was rein soll — Gewerk, Mengen, Qualität. Mobil: Tippen oder Sprechen."
               full
             >
               <KiChatComposer
-                multiline
-                rows={4}
                 value={prompt}
                 onChange={setPrompt}
-                onSubmit={generieren}
+                onSubmit={() => void generieren()}
                 disabled={pending}
-                placeholder="z. B. Bad 8 m²: Abbruch Altfliesen, Abdichtung, Fliesenwand/-boden Mittelklasse, WC und Waschtisch — inkl. Dokumenttitel & Kurzbeschreibung"
-                submitLabel={
-                  pending ? (
-                    'Generiert…'
-                  ) : (
-                    <>
-                      <MockIcon ctx="btn" n="sparkles" size={14} /> Generieren
-                    </>
-                  )
-                }
+                placeholder="z. B. Bad 8 m²: Abbruch Altfliesen, Abdichtung, Fliesenwand/-boden Mittelklasse…"
               />
             </MockField>
-          ) : (
+          ) : null}
+          {ergebnis ? (
             <div className="angebot-ki__preview space-y-3">
               {ergebnis.hinweis ? (
                 <p className="angebot-ki__hint">{ergebnis.hinweis}</p>
@@ -277,7 +274,7 @@ export function AngebotKiAssistentButton({
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </MockModal>
     </>

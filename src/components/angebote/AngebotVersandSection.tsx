@@ -11,8 +11,6 @@ import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
@@ -99,12 +97,6 @@ export function AngebotVersandSection({
   }
   const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
 
-  useKiAssistDraftConsumer(kundeModal, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: setSubject,
-      setBody: () => {},
-    })
-  })
   const [hwModal, setHwModal] = useState<{
     id: string
     name: string
@@ -483,11 +475,11 @@ export function AngebotVersandSection({
         size="lg"
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
-              Jetzt senden
-            </Button>
             <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
               Abbrechen
+            </Button>
+            <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
+              Jetzt senden
             </Button>
           </div>
         }
@@ -497,9 +489,10 @@ export function AngebotVersandSection({
         </p>
         <KiAssistFieldLabel
           label="Betreff"
-          scope="mail"
+          value={subject}
+          onApply={setSubject}
           extraHint="Angebotsversand — Betreff an den Kunden."
-          draftInput={subject || null}
+          multiline={false}
         >
           <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
         </KiAssistFieldLabel>

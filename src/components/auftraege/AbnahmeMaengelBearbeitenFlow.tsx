@@ -8,12 +8,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import {
-  applyKiDokumentTextDraft,
-  claimKiAssistListTarget,
-  setKiAssistListTarget,
-} from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import {
   loadAbnahmeprotokollSummary,
@@ -47,21 +41,6 @@ export function AbnahmeMaengelBearbeitenFlow({
   const [uploadTarget, setUploadTarget] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  useKiAssistDraftConsumer(true, 'text', (d) => {
-    for (const m of maengel) {
-      if (claimKiAssistListTarget(m.punkt_id)) {
-        applyKiDokumentTextDraft(d, {
-          setText: (v) => {
-            setMaengel((prev) =>
-              prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, beschreibung: v } : x))
-            )
-          },
-        })
-        return
-      }
-    }
-  })
 
   useEffect(() => {
     void (async () => {
@@ -156,11 +135,11 @@ export function AbnahmeMaengelBearbeitenFlow({
   const offen = countOffeneMaengel(maengel)
 
   const footer = (
-    <div className="flex justify-between gap-2">
-      <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+    <div className="sheet-footer-actions">
+      <Button type="button" variant="secondary" onClick={onClose}>
         Schließen
       </Button>
-      <Button type="button" variant="primary" size="sm" onClick={onDone} disabled={pending}>
+      <Button type="button" variant="primary" onClick={onDone} disabled={pending}>
         Fertig
       </Button>
     </div>
@@ -225,10 +204,13 @@ export function AbnahmeMaengelBearbeitenFlow({
               </div>
               <KiAssistFieldLabel
                 label="Beschreibung"
-                scope="mangel"
+                value={m.beschreibung}
+                onApply={(text) => {
+                  setMaengel((prev) =>
+                    prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, beschreibung: text } : x))
+                  )
+                }}
                 extraHint="Mangel-Beschreibung für Abnahme/PDF (kundensichtbar)."
-                draftInput={m.beschreibung || null}
-                onBeforeOpen={() => setKiAssistListTarget(m.punkt_id)}
               >
                 <Textarea
                   rows={2}

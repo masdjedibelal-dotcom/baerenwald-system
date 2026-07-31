@@ -205,6 +205,9 @@ function MergeForm({
         </select>
       </label>
       <div className="flex gap-2">
+        <button type="button" className="text-[length:var(--fs-meta)] underline" onClick={onCancel}>
+          Abbrechen
+        </button>
         <button
           type="button"
           className="rounded-md bg-amber-900 px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-white disabled:opacity-50"
@@ -212,9 +215,6 @@ function MergeForm({
           onClick={onMerge}
         >
           Zusammenführen
-        </button>
-        <button type="button" className="text-[length:var(--fs-meta)] underline" onClick={onCancel}>
-          Abbrechen
         </button>
       </div>
     </div>

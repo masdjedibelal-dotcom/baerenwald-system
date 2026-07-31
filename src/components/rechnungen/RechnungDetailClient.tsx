@@ -392,11 +392,10 @@ export function RechnungDetailClient({
 
   const primaryAction = useMemo((): DetailActionDef | null => {
     const cta = primaryCta('rechnung', detail.status, { ueberfaellig })
-    if (!cta) return null
-    if (cta.id === 'rechnung_versenden') {
+    if (cta?.id === 'rechnung_versenden') {
       return { label: cta.label, icon: cta.icon, onClick: handleSenden, disabled: pending }
     }
-    if (cta.id === 'bewertung_einholen') {
+    if (cta?.id === 'bewertung_einholen') {
       return {
         label: cta.label,
         icon: cta.icon,
@@ -418,8 +417,29 @@ export function RechnungDetailClient({
         },
       }
     }
+    /* Gesendet: kein anderer Primary → Bearbeiten als CTA */
+    if (rechnungKorrekturModus(detail.status) !== 'gesperrt' && detail.status === 'gesendet') {
+      return {
+        label: 'Rechnung bearbeiten',
+        icon: 'pencil',
+        onClick: handleKorrigieren,
+        disabled: pending,
+      }
+    }
     return null
   }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden])
+
+  const secondaryAction = useMemo((): DetailActionDef | null => {
+    if (rechnungKorrekturModus(detail.status) === 'gesperrt') return null
+    /* Bei gesendet ist Bearbeiten bereits Primary */
+    if (detail.status === 'gesendet') return null
+    return {
+      label: 'Rechnung bearbeiten',
+      icon: 'pencil',
+      onClick: handleKorrigieren,
+      disabled: pending,
+    }
+  }, [detail.status, pending])
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
   const rechnungStatus = rechnungStatusDisplay(detail.status, { ueberfaellig })
@@ -502,10 +522,6 @@ export function RechnungDetailClient({
     const pos = normalizeAngebotPositionen(detail.positionen ?? []).filter(
       (p) => !istGewerkBeschreibungPosition(p)
     )
-    const gestellt =
-      detail.status === 'gesendet' ||
-      detail.status === 'bezahlt' ||
-      detail.status === 'storniert'
     const mwstSatz =
       detail.mwst_satz != null && Number.isFinite(Number(detail.mwst_satz))
         ? Number(detail.mwst_satz)
@@ -546,14 +562,7 @@ export function RechnungDetailClient({
         )}
         groupByGewerk
         footerNettoMwst={{ netto, mwstSatz, mwstBetrag, brutto }}
-        onOpenDokument={gestellt ? handleKorrigieren : openWizard}
-        dokumentHint={
-          gestellt
-            ? null
-            : 'Positionen änderst du im Rechnungs-Dokument — nicht in dieser Tabelle.'
-        }
-        dokumentActionLabel={gestellt ? 'Bearbeiten' : 'Dokument öffnen'}
-        emptyHint="Noch keine Positionen — im Rechnungs-Dokument anlegen."
+        emptyHint="Noch keine Positionen — über „Rechnung bearbeiten“ anlegen."
       />
     )
   })()
@@ -681,6 +690,7 @@ export function RechnungDetailClient({
           <DetailActionsBar
             sheetTitle="Rechnung"
             primary={primaryAction}
+            secondary={secondaryAction}
             menuItems={[]}
           />
         ),
@@ -746,11 +756,11 @@ export function RechnungDetailClient({
         size="sm"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
-              Gutschrift erstellen
-            </Button>
             <Button type="button" variant="secondary" onClick={() => setRechnungConfirm(null)}>
               Abbrechen
+            </Button>
+            <Button type="button" variant="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
+              Gutschrift erstellen
             </Button>
           </div>
         }

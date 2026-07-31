@@ -70,19 +70,28 @@ export const KI_ASSIST_SCOPES: Record<KiAssistScopeId, KiAssistScope> = {
     id: 'position',
     label: 'Position',
     intro:
-      'Ich helfe dir bei **einer Position** (Titel, Menge, Einheit, Beschreibung, optional Preis) für Angebot oder Rechnung. Beschreib kurz, was gebaut/geliefert werden soll — ich formuliere die Position fertig zum Übernehmen.',
-    placeholder: 'z. B. „Badfliesen 12 m² inkl. Verlegung, Mittelklasse“…',
-    systemHint: `Modus: EINE Position für Angebot/Rechnung (Handwerk).
-Erzeuge passende Bezeichnung, Menge, Einheit und Leistungsbeschreibung.
+      'Beschreib mir die **Position** — was gemacht wird, **Menge/Einheit** und idealerweise den **Netto-Preis**. Ich formuliere daraus eine klare Positions-Card zum Übernehmen.',
+    placeholder: 'z. B. „Wandfliesen Bad 12 m², inkl. Verlegen, 85 €/m²“…',
+    systemHint: `Modus: EINE Position für Angebot/Rechnung (Handwerk Bärenwald).
+Frage bei Bedarf kurz nach fehlenden Angaben (Menge, Einheit, Preis).
+Erzeuge Bezeichnung, Beschreibung, Menge, Einheit und Preis (netto, Zahl ohne €-Zeichen).
+Zeige die Position klar strukturiert; am Ende immer bw-apply type position.
 ${BW_APPLY_HINT}`,
     quickPrompts: [
       {
         label: 'Aus Stichworten',
-        prompt: 'Formuliere aus meinen Stichworten eine klare Angebotsposition mit Menge und Beschreibung.',
+        prompt:
+          'Formuliere aus meinen Stichworten eine Angebotsposition mit Bezeichnung, Beschreibung, Menge, Einheit und Preis.',
       },
       {
         label: 'Pauschal',
-        prompt: 'Mache daraus eine Pauschal-Position mit kurzer Leistungsbeschreibung.',
+        prompt:
+          'Mache daraus eine Pauschal-Position (Menge 1, Einheit Pauschal) mit kurzer Leistungsbeschreibung und Preis.',
+      },
+      {
+        label: 'Nach Aufwand',
+        prompt:
+          'Formuliere eine Regie-/Aufwandsposition mit Beschreibung; Menge und Preis kannst du sinnvolle Defaults setzen.',
       },
     ],
   },

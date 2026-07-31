@@ -14,6 +14,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -374,6 +375,38 @@ export function AuftragDokumenteTab({
     )
   }
 
+  function renderMobileCard(row: AuftragDokumentZeile) {
+    const href = rowHref(row)
+    const ready = rowPdfReady(row)
+    const openable = Boolean(ready && href)
+    const meta = [
+      dokumentTypLabel(row.quelle),
+      row.datum ? formatDatum(row.datum) : null,
+      row.beschreibung && row.beschreibung !== '—' ? row.beschreibung : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    const freigabeLabelText = freigabeLabel(row)
+    return (
+      <DokMobileCard
+        key={row.id}
+        title={row.name}
+        meta={meta}
+        onClick={
+          openable && href
+            ? () => window.open(href, '_blank', 'noopener,noreferrer')
+            : undefined
+        }
+        className={!openable ? 'dok-card--static' : undefined}
+        badge={
+          <span className={cn('dok-card__tag', row.fuerKunde && 'is-kunde')}>
+            {freigabeLabelText}
+          </span>
+        }
+      />
+    )
+  }
+
   return (
     <div className="auftrag-dok-panel pb-4">
       <Card
@@ -468,10 +501,10 @@ export function AuftragDokumenteTab({
               ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
               : 'Noch keine Dokumente.'}
           </p>
+        ) : isMobile ? (
+          <div className="dok-cards">{zeilen.map(renderMobileCard)}</div>
         ) : (
-          <div className="dok-list">
-            {zeilen.map(renderDeskRow)}
-          </div>
+          <div className="dok-list">{zeilen.map(renderDeskRow)}</div>
         )}
       </Card>
 
@@ -502,12 +535,12 @@ export function AuftragDokumenteTab({
 function DokumentEditFooter({ pending, onSave }: { pending: boolean; onSave: () => void }) {
   const requestClose = useEditorSheetRequestClose()
   return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
-        ✓ Speichern
-      </Button>
+    <div className="sheet-footer-actions ldr-cta">
       <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
+      </Button>
+      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
+        Speichern
       </Button>
     </div>
   )

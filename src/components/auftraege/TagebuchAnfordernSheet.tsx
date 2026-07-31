@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -130,16 +129,6 @@ export function TagebuchAnfordernSheet({
       confirmBusy={pending}
       onConfirm={send}
       confirmDisabled={!handwerkerId || pending || !hwOptions.length}
-      footer={
-        <div className="kunde-create-footer">
-          <MockBtn kind="primary" icon="send" disabled={pending || !handwerkerId} onClick={send}>
-            {pending ? 'Senden…' : 'Senden'}
-          </MockBtn>
-          <MockBtn kind="secondary" disabled={pending} onClick={onClose}>
-            Abbrechen
-          </MockBtn>
-        </div>
-      }
     >
       {!hwOptions.length ? (
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">

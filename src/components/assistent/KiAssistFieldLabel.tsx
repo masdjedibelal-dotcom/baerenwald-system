@@ -1,30 +1,40 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
-import type { KiAssistScopeId } from '@/lib/copilot/ki-assist-scopes'
+import { useState, type ReactNode } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { KiTextRewriteSheet } from '@/components/assistent/KiTextRewriteSheet'
 import { cn } from '@/lib/utils'
 
-/** Label-Zeile mit KI-Icon — für kundensichtbare Textfelder. */
+/**
+ * Label + Sparkles für Textblöcke → Inline-Rewrite-Sheet (kein globaler Assistent).
+ */
 export function KiAssistFieldLabel({
   label,
-  scope,
+  value,
+  onApply,
   extraHint,
-  draftInput,
   required,
   className,
   children,
-  onBeforeOpen,
+  multiline = true,
+  disabled,
 }: {
   label: ReactNode
-  scope: KiAssistScopeId
+  /** Aktueller Feldtext — Quelle fürs Umschreiben */
+  value: string
+  /** Übernahme in das Feld */
+  onApply: (text: string) => void
   extraHint?: string | null
-  draftInput?: string | null
   required?: boolean
   className?: string
   children?: ReactNode
-  onBeforeOpen?: () => void
+  /** Einzeiler (Betreff) vs. Textarea */
+  multiline?: boolean
+  disabled?: boolean
 }) {
+  const [open, setOpen] = useState(false)
+  const labelText = typeof label === 'string' ? label : 'Text'
+
   return (
     <div className={cn('ki-assist-field', className)}>
       <div className="lt-field-lbl lt-field-lbl--with-ki">
@@ -32,14 +42,27 @@ export function KiAssistFieldLabel({
           {label}
           {required ? <span className="req"> *</span> : null}
         </span>
-        <KiAssistIconButton
-          scope={scope}
-          extraHint={extraHint}
-          draftInput={draftInput}
-          onBeforeOpen={onBeforeOpen}
-        />
+        <button
+          type="button"
+          className="ki-assist-icon-btn"
+          title={`KI: ${labelText} umschreiben`}
+          aria-label={`KI: ${labelText} umschreiben`}
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+        >
+          <MockIcon ctx="btn" n="sparkles" size={16} />
+        </button>
       </div>
       {children}
+      <KiTextRewriteSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        fieldLabel={labelText}
+        sourceText={value}
+        extraHint={extraHint}
+        multiline={multiline}
+        onApply={onApply}
+      />
     </div>
   )
 }

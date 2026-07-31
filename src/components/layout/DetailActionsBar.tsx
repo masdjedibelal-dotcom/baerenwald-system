@@ -114,7 +114,7 @@ function hasMenuContent(items: ActionsMenuItem[]): boolean {
 
 /**
  * Desktop: Primary (+ optional Secondary / ⋯ nur wenn Items).
- * Mobil: Floating Glass-CTA; Scroll → kompakt (Icon + Verb).
+ * Mobil Hybrid: oben nur Bottom-Nav; nach Scroll Nav weg + floating CTA.
  */
 export function DetailActionsBar({
   primary,
@@ -126,6 +126,7 @@ export function DetailActionsBar({
   const [topActionsEl, setTopActionsEl] = useState<HTMLElement | null>(null)
   const isMobile = useIsMobile()
   const { scrolled } = useMobileScrollChrome(isMobile)
+  const hasMobilePrimary = Boolean(mounted && isMobile && primary)
   useEffect(() => setMounted(true), [])
   useEffect(() => {
     if (!mounted || !isMobile) {
@@ -134,6 +135,20 @@ export function DetailActionsBar({
     }
     setTopActionsEl(document.getElementById('detail-entity-top-overflow'))
   }, [mounted, isMobile])
+
+  /* Hybrid: body-Klassen steuern Bottom-Nav ↔ CTA (CSS). */
+  useEffect(() => {
+    const root = document.body
+    if (!hasMobilePrimary) {
+      root.classList.remove('has-detail-mobile-cta', 'detail-cta-mode')
+      return
+    }
+    root.classList.add('has-detail-mobile-cta')
+    root.classList.toggle('detail-cta-mode', scrolled)
+    return () => {
+      root.classList.remove('has-detail-mobile-cta', 'detail-cta-mode')
+    }
+  }, [hasMobilePrimary, scrolled])
 
   const cleanMenuItems = useMemo(
     () => withoutPrimaryDuplicate(menuItems, primary?.label),
@@ -181,25 +196,23 @@ export function DetailActionsBar({
     <div
       className={cn(
         'detail-actions-desktop hidden items-center gap-2 md:flex',
-        alonePrimary ? 'justify-center w-full' : 'justify-between w-full'
+        alonePrimary ? 'justify-center w-full' : 'justify-end w-full'
       )}
     >
+      {secondary ? (
+        <button
+          type="button"
+          className="btn secondary sm inline-flex shrink-0 gap-1.5"
+          onClick={secondary.onClick}
+          disabled={secondary.disabled}
+          aria-label={secondary.label}
+        >
+          {secondary.icon ? <ActionIcon n={secondary.icon} size={14} /> : null}
+          {secondary.label}
+        </button>
+      ) : null}
+      {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
       {primary ? <ActionControl action={primary} /> : null}
-      <div className="flex items-center gap-2">
-        {secondary ? (
-          <button
-            type="button"
-            className="btn secondary sm inline-flex shrink-0 gap-1.5"
-            onClick={secondary.onClick}
-            disabled={secondary.disabled}
-            aria-label={secondary.label}
-          >
-            {secondary.icon ? <ActionIcon n={secondary.icon} size={14} /> : null}
-            {secondary.label}
-          </button>
-        ) : null}
-        {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
-      </div>
     </div>
   )
 
@@ -214,17 +227,19 @@ export function DetailActionsBar({
           <div
             className={cn(
               'detail-mobile-action-bar md:hidden',
-              scrolled && 'detail-mobile-action-bar--compact',
+              !scrolled && 'detail-mobile-action-bar--hidden',
+              scrolled && 'detail-mobile-action-bar--nav-replaced',
               'detail-mobile-action-bar--solo'
             )}
             role="toolbar"
             aria-label="Aktionen"
+            aria-hidden={!scrolled}
           >
             <div className="detail-mobile-action-bar__inner detail-mobile-action-bar__inner--solo">
               <ActionControl
                 action={primary}
                 size="md"
-                compact={scrolled}
+                compact={false}
                 className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--solo"
               />
             </div>

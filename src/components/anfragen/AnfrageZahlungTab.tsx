@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -16,10 +15,8 @@ import type { StatusTone } from '@/lib/status/status-tone'
  */
 export function AnfrageZahlungTab({
   rechnungen,
-  onCreateAngebot,
 }: {
   rechnungen: ProjektRechnungKurz[]
-  onCreateAngebot?: () => void
 }) {
   const aktiv = rechnungen.filter((r) => String(r.status).toLowerCase() !== 'storniert')
   const geplant = aktiv.filter((r) => String(r.status).toLowerCase() === 'entwurf')
@@ -27,21 +24,14 @@ export function AnfrageZahlungTab({
 
   if (aktiv.length === 0) {
     return (
-        <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
-          <div className="zahlplan-empty">
-            <MockIcon ctx="empty" n="calculator" size={26} />
-            <div className="zahlplan-empty__title">Noch keine Zahlung</div>
+      <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
+        <div className="zahlplan-empty">
+          <MockIcon ctx="empty" n="calculator" size={26} />
+          <div className="zahlplan-empty__title">Noch keine Zahlung</div>
           <div className="zahlplan-empty__text">
             Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten
             Schritt fest.
           </div>
-          {onCreateAngebot ? (
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4 }}>
-              <MockBtn kind="primary" icon="file-invoice" onClick={onCreateAngebot}>
-                Angebot erstellen
-              </MockBtn>
-            </div>
-          ) : null}
         </div>
       </MockCard>
     )

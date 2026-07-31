@@ -4,10 +4,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { Input } from '@/components/ui/Input'
@@ -33,28 +30,26 @@ function InformierenFooter({
 }) {
   const requestClose = useEditorSheetRequestClose()
   return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+    <div className="sheet-footer-actions ldr-cta">
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
       </Button>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" loading={pending} onClick={onTogglePreview}>
-          {showPreview ? (
-            <>
-              <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
-              Vorschau aus
-            </>
-          ) : (
-            <>
-              <Eye className="mr-1.5 h-4 w-4" aria-hidden />
-              Vorschau
-            </>
-          )}
-        </Button>
-        <Button type="button" variant="primary" loading={pending} onClick={onSend}>
-          Senden
-        </Button>
-      </div>
+      <Button type="button" variant="secondary" loading={pending} onClick={onTogglePreview}>
+        {showPreview ? (
+          <>
+            <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
+            Vorschau aus
+          </>
+        ) : (
+          <>
+            <Eye className="mr-1.5 h-4 w-4" aria-hidden />
+            Vorschau
+          </>
+        )}
+      </Button>
+      <Button type="button" variant="primary" loading={pending} onClick={onSend}>
+        Senden
+      </Button>
     </div>
   )
 }
@@ -151,19 +146,6 @@ export function KundeInformierenModal({
           ? `Leistung: ${scope.leistungName}`
           : ''
 
-  useKiAssistDraftConsumer(open, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: (v) => {
-        setBetreff(v)
-        setDirty(true)
-      },
-      setBody: (v) => {
-        setNachricht(v)
-        setDirty(true)
-      },
-    })
-  })
-
   return (
     <EditorSheet
       open={open}
@@ -177,13 +159,6 @@ export function KundeInformierenModal({
       composeLabel="Senden"
       onConfirm={senden}
       confirmBusy={pending}
-      headerEnd={
-        <KiAssistIconButton
-          scope="portal"
-          extraHint={`Kunden-Update / Statusseite + Mail an ${kundeName}. ${scopeHint}`}
-          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
-        />
-      }
       footer={
         <InformierenFooter
           pending={pending}
@@ -227,9 +202,13 @@ export function KundeInformierenModal({
 
         <KiAssistFieldLabel
           label="Betreff"
-          scope="mail"
+          value={betreff}
+          onApply={(text) => {
+            setBetreff(text)
+            setDirty(true)
+          }}
           extraHint={`Kunde informieren · ${kundeName}`}
-          draftInput={betreff || null}
+          multiline={false}
         >
           <Input
             value={betreff}
@@ -241,9 +220,12 @@ export function KundeInformierenModal({
         </KiAssistFieldLabel>
         <KiAssistFieldLabel
           label="Nachricht"
-          scope="portal"
+          value={nachricht}
+          onApply={(text) => {
+            setNachricht(text)
+            setDirty(true)
+          }}
           extraHint="Erscheint in Mail und auf der Kunden-Statusseite."
-          draftInput={[betreff, nachricht].filter(Boolean).join('\n\n') || null}
         >
           <Textarea
             rows={6}

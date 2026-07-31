@@ -2,7 +2,7 @@
 
 import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -47,57 +47,9 @@ function defaultGueltigBis(typ: ComplianceDokumentTyp, existing?: PartnerDokumen
   return ''
 }
 
-function SheetFooter({
-  pending,
-  canSave,
-  existing,
-  onSave,
-  onView,
-  onDelete,
-}: {
-  pending: boolean
-  canSave: boolean
-  existing: PartnerDokument | null
-  onSave: () => void
-  onView: () => void
-  onDelete: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="primary" loading={pending} disabled={!canSave} onClick={onSave}>
-          ✓ Speichern
-        </Button>
-        {existing?.datei_url ? (
-          <Button type="button" variant="secondary" disabled={pending} onClick={onView}>
-            <ActionIcon n="eye" size={14} />
-            Ansehen
-          </Button>
-        ) : null}
-        {existing ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-status-cancel-text"
-            disabled={pending}
-            onClick={onDelete}
-          >
-            <ActionIcon n="trash" size={14} />
-            Löschen
-          </Button>
-        ) : null}
-      </div>
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </Button>
-    </div>
-  )
-}
-
 /**
  * Compliance-Unterlage hochladen / bearbeiten — EditorSheet Split-over.
- * Beim Neu-Upload optional Vorlage aus dem Katalog wählen oder leer lassen (eigene Unterlage).
+ * Neu: optional Vorlage, dann Titel → Beschreibung → Datei → Gültig bis.
  */
 export function PartnerDokumentEditorSheet({
   open,
@@ -114,7 +66,7 @@ export function PartnerDokumentEditorSheet({
   handwerkerId: string
   typ: ComplianceDokumentTyp | null
   typen?: ComplianceDokumentTyp[]
-  /** Neu-Upload: Vorlage wählbar oder leer = selbst hochladen */
+  /** Neu-Upload: Vorlage optional wählbar */
   allowTypPick?: boolean
   existing: PartnerDokument | null
   onSaved?: () => void
@@ -130,7 +82,7 @@ export function PartnerDokumentEditorSheet({
 
   const pickOptions = useMemo(
     () => [
-      { value: '', label: 'Ohne Vorlage — selbst hochladen' },
+      { value: '', label: 'Ohne Vorlage' },
       ...typen
         .filter((t) => t.slug !== INDIVIDUELL_TYP_SLUG)
         .map((t) => ({ value: t.slug, label: t.bezeichnung })),
@@ -195,6 +147,7 @@ export function PartnerDokumentEditorSheet({
   }, [selectedSlug, open, existing, allowTypPick, typen])
 
   const isEdit = Boolean(existing)
+  const hatDatei = Boolean(file || existing?.datei_url)
   const canSave = Boolean(effectiveTyp && titel.trim() && (isEdit || file || existing?.datei_url))
 
   function markDirty() {
@@ -299,11 +252,12 @@ export function PartnerDokumentEditorSheet({
         ? 'Vorhanden — bearbeiten, ersetzen oder löschen'
         : null
 
-  const crumbLabel = allowTypPick && !existing
-    ? selectedSlug
-      ? effectiveTyp?.bezeichnung ?? 'Unterlage'
-      : 'Eigene Unterlage'
-    : effectiveTyp?.bezeichnung ?? 'Unterlage'
+  const crumbLabel =
+    allowTypPick && !existing
+      ? selectedSlug
+        ? effectiveTyp?.bezeichnung ?? 'Unterlage'
+        : 'Eigene Unterlage'
+      : effectiveTyp?.bezeichnung ?? 'Unterlage'
 
   return (
     <EditorSheet
@@ -314,16 +268,9 @@ export function PartnerDokumentEditorSheet({
       context="detail"
       dirty={dirty}
       size="md"
-      footer={
-        <SheetFooter
-          pending={pending}
-          canSave={canSave}
-          existing={existing}
-          onSave={speichern}
-          onView={() => void openDatei()}
-          onDelete={removeDoc}
-        />
-      }
+      onConfirm={speichern}
+      confirmDisabled={!canSave || pending}
+      confirmBusy={pending}
     >
       <div className="space-y-4">
         {partnerHint ? (
@@ -333,11 +280,7 @@ export function PartnerDokumentEditorSheet({
               ? ` · ${String(existing.hochgeladen_am).slice(0, 10)}`
               : null}
           </p>
-        ) : (
-          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Optional Vorlage wählen oder leer lassen und eigene Datei hochladen.
-          </p>
-        )}
+        ) : null}
 
         {allowTypPick && !existing ? (
           <Select
@@ -349,7 +292,6 @@ export function PartnerDokumentEditorSheet({
               setSelectedSlug(e.target.value)
               markDirty()
             }}
-            hint="Aus dem Katalog oder ohne Vorlage selbst hochladen."
           />
         ) : null}
 
@@ -358,6 +300,30 @@ export function PartnerDokumentEditorSheet({
             {effectiveTyp.beschreibung}
           </p>
         ) : null}
+
+        <Input
+          label="Titel"
+          value={titel}
+          required
+          disabled={pending}
+          onChange={(e) => {
+            setTitel(e.target.value)
+            markDirty()
+          }}
+        />
+
+        <Textarea
+          label="Beschreibung"
+          rows={4}
+          plain
+          value={beschreibung}
+          disabled={pending}
+          onChange={(e) => {
+            setBeschreibung(e.target.value)
+            markDirty()
+          }}
+          hint="Optional — z. B. Versicherungsnummer, Hinweise zur Prüfung."
+        />
 
         <div className="form-field">
           <label className="form-field-label">
@@ -390,40 +356,40 @@ export function PartnerDokumentEditorSheet({
           ) : null}
         </div>
 
-        <Input
-          label="Titel"
-          value={titel}
-          required
-          disabled={pending}
-          onChange={(e) => {
-            setTitel(e.target.value)
-            markDirty()
-          }}
-        />
+        {hatDatei ? (
+          <Input
+            label="Gültig bis"
+            type="date"
+            value={gueltigBis}
+            disabled={pending}
+            onChange={(e) => {
+              setGueltigBis(e.target.value)
+              markDirty()
+            }}
+          />
+        ) : null}
 
-        <Textarea
-          label="Beschreibung"
-          rows={4}
-          plain
-          value={beschreibung}
-          disabled={pending}
-          onChange={(e) => {
-            setBeschreibung(e.target.value)
-            markDirty()
-          }}
-          hint="Optional — z. B. Versicherungsnummer, Hinweise zur Prüfung."
-        />
-
-        <Input
-          label="Gültig bis"
-          type="date"
-          value={gueltigBis}
-          disabled={pending}
-          onChange={(e) => {
-            setGueltigBis(e.target.value)
-            markDirty()
-          }}
-        />
+        {existing ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {existing.datei_url ? (
+              <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void openDatei()}>
+                <ActionIcon n="eye" size={14} />
+                Ansehen
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-status-cancel-text"
+              disabled={pending}
+              onClick={removeDoc}
+            >
+              <ActionIcon n="trash" size={14} />
+              Löschen
+            </Button>
+          </div>
+        ) : null}
       </div>
     </EditorSheet>
   )

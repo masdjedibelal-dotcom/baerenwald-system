@@ -305,7 +305,15 @@ export function useDetailQuickActions({
         size="md"
         dirty={notizText.trim().length > 0}
         footer={
-          <div className="phase-sheet-footer" style={{ justifyContent: 'space-between' }}>
+          <div className="phase-sheet-footer">
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={pending}
+              onClick={() => setNotizOpen(false)}
+            >
+              Abbrechen
+            </button>
             <button
               type="button"
               className="btn primary"
@@ -314,14 +322,6 @@ export function useDetailQuickActions({
             >
               <ActionIcon n="check" size={14} />
               Speichern
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={pending}
-              onClick={() => setNotizOpen(false)}
-            >
-              Abbrechen
             </button>
           </div>
         }

@@ -17,7 +17,7 @@ export type CrmNotificationItem = {
   gelesen: boolean
 }
 
-export type CrmNotificationFilter = 'alle' | 'ungelesen' | 'gelesen'
+export type CrmNotificationFilter = 'ungelesen' | 'gelesen'
 
 const DAYS = 7
 
@@ -39,7 +39,13 @@ function typIcon(typ: CrmNotificationTyp): string {
   return 'check'
 }
 
-export { typIcon, typLabel }
+function ctaLabel(typ: CrmNotificationTyp): string {
+  if (typ === 'neue_anfrage') return 'Anfrage öffnen'
+  if (typ === 'handwerker_update') return 'Bautagebuch öffnen'
+  return 'Auftrag öffnen'
+}
+
+export { typIcon, typLabel, ctaLabel }
 
 function pushLead(
   items: CrmNotificationItem[],
@@ -68,7 +74,7 @@ async function currentUserId(): Promise<string | null> {
 
 /** Inbox der letzten 7 Tage: externe Kommunikation (Anfrage, HW-Update, Abschluss). */
 export async function listCrmNotifications(
-  filter: CrmNotificationFilter = 'alle'
+  filter: CrmNotificationFilter = 'ungelesen'
 ): Promise<{ ok: true; items: CrmNotificationItem[]; unreadCount: number } | { ok: false; message: string }> {
   const userId = await currentUserId()
   if (!userId) return { ok: false, message: 'Nicht angemeldet' }
@@ -184,17 +190,13 @@ export async function listCrmNotifications(
 
   const unreadCount = items.filter((i) => !i.gelesen).length
   const filtered =
-    filter === 'ungelesen'
-      ? items.filter((i) => !i.gelesen)
-      : filter === 'gelesen'
-        ? items.filter((i) => i.gelesen)
-        : items
+    filter === 'gelesen' ? items.filter((i) => i.gelesen) : items.filter((i) => !i.gelesen)
 
   return { ok: true, items: filtered, unreadCount }
 }
 
 export async function getCrmNotificationUnreadCount(): Promise<number> {
-  const res = await listCrmNotifications('alle')
+  const res = await listCrmNotifications('ungelesen')
   if (!res.ok) return 0
   return res.unreadCount
 }

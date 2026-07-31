@@ -13,6 +13,7 @@ import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -359,6 +360,26 @@ export function KundenDokumenteTab({
               ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
               : 'Noch keine Dokumente.'}
           </p>
+        ) : isMobile ? (
+          <div className="dok-cards">
+            {docs.map((d) => {
+              const sizeLabel = formatBytes(d.groesse_bytes)
+              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
+              return (
+                <DokMobileCard
+                  key={d.id}
+                  title={d.name}
+                  meta={meta}
+                  onClick={() => openView(d)}
+                  badge={
+                    <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
+                      {d.freigabe ? 'Kunde' : 'intern'}
+                    </span>
+                  }
+                />
+              )
+            })}
+          </div>
         ) : (
           <div className="dok-list dok-list--kunde">
             {docs.map((d) => {

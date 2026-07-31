@@ -28,27 +28,25 @@ function KontaktFooter({
 }) {
   const requestClose = useEditorSheetRequestClose()
   return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()}>
+    <div className="sheet-footer-actions ldr-cta">
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()}>
         Abbrechen
       </Button>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" onClick={onCopy}>
-          <Copy className="mr-1.5 h-4 w-4" aria-hidden />
-          Text kopieren
+      <Button type="button" variant="secondary" onClick={onCopy}>
+        <Copy className="mr-1.5 h-4 w-4" aria-hidden />
+        Text kopieren
+      </Button>
+      {mode === 'whatsapp' ? (
+        <Button type="button" variant="primary" onClick={onPrimary}>
+          <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
+          In WhatsApp öffnen
         </Button>
-        {mode === 'whatsapp' ? (
-          <Button type="button" variant="primary" onClick={onPrimary}>
-            <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
-            In WhatsApp öffnen
-          </Button>
-        ) : (
-          <Button type="button" variant="primary" onClick={onPrimary}>
-            <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-            In Mail-App öffnen
-          </Button>
-        )}
-      </div>
+      ) : (
+        <Button type="button" variant="primary" onClick={onPrimary}>
+          <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
+          In Mail-App öffnen
+        </Button>
+      )}
     </div>
   )
 }

@@ -108,6 +108,48 @@ export async function saveKundeOrganisation(
   return { ok: true }
 }
 
+/** Nur Freigabe-Regeln (HV-Übersicht) — ohne Org-Kennung/Logo. */
+export async function saveKundeFreigabeRegeln(
+  kundeId: string,
+  input: {
+    freigabe_schwelle_eur?: number | null
+    notfall_direkt: boolean
+    freigabe_modus?: FreigabeModus
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = kundeId?.trim()
+  if (!id) return { ok: false, message: 'Kunde fehlt.' }
+
+  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('typ, freigabe_modus').eq('id', id).maybeSingle()
+  )
+  if (kundeErr) return { ok: false, message: kundeErr.message }
+  const row = kundeRow as { typ?: string; freigabe_modus?: FreigabeModus | null } | null
+  if (!istKundeHausverwaltungTyp(row?.typ)) {
+    return { ok: false, message: 'Freigabe-Regeln nur für Hausverwaltung.' }
+  }
+
+  const freigabeModus: FreigabeModus =
+    input.freigabe_modus === 'direkt' || input.freigabe_modus === 'freigabe'
+      ? input.freigabe_modus
+      : row?.freigabe_modus === 'direkt'
+        ? 'direkt'
+        : 'freigabe'
+
+  const payload = {
+    freigabe_modus: freigabeModus,
+    freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
+    notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
+  }
+
+  const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true }
+}
+
 /** Prüft ob Org-Kennung gesetzt ist (Pflicht vor erstem Objekt im Auftraggeber-Modus). */
 export async function kundeHatOrgKennung(kundeId: string): Promise<boolean> {
   const { data } = await withCrmReadFallback(async (db) =>

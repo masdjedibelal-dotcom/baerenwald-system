@@ -1,11 +1,14 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { Input } from '@/components/ui/Input'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { toast } from '@/components/ui/app-toast'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
@@ -15,36 +18,6 @@ import {
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 
 const COLS = '42px 2fr 1.5fr 1fr'
-
-function Sec({
-  title,
-  actions,
-  children,
-}: {
-  title: string
-  actions?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        <span style={{ fontSize: 'var(--fs-text)', fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
-        <div style={{ flex: 1 }} />
-        {actions}
-      </div>
-      <div>{children}</div>
-    </div>
-  )
-}
 
 function initialsFromName(name: string, email: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -70,6 +43,7 @@ function avatarColor(u: BenutzerZeile, index: number): string {
 
 export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeile[] }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [rows, setRows] = useState(initial)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -129,8 +103,9 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
 
   return (
     <>
-      <Sec
+      <MockCard
         title="Teammitglieder"
+        icon="users"
         actions={
           <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
             Einladen
@@ -138,7 +113,35 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         }
       >
         {rows.length === 0 ? (
-          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>Noch keine Benutzer.</p>
+          <p className="m-0 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
+            Noch keine Benutzer.
+          </p>
+        ) : isMobile ? (
+          <div className="dok-cards">
+            {rows.map((u, i) => {
+              const initials = initialsFromName(u.name, u.email)
+              const color = avatarColor(u, i)
+              return (
+                <DokMobileCard
+                  key={u.id}
+                  title={u.name}
+                  meta={
+                    [u.email || null, !u.aktiv ? 'deaktiviert' : null].filter(Boolean).join(' · ') ||
+                    null
+                  }
+                  onClick={() => openEdit(u)}
+                  badge={<MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>}
+                  className={!u.aktiv ? 'opacity-55' : undefined}
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className={`avatar ${color}`.trim()} aria-hidden>
+                      {initials}
+                    </div>
+                  </div>
+                </DokMobileCard>
+              )
+            })}
+          </div>
         ) : (
           <div style={{ margin: 0 }}>
             <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
@@ -173,13 +176,31 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                   <div className={`avatar ${color}`.trim()} aria-hidden>
                     {initials}
                   </div>
-                  <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--fs-text)',
+                      fontWeight: 500,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {u.name}
                     {!u.aktiv ? (
                       <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
                     ) : null}
                   </div>
-                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--fs-meta)',
+                      color: 'var(--text-3)',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {u.email || '—'}
                   </div>
                   <div>
@@ -190,7 +211,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             })}
           </div>
         )}
-      </Sec>
+      </MockCard>
 
       <EditorSheet
         open={inviteOpen}

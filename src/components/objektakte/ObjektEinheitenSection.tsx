@@ -27,9 +27,6 @@ function EinheitFormFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="kunde-create-footer">
-      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
-        {pending ? '…' : 'Speichern'}
-      </MockBtn>
       <button
         type="button"
         className="btn secondary"
@@ -38,6 +35,9 @@ function EinheitFormFooter({
       >
         Abbrechen
       </button>
+      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
+        {pending ? '…' : 'Speichern'}
+      </MockBtn>
     </div>
   )
 }
@@ -183,16 +183,7 @@ export function ObjektEinheitenSection({
       </div>
 
       {rows.length === 0 ? (
-        <MockEmpty
-            icon="building"
-            title="Noch keine Einheiten"
-          hint="Wohneinheit hinzufügen"
-          action={
-            <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Einheit anlegen
-            </MockBtn>
-          }
-        />
+        <MockEmpty icon="building" title="Noch keine Einheiten" hint="Wohneinheit hinzufügen" />
       ) : (
         <div className="listcard">
           <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
@@ -226,9 +217,7 @@ export function ObjektEinheitenSection({
                   {e.wohnflaeche_m2 != null ? `${e.wohnflaeche_m2} m²` : '—'}
                 </div>
                 <div>
-                  <MockBadge kind={vermietet ? 'aktiv' : 'storniert'}>
-                    {vermietet ? 'Vermietet' : 'Frei'}
-                  </MockBadge>
+                  {vermietet ? <MockBadge kind="aktiv">Vermietet</MockBadge> : null}
                 </div>
                 <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>—</div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
@@ -308,8 +297,8 @@ export function ObjektEinheitenSection({
         {drawer ? (
           <div className="space-y-3">
             <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
-              {drawer.wohnflaeche_m2 != null ? `${drawer.wohnflaeche_m2} m²` : 'Keine Fläche'} ·{' '}
-              {vermietetIds.has(drawer.id) ? 'Vermietet' : 'Frei'}
+              {drawer.wohnflaeche_m2 != null ? `${drawer.wohnflaeche_m2} m²` : 'Keine Fläche'}
+              {vermietetIds.has(drawer.id) ? ' · Vermietet' : ''}
             </p>
             <div className="form-section-h">Mieter-Daten</div>
             {mieterDesDrawers.length === 0 ? (

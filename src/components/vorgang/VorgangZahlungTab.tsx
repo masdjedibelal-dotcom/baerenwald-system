@@ -858,17 +858,6 @@ export function VorgangZahlungTab({
                 </>
               )}
             </div>
-            {interactive ? (
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4 }}>
-                <MockBtn
-                  kind="primary"
-                  icon="file-invoice"
-                  onClick={() => onCreateInvoice?.({ voll: true })}
-                >
-                  Rechnung erstellen
-                </MockBtn>
-              </div>
-            ) : null}
           </div>
         </MockCard>
         {canEditPlan ? (
@@ -924,10 +913,12 @@ export function VorgangZahlungTab({
               von {formatEurBetrag(totalBruttoResolved || bezahltBrutto)}
             </span>
           </div>
-          <div className="zahlplan-summary__meta">
-            {pct} % bezahlt
-            {gestelltBrutto > 0 ? ` · ${formatEurBetrag(gestelltBrutto)} gestellt` : ''}
-          </div>
+          {variant !== 'rechnung' ? (
+            <div className="zahlplan-summary__meta">
+              {pct} % bezahlt
+              {gestelltBrutto > 0 ? ` · ${formatEurBetrag(gestelltBrutto)} gestellt` : ''}
+            </div>
+          ) : null}
         </div>
         {variant !== 'rechnung' ? (
           <div className="zahlplan-bar" aria-hidden>

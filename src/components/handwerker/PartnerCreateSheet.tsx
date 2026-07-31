@@ -4,37 +4,11 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
 
 type GewerkOpt = { id: string; name: string; slug: string }
-
-function PartnerCreateFooter({
-  pending,
-  onSubmit,
-}: {
-  pending: boolean
-  onSubmit: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="hw-create-footer">
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : 'Handwerker anlegen'}
-      </MockBtn>
-      <button
-        type="button"
-        className="btn secondary"
-        onClick={() => requestClose?.()}
-        disabled={pending}
-      >
-        Abbrechen
-      </button>
-    </div>
-  )
-}
 
 /** Handwerker anlegen — EditorSheet, Host z. B. `/neu?art=handwerker`. */
 export function PartnerCreateSheet({
@@ -128,8 +102,6 @@ export function PartnerCreateSheet({
     })
   }
 
-  const footer = <PartnerCreateFooter pending={pending} onSubmit={submit} />
-
   return (
     <EditorSheet
       open={open}
@@ -139,7 +111,9 @@ export function PartnerCreateSheet({
       context="detail"
       dirty={dirty}
       size="lg"
-      footer={footer}
+      onConfirm={submit}
+      confirmBusy={pending}
+      confirmDisabled={pending || !firma.trim() || !gewerkSlug.trim() || !tel.trim()}
       className="hw-create-sheet"
     >
       <div className="hw-create">

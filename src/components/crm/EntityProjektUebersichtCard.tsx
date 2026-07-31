@@ -6,8 +6,6 @@ import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSe
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
 import { formatDatum, cn } from '@/lib/utils'
 
@@ -71,12 +69,6 @@ export function EntityProjektUebersichtCard({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initial)
   const [pending, startTransition] = useTransition()
-
-  useKiAssistDraftConsumer(editing && editableFields.includes('beschreibung'), 'text', (d) => {
-    applyKiDokumentTextDraft(d, {
-      setText: (v) => setDraft((prev) => ({ ...prev, beschreibung: v })),
-    })
-  })
 
   useEffect(() => {
     if (!editing) setDraft(initial)
@@ -154,9 +146,9 @@ export function EntityProjektUebersichtCard({
           can('beschreibung') ? (
             <KiAssistFieldLabel
               label="Beschreibung"
-              scope="dokument"
+              value={draft.beschreibung}
+              onApply={(text) => patch({ beschreibung: text })}
               extraHint="Projektbeschreibung (kundensichtbar)."
-              draftInput={draft.beschreibung || null}
             >
               <textarea
                 className="input"

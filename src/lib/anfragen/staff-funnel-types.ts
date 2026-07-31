@@ -20,6 +20,9 @@ export type StaffFunnelStepId =
   | 'beratung'
   | 'crm_pruefen'
 
+/** Formular = Card-Funnel wie Website; Frei = Vorhaben/Beschreibung als Text. */
+export type StaffErfassungsModus = 'formular' | 'frei'
+
 export type StaffFunnelState = {
   // crm_kontext
   kundeId: string | null
@@ -30,9 +33,11 @@ export type StaffFunnelState = {
   telefon: string
   kanal: LeadKanal
   interneNotiz: string
+  /** Formular (Karten) vs. freie Texterfassung */
+  erfassungsModus: StaffErfassungsModus
   /** Mock-Anliegen (Create-Screen) */
   anliegen: StaffAnliegenId | ''
-  /** Freititel „Vorhaben“ */
+  /** Freititel „Vorhaben“ — bei Formular aus Karten generiert */
   vorhaben: string
   // funnel
   situation: SituationValue | ''
@@ -47,7 +52,7 @@ export type StaffFunnelState = {
   dringlichkeit: string
   kundentyp: string
   zeitraum: string
-  /** Budget-Freitext / Orientierung (Accordion) */
+  /** Budget-Freitext (optional, UI entfernt) */
   budgetHinweis: string
   plz: string
   ort: string
@@ -230,6 +235,7 @@ export function createInitialStaffFunnelState(
     telefon: '',
     kanal: 'telefon',
     interneNotiz: '',
+    erfassungsModus: 'formular',
     anliegen: '',
     vorhaben: '',
     situation: '',

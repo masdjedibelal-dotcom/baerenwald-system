@@ -5,8 +5,6 @@ import { useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft, setKiAssistListTarget, claimKiAssistListTarget } from '@/lib/copilot/ki-assist-apply'
 import {
   type BaustoppTyp,
   beendeBaustopp,
@@ -85,15 +83,6 @@ export function AuftragNachtragBaustoppSection({
   const [beschreibung, setBeschreibung] = useState('')
   const [posText, setPosText] = useState('')
 
-  useKiAssistDraftConsumer(nachtragOpen, 'text', (d) => {
-    if (claimKiAssistListTarget('nachtrag-pos')) {
-      applyKiDokumentTextDraft(d, { setText: setPosText })
-      return
-    }
-    if (claimKiAssistListTarget('nachtrag-besch')) {
-      applyKiDokumentTextDraft(d, { setText: setBeschreibung })
-    }
-  })
   const [posMin, setPosMin] = useState('')
   const [posMax, setPosMax] = useState('')
   const [hwBest, setHwBest] = useState(false)
@@ -472,10 +461,9 @@ export function AuftragNachtragBaustoppSection({
               </label>
               <KiAssistFieldLabel
                 label="Beschreibung"
-                scope="dokument"
+                value={beschreibung}
+                onApply={setBeschreibung}
                 extraHint="Nachtrag-Beschreibung für den Kunden."
-                draftInput={beschreibung || null}
-                onBeforeOpen={() => setKiAssistListTarget('nachtrag-besch')}
               >
                 <Textarea
                   value={beschreibung}
@@ -485,10 +473,9 @@ export function AuftragNachtragBaustoppSection({
               </KiAssistFieldLabel>
               <KiAssistFieldLabel
                 label="Position (Beschreibung)"
-                scope="position"
+                value={posText}
+                onApply={setPosText}
                 extraHint="Leistungsbeschreibung der Nachtragsposition."
-                draftInput={posText || null}
-                onBeforeOpen={() => setKiAssistListTarget('nachtrag-pos')}
               >
                 <Textarea
                   value={posText}

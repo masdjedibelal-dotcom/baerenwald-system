@@ -19,7 +19,7 @@ interface ModalProps {
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
-  /** Footer: Primary links (grün/weiß) · Secondary rechts (weiß/grün) */
+  /** Footer: Secondary/Abbrechen links · Primary rechts (space-between) */
   footerSpread?: boolean
 }
 

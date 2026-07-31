@@ -12,13 +12,15 @@ import { cn } from '@/lib/utils'
 export type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   /** Zusätzliche Klasse am äußeren Wrapper */
   wrapperClassName?: string
+  /** Kompakt (Filter, Range-Rows) */
+  size?: 'sm' | 'md'
 }
 
 /**
  * Datumsfeld: Text linksbündig, Kalender-Icon rechts öffnet den nativen Picker.
  */
 export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function DateInput(
-  { className, wrapperClassName, disabled, onClick, ...props },
+  { className, wrapperClassName, disabled, onClick, size = 'md', ...props },
   ref
 ) {
   const localRef = useRef<HTMLInputElement | null>(null)
@@ -43,11 +45,18 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function D
   }
 
   return (
-    <div className={cn('date-field', disabled && 'is-disabled', wrapperClassName)}>
+    <div
+      className={cn(
+        'date-field',
+        size === 'sm' && 'date-field--sm',
+        disabled && 'is-disabled',
+        wrapperClassName
+      )}
+    >
       <input
         ref={setRefs}
         type="date"
-        className={cn('input date-field__input', className)}
+        className={cn('input date-field__input', size === 'sm' && 'input--sm', className)}
         disabled={disabled}
         onClick={onClick}
         {...props}
@@ -61,7 +70,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function D
         title="Kalender öffnen"
         onClick={openPicker}
       >
-        <MockIcon ctx="btn" n="calendar" size={15} />
+        <MockIcon ctx="btn" n="calendar" size={size === 'sm' ? 14 : 15} />
       </button>
     </div>
   )

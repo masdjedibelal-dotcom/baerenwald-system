@@ -6,8 +6,6 @@ import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { previewBesichtigungTerminMail } from '@/app/actions/mails'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import { TERMIN_MAIL_AUTO_MARKER } from '@/lib/mail/termin-mail-editor'
@@ -154,19 +152,6 @@ export function TerminBestaetigungMailEditor({
 
   const draft = value ?? emptyDraft(kontaktEmail)
 
-  useKiAssistDraftConsumer(active, ['mail', 'text'], (d) => {
-    const next = { ...draft }
-    applyKiMailOrTextDraft(d, {
-      setBetreff: (v) => {
-        next.betreff = v
-      },
-      setBody: (v) => {
-        next.bodyText = v
-      },
-    })
-    onChange(next)
-  })
-
   return (
     <div className="space-y-3 rounded-lg border border-bw-border bg-bw-bg p-3">
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
@@ -181,9 +166,10 @@ export function TerminBestaetigungMailEditor({
       {error ? <p className="text-[length:var(--fs-meta)] text-red-600">{error}</p> : null}
       <KiAssistFieldLabel
         label="Betreff"
-        scope="mail"
+        value={draft.betreff}
+        onApply={(text) => onChange({ ...draft, betreff: text })}
         extraHint={`Terminbestätigung an ${kontaktName || 'Kunde'}.`}
-        draftInput={draft.betreff || null}
+        multiline={false}
       >
         <Input
           value={draft.betreff}
@@ -207,9 +193,9 @@ export function TerminBestaetigungMailEditor({
       />
       <KiAssistFieldLabel
         label="Nachricht"
-        scope="mail"
+        value={draft.bodyText}
+        onApply={(text) => onChange({ ...draft, bodyText: text })}
         extraHint={`Terminbestätigung Mailtext. Marker „${TERMIN_MAIL_AUTO_MARKER}“ belassen.`}
-        draftInput={[draft.betreff, draft.bodyText].filter(Boolean).join('\n\n') || null}
       >
         <Textarea
           rows={8}

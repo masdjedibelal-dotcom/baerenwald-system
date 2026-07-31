@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Trash2, X } from 'lucide-react'
-import { ActionSheet } from '@/components/ui/ActionSheet'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
@@ -72,7 +72,8 @@ export function DocumentCanvas({
   busy,
   busyLabel,
 }: DocumentCanvasProps) {
-  const [mounted, setMounted] = useState(false)
+  // Client sofort mounten — sonst ein Frame Flash der darunterliegenden Seite (z. B. Vorgänge)
+  const [mounted, setMounted] = useState(() => typeof document !== 'undefined')
   const [discardOpen, setDiscardOpen] = useState(false)
   const [saveFlash, setSaveFlash] = useState(false)
   const [barCompact, setBarCompact] = useState(false)
@@ -329,7 +330,6 @@ export function DocumentCanvas({
             interactionLocked && 'pointer-events-none opacity-60'
           )}
         >
-          {docActions}
           {onDiscard ? (
             <button
               type="button"
@@ -343,6 +343,7 @@ export function DocumentCanvas({
               <span className="doc-action-bar__lbl">Verwerfen</span>
             </button>
           ) : null}
+          {docActions}
         </footer>
       ) : null}
       {busy ? (
@@ -354,25 +355,20 @@ export function DocumentCanvas({
           <p className="page-loading__label">{busyLabel?.trim() || 'Bitte warten…'}</p>
         </div>
       ) : null}
-      <ActionSheet
+      <ConfirmPopup
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
         title="Änderungen verwerfen?"
-        items={[
-          {
-            label: 'Verwerfen',
-            danger: true,
-            onClick: () => {
-              setDiscardOpen(false)
-              onDiscard?.()
-            },
-          },
-          {
-            label: 'Weiter bearbeiten',
-            onClick: () => setDiscardOpen(false),
-          },
-        ]}
-      />
+        confirmLabel="Verwerfen"
+        cancelLabel="Weiter bearbeiten"
+        danger
+        onConfirm={() => {
+          setDiscardOpen(false)
+          onDiscard?.()
+        }}
+      >
+        Ungespeicherte Eingaben gehen verloren.
+      </ConfirmPopup>
     </div>
   )
 

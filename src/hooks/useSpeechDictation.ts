@@ -112,7 +112,7 @@ export function useSpeechDictation({
     }
     rec.onend = () => {
       setListening(false)
-      onInterimRef.current?.('')
+      // Interim nicht hier leeren — Composer übernimmt den Text beim Stopp/Review.
     }
     recRef.current = rec
     try {

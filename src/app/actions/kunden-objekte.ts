@@ -143,6 +143,43 @@ export async function createKundenObjekt(
   return { ok: true, objekt: data as KundenObjekt }
 }
 
+/** Nur Freigabe-Overrides (NULL = HV erben). */
+export async function updateKundenObjektFreigabe(
+  objektId: string,
+  kundeId: string,
+  input: {
+    freigabe_schwelle_eur: number | null
+    notfall_direkt: boolean | null
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const oid = objektId?.trim()
+  const kid = kundeId?.trim()
+  if (!oid || !kid) return { ok: false, message: 'Objekt oder Kunde fehlt.' }
+
+  const schwelle =
+    input.freigabe_schwelle_eur != null && Number.isFinite(Number(input.freigabe_schwelle_eur))
+      ? Number(input.freigabe_schwelle_eur)
+      : null
+  const payload = {
+    freigabe_schwelle_eur: schwelle != null && schwelle > 0 ? schwelle : null,
+    notfall_direkt: input.notfall_direkt,
+    updated_at: new Date().toISOString(),
+  }
+
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('kunden_objekte')
+    .update(payload)
+    .eq('id', oid)
+    .eq('kunde_id', kid)
+
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath(`/kunden/${kid}`)
+  revalidatePath(`/kunden/${kid}/objekte/${oid}`)
+  return { ok: true }
+}
+
 export async function updateKundenObjekt(
   objektId: string,
   kundeId: string,

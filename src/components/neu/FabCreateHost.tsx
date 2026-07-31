@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -13,6 +12,7 @@ import { KalenderTerminEditorSheet } from '@/components/kalender/KalenderTerminE
 import { TodoEditorSheet } from '@/components/todos/TodoEditorSheet'
 import { AnfrageWizard } from '@/components/anfragen/AnfrageWizard'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
+import { useTransition, hideOverlayBusy } from '@/components/ui/action-busy'
 
 export type FabOverlayArt =
   | 'kunde'
@@ -69,6 +69,13 @@ export function FabCreateHost() {
     return () => document.removeEventListener(EVENT, onOpen)
   }, [])
 
+  // Popover-Busy ausblenden, sobald Overlay/Picker gemountet ist
+  useEffect(() => {
+    if (!art) return
+    const t = window.setTimeout(() => hideOverlayBusy(), 60)
+    return () => clearTimeout(t)
+  }, [art])
+
   useEffect(() => {
     if (art !== 'handwerker') return
     if (gewerke.length > 0) return
@@ -76,7 +83,7 @@ export function FabCreateHost() {
       const r = await listGewerkeFuerFab()
       if (r.ok) setGewerke(r.gewerke)
     })
-  }, [art, gewerke.length])
+  }, [art, gewerke.length, startTransition])
 
   const vorgangArt: FabVorgangArt | null =
     art === 'rechnung' || art === 'angebot' ? art : null

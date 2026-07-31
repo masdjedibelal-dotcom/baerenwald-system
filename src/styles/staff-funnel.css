@@ -63,9 +63,47 @@
   margin: 0;
   font-size: var(--fs-meta, 12px);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--sf-text-4);
+  color: var(--text-3, #7a7570);
+}
+
+.staff-funnel .sf-radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staff-funnel .sf-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card, #fff);
+  font-size: var(--fs-text);
+  color: var(--sf-text);
+  cursor: pointer;
+}
+
+.staff-funnel .sf-radio:has(input:checked) {
+  border-color: var(--border-strong, rgba(30, 28, 26, 0.18));
+  background: var(--bg-soft, #f4f5f4);
+}
+
+.staff-funnel .sf-radio input {
+  margin: 0;
+  accent-color: var(--sf-accent);
+}
+
+.staff-funnel .segment-toggle {
+  width: 100%;
+}
+
+.staff-funnel .segment-toggle-btn {
+  flex: 1;
 }
 
 .staff-funnel .sf-anliegen {

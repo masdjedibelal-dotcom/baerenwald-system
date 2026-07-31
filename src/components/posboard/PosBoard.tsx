@@ -5,10 +5,8 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { PositionModal } from '@/components/posboard/PositionModal'
-import {
-  PositionAddSheet,
-  type PositionAddMode,
-} from '@/components/posboard/PositionAddSheet'
+import { PositionAddSheet, type PositionAddMode } from '@/components/posboard/PositionAddSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import type { PosAddKind } from '@/components/posboard/PosAddRow'
 import { guardSheetPointerFallthrough } from '@/lib/surfaces/editor-sheet-history'
 import {
@@ -818,29 +816,27 @@ export function PosBoard({
         </MockModal>
       ) : null}
       {gewerkAddOpen ? (
-        <MockModal
+        <EditorSheet
           open
+          context="canvas"
+          title="Gewerk hinzufügen"
+          subtitle="Abschnitt aus Stammdaten oder freier Bezeichnung"
           onClose={() => {
             setGewerkAddOpen(false)
             setGewerkAddPick('')
             setGewerkAddCustom('')
           }}
-          icon="folder"
-          title="Gewerk hinzufügen"
-          sub="Abschnitt aus Stammdaten oder freier Bezeichnung"
           footer={
-            <>
-              <div style={{ flex: 1 }} />
+            <div className="sheet-footer-actions">
               <MockBtn
-                sm
                 kind="primary"
                 icon="check"
                 disabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
-                onClick={confirmAddGewerk}
+                onClick={() => confirmAddGewerk()}
               >
                 Hinzufügen
               </MockBtn>
-            </>
+            </div>
           }
         >
           {gewerkeZumHinzufuegen.length > 0 ? (
@@ -864,11 +860,11 @@ export function PosBoard({
               </select>
             </div>
           ) : (
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginBottom: 10 }}>
+            <p className="m-0 mb-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
               {gewerke.length === 0
                 ? 'Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.'
                 : 'Alle Stammdaten-Gewerke sind bereits als Abschnitt vorhanden.'}
-            </div>
+            </p>
           )}
           <div className="field" style={{ marginTop: gewerkeZumHinzufuegen.length ? 12 : 0 }}>
             <div className="field-label">Oder freie Bezeichnung</div>
@@ -882,7 +878,7 @@ export function PosBoard({
               placeholder="z.B. Trockenbau · 1. OG"
             />
           </div>
-        </MockModal>
+        </EditorSheet>
       ) : null}
       {addSheetOpen ? (
         <PositionAddSheet

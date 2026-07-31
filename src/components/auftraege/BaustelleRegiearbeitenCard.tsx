@@ -150,11 +150,11 @@ export function BaustelleRegiearbeitenCard({
             onChange={(e) => setForm((f) => ({ ...f, material: e.target.value }))}
           />
           <div className="flex justify-between gap-2">
-            <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
-              Speichern
-            </Button>
             <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>
               Abbrechen
+            </Button>
+            <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
+              Speichern
             </Button>
           </div>
         </div>

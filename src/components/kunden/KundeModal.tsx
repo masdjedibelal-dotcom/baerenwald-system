@@ -3,7 +3,7 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
@@ -25,33 +25,6 @@ const TYP_OPTS = [
   { value: 'hausverwaltung', label: 'Hausverwaltung' },
   { value: 'gewerbe', label: 'Gewerbe' },
 ] as const
-
-function KundeModalFooter({
-  pending,
-  isCreate,
-  onSubmit,
-}: {
-  pending: boolean
-  isCreate: boolean
-  onSubmit: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="kunde-create-footer">
-      <MockBtn kind="primary" icon="user-plus" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : isCreate ? 'Kunde anlegen' : 'Speichern'}
-      </MockBtn>
-      <button
-        type="button"
-        className="btn secondary"
-        onClick={() => requestClose?.()}
-        disabled={pending}
-      >
-        Abbrechen
-      </button>
-    </div>
-  )
-}
 
 export function KundeModal({
   open,
@@ -243,10 +216,6 @@ export function KundeModal({
     })
   }
 
-  const footer = (
-    <KundeModalFooter pending={pending} isCreate={isCreate} onSubmit={submit} />
-  )
-
   return (
     <EditorSheet
       open={open}
@@ -256,7 +225,9 @@ export function KundeModal({
       context="detail"
       dirty={dirty}
       size="lg"
-      footer={footer}
+      onConfirm={submit}
+      confirmBusy={pending}
+      confirmDisabled={pending}
       className="kunde-create-sheet"
     >
       <div className="kunde-create">
@@ -413,6 +384,9 @@ export function KundeModal({
         size="sm"
         footer={
           <div className="kunde-create-footer">
+            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
+              Abbrechen
+            </Button>
             <Button
               type="button"
               loading={pending}
@@ -422,9 +396,6 @@ export function KundeModal({
               }}
             >
               Zusammenführen
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
-              Abbrechen
             </Button>
           </div>
         }

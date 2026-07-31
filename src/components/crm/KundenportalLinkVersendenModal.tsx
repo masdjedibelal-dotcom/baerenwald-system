@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -91,10 +89,6 @@ export function KundenportalLinkVersendenModal({
     return () => clearTimeout(timer)
   }, [open, kundeId, text, anrede, loading])
 
-  useKiAssistDraftConsumer(open, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, { setBetreff, setBody: setText })
-  })
-
   async function handleSend() {
     if (!kundeId?.trim()) {
       toast.error('Kein Kunde verknüpft.')
@@ -172,10 +166,12 @@ export function KundenportalLinkVersendenModal({
           />
           <KiAssistFieldLabel
             label="Betreff"
-            scope="mail"
+            value={betreff}
+            onApply={setBetreff}
             extraHint={`Portal-Einladung. Anrede: ${anrede}.`}
-            draftInput={betreff || null}
+            multiline={false}
             required
+            disabled={sending}
           >
             <input
               className="txt"
@@ -186,9 +182,10 @@ export function KundenportalLinkVersendenModal({
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Text"
-            scope="mail"
+            value={text}
+            onApply={setText}
             extraHint="Portal-Einladungsmail an den Kunden."
-            draftInput={[betreff, text].filter(Boolean).join('\n\n') || null}
+            disabled={sending}
           >
             <textarea
               className="ta"

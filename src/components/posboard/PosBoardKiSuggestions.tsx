@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -23,6 +22,7 @@ type Props = {
 
 /**
  * KI-/Katalog-Vorschläge am PosBoard: laden, anzeigen, ausblenden (ohne löschen), übernehmen.
+ * Lokales Loading — kein globaler actionBusy-Overlay.
  */
 export function PosBoardKiSuggestions({
   context,
@@ -34,7 +34,7 @@ export function PosBoardKiSuggestions({
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set())
   const [panelOpen, setPanelOpen] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
 
   const existing = existingVarianteIds
     ? existingVarianteIds instanceof Set
@@ -42,21 +42,22 @@ export function PosBoardKiSuggestions({
       : new Set(existingVarianteIds)
     : new Set<string>()
 
-  function load() {
+  async function load() {
     setError(null)
-    startTransition(async () => {
-      try {
-        const list = await suggestKatalogPositionen({
-          text: context.text,
-          gewerkHints: context.gewerkHints,
-          limit: 8,
-        })
-        setItems(list)
-        setPanelOpen(true)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Vorschläge fehlgeschlagen')
-      }
-    })
+    setPending(true)
+    try {
+      const list = await suggestKatalogPositionen({
+        text: context.text,
+        gewerkHints: context.gewerkHints,
+        limit: 8,
+      })
+      setItems(list)
+      setPanelOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Vorschläge fehlgeschlagen')
+    } finally {
+      setPending(false)
+    }
   }
 
   const visible =
@@ -85,17 +86,24 @@ export function PosBoardKiSuggestions({
           type="button"
           className="btn secondary sm"
           disabled={pending || !context.text.trim()}
-          onClick={() => load()}
+          onClick={() => void load()}
         >
           {pending ? 'Sucht…' : items ? 'Neu vorschlagen' : 'Vorschlagen'}
         </button>
       </div>
 
+      {pending ? (
+        <div className="flex items-center gap-2 border-t border-bw-border px-3 py-3 text-[12px] text-bw-text-muted">
+          <span className="page-loading__spinner page-loading__spinner--sm" aria-hidden />
+          Sucht passende Positionen…
+        </div>
+      ) : null}
+
       {error ? (
         <p className="border-t border-bw-border px-3 py-2 text-[12px] text-danger">{error}</p>
       ) : null}
 
-      {panelOpen && items ? (
+      {!pending && panelOpen && items ? (
         <div className="space-y-1.5 border-t border-bw-border px-3 py-2">
           {visible.length === 0 ? (
             <p className="text-[12px] text-bw-text-muted">

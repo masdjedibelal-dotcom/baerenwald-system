@@ -255,13 +255,6 @@ function LoginPageContent() {
                   {loading ? 'Bitte warten…' : 'Anmelden'}
                 </button>
               </div>
-
-              <p className="crm-login__foot">
-                Probleme bei der Anmeldung?{' '}
-                <button type="button" className="crm-login__link" onClick={openForgot}>
-                  Passwort zurücksetzen
-                </button>
-              </p>
             </>
           ) : (
             <>

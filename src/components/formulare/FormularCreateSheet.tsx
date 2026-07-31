@@ -4,7 +4,6 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveFormularTemplate } from '@/app/(dashboard)/formulare/actions'
@@ -145,13 +144,9 @@ export function FormularCreateSheet({
       context="detail"
       dirty={dirty}
       size="lg"
-      footer={
-        <div className="kunde-create-footer" style={{ justifyContent: 'flex-end' }}>
-          <MockBtn kind="primary" icon="check" disabled={pending} onClick={speichern}>
-            {pending ? '…' : 'Anlegen'}
-          </MockBtn>
-        </div>
-      }
+      onConfirm={speichern}
+      confirmBusy={pending}
+      confirmDisabled={pending}
     >
       <div className="kunde-create">
         {err ? <p className="kunde-create__err">{err}</p> : null}

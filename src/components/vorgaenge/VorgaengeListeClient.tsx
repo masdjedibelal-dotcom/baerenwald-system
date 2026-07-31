@@ -28,13 +28,14 @@ import {
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
-import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { DateInput } from '@/components/ui/DateInput'
+import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
@@ -643,15 +644,14 @@ export function VorgaengeListeClient({
   }
 
   const filterFooter = (
-    <>
-      <MockBtn kind="ghost" onClick={resetFilters}>
+    <div className="sheet-footer-actions">
+      <MockBtn kind="secondary" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
-      <div style={{ flex: 1 }} />
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
         Anwenden ({filtered.length})
       </MockBtn>
-    </>
+    </div>
   )
 
   const filterFields = (
@@ -723,48 +723,46 @@ export function VorgaengeListeClient({
           </MockChip>
         ))}
       </div>
-      <div className="form-grid" style={{ marginBottom: 16 }}>
-        <label className="field">
-          <span className="field-lbl">Wert von (€)</span>
+      <FilterRangeRow
+        title="Wert (€)"
+        von={
           <input
             className="txt"
             type="number"
             value={fWertVon}
             onChange={(e) => setFWertVon(e.target.value)}
             placeholder="0"
+            inputMode="decimal"
           />
-        </label>
-        <label className="field">
-          <span className="field-lbl">Wert bis (€)</span>
+        }
+        bis={
           <input
             className="txt"
             type="number"
             value={fWertBis}
             onChange={(e) => setFWertBis(e.target.value)}
             placeholder="—"
+            inputMode="decimal"
           />
-        </label>
-      </div>
-      <div className="form-grid">
-        <label className="field">
-          <span className="field-lbl">Datum von</span>
-          <input
-            className="txt"
-            type="date"
+        }
+      />
+      <FilterRangeRow
+        title="Zeitraum"
+        von={
+          <DateInput
+            size="sm"
             value={fDatumVon}
             onChange={(e) => setFDatumVon(e.target.value)}
           />
-        </label>
-        <label className="field">
-          <span className="field-lbl">Datum bis</span>
-          <input
-            className="txt"
-            type="date"
+        }
+        bis={
+          <DateInput
+            size="sm"
             value={fDatumBis}
             onChange={(e) => setFDatumBis(e.target.value)}
           />
-        </label>
-      </div>
+        }
+      />
     </>
   )
 
@@ -811,6 +809,7 @@ export function VorgaengeListeClient({
         <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
+          directOpen={() => setFilterOpen(true)}
           items={[
             {
               icon: 'filter',
@@ -891,17 +890,35 @@ export function VorgaengeListeClient({
           onClose={() => setFilterOpen(false)}
           title="Filter & Suchen"
           headerEnd={
-            <button
-              type="button"
-              className="mobile-filter-sheet__reset"
-              onClick={resetFilters}
-              disabled={!activeFilterCount}
-            >
-              Zurücksetzen
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="mobile-filter-sheet__reset"
+                onClick={() =>
+                  runMockListExport(
+                    exportToCSV,
+                    (filtered.length ? filtered : baseRows).map(toExportRow),
+                    EXPORT_FIELDS,
+                    'vorgaenge'
+                  )
+                }
+                title="CSV exportieren"
+                aria-label="CSV exportieren"
+              >
+                CSV
+              </button>
+              <button
+                type="button"
+                className="mobile-filter-sheet__reset"
+                onClick={resetFilters}
+                disabled={!activeFilterCount}
+              >
+                Zurücksetzen
+              </button>
+            </div>
           }
           footer={
-            <button type="button" className="btn primary w-full" onClick={() => setFilterOpen(false)}>
+            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
             </button>
           }
@@ -1115,11 +1132,7 @@ export function VorgaengeListeClient({
                     : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
             }
             action={
-              lifecycle === 'offen' ? (
-                <MockBtn kind="primary" icon="plus" onClick={() => openFabCreate('anfrage')}>
-                  Neue Anfrage
-                </MockBtn>
-              ) : (
+              lifecycle === 'offen' ? undefined : (
                 <MockBtn kind="ghost" onClick={() => setLifecycleFilter('offen')}>
                   Zu offenen Vorgängen
                 </MockBtn>
@@ -1246,17 +1259,21 @@ export function VorgaengeListeClient({
         )}
         {displayItems.length > 0 ? (
           <div className="vg-aggregate" aria-label="Zusammenfassung">
-            <span>
-              {filtered.length} Vorgänge · Summe{' '}
-              {filtered
-                .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
-                .toLocaleString('de-DE', {
-                  style: 'currency',
-                  currency: 'EUR',
-                  maximumFractionDigits: 0,
-                })}
-              {selectedCount > 0 ? ` · Auswahl ${selectedCount}` : ''}
-            </span>
+            <div className="vg-aggregate__sum">
+              <span>Summe</span>
+              <b>
+                {filtered
+                  .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
+                  .toLocaleString('de-DE', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    maximumFractionDigits: 0,
+                  })}
+              </b>
+            </div>
+            {selectedCount > 0 ? (
+              <span className="vg-aggregate__sel">Auswahl {selectedCount}</span>
+            ) : null}
           </div>
         ) : null}
       </div>

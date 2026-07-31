@@ -116,15 +116,14 @@ export function AngebotLeistungenTab({
       phase="angebot"
       rows={rows}
       onOpenDokument={onOpenDokument}
-      dokumentHint="Positionen werden im Angebot bearbeitet"
-      dokumentActionLabel="Im Angebot bearbeiten"
+      dokumentHint=""
       groupByGewerk
       footerNettoMwst={{
         netto: summen.nettoMin,
         mwstSatz: summen.mwstSatz,
         mwstBetrag: summen.mwstBetragMin,
       }}
-      emptyHint="Noch keine Positionen — im Angebots-Dokument anlegen."
+      emptyHint="Noch keine Positionen — über „Angebot bearbeiten“ anlegen."
     />
   )
 }

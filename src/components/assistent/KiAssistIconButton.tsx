@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Sparkles-Icon in Editoren → öffnet Assistenten bereits auf den Scope eingestellt.
+ * `overSheet`: Chat liegt über dem EditorSheet (z. B. Position hinzufügen).
  */
 export function KiAssistIconButton({
   scope,
@@ -16,6 +17,7 @@ export function KiAssistIconButton({
   className,
   title,
   onBeforeOpen,
+  overSheet = false,
 }: {
   scope: KiAssistScopeId
   extraHint?: string | null
@@ -23,6 +25,8 @@ export function KiAssistIconButton({
   className?: string
   title?: string
   onBeforeOpen?: () => void
+  /** Assistent über Wizard-Sheet (z-index + Close nach Übernehmen) */
+  overSheet?: boolean
 }) {
   const { openScoped } = useAssistent()
   const meta = getKiAssistScope(scope)
@@ -40,6 +44,7 @@ export function KiAssistIconButton({
           scopeId: scope,
           extraHint: extraHint ?? null,
           draftInput: draftInput ?? null,
+          layer: overSheet ? 'over-sheet' : 'default',
         })
       }}
     >

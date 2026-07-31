@@ -1,20 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import { useRouter } from 'next/navigation'
-import {
-  AngebotKiAssistentButton,
-  type AngebotKiApplyPayload,
-} from '@/components/angebote/AngebotKiAssistent'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { DocActionBar } from '@/components/surfaces/primitives'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft, applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import {
   MetaCrowButton,
   TotBand,
@@ -48,10 +40,6 @@ import {
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import type {
-  AngebotKiKontextPosition,
-  AngebotKiKontextPreisliste,
-} from '@/lib/angebote/angebot-ki-types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
   berechneHinweis35aAnteil,
@@ -241,15 +229,6 @@ export function RechnungWizard({
   const [sheet, setSheet] = useState<
     'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | null
   >(null)
-  useKiAssistDraftConsumer(sheet === 'versand', 'text', (d) => {
-    applyKiDokumentTextDraft(d, { setText: setEinleitung })
-  })
-  useKiAssistDraftConsumer(sheet === 'versand', ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: setMailBetreff,
-      setBody: () => {},
-    })
-  })
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const zahlfrist: ZahlfristSeg = zahlfristInit.seg
@@ -261,7 +240,6 @@ export function RechnungWizard({
   const [rechnungsnummer, setRechnungsnummer] = useState(
     bootstrap.rechnungsnummer?.trim() || ''
   )
-  const isMobile = useIsMobile()
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
   const [hintsOpen, setHintsOpen] = useState(true)
@@ -341,111 +319,6 @@ export function RechnungWizard({
   const brutto = berechnung.brutto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
-
-  const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
-    return zeilen
-      .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      .map((z) => ({
-        id: z.id,
-        leistung: z.bezeichnung,
-        beschreibung: z.positionBeschreibung ?? '',
-        menge: z.menge,
-        einheit: z.einheit,
-        preis_netto: z.vkNetto,
-        gewerk_slug: z.gewerk_slug ?? null,
-        gewerk_name: z.gewerkName ?? null,
-        preisliste_id: z.preisliste_id ?? null,
-      }))
-  }, [zeilen])
-
-  const kiKontextPreislisten = useMemo((): AngebotKiKontextPreisliste[] => {
-    return preislisten
-      .filter((p) => p.aktiv !== false)
-      .map((p) => {
-        const g = gewerke.find((x) => x.id === p.gewerk_id) ?? p.gewerke
-        return {
-          id: p.id,
-          leistung: p.leistung,
-          einheit: p.einheit,
-          preis_min: p.preis_min,
-          gewerk_slug: g?.slug ?? null,
-          gewerk_name: g?.name ?? null,
-          kategorie: p.kategorie ?? null,
-        }
-      })
-  }, [preislisten, gewerke])
-
-  const kiGewerke = useMemo(
-    () => gewerke.filter((g) => g.aktiv !== false).map((g) => ({ slug: g.slug, name: g.name })),
-    [gewerke]
-  )
-
-  const kiLeadKurz = useMemo(() => {
-    return [kundeName, auftragLabel, bootstrap.projektTitel]
-      .map((s) => String(s ?? '').trim())
-      .filter(Boolean)
-      .join(' · ')
-  }, [kundeName, auftragLabel, bootstrap.projektTitel])
-
-  function applyRechnungKi(payload: AngebotKiApplyPayload) {
-    if (payload.beschreibung != null) {
-      setEinleitung(payload.beschreibung)
-    } else if (payload.titel != null && payload.titel.trim()) {
-      const t = payload.titel.trim()
-      setEinleitung((prev) => (prev.trim() ? prev : t))
-    }
-    if (!payload.positionen.length) return
-
-    setZeilen((prev) => {
-      let next = [...prev]
-      for (const p of payload.positionen) {
-        const gewerk =
-          (p.gewerk_slug
-            ? gewerke.find((g) => g.slug === p.gewerk_slug)
-            : undefined) ??
-          (p.gewerk_name
-            ? gewerke.find((g) => g.name.toLowerCase() === p.gewerk_name!.toLowerCase())
-            : undefined)
-        const gewerkPatch = gewerk
-          ? {
-              gewerk_id: gewerk.id,
-              gewerk_slug: gewerk.slug,
-              gewerkName: gewerk.name,
-            }
-          : {}
-
-        if (p.match.kind === 'vorhanden_wizard' && p.match.ref_id) {
-          next = next.map((z) => {
-            if (z.id !== p.match.ref_id || z.typ !== 'artikel') return z
-            return {
-              ...z,
-              bezeichnung: p.leistung || z.bezeichnung,
-              positionBeschreibung: p.beschreibung || z.positionBeschreibung,
-              menge: p.menge,
-              einheit: p.einheit || z.einheit,
-              vkNetto: p.preis_netto,
-              ...gewerkPatch,
-            }
-          })
-          continue
-        }
-
-        next.push(
-          neueArtikelZeile({
-            bezeichnung: p.leistung,
-            positionBeschreibung: p.beschreibung || undefined,
-            menge: p.menge,
-            einheit: p.einheit || 'Stk.',
-            vkNetto: p.preis_netto,
-            preisliste_id: p.match.kind === 'preisliste' ? p.match.ref_id || null : null,
-            position_quelle: p.match.kind === 'preisliste' ? 'katalog' : 'frei',
-            ...gewerkPatch,
-          })
-        )
-      }
-      return next
-    })
-  }
 
   const vkNettoPlan = bootstrap.gesamtNetto ?? bootstrap.abschlag?.gesamtNetto ?? netto
 
@@ -1065,20 +938,6 @@ export function RechnungWizard({
             ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
             : null
         }
-        headerAction={
-          <AngebotKiAssistentButton
-            sm
-            label="Mit KI"
-            dokumentLabel="Rechnung"
-            leadKurz={kiLeadKurz}
-            titel={rechnungTitel || rTitel}
-            beschreibung={einleitung}
-            positionen={kiKontextPositionen}
-            preislisten={kiKontextPreislisten}
-            gewerke={kiGewerke}
-            onApply={applyRechnungKi}
-          />
-        }
       />
 
       <TotBand
@@ -1142,24 +1001,20 @@ export function RechnungWizard({
     </div>
   )
 
-  const footerCta = (
-    <button
-      type="button"
-      className="btn primary"
-      disabled={saving || (hasPlan && !planOk)}
-      onClick={() =>
-        void persistDraft().then((id) => {
-          if (id) toast.success('Entwurf gespeichert')
-        })
-      }
-    >
-      {saving ? 'Speichern…' : 'Speichern'}
-    </button>
-  )
-
   const docActions = (
     <DocActionBar
       actions={[
+        {
+          id: 'save',
+          label: saving ? 'Speichern…' : 'Speichern',
+          onClick: () => {
+            if (saving || (hasPlan && !planOk)) return
+            void persistDraft().then((id) => {
+              if (id) toast.success('Entwurf gespeichert')
+            })
+          },
+          icon: <ActionIcon n="device-floppy" size={20} />,
+        },
         {
           id: 'preview',
           label: 'Vorschau',
@@ -1173,17 +1028,6 @@ export function RechnungWizard({
           label: 'Senden',
           onClick: () => setSheet('versand'),
           icon: <ActionIcon n="send" size={20} />,
-        },
-        {
-          id: 'save',
-          label: saving ? 'Speichern…' : 'Speichern',
-          onClick: () => {
-            if (saving || (hasPlan && !planOk)) return
-            void persistDraft().then((id) => {
-              if (id) toast.success('Entwurf gespeichert')
-            })
-          },
-          icon: <ActionIcon n="device-floppy" size={20} />,
         },
       ]}
     />
@@ -1209,7 +1053,6 @@ export function RechnungWizard({
         docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
-        footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
       />
@@ -1649,13 +1492,6 @@ export function RechnungWizard({
         onConfirm={() => void handleFinish(true)}
         confirmDisabled={saving || (hasPlan && !planOk)}
         confirmBusy={saving}
-        headerEnd={
-          <KiAssistIconButton
-            scope="mail"
-            extraHint="Betreff und Anschreiben für den Rechnungsversand."
-            draftInput={`${mailBetreff || defaultBetreff}\n\n${einleitung}`.trim() || null}
-          />
-        }
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField
@@ -1676,9 +1512,10 @@ export function RechnungWizard({
           />
           <KiAssistFieldLabel
             label="Betreff"
-            scope="mail"
+            value={mailBetreff || defaultBetreff}
+            onApply={setMailBetreff}
             extraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
-            draftInput={mailBetreff || defaultBetreff || null}
+            multiline={false}
           >
             <input
               className="input"
@@ -1689,9 +1526,9 @@ export function RechnungWizard({
           <div className="full">
             <KiAssistFieldLabel
               label="Einleitung"
-              scope="dokument"
+              value={einleitung}
+              onApply={setEinleitung}
               extraHint="Anschreiben in der Mail und auf der Rechnung."
-              draftInput={einleitung || null}
             >
               <textarea
                 className="input ta"

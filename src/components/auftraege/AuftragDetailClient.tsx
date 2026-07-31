@@ -398,7 +398,7 @@ export function AuftragDetailClient({
   const { refresh } = useCrmRefresh()
   const isMobile = useIsMobile()
   const [detail, setDetail] = useState(initial)
-  const [, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition()
 
   const kundeTel =
     detail.kunden?.telefon?.trim() || _leadDetail?.kontakt_telefon?.trim() || ''
@@ -1084,6 +1084,16 @@ export function AuftragDetailClient({
               }
               return { label: cta.label, icon: cta.icon, onClick }
             })()}
+            secondary={
+              !istStorniert && detail.angebot_id
+                ? {
+                    label: 'Auftrag bearbeiten',
+                    icon: 'pencil',
+                    onClick: openAngebotKorrektur,
+                    disabled: pending,
+                  }
+                : null
+            }
             menuItems={[]}
           />
         ),

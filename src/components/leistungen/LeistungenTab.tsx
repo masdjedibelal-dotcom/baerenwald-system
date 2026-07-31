@@ -476,13 +476,6 @@ export function LeistungenTab({
           icon="clipboard-list"
           title={emptyTitle}
           hint={emptyHint ?? hint ?? undefined}
-          action={
-            onOpenDokument ? (
-              <Button type="button" variant="secondary" onClick={onOpenDokument}>
-                {openDocLabel}
-              </Button>
-            ) : undefined
-          }
         />
         {belowTable}
       </div>
@@ -491,7 +484,7 @@ export function LeistungenTab({
 
   return (
     <div className={cn('lt-root space-y-3', isMobile && 'lt-root--mobile-cards')}>
-      {isRechnung || isAuftrag ? (
+      {isRechnung || (isAuftrag && onOpenDokument) ? (
         <div className="lt-sec-h">
           <span className="lt-sec-title">Leistungen</span>
           <div className="lt-sec-h__actions">
@@ -647,31 +640,7 @@ export function LeistungenTab({
         open={Boolean(activeRow)}
         onClose={() => setActiveId(null)}
         row={activeRow}
-        actions={
-          activeRow
-            ? [
-                ...(drawerActionsForRow?.(activeRow) ?? []),
-                ...(onOpenDokument && phase !== 'auftrag'
-                  ? [
-                      {
-                        id: 'dokument',
-                        label:
-                          phase === 'rechnung'
-                            ? 'Rechnung korrigieren'
-                            : phase === 'angebot'
-                              ? 'Angebot öffnen'
-                              : 'Angebot erstellen',
-                        variant: 'primary' as const,
-                        onClick: () => {
-                          setActiveId(null)
-                          onOpenDokument()
-                        },
-                      },
-                    ]
-                  : []),
-              ]
-            : []
-        }
+        actions={activeRow ? (drawerActionsForRow?.(activeRow) ?? []) : []}
       />
     </div>
   )

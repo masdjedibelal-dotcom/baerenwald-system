@@ -15,8 +15,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft, claimKiAssistListTarget, setKiAssistListTarget } from '@/lib/copilot/ki-assist-apply'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -120,29 +118,6 @@ export function AbnahmeprotokollCreateWizard({
   const [meta, setMeta] = useState<AbnahmeProtokollMeta>(() =>
     emptyAbnahmeProtokollMeta(initialMeta)
   )
-
-  useKiAssistDraftConsumer(true, 'text', (d) => {
-    for (const p of punkte) {
-      if (claimKiAssistListTarget(`mangel:${p.id}`)) {
-        applyKiDokumentTextDraft(d, {
-          setText: (v) =>
-            setPunkte((prev) => prev.map((x) => (x.id === p.id ? { ...x, notiz: v } : x))),
-        })
-        return
-      }
-    }
-    if (claimKiAssistListTarget('rechtshinweise')) {
-      applyKiDokumentTextDraft(d, {
-        setText: (v) => setMeta((m) => ({ ...m, rechtshinweise: v })),
-      })
-      return
-    }
-    if (claimKiAssistListTarget('hinweis_sonstiges')) {
-      applyKiDokumentTextDraft(d, {
-        setText: (v) => setMeta((m) => ({ ...m, hinweis_sonstiges: v })),
-      })
-    }
-  })
 
   const onClose = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -399,10 +374,9 @@ export function AbnahmeprotokollCreateWizard({
       </fieldset>
       <KiAssistFieldLabel
         label="Hinweis (z. B. nicht Vertragsgegenstand)"
-        scope="dokument"
+        value={meta.hinweis_sonstiges}
+        onApply={(text) => patchMeta({ hinweis_sonstiges: text })}
         extraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
-        draftInput={meta.hinweis_sonstiges || null}
-        onBeforeOpen={() => setKiAssistListTarget('hinweis_sonstiges')}
       >
         <Textarea
           plain
@@ -449,10 +423,14 @@ export function AbnahmeprotokollCreateWizard({
                     <>
                       <KiAssistFieldLabel
                         label="Mangel-Beschreibung (PDF)"
-                        scope="mangel"
+                        value={punkt.notiz ?? ''}
+                        onApply={(text) =>
+                          setPunkte((prev) =>
+                            prev.map((p) => (p.id === punkt.id ? { ...p, notiz: text } : p))
+                          )
+                        }
                         extraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
-                        draftInput={punkt.notiz || null}
-                        onBeforeOpen={() => setKiAssistListTarget(`mangel:${punkt.id}`)}
+                        multiline={false}
                       >
                         <Input
                           value={punkt.notiz ?? ''}
@@ -862,10 +840,9 @@ export function AbnahmeprotokollCreateWizard({
         >
           <KiAssistFieldLabel
             label="Weitere Hinweise (Rechtstext)"
-            scope="dokument"
+            value={meta.rechtshinweise}
+            onApply={(text) => patchMeta({ rechtshinweise: text })}
             extraHint="Rechtshinweise im Abnahmeprotokoll (kundensichtbar)."
-            draftInput={meta.rechtshinweise || null}
-            onBeforeOpen={() => setKiAssistListTarget('rechtshinweise')}
           >
             <Textarea
               plain

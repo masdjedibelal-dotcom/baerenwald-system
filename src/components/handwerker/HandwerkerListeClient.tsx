@@ -295,15 +295,14 @@ export function HandwerkerListeClient({
   const displayItems = isMobile ? infiniteItems : pageItems
 
   const filterFooter = (
-    <>
-      <MockBtn kind="ghost" onClick={resetFilters}>
+    <div className="sheet-footer-actions">
+      <MockBtn kind="secondary" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
-      <div style={{ flex: 1 }} />
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
         Anwenden ({filtered.length})
       </MockBtn>
-    </>
+    </div>
   )
 
   const filterFields = (
@@ -461,7 +460,7 @@ export function HandwerkerListeClient({
             </button>
           }
           footer={
-            <button type="button" className="btn primary w-full" onClick={() => setFilterOpen(false)}>
+            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
             </button>
           }
@@ -508,7 +507,10 @@ export function HandwerkerListeClient({
 
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className={cn('listcard listcard--scroll listcard--cols', selectMode && 'vg-selectmode')}
+        className={cn(
+          'listcard listcard--scroll listcard--cols',
+          (isMobile || selectMode) && 'vg-selectmode'
+        )}
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
@@ -620,14 +622,59 @@ export function HandwerkerListeClient({
               gewerke.length > 0
                 ? gewerke.slice(0, 3)
                 : gewerkeFallback
-                  ? gewerkeFallback.split(/[·,]/).map((g) => g.trim()).filter(Boolean).slice(0, 3)
+                  ? gewerkeFallback
+                      .split(/[·,]/)
+                      .map((g) => g.trim())
+                      .filter(Boolean)
+                      .slice(0, 3)
                   : []
+            const primaryGewerk = pills[0] ?? '—'
             const tel = h.telefon?.trim() || ''
             const mail = h.email?.trim() || ''
             const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
             const copy = () => runDuplicateHandwerker(h.id, router)
             const edit = () => openDetail(h.id)
-            const row = (
+            const row = isMobile ? (
+              <div
+                role="button"
+                tabIndex={0}
+                className={cn('vg-row', selected[h.id] && 'sel')}
+                onClick={() => openDetail(h.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDetail(h.id)
+                  }
+                }}
+              >
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(h.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[h.id] && 'on')}>
+                    {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
+                <div className="vg-vorgang">
+                  <div className="t" title={handwerkerDisplayName(h)}>
+                    {handwerkerDisplayName(h)}
+                  </div>
+                </div>
+                <div className="vg-status">
+                  <span className="pill-tag" title={pills.join(' · ') || undefined}>
+                    {primaryGewerk}
+                  </span>
+                </div>
+                <div className="vg-kunde">
+                  <span className="vg-kunde__name" title={contactSub}>
+                    {contactSub}
+                  </span>
+                </div>
+              </div>
+            ) : (
               <div
                 role="button"
                 tabIndex={0}
@@ -667,7 +714,6 @@ export function HandwerkerListeClient({
                     <span style={{ color: 'var(--text-3)' }}>—</span>
                   )}
                 </div>
-                {isMobile ? <div className="lc-sub">{contactSub}</div> : null}
                 <div className="lc-desk" style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
                   {tel || '—'}
                 </div>
@@ -694,9 +740,9 @@ export function HandwerkerListeClient({
             return (
               <SwipeRow
                 key={h.id}
-                disabled={!isMobile || selectMode}
+                disabled={!isMobile}
                 rightActions={
-                  isMobile && !selectMode
+                  isMobile
                     ? [
                         { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
                         { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },

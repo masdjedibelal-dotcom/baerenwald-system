@@ -26,27 +26,22 @@ import {
 } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
+import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
+import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import type { Kunde, KundenObjekt } from '@/lib/types'
-import {
-  kundeNeueAnfrageHref,
-  kundeNeuesAngebotHref,
-  kundeNeuerAuftragHref,
-} from '@/lib/kunden/kunde-pipeline-nav'
 import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
@@ -158,12 +153,6 @@ export function KundeDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
 
-  useKiAssistDraftConsumer(portalModalOpen, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: setPortalBetreff,
-      setBody: setPortalText,
-    })
-  })
   const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
   const [spamPending, setSpamPending] = useState(false)
   const [rechnungModalOpen, setRechnungModalOpen] = useState(false)
@@ -659,6 +648,29 @@ export function KundeDetailClient({
         }}
         onSaved={() => refresh()}
       />
+      {kunde.org_kennung?.trim() ? (
+        <MeldeLinksCard
+          orgSlug={kunde.org_kennung.trim().toLowerCase()}
+          aushangPdfHref={`/api/kunden/${kunde.id}/aushang-pdf`}
+        />
+      ) : null}
+      {zeigtOrganisationTab ? (
+        <FreigabeSettingsCard
+          value={{
+            notfall_direkt: kunde.notfall_direkt ?? true,
+            freigabe_schwelle_eur:
+              kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
+          }}
+          onSave={async (next) =>
+            saveKundeFreigabeRegeln(kunde.id, {
+              notfall_direkt: Boolean(next.notfall_direkt),
+              freigabe_schwelle_eur: next.freigabe_schwelle_eur,
+              freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
+            })
+          }
+          onSaved={() => refresh()}
+        />
+      ) : null}
       {zusatzfelderCard}
       <KundeWirtschaftlicheUebersicht kunde={kunde} />
       {editingKontakt ? (
@@ -674,7 +686,6 @@ export function KundeDetailClient({
       kundeId={kunde.id}
       objekte={kundenObjekte}
       verwaltungName={kundeDisplayName(kunde)}
-      orgKennung={kunde.org_kennung}
       onChanged={() => refresh()}
     />
   ) : null
@@ -785,9 +796,6 @@ export function KundeDetailClient({
         titleBadges: (
           <>
             <TypBadge typ={kunde.typ} />
-            {wirtschaftSnap.aktiveVorgaenge > 0 ? (
-              <MockBadge kind="aktiv">In Arbeit</MockBadge>
-            ) : null}
             {istSpam ? (
               <MockBadge kind="storniert">
                 <span className="inline-flex items-center gap-1">
@@ -799,7 +807,6 @@ export function KundeDetailClient({
           </>
         ),
         badges: kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null,
-        titleTrailing: <PortalLoginIconButton kundeId={kunde.id} label="Kundenportal öffnen" />,
         actions: <DetailActionsBar sheetTitle="Kunde" menuItems={[]} />,
       }}
     >
@@ -825,11 +832,11 @@ export function KundeDetailClient({
         size="lg"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
-              Senden
-            </Button>
             <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
+            </Button>
+            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+              Senden
             </Button>
           </div>
         }
@@ -870,17 +877,18 @@ export function KundeDetailClient({
           />
           <KiAssistFieldLabel
             label="Betreff"
-            scope="portal"
+            value={portalBetreff}
+            onApply={setPortalBetreff}
             extraHint="Portal-Einladung Betreff an den Kunden."
-            draftInput={portalBetreff || null}
+            multiline={false}
           >
             <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Text"
-            scope="portal"
+            value={portalText}
+            onApply={setPortalText}
             extraHint="Portal-Einladungstext an den Kunden."
-            draftInput={[portalBetreff, portalText].filter(Boolean).join('\n\n') || null}
           >
             <Textarea rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
           </KiAssistFieldLabel>
@@ -929,11 +937,11 @@ export function KundeDetailClient({
         size="sm"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" loading={pending} onClick={() => executeMerge()}>
-              Zusammenführen
-            </Button>
             <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
               Abbrechen
+            </Button>
+            <Button type="button" loading={pending} onClick={() => executeMerge()}>
+              Zusammenführen
             </Button>
           </div>
         }

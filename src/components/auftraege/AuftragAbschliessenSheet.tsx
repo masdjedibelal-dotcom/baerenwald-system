@@ -3,8 +3,7 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
   AbnahmeBegehListe,
   AbnahmeProgressBar,
@@ -61,15 +60,6 @@ export function AuftragAbschliessenSheet({
   }, [open, positionen])
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
-
-  useKiAssistDraftConsumer(open && step === 'checkliste', ['maengel', 'text'], (d) => {
-    if (d.type === 'maengel') setMaengelFrei(d.text)
-    else if (d.type === 'text') {
-      if (d.titel || d.text) {
-        setMaengelFrei((prev) => (prev.trim() ? `${prev.trim()}\n${d.text}` : d.text))
-      }
-    }
-  })
 
   function abschliessenOhneAbnahme() {
     startTransition(async () => {
@@ -141,7 +131,7 @@ export function AuftragAbschliessenSheet({
             >
               Nein — nur abschließen
             </Button>
-            <Button type="button" variant="ghost" className="w-full" onClick={onClose} disabled={pending}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
               Abbrechen
             </Button>
           </div>
@@ -162,16 +152,9 @@ export function AuftragAbschliessenSheet({
       title="Abnahmeprotokoll"
       size="lg"
       dirty={!pending}
-      headerEnd={
-        <KiAssistIconButton
-          scope="mangel"
-          extraHint="Abnahme: freie Mängel ohne Leistungsbezug."
-          draftInput={maengelFrei.trim() || null}
-        />
-      }
       footer={
-        <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-          <Button type="button" variant="ghost" onClick={() => setStep('frage')} disabled={pending}>
+        <div className="sheet-footer-actions ldr-cta">
+          <Button type="button" variant="secondary" onClick={() => setStep('frage')} disabled={pending}>
             Zurück
           </Button>
           <Button
@@ -193,22 +176,19 @@ export function AuftragAbschliessenSheet({
           </h3>
           <AbnahmeBegehListe punkte={punkte} onChange={setPunkte} />
         </div>
-        <label className="block">
-          <span className="lt-field-lbl lt-field-lbl--with-ki">
-            <span>Mängel (frei, optional)</span>
-            <KiAssistIconButton
-              scope="mangel"
-              extraHint="Abnahme-Mängel formulieren."
-              draftInput={maengelFrei.trim() || null}
-            />
-          </span>
+        <KiAssistFieldLabel
+          label="Mängel (frei, optional)"
+          value={maengelFrei}
+          onApply={setMaengelFrei}
+          extraHint="Abnahme: freie Mängel ohne Leistungsbezug."
+        >
           <Textarea
             rows={3}
             value={maengelFrei}
             onChange={(e) => setMaengelFrei(e.target.value)}
             placeholder="Offene Punkte ohne Leistungsbezug…"
           />
-        </label>
+        </KiAssistFieldLabel>
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>
           <Textarea

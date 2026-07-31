@@ -1,57 +1,15 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { toast } from '@/components/ui/app-toast'
-
-function Sec({
-  title,
-  icon,
-  actions,
-  children,
-}: {
-  title: string
-  icon?: string
-  actions?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <div style={{ marginBottom: 32 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
-        >
-          {title}
-        </span>
-        <div style={{ flex: 1 }} />
-        {actions}
-      </div>
-      <div>{children}</div>
-    </div>
-  )
-}
 
 function formatAdresse(v: FirmenEinstellungen): string {
   return [v.strasse, [v.plz, v.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
@@ -111,7 +69,7 @@ type EditDraft = {
   bank: string
 }
 
-/** Mock-Parität: Firma Stammdaten + Brand & Rechnung (randlos). */
+/** Firma: Stammdaten-, Brand- und Rechnungs-Cards. */
 export function FirmaBrandingForm({
   initial,
   naechsteRechnungsnummer,
@@ -248,8 +206,8 @@ export function FirmaBrandingForm({
   ]
 
   return (
-    <div>
-      <Sec
+    <div className="space-y-4">
+      <MockCard
         title="Stammdaten"
         icon="clipboard-list"
         actions={
@@ -291,27 +249,17 @@ export function FirmaBrandingForm({
           )}
         </div>
 
-        <div>
+        <div className="props">
           {detailRows.map((r) => (
-            <div
-              key={r.label}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '140px 1fr',
-                gap: 12,
-                padding: '12px 0',
-                borderBottom: '0.5px solid var(--border)',
-                fontSize: 'var(--fs-text)',
-              }}
-            >
-              <div style={{ color: 'var(--text-3)' }}>{r.label}</div>
-              <div style={{ color: 'var(--text)', fontWeight: 500 }}>{r.value}</div>
+            <div key={r.label} className="prop">
+              <div className="prop-l">{r.label}</div>
+              <div className="prop-v">{r.value}</div>
             </div>
           ))}
         </div>
-      </Sec>
+      </MockCard>
 
-      <Sec title="Brand & Rechnung" icon="file-invoice">
+      <MockCard title="Brand" icon="photo">
         <div className="setting-row">
           <div>
             <div className="lbl">Logo</div>
@@ -362,7 +310,9 @@ export function FirmaBrandingForm({
             title="Markengrün"
           />
         </div>
+      </MockCard>
 
+      <MockCard title="Rechnung" icon="file-invoice">
         <div className="setting-row">
           <div>
             <div className="lbl">Rechnungsnummern</div>
@@ -411,7 +361,7 @@ export function FirmaBrandingForm({
             </button>
           )}
         </div>
-      </Sec>
+      </MockCard>
 
       <EditorSheet
         open={sheetOpen}
@@ -419,16 +369,9 @@ export function FirmaBrandingForm({
         title="Stammdaten bearbeiten"
         crumb="Firma >"
         size="lg"
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn kind="primary" icon="check" disabled={pending} onClick={saveStamm}>
-              Speichern
-            </MockBtn>
-            <button type="button" className="btn secondary" onClick={() => setSheetOpen(false)}>
-              Abbrechen
-            </button>
-          </div>
-        }
+        onConfirm={saveStamm}
+        confirmDisabled={pending}
+        confirmBusy={pending}
       >
         <div className="kunde-create">
           <MockFormSection title="Firma" icon="building">

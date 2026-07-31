@@ -36,21 +36,19 @@ function MailFooter({
 }) {
   const requestClose = useEditorSheetRequestClose()
   return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+    <div className="sheet-footer-actions ldr-cta">
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Später
       </Button>
-      <div className="flex flex-wrap gap-2">
-        {portalLink ? (
-          <Button type="button" variant="secondary" onClick={() => void onCopyLink()}>
-            <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
-            Link kopieren
-          </Button>
-        ) : null}
-        <Button type="button" variant="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
-          Jetzt senden
+      {portalLink ? (
+        <Button type="button" variant="secondary" onClick={() => void onCopyLink()}>
+          <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
+          Link kopieren
         </Button>
-      </div>
+      ) : null}
+      <Button type="button" variant="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
+        Jetzt senden
+      </Button>
     </div>
   )
 }

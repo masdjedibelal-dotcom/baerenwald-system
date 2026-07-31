@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -24,6 +23,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
 import { MockDokumenteCard, MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -484,6 +484,9 @@ export function HandwerkerDetailClient({
                 />
               </InlineEditField>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'space-between' }}>
+                <button type="button" className="btn secondary sm" onClick={cancelEditStamm}>
+                  Abbrechen
+                </button>
                 <button
                   type="button"
                   className="btn primary sm"
@@ -491,9 +494,6 @@ export function HandwerkerDetailClient({
                   onClick={saveHandwerkerStamm}
                 >
                   Speichern
-                </button>
-                <button type="button" className="btn secondary sm" onClick={cancelEditStamm}>
-                  Abbrechen
                 </button>
               </div>
             </div>
@@ -815,12 +815,36 @@ export function HandwerkerDetailClient({
     <MockDokumenteCard count={dokumenteAnzahl}>
       {dokumenteAnzahl === 0 ? (
         <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-          {isMobile
-            ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
-            : 'Noch keine Dokumente — Unterlagen im Tab Compliance pflegen.'}
+          Noch keine Dokumente.
         </p>
+      ) : isMobile ? (
+        <div className="dok-cards">
+          {standardDokumente(payload.dokumente).map((d) => {
+            const title = d.bezeichnung?.trim() || d.typ || 'Dokument'
+            const meta = d.gueltig_bis
+              ? `gültig bis ${String(d.gueltig_bis).slice(0, 10)}`
+              : null
+            return (
+              <DokMobileCard
+                key={d.id}
+                title={title}
+                meta={meta}
+                onClick={() => {
+                  void (async () => {
+                    const r = await signPartnerDokumentUrl(d.datei_url)
+                    if (!r.ok) {
+                      toast.error(r.message)
+                      return
+                    }
+                    window.open(r.url, '_blank', 'noopener,noreferrer')
+                  })()
+                }}
+              />
+            )
+          })}
+        </div>
       ) : (
-        <div className="dok-list space-y-1">
+        <div className="dok-list">
           {standardDokumente(payload.dokumente).map((d) => (
             <button
               key={d.id}
@@ -953,7 +977,6 @@ export function HandwerkerDetailClient({
             ) : null}
           </>
         ),
-        titleTrailing: <PortalLoginIconButton handwerkerId={hw.id} label="Partner-Portal öffnen" />,
         actions: <DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />,
       }}
     >
@@ -970,11 +993,11 @@ export function HandwerkerDetailClient({
         size="lg"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
-              Senden
-            </Button>
             <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
+            </Button>
+            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+              Senden
             </Button>
           </div>
         }

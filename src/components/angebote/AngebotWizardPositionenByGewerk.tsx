@@ -7,12 +7,6 @@ import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamt
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { toast } from '@/components/ui/app-toast'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import {
-  applyKiDokumentTextDraft,
-  claimKiAssistListTarget,
-  setKiAssistListTarget,
-} from '@/lib/copilot/ki-assist-apply'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   GEWERK_BLOCK_ANFAHRT,
@@ -107,7 +101,7 @@ const GEWERK_BESCHREIBUNG_HINT =
   'Optional: Fließtext direkt unter dem Gewerk-Titel im PDF — z. B. Umfang oder Hinweise zum Abschnitt'
 
 function GewerkBlockMeta({
-  blockKey,
+  blockKey: _blockKey,
   displayTitle,
   blockBeschreibung,
   onRename,
@@ -121,11 +115,6 @@ function GewerkBlockMeta({
 }) {
   const isMobile = useIsMobile()
   const [titleDraft, setTitleDraft] = useState(displayTitle)
-
-  useKiAssistDraftConsumer(true, 'text', (d) => {
-    if (!claimKiAssistListTarget(`gewerk-besch:${blockKey}`)) return
-    applyKiDokumentTextDraft(d, { setText: onBeschreibungChange })
-  })
 
   useEffect(() => {
     setTitleDraft(displayTitle)
@@ -163,10 +152,9 @@ function GewerkBlockMeta({
       </label>
       <KiAssistFieldLabel
         label="Beschreibung (optional)"
-        scope="dokument"
+        value={blockBeschreibung}
+        onApply={onBeschreibungChange}
         extraHint={GEWERK_BESCHREIBUNG_HINT}
-        draftInput={blockBeschreibung || null}
-        onBeforeOpen={() => setKiAssistListTarget(`gewerk-besch:${blockKey}`)}
       >
         <textarea
           className="input min-h-[72px] w-full resize-y text-[length:var(--fs-meta)] leading-relaxed"

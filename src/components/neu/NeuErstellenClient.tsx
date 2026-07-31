@@ -445,11 +445,11 @@ export function NeuErstellenClient({
             </div>
 
             <div className="neu-actions">
-              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitKunde}>
-                Kunde anlegen
-              </MockBtn>
               <MockBtn kind="secondary" onClick={() => router.push('/kunden')}>
                 Abbrechen
+              </MockBtn>
+              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitKunde}>
+                Kunde anlegen
               </MockBtn>
             </div>
           </div>
@@ -607,11 +607,11 @@ export function NeuErstellenClient({
             </div>
 
             <div className="neu-actions">
-              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitHandwerker}>
-                Partner anlegen
-              </MockBtn>
               <MockBtn kind="secondary" onClick={() => router.push('/handwerker')}>
                 Abbrechen
+              </MockBtn>
+              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitHandwerker}>
+                Partner anlegen
               </MockBtn>
             </div>
           </div>

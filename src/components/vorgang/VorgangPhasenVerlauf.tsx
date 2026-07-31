@@ -306,24 +306,16 @@ export function VorgangPhasenVerlauf({
         crumb={active?.sheetCrumb ?? null}
         size="lg"
         manageHistory={false}
-        footer={
-          active ? (
-            <div className="phase-sheet-footer">
-              {active.href && fromRef?.kind !== active.kind ? (
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={onZurPhase}
-                  disabled={navBusy}
-                >
-                  {navBusy ? 'Laden…' : 'Zur Phase'}
-                </button>
-              ) : (
-                <button type="button" className="btn ghost" onClick={closeRead} disabled={navBusy}>
-                  Schließen
-                </button>
-              )}
-            </div>
+        headerEnd={
+          active?.href && fromRef?.kind !== active.kind ? (
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={onZurPhase}
+              disabled={navBusy}
+            >
+              {navBusy ? 'Laden…' : 'Zur Phase'}
+            </button>
           ) : null
         }
       >

@@ -18,6 +18,11 @@ export type AssistentScopedSession = {
   extraHint?: string | null
   /** Vorbelegung im Eingabefeld */
   draftInput?: string | null
+  /**
+   * over-sheet: über EditorSheet/Wizard (z-index), nach Übernehmen schließen.
+   * Für kontextbezogene KI an Formularen.
+   */
+  layer?: 'default' | 'over-sheet'
 }
 
 /** Einmalige Auto-Analyse (z. B. Dashboard-KPIs) — öffnet Panel und sendet Prompt. */
@@ -140,4 +145,9 @@ export function useAssistent() {
   const ctx = useContext(AssistentContext)
   if (!ctx) throw new Error('useAssistent außerhalb AssistentProvider')
   return ctx
+}
+
+/** Für Surfaces außerhalb des Providers (kein Throw). */
+export function useAssistentOptional() {
+  return useContext(AssistentContext)
 }

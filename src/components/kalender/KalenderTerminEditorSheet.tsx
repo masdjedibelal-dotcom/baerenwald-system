@@ -4,9 +4,12 @@ import { useEffect, useId, useMemo, useState, useTransition } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
+import { DateInput } from '@/components/ui/DateInput'
+import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+import { TimeInput } from '@/components/ui/TimeInput'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteKalenderTermin,
@@ -317,16 +320,32 @@ export function KalenderTerminEditorSheet({
             required
           />
         </div>
-        <Input
-          type="date"
-          label="Datum"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
-          required
-        />
-        <div />
-        <Input type="time" label="Von" value={von} onChange={(e) => setVon(e.target.value)} />
-        <Input type="time" label="Bis" value={bis} onChange={(e) => setBis(e.target.value)} />
+        <div className="full">
+          <span className="input-label">
+            Datum
+            <span className="ml-0.5 text-bw-accent" aria-hidden>
+              *
+            </span>
+          </span>
+          <DateInput
+            size="sm"
+            value={datum}
+            onChange={(e) => setDatum(e.target.value)}
+            required
+          />
+        </div>
+        <div className="full">
+          <FilterRangeRow
+            title="Uhrzeit"
+            className="!mb-0"
+            von={
+              <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
+            }
+            bis={
+              <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
+            }
+          />
+        </div>
 
         <div className="full">
           <Combobox

@@ -6,8 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
@@ -69,16 +67,6 @@ export function ZahlungserinnerungMailModal({
     stufe2Gesendet: boolean
   } | null>(null)
   const [dirty, setDirty] = useState(false)
-
-  useKiAssistDraftConsumer(open && !!mail, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: (v) => {
-        setDirty(true)
-        setMail((prev) => (prev ? { ...prev, betreff: v } : prev))
-      },
-      setBody: () => {},
-    })
-  })
 
   useEffect(() => {
     if (!open) {
@@ -218,9 +206,13 @@ export function ZahlungserinnerungMailModal({
 
           <KiAssistFieldLabel
             label="Betreff"
-            scope="mail"
+            value={mail.betreff}
+            onApply={(text) => {
+              setDirty(true)
+              setMail((prev) => (prev ? { ...prev, betreff: text } : prev))
+            }}
             extraHint={`Zahlungserinnerung Stufe ${stufe} — Betreff an den Kunden.`}
-            draftInput={mail.betreff || null}
+            multiline={false}
           >
             <Input
               value={mail.betreff}

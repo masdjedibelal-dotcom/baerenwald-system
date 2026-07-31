@@ -7,12 +7,6 @@ import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import {
-  applyKiDokumentTextDraft,
-  claimKiAssistListTarget,
-  setKiAssistListTarget,
-} from '@/lib/copilot/ki-assist-apply'
 import { cn } from '@/lib/utils'
 import type { Gewerk, Handwerker, Preisliste } from '@/lib/types'
 
@@ -79,20 +73,6 @@ export function OfferPositionCard({
     margeEuro != null && nettoZeile > 0
       ? Math.round((margeEuro / nettoZeile) * 1000) / 10
       : null
-
-  useKiAssistDraftConsumer(true, 'text', (d) => {
-    if (claimKiAssistListTarget(row.key)) {
-      applyKiDokumentTextDraft(d, {
-        setText: (v) => onPatch({ beschreibung: v }),
-      })
-      return
-    }
-    if (claimKiAssistListTarget(`ext:${row.key}`)) {
-      applyKiDokumentTextDraft(d, {
-        setText: (v) => onPatch({ notiz_extern: v }),
-      })
-    }
-  })
 
   return (
     <article
@@ -201,10 +181,9 @@ export function OfferPositionCard({
           </div>
           <KiAssistFieldLabel
             label="Beschreibung (Kundentext)"
-            scope="position"
+            value={row.beschreibung}
+            onApply={(text) => onPatch({ beschreibung: text })}
             extraHint="Leistungsbeschreibung auf Angebot/PDF."
-            draftInput={row.beschreibung || null}
-            onBeforeOpen={() => setKiAssistListTarget(row.key)}
           >
             <Textarea
               hint="Wird im Angebot / PDF angezeigt"
@@ -307,10 +286,9 @@ export function OfferPositionCard({
 
           <KiAssistFieldLabel
             label="Notiz für Kunden"
-            scope="dokument"
+            value={row.notiz_extern}
+            onApply={(text) => onPatch({ notiz_extern: text })}
             extraHint="Kundennotiz zur Position (sichtbar)."
-            draftInput={row.notiz_extern || null}
-            onBeforeOpen={() => setKiAssistListTarget(`ext:${row.key}`)}
           >
             <Textarea
               value={row.notiz_extern}

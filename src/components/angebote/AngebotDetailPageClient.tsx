@@ -21,8 +21,6 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
@@ -190,13 +188,6 @@ export function AngebotDetailPageClient({
   const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
   const [ablehnenNotiz, setAblehnenNotiz] = useState('')
   const [ablehnenKonkurrenz, setAblehnenKonkurrenz] = useState('')
-
-  useKiAssistDraftConsumer(acceptOpen, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: setAufBetreff,
-      setBody: () => {},
-    })
-  })
 
   useEffect(() => {
     const raw = searchParams.get('tab')
@@ -471,6 +462,16 @@ export function AngebotDetailPageClient({
     return null
   }, [statusEinfach, detail.status, pending])
 
+  const secondaryAction = useMemo((): DetailActionDef | null => {
+    if (!kannBearbeiten) return null
+    return {
+      label: 'Angebot bearbeiten',
+      icon: 'pencil',
+      onClick: openWizardBearbeiten,
+      disabled: pending,
+    }
+  }, [kannBearbeiten, pending])
+
   const stammdatenInhalt = (
     <>
       {lead ? <HvMeldungKontextCards lead={lead} /> : null}
@@ -614,6 +615,7 @@ export function AngebotDetailPageClient({
           <DetailActionsBar
             sheetTitle="Angebot"
             primary={primaryAction}
+            secondary={secondaryAction}
             menuItems={[]}
           />
         ),
@@ -716,9 +718,10 @@ export function AngebotDetailPageClient({
               <>
                 <KiAssistFieldLabel
                   label="Betreff"
-                  scope="mail"
+                  value={aufBetreff}
+                  onApply={setAufBetreff}
                   extraHint="Auftragsbestätigung — Betreff an den Kunden."
-                  draftInput={aufBetreff || null}
+                  multiline={false}
                 >
                   <Input
                     value={aufBetreff}

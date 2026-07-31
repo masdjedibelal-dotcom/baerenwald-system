@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { MockBtn, MockBadge, MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/app-toast'
@@ -23,25 +22,26 @@ import {
 import type { Gewerk } from '@/lib/types'
 
 /** Zweistufige Katalog-Ansicht: Position → Varianten (Preis/Aktiv inline). */
-export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[] }) {
+export function KatalogPreislistenClient({
+  gewerkeAlle,
+  initialRows = [],
+}: {
+  gewerkeAlle: Gewerk[]
+  initialRows?: KatalogPosition[]
+}) {
   const [pending, startTransition] = useTransition()
-  const [rows, setRows] = useState<KatalogPosition[]>([])
+  const [rows, setRows] = useState<KatalogPosition[]>(initialRows)
   const [tabGewerkId, setTabGewerkId] = useState<string | null>(null)
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({})
-  const [loaded, setLoaded] = useState(false)
-
-  function reload() {
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: false })
-      setRows(list)
-      setLoaded(true)
-    })
-  }
 
   useEffect(() => {
-    reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    setRows(initialRows)
+  }, [initialRows])
+
+  async function reload() {
+    const list = await listKatalogPositionen({ nurAktiv: false })
+    setRows(list)
+  }
 
   const gewerkeTabs = useMemo(() => {
     const ids = new Set(rows.map((r) => r.gewerk_id))
@@ -59,11 +59,7 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
     [rows, activeGewerkId]
   )
 
-  if (!loaded) {
-    return <CrmInlineLoading label="Preiskatalog wird geladen …" />
-  }
-
-  if (loaded && rows.length === 0) {
+  if (rows.length === 0) {
     return (
       <MockCard title="Preiskatalog">
         <MockEmpty
@@ -87,7 +83,16 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
           </MockChip>
         ))}
         <div className="ml-auto">
-          <MockBtn sm kind="ghost" disabled={pending} onClick={reload}>
+          <MockBtn
+            sm
+            kind="ghost"
+            disabled={pending}
+            onClick={() => {
+              startTransition(async () => {
+                await reload()
+              })
+            }}
+          >
             Aktualisieren
           </MockBtn>
         </div>
@@ -116,7 +121,7 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
                     startTransition(async () => {
                       const r = await setKatalogPositionAktiv(p.id, v)
                       if (!r.ok) toast.error(r.message)
-                      else reload()
+                      else await reload()
                     })
                   }}
                   label="Aktiv"
@@ -142,7 +147,7 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
                             startTransition(async () => {
                               const r = await updateKatalogVariantePreis(v.id, n)
                               if (!r.ok) toast.error(r.message)
-                              else reload()
+                              else await reload()
                             })
                           }}
                         />
@@ -153,7 +158,7 @@ export function KatalogPreislistenClient({ gewerkeAlle }: { gewerkeAlle: Gewerk[
                           startTransition(async () => {
                             const r = await setKatalogVarianteAktiv(v.id, on)
                             if (!r.ok) toast.error(r.message)
-                            else reload()
+                            else await reload()
                           })
                         }}
                         label="Aktiv"

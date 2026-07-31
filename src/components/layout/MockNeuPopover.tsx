@@ -2,6 +2,7 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openFabCreate, type FabOverlayArt } from '@/components/neu/FabCreateHost'
+import { showOverlayBusy } from '@/components/ui/action-busy'
 
 type NeuItem = { ic: string; label: string; desc: string; overlay: FabOverlayArt }
 
@@ -22,10 +23,21 @@ const PLAN_ITEMS: NeuItem[] = [
   { ic: 'clipboard-list', label: 'To-do', desc: 'Aufgabe mit Fälligkeit', overlay: 'todo' },
 ]
 
+const BUSY_LABEL: Record<FabOverlayArt, string> = {
+  anfrage: 'Anfrage wird geöffnet…',
+  angebot: 'Angebot wird geöffnet…',
+  rechnung: 'Rechnung wird geöffnet…',
+  kunde: 'Kunde wird geöffnet…',
+  handwerker: 'Handwerker wird geöffnet…',
+  termin: 'Termin wird geöffnet…',
+  todo: 'To-do wird geöffnet…',
+}
+
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null
 
   function go(item: NeuItem) {
+    showOverlayBusy(BUSY_LABEL[item.overlay])
     onClose()
     openFabCreate(item.overlay)
   }

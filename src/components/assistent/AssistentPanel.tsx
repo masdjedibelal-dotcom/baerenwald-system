@@ -1,8 +1,7 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { KiChatComposer } from '@/components/assistent/KiChatComposer'
@@ -11,6 +10,7 @@ import {
   getKiAssistScope,
   parseBwApplyDraft,
   stripBwApplyBlock,
+  type KiAssistDraft,
 } from '@/lib/copilot/ki-assist-scopes'
 import {
   emptyAssistentUi,
@@ -18,6 +18,7 @@ import {
   type AssistentPreview,
   type AssistentUiPayload,
 } from '@/lib/copilot/assistent-ui'
+import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 
@@ -136,10 +137,46 @@ function PreviewCard({
   )
 }
 
-const DEFAULT_INTRO: ChatMsg = {
-  role: 'assistant',
-  content:
-    'Hallo — ich bin dein CRM-Assistent.\n\n• Wissen & Daten\n• Aktionen mit Vorschau im Chat\n• Deep-Links ins richtige Formular (z. B. Angebots-Positionen)\n• Tagesplan\n\nFrag z. B. „Plane heute“ oder „Angebot für Müller + senden“.',
+function PositionDraftCard({
+  draft,
+  onApply,
+  disabled,
+  applyLabel,
+}: {
+  draft: Extract<KiAssistDraft, { type: 'position' }>
+  onApply: () => void
+  disabled?: boolean
+  applyLabel: string
+}) {
+  return (
+    <div className="ki-pos-draft-card">
+      <div className="ki-pos-draft-card__head">Positions-Vorschlag</div>
+      <p className="ki-pos-draft-card__name">{draft.name || '—'}</p>
+      {draft.beschreibung?.trim() ? (
+        <p className="ki-pos-draft-card__desc">{draft.beschreibung}</p>
+      ) : null}
+      <p className="ki-pos-draft-card__meta">
+        {[
+          draft.menge != null && draft.menge > 0
+            ? `${draft.menge} ${draft.einheit?.trim() || 'Stk.'}`
+            : null,
+          draft.preis != null && draft.preis >= 0
+            ? `${formatEurBetrag(draft.preis)} netto`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'Menge / Preis offen'}
+      </p>
+      <button
+        type="button"
+        className="btn primary sm ki-pos-draft-card__apply"
+        disabled={disabled}
+        onClick={onApply}
+      >
+        {applyLabel}
+      </button>
+    </div>
+  )
 }
 
 export function AssistentPanel() {
@@ -156,18 +193,37 @@ export function AssistentPanel() {
   } = useAssistent()
   const scopeMeta = scoped ? getKiAssistScope(scoped.scopeId) : null
 
-  const [messages, setMessages] = useState<ChatMsg[]>([DEFAULT_INTRO])
+  const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pageSnapshot, setPageSnapshot] = useState<string | null>(null)
+  const [stuckUp, setStuckUp] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const lastScopeKey = useRef<string | null>(null)
   const lastAutoId = useRef<string | null>(null)
   const pendingRef = useRef(false)
   const contextHintRef = useRef('')
 
+  const chatStarted =
+    messages.some((m) => m.role === 'user') || pending || Boolean(autoSession)
+
+  const startHeadline = autoSession
+    ? autoSession.title
+    : scopeMeta
+      ? scopeMeta.label
+      : 'Wie kann ich dir helfen?'
+  const startSub = autoSession
+    ? 'KPI-Analyse für den Geschäftsführer'
+    : scopeMeta
+      ? scoped?.layer === 'over-sheet'
+        ? 'Beschreib die Position — danach Übernehmen in die Karte.'
+        : 'Ich bin dein Assistent für diesen Editor.'
+      : 'Ich bin dein CRM-Assistent.'
+
+  const overSheet = scoped?.layer === 'over-sheet'
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -214,31 +270,53 @@ export function AssistentPanel() {
   const quick = autoSession
     ? [
         { label: 'Nochmal analysieren', prompt: autoSession.autoPrompt },
-        { label: 'Was zuerst tun?', prompt: 'Was ist die eine wichtigste Entscheidung jetzt — und warum?' },
+        {
+          label: 'Was zuerst tun?',
+          prompt: 'Was ist die eine wichtigste Entscheidung jetzt — und warum?',
+        },
         { label: 'Risiken', prompt: 'Welche Risiken oder Engpässe siehst du in den Zahlen?' },
       ]
     : scopeMeta?.quickPrompts ?? QUICK_DEFAULT
 
-  // Neuer Scope → Chat auf Modus zurücksetzen (nicht bei Auto-Analyse)
   useEffect(() => {
     if (!open || autoSession) return
     const key = scoped ? `${scoped.scopeId}:${scoped.extraHint ?? ''}` : 'general'
     if (lastScopeKey.current === key) return
     lastScopeKey.current = key
     if (scoped && scopeMeta) {
-      setMessages([{ role: 'assistant', content: scopeMeta.intro.replace(/\*\*/g, '') }])
+      setMessages([])
       setInput(scoped.draftInput?.trim() || '')
       setError(null)
       requestAnimationFrame(() => inputRef.current?.focus())
     } else if (!scoped) {
-      setMessages([DEFAULT_INTRO])
+      setMessages([])
       setInput('')
     }
   }, [open, scoped, scopeMeta, autoSession])
 
+  const scrollToBottom = useCallback((smooth = true) => {
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+  }, [])
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, open])
+    if (!chatStarted) return
+    scrollToBottom(true)
+  }, [messages, open, pending, chatStarted, scrollToBottom])
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el || !chatStarted) {
+      setStuckUp(false)
+      return
+    }
+    const onScroll = () => {
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+      setStuckUp(dist > 120)
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [chatStarted, messages, open])
 
   function closePanel() {
     setOpen(false)
@@ -246,6 +324,16 @@ export function AssistentPanel() {
     clearAutoSession()
     lastScopeKey.current = null
     lastAutoId.current = null
+  }
+
+  function resetToGeneral() {
+    clearScoped()
+    clearAutoSession()
+    lastScopeKey.current = null
+    lastAutoId.current = null
+    setMessages([])
+    setInput('')
+    setError(null)
   }
 
   function navigateCrm(href: string) {
@@ -260,6 +348,11 @@ export function AssistentPanel() {
       return
     }
     setPendingDraft(draft)
+    if (scoped?.layer === 'over-sheet') {
+      toast.success('Position übernommen')
+      closePanel()
+      return
+    }
     toast.success('In Formular übernommen — Fenster schließen oder weiter chatten.')
   }
 
@@ -267,13 +360,14 @@ export function AssistentPanel() {
     const msg = text.trim()
     if (!msg || pendingRef.current) return
     pendingRef.current = true
+    setPending(true)
     setError(null)
     setInput('')
     const historyForApi = (
       opts?.historyOverride ?? messages.filter((m) => m.role === 'user' || m.content)
     ).map((m) => ({ role: m.role, content: m.content }))
     setMessages((m) => [...m, { role: 'user', content: msg }])
-    startTransition(async () => {
+    void (async () => {
       try {
         const res = await fetch('/api/copilot/chat', {
           method: 'POST',
@@ -315,11 +409,11 @@ export function AssistentPanel() {
         setMessages((m) => [...m, { role: 'assistant', content: err }])
       } finally {
         pendingRef.current = false
+        setPending(false)
       }
-    })
+    })()
   }
 
-  // Dashboard-/Auto-Analyse: Intro + einmalig Prompt senden
   useEffect(() => {
     if (!open || !autoSession) return
     if (lastAutoId.current === autoSession.id) return
@@ -329,151 +423,166 @@ export function AssistentPanel() {
     setMessages([introMsg])
     setInput('')
     setError(null)
-    // contextHint in Closure kann noch alt sein — kleinen Tick warten
     const t = window.setTimeout(() => {
       send(autoSession.autoPrompt, { historyOverride: [introMsg] })
     }, 0)
     return () => window.clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei neuer Auto-Session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, autoSession])
 
   if (!open) return null
+
+  const title = autoSession
+    ? autoSession.title
+    : scopeMeta
+      ? `KI · ${scopeMeta.label}`
+      : 'Assistent'
 
   return (
     <>
       <button
         type="button"
-        className="assistent-scrim"
+        className={cn('assistent-scrim', overSheet && 'assistent-scrim--over-sheet')}
         aria-label="Assistent schließen"
         onClick={closePanel}
       />
-      <aside className="assistent-panel" role="dialog" aria-label="Assistent">
-        <div className="assistent-panel__handle" aria-hidden>
-          <span />
-        </div>
+      <aside
+        className={cn('assistent-panel', overSheet && 'assistent-panel--over-sheet')}
+        role="dialog"
+        aria-label="Assistent"
+      >
         <header className="assistent-panel__head">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--green-50)] text-[var(--green)]">
-            <MockIcon ctx="btn" n="sparkles" size={16} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">
-              {autoSession
-                ? autoSession.title
-                : scopeMeta
-                  ? `KI · ${scopeMeta.label}`
-                  : 'Assistent'}
-            </p>
-            <p className="truncate text-[length:var(--fs-meta)] text-bw-text-muted">
-              {autoSession
-                ? 'KPI-Analyse für den Geschäftsführer'
-                : scopeMeta
-                  ? 'Bereit für diesen Editor — beschreiben & übernehmen'
-                  : `Wissen · Ausführen · Springen · ${pathname}`}
-            </p>
-          </div>
-          {scoped || autoSession ? (
-            <button
-              type="button"
-              className="btn ghost sm"
-              title="Allgemeinen Assistenten öffnen"
-              onClick={() => {
-                clearScoped()
-                clearAutoSession()
-                lastScopeKey.current = null
-                lastAutoId.current = null
-                setMessages([DEFAULT_INTRO])
-                setInput('')
-              }}
-            >
-              Allgemein
-            </button>
-          ) : null}
           <button
             type="button"
-            className="btn ghost sm"
+            className="assistent-panel__close"
             onClick={closePanel}
             aria-label="Schließen"
           >
             <MockIcon ctx="btn" n="x" size={16} />
           </button>
+          <div className="assistent-panel__head-title min-w-0 flex-1">
+            <p className="assistent-panel__title">{title}</p>
+          </div>
+          {(scoped || autoSession) && !overSheet ? (
+            <button
+              type="button"
+              className="btn ghost sm"
+              title="Allgemeinen Assistenten öffnen"
+              onClick={resetToGeneral}
+            >
+              Allgemein
+            </button>
+          ) : null}
         </header>
 
-        <div className="assistent-panel__body">
-          {messages.map((m, i) => {
-            const draft = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
-            const display =
-              m.role === 'assistant' && draft ? stripBwApplyBlock(m.content) || m.content : m.content
-            return (
-              <div key={`${m.role}-${i}`}>
-                <div
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-[length:var(--fs-text)] leading-relaxed whitespace-pre-wrap',
-                    m.role === 'assistant'
-                      ? 'bg-bw-surface-2 text-bw-text'
-                      : 'ml-6 bg-[#2E7D52] text-white'
-                  )}
-                >
-                  {display}
-                </div>
-                {draft ? (
-                  <button
-                    type="button"
-                    className="btn primary sm mt-2"
-                    disabled={pending}
-                    onClick={() => applyDraftFromMessage(m.content)}
+        <div className="assistent-panel__body" ref={bodyRef}>
+          {!chatStarted ? (
+            <div className="assistent-panel__start">
+              <p className="assistent-panel__start-headline">{startHeadline}</p>
+              <p className="assistent-panel__start-sub">{startSub}</p>
+            </div>
+          ) : (
+            <>
+              {messages.map((m, i) => {
+                const draft = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
+                const display =
+                  m.role === 'assistant' && draft
+                    ? stripBwApplyBlock(m.content) || m.content
+                    : m.content
+                return (
+                  <div
+                    key={`${m.role}-${i}`}
+                    className={cn('assistent-msg', m.role === 'user' && 'assistent-msg--user')}
                   >
-                    In Formular übernehmen
-                  </button>
-                ) : null}
-                {m.role === 'assistant' && m.ui ? (
-                  <AssistentUiBlocks
-                    ui={m.ui}
-                    disabled={pending}
-                    onNavigate={navigateCrm}
-                    onConfirm={(prompt) => send(prompt)}
-                  />
-                ) : null}
-              </div>
-            )
-          })}
-          {pending ? (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Denkt nach…</p>
+                    <div
+                      className={cn(
+                        'assistent-bubble',
+                        m.role === 'assistant' ? 'assistent-bubble--ai' : 'assistent-bubble--user'
+                      )}
+                    >
+                      {display}
+                    </div>
+                    {draft?.type === 'position' ? (
+                      <PositionDraftCard
+                        draft={draft}
+                        disabled={pending}
+                        applyLabel={overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
+                        onApply={() => applyDraftFromMessage(m.content)}
+                      />
+                    ) : draft ? (
+                      <button
+                        type="button"
+                        className="btn primary sm mt-2"
+                        disabled={pending}
+                        onClick={() => applyDraftFromMessage(m.content)}
+                      >
+                        {overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
+                      </button>
+                    ) : null}
+                    {m.role === 'assistant' && m.ui ? (
+                      <AssistentUiBlocks
+                        ui={m.ui}
+                        disabled={pending}
+                        onNavigate={navigateCrm}
+                        onConfirm={(prompt) => send(prompt)}
+                      />
+                    ) : null}
+                  </div>
+                )
+              })}
+              {pending ? (
+                <div
+                  className="assistent-typing assistent-bubble assistent-bubble--ai"
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Assistent schreibt"
+                >
+                  <span className="assistent-typing__dot" />
+                  <span className="assistent-typing__dot" />
+                  <span className="assistent-typing__dot" />
+                </div>
+              ) : null}
+              <div ref={bottomRef} />
+            </>
+          )}
+
+          {stuckUp ? (
+            <button
+              type="button"
+              className="assistent-panel__scroll-down"
+              aria-label="Zum Ende scrollen"
+              onClick={() => scrollToBottom(true)}
+            >
+              <MockIcon ctx="btn" n="arrow-down" size={16} />
+            </button>
           ) : null}
-          <div ref={bottomRef} />
         </div>
 
         <div className="assistent-panel__foot">
-          <div className="flex flex-wrap gap-1.5">
-            {quick.map((q) => (
-              <button
-                key={q.label}
-                type="button"
-                className="rounded-full border border-bw-border bg-white px-2.5 py-1 text-[length:var(--fs-meta)] text-bw-text hover:bg-bw-surface-2 active:scale-[0.97]"
-                disabled={pending}
-                onClick={() => send(q.prompt)}
-              >
-                {q.label}
-              </button>
-            ))}
-          </div>
+          {!chatStarted ? (
+            <div className="assistent-panel__chips">
+              {quick.map((q) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  className="assistent-chip"
+                  disabled={pending}
+                  onClick={() => send(q.prompt)}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {error ? <p className="text-[length:var(--fs-meta)] text-danger">{error}</p> : null}
           <KiChatComposer
             value={input}
             onChange={setInput}
             onSubmit={() => send(input)}
             disabled={pending}
-            placeholder={
-              scopeMeta?.placeholder ?? 'Fragen, Auftrag oder „öffne Positionen“…'
-            }
+            placeholder={scopeMeta?.placeholder ?? 'Nachricht schreiben…'}
             inputRef={inputRef}
           />
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            {autoSession
-              ? 'Analyse basiert auf den aktuell sichtbaren Dashboard-Zahlen.'
-              : scopeMeta
-                ? 'Antwort mit „In Formular übernehmen“ füllt das offene Feld.'
-                : 'Vorschau im Chat — Versand erst mit „Jetzt ausführen“.'}
-          </p>
         </div>
       </aside>
     </>

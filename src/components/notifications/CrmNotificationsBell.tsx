@@ -6,18 +6,19 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
+  ctaLabel,
   listCrmNotifications,
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
   typIcon,
+  typLabel,
   type CrmNotificationFilter,
   type CrmNotificationItem,
 } from '@/app/(dashboard)/notifications/actions'
 import { formatRelativeDate, cn } from '@/lib/utils'
 
 /**
- * TopBar-Glocke: Unread-Badge · Panel (Desktop Slideover / Mobil Bottom Sheet)
- * mit Filter gelesen/ungelesen · letzte 7 Tage · externe Updates.
+ * TopBar-Glocke: Unread-Badge · Liste · Detail-Sheet mit CTA zum Vorgang.
  */
 export function CrmNotificationsBell() {
   const router = useRouter()
@@ -25,6 +26,7 @@ export function CrmNotificationsBell() {
   const [filter, setFilter] = useState<CrmNotificationFilter>('ungelesen')
   const [items, setItems] = useState<CrmNotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [detail, setDetail] = useState<CrmNotificationItem | null>(null)
   const [pending, startTransition] = useTransition()
 
   const reload = useCallback(
@@ -46,7 +48,7 @@ export function CrmNotificationsBell() {
   useEffect(() => {
     let cancelled = false
     const loadBadge = () => {
-      void listCrmNotifications('alle').then((res) => {
+      void listCrmNotifications('ungelesen').then((res) => {
         if (cancelled || !res.ok) return
         setUnreadCount(res.unreadCount)
       })
@@ -65,26 +67,46 @@ export function CrmNotificationsBell() {
   }, [open, filter, reload])
 
   function onOpen() {
+    setDetail(null)
     setOpen(true)
   }
 
-  function onRowClick(item: CrmNotificationItem) {
+  function markLocalRead(item: CrmNotificationItem) {
+    setUnreadCount((c) => Math.max(0, c - 1))
+    if (filter === 'ungelesen') {
+      setItems((prev) => prev.filter((x) => x.sourceKey !== item.sourceKey))
+    } else {
+      setItems((prev) =>
+        prev.map((x) => (x.sourceKey === item.sourceKey ? { ...x, gelesen: true } : x))
+      )
+    }
+  }
+
+  function openDetail(item: CrmNotificationItem) {
+    setDetail(item)
+    if (item.gelesen) return
     startTransition(async () => {
-      if (!item.gelesen) {
-        await markCrmNotificationRead(item.sourceKey)
-        setUnreadCount((c) => Math.max(0, c - 1))
-        setItems((prev) =>
-          prev.map((x) => (x.sourceKey === item.sourceKey ? { ...x, gelesen: true } : x))
-        )
-      }
-      setOpen(false)
-      router.push(item.href)
+      const r = await markCrmNotificationRead(item.sourceKey)
+      if (!r.ok) return
+      markLocalRead(item)
+      setDetail((cur) =>
+        cur?.sourceKey === item.sourceKey ? { ...cur, gelesen: true } : cur
+      )
     })
+  }
+
+  function goToVorgang() {
+    if (!detail) return
+    const href = detail.href
+    setDetail(null)
+    setOpen(false)
+    router.push(href)
   }
 
   function onMarkAll() {
     startTransition(async () => {
       await markAllCrmNotificationsRead()
+      setDetail(null)
       reload(filter)
     })
   }
@@ -111,7 +133,10 @@ export function CrmNotificationsBell() {
 
       <EditorSheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setDetail(null)
+          setOpen(false)
+        }}
         title="Updates"
         subtitle="Externe Meldungen · letzte 7 Tage"
         context="detail"
@@ -129,7 +154,6 @@ export function CrmNotificationsBell() {
             [
               ['ungelesen', 'Ungelesen'],
               ['gelesen', 'Gelesen'],
-              ['alle', 'Alle'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -151,9 +175,7 @@ export function CrmNotificationsBell() {
           <p className="crm-notif-empty">
             {filter === 'ungelesen'
               ? 'Keine ungelesenen Updates.'
-              : filter === 'gelesen'
-                ? 'Noch keine gelesenen Updates.'
-                : 'Keine Updates in den letzten 7 Tagen.'}
+              : 'Noch keine gelesenen Updates.'}
           </p>
         ) : (
           <ul className="crm-notif-list">
@@ -162,7 +184,7 @@ export function CrmNotificationsBell() {
                 <button
                   type="button"
                   className={cn('crm-notif-row', !item.gelesen && 'is-unread')}
-                  onClick={() => onRowClick(item)}
+                  onClick={() => openDetail(item)}
                 >
                   <span className="crm-notif-row__ico" aria-hidden>
                     <MockIcon ctx="row" n={typIcon(item.typ)} size={18} />
@@ -182,6 +204,40 @@ export function CrmNotificationsBell() {
             ))}
           </ul>
         )}
+      </EditorSheet>
+
+      <EditorSheet
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title={detail ? typLabel(detail.typ) : 'Update'}
+        crumb="Updates >"
+        context="detail"
+        size="md"
+      >
+        {detail ? (
+          <div className="crm-notif-detail">
+            <div className="crm-notif-detail__ico" aria-hidden>
+              <MockIcon ctx="row" n={typIcon(detail.typ)} size={22} />
+            </div>
+            <p className="crm-notif-detail__title">{detail.title}</p>
+            {detail.subtitle ? (
+              <p className="crm-notif-detail__sub">{detail.subtitle}</p>
+            ) : null}
+            <p className="crm-notif-detail__meta">{formatRelativeDate(detail.createdAt)}</p>
+            <p className="crm-notif-detail__hint">
+              {detail.typ === 'neue_anfrage'
+                ? 'Neue Anfrage aus dem Meldeformular oder Portal.'
+                : detail.typ === 'handwerker_update'
+                  ? 'Eintrag vom Partner im Bautagebuch.'
+                  : 'Der Auftrag wurde als abgeschlossen markiert.'}
+            </p>
+            <div className="crm-notif-detail__actions">
+              <MockBtn kind="primary" icon="arrow-right" onClick={goToVorgang}>
+                {ctaLabel(detail.typ)}
+              </MockBtn>
+            </div>
+          </div>
+        ) : null}
       </EditorSheet>
     </>
   )

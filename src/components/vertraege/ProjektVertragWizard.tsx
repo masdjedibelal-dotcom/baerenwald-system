@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileText, Save } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { DocActionBar } from '@/components/surfaces/primitives'
@@ -10,8 +10,6 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import {
   finalizeHandwerkerAcceptWizard,
@@ -76,16 +74,6 @@ export function ProjektVertragWizard({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [positionenAuftragSpeichern, setPositionenAuftragSpeichern] = useState(true)
-  const vertragKiFieldRef = useRef<'bauvorhaben' | 'leistungsumfang' | 'verguetung_text'>('leistungsumfang')
-
-  useKiAssistDraftConsumer(step === 2, 'text', (d) => {
-    applyKiDokumentTextDraft(d, {
-      setText: (v) => {
-        const key = vertragKiFieldRef.current
-        setMeta((m) => ({ ...m, [key]: v }))
-      },
-    })
-  })
 
   const handwerker = useMemo(
     () => bootstrap.handwerker_optionen.find((h) => h.id === meta.handwerker_id) ?? null,
@@ -434,55 +422,38 @@ export function ProjektVertragWizard({
               <div className="space-y-4">
                 <KiAssistFieldLabel
                   label="Bauvorhaben"
-                  scope="dokument"
+                  value={meta.bauvorhaben}
+                  onApply={(text) => setMeta((m) => ({ ...m, bauvorhaben: text }))}
                   extraHint="Vertrags-Bauvorhaben (kundensichtbar im PDF)."
-                  draftInput={meta.bauvorhaben || null}
-                  onBeforeOpen={() => {
-                    vertragKiFieldRef.current = 'bauvorhaben'
-                  }}
+                  multiline={false}
                 >
                   <Input
                     value={meta.bauvorhaben}
                     onChange={(e) => setMeta((m) => ({ ...m, bauvorhaben: e.target.value }))}
-                    onFocus={() => {
-                      vertragKiFieldRef.current = 'bauvorhaben'
-                    }}
                   />
                 </KiAssistFieldLabel>
                 <KiAssistFieldLabel
                   label="Leistungsumfang (§2)"
-                  scope="dokument"
+                  value={meta.leistungsumfang}
+                  onApply={(text) => setMeta((m) => ({ ...m, leistungsumfang: text }))}
                   extraHint="Vertrags-Leistungsumfang für den Kunden."
-                  draftInput={meta.leistungsumfang || null}
-                  onBeforeOpen={() => {
-                    vertragKiFieldRef.current = 'leistungsumfang'
-                  }}
                 >
                   <Textarea
                     rows={4}
                     value={meta.leistungsumfang}
                     onChange={(e) => setMeta((m) => ({ ...m, leistungsumfang: e.target.value }))}
-                    onFocus={() => {
-                      vertragKiFieldRef.current = 'leistungsumfang'
-                    }}
                   />
                 </KiAssistFieldLabel>
                 <KiAssistFieldLabel
                   label="Vergütung (§3)"
-                  scope="dokument"
+                  value={meta.verguetung_text}
+                  onApply={(text) => setMeta((m) => ({ ...m, verguetung_text: text }))}
                   extraHint="Vergütungstext im Vertrag für den Kunden."
-                  draftInput={meta.verguetung_text || null}
-                  onBeforeOpen={() => {
-                    vertragKiFieldRef.current = 'verguetung_text'
-                  }}
                 >
                   <Textarea
                     rows={5}
                     value={meta.verguetung_text}
                     onChange={(e) => setMeta((m) => ({ ...m, verguetung_text: e.target.value }))}
-                    onFocus={() => {
-                      vertragKiFieldRef.current = 'verguetung_text'
-                    }}
                   />
                 </KiAssistFieldLabel>
                 {nachtragMode?.parent_verguetung_text ? (

@@ -86,7 +86,10 @@ export function AnfragePhaseEditSheet({
       dirty={false}
       overlayClassName="editor-sheet-overlay--stack"
       footer={
-        <div className="phase-sheet-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="phase-sheet-footer">
+          <button type="button" className="btn secondary" onClick={onClose} disabled={pending}>
+            Abbrechen
+          </button>
           <button
             type="button"
             className="btn primary"
@@ -95,9 +98,6 @@ export function AnfragePhaseEditSheet({
           >
             <MockIcon ctx="default" n="check" size={14} />
             Speichern
-          </button>
-          <button type="button" className="btn secondary" onClick={onClose} disabled={pending}>
-            Abbrechen
           </button>
         </div>
       }

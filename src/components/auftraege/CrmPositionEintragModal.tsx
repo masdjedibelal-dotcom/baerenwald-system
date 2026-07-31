@@ -4,8 +4,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
 import { Camera } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -107,12 +106,6 @@ export function CrmPositionEintragModal({
 
   const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath)
 
-  useKiAssistDraftConsumer(open, 'text', (d) => {
-    if (d.type !== 'text') return
-    if (d.titel?.trim()) setTitel(d.titel.trim())
-    if (d.text.trim()) setBeschreibung(d.text.trim())
-  })
-
   return (
     <EditorSheet
       open={open}
@@ -120,20 +113,13 @@ export function CrmPositionEintragModal({
       title="Tagebuch-Eintrag"
       size="lg"
       dirty={dirty && !pending}
-      headerEnd={
-        <KiAssistIconButton
-          scope="bautagebuch"
-          extraHint="Bautagebuch-Eintrag für Kundenportal / Baustelle."
-          draftInput={[titel, beschreibung].filter(Boolean).join('\n') || null}
-        />
-      }
       footer={
-        <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </Button>
+        <div className="sheet-footer-actions ldr-cta">
           <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
             Abbrechen
+          </Button>
+          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
+            Speichern
           </Button>
         </div>
       }
@@ -156,32 +142,34 @@ export function CrmPositionEintragModal({
           </label>
         </div>
 
-        <label className="block">
-          <span className="lt-field-lbl lt-field-lbl--with-ki">
-            <span>Titel</span>
-            <KiAssistIconButton
-              scope="bautagebuch"
-              extraHint="Bautagebuch-Eintrag."
-              draftInput={[titel, beschreibung].filter(Boolean).join('\n') || null}
-            />
-          </span>
+        <KiAssistFieldLabel
+          label="Titel"
+          value={titel}
+          onApply={setTitel}
+          extraHint="Bautagebuch-Eintrag — Kurztitel fürs Portal."
+          multiline={false}
+        >
           <input
             className="input"
             value={titel}
             onChange={(e) => setTitel(e.target.value)}
             placeholder="Kurzer Titel fürs Portal"
           />
-        </label>
+        </KiAssistFieldLabel>
 
-        <label className="block">
-          <span className="lt-field-lbl">Beschreibung</span>
+        <KiAssistFieldLabel
+          label="Beschreibung"
+          value={beschreibung}
+          onApply={setBeschreibung}
+          extraHint="Bautagebuch-Eintrag — Was ist auf der Baustelle passiert?"
+        >
           <Textarea
             rows={4}
             value={beschreibung}
             onChange={(e) => setBeschreibung(e.target.value)}
             placeholder="Was ist auf der Baustelle passiert?"
           />
-        </label>
+        </KiAssistFieldLabel>
 
         <label className="block">
           <span className="lt-field-lbl">Leistung</span>

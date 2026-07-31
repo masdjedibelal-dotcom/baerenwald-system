@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { KundeModal } from '@/components/kunden/KundeModal'
+import { showRouteBusy, hideOverlayBusy } from '@/components/ui/action-busy'
 import type { Kunde } from '@/lib/types'
 
 export type FabVorgangArt = 'anfrage' | 'angebot' | 'rechnung'
@@ -44,11 +45,15 @@ export function FabVorgangStartModal({
   if (!art || art === 'anfrage') return null
 
   function startAngebot(kid: string) {
+    hideOverlayBusy()
+    showRouteBusy('Angebot wird geöffnet…')
     onClose()
     router.push(`/angebote/neu?kunde_id=${encodeURIComponent(kid)}`)
   }
 
   function startRechnung(kid: string) {
+    hideOverlayBusy()
+    showRouteBusy('Rechnung wird geöffnet…')
     onClose()
     router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kid)}`)
   }

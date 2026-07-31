@@ -12,13 +12,15 @@ import { cn } from '@/lib/utils'
 export type TimeInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   /** Zusätzliche Klasse am äußeren Wrapper */
   wrapperClassName?: string
+  /** Kompakt (Filter, Range-Rows) */
+  size?: 'sm' | 'md'
 }
 
 /**
  * Uhrzeitfeld: Text linksbündig, Uhr-Icon rechts öffnet den nativen Picker.
  */
 export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(function TimeInput(
-  { className, wrapperClassName, disabled, onClick, ...props },
+  { className, wrapperClassName, disabled, onClick, size = 'md', ...props },
   ref
 ) {
   const localRef = useRef<HTMLInputElement | null>(null)
@@ -43,11 +45,18 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(function T
   }
 
   return (
-    <div className={cn('time-field', disabled && 'is-disabled', wrapperClassName)}>
+    <div
+      className={cn(
+        'time-field',
+        size === 'sm' && 'time-field--sm',
+        disabled && 'is-disabled',
+        wrapperClassName
+      )}
+    >
       <input
         ref={setRefs}
         type="time"
-        className={cn('input time-field__input', className)}
+        className={cn('input time-field__input', size === 'sm' && 'input--sm', className)}
         disabled={disabled}
         onClick={onClick}
         {...props}
@@ -61,7 +70,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(function T
         title="Uhrzeit wählen"
         onClick={openPicker}
       >
-        <MockIcon ctx="btn" n="clock" size={15} />
+        <MockIcon ctx="btn" n="clock" size={size === 'sm' ? 14 : 15} />
       </button>
     </div>
   )

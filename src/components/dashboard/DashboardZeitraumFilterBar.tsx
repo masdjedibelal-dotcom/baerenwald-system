@@ -11,7 +11,8 @@ import {
   type DashboardZeitraumFilter,
   type DashboardZeitraumPreset,
 } from '@/lib/dashboard/dashboard-analytics'
-import { LIST_FILTER_SELECT_CLASS } from '@/lib/list-filter-ui'
+import { DateInput } from '@/components/ui/DateInput'
+import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -128,25 +129,25 @@ export function DashboardZeitraumFilterBar({ filter }: Props) {
 
       {customMode ? (
         <div className="dash-zeitraum-panel__custom">
-          <label className="dash-zeitraum-panel__field">
-            Von
-            <input
-              type="date"
-              value={draftVon}
-              onChange={(e) => setDraftVon(e.target.value)}
-              className={LIST_FILTER_SELECT_CLASS}
-            />
-          </label>
-          <label className="dash-zeitraum-panel__field">
-            Bis
-            <input
-              type="date"
-              value={draftBis}
-              min={draftVon || undefined}
-              onChange={(e) => setDraftBis(e.target.value)}
-              className={LIST_FILTER_SELECT_CLASS}
-            />
-          </label>
+          <FilterRangeRow
+            title="Zeitraum"
+            className="!mb-3"
+            von={
+              <DateInput
+                size="sm"
+                value={draftVon}
+                onChange={(e) => setDraftVon(e.target.value)}
+              />
+            }
+            bis={
+              <DateInput
+                size="sm"
+                value={draftBis}
+                min={draftVon || undefined}
+                onChange={(e) => setDraftBis(e.target.value)}
+              />
+            }
+          />
           <div className="dash-zeitraum-panel__actions">
             <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
               Abbrechen

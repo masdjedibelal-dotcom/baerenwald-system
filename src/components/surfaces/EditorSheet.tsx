@@ -12,10 +12,9 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
-import { ActionSheet } from '@/components/ui/ActionSheet'
-import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
+import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { trapFocus } from '@/lib/a11y/focus-trap'
@@ -103,6 +102,19 @@ export function EditorSheet({
   manageHistory = true,
 }: EditorSheetProps) {
   const isMobile = useIsMobile()
+  const assistent = useAssistentOptional()
+  const [fieldOverlayOpen, setFieldOverlayOpen] = useState(false)
+  useEffect(() => {
+    const on = (e: Event) => {
+      const open = Boolean((e as CustomEvent<{ open?: boolean }>).detail?.open)
+      setFieldOverlayOpen(open)
+    }
+    window.addEventListener('ki-field-overlay', on)
+    return () => window.removeEventListener('ki-field-overlay', on)
+  }, [])
+  const pauseFocusTrap = Boolean(
+    (assistent?.open && assistent.scoped?.layer === 'over-sheet') || fieldOverlayOpen
+  )
   const [mounted, setMounted] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -195,9 +207,16 @@ export function EditorSheet({
     updateEditorSheetHistoryPop(sheetId, handleHistoryPop)
   }, [open, sheetId, handleHistoryPop, manageHistory])
 
-  /* Body scroll lock + focus trap */
+  /* Body scroll lock + focus trap (pausiert, wenn KI-Assistent über dem Sheet liegt) */
   useEffect(() => {
     if (!open || !mounted) return
+    if (pauseFocusTrap) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const el = rootRef.current
@@ -206,7 +225,7 @@ export function EditorSheet({
       document.body.style.overflow = prev
       release?.()
     }
-  }, [open, mounted, requestClose])
+  }, [open, mounted, requestClose, pauseFocusTrap])
 
   /* S7: visualViewport — Overlay anpassen bei Tastatur, Panel nicht auf Fullscreen ziehen */
   useEffect(() => {
@@ -262,8 +281,8 @@ export function EditorSheet({
           className="editor-sheet__confirm"
           disabled={confirmDisabled || confirmBusy}
           onClick={handleConfirm}
-          aria-label="Speichern"
-          title="Speichern"
+          aria-label="Bestätigen"
+          title="Bestätigen"
         >
           <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
         </button>
@@ -340,36 +359,17 @@ export function EditorSheet({
       >
         {panel}
       </div>
-      {isMobile ? (
-        <ActionSheet
-          open={discardOpen}
-          onClose={() => setDiscardOpen(false)}
-          title="Änderungen verwerfen?"
-          items={[
-            { label: 'Verwerfen', danger: true, onClick: confirmClose },
-            { label: 'Weiter bearbeiten', onClick: () => setDiscardOpen(false) },
-          ]}
-        />
-      ) : (
-        <Modal
-          open={discardOpen}
-          onClose={() => setDiscardOpen(false)}
-          title="Änderungen verwerfen?"
-          size="sm"
-          footer={
-            <>
-              <Button type="button" variant="ghost" onClick={() => setDiscardOpen(false)}>
-                Weiter bearbeiten
-              </Button>
-              <Button type="button" variant="danger" onClick={confirmClose}>
-                Verwerfen
-              </Button>
-            </>
-          }
-        >
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Ungespeicherte Eingaben gehen verloren.</p>
-        </Modal>
-      )}
+      <ConfirmPopup
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Änderungen verwerfen?"
+        confirmLabel="Verwerfen"
+        cancelLabel="Weiter bearbeiten"
+        danger
+        onConfirm={confirmClose}
+      >
+        Ungespeicherte Eingaben gehen verloren.
+      </ConfirmPopup>
     </EditorSheetApiContext.Provider>,
     document.body
   )

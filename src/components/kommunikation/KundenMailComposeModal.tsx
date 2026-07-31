@@ -4,10 +4,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
 import { Save } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { Input } from '@/components/ui/Input'
@@ -141,10 +138,6 @@ export function KundenMailComposeModal({
     })
   }
 
-  useKiAssistDraftConsumer(open && !!ctx, ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, { setBetreff, setBody: setBodyHtml })
-  })
-
   return (
     <>
       <EditorSheet
@@ -157,13 +150,6 @@ export function KundenMailComposeModal({
         confirmBusy={pending}
         onConfirm={senden}
         size="lg"
-        headerEnd={
-          <KiAssistIconButton
-            scope="mail"
-            extraHint={`Kunden-Mail${ctx ? ` · Kontext ${ctx.kontextTyp}` : ''}. Anrede: ${anrede}.`}
-            draftInput={[betreff, bodyHtml].filter(Boolean).join('\n\n') || null}
-          />
-        }
       >
         {ctx ? (
           <div className="space-y-3">
@@ -201,17 +187,18 @@ export function KundenMailComposeModal({
             />
             <KiAssistFieldLabel
               label="Betreff"
-              scope="mail"
+              value={betreff}
+              onApply={setBetreff}
               extraHint={`Kunden-Mail Betreff. Anrede: ${anrede}.`}
-              draftInput={betreff || null}
+              multiline={false}
             >
               <Input value={betreff} onChange={(e) => setBetreff(e.target.value)} />
             </KiAssistFieldLabel>
             <KiAssistFieldLabel
               label="Nachricht"
-              scope="mail"
+              value={bodyHtml}
+              onApply={setBodyHtml}
               extraHint={`Kunden-Mail Text. Anrede: ${anrede}.`}
-              draftInput={[betreff, bodyHtml].filter(Boolean).join('\n\n') || null}
             >
               <Textarea rows={8} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} />
             </KiAssistFieldLabel>

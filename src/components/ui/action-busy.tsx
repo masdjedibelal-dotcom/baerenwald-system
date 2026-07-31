@@ -1,15 +1,18 @@
 'use client'
 
 import {
+  Suspense,
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useTransition as useReactTransition,
   type ReactNode,
   type TransitionStartFunction,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 type BusyState = { depth: number; label: string }
 
@@ -23,6 +26,13 @@ const DEFAULT_LABEL = 'Wird geladen…'
 
 let state: BusyState = { depth: 0, label: DEFAULT_LABEL }
 const listeners = new Set<(s: BusyState) => void>()
+
+/** Route-Navigation: einmal show, hide bei Path-/Query-Wechsel oder Timeout. */
+let routeBusyDepth = 0
+let routeBusyTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Overlay nach Neu-Popover: hide wenn Sheet/Wizard da ist. */
+let overlayBusyActive = false
 
 function emit() {
   for (const l of Array.from(listeners)) l(state)
@@ -61,6 +71,66 @@ export const actionBusy: BusyApi = {
   show: showBusy,
   hide: hideBusy,
   run: runBusy,
+}
+
+/**
+ * Loading bis die Ziel-URL (Pfad oder Query) wechselt — verhindert Flash der alten Seite
+ * (z. B. Vorgänge) nach Schließen eines Pickers vor `router.push`.
+ */
+export function showRouteBusy(label: string, safetyMs = 12000) {
+  if (routeBusyDepth === 0) {
+    showBusy(label)
+    routeBusyDepth = 1
+  } else {
+    state = { ...state, label: label.trim() || state.label || DEFAULT_LABEL }
+    emit()
+  }
+  if (routeBusyTimer) clearTimeout(routeBusyTimer)
+  routeBusyTimer = setTimeout(() => {
+    hideRouteBusy()
+  }, safetyMs)
+}
+
+export function hideRouteBusy() {
+  if (routeBusyTimer) {
+    clearTimeout(routeBusyTimer)
+    routeBusyTimer = null
+  }
+  if (routeBusyDepth <= 0) return
+  routeBusyDepth = 0
+  hideBusy()
+}
+
+/** Kurz zwischen Neu-Menü und Overlay — getrennt von Route-Busy. */
+export function showOverlayBusy(label: string) {
+  if (overlayBusyActive) {
+    state = { ...state, label: label.trim() || state.label || DEFAULT_LABEL }
+    emit()
+    return
+  }
+  overlayBusyActive = true
+  showBusy(label)
+}
+
+export function hideOverlayBusy() {
+  if (!overlayBusyActive) return
+  overlayBusyActive = false
+  hideBusy()
+}
+
+function RouteBusyPathListener() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const routeKey = `${pathname ?? ''}?${searchParams?.toString() ?? ''}`
+  const prevRouteKey = useRef(routeKey)
+
+  useEffect(() => {
+    if (prevRouteKey.current === routeKey) return
+    prevRouteKey.current = routeKey
+    if (routeBusyDepth > 0) hideRouteBusy()
+  }, [routeKey])
+
+  return null
 }
 
 const ActionBusyContext = createContext<BusyApi>(actionBusy)
@@ -107,6 +177,9 @@ export function ActionBusyProvider({ children }: { children: ReactNode }) {
 
   return (
     <ActionBusyContext.Provider value={actionBusy}>
+      <Suspense fallback={null}>
+        <RouteBusyPathListener />
+      </Suspense>
       {children}
       {mounted && open
         ? createPortal(

@@ -1,13 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import {
-  AngebotKiAssistentButton,
-  type AngebotKiApplyPayload,
-} from '@/components/angebote/AngebotKiAssistent'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
 import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
@@ -22,10 +17,7 @@ import {
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft, applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { DocActionBar } from '@/components/surfaces/primitives'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { MockField } from '@/components/mock-ui/MockForm'
@@ -87,10 +79,6 @@ import {
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import type {
-  AngebotKiKontextPosition,
-  AngebotKiKontextPreisliste,
-} from '@/lib/angebote/angebot-ki-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
@@ -284,18 +272,6 @@ export function AngebotWizard({
     if (focusField === 'titel' || focusField === 'beschreibung') return 'dokument'
     return null
   })
-  const versandTextFieldRef = useRef<'einleitung' | 'schluss'>('einleitung')
-  useKiAssistDraftConsumer(sheet === 'versand', 'text', (d) => {
-    applyKiDokumentTextDraft(d, {
-      setText: (v) => {
-        if (versandTextFieldRef.current === 'schluss') {
-          setMeta((m) => ({ ...m, schluss: v }))
-        } else {
-          setMeta((m) => ({ ...m, einleitung: v }))
-        }
-      },
-    })
-  })
   const [kundePickerOpen, setKundePickerOpen] = useState(false)
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
@@ -354,7 +330,6 @@ export function AngebotWizard({
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
   const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
-  const isMobile = useIsMobile()
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
@@ -365,16 +340,6 @@ export function AngebotWizard({
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailBetreff, setMailBetreff] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
-
-  useKiAssistDraftConsumer(sheet === 'dokument', 'text', (d) => {
-    applyKiDokumentTextDraft(d, { setText: setProjektbeschreibung })
-  })
-  useKiAssistDraftConsumer(sheet === 'versand', ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff: setMailBetreff,
-      setBody: () => {},
-    })
-  })
 
   const zahlfristInit = zahlfristSegFromAngebotMeta(meta)
   const [zahlfristSeg, setZahlfristSeg] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -523,125 +488,6 @@ export function AngebotWizard({
     () => gewerke.map((g) => g.name).filter(Boolean),
     [gewerke]
   )
-
-  const kiKontextPositionen = useMemo((): AngebotKiKontextPosition[] => {
-    return zeilen
-      .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      .map((z) => ({
-        id: z.id,
-        leistung: z.bezeichnung,
-        beschreibung: z.positionBeschreibung ?? '',
-        menge: z.menge,
-        einheit: z.einheit,
-        preis_netto: z.vkNetto,
-        gewerk_slug: z.gewerk_slug ?? null,
-        gewerk_name: z.gewerkName ?? null,
-        preisliste_id: z.preisliste_id ?? null,
-      }))
-  }, [zeilen])
-
-  const kiKontextPreislisten = useMemo((): AngebotKiKontextPreisliste[] => {
-    return preislisten
-      .filter((p) => p.aktiv !== false)
-      .map((p) => {
-        const g = gewerke.find((x) => x.id === p.gewerk_id) ?? p.gewerke
-        return {
-          id: p.id,
-          leistung: p.leistung,
-          einheit: p.einheit,
-          preis_min: p.preis_min,
-          gewerk_slug: g?.slug ?? null,
-          gewerk_name: g?.name ?? null,
-          kategorie: p.kategorie ?? null,
-        }
-      })
-  }, [preislisten, gewerke])
-
-  const kiGewerke = useMemo(
-    () => gewerke.filter((g) => g.aktiv !== false).map((g) => ({ slug: g.slug, name: g.name })),
-    [gewerke]
-  )
-
-  const kiLeadKurz = useMemo(() => {
-    const parts = [
-      name,
-      projekt,
-      region,
-      budgetAnzeige,
-      leadSituationDisplay(leadState.situation),
-      bereicheFuerAnzeige(leadState.bereiche, leadState.situation)
-        .map((b) => BEREICH_LABELS[b] ?? b)
-        .join(', '),
-    ]
-      .map((s) => String(s ?? '').trim())
-      .filter(Boolean)
-    return parts.join(' · ')
-  }, [name, projekt, region, budgetAnzeige, leadState.situation, leadState.bereiche])
-
-  function applyAngebotKi(payload: AngebotKiApplyPayload) {
-    if (payload.titel != null && payload.titel.trim()) {
-      patchProjektTitel(payload.titel.trim())
-    }
-    if (payload.beschreibung != null) {
-      setProjektbeschreibung(payload.beschreibung)
-    }
-    if (!payload.positionen.length) return
-
-    setZeilen((prev) => {
-      let next = [...prev]
-      for (const p of payload.positionen) {
-        const gewerk =
-          (p.gewerk_slug
-            ? gewerke.find((g) => g.slug === p.gewerk_slug)
-            : undefined) ??
-          (p.gewerk_name
-            ? gewerke.find((g) => g.name.toLowerCase() === p.gewerk_name!.toLowerCase())
-            : undefined)
-        const gewerkPatch = gewerk
-          ? {
-              gewerk_id: gewerk.id,
-              gewerk_slug: gewerk.slug,
-              gewerkName: gewerk.name,
-            }
-          : {}
-
-        if (p.match.kind === 'vorhanden_wizard' && p.match.ref_id) {
-          next = next.map((z) => {
-            if (z.id !== p.match.ref_id || z.typ !== 'artikel') return z
-            return {
-              ...z,
-              bezeichnung: p.leistung || z.bezeichnung,
-              positionBeschreibung: p.beschreibung || z.positionBeschreibung,
-              menge: p.menge,
-              einheit: p.einheit || z.einheit,
-              vkNetto: p.preis_netto,
-              ...gewerkPatch,
-            }
-          })
-          continue
-        }
-
-        next.push(
-          neueArtikelZeile({
-            bezeichnung: p.leistung,
-            positionBeschreibung: p.beschreibung || undefined,
-            menge: p.menge,
-            einheit: p.einheit || 'Stk.',
-            vkNetto: p.preis_netto,
-            preisliste_id: p.match.kind === 'preisliste' ? p.match.ref_id || null : null,
-            position_quelle: p.match.kind === 'preisliste' ? 'katalog' : 'frei',
-            ...gewerkPatch,
-          })
-        )
-      }
-      setPositions(
-        next
-          .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-          .map(dokumentArtikelToWizardPosition)
-      )
-      return next
-    })
-  }
 
   const zahlfristText = useMemo(
     () => zahlfristAnzeigeFromLocal(zahlfristSeg, zahlfristDatum),
@@ -850,15 +696,6 @@ export function AngebotWizard({
     setSheet('vorschau')
   }
 
-  async function openPdf() {
-    const id = await ensureDraftForPreview()
-    if (!id) {
-      toast.error('Entwurf speichern fehlgeschlagen — PDF nicht verfügbar.')
-      return
-    }
-    window.open(`/api/angebot-pdf?angebotId=${encodeURIComponent(id)}`, '_blank', 'noopener,noreferrer')
-  }
-
   function onKundePick(k: Kunde) {
     setLeadState((prev) => ({
       ...prev,
@@ -1051,6 +888,15 @@ export function AngebotWizard({
     <DocActionBar
       actions={[
         {
+          id: 'save',
+          label: saving ? 'Speichern…' : 'Speichern',
+          onClick: () => {
+            if (saving) return
+            void persistDraft({ notify: true })
+          },
+          icon: <ActionIcon n="device-floppy" size={20} />,
+        },
+        {
           id: 'preview',
           label: 'Vorschau',
           onClick: () => void openVorschauSheet(),
@@ -1062,22 +908,6 @@ export function AngebotWizard({
           onClick: () => setSheet('versand'),
           icon: <ActionIcon n="send" size={20} />,
         },
-        isMobile
-          ? {
-              id: 'save',
-              label: saving ? 'Speichern…' : 'Speichern',
-              onClick: () => {
-                if (saving) return
-                void persistDraft({ notify: true })
-              },
-              icon: <ActionIcon n="device-floppy" size={20} />,
-            }
-          : {
-              id: 'pdf',
-              label: 'PDF',
-              onClick: () => void openPdf(),
-              icon: <ActionIcon n="download" size={20} />,
-            },
       ]}
     />
   )
@@ -1102,22 +932,6 @@ export function AngebotWizard({
               : p.kind === 'nachlass'
                 ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
                 : null
-        }
-        headerAction={
-          istAuftragKorrektur ? undefined : (
-            <AngebotKiAssistentButton
-              sm
-              label="Mit KI"
-              dokumentLabel="Angebot"
-              leadKurz={kiLeadKurz}
-              titel={meta.leistungsumfang}
-              beschreibung={projektbeschreibung}
-              positionen={kiKontextPositionen}
-              preislisten={kiKontextPreislisten}
-              gewerke={kiGewerke}
-              onApply={applyAngebotKi}
-            />
-          )
         }
       />
 
@@ -1152,17 +966,6 @@ export function AngebotWizard({
     </div>
   )
 
-  const footerCta = (
-    <button
-      type="button"
-      className="btn primary"
-      disabled={saving}
-      onClick={() => void persistDraft({ notify: true })}
-    >
-      {saving ? 'Speichern…' : 'Speichern'}
-    </button>
-  )
-
   const closeSheet = () => setSheet(null)
 
   const wizard = (
@@ -1179,7 +982,6 @@ export function AngebotWizard({
         docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
-        footerCta={isMobile ? undefined : footerCta}
         className="wizard-flow"
         manageHistory={false}
       />
@@ -1256,9 +1058,9 @@ export function AngebotWizard({
           </MockField>
           <KiAssistFieldLabel
             label="Beschreibung"
-            scope="dokument"
+            value={projektbeschreibung}
+            onApply={setProjektbeschreibung}
             extraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
-            draftInput={projektbeschreibung || null}
           >
             <textarea
               className="input ta"
@@ -1421,16 +1223,6 @@ export function AngebotWizard({
         onConfirm={() => void handleFinishVersenden()}
         confirmDisabled={saving}
         confirmBusy={saving}
-        headerEnd={
-          <KiAssistIconButton
-            scope="mail"
-            extraHint="Betreff und Anschreiben für den Angebotsversand."
-            draftInput={
-              `${mailBetreff || defaultMailBetreff}\n\n${meta.einleitung}\n\n${meta.schluss}`.trim() ||
-              null
-            }
-          />
-        }
         footer={
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {istAuftragKorrektur ? (
@@ -1469,9 +1261,11 @@ export function AngebotWizard({
           />
           <KiAssistFieldLabel
             label="Betreff"
-            scope="mail"
+            value={mailBetreff || defaultMailBetreff}
+            onApply={setMailBetreff}
             extraHint="Mail-Betreff für den Angebotsversand an den Kunden."
-            draftInput={mailBetreff || defaultMailBetreff || null}
+            multiline={false}
+            disabled={saving}
           >
             <input
               className="input"
@@ -1483,20 +1277,14 @@ export function AngebotWizard({
           <div className="full">
             <KiAssistFieldLabel
               label="Einleitung"
-              scope="dokument"
+              value={meta.einleitung}
+              onApply={(text) => setMeta((m) => ({ ...m, einleitung: text }))}
               extraHint="Anschreiben in der Mail und auf dem Angebot."
-              draftInput={meta.einleitung || null}
-              onBeforeOpen={() => {
-                versandTextFieldRef.current = 'einleitung'
-              }}
             >
               <textarea
                 className="input ta"
                 rows={5}
                 value={meta.einleitung}
-                onFocus={() => {
-                  versandTextFieldRef.current = 'einleitung'
-                }}
                 onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
               />
             </KiAssistFieldLabel>
@@ -1504,20 +1292,14 @@ export function AngebotWizard({
           <div className="full">
             <KiAssistFieldLabel
               label="Schlusstext"
-              scope="dokument"
+              value={meta.schluss}
+              onApply={(text) => setMeta((m) => ({ ...m, schluss: text }))}
               extraHint="Schlusstext in der Mail und auf dem Angebot."
-              draftInput={meta.schluss || null}
-              onBeforeOpen={() => {
-                versandTextFieldRef.current = 'schluss'
-              }}
             >
               <textarea
                 className="input ta"
                 rows={4}
                 value={meta.schluss}
-                onFocus={() => {
-                  versandTextFieldRef.current = 'schluss'
-                }}
                 onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
               />
             </KiAssistFieldLabel>

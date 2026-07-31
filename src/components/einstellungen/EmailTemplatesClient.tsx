@@ -9,8 +9,6 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import { saveEmailTemplate, type EmailTemplateRow } from '@/app/(dashboard)/einstellungen/email/actions'
 import { applyEmailTemplateVars, type EmailPreviewVars } from '@/lib/email-template-preview-vars'
@@ -57,13 +55,6 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
   const [pending, startTransition] = useTransition()
   const betreffRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
-
-  useKiAssistDraftConsumer(!!open && tab === 'edit', ['mail', 'text'], (d) => {
-    applyKiMailOrTextDraft(d, {
-      setBetreff,
-      setBody: setBodyHtml,
-    })
-  })
 
   function openModal(t: EmailTemplateRow) {
     setOpen(t)
@@ -191,9 +182,10 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 <div>
                   <KiAssistFieldLabel
                     label="Betreff"
-                    scope="mail"
+                    value={betreff}
+                    onApply={setBetreff}
                     extraHint="E-Mail-Vorlage Betreff (kann {{Variablen}} enthalten)."
-                    draftInput={betreff || null}
+                    multiline={false}
                   >
                     <Input
                       ref={betreffRef}
@@ -218,9 +210,9 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 <div>
                   <KiAssistFieldLabel
                     label="Inhalt (HTML)"
-                    scope="mail"
+                    value={bodyHtml}
+                    onApply={setBodyHtml}
                     extraHint="E-Mail-Vorlage Inhalt. Variablen wie {{kundenname}} beibehalten."
-                    draftInput={[betreff, bodyHtml].filter(Boolean).join('\n\n') || null}
                   >
                     <div className="mb-2 flex flex-wrap gap-1">
                       {VARIABLES.map((v) => (

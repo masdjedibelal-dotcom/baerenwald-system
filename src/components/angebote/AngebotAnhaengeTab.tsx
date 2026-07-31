@@ -6,8 +6,10 @@ import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const COLS = 'minmax(0, 1fr) auto auto'
 
@@ -105,6 +107,7 @@ export function AngebotAnhaengeTab({
 
 function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   const [view, setView] = useState<DocRow | null>(null)
+  const isMobile = useIsMobile()
   const erstellt = detail.updated_at || detail.created_at
   const pdfHref = detail.pdf_url?.trim() || `/api/angebote/${detail.id}/pdf`
 
@@ -136,7 +139,24 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   return (
     <>
       <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
-        {docs.length === 0 ? null : (
+        {docs.length === 0 ? null : isMobile ? (
+          <div className="dok-cards">
+            {docs.map((d) => {
+              const meta = [d.beschreibung || null, formatDatum(d.created_at)]
+                .filter(Boolean)
+                .join(' · ')
+              return (
+                <DokMobileCard
+                  key={d.id}
+                  title={d.name}
+                  meta={meta}
+                  onClick={() => setView(d)}
+                  badge={<span className="dok-card__tag">intern</span>}
+                />
+              )
+            })}
+          </div>
+        ) : (
           <div className="dok-list">
             {docs.map((d) => {
               const meta = [d.beschreibung || null, formatDatum(d.created_at)]

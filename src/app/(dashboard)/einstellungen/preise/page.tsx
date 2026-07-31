@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase-server'
+import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
 import { KatalogPreislistenClient } from '@/components/preislisten/KatalogPreislistenClient'
 import { PreislistenClient } from '@/components/preislisten/PreislistenClient'
 import type { Gewerk, Preisliste } from '@/lib/types'
@@ -20,19 +21,18 @@ function normalizePreislistenRow(r: Record<string, unknown>): Preisliste {
 /** Einstellungen → Preise: Katalog (neu) + Legacy-Preisliste bis Umstellung. */
 export default async function EinstellungenPreisePage() {
   const supabase = createClient()
-  const [{ data: rows, error }, { data: gewerke }, katalogRes] = await Promise.all([
+  const [{ data: rows, error }, { data: gewerke }, katalogRows] = await Promise.all([
     supabase
       .from('preislisten')
       .select('*, gewerke(id, name, slug, aktiv)')
       .eq('aktiv', true)
       .order('leistung', { ascending: true }),
     supabase.from('gewerke').select('id, name, slug, aktiv').order('name', { ascending: true }),
-    supabase.from('katalog_positionen').select('id', { count: 'exact', head: true }),
+    listKatalogPositionen({ nurAktiv: false }),
   ])
 
   const gw = (gewerke ?? []) as Gewerk[]
-  const hatKatalog =
-    !katalogRes.error && typeof katalogRes.count === 'number' && katalogRes.count > 0
+  const hatKatalog = katalogRows.length > 0
 
   if (error && !hatKatalog) {
     return (
@@ -53,7 +53,7 @@ export default async function EinstellungenPreisePage() {
         <p className="text-[12px] text-bw-text-muted">
           Positionen mit Varianten. Freie Angebotspositionen werden nicht mehr zurückgeschrieben.
         </p>
-        <KatalogPreislistenClient gewerkeAlle={gw} />
+        <KatalogPreislistenClient gewerkeAlle={gw} initialRows={katalogRows} />
       </section>
 
       {sorted.length > 0 ? (

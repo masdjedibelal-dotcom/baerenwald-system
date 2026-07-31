@@ -1,25 +1,49 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSpeechDictation } from '@/hooks/useSpeechDictation'
 import { cn } from '@/lib/utils'
 
-type Mode = 'text' | 'voice'
+const MAX_ROWS = 4
+const LINE_PX = 22
+/** Max. Zeichen für Tippen und Sprachergebnis. */
+const MAX_CHARS = 500
+/** Max. Aufnahmedauer Sprachnotiz. */
+const VOICE_MAX_SEC = 30
+
+function clampText(s: string) {
+  return s.length <= MAX_CHARS ? s : s.slice(0, MAX_CHARS)
+}
+
+function VoiceWaves({ active }: { active: boolean }) {
+  return (
+    <div className={cn('ki-voice-waves', active && 'is-active')} aria-hidden>
+      {Array.from({ length: 11 }).map((_, i) => (
+        <span key={i} style={{ animationDelay: `${i * 0.07}s` }} />
+      ))}
+    </div>
+  )
+}
 
 /**
- * KI-Chat-Eingabe: Desktop nur Tippen; mobil Tippen **oder** Spracheingabe.
+ * Chat-Composer im GPT-Muster: Mic · Textfeld (1–4 Zeilen) · Senden.
+ * Sprache: Wellen beim Aufnehmen → Stopp → Text sichtbar → Senden.
+ * Limits: 30 s Aufnahme, 500 Zeichen.
  */
 export function KiChatComposer({
   value,
   onChange,
   onSubmit,
   disabled,
-  placeholder,
-  multiline = false,
-  rows = 3,
-  submitLabel,
+  placeholder = 'Nachricht schreiben…',
   inputRef,
 }: {
   value: string
@@ -27,174 +51,236 @@ export function KiChatComposer({
   onSubmit: () => void
   disabled?: boolean
   placeholder?: string
-  multiline?: boolean
-  rows?: number
-  /** Optionaler Extra-Inhalt unter dem Modus-Segment */
-  submitLabel?: ReactNode
-  inputRef?: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }) {
-  const isMobile = useIsMobile()
-  const [mode, setMode] = useState<Mode>('text')
+  const [voicePhase, setVoicePhase] = useState<'idle' | 'listening' | 'review'>('idle')
   const [interim, setInterim] = useState('')
+  const [voiceLeft, setVoiceLeft] = useState(VOICE_MAX_SEC)
+  const localRef = useRef<HTMLTextAreaElement>(null)
+  const taRef = inputRef ?? localRef
   const valueRef = useRef(value)
+  const interimRef = useRef(interim)
+  const hadListeningRef = useRef(false)
+  const finishingRef = useRef(false)
+  const finishVoiceRef = useRef<() => void>(() => {})
   valueRef.current = value
+  interimRef.current = interim
+
+  const setClamped = (next: string) => {
+    onChange(clampText(next))
+  }
 
   const speech = useSpeechDictation({
     onFinal: (chunk) => {
-      onChange([valueRef.current.trim(), chunk.trim()].filter(Boolean).join(' '))
+      setClamped([valueRef.current.trim(), chunk.trim()].filter(Boolean).join(' '))
     },
-    onInterim: setInterim,
+    onInterim: (t) => {
+      const room = Math.max(0, MAX_CHARS - valueRef.current.trim().length - (valueRef.current.trim() ? 1 : 0))
+      setInterim(clampText(t).slice(0, room || MAX_CHARS))
+    },
   })
 
-  useEffect(() => {
-    if (!isMobile && mode === 'voice') {
-      speech.stop()
-      setMode('text')
-      setInterim('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, mode])
+  useLayoutEffect(() => {
+    const el = taRef.current
+    if (!el || voicePhase === 'listening') return
+    el.style.height = 'auto'
+    const max = LINE_PX * MAX_ROWS
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`
+  }, [value, voicePhase, taRef])
 
-  useEffect(() => {
-    if (mode !== 'voice') {
-      speech.stop()
-      setInterim('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode])
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (disabled || !value.trim()) return
+  function finishVoice() {
+    if (finishingRef.current) return
+    finishingRef.current = true
     speech.stop()
+    const merged = clampText(
+      [valueRef.current.trim(), interimRef.current.trim()].filter(Boolean).join(' ')
+    )
+    if (merged) setClamped(merged)
+    setInterim('')
+    interimRef.current = ''
+    setVoicePhase(merged ? 'review' : 'idle')
+    hadListeningRef.current = false
+    setVoiceLeft(VOICE_MAX_SEC)
+    window.setTimeout(() => {
+      finishingRef.current = false
+      requestAnimationFrame(() => taRef.current?.focus())
+    }, 120)
+  }
+  finishVoiceRef.current = finishVoice
+
+  useEffect(() => {
+    if (voicePhase === 'listening' && speech.listening) {
+      hadListeningRef.current = true
+    }
+    if (voicePhase === 'listening' && speech.error && !speech.listening && !hadListeningRef.current) {
+      setVoicePhase('idle')
+      setVoiceLeft(VOICE_MAX_SEC)
+      return
+    }
+    if (
+      voicePhase === 'listening' &&
+      hadListeningRef.current &&
+      !speech.listening &&
+      !finishingRef.current
+    ) {
+      finishVoice()
+    }
+    if (voicePhase !== 'listening') {
+      hadListeningRef.current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.listening, speech.error, voicePhase])
+
+  // 30-Sekunden-Limit Sprachnotiz
+  useEffect(() => {
+    if (voicePhase !== 'listening') return
+    setVoiceLeft(VOICE_MAX_SEC)
+    const started = Date.now()
+    const tick = window.setInterval(() => {
+      const left = Math.max(0, VOICE_MAX_SEC - Math.floor((Date.now() - started) / 1000))
+      setVoiceLeft(left)
+      if (left <= 0) {
+        window.clearInterval(tick)
+        finishVoiceRef.current()
+      }
+    }, 250)
+    return () => window.clearInterval(tick)
+  }, [voicePhase])
+
+  // Live-Text während Aufnahme auf 500 Zeichen deckeln → Stopp
+  useEffect(() => {
+    if (voicePhase !== 'listening') return
+    const live = [value.trim(), interim.trim()].filter(Boolean).join(' ')
+    if (live.length >= MAX_CHARS) finishVoiceRef.current()
+  }, [value, interim, voicePhase])
+
+  function handleSubmit(e?: FormEvent) {
+    e?.preventDefault()
+    const text = clampText(value.trim())
+    if (disabled || !text) return
+    if (text !== value) setClamped(text)
+    speech.stop()
+    setVoicePhase('idle')
+    setInterim('')
     onSubmit()
   }
 
-  const preview = [value.trim(), interim.trim()].filter(Boolean).join(' ')
+  function startVoice() {
+    if (disabled || !speech.supported) return
+    finishingRef.current = false
+    hadListeningRef.current = false
+    setInterim('')
+    interimRef.current = ''
+    setVoiceLeft(VOICE_MAX_SEC)
+    setVoicePhase('listening')
+    speech.start()
+  }
+
+  function stopVoice() {
+    finishVoice()
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
+  const livePreview = clampText([value.trim(), interim.trim()].filter(Boolean).join(' '))
+  const chars = value.length
+  const nearLimit = chars >= MAX_CHARS - 50
+
+  if (voicePhase === 'listening') {
+    return (
+      <div className="ki-chat-composer ki-chat-composer--voice">
+        <div className="ki-chat-composer__voice-panel">
+          <VoiceWaves active />
+          <p className="ki-chat-composer__voice-timer" aria-live="polite">
+            {voiceLeft}s
+          </p>
+          <p className="ki-chat-composer__voice-hint" aria-live="polite">
+            {livePreview || 'Ich höre zu…'}
+          </p>
+          <p className="ki-chat-composer__voice-meta">
+            Max. {VOICE_MAX_SEC}s · {livePreview.length}/{MAX_CHARS} Zeichen
+          </p>
+          <button
+            type="button"
+            className="btn primary sm ki-chat-composer__voice-stop"
+            onClick={stopVoice}
+            aria-label="Aufnahme stoppen"
+          >
+            <MockIcon ctx="btn" n="player-stop" size={14} />
+            Stopp
+          </button>
+        </div>
+        {speech.error ? (
+          <p className="ki-chat-composer__error">{speech.error}</p>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
-    <div className="ki-chat-composer space-y-2">
-      {isMobile ? (
-        <div className="seg" role="group" aria-label="Eingabeart">
-          <button
-            type="button"
-            className={cn(mode === 'text' && 'on')}
-            disabled={disabled}
-            onClick={() => setMode('text')}
-          >
-            Tippen
-          </button>
-          <button
-            type="button"
-            className={cn(mode === 'voice' && 'on')}
-            disabled={disabled || !speech.supported}
-            title={
-              speech.supported
-                ? 'Spracheingabe'
-                : 'Spracheingabe auf diesem Gerät nicht verfügbar'
-            }
-            onClick={() => setMode('voice')}
-          >
-            Sprechen
-          </button>
-        </div>
-      ) : null}
+    <form className="ki-chat-composer" onSubmit={handleSubmit}>
+      <div className="ki-chat-composer__bar">
+        <button
+          type="button"
+          className="ki-chat-composer__icon-btn"
+          disabled={disabled || !speech.supported}
+          title={
+            speech.supported
+              ? `Sprachnotiz aufnehmen (max. ${VOICE_MAX_SEC}s)`
+              : 'Spracheingabe auf diesem Gerät nicht verfügbar'
+          }
+          aria-label="Sprachnotiz aufnehmen"
+          onClick={startVoice}
+        >
+          <MockIcon ctx="btn" n="microphone" size={18} />
+        </button>
 
-      {isMobile && mode === 'voice' ? (
-        <div className="space-y-2">
-          <button
-            type="button"
-            className={cn(
-              'ki-chat-composer__mic',
-              speech.listening && 'is-listening'
-            )}
-            disabled={disabled || !speech.supported}
-            aria-pressed={speech.listening}
-            aria-label={speech.listening ? 'Aufnahme stoppen' : 'Aufnahme starten'}
-            onClick={() => speech.toggle()}
-          >
-            <MockIcon ctx="btn" n="microphone" size={22} />
-            <span>
-              {speech.listening
-                ? 'Zuhören… tippen zum Stoppen'
-                : speech.supported
-                  ? 'Tippen zum Sprechen'
-                  : 'Nicht verfügbar'}
-            </span>
-          </button>
-          <div
-            className={cn(
-              'ki-chat-composer__preview',
-              !preview && 'is-empty'
-            )}
-            aria-live="polite"
-          >
-            {preview || 'Gesprochenes erscheint hier…'}
-          </div>
-          <button
-            type="button"
-            className="btn primary sm w-full"
-            disabled={disabled || !value.trim()}
-            onClick={() => {
-              speech.stop()
-              onSubmit()
-            }}
-          >
-            {submitLabel ?? (
-              <>
-                <MockIcon ctx="btn" n="send" size={14} /> Senden
-              </>
-            )}
-          </button>
-          {speech.error ? (
-            <p className="text-[length:var(--fs-meta)] text-danger">{speech.error}</p>
-          ) : null}
-        </div>
-      ) : (
-        <form className="flex gap-2" onSubmit={handleSubmit}>
-          {multiline ? (
-            <textarea
-              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-              className="sel min-w-0 flex-1"
-              rows={rows}
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              disabled={disabled}
-            />
-          ) : (
-            <input
-              ref={inputRef as React.RefObject<HTMLInputElement>}
-              className="sel min-w-0 flex-1"
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              disabled={disabled}
-            />
+        <textarea
+          ref={taRef}
+          className="ki-chat-composer__input"
+          rows={1}
+          maxLength={MAX_CHARS}
+          placeholder={
+            voicePhase === 'review' ? 'Text prüfen und senden…' : placeholder
+          }
+          value={value}
+          onChange={(e) => {
+            setClamped(e.target.value)
+            if (voicePhase === 'review' && !e.target.value.trim()) setVoicePhase('idle')
+          }}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          enterKeyHint="send"
+        />
+
+        <button
+          type="submit"
+          className="ki-chat-composer__send"
+          disabled={disabled || !value.trim()}
+          aria-label="Senden"
+          title="Senden"
+        >
+          <MockIcon ctx="btn" n="send" size={16} />
+        </button>
+      </div>
+      {nearLimit || voicePhase === 'review' ? (
+        <p
+          className={cn(
+            'ki-chat-composer__count',
+            chars >= MAX_CHARS && 'is-limit'
           )}
-          {isMobile ? (
-            <button
-              type="button"
-              className={cn(
-                'btn ghost sm ki-chat-composer__mic-inline',
-                speech.listening && 'is-listening'
-              )}
-              disabled={disabled || !speech.supported}
-              title="Kurz Spracheingabe"
-              aria-label="Spracheingabe"
-              onClick={() => {
-                setMode('voice')
-                if (!speech.listening) speech.start()
-              }}
-            >
-              <MockIcon ctx="btn" n="microphone" size={16} />
-            </button>
-          ) : null}
-          <button type="submit" className="btn primary sm" disabled={disabled || !value.trim()}>
-            {submitLabel ?? <MockIcon ctx="btn" n="send" size={14} />}
-          </button>
-        </form>
-      )}
-    </div>
+        >
+          {chars}/{MAX_CHARS}
+        </p>
+      ) : null}
+      {speech.error && voicePhase !== 'listening' ? (
+        <p className="ki-chat-composer__error">{speech.error}</p>
+      ) : null}
+    </form>
   )
 }

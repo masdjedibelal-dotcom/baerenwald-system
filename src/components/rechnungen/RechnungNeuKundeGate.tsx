@@ -7,6 +7,7 @@ import { DashedAddCard } from '@/components/surfaces/primitives'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { toast } from '@/components/ui/app-toast'
+import { showRouteBusy } from '@/components/ui/action-busy'
 import type { Kunde } from '@/lib/types'
 
 /**
@@ -32,6 +33,7 @@ export function RechnungNeuKundeGate({
     openingRef.current = true
     setOpening(true)
     setPickerOpen(false)
+    showRouteBusy('Rechnung wird geöffnet…')
     router.replace(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
   }
 

@@ -333,39 +333,44 @@ export function PositionAddSheet({
         ? 'Übernehmen'
         : 'Hinzufügen'
 
-  useKiAssistDraftConsumer(open && (mode === 'frei' || mode === 'freitext'), ['position', 'text'], (d) => {
+  useKiAssistDraftConsumer(open, ['position', 'text'], (d) => {
+    // KI-Übernahme: immer auf Frei-Karte schreiben und vorhandene Werte überschreiben
     if (d.type === 'position') {
       if (mode === 'freitext') {
-        setFreitext((f) => ({
-          ...f,
-          name: d.name || f.name,
-          beschreibung: d.beschreibung?.trim() || d.name || f.beschreibung,
-        }))
+        setFreitext({
+          name: d.name || '',
+          beschreibung: d.beschreibung?.trim() || d.name || '',
+          gewerk: (preferredGewerkName || freitext.gewerk || 'Allgemein').trim() || 'Allgemein',
+        })
         setMode('freitext')
       } else {
         setFrei((f) => ({
-          ...f,
-          name: d.name || f.name,
-          beschreibung: d.beschreibung ?? f.beschreibung,
-          menge: d.menge && d.menge > 0 ? d.menge : f.menge,
-          einheit: d.einheit?.trim() || f.einheit,
-          preis: d.preis != null && d.preis >= 0 ? d.preis : f.preis,
+          ...emptyFrei(preferredGewerkName || f.gewerk || ''),
+          name: d.name || '',
+          beschreibung: d.beschreibung ?? '',
+          menge: d.menge && d.menge > 0 ? d.menge : 1,
+          einheit: d.einheit?.trim() || 'Stück',
+          preis: d.preis != null && d.preis >= 0 ? d.preis : 0,
+          gewerk: (preferredGewerkName || f.gewerk || 'Allgemein').trim() || 'Allgemein',
         }))
         setMode('frei')
       }
     } else if (d.type === 'text') {
       if (mode === 'freitext') {
-        setFreitext((f) => ({
-          ...f,
-          name: d.titel?.trim() || f.name,
-          beschreibung: d.text || f.beschreibung,
-        }))
+        setFreitext({
+          name: d.titel?.trim() || '',
+          beschreibung: d.text || '',
+          gewerk: (preferredGewerkName || freitext.gewerk || 'Allgemein').trim() || 'Allgemein',
+        })
+        setMode('freitext')
       } else {
         setFrei((f) => ({
-          ...f,
-          name: d.titel?.trim() || f.name,
-          beschreibung: d.text || f.beschreibung,
+          ...emptyFrei(preferredGewerkName || f.gewerk || ''),
+          name: d.titel?.trim() || '',
+          beschreibung: d.text || '',
+          gewerk: (preferredGewerkName || f.gewerk || 'Allgemein').trim() || 'Allgemein',
         }))
+        setMode('frei')
       }
     }
   })
@@ -377,6 +382,15 @@ export function PositionAddSheet({
     mode === 'gewerk' ||
     (mode === 'preisliste' && picked)
 
+  const kiDraftSeed =
+    mode === 'freitext'
+      ? [freitext.name, freitext.beschreibung].filter(Boolean).join(' — ') || null
+      : mode === 'frei'
+        ? [frei.name, frei.beschreibung, frei.menge ? `${frei.menge} ${frei.einheit}` : '', frei.preis ? `${frei.preis} €` : '']
+            .filter(Boolean)
+            .join(' — ') || null
+        : null
+
   return (
     <EditorSheet
       open={open}
@@ -387,27 +401,27 @@ export function PositionAddSheet({
       onConfirm={onConfirm}
       confirmDisabled={confirmDisabled}
       headerEnd={
-        mode === 'frei' || mode === 'freitext' || mode === 'preisliste' ? (
+        mode === 'nachlass' || mode === 'gewerk' ? null : (
           <KiAssistIconButton
-            scope={mode === 'freitext' ? 'freitext' : mode === 'preisliste' ? 'positionen' : 'position'}
+            overSheet
+            scope="position"
+            title="Position mit KI formulieren"
             extraHint={
               preferredGewerkName
-                ? `Gewerk-Kontext: ${preferredGewerkName}. Dokument: Angebot/Rechnung-Position.`
-                : 'Dokument: Angebot/Rechnung-Position (Handwerk).'
+                ? `Gewerk-Kontext: ${preferredGewerkName}. Eine freie Kalkulationsposition für Angebot/Rechnung.`
+                : 'Eine freie Kalkulationsposition für Angebot/Rechnung (Handwerk).'
             }
-            draftInput={
-              mode === 'frei'
-                ? [frei.name, frei.beschreibung].filter(Boolean).join(' — ') || null
-                : mode === 'freitext'
-                  ? [freitext.name, freitext.beschreibung].filter(Boolean).join(' — ') || null
-                  : null
-            }
+            draftInput={kiDraftSeed}
+            onBeforeOpen={() => {
+              // Preisliste → Frei, damit Übernahme sichtbare Felder hat
+              if (mode === 'preisliste') setMode('frei')
+            }}
           />
-        ) : null
+        )
       }
       footer={
         showFooter ? (
-          <div className="rate-drawer-cta">
+          <div className="sheet-footer-actions">
             <MockBtn
               kind="primary"
               icon="check"
@@ -575,15 +589,8 @@ export function PositionAddSheet({
           </div>
           <div />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <div className="field-label field-label--with-ki">
-              <span>
-                Bezeichnung<span className="req">*</span>
-              </span>
-              <KiAssistIconButton
-                scope="position"
-                extraHint="Freie Kalkulationsposition für Angebot/Rechnung."
-                draftInput={[frei.name, frei.beschreibung].filter(Boolean).join(' — ') || null}
-              />
+            <div className="field-label">
+              Bezeichnung<span className="req">*</span>
             </div>
             <input
               className="txt"

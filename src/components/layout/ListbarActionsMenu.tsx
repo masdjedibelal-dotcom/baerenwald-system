@@ -19,8 +19,9 @@ export type ListbarActionItem = {
 }
 
 /**
- * Mobil: optional `leading` (z. B. Offen/Erledigt) + Filter-Icon → ActionSheet.
- * Desktop: `desktop` unverändert (Segment, Filter, Export, …).
+ * Mobil: optional `leading` + Filter-Icon.
+ * Mit `directOpen`: Icon öffnet direkt (z. B. Filter-Sheet), ohne ActionSheet-Zwischenschritt.
+ * Desktop: `desktop` unverändert.
  */
 export function ListbarActionsMenu({
   items,
@@ -28,6 +29,7 @@ export function ListbarActionsMenu({
   desktop,
   leading,
   title = 'Aktionen',
+  directOpen,
 }: {
   items: ListbarActionItem[]
   /** Badge am Icon (z. B. aktive Filteranzahl) */
@@ -36,6 +38,8 @@ export function ListbarActionsMenu({
   /** Mobil links neben dem Filter-Icon (z. B. Segment-Toggle) */
   leading?: ReactNode
   title?: string
+  /** Mobil: Icon öffnet direkt diese Aktion statt Listen-Aktionen-Sheet */
+  directOpen?: () => void
 }) {
   const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
@@ -62,6 +66,14 @@ export function ListbarActionsMenu({
     onClick: () => runSelect(it),
   }))
 
+  const onMobileTrigger = () => {
+    if (directOpen) {
+      directOpen()
+      return
+    }
+    setOpen((v) => !v)
+  }
+
   return (
     <div className="listbar-actions">
       <div className="listbar-actions-desktop">{desktop}</div>
@@ -71,11 +83,11 @@ export function ListbarActionsMenu({
           ref={anchorRef}
           type="button"
           className={cn('btn sm icon', hasActive ? 'primary' : 'ghost')}
-          title={title}
-          aria-label={title}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          onClick={() => setOpen((v) => !v)}
+          title={directOpen ? 'Filter & Suchen' : title}
+          aria-label={directOpen ? 'Filter & Suchen' : title}
+          aria-expanded={directOpen ? undefined : open}
+          aria-haspopup={directOpen ? undefined : 'menu'}
+          onClick={onMobileTrigger}
         >
           <MockIcon ctx="btn" n="filter" size={14} />
         </button>
@@ -84,7 +96,7 @@ export function ListbarActionsMenu({
             {activeHint > 9 ? '9+' : activeHint}
           </span>
         ) : null}
-        {isMobile ? (
+        {directOpen ? null : isMobile ? (
           <ActionSheet
             open={open}
             onClose={() => setOpen(false)}

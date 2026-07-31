@@ -178,12 +178,9 @@ export function BaustelleTeamCard({
       </div>
 
       <div className="flex gap-2">
-        <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
-          Speichern
-        </Button>
         <Button
           type="button"
-          variant="ghost"
+          variant="secondary"
           size="sm"
           disabled={pending}
           onClick={() => {
@@ -192,6 +189,9 @@ export function BaustelleTeamCard({
           }}
         >
           Abbrechen
+        </Button>
+        <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
+          Speichern
         </Button>
       </div>
     </div>

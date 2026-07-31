@@ -6,6 +6,9 @@ import { loadCrmTeamFuerTermin } from '@/app/(dashboard)/anfragen/actions'
 import { saveKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
 import { toast } from '@/components/ui/app-toast'
+import { DateInput } from '@/components/ui/DateInput'
+import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
+import { TimeInput } from '@/components/ui/TimeInput'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { KalenderTermin } from '@/lib/types'
 
@@ -85,24 +88,22 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
       onConfirm={() => void speichern()}
     >
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
-        <label>
+        <label className="md:col-span-2">
           <span className="input-label">Datum</span>
-          <input
-            type="date"
-            className="input"
-            value={datum}
-            onChange={(e) => setDatum(e.target.value)}
-            required
+          <DateInput size="sm" value={datum} onChange={(e) => setDatum(e.target.value)} required />
+        </label>
+        <div className="md:col-span-2">
+          <FilterRangeRow
+            title="Uhrzeit"
+            className="!mb-0"
+            von={
+              <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
+            }
+            bis={
+              <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
+            }
           />
-        </label>
-        <label>
-          <span className="input-label">Uhrzeit von</span>
-          <input type="time" className="input" value={von} onChange={(e) => setVon(e.target.value)} />
-        </label>
-        <label>
-          <span className="input-label">Uhrzeit bis</span>
-          <input type="time" className="input" value={bis} onChange={(e) => setBis(e.target.value)} />
-        </label>
+        </div>
         <label className="md:col-span-2">
           <span className="input-label">Adresse</span>
           <input

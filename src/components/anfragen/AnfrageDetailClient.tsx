@@ -52,7 +52,6 @@ const AngebotWizard = dynamic(
 )
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { TodosPanel } from '@/components/todos/TodosPanel'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -69,7 +68,7 @@ import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet' | 'todos'
+type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'uebersicht',
@@ -77,7 +76,6 @@ const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'zahlung',
   'akte',
   'aktivitaet',
-  'todos',
 ])
 const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'uebersicht'
 
@@ -127,7 +125,6 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
   ) {
     return 'aktivitaet'
   }
-  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'todos'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'uebersicht'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
@@ -520,7 +517,7 @@ export function AnfrageDetailClient({
       dokumentHint="Verbindliche Leistungen entstehen erst mit dem Angebot — hier siehst du nur den Bedarf aus der Anfrage."
       dokumentActionLabel="Angebot erstellen"
       emptyTitle="Noch keine Leistungen"
-      emptyHint="Zuerst Angebot erstellen — dort legst du verbindliche Positionen an."
+      emptyHint="Verbindliche Positionen entstehen mit dem Angebot."
     />
   )
 
@@ -556,10 +553,7 @@ export function AnfrageDetailClient({
       label: entityDetailTabLabel('zahlung'),
       icon: 'receipt',
       render: () => (
-        <AnfrageZahlungTab
-          rechnungen={projektKontext?.rechnungen ?? []}
-          onCreateAngebot={openAngebotErstellen}
-        />
+        <AnfrageZahlungTab rechnungen={projektKontext?.rechnungen ?? []} />
       ),
     },
     {
@@ -588,22 +582,6 @@ export function AnfrageDetailClient({
       icon: 'history',
       count: timelineItems.length || undefined,
       render: () => timelineTab,
-    },
-    {
-      id: 'todos',
-      label: entityDetailTabLabel('todos'),
-      icon: 'clipboard-list',
-      render: () => (
-        <TodosPanel
-          compact
-          filter={{ leadId: lead.id }}
-          lockedLinks={{
-            leadId: lead.id,
-            kundeId: leadVertragsKundeId(lead) ?? null,
-            label: leadKontaktAnzeigeName(lead) || 'Anfrage',
-          }}
-        />
-      ),
     },
   ]
 

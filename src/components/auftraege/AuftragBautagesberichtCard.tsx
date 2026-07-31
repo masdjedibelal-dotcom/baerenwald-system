@@ -5,11 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
+import { DateInput } from '@/components/ui/DateInput'
+import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { TimeInput } from '@/components/ui/TimeInput'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiDokumentTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAuftragBautagesbericht,
@@ -264,16 +265,6 @@ export function AuftragBautagesberichtCard({
   }
 
   const formOpen = addOpen || editId != null
-  const btFieldRef = useRef<'behinderungen' | 'qualitaetssicherung' | 'zusammenfassung'>('zusammenfassung')
-
-  useKiAssistDraftConsumer(formOpen, 'text', (d) => {
-    applyKiDokumentTextDraft(d, {
-      setText: (v) => {
-        const key = btFieldRef.current
-        setForm((f) => ({ ...f, [key]: v }))
-      },
-    })
-  })
 
   const sheetTitle = editId
     ? 'Bautagesbericht bearbeiten'
@@ -402,8 +393,8 @@ export function AuftragBautagesberichtCard({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="form-field">
               <label className="form-field-label">Datum</label>
-              <Input
-                type="date"
+              <DateInput
+                size="sm"
                 value={form.datum}
                 onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
               />
@@ -416,20 +407,24 @@ export function AuftragBautagesberichtCard({
                 placeholder="z. B. Sonnig, trocken"
               />
             </div>
-            <div className="form-field">
-              <label className="form-field-label">Arbeitszeit von</label>
-              <Input
-                type="time"
-                value={form.arbeitszeit_von}
-                onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_von: e.target.value }))}
-              />
-            </div>
-            <div className="form-field">
-              <label className="form-field-label">Arbeitszeit bis</label>
-              <Input
-                type="time"
-                value={form.arbeitszeit_bis}
-                onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_bis: e.target.value }))}
+            <div className="form-field sm:col-span-2">
+              <FilterRangeRow
+                title="Arbeitszeit"
+                className="!mb-0"
+                von={
+                  <TimeInput
+                    size="sm"
+                    value={form.arbeitszeit_von}
+                    onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_von: e.target.value }))}
+                  />
+                }
+                bis={
+                  <TimeInput
+                    size="sm"
+                    value={form.arbeitszeit_bis}
+                    onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_bis: e.target.value }))}
+                  />
+                }
               />
             </div>
             <div className="form-field">
@@ -456,40 +451,28 @@ export function AuftragBautagesberichtCard({
           <div className="form-field">
             <KiAssistFieldLabel
               label="Behinderungen und Besonderheiten"
-              scope="dokument"
+              value={form.behinderungen}
+              onApply={(text) => setForm((f) => ({ ...f, behinderungen: text }))}
               extraHint="Bautagesbericht — Behinderungen (PDF)."
-              draftInput={form.behinderungen || null}
-              onBeforeOpen={() => {
-                btFieldRef.current = 'behinderungen'
-              }}
             >
               <Textarea
                 rows={3}
                 value={form.behinderungen}
                 onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
-                onFocus={() => {
-                  btFieldRef.current = 'behinderungen'
-                }}
               />
             </KiAssistFieldLabel>
           </div>
           <div className="form-field">
             <KiAssistFieldLabel
               label="Qualitätssicherung und Dokumentation"
-              scope="dokument"
+              value={form.qualitaetssicherung}
+              onApply={(text) => setForm((f) => ({ ...f, qualitaetssicherung: text }))}
               extraHint="Bautagesbericht — Qualitätssicherung (PDF)."
-              draftInput={form.qualitaetssicherung || null}
-              onBeforeOpen={() => {
-                btFieldRef.current = 'qualitaetssicherung'
-              }}
             >
               <Textarea
                 rows={3}
                 value={form.qualitaetssicherung}
                 onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
-                onFocus={() => {
-                  btFieldRef.current = 'qualitaetssicherung'
-                }}
               />
             </KiAssistFieldLabel>
           </div>
@@ -501,20 +484,14 @@ export function AuftragBautagesberichtCard({
           <div className="form-field">
             <KiAssistFieldLabel
               label="Zusammenfassung"
-              scope="dokument"
+              value={form.zusammenfassung}
+              onApply={(text) => setForm((f) => ({ ...f, zusammenfassung: text }))}
               extraHint="Bautagesbericht — Zusammenfassung (PDF)."
-              draftInput={form.zusammenfassung || null}
-              onBeforeOpen={() => {
-                btFieldRef.current = 'zusammenfassung'
-              }}
             >
               <Textarea
                 rows={3}
                 value={form.zusammenfassung}
                 onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
-                onFocus={() => {
-                  btFieldRef.current = 'zusammenfassung'
-                }}
               />
             </KiAssistFieldLabel>
           </div>
@@ -596,12 +573,12 @@ function BautagesberichtFormFooter({
 }) {
   const requestClose = useEditorSheetRequestClose()
   return (
-    <div className="ldr-cta" style={{ justifyContent: 'space-between' }}>
-      <Button type="button" variant="ghost" onClick={() => requestClose?.()} disabled={pending}>
+    <div className="sheet-footer-actions ldr-cta">
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
       </Button>
       <Button type="button" variant="primary" loading={pending} onClick={onSave}>
-        ✓ Speichern
+        Speichern
       </Button>
     </div>
   )

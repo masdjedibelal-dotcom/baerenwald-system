@@ -9,9 +9,6 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { applyKiMailOrTextDraft } from '@/lib/copilot/ki-assist-apply'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -105,20 +102,6 @@ export function KommunikationVorlagenClient({
     })
   }
 
-  useKiAssistDraftConsumer(editOpen && !!edit, ['mail', 'text'], (d) => {
-    if (!edit) return
-    const next = { ...edit }
-    applyKiMailOrTextDraft(d, {
-      setBetreff: (v) => {
-        next.betreff = v
-      },
-      setBody: (v) => {
-        next.body_text = v
-      },
-    })
-    setEdit(next)
-  })
-
   return (
     <>
       <Card
@@ -176,15 +159,6 @@ export function KommunikationVorlagenClient({
         size="md"
         confirmBusy={pending}
         onConfirm={save}
-        headerEnd={
-          edit ? (
-            <KiAssistIconButton
-              scope="mail"
-              extraHint="Kunden-Mail-Vorlage."
-              draftInput={[edit.betreff, edit.body_text].filter(Boolean).join('\n\n') || null}
-            />
-          ) : null
-        }
       >
         {edit ? (
           <div className="space-y-3">
@@ -206,8 +180,9 @@ export function KommunikationVorlagenClient({
             />
             <KiAssistFieldLabel
               label="Betreff (optional)"
-              scope="mail"
-              draftInput={edit.betreff || null}
+              value={edit.betreff}
+              onApply={(text) => setEdit({ ...edit, betreff: text })}
+              multiline={false}
             >
               <Input
                 value={edit.betreff}
@@ -216,8 +191,8 @@ export function KommunikationVorlagenClient({
             </KiAssistFieldLabel>
             <KiAssistFieldLabel
               label="Nachricht"
-              scope="mail"
-              draftInput={[edit.betreff, edit.body_text].filter(Boolean).join('\n\n') || null}
+              value={edit.body_text}
+              onApply={(text) => setEdit({ ...edit, body_text: text })}
             >
               <Textarea
                 rows={8}
