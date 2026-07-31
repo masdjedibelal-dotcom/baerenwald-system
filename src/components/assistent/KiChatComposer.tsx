@@ -56,7 +56,7 @@ export function KiChatComposer({
   const [voicePhase, setVoicePhase] = useState<'idle' | 'listening' | 'review'>('idle')
   const [interim, setInterim] = useState('')
   const [voiceLeft, setVoiceLeft] = useState(VOICE_MAX_SEC)
-  const localRef = useRef<HTMLTextAreaElement>(null)
+  const localRef = useRef<HTMLTextAreaElement | null>(null)
   const taRef = inputRef ?? localRef
   const valueRef = useRef(value)
   const interimRef = useRef(interim)
@@ -241,7 +241,7 @@ export function KiChatComposer({
         </button>
 
         <textarea
-          ref={taRef}
+          ref={taRef as React.RefObject<HTMLTextAreaElement>}
           className="ki-chat-composer__input"
           rows={1}
           maxLength={MAX_CHARS}
@@ -278,7 +278,7 @@ export function KiChatComposer({
           {chars}/{MAX_CHARS}
         </p>
       ) : null}
-      {speech.error && voicePhase !== 'listening' ? (
+      {speech.error ? (
         <p className="ki-chat-composer__error">{speech.error}</p>
       ) : null}
     </form>

@@ -9,7 +9,7 @@ import {
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
-export type TimeInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
+export type TimeInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> & {
   /** Zusätzliche Klasse am äußeren Wrapper */
   wrapperClassName?: string
   /** Kompakt (Filter, Range-Rows) */

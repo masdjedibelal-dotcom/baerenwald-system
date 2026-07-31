@@ -19417,7 +19417,8 @@ button.crow.crow--tap:hover {
     min-width: 0;
     min-height: 46px;
     justify-content: center;
-    width: auto;
+    /* !important: schlägt Utility .w-full ohne Selektor mit .w-full (Tailwind Circular-Apply) */
+    width: auto !important;
     max-width: none;
   }
 
@@ -19495,15 +19496,6 @@ button.crow.crow--tap:hover {
   .zahlplan-editor-footer:has(> button:only-child) {
     justify-content: center;
   }
-}
-.sheet-footer-actions > .btn.w-full,
-.sheet-footer-actions > button.w-full,
-.mobile-filter-sheet__footer > .btn.w-full,
-.mobile-filter-sheet__footer > button.w-full,
-.modal-form-footer > .btn.w-full,
-.modal-form-footer > button.w-full {
-  width: auto !important;
-  max-width: none;
 }
 
 /*

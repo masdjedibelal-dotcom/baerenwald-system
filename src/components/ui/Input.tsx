@@ -5,14 +5,16 @@ import { DateInput } from '@/components/ui/DateInput'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { cn } from '@/lib/utils'
 
-export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
   label?: string
   error?: string
   hint?: string
+  /** Nur für native number/text; Date/Time nutzen eigene Kompakt-Größe intern. */
+  size?: number
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, className = '', id, type, ...props },
+  { label, error, hint, className = '', id, type, size, ...props },
   ref
 ) {
   const inputId = id ?? props.name
@@ -50,6 +52,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           ref={ref}
           id={inputId}
           type={type}
+          size={size}
           {...props}
           className={cn('input', error && 'input-error', className)}
         />
