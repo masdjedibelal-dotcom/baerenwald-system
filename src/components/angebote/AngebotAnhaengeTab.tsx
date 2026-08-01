@@ -1,11 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
@@ -19,7 +17,6 @@ type DocRow = {
   href: string
   created_at: string
   beschreibung: string
-  isImage: boolean
 }
 
 function formatDatum(iso: string): string {
@@ -39,37 +36,32 @@ function angebotPdfDateiname(detail: AngebotDetail): string {
   return `Angebot_${nr.replace(/\s+/g, '_')}_Baerenwald.pdf`
 }
 
-function isImageDoc(name: string, url: string): boolean {
-  return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(`${name} ${url}`)
-}
-
-/** Badge-Zähler: Lead-Uploads + Angebot-PDF (+ Projektfotos nur ohne Lead-Upload-UI) + Rechnungen. */
-export function anzahlAngebotAnhaenge(
-  detail: AngebotDetail,
-  leadDokumente?: LeadDokumentRow[] | null,
-  opts?: { includeFotos?: boolean; rechnungenCount?: number }
-): number {
-  const uploads = Array.isArray(leadDokumente) ? leadDokumente.length : 0
-  const fotos =
-    opts?.includeFotos === false ? 0 : parseProjektFotos(detail.fotos_urls).length
-  return uploads + 1 + fotos + (opts?.rechnungenCount ?? 0)
+function openDokumentDatei(url: string) {
+  const href = url.trim()
+  if (!href) return
+  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 /**
- * Dokumente-Tab wie Anfrage: bei Lead → AnfrageDokumenteTab (Upload + PDF),
- * sonst MockDokumenteCard mit PDF + Projektfotos.
+ * Angebot → Dokumente: gleiche Liste wie Anfrage (Lead-Uploads + Angebote + Rechnungen).
+ * Fallback ohne Lead: PDF + Projektfotos.
  */
 export function AngebotAnhaengeTab({
   detail,
-  leadId,
-  dokumente = [],
-  rechnungen = [],
+  leadDokumente = [],
+  leadAngebote = [],
+  leadRechnungen = [],
   onReload,
 }: {
   detail: AngebotDetail
-  leadId?: string | null
-  dokumente?: LeadDokumentRow[]
-  rechnungen?: {
+  leadDokumente?: LeadDokumentRow[]
+  leadAngebote?: {
+    id: string
+    created_at: string
+    angebotsnr?: string | null
+    pdf_url?: string | null
+  }[]
+  leadRechnungen?: {
     id: string
     created_at?: string | null
     rechnungsnummer?: string | null
@@ -81,22 +73,28 @@ export function AngebotAnhaengeTab({
     abschlag_index?: number | null
     beleg_typ?: string | null
   }[]
-  onReload?: () => void
+  onReload: () => void
 }) {
-  if (leadId?.trim() && onReload) {
+  const leadId = detail.lead_id?.trim() || null
+
+  if (leadId) {
     return (
       <AnfrageDokumenteTab
         leadId={leadId}
-        dokumente={dokumente}
-        angebote={[
-          {
-            id: detail.id,
-            created_at: detail.created_at,
-            angebotsnr: detail.angebotsnr,
-            pdf_url: detail.pdf_url,
-          },
-        ]}
-        rechnungen={rechnungen}
+        dokumente={leadDokumente}
+        angebote={
+          leadAngebote.length > 0
+            ? leadAngebote
+            : [
+                {
+                  id: detail.id,
+                  created_at: detail.created_at,
+                  angebotsnr: detail.angebotsnr,
+                  pdf_url: detail.pdf_url,
+                },
+              ]
+        }
+        rechnungen={leadRechnungen}
         onReload={onReload}
       />
     )
@@ -106,7 +104,6 @@ export function AngebotAnhaengeTab({
 }
 
 function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
-  const [view, setView] = useState<DocRow | null>(null)
   const isMobile = useIsMobile()
   const erstellt = detail.updated_at || detail.created_at
   const pdfHref = detail.pdf_url?.trim() || `/api/angebote/${detail.id}/pdf`
@@ -119,7 +116,6 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
         href: pdfHref,
         created_at: erstellt,
         beschreibung: 'Angebot PDF',
-        isImage: false,
       },
     ]
     parseProjektFotos(detail.fotos_urls).forEach((foto, i) => {
@@ -130,122 +126,74 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
         href: foto.url,
         created_at: erstellt,
         beschreibung: foto.beschreibung?.trim() || '',
-        isImage: isImageDoc(name, foto.url),
       })
     })
     return rows
   }, [detail, erstellt, pdfHref])
 
   return (
-    <>
-      <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
-        {docs.length === 0 ? null : isMobile ? (
-          <div className="dok-cards">
-            {docs.map((d) => {
-              const meta = [d.beschreibung || null, formatDatum(d.created_at)]
-                .filter(Boolean)
-                .join(' · ')
-              return (
-                <DokMobileCard
-                  key={d.id}
-                  title={d.name}
-                  meta={meta}
-                  onClick={() => setView(d)}
-                  badge={<span className="dok-card__tag">intern</span>}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <div className="dok-list">
-            {docs.map((d) => {
-              const meta = [d.beschreibung || null, formatDatum(d.created_at)]
-                .filter(Boolean)
-                .join(' · ')
-              return (
-                <div
-                  key={d.id}
-                  className="list-row dok-list__row--openable"
-                  style={{ gridTemplateColumns: COLS, cursor: 'pointer', alignItems: 'center' }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setView(d)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      setView(d)
-                    }
-                  }}
-                >
-                  <div className="dok-list__main min-w-0">
-                    <div className="dok-list__name">
-                      {d.name}
-                      {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
-                    </div>
-                  </div>
-                  <span className="dok-list__freigabe">
-                    <span>intern</span>
-                  </span>
-                  <div className="dok-list__actions" onClick={(e) => e.stopPropagation()}>
-                    <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
+    <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
+      {docs.length === 0 ? null : isMobile ? (
+        <div className="dok-cards">
+          {docs.map((d) => {
+            const meta = [d.beschreibung || null, formatDatum(d.created_at)]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <DokMobileCard
+                key={d.id}
+                title={d.name}
+                meta={meta}
+                onClick={() => openDokumentDatei(d.href)}
+                badge={<span className="dok-card__tag">intern</span>}
+              />
+            )
+          })}
+        </div>
+      ) : (
+        <div className="dok-list">
+          {docs.map((d) => {
+            const meta = [d.beschreibung || null, formatDatum(d.created_at)]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <div
+                key={d.id}
+                className="list-row dok-list__row--openable"
+                style={{ gridTemplateColumns: COLS, cursor: 'pointer', alignItems: 'center' }}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDokumentDatei(d.href)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openDokumentDatei(d.href)
+                  }
+                }}
+              >
+                <div className="dok-list__main min-w-0">
+                  <div className="dok-list__name">
+                    {d.name}
+                    {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </MockDokumenteCard>
-
-      <MockModal
-        open={!!view}
-        onClose={() => setView(null)}
-        icon={view?.isImage ? 'photo' : 'file-text'}
-        title={view?.name ?? 'Dokument'}
-        sub={view ? formatDatum(view.created_at) : undefined}
-        footer={
-          <MockBtn sm kind="primary" icon="x" onClick={() => setView(null)}>
-            Schließen
-          </MockBtn>
-        }
-      >
-        {view ? (
-          view.isImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={view.href}
-              alt={view.name}
-              style={{ width: '100%', borderRadius: 8, display: 'block' }}
-            />
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: 'center',
-                background: 'var(--bg-soft)',
-                borderRadius: 10,
-                border: '0.5px solid var(--border)',
-              }}
-            >
-              <MockIcon
-                ctx="empty"
-                n="file-text"
-                size={44}
-                style={{ color: 'var(--text-4)' }}
-              />
-              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500, marginTop: 10 }}>{view.name}</div>
-              <a
-                href={view.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn ghost sm"
-                style={{ marginTop: 12, display: 'inline-flex' }}
-              >
-                Datei öffnen
-              </a>
-            </div>
-          )
-        ) : null}
-      </MockModal>
-    </>
+                <span className="dok-list__freigabe">
+                  <span>intern</span>
+                </span>
+                <div className="dok-list__actions" onClick={(e) => e.stopPropagation()}>
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="eye"
+                    title="Ansehen"
+                    onClick={() => openDokumentDatei(d.href)}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </MockDokumenteCard>
   )
 }

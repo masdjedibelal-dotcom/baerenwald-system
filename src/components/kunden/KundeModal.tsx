@@ -3,7 +3,7 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
@@ -13,10 +13,9 @@ import { toast } from '@/components/ui/app-toast'
 import {
   initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
-  istKundeHausverwaltungTyp,
   splitStrasseHausnummer,
 } from '@/lib/kunde-stammdaten'
-import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
+import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
 
@@ -34,6 +33,7 @@ export function KundeModal({
   stayOnPage = false,
   revalidateAnfrageId,
   onSaved,
+  context = 'detail',
 }: {
   open: boolean
   onClose: () => void
@@ -43,12 +43,17 @@ export function KundeModal({
   /** Kein Redirect zur Kundenseite nach Speichern (z. B. Anfrage-Detail). */
   stayOnPage?: boolean
   revalidateAnfrageId?: string
-  onSaved?: (kundeId?: string) => void
+  /** Optional: gespeicherte Stammdaten für lokale UI-Updates ohne Reload. */
+  onSaved?: (kundeId?: string, saved?: Partial<Kunde>) => void
+  /** canvas = über Wizard/DocumentCanvas (z. B. Angebot → Kunde bearbeiten). */
+  context?: EditorSheetContext
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [typ, setTyp] = useState('privat')
-  const [nameDisplay, setNameDisplay] = useState('')
+  const [firmaName, setFirmaName] = useState('')
+  const [vorname, setVorname] = useState('')
+  const [nachname, setNachname] = useState('')
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
   const [strasseNr, setStrasseNr] = useState('')
@@ -64,7 +69,6 @@ export function KundeModal({
   const [dirty, setDirty] = useState(false)
 
   const firmaPflicht = istKundeFirmaPflichtTyp(typ)
-  const istHausverwaltung = istKundeHausverwaltungTyp(typ)
   const isCreate = !editKunde
 
   useEffect(() => {
@@ -79,14 +83,13 @@ export function KundeModal({
         funnelDaten: leadFunnelDaten,
       })
       setTyp(typVal)
-      if (istKundeFirmaPflichtTyp(typVal)) {
-        setNameDisplay((editKunde.name ?? namen.name ?? '').trim())
-      } else {
-        setNameDisplay(
-          [namen.vorname, namen.nachname].filter(Boolean).join(' ').trim() ||
-            (editKunde.name ?? '')
-        )
-      }
+      setFirmaName(
+        istKundeFirmaPflichtTyp(typVal)
+          ? (editKunde.name ?? namen.name ?? '').trim()
+          : ''
+      )
+      setVorname((namen.vorname ?? editKunde.vorname ?? '').trim())
+      setNachname((namen.nachname ?? editKunde.nachname ?? '').trim())
       setTelefon(editKunde.telefon ?? '')
       setEmail(editKunde.email ?? '')
       const addr = initKundeStammEditFelder(editKunde)
@@ -96,7 +99,9 @@ export function KundeModal({
       setNotizen(editKunde.notizen ?? '')
     } else {
       setTyp('privat')
-      setNameDisplay('')
+      setFirmaName('')
+      setVorname('')
+      setNachname('')
       setTelefon('')
       setEmail('')
       setStrasseNr('')
@@ -147,16 +152,19 @@ export function KundeModal({
 
   const singleDupe = dupes.length === 1 ? dupes[0]! : null
 
-  const nameLabel = useMemo(() => {
-    if (istHausverwaltung) return 'Firma'
-    if (firmaPflicht) return 'Firma / Name'
-    return 'Name'
-  }, [istHausverwaltung, firmaPflicht])
-
   function submit() {
     setErr(null)
-    if (!nameDisplay.trim()) {
-      setErr(`${nameLabel} ist Pflicht.`)
+    if (firmaPflicht) {
+      if (!firmaName.trim()) {
+        setErr('Firma ist Pflicht.')
+        return
+      }
+      if (!vorname.trim() && !nachname.trim()) {
+        setErr('Ansprechpartner: Vorname oder Nachname ist Pflicht.')
+        return
+      }
+    } else if (!vorname.trim() && !nachname.trim()) {
+      setErr('Vorname oder Nachname ist Pflicht.')
       return
     }
     if (!telefon.trim()) {
@@ -177,15 +185,13 @@ export function KundeModal({
       return
     }
 
-    const privatNamen = splitDeutscherVollname(nameDisplay)
-
     startTransition(async () => {
       const res = await saveKunde(
         {
           typ,
-          name: firmaPflicht ? nameDisplay.trim() : null,
-          vorname: firmaPflicht ? null : privatNamen.vorname,
-          nachname: firmaPflicht ? null : privatNamen.nachname,
+          name: firmaPflicht ? firmaName.trim() : null,
+          vorname: vorname.trim() || null,
+          nachname: nachname.trim() || null,
           strasse: splitAddr.strasse,
           hausnummer: splitAddr.hausnummer,
           plz,
@@ -204,12 +210,26 @@ export function KundeModal({
       }
       toast.success(isCreate ? 'Kunde angelegt' : 'Gespeichert')
       setDirty(false)
+      const saved: Partial<Kunde> = {
+        id: res.id,
+        typ,
+        vorname: vorname.trim() || null,
+        nachname: nachname.trim() || null,
+        telefon: telefon || null,
+        email: email || null,
+        plz,
+        ort,
+        strasse: splitAddr.strasse || null,
+        hausnummer: splitAddr.hausnummer || null,
+        notizen: notizen || null,
+        ...(firmaPflicht ? { name: firmaName.trim() || null } : {}),
+      }
       onClose()
       if (stayOnPage) {
-        onSaved?.(res.id)
+        onSaved?.(res.id, saved)
         router.refresh()
       } else {
-        onSaved?.(res.id)
+        onSaved?.(res.id, saved)
         router.push(`/kunden/${res.id}`)
         router.refresh()
       }
@@ -222,7 +242,7 @@ export function KundeModal({
       onClose={onClose}
       title={isCreate ? 'Neuen Kunden anlegen' : 'Kunde bearbeiten'}
       crumb={isCreate ? 'Kunden >' : null}
-      context="detail"
+      context={context}
       dirty={dirty}
       size="lg"
       onConfirm={submit}
@@ -297,15 +317,43 @@ export function KundeModal({
               ))}
             </div>
           </div>
-          <MockField label={nameLabel} required full>
-            <input
-              className="input"
-              value={nameDisplay}
-              onChange={(e) => mark(() => setNameDisplay(e.target.value))}
-              placeholder={firmaPflicht ? 'Muster GmbH' : 'Maria Koch'}
-              autoComplete="name"
-            />
-          </MockField>
+          {firmaPflicht ? (
+            <MockField label="Firma" required full>
+              <input
+                className="input"
+                value={firmaName}
+                onChange={(e) => mark(() => setFirmaName(e.target.value))}
+                placeholder="Muster GmbH"
+                autoComplete="organization"
+              />
+            </MockField>
+          ) : null}
+          <div className="full kunde-create__name-row">
+            <MockField
+              label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'}
+              required
+            >
+              <input
+                className="input"
+                value={vorname}
+                onChange={(e) => mark(() => setVorname(e.target.value))}
+                placeholder="Maria"
+                autoComplete="given-name"
+              />
+            </MockField>
+            <MockField
+              label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'}
+              required
+            >
+              <input
+                className="input"
+                value={nachname}
+                onChange={(e) => mark(() => setNachname(e.target.value))}
+                placeholder="Koch"
+                autoComplete="family-name"
+              />
+            </MockField>
+          </div>
         </MockFormSection>
 
         <MockFormSection title="Kontakt" icon="link" columns={2}>
@@ -352,12 +400,12 @@ export function KundeModal({
                 inputMode="numeric"
               />
             </MockField>
-            <MockField label="Stadtteil / Stadt">
+            <MockField label="Stadt">
               <input
                 className="input"
                 value={ort}
                 onChange={(e) => mark(() => setOrt(e.target.value))}
-                placeholder="Schwabing"
+                placeholder="München"
                 autoComplete="address-level2"
               />
             </MockField>

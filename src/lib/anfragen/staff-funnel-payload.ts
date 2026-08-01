@@ -1,6 +1,10 @@
 import type { NeueAnfragePayload } from '@/app/(dashboard)/anfragen/actions'
 import type { StaffFunnelState } from '@/lib/anfragen/staff-funnel-types'
-import { STAFF_ANLIEGEN, anliegenToSituation } from '@/lib/anfragen/staff-funnel-types'
+import {
+  STAFF_ANLIEGEN,
+  STAFF_ANLIEGEN_LABELS,
+  anliegenToSituation,
+} from '@/lib/anfragen/staff-funnel-types'
 import { needsBeratungPfad } from '@/lib/anfragen/staff-funnel-steps'
 import { normalizeSituation } from '@/lib/vorab-formular-config'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
@@ -20,7 +24,11 @@ export function resolveStaffFunnelVorhaben(state: StaffFunnelState): string {
   const sit = state.situation || anliegenToSituation(state.anliegen) || ''
   const fromCards = situationBereichTitel(sit, state.bereiche)
   if (fromCards) return fromCards
-  return STAFF_ANLIEGEN.find((a) => a.id === state.anliegen)?.label ?? ''
+  return (
+    STAFF_ANLIEGEN.find((a) => a.id === state.anliegen)?.label ??
+    STAFF_ANLIEGEN_LABELS[state.anliegen] ??
+    ''
+  )
 }
 
 export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayload | { error: string } {
@@ -48,16 +56,15 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
   }
 
   const isGewerbe = state.anliegen === 'gewerbe' || situationRaw === 'gewerbe'
-  const isTermin = state.anliegen === 'termin'
-  const isHv = state.anliegen === 'hausverwaltung'
+  /** Hausverwaltung ist Kundentyp, kein Anliegen (wie Website). */
+  const isHv = state.kundentyp === 'verwaltung'
 
-  if (!isFrei && !isGewerbe && !isTermin && state.bereiche.length === 0) {
+  if (!isFrei && !isGewerbe && state.bereiche.length === 0) {
     return { error: 'Bitte mindestens einen Bereich wählen.' }
   }
 
   const situationNorm = normalizeSituation(situationRaw) || situationRaw
   const beratung =
-    isTermin ||
     isGewerbe ||
     needsBeratungPfad({ ...state, situation: situationNorm }) ||
     state.preisModus === 'komplex'
@@ -87,6 +94,16 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     hausnummer: state.hausnummer.trim() || null,
     plz: state.plz.trim() || null,
     ort: state.ort.trim() || null,
+    objekt_strasse: state.objektStrasse.trim() || null,
+    objekt_hausnummer: state.objektHausnummer.trim() || null,
+    objekt_plz: state.objektPlz.trim() || null,
+    objekt_ort: state.objektOrt.trim() || null,
+    meldeadresse_abweichend: Boolean(
+      state.objektStrasse.trim() ||
+        state.objektHausnummer.trim() ||
+        state.objektPlz.trim() ||
+        state.objektOrt.trim()
+    ),
     zeitraum: state.zeitraum || null,
     budget_hinweis: state.budgetHinweis.trim() || null,
     zustand: state.zustand || null,

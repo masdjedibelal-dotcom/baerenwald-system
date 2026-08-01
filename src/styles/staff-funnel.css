@@ -475,3 +475,53 @@
   font-weight: 500;
   color: var(--text-3);
 }
+
+
+/* Sticky Preisrahmen — mobil unten, Desktop auch sichtbar unten */
+.staff-funnel.document-canvas .document-canvas__footer-cta,
+.staff-funnel.document-canvas .doccv-foot {
+  display: block;
+  flex-shrink: 0;
+  border-top: 0.5px solid var(--border, rgba(30, 28, 26, 0.08));
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--bw-material-bar, var(--card, #fff));
+  backdrop-filter: blur(var(--bw-material-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--bw-material-blur, 12px));
+}
+
+@media (max-width: 768px) {
+  .staff-funnel.document-canvas {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .staff-funnel.document-canvas .document-canvas__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .staff-funnel.document-canvas .document-canvas__footer-cta,
+  .staff-funnel.document-canvas .doccv-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    box-shadow: 0 -8px 24px rgba(16, 24, 40, 0.08);
+  }
+}
+
+.staff-funnel .document-canvas__footer-cta .preis-karte,
+.staff-funnel .doccv-foot .preis-karte {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.staff-funnel .preis-karte-zahl--dash {
+  color: var(--text-3, #7a7570);
+  font-weight: 600;
+}
+
+.staff-funnel .preis-karte--empty .preis-karte-trenner {
+  color: var(--text-3, #7a7570);
+}

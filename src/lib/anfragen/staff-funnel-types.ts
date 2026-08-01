@@ -58,6 +58,11 @@ export type StaffFunnelState = {
   ort: string
   strasse: string
   hausnummer: string
+  /** Leistungs-/Objektadresse, wenn abweichend von Kundenadresse */
+  objektPlz: string
+  objektOrt: string
+  objektStrasse: string
+  objektHausnummer: string
   // preis
   preisModus: 'rahmen' | 'komplex' | 'manual'
   preisMin: number | null
@@ -68,8 +73,11 @@ export type StaffFunnelState = {
   freitext: string
 }
 
-/** Mock ANLIEGEN-Karten (Create-Screen). */
-export type StaffAnliegenId = 'erneuern' | 'termin' | 'gewerbe' | 'hausverwaltung'
+/**
+ * Anliegen-Karten = Website-Funnel Schritt 1 (`BW_FUNNEL_STEP1_OPTIONS`).
+ * Kein „Termin/Beratung“ / „Hausverwaltung“ als Anliegen — HV = Kundentyp.
+ */
+export type StaffAnliegenId = 'erneuern' | 'betreuung' | 'kaputt' | 'gewerbe'
 
 export const STAFF_ANLIEGEN: {
   id: StaffAnliegenId
@@ -82,37 +90,61 @@ export const STAFF_ANLIEGEN: {
   {
     id: 'erneuern',
     label: 'Umbau & Modernisierung',
-    hint: 'Innenausbau, Außenbereich, Terrasse, Keller, DG',
+    hint: 'Inkl. Innenausbau, Außenbereich, Terrasse, Keller, DG',
     icon: '01-haus-erneuern',
     situation: 'erneuern',
   },
   {
-    id: 'termin',
-    label: 'Termin / Beratung',
-    hint: 'Besichtigung, Beratung vor Ort, Aufmaß',
-    icon: '23-chat',
-    situation: 'erneuern',
+    id: 'betreuung',
+    label: 'Betreuung',
+    hint: 'Garten, Reinigung, Hausmeister, Winterdienst',
+    icon: '03-betreuung',
+    situation: 'betreuung',
+  },
+  {
+    id: 'kaputt',
+    label: 'Reparatur & Notfall',
+    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählst du, wie schnell wir kommen sollen',
+    icon: '02-reparatur',
+    situation: 'kaputt',
   },
   {
     id: 'gewerbe',
     label: 'Gewerbe',
-    hint: 'Büro, Praxis, Laden, Gastronomie',
+    hint: 'Büro, Praxis, Laden, Gastronomie — wir planen individuell',
     icon: '04-gewerbe',
     tag: 'B2B',
     situation: 'gewerbe',
   },
-  {
-    id: 'hausverwaltung',
-    label: 'Hausverwaltung',
-    hint: 'Meldung, Freigabe, Objekt & Melder',
-    icon: '18-hausmeister',
-    situation: 'erneuern',
-  },
 ]
 
-export function anliegenToSituation(anliegen: StaffAnliegenId | ''): SituationValue | '' {
+/** Labels inkl. Legacy-Anliegen (ältere CRM-Erfassungen). */
+export const STAFF_ANLIEGEN_LABELS: Record<string, string> = {
+  erneuern: 'Umbau & Modernisierung',
+  betreuung: 'Betreuung',
+  kaputt: 'Reparatur & Notfall',
+  gewerbe: 'Gewerbe',
+  termin: 'Termin / Beratung',
+  hausverwaltung: 'Hausverwaltung',
+}
+
+export function anliegenToSituation(anliegen: StaffAnliegenId | '' | string): SituationValue | '' {
   if (!anliegen) return ''
-  return STAFF_ANLIEGEN.find((a) => a.id === anliegen)?.situation ?? ''
+  const fromList = STAFF_ANLIEGEN.find((a) => a.id === anliegen)?.situation
+  if (fromList) return fromList
+  // Legacy
+  if (anliegen === 'termin' || anliegen === 'hausverwaltung') return 'erneuern'
+  if (
+    anliegen === 'erneuern' ||
+    anliegen === 'betreuung' ||
+    anliegen === 'kaputt' ||
+    anliegen === 'gewerbe' ||
+    anliegen === 'neubauen' ||
+    anliegen === 'notfall'
+  ) {
+    return anliegen
+  }
+  return ''
 }
 
 export const STAFF_FUNNEL_STEP_LABELS: Record<StaffFunnelStepId, string> = {
@@ -255,6 +287,10 @@ export function createInitialStaffFunnelState(
     ort: '',
     strasse: '',
     hausnummer: '',
+    objektPlz: '',
+    objektOrt: '',
+    objektStrasse: '',
+    objektHausnummer: '',
     preisModus: 'rahmen',
     preisMin: null,
     preisMax: null,

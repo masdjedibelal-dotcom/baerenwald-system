@@ -257,32 +257,37 @@ export function PositionModal({
               </select>
             </div>
           </Field>
-          <Field label={p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}>
-            <div className="txt-prefix">
-              <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
-              <input
-                className="txt"
-                type="number"
-                value={p.preis}
-                onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
-              />
+          <div className="field pos-add-preis-ust">
+            <div className="pos-add-preis-ust__labels">
+              <div className="field-label">
+                {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
+              </div>
+              {showUst !== false ? <div className="field-label">USt.</div> : null}
             </div>
-          </Field>
-          {showUst !== false ? (
-            <Field label="USt.">
-              <select
-                className="sel"
-                value={String(p.ust != null ? p.ust : 19)}
-                onChange={(e) => onChange({ ust: Number(e.target.value) })}
-              >
-                <option value="19">19%</option>
-                <option value="7">7%</option>
-                <option value="0">0%</option>
-              </select>
-            </Field>
-          ) : (
-            <div />
-          )}
+            <div className="pos-add-preis-ust__row">
+              <div className="txt-prefix pos-add-preis-ust__preis">
+                <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
+                <input
+                  className="txt"
+                  type="number"
+                  value={p.preis}
+                  onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
+                />
+              </div>
+              {showUst !== false ? (
+                <select
+                  className="sel pos-add-preis-ust__ust"
+                  value={String(p.ust != null ? p.ust : 19)}
+                  onChange={(e) => onChange({ ust: Number(e.target.value) })}
+                  aria-label="USt."
+                >
+                  <option value="19">19%</option>
+                  <option value="7">7%</option>
+                  <option value="0">0%</option>
+                </select>
+              ) : null}
+            </div>
+          </div>
           <Field label="Zeilensumme">
             <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
               {formatEurBetrag(line)}

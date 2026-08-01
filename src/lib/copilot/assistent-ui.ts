@@ -1,5 +1,11 @@
 /** UI-Payloads für den CRM-Assistenten (Sidepanel). Client + Server. */
 
+import {
+  angebotChipLabel,
+  nestedName,
+  rechnungChipLabel,
+} from '@/lib/copilot/sanitize-chat-text'
+
 export type AssistentNavLink = {
   type: 'navigate'
   href: string
@@ -186,6 +192,48 @@ export function collectAssistentUiFromToolResult(
           hint: str(o.hint) || undefined,
         })
       }
+    }
+  }
+
+  // Listen → Chips mit Namen/Betrag (keine Nummern/UUIDs im Label)
+  if (toolName === 'get_offene_rechnungen' && Array.isArray(result)) {
+    for (const row of result.slice(0, 8)) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      if (typeof o.id !== 'string' || !o.id) continue
+      ui.links.push({
+        type: 'navigate',
+        href: `/rechnungen/${o.id}`,
+        label: rechnungChipLabel(o),
+        hint: o.faellig_am ? `Fällig ${str(o.faellig_am)}` : undefined,
+      })
+    }
+  }
+
+  if (toolName === 'get_offene_angebote' && Array.isArray(result)) {
+    for (const row of result.slice(0, 8)) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      if (typeof o.id !== 'string' || !o.id) continue
+      ui.links.push({
+        type: 'navigate',
+        href: `/angebote/${o.id}`,
+        label: angebotChipLabel(o),
+      })
+    }
+  }
+
+  if (toolName === 'get_auftrag_status' && Array.isArray(result)) {
+    for (const row of result.slice(0, 8)) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      if (typeof o.id !== 'string' || !o.id) continue
+      const titel = str(o.titel) || nestedName(o.kunden, 'Auftrag')
+      ui.links.push({
+        type: 'navigate',
+        href: `/auftraege/${o.id}`,
+        label: titel,
+      })
     }
   }
 

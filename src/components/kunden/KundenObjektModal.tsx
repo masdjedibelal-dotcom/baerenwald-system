@@ -3,7 +3,6 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
@@ -188,16 +187,8 @@ export function KundenObjektModal({
     })
   }
 
-  const footer = (
-    <div className="kunde-create-footer">
-      <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="check" disabled={pending} onClick={speichern}>
-        {pending ? '…' : isEdit ? 'Speichern' : 'Objekt anlegen'}
-      </MockBtn>
-    </div>
-  )
+  const canSave =
+    Boolean(titel.trim() && strasseNr.trim() && plz.trim() && ort.trim()) && !pending
 
   return (
     <EditorSheet
@@ -208,7 +199,9 @@ export function KundenObjektModal({
       context="detail"
       dirty={dirty}
       size="lg"
-      footer={footer}
+      onConfirm={speichern}
+      confirmDisabled={!canSave}
+      confirmBusy={pending}
       className="kunde-create-sheet"
     >
       <div className="kunde-create">

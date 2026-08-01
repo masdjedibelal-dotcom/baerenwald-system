@@ -19,6 +19,18 @@ export type KiAssistDraft =
       menge?: number
       einheit?: string
       preis?: number
+      gewerk?: string
+    }
+  | {
+      type: 'positionen'
+      items: Array<{
+        name: string
+        beschreibung?: string
+        menge?: number
+        einheit?: string
+        preis?: number
+        gewerk?: string
+      }>
     }
   | {
       type: 'text'
@@ -57,7 +69,8 @@ Wenn der Nutzer Inhalt für das Formular will, antworte kurz menschlich UND am E
 \`\`\`
 
 Erlaubte JSON-Formen:
-- Position: {"type":"position","name":"…","beschreibung":"…","menge":1,"einheit":"Stk.","preis":0}
+- Eine Position: {"type":"position","name":"…","beschreibung":"…","menge":1,"einheit":"Stk.","preis":0}
+- Mehrere Positionen: {"type":"positionen","items":[{"name":"…","beschreibung":"…","menge":1,"einheit":"m²","preis":0,"gewerk":"optional"},…]}
 - Freitext / Tagebuch / Dokument / Portal: {"type":"text","titel":"optional","text":"…"}
 - Mängel-Liste: {"type":"maengel","text":"Zeile1\\nZeile2"}
 - Kunden-Mail: {"type":"mail","betreff":"…","text":"Nachrichtentext ohne HTML"}
@@ -99,20 +112,22 @@ ${BW_APPLY_HINT}`,
     id: 'positionen',
     label: 'Positionen',
     intro:
-      'Ich schlage **mehrere Positionen** für Angebot oder Rechnung vor. Sag mir den Auftragsumfang — ich liefere Titel, Mengen und Beschreibungen zum Übernehmen.',
+      'Beschreib die **Arbeiten** (Umfang, Räume, Mengen). Ich zerlege das in **mehrere Positionen** — danach kannst du alle auf einmal übernehmen.',
     placeholder: 'z. B. „Komplettbad renovieren, ca. 8 m², inkl. Sanitär und Fliesen“…',
     systemHint: `Modus: Mehrere Kalkulationspositionen für Angebot/Rechnung (Handwerk Bärenwald).
-Strukturiere konkrete Positionen (Bezeichnung, Menge, Einheit, Beschreibung).
-Für die erste Position zusätzlich bw-apply mit type position; weitere als nummerierte Liste im Text.
+Warte auf die Beschreibung des Nutzers — keine Positionen erfinden, bevor er den Auftragsumfang nennt.
+Zerlege in konkrete, kalkulierbare Positionen (Bezeichnung, Menge, Einheit, kurze Beschreibung, Netto-Preis wenn schätzbar).
+Am Ende IMMER genau einen bw-apply-Block type "positionen" mit items-Array (mind. 2 wenn sinnvoll, sonst so viele wie nötig).
+Kein Katalog-Matching. Keine UUIDs/Nummern im Chattext.
 ${BW_APPLY_HINT}`,
     quickPrompts: [
       {
         label: 'Gewerk aufteilen',
-        prompt: 'Teile den beschriebenen Auftrag in sinnvolle Einzelpositionen mit Mengen auf.',
+        prompt: 'Teile meine Beschreibung in sinnvolle Einzelpositionen mit Mengen und Einheiten auf.',
       },
       {
         label: 'Nur Leistungen',
-        prompt: 'Nur Leistungspositionen, kein Dokumenttitel — konkret und kalkulierbar.',
+        prompt: 'Nur Leistungspositionen — konkret und kalkulierbar, ohne Dokumenttitel.',
       },
     ],
   },
@@ -262,7 +277,32 @@ export function parseBwApplyDraft(content: string): KiAssistDraft | null {
         menge: typeof raw.menge === 'number' ? raw.menge : Number(raw.menge) || undefined,
         einheit: raw.einheit != null ? String(raw.einheit) : undefined,
         preis: typeof raw.preis === 'number' ? raw.preis : Number(raw.preis) || undefined,
+        gewerk: raw.gewerk != null ? String(raw.gewerk).trim() || undefined : undefined,
       }
+    }
+    if (type === 'positionen') {
+      const rawItems = Array.isArray(raw.items)
+        ? raw.items
+        : Array.isArray(raw.positionen)
+          ? raw.positionen
+          : []
+      const items: Extract<KiAssistDraft, { type: 'positionen' }>['items'] = []
+      for (const it of rawItems) {
+        if (!it || typeof it !== 'object') continue
+        const o = it as Record<string, unknown>
+        const name = String(o.name ?? o.leistung ?? '').trim()
+        if (!name) continue
+        items.push({
+          name,
+          beschreibung: o.beschreibung != null ? String(o.beschreibung) : undefined,
+          menge: typeof o.menge === 'number' ? o.menge : Number(o.menge) || undefined,
+          einheit: o.einheit != null ? String(o.einheit) : undefined,
+          preis: typeof o.preis === 'number' ? o.preis : Number(o.preis) || undefined,
+          gewerk: o.gewerk != null ? String(o.gewerk).trim() || undefined : undefined,
+        })
+      }
+      if (!items.length) return null
+      return { type: 'positionen', items }
     }
     if (type === 'maengel') {
       const text = String(raw.text ?? '').trim()

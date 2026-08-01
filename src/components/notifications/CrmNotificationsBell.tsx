@@ -7,10 +7,10 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
   ctaLabel,
+  getCrmNotificationUnreadCount,
   listCrmNotifications,
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
-  typIcon,
   typLabel,
   type CrmNotificationFilter,
   type CrmNotificationItem,
@@ -48,16 +48,22 @@ export function CrmNotificationsBell() {
   useEffect(() => {
     let cancelled = false
     const loadBadge = () => {
-      void listCrmNotifications('ungelesen').then((res) => {
-        if (cancelled || !res.ok) return
-        setUnreadCount(res.unreadCount)
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void getCrmNotificationUnreadCount().then((n) => {
+        if (cancelled) return
+        setUnreadCount(n)
       })
     }
     loadBadge()
-    const t = window.setInterval(loadBadge, 60_000)
+    const t = window.setInterval(loadBadge, 3 * 60_000)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') loadBadge()
+    }
+    document.addEventListener('visibilitychange', onVis)
     return () => {
       cancelled = true
       window.clearInterval(t)
+      document.removeEventListener('visibilitychange', onVis)
     }
   }, [])
 
@@ -93,6 +99,10 @@ export function CrmNotificationsBell() {
         cur?.sourceKey === item.sourceKey ? { ...cur, gelesen: true } : cur
       )
     })
+  }
+
+  function closeDetail() {
+    setDetail(null)
   }
 
   function goToVorgang() {
@@ -141,6 +151,7 @@ export function CrmNotificationsBell() {
         subtitle="Externe Meldungen · letzte 7 Tage"
         context="detail"
         size="md"
+        overlayClassName={detail ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
           unreadCount > 0 ? (
             <MockBtn sm kind="ghost" disabled={pending} onClick={onMarkAll}>
@@ -180,15 +191,12 @@ export function CrmNotificationsBell() {
         ) : (
           <ul className="crm-notif-list">
             {items.map((item) => (
-              <li key={item.sourceKey}>
+              <li key={item.sourceKey} className="crm-notif-list__item">
                 <button
                   type="button"
                   className={cn('crm-notif-row', !item.gelesen && 'is-unread')}
                   onClick={() => openDetail(item)}
                 >
-                  <span className="crm-notif-row__ico" aria-hidden>
-                    <MockIcon ctx="row" n={typIcon(item.typ)} size={18} />
-                  </span>
                   <span className="crm-notif-row__body">
                     <span className="crm-notif-row__title">{item.title}</span>
                     {item.subtitle ? (
@@ -208,17 +216,16 @@ export function CrmNotificationsBell() {
 
       <EditorSheet
         open={Boolean(detail)}
-        onClose={() => setDetail(null)}
+        onClose={closeDetail}
         title={detail ? typLabel(detail.typ) : 'Update'}
         crumb="Updates >"
         context="detail"
         size="md"
+        overlayClassName="editor-sheet-overlay--stack"
+        manageHistory={Boolean(detail)}
       >
         {detail ? (
           <div className="crm-notif-detail">
-            <div className="crm-notif-detail__ico" aria-hidden>
-              <MockIcon ctx="row" n={typIcon(detail.typ)} size={22} />
-            </div>
             <p className="crm-notif-detail__title">{detail.title}</p>
             {detail.subtitle ? (
               <p className="crm-notif-detail__sub">{detail.subtitle}</p>
@@ -226,9 +233,9 @@ export function CrmNotificationsBell() {
             <p className="crm-notif-detail__meta">{formatRelativeDate(detail.createdAt)}</p>
             <p className="crm-notif-detail__hint">
               {detail.typ === 'neue_anfrage'
-                ? 'Neue Anfrage aus dem Meldeformular oder Portal.'
+                ? 'Neue Anfrage aus dem Meldeformular oder Portal. Öffne die Anfrage, um Kontakt und Details zu prüfen.'
                 : detail.typ === 'handwerker_update'
-                  ? 'Eintrag vom Partner im Bautagebuch.'
+                  ? 'Eintrag vom Partner im Bautagebuch. Im Auftrag siehst du den vollständigen Eintrag.'
                   : 'Der Auftrag wurde als abgeschlossen markiert.'}
             </p>
             <div className="crm-notif-detail__actions">

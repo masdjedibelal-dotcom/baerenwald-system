@@ -1,7 +1,7 @@
 'use client'
 
 import { ChunkLoadRecovery } from '@/components/layout/ChunkLoadRecovery'
-import { SessionKeepAlive } from '@/components/layout/SessionKeepAlive'
+import { SessionGuard } from '@/components/layout/SessionGuard'
 import { ActionBusyProvider } from '@/components/ui/action-busy'
 import { ConfirmDeleteProvider } from '@/components/ui/confirm-delete'
 
@@ -10,7 +10,7 @@ export function DashboardProviders({ children }: { children: React.ReactNode }) 
     <ActionBusyProvider>
       <ConfirmDeleteProvider>
         {children}
-        <SessionKeepAlive />
+        <SessionGuard />
         <ChunkLoadRecovery />
       </ConfirmDeleteProvider>
     </ActionBusyProvider>

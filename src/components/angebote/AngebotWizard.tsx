@@ -18,24 +18,27 @@ import {
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { DocActionBar } from '@/components/surfaces/primitives'
-import { ActionIcon } from '@/components/ui/ActionIcon'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
+import { Check, FileText } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
+import { KundeModal } from '@/components/kunden/KundeModal'
+import { DateInput } from '@/components/ui/DateInput'
+import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import {
   normalizeVorgangWiederkehr,
+  WIEDERKEHR_TURNUS_LABELS,
+  WIEDERKEHR_TURNUS_VALUES,
   type VorgangWiederkehr,
+  type WiederkehrTurnus,
 } from '@/lib/vorgang/wiederkehrend'
 import {
-  finalizeAngebotWizardWithoutMail,
   saveAngebotWizardDraft,
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
@@ -82,12 +85,20 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import {
+  kundentypLabel,
   leadKontaktAnzeigeName,
   leadVertragsKundeId,
   resolveLeadKunde,
   resolveLeadPreisAnzeige,
 } from '@/lib/lead-display-helpers'
+import { normalizeKundeNamen } from '@/lib/kunde-namen'
+import {
+  istKundeFirmaPflichtTyp,
+  kundeStrasseHausnummerZeile,
+} from '@/lib/kunde-stammdaten'
+import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
@@ -98,12 +109,16 @@ import {
 } from '@/lib/posboard/pos-board-line'
 import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import {
+  ANGEBOT_MAIL_BOX_MARKER,
+  angebotMailFullTextForEditor,
   defaultAngebotEinleitungText,
   isDefaultAngebotEinleitung,
+  parseAngebotMailFullTextFromEditor,
 } from '@/lib/templates/angebot-mail'
+import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotPosition, Gewerk, Handwerker, Kunde, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
-import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
+import { BEREICH_LABELS, cn, formatDatum } from '@/lib/utils'
 import type { ZahlfristSeg } from '@/lib/zahlfrist'
 
 function kundenName(lead: LeadDetail) {
@@ -146,22 +161,10 @@ function projektLabel(lead: LeadDetail) {
   return leadSituationDisplay(lead.situation) || 'Projekt'
 }
 
-function regionLabel(lead: LeadDetail): string {
-  const plz = lead.plz?.trim()
-  const kundeOrt =
-    lead.kunden && 'ort' in lead.kunden
-      ? String((lead.kunden as { ort?: string | null }).ort ?? '').trim()
-      : ''
-  if (plz && kundeOrt) return `${kundeOrt} · ${plz}`
-  if (plz) return plz
-  if (kundeOrt) return kundeOrt
-  return '—'
-}
-
 /**
  * Angebots-Wizard — DocumentCanvas 1:1 Mock:
  * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Versand),
- * DocBar Vorschau · Senden · PDF|Speichern · Verwerfen; mobil Speichern in DocBar (kein Footer-CTA).
+ * Header: Vorschau · ✓ (Popover Speichern/Senden); X schließt (kein Footer-DocBar).
  */
 export function AngebotWizard({
   lead,
@@ -216,11 +219,7 @@ export function AngebotWizard({
   const ag = leadState.auftraggeber
   const isHv = Boolean(leadState.auftraggeber_kunde_id || ag?.id)
   const kundeId = leadVertragsKundeId(leadState)
-  const email = (
-    isHv
-      ? ag?.email ?? ''
-      : melder?.email ?? leadState.kontakt_email ?? ''
-  ).trim()
+  const sheetKunde = (isHv ? ag : melder) ?? null
   const leistungsumfangInitial =
     bereicheFuerAnzeige(leadState.bereiche, leadState.situation)
       .map((b) => BEREICH_LABELS[b] ?? b)
@@ -236,7 +235,39 @@ export function AngebotWizard({
     leadState.preis_max,
     leadState.funnel_daten
   )
-  const region = regionLabel(leadState)
+  const sheetNamen = normalizeKundeNamen({
+    typ: sheetKunde?.typ ?? kundeTyp,
+    name: sheetKunde?.name,
+    vorname: sheetKunde?.vorname,
+    nachname: sheetKunde?.nachname,
+    funnelDaten: leadState.funnel_daten,
+    kontaktName: leadState.kontakt_name,
+  })
+  const sheetFirma = istKundeFirmaPflichtTyp(sheetKunde?.typ ?? kundeTyp)
+    ? (
+        (isHv ? ag?.org_anzeigename?.trim() : null) ||
+        sheetKunde?.name?.trim() ||
+        sheetNamen.name.trim() ||
+        ''
+      )
+    : ''
+  const sheetAnschrift = sheetKunde
+    ? kundeStrasseHausnummerZeile(sheetKunde) || sheetKunde.adresse?.trim() || null
+    : null
+  const sheetStadt = [sheetKunde?.plz?.trim(), sheetKunde?.ort?.trim()]
+    .filter(Boolean)
+    .join(' ')
+  const sheetEmail = (
+    sheetKunde?.email ?? leadState.kontakt_email ?? ''
+  ).trim()
+  const sheetTelefon = (
+    sheetKunde?.telefon ?? leadState.kontakt_telefon ?? ''
+  ).trim()
+  const sheetKundentypLabel = kundentypLabel(sheetKunde?.typ ?? kundeTyp)
+  const crowKundeValue =
+    sheetFirma ||
+    [sheetNamen.vorname, sheetNamen.nachname].filter(Boolean).join(' ') ||
+    name
 
   const leadZeilen = useMemo(
     () =>
@@ -262,9 +293,15 @@ export function AngebotWizard({
   const [mounted, setMounted] = useState(false)
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
-  /** Neu: Typ zuerst wählen — entscheidet über Gewerke im PosBoard. */
+  /**
+   * Neu: zuerst Art (Einmalig/Wiederkehrend), bei Einmalig dann Layout (Einfach/Komplex).
+   * Wiederkehrend (Wartung/Winterdienst) → immer Einfach, ohne Komplex-Schritt.
+   */
   const needsTypGate = !bootstrap?.angebotId && !istAuftragKorrektur && !istNachtrag
-  const [typConfirmed, setTypConfirmed] = useState(!needsTypGate)
+  const [typGateStep, setTypGateStep] = useState<'art' | 'layout' | null>(
+    () => (needsTypGate ? 'art' : null)
+  )
+  const typConfirmed = typGateStep === null
   const [sheet, setSheet] = useState<WizardSheetId>(() => {
     const s = Number(initialStep)
     if (s === 4) return 'vorschau'
@@ -272,7 +309,10 @@ export function AngebotWizard({
     if (focusField === 'titel' || focusField === 'beschreibung') return 'dokument'
     return null
   })
-  const [kundePickerOpen, setKundePickerOpen] = useState(false)
+  const [kundeEditOpen, setKundeEditOpen] = useState(false)
+  const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [fotoLightboxUrl, setFotoLightboxUrl] = useState<string | null>(null)
+  const [mailBodyDraft, setMailBodyDraft] = useState('')
   const [, setPositions] = useState<WizardPosition[]>(() =>
     initialZeilen
       .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -335,7 +375,7 @@ export function AngebotWizard({
   const draftSnapshotRef = useRef('')
 
   const [mailTo, setMailTo] = useState<string[]>(() =>
-    email && isValidEmail(email) ? [email] : []
+    sheetEmail && isValidEmail(sheetEmail) ? [sheetEmail] : []
   )
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailBetreff, setMailBetreff] = useState('')
@@ -347,8 +387,57 @@ export function AngebotWizard({
 
   useEffect(() => {
     if (mailTo.length) return
-    if (email && isValidEmail(email)) setMailTo([email])
-  }, [email, mailTo.length])
+    if (sheetEmail && isValidEmail(sheetEmail)) setMailTo([sheetEmail])
+  }, [sheetEmail, mailTo.length])
+
+  useEffect(() => {
+    if (sheet !== 'kunde' || !isHv) {
+      setHvObjekte([])
+      return
+    }
+    const hvId = (ag?.id || leadState.auftraggeber_kunde_id || '').trim()
+    if (!hvId) {
+      setHvObjekte([])
+      return
+    }
+    let cancelled = false
+    void fetchKundenObjekte(hvId).then((rows) => {
+      if (!cancelled) setHvObjekte(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [sheet, isHv, ag?.id, leadState.auftraggeber_kunde_id])
+
+  const mailAnrede = meta.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
+  const mailKundeKontext = useMemo((): KundeAnredeKontext => {
+    const k = sheetKunde
+    return {
+      name: k?.name?.trim() || name,
+      vorname: k?.vorname ?? sheetNamen.vorname,
+      nachname: k?.nachname ?? sheetNamen.nachname,
+      typ: k?.typ ?? kundeTyp,
+      ansprechpartner:
+        k && 'ansprechpartner' in k
+          ? (k as { ansprechpartner?: string | null }).ansprechpartner
+          : null,
+    }
+  }, [sheetKunde, name, sheetNamen.vorname, sheetNamen.nachname, kundeTyp])
+
+  useEffect(() => {
+    if (sheet !== 'versand') return
+    setMailBodyDraft(
+      angebotMailFullTextForEditor(
+        meta.einleitung,
+        meta.schluss,
+        mailAnrede,
+        meta.leistungsumfang.trim() || projekt,
+        mailKundeKontext
+      )
+    )
+    // Nur beim Öffnen des Versand-Sheets neu aufbauen — nicht bei jedem Tastendruck.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open sync
+  }, [sheet])
 
   const defaultMailBetreff = `Ihr Angebot — ${meta.titel.trim() || projekt}`
   useEffect(() => {
@@ -696,20 +785,37 @@ export function AngebotWizard({
     setSheet('vorschau')
   }
 
-  function onKundePick(k: Kunde) {
-    setLeadState((prev) => ({
-      ...prev,
-      kunde_id: k.id,
-      kunden: k,
-      kontakt_email: k.email?.trim() || prev.kontakt_email,
-      kontakt_telefon: k.telefon?.trim() || prev.kontakt_telefon,
-    }))
-    const mail = k.email?.trim()
+  const kundeZumBearbeiten: Kunde | null =
+    isHv && ag?.id ? (ag as Kunde) : melder
+
+  function onKundeSaved(_id?: string, saved?: Partial<Kunde>) {
+    setKundeEditOpen(false)
+    if (!saved) return
+    setLeadState((prev) => {
+      if (isHv) {
+        const prevAg = prev.auftraggeber
+        return {
+          ...prev,
+          auftraggeber: { ...(prevAg ?? {}), ...saved } as LeadDetail['auftraggeber'],
+          kontakt_email: saved.email?.trim() || prev.kontakt_email,
+          kontakt_telefon: saved.telefon?.trim() || prev.kontakt_telefon,
+        }
+      }
+      const prevKunde = resolveLeadKunde(prev.kunden)
+      return {
+        ...prev,
+        kunden: { ...(prevKunde ?? {}), ...saved } as Kunde,
+        kontakt_email: saved.email?.trim() || prev.kontakt_email,
+        kontakt_telefon: saved.telefon?.trim() || prev.kontakt_telefon,
+        kundentyp: saved.typ?.trim() || prev.kundentyp,
+      }
+    })
+    const mail = saved.email?.trim()
     if (mail && isValidEmail(mail)) setMailTo([mail])
-    setKundePickerOpen(false)
   }
 
   async function handleCanvasClose() {
+    setKundeEditOpen(false)
     if (draftDirty && !saving) {
       /* S9: X speichert best-effort — ohne Validierungs-Toasts bei leerem Entwurf */
       const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
@@ -734,68 +840,16 @@ export function AngebotWizard({
     void handleCanvasClose()
   }
 
-  async function handleFinishErstellen() {
-    setSaving(true)
-    try {
-      const id = await persistDraft({ notify: false })
-      if (!id) return
-      const res = await finalizeAngebotWizardWithoutMail(id)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(
-        res.angebotsnr?.trim()
-          ? `Angebot ${res.angebotsnr.trim()} erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
-          : `Angebot erstellt · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
-      )
-      onDone?.(id, { mode: 'saved' })
-      onClose()
-      router.refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  /** Korrektur: speichern + Auftrag synchronisieren, ohne Kunden-Mail (mündliche Zusage). */
-  async function handleFinishKorrekturSpeichern() {
-    setSaving(true)
-    try {
-      const id = await persistDraft({ notify: false })
-      if (!id) return
-      const res = await finalizeAngebotWizardWithoutMail(id)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(
-        'Korrektur übernommen — ohne Mail an den Kunden. Als Nächstes Abschlagsplan / Schlussrechnung prüfen.'
-      )
-      onDone?.(id, { mode: 'saved', auftragKorrektur: true })
-      onClose()
-      router.refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function handleFinishVersenden() {
     const recipients =
       mailTo.length > 0
         ? mailTo
-        : email && isValidEmail(email)
-          ? [email]
+        : sheetEmail && isValidEmail(sheetEmail)
+          ? [sheetEmail]
           : []
     if (!recipients.length) {
-      toast.error(
-        istAuftragKorrektur
-          ? 'Keine Kunden-E-Mail — nutze „Speichern & übernehmen“ ohne Versand.'
-          : 'Keine Kunden-E-Mail hinterlegt — Versand nicht möglich. Nutze „Erstellen“ ohne Mail.'
-      )
+      toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+      setSheet('versand')
       return
     }
     setSaving(true)
@@ -834,26 +888,18 @@ export function AngebotWizard({
     }
   }
 
-  function patchTitel(v: string) {
+  function patchProjektTitel(v: string) {
     setMeta((m) => {
+      const lu = v.trim()
       const altLu = m.leistungsumfang.trim() || projekt
-      const patch: Partial<AngebotWizardMeta> = { titel: v }
-      if (!m.leistungsumfang.trim()) {
-        patch.leistungsumfang = v
+      const patch: Partial<AngebotWizardMeta> = {
+        leistungsumfang: v,
+        /** Angebotstitel bleibt Standard und folgt dem Projekttitel. */
+        titel: lu ? `Angebot ${lu} — ${name}` : m.titel,
       }
       if (isDefaultAngebotEinleitung(m.einleitung, altLu)) {
         const effAnrede = m.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
-        patch.einleitung = defaultAngebotEinleitungText(effAnrede, v.trim() || projekt)
-      }
-      return { ...m, ...patch }
-    })
-  }
-
-  function patchProjektTitel(v: string) {
-    setMeta((m) => {
-      const patch: Partial<AngebotWizardMeta> = { leistungsumfang: v }
-      if (!m.titel.trim() || m.titel === defaultMeta.titel) {
-        patch.titel = v.trim() ? `Angebot ${v.trim()} — ${name}` : m.titel
+        patch.einleitung = defaultAngebotEinleitungText(effAnrede, lu || projekt)
       }
       return { ...m, ...patch }
     })
@@ -869,7 +915,7 @@ export function AngebotWizard({
       : `MwSt ${effektiverMwstSatz}%`
 
   const dokumentCrowValue = [
-    meta.titel.trim() || meta.leistungsumfang.trim() || 'Titel offen',
+    meta.leistungsumfang.trim() || meta.titel.trim() || 'Titel offen',
     dokumentTyp === 'projekt' ? 'Komplex' : 'Einfach',
   ].join(' · ')
 
@@ -880,36 +926,55 @@ export function AngebotWizard({
     .filter(Boolean)
     .join(' · ')
 
-  const versandCrowValue = mailTo[0]?.trim() || email?.trim() || 'Empfänger ergänzen'
+  const versandCrowValue = mailTo[0]?.trim() || sheetEmail?.trim() || 'Empfänger ergänzen'
 
   const wizardSubtitle = name?.trim() && name !== '—' ? name.trim() : undefined
 
-  const docActions = (
-    <DocActionBar
-      actions={[
-        {
-          id: 'save',
-          label: saving ? 'Speichern…' : 'Speichern',
-          onClick: () => {
-            if (saving) return
-            void persistDraft({ notify: true })
+  const headerEnd = (
+    <>
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={() => void openVorschauSheet()}
+        aria-label="Vorschau"
+        title="Vorschau"
+      >
+        <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <ActionsMenu
+        sheetTitle="Angebot"
+        align="right"
+        trigger={
+          <span
+            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+            aria-label="Speichern oder senden"
+            title="Speichern oder senden"
+          >
+            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+          </span>
+        }
+        items={[
+          {
+            label: saving ? 'Speichern…' : 'Speichern',
+            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
+            onClick: () => {
+              if (saving) return
+              void persistDraft({ notify: true })
+            },
           },
-          icon: <ActionIcon n="device-floppy" size={20} />,
-        },
-        {
-          id: 'preview',
-          label: 'Vorschau',
-          onClick: () => void openVorschauSheet(),
-          icon: <ActionIcon n="file-text" size={20} />,
-        },
-        {
-          id: 'send',
-          label: 'Senden',
-          onClick: () => setSheet('versand'),
-          icon: <ActionIcon n="send" size={20} />,
-        },
-      ]}
-    />
+          {
+            label: saving ? 'Senden…' : 'Senden',
+            icon: <MockIcon ctx="btn" n="send" size={16} />,
+            hint: 'Speichert und versendet',
+            onClick: () => {
+              if (saving) return
+              void handleFinishVersenden()
+            },
+          },
+        ]}
+      />
+    </>
   )
 
   const documentColumn = (
@@ -947,7 +1012,7 @@ export function AngebotWizard({
 
   const metaColumn = (
     <div className="dc-meta-stack">
-      <MetaCrowButton label="Kunde" value={name} onClick={() => setSheet('kunde')} />
+      <MetaCrowButton label="Kunde" value={crowKundeValue} onClick={() => setSheet('kunde')} />
       <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
@@ -966,7 +1031,11 @@ export function AngebotWizard({
     </div>
   )
 
-  const closeSheet = () => setSheet(null)
+  const closeSheet = () => {
+    setKundeEditOpen(false)
+    setFotoLightboxUrl(null)
+    setSheet(null)
+  }
 
   const wizard = (
     <>
@@ -974,12 +1043,9 @@ export function AngebotWizard({
         title={wizardTitel}
         subtitle={wizardSubtitle}
         onClose={handleRequestClose}
-        onSave={() => void persistDraft({ notify: true })}
-        saveBusy={saving}
+        headerEnd={headerEnd}
         busy={saving}
         busyLabel="Wird gesendet…"
-        onDiscard={() => onClose()}
-        docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
         className="wizard-flow"
@@ -992,40 +1058,86 @@ export function AngebotWizard({
         title="Kunde"
         context="canvas"
         headerEnd={
-          <button
-            type="button"
-            className="editor-sheet__confirm-text"
-            onClick={() => setKundePickerOpen(true)}
-          >
-            Wechseln
-          </button>
+          kundeZumBearbeiten ? (
+            <button
+              type="button"
+              className="editor-sheet__confirm-text"
+              onClick={() => setKundeEditOpen(true)}
+            >
+              Bearbeiten
+            </button>
+          ) : null
         }
       >
         <div className="gfc">
           <div className="gfc-row">
-            <span className="gfc-l">Name</span>
-            <span className="gfc-v">{name}</span>
+            <span className="gfc-l">Kundentyp</span>
+            <span className="gfc-v">{sheetKundentypLabel || '—'}</span>
+          </div>
+          {sheetFirma ? (
+            <div className="gfc-row">
+              <span className="gfc-l">Firma</span>
+              <span className="gfc-v">{sheetFirma}</span>
+            </div>
+          ) : null}
+          <div className="gfc-row">
+            <span className="gfc-l">{sheetFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
+            <span className="gfc-v">{sheetNamen.vorname || '—'}</span>
           </div>
           <div className="gfc-row">
-            <span className="gfc-l">Region</span>
-            <span className="gfc-v">{region}</span>
+            <span className="gfc-l">{sheetFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
+            <span className="gfc-v">{sheetNamen.nachname || '—'}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Anschrift</span>
+            <span className="gfc-v">{sheetAnschrift || '—'}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Stadt</span>
+            <span className="gfc-v">{sheetStadt || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">E-Mail</span>
-            <span className="gfc-v">{email || <em>fehlt</em>}</span>
+            <span className="gfc-v">{sheetEmail || <em>fehlt</em>}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Telefon</span>
+            <span className="gfc-v">{sheetTelefon || <em>fehlt</em>}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Budget</span>
             <span className="gfc-v">{budgetAnzeige}</span>
           </div>
+          {isHv ? (
+            hvObjekte.length === 0 ? (
+              <div className="gfc-row">
+                <span className="gfc-l">Objekte</span>
+                <span className="gfc-v">—</span>
+              </div>
+            ) : (
+              hvObjekte.map((o, i) => (
+                <div key={o.id} className="gfc-row">
+                  <span className="gfc-l">{i === 0 ? 'Objekte' : ''}</span>
+                  <span className="gfc-v">
+                    {kundenObjektKurzlabel(o)}
+                    {leadState.kunde_objekt_id === o.id ? ' · aktiv' : ''}
+                  </span>
+                </div>
+              ))
+            )
+          ) : null}
         </div>
       </EditorSheet>
 
-      <KundePickerSheet
-        open={kundePickerOpen}
-        onClose={() => setKundePickerOpen(false)}
-        onPick={onKundePick}
+      <KundeModal
+        open={kundeEditOpen}
+        onClose={() => setKundeEditOpen(false)}
+        editKunde={kundeZumBearbeiten}
+        leadFunnelDaten={leadState.funnel_daten}
+        stayOnPage
+        revalidateAnfrageId={leadState.id}
         context="canvas"
+        onSaved={onKundeSaved}
       />
 
       <EditorSheet
@@ -1035,25 +1147,13 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          {!istAuftragKorrektur ? (
-            <div className="full">
-              <VorgangArtWiederkehrField value={wiederkehr} onChange={setWiederkehr} />
-            </div>
-          ) : null}
-          <MockField label="Angebotstitel" full>
-            <input
-              className="input"
-              value={meta.titel}
-              onChange={(e) => patchTitel(e.target.value)}
-              autoFocus={focusField === 'titel'}
-            />
-          </MockField>
           <MockField label="Projekt-Titel" full>
             <input
               className="input"
               value={meta.leistungsumfang}
               onChange={(e) => patchProjektTitel(e.target.value)}
               placeholder="z.B. Badmodernisierung"
+              autoFocus={focusField === 'titel'}
             />
           </MockField>
           <KiAssistFieldLabel
@@ -1063,75 +1163,101 @@ export function AngebotWizard({
             extraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
           >
             <textarea
-              className="input ta"
-              rows={5}
+              className="input ta wizard-dok-beschreibung"
+              rows={8}
               value={projektbeschreibung}
               onChange={(e) => setProjektbeschreibung(e.target.value)}
               autoFocus={focusField === 'beschreibung'}
             />
           </KiAssistFieldLabel>
-          <div className="full">
+          <div className="full wizard-dok-fotos">
             <div className="section-h" style={{ marginBottom: 10, textTransform: 'none', letterSpacing: 0 }}>
               Fotos · {projektFotos.length}
             </div>
-            <div className="fotos-grid">
-              {projektFotos.map((f) => (
-                <div key={f.url} className="foto-card">
-                  <div className="foto-img">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.url} alt="" />
-                    <div className="foto-img-actions">
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="trash"
-                        title="Entfernen"
-                        onClick={() =>
-                          setProjektFotos((prev) => prev.filter((x) => x.url !== f.url))
-                        }
-                      />
-                    </div>
+            {projektFotos.length > 0 ? (
+              <div className="wizard-dok-fotos__grid">
+                {projektFotos.map((f) => (
+                  <div key={f.url} className="wizard-dok-fotos__item">
+                    <button
+                      type="button"
+                      className="wizard-dok-fotos__thumb"
+                      onClick={() => setFotoLightboxUrl(f.url)}
+                      aria-label="Foto vergrößern"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={f.url} alt="" />
+                    </button>
+                    <button
+                      type="button"
+                      className="wizard-dok-fotos__remove"
+                      title="Entfernen"
+                      aria-label="Foto entfernen"
+                      onClick={() => {
+                        setProjektFotos((prev) => prev.filter((x) => x.url !== f.url))
+                        if (fotoLightboxUrl === f.url) setFotoLightboxUrl(null)
+                      }}
+                    >
+                      <MockIcon ctx="default" n="trash" size={12} />
+                    </button>
                   </div>
-                  <div className="foto-desc">
-                    <textarea
-                      className="input ta"
-                      rows={2}
-                      placeholder="Beschreibung (optional)"
-                      value={f.beschreibung}
-                      onChange={(e) =>
-                        setProjektFotos((prev) =>
-                          prev.map((x) =>
-                            x.url === f.url ? { ...x, beschreibung: e.target.value } : x
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="foto-upload"
-                disabled={projektUploading || saving}
-                onClick={() => fotoInputRef.current?.click()}
-              >
-                <MockIcon ctx="default" n="plus" size={18} />
-                <div>{projektUploading ? 'Wird hochgeladen…' : 'Fotos hinzufügen'}</div>
-              </button>
-              <input
-                ref={fotoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  const files = e.target.files ? Array.from(e.target.files) : []
-                  e.target.value = ''
-                  void uploadProjektFotoFiles(files)
-                }}
-              />
-            </div>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="wizard-dok-fotos__upload"
+              disabled={projektUploading || saving}
+              onClick={() => fotoInputRef.current?.click()}
+            >
+              <MockIcon ctx="default" n="plus" size={16} />
+              <span>{projektUploading ? 'Wird hochgeladen…' : 'Fotos hinzufügen'}</span>
+            </button>
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = e.target.files ? Array.from(e.target.files) : []
+                e.target.value = ''
+                void uploadProjektFotoFiles(files)
+              }}
+            />
           </div>
+          <Modal
+            open={Boolean(fotoLightboxUrl)}
+            onClose={() => setFotoLightboxUrl(null)}
+            title="Foto"
+            size="xl"
+          >
+            {fotoLightboxUrl ? (
+              <div className="wizard-dok-fotos__lightbox">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={fotoLightboxUrl} alt="Foto" />
+                <label className="wizard-dok-fotos__lightbox-cap">
+                  <span>Beschreibung (optional)</span>
+                  <textarea
+                    className="input ta"
+                    rows={3}
+                    placeholder="z. B. Istzustand…"
+                    value={
+                      projektFotos.find((x) => x.url === fotoLightboxUrl)?.beschreibung ?? ''
+                    }
+                    onChange={(e) =>
+                      setProjektFotos((prev) =>
+                        prev.map((x) =>
+                          x.url === fotoLightboxUrl
+                            ? { ...x, beschreibung: e.target.value }
+                            : x
+                        )
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            ) : null}
+          </Modal>
         </div>
       </EditorSheet>
 
@@ -1142,45 +1268,43 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Gültig bis">
-            <input
-              type="date"
-              className="input"
-              value={meta.gueltig_bis}
-              onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
-            />
-          </MockField>
-          <MockField
-            label="Leistungszeitraum von"
-            hint={istAuftragKorrektur ? 'Ausführungszeitraum am Auftrag' : undefined}
-          >
-            <input
-              type="date"
-              className="input"
-              value={meta.leistungszeitraum_von ?? ''}
-              onChange={(e) =>
-                setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-              }
-            />
-          </MockField>
-          <MockField label="Leistungszeitraum bis">
-            <input
-              type="date"
-              className="input"
-              value={meta.leistungszeitraum_bis ?? ''}
-              onChange={(e) =>
-                setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-              }
-            />
-          </MockField>
+          <div className="full wizard-zahlung-dates">
+            <MockField label="Gültig bis">
+              <DateInput
+                size="sm"
+                value={meta.gueltig_bis}
+                onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
+              />
+            </MockField>
+            <MockField
+              label="Leistungszeitraum von"
+              hint={istAuftragKorrektur ? 'Ausführungszeitraum am Auftrag' : undefined}
+            >
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_von ?? ''}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+                }
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum bis">
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_bis ?? ''}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+                }
+              />
+            </MockField>
+          </div>
           <MockField label="Zahlfrist" full hint="Zahlungsziel nach Rechnungsstellung">
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <MockZahlfristSeg value={zahlfristSeg} onChange={(v) => applyZahlfrist(v)} />
               {zahlfristSeg === 'datum' ? (
-                <div style={{ width: 180 }}>
-                  <input
-                    type="date"
-                    className="input"
+                <div style={{ width: 160 }}>
+                  <DateInput
+                    size="sm"
                     value={zahlfristDatum}
                     onChange={(e) => applyZahlfrist('datum', e.target.value)}
                   />
@@ -1218,28 +1342,6 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Versand"
         context="canvas"
-        compose
-        composeLabel={saving ? '…' : 'Senden'}
-        onConfirm={() => void handleFinishVersenden()}
-        confirmDisabled={saving}
-        confirmBusy={saving}
-        footer={
-          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-            {istAuftragKorrektur ? (
-              <MockBtn
-                kind="ghost"
-                disabled={saving}
-                onClick={() => void handleFinishKorrekturSpeichern()}
-              >
-                {saving ? '…' : 'Übernehmen'}
-              </MockBtn>
-            ) : (
-              <MockBtn kind="ghost" disabled={saving} onClick={() => void handleFinishErstellen()}>
-                {saving ? '…' : 'Erstellen'}
-              </MockBtn>
-            )}
-          </div>
-        }
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField
@@ -1276,31 +1378,37 @@ export function AngebotWizard({
           </KiAssistFieldLabel>
           <div className="full">
             <KiAssistFieldLabel
-              label="Einleitung"
-              value={meta.einleitung}
-              onApply={(text) => setMeta((m) => ({ ...m, einleitung: text }))}
-              extraHint="Anschreiben in der Mail und auf dem Angebot."
+              label="E-Mail-Text"
+              value={mailBodyDraft}
+              onApply={(text) => {
+                setMailBodyDraft(text)
+                const parsed = parseAngebotMailFullTextFromEditor(
+                  text,
+                  mailAnrede,
+                  meta.leistungsumfang.trim() || projekt,
+                  mailKundeKontext
+                )
+                setMeta((m) => ({ ...m, einleitung: parsed.einleitung, schluss: parsed.schluss }))
+              }}
+              extraHint={`Kompletter Mail-Text inkl. Begrüßung. Die Zeile „${ANGEBOT_MAIL_BOX_MARKER}“ nicht löschen — dort erscheinen Angebotsnummer, Preis und Gültigkeit.`}
             >
               <textarea
-                className="input ta"
-                rows={5}
-                value={meta.einleitung}
-                onChange={(e) => setMeta((m) => ({ ...m, einleitung: e.target.value }))}
-              />
-            </KiAssistFieldLabel>
-          </div>
-          <div className="full">
-            <KiAssistFieldLabel
-              label="Schlusstext"
-              value={meta.schluss}
-              onApply={(text) => setMeta((m) => ({ ...m, schluss: text }))}
-              extraHint="Schlusstext in der Mail und auf dem Angebot."
-            >
-              <textarea
-                className="input ta"
-                rows={4}
-                value={meta.schluss}
-                onChange={(e) => setMeta((m) => ({ ...m, schluss: e.target.value }))}
+                className="input ta wizard-dok-beschreibung"
+                rows={14}
+                value={mailBodyDraft}
+                disabled={saving}
+                spellCheck
+                onChange={(e) => {
+                  const text = e.target.value
+                  setMailBodyDraft(text)
+                  const parsed = parseAngebotMailFullTextFromEditor(
+                    text,
+                    mailAnrede,
+                    meta.leistungsumfang.trim() || projekt,
+                    mailKundeKontext
+                  )
+                  setMeta((m) => ({ ...m, einleitung: parsed.einleitung, schluss: parsed.schluss }))
+                }}
               />
             </KiAssistFieldLabel>
           </div>
@@ -1311,7 +1419,7 @@ export function AngebotWizard({
               einleitung={meta.einleitung}
               schluss={meta.schluss}
               leistungsumfang={meta.leistungsumfang.trim() || projekt}
-              empfaengerHint={mailTo[0] || email || undefined}
+              empfaengerHint={mailTo[0] || sheetEmail || undefined}
             />
           </div>
         </div>
@@ -1324,50 +1432,146 @@ export function AngebotWizard({
       <EditorSheet
         open
         onClose={onClose}
-        title="Angebotstyp"
+        title={typGateStep === 'layout' ? 'Angebotslayout' : 'Art der Leistung'}
         context="canvas"
         manageHistory={false}
       >
-        <p
-          style={{
-            margin: '0 0 14px',
-            fontSize: 'var(--fs-meta)',
-            color: 'var(--text-3)',
-            lineHeight: 1.45,
-          }}
-        >
-          Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst.
-        </p>
-        <div className="doctype-row doctype-row--stack">
-          <button
-            type="button"
-            className="doctype-radio-opt doctype-radio-opt--block"
-            onClick={() => {
-              setDokumentTyp('einfach')
-              setTypConfirmed(true)
-            }}
-          >
-            <span className="dot" />
-            <span className="doctype-radio-opt__copy">
-              <span className="lbl">Einfach</span>
-              <span className="hint">Nur Positionen — ohne Gewerk-Abschnitte</span>
-            </span>
-          </button>
-          <button
-            type="button"
-            className="doctype-radio-opt doctype-radio-opt--block"
-            onClick={() => {
-              setDokumentTyp('projekt')
-              setTypConfirmed(true)
-            }}
-          >
-            <span className="dot" />
-            <span className="doctype-radio-opt__copy">
-              <span className="lbl">Komplex</span>
-              <span className="hint">Mit Gewerken — z. B. Sanitär, Elektro, Maler</span>
-            </span>
-          </button>
-        </div>
+        {typGateStep === 'art' ? (
+          <>
+            <p
+              style={{
+                margin: '0 0 14px',
+                fontSize: 'var(--fs-meta)',
+                color: 'var(--text-3)',
+                lineHeight: 1.45,
+              }}
+            >
+              Einmalig = Projekt/Auftrag mit Abschluss. Wiederkehrend = Bestand wie Wartung,
+              Winterdienst oder Hausmeisterservice.
+            </p>
+            <div className="doctype-row doctype-row--stack">
+              <button
+                type="button"
+                className="doctype-radio-opt doctype-radio-opt--block"
+                onClick={() => {
+                  setWiederkehr({ ist_wiederkehrend: false, wiederkehr_turnus: null })
+                  setTypGateStep('layout')
+                }}
+              >
+                <span className="dot" />
+                <span className="doctype-radio-opt__copy">
+                  <span className="lbl">Einmalig</span>
+                  <span className="hint">Projekt oder einmaliger Auftrag</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={
+                  wiederkehr.ist_wiederkehrend
+                    ? 'doctype-radio-opt doctype-radio-opt--block on'
+                    : 'doctype-radio-opt doctype-radio-opt--block'
+                }
+                onClick={() =>
+                  setWiederkehr({
+                    ist_wiederkehrend: true,
+                    wiederkehr_turnus: wiederkehr.wiederkehr_turnus ?? 'monatlich',
+                  })
+                }
+              >
+                <span className="dot" />
+                <span className="doctype-radio-opt__copy">
+                  <span className="lbl">Wiederkehrend</span>
+                  <span className="hint">Wartung, Winterdienst, Pflege — Bestand</span>
+                </span>
+              </button>
+            </div>
+            {wiederkehr.ist_wiederkehrend ? (
+              <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
+                <label className="field">
+                  <span className="field-label">Zeitintervall</span>
+                  <select
+                    className="sel"
+                    value={wiederkehr.wiederkehr_turnus ?? 'monatlich'}
+                    onChange={(e) =>
+                      setWiederkehr({
+                        ist_wiederkehrend: true,
+                        wiederkehr_turnus: e.target.value as WiederkehrTurnus,
+                      })
+                    }
+                  >
+                    {WIEDERKEHR_TURNUS_VALUES.map((v) => (
+                      <option key={v} value={v}>
+                        {WIEDERKEHR_TURNUS_LABELS[v]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => {
+                    setDokumentTyp('einfach')
+                    setTypGateStep(null)
+                  }}
+                >
+                  Weiter
+                </button>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <p
+              style={{
+                margin: '0 0 14px',
+                fontSize: 'var(--fs-meta)',
+                color: 'var(--text-3)',
+                lineHeight: 1.45,
+              }}
+            >
+              Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst — nur bei
+              einmaligen Projekten relevant.
+            </p>
+            <div className="doctype-row doctype-row--stack">
+              <button
+                type="button"
+                className="doctype-radio-opt doctype-radio-opt--block"
+                onClick={() => {
+                  setDokumentTyp('einfach')
+                  setTypGateStep(null)
+                }}
+              >
+                <span className="dot" />
+                <span className="doctype-radio-opt__copy">
+                  <span className="lbl">Einfach</span>
+                  <span className="hint">Nur Positionen — ohne Gewerk-Abschnitte</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="doctype-radio-opt doctype-radio-opt--block"
+                onClick={() => {
+                  setDokumentTyp('projekt')
+                  setTypGateStep(null)
+                }}
+              >
+                <span className="dot" />
+                <span className="doctype-radio-opt__copy">
+                  <span className="lbl">Komplex</span>
+                  <span className="hint">Mit Gewerken — z. B. Sanitär, Elektro, Maler</span>
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ marginTop: 12 }}
+              onClick={() => setTypGateStep('art')}
+            >
+              Zurück
+            </button>
+          </>
+        )}
       </EditorSheet>
     ) : (
       wizard

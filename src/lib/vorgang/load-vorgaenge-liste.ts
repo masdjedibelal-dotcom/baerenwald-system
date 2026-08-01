@@ -59,62 +59,131 @@ export async function loadVorgaengeListe(): Promise<{
     return { rows: [], error: 'Sitzung abgelaufen — bitte erneut anmelden.' }
   }
 
-  const [leadsRes, angeboteRes, auftraegeRes, rechnungenRes, positionenRes] = await Promise.all([
-    withCrmReadFallback(async (db) =>
-      db
-        .from('leads')
-        .select(VORGAENGE_LEAD_SELECT)
-        .is('geloescht_am', null)
-        .order('updated_at', { ascending: false })
-        .limit(200)
-    ),
-    withCrmReadFallback(async (db) =>
-      db
-        .from('angebote')
-        .select(
-          'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch'
-        )
-        .not('lead_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    ),
-    withCrmReadFallback(async (db) =>
-      db
-        .from('auftraege')
-        .select(
-          'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall'
-        )
-        .not('lead_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    ),
+  const RECHNUNG_SELECT =
+    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ)'
+
+  const leadsRes = await withCrmReadFallback(async (db) =>
+    db
+      .from('leads')
+      .select(VORGAENGE_LEAD_SELECT)
+      .is('geloescht_am', null)
+      .order('updated_at', { ascending: false })
+      .limit(200)
+  )
+
+  if (leadsRes.error || !leadsRes.data) {
+    return { rows: [], error: leadsRes.error?.message ?? 'Leads konnten nicht geladen werden.' }
+  }
+
+  const leadIds = (leadsRes.data as Array<{ id: string }>).map((l) => l.id).filter(Boolean)
+
+  const emptySatellites = {
+    data: [] as unknown[],
+    error: null as { message: string } | null,
+  }
+
+  const [angeboteRes, auftraegeRes] = leadIds.length
+    ? await Promise.all([
+        withCrmReadFallback(async (db) =>
+          db
+            .from('angebote')
+            .select(
+              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch'
+            )
+            .in('lead_id', leadIds)
+            .order('created_at', { ascending: false })
+            .limit(500)
+        ),
+        withCrmReadFallback(async (db) =>
+          db
+            .from('auftraege')
+            .select(
+              'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall'
+            )
+            .in('lead_id', leadIds)
+            .order('created_at', { ascending: false })
+            .limit(500)
+        ),
+      ])
+    : [emptySatellites, emptySatellites]
+
+  if (angeboteRes.error || auftraegeRes.error) {
+    return {
+      rows: [],
+      error: angeboteRes.error?.message ?? auftraegeRes.error?.message ?? null,
+    }
+  }
+
+  const auftragIds = (
+    (auftraegeRes.data ?? []) as Array<{ id: string }>
+  )
+    .map((a) => a.id)
+    .filter(Boolean)
+  const angebotIds = (
+    (angeboteRes.data ?? []) as Array<{ id: string }>
+  )
+    .map((a) => a.id)
+    .filter(Boolean)
+
+  const [rechnungenLinkedRes, rechnungenStandaloneRes, positionenRes] = await Promise.all([
+    auftragIds.length || angebotIds.length
+      ? withCrmReadFallback(async (db) => {
+          let q = db
+            .from('rechnungen')
+            .select(RECHNUNG_SELECT)
+            .order('created_at', { ascending: false })
+            .limit(500)
+          if (auftragIds.length && angebotIds.length) {
+            q = q.or(
+              `auftrag_id.in.(${auftragIds.join(',')}),angebot_id.in.(${angebotIds.join(',')})`
+            )
+          } else if (auftragIds.length) {
+            q = q.in('auftrag_id', auftragIds)
+          } else {
+            q = q.in('angebot_id', angebotIds)
+          }
+          return q
+        })
+      : Promise.resolve(emptySatellites),
+    // Direktrechnungen ohne Lead-Bezug (begrenzt)
     withCrmReadFallback(async (db) =>
       db
         .from('rechnungen')
-        .select(
-          'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ)'
+        .select(RECHNUNG_SELECT)
+        .is('auftrag_id', null)
+        .is('angebot_id', null)
+        .order('created_at', { ascending: false })
+        .limit(100)
+    ),
+    auftragIds.length
+      ? withCrmReadFallback(async (db) =>
+          db
+            .from('auftrag_positionen')
+            .select('auftrag_id, handwerker_id, handwerker_status')
+            .in('auftrag_id', auftragIds)
+            .order('created_at', { ascending: false })
+            .limit(2000)
         )
-        .order('created_at', { ascending: false })
-        .limit(500)
-    ),
-    withCrmReadFallback(async (db) =>
-      db
-        .from('auftrag_positionen')
-        .select('auftrag_id, handwerker_id, handwerker_status')
-        .order('created_at', { ascending: false })
-        .limit(2000)
-    ),
+      : Promise.resolve(emptySatellites),
   ])
 
-  const err =
-    leadsRes.error?.message ??
-    angeboteRes.error?.message ??
-    auftraegeRes.error?.message ??
-    rechnungenRes.error?.message ??
-    positionenRes.error?.message ??
-    null
+  const rechnungenById = new Map<string, unknown>()
+  for (const row of [
+    ...(rechnungenLinkedRes.data ?? []),
+    ...(rechnungenStandaloneRes.data ?? []),
+  ]) {
+    const id = String((row as { id: string }).id)
+    if (!rechnungenById.has(id)) rechnungenById.set(id, row)
+  }
+  const rechnungenRes = {
+    data: Array.from(rechnungenById.values()),
+    error: rechnungenLinkedRes.error ?? rechnungenStandaloneRes.error,
+  }
 
-  if (err || !leadsRes.data) {
+  const err =
+    rechnungenRes.error?.message ?? positionenRes.error?.message ?? null
+
+  if (err) {
     return { rows: [], error: err }
   }
 

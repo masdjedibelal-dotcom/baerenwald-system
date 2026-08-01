@@ -11,7 +11,7 @@ import { toast } from '@/components/ui/app-toast'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
 
-/** Portal-first Bautagebuch-Eintrag: Titel · Text · Fotos · Leistung. */
+/** Bautagebuch-Eintrag: Leistung · Titel · Beschreibung · Fotos. */
 export function CrmPositionEintragModal({
   open,
   onClose,
@@ -125,22 +125,21 @@ export function CrmPositionEintragModal({
       }
     >
       <div className="space-y-4">
-        <div>
-          <span className="lt-field-lbl">Fotos</span>
-          <label className="lt-foto-zone">
-            <Camera className="h-5 w-5" aria-hidden />
-            <span>{fotoPath ? 'Foto gesetzt — tippen zum Ändern' : 'Foto hinzufügen'}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) void uploadFoto(f)
-              }}
-            />
-          </label>
-        </div>
+        <label className="block">
+          <span className="lt-field-lbl">Leistung</span>
+          <select
+            className="input"
+            value={positionId}
+            onChange={(e) => setPositionId(e.target.value)}
+          >
+            <option value="">Leistung auswählen…</option>
+            {sortedPos.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.leistung_name?.trim() || 'Leistung'}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <KiAssistFieldLabel
           label="Titel"
@@ -171,21 +170,22 @@ export function CrmPositionEintragModal({
           />
         </KiAssistFieldLabel>
 
-        <label className="block">
-          <span className="lt-field-lbl">Leistung</span>
-          <select
-            className="input"
-            value={positionId}
-            onChange={(e) => setPositionId(e.target.value)}
-          >
-            <option value="">Ohne Bezug</option>
-            {sortedPos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.leistung_name?.trim() || 'Leistung'}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <span className="lt-field-lbl">Fotos</span>
+          <label className="lt-foto-zone">
+            <Camera className="h-5 w-5" aria-hidden />
+            <span>{fotoPath ? 'Foto gesetzt — tippen zum Ändern' : 'Foto hinzufügen'}</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) void uploadFoto(f)
+              }}
+            />
+          </label>
+        </div>
       </div>
     </EditorSheet>
   )

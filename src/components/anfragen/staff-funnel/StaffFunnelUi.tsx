@@ -116,12 +116,10 @@ export function StaffPreisIndikation({
   min,
   max,
   komplex,
-  hinweis,
 }: {
   min: number | null
   max: number | null
   komplex?: boolean
-  hinweis?: string
 }) {
   const fmt = (n: number) =>
     new Intl.NumberFormat('de-DE', {
@@ -130,33 +128,23 @@ export function StaffPreisIndikation({
       maximumFractionDigits: 0,
     }).format(n)
 
-  if (komplex || (min == null && max == null)) {
-    return (
-      <div className="preis-karte preis-karte--beratung">
-        <p className="preis-karte-kicker">Preisindikation</p>
-        <div className="preis-karte-range">
-          <span className="preis-karte-zahl" style={{ fontSize: '1.35rem' }}>
-            Persönliche Beratung
-          </span>
-        </div>
-        <p className="preis-karte-hinweis">
-          {hinweis?.trim() ||
-            'Für diese Auswahl gibt es keinen verlässlichen Online-Preisrahmen — Aufwand und Budget klären wir im Gespräch.'}
-        </p>
-      </div>
-    )
-  }
-
-  const hasRange = min != null && max != null && min !== max
-  const fixed = min != null && max != null && min === max
+  const empty = komplex || (min == null && max == null)
+  const hasRange = !empty && min != null && max != null && min !== max
+  const fixed = !empty && min != null && max != null && min === max
 
   return (
-    <div className="preis-karte">
+    <div className={empty ? 'preis-karte preis-karte--empty' : 'preis-karte'}>
       <p className="preis-karte-kicker">
         {fixed ? 'Unverbindlicher Preis' : 'Unverbindlicher Preisrahmen'}
       </p>
       <div className="preis-karte-range">
-        {hasRange ? (
+        {empty ? (
+          <>
+            <span className="preis-karte-zahl preis-karte-zahl--dash">—</span>
+            <span className="preis-karte-trenner">–</span>
+            <span className="preis-karte-zahl preis-karte-zahl--dash">—</span>
+          </>
+        ) : hasRange ? (
           <>
             <span className="preis-karte-zahl">{fmt(min!)}</span>
             <span className="preis-karte-trenner">–</span>
@@ -166,10 +154,6 @@ export function StaffPreisIndikation({
           <span className="preis-karte-zahl">{fmt(min ?? max ?? 0)}</span>
         )}
       </div>
-      <p className="preis-karte-hinweis">
-        {hinweis?.trim() ||
-          'Orientierung fürs Kundengespräch — unverbindlich, wie auf der Website.'}
-      </p>
     </div>
   )
 }

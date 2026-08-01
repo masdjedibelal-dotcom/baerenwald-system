@@ -237,7 +237,7 @@ export function KiChatComposer({
           aria-label="Sprachnotiz aufnehmen"
           onClick={startVoice}
         >
-          <MockIcon ctx="btn" n="microphone" size={18} />
+          <MockIcon ctx="default" n="microphone" size={18} />
         </button>
 
         <textarea

@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
+import { Check, FileText } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { DocActionBar } from '@/components/surfaces/primitives'
-import { ActionIcon } from '@/components/ui/ActionIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
@@ -16,10 +16,18 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
+import { DateInput } from '@/components/ui/DateInput'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
+import { KundeModal } from '@/components/kunden/KundeModal'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
-import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import { toast } from '@/components/ui/app-toast'
+import { kundentypLabel } from '@/lib/lead-display-helpers'
+import { normalizeKundeNamen } from '@/lib/kunde-namen'
+import {
+  istKundeFirmaPflichtTyp,
+  kundeStrasseHausnummerZeile,
+} from '@/lib/kunde-stammdaten'
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
@@ -78,8 +86,12 @@ import {
 import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
 import {
   normalizeVorgangWiederkehr,
+  WIEDERKEHR_TURNUS_LABELS,
+  WIEDERKEHR_TURNUS_VALUES,
   type VorgangWiederkehr,
+  type WiederkehrTurnus,
 } from '@/lib/vorgang/wiederkehrend'
+import { cn } from '@/lib/utils'
 import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
@@ -140,14 +152,33 @@ export function RechnungWizard({
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [kunde, setKunde] = useState(bootstrap.kunde)
   const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
-  const [kundePickerOpen, setKundePickerOpen] = useState(false)
+  const [kundeEditOpen, setKundeEditOpen] = useState(false)
+  const kundeNamen = normalizeKundeNamen({
+    typ: kunde?.typ,
+    name: kunde?.name,
+    vorname: kunde?.vorname,
+    nachname: kunde?.nachname,
+  })
+  const kundeFirma = istKundeFirmaPflichtTyp(kunde?.typ)
+    ? kunde?.name?.trim() || kundeNamen.name.trim() || ''
+    : ''
   const kundeName =
+    kundeFirma ||
+    [kundeNamen.vorname, kundeNamen.nachname].filter(Boolean).join(' ') ||
     kunde?.name?.trim() ||
-    [kunde?.vorname, kunde?.nachname].filter(Boolean).join(' ') ||
     'Kunde wählen'
   const kundeEmail = (kunde?.email || '').trim()
+  const kundeTelefon = (kunde?.telefon || '').trim()
+  const kundeAnschrift = kunde
+    ? kundeStrasseHausnummerZeile(kunde) || kunde.adresse?.trim() || null
+    : null
+  const kundeStadt = [kunde?.plz?.trim(), kunde?.ort?.trim()].filter(Boolean).join(' ')
+  const kundeTypLabel = kundentypLabel(kunde?.typ)
   const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
   const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
+  /** Neu: Art der Leistung vor dem Wizard (nicht im Dokument-Sheet). */
+  const needsArtGate = !bootstrap.rechnungId
+  const [artGateOpen, setArtGateOpen] = useState(needsArtGate)
   const auftragLabel =
     bootstrap.auftragsReferenz?.trim() ||
     bootstrap.projektTitel?.trim() ||
@@ -725,7 +756,8 @@ export function RechnungWizard({
 
       const to = mailTo.filter((e) => isValidEmail(e))
       if (!to.length) {
-        toast.error('Mindestens eine gültige Empfänger-E-Mail erforderlich.')
+        toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+        setSheet('versand')
         return
       }
       const res = await sendRechnungWizard({
@@ -846,30 +878,14 @@ export function RechnungWizard({
 
   const wizardSubtitle = kundeName?.trim() || undefined
 
-  function onKundePick(k: Kunde) {
-    setKunde({
-      id: k.id,
-      name: k.name,
-      vorname: k.vorname,
-      nachname: k.nachname,
-      email: k.email,
-      telefon: k.telefon,
-      adresse: k.adresse,
-      strasse: k.strasse,
-      hausnummer: k.hausnummer,
-      plz: k.plz,
-      ort: k.ort,
-      typ: k.typ,
-      ust_id: k.ust_id,
-      kundennummer: k.kundennummer,
-    })
-    setKundeId(k.id)
-    setKundePickerOpen(false)
-    setSheet(null)
-    const email = (k.email || '').trim()
+  function onKundeSaved(_id?: string, saved?: Partial<Kunde>) {
+    setKundeEditOpen(false)
+    if (!saved) return
+    setKunde((prev) => ({ ...(prev ?? {}), ...saved, id: saved.id || prev?.id || kundeId } as typeof kunde))
+    if (saved.id) setKundeId(saved.id)
+    const email = saved.email?.trim()
     if (email && isValidEmail(email)) setMailTo([email])
     setDraftDirty(true)
-    toast.success('Kunde übernommen')
   }
 
   const steuernBlock = (
@@ -969,13 +985,11 @@ export function RechnungWizard({
       <div className="document-section__label" style={{ marginBottom: 10 }}>
         Rechnungsdaten
       </div>
-      {!hatAuftrag ? (
-        <MetaCrowButton
-          label="Kunde"
-          value={kundeName}
-          onClick={() => setSheet('kunde')}
-        />
-      ) : null}
+      <MetaCrowButton
+        label="Kunde"
+        value={kundeName}
+        onClick={() => setSheet('kunde')}
+      />
       <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
@@ -1001,39 +1015,61 @@ export function RechnungWizard({
     </div>
   )
 
-  const docActions = (
-    <DocActionBar
-      actions={[
-        {
-          id: 'save',
-          label: saving ? 'Speichern…' : 'Speichern',
-          onClick: () => {
-            if (saving || (hasPlan && !planOk)) return
-            void persistDraft().then((id) => {
-              if (id) toast.success('Entwurf gespeichert')
-            })
+  const headerEnd = (
+    <>
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={() => {
+          void persistDraft().then(() => setSheet('vorschau'))
+        }}
+        aria-label="Vorschau"
+        title="Vorschau"
+      >
+        <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <ActionsMenu
+        sheetTitle="Rechnung"
+        align="right"
+        trigger={
+          <span
+            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+            aria-label="Speichern oder senden"
+            title="Speichern oder senden"
+          >
+            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+          </span>
+        }
+        items={[
+          {
+            label: saving ? 'Speichern…' : 'Speichern',
+            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
+            onClick: () => {
+              if (saving || (hasPlan && !planOk)) return
+              void persistDraft().then((id) => {
+                if (id) toast.success('Entwurf gespeichert')
+              })
+            },
           },
-          icon: <ActionIcon n="device-floppy" size={20} />,
-        },
-        {
-          id: 'preview',
-          label: 'Vorschau',
-          onClick: () => {
-            void persistDraft().then(() => setSheet('vorschau'))
+          {
+            label: saving ? 'Senden…' : 'Senden',
+            icon: <MockIcon ctx="btn" n="send" size={16} />,
+            hint: 'Speichert und versendet',
+            onClick: () => {
+              if (saving) return
+              void handleFinish(true)
+            },
           },
-          icon: <ActionIcon n="file-text" size={20} />,
-        },
-        {
-          id: 'send',
-          label: 'Senden',
-          onClick: () => setSheet('versand'),
-          icon: <ActionIcon n="send" size={20} />,
-        },
-      ]}
-    />
+        ]}
+      />
+    </>
   )
 
-  const closeSheet = () => setSheet(null)
+  const closeSheet = () => {
+    setKundeEditOpen(false)
+    setSheet(null)
+  }
 
   const wizard = (
     <>
@@ -1041,16 +1077,9 @@ export function RechnungWizard({
         title={wizardTitel}
         subtitle={wizardSubtitle}
         onClose={handleRequestClose}
-        onSave={() =>
-          void persistDraft().then((id) => {
-            if (id) toast.success('Entwurf gespeichert')
-          })
-        }
-        saveBusy={saving}
+        headerEnd={headerEnd}
         busy={saving}
         busyLabel="Wird versendet…"
-        onDiscard={() => onClose()}
-        docActions={docActions}
         document={documentColumn}
         meta={metaColumn}
         className="wizard-flow"
@@ -1063,19 +1092,43 @@ export function RechnungWizard({
         title="Kunde"
         context="canvas"
         headerEnd={
-          <button
-            type="button"
-            className="editor-sheet__confirm-text"
-            onClick={() => setKundePickerOpen(true)}
-          >
-            Wechseln
-          </button>
+          kunde ? (
+            <button
+              type="button"
+              className="editor-sheet__confirm-text"
+              onClick={() => setKundeEditOpen(true)}
+            >
+              Bearbeiten
+            </button>
+          ) : null
         }
       >
         <div className="gfc">
           <div className="gfc-row">
-            <span className="gfc-l">Name</span>
-            <span className="gfc-v">{kundeName}</span>
+            <span className="gfc-l">Kundentyp</span>
+            <span className="gfc-v">{kundeTypLabel || '—'}</span>
+          </div>
+          {kundeFirma ? (
+            <div className="gfc-row">
+              <span className="gfc-l">Firma</span>
+              <span className="gfc-v">{kundeFirma}</span>
+            </div>
+          ) : null}
+          <div className="gfc-row">
+            <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
+            <span className="gfc-v">{kundeNamen.vorname || '—'}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">{kundeFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
+            <span className="gfc-v">{kundeNamen.nachname || '—'}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Anschrift</span>
+            <span className="gfc-v">{kundeAnschrift || '—'}</span>
+          </div>
+          <div className="gfc-row">
+            <span className="gfc-l">Stadt</span>
+            <span className="gfc-v">{kundeStadt || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">E-Mail</span>
@@ -1083,17 +1136,18 @@ export function RechnungWizard({
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Telefon</span>
-            <span className="gfc-v">{kunde?.telefon?.trim() || '—'}</span>
+            <span className="gfc-v">{kundeTelefon || <em>fehlt</em>}</span>
           </div>
         </div>
       </EditorSheet>
 
-      <KundePickerSheet
-        open={kundePickerOpen}
-        onClose={() => setKundePickerOpen(false)}
-        onPick={onKundePick}
+      <KundeModal
+        open={kundeEditOpen}
+        onClose={() => setKundeEditOpen(false)}
+        editKunde={(kunde as Kunde | null) ?? null}
+        stayOnPage
         context="canvas"
-        title="Kunde"
+        onSaved={onKundeSaved}
       />
 
       <EditorSheet
@@ -1114,75 +1168,6 @@ export function RechnungWizard({
               placeholder="z.B. Badsanierung München"
             />
           </MockField>
-          {hatAuftrag && !rateLocked ? (
-            <div className="full">
-              <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
-                Art
-              </div>
-              <div className="seg" role="group" aria-label="Rechnungsart">
-                <button
-                  type="button"
-                  className={rechnungsart === 'abschlag' ? 'on' : undefined}
-                  onClick={() => setRechnungsart('abschlag')}
-                >
-                  Abschlag
-                </button>
-                <button
-                  type="button"
-                  className={rechnungsart === 'schluss' ? 'on' : undefined}
-                  onClick={() => setRechnungsart('schluss')}
-                >
-                  Schluss
-                </button>
-              </div>
-            </div>
-          ) : !hatAuftrag ? (
-            <div className="full">
-              <div className="section-h" style={{ marginBottom: 10, textTransform: 'none' }}>
-                Art
-              </div>
-              <div className="seg" role="group" aria-label="Rechnungsart">
-                <button type="button" className="on" disabled>
-                  Einzel
-                </button>
-              </div>
-            </div>
-          ) : null}
-          <div className="full">
-            <VorgangArtWiederkehrField
-              value={wiederkehr}
-              onChange={setWiederkehr}
-              hint="Wiederkehrend — Abrechnung zu wiederkehrendem Auftrag"
-            />
-          </div>
-          <MockField label="Rechnungsdatum">
-            <input
-              type="date"
-              className="input"
-              value={meta.rechnungsdatum}
-              onChange={(e) => setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))}
-            />
-          </MockField>
-          <MockField label="Leistungszeitraum von">
-            <input
-              type="date"
-              className="input"
-              value={meta.leistungszeitraum_von}
-              onChange={(e) =>
-                setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-              }
-            />
-          </MockField>
-          <MockField label="Leistungszeitraum bis" full>
-            <input
-              type="date"
-              className="input"
-              value={meta.leistungszeitraum_bis}
-              onChange={(e) =>
-                setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-              }
-            />
-          </MockField>
         </div>
       </EditorSheet>
 
@@ -1193,6 +1178,33 @@ export function RechnungWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
+          <div className="full wizard-zahlung-dates">
+            <MockField label="Rechnungsdatum">
+              <DateInput
+                size="sm"
+                value={meta.rechnungsdatum}
+                onChange={(e) => setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))}
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum von">
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_von}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+                }
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum bis">
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_bis}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+                }
+              />
+            </MockField>
+          </div>
           {!hatAuftrag ? (
             <div className="full card" style={{ padding: 16 }}>
               <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
@@ -1489,9 +1501,6 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Versand"
         context="canvas"
-        onConfirm={() => void handleFinish(true)}
-        confirmDisabled={saving || (hasPlan && !planOk)}
-        confirmBusy={saving}
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField
@@ -1556,5 +1565,92 @@ export function RechnungWizard({
     </>
   )
 
-  return wizard
+  return createPortal(
+    artGateOpen ? (
+      <EditorSheet
+        open
+        onClose={onClose}
+        title="Art der Leistung"
+        context="canvas"
+        manageHistory={false}
+      >
+        <p
+          style={{
+            margin: '0 0 14px',
+            fontSize: 'var(--fs-meta)',
+            color: 'var(--text-3)',
+            lineHeight: 1.45,
+          }}
+        >
+          Einmalig = Projekt/Auftrag mit Abschluss. Wiederkehrend = Bestand wie Wartung,
+          Winterdienst oder Hausmeisterservice.
+        </p>
+        <div className="doctype-row doctype-row--stack">
+          <button
+            type="button"
+            className="doctype-radio-opt doctype-radio-opt--block"
+            onClick={() => {
+              setWiederkehr({ ist_wiederkehrend: false, wiederkehr_turnus: null })
+              setArtGateOpen(false)
+            }}
+          >
+            <span className="dot" />
+            <span className="doctype-radio-opt__copy">
+              <span className="lbl">Einmalig</span>
+              <span className="hint">Projekt oder einmaliger Auftrag</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={
+              wiederkehr.ist_wiederkehrend
+                ? 'doctype-radio-opt doctype-radio-opt--block on'
+                : 'doctype-radio-opt doctype-radio-opt--block'
+            }
+            onClick={() =>
+              setWiederkehr({
+                ist_wiederkehrend: true,
+                wiederkehr_turnus: wiederkehr.wiederkehr_turnus ?? 'monatlich',
+              })
+            }
+          >
+            <span className="dot" />
+            <span className="doctype-radio-opt__copy">
+              <span className="lbl">Wiederkehrend</span>
+              <span className="hint">Wartung, Winterdienst, Pflege — Bestand</span>
+            </span>
+          </button>
+        </div>
+        {wiederkehr.ist_wiederkehrend ? (
+          <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
+            <label className="field">
+              <span className="field-label">Zeitintervall</span>
+              <select
+                className="sel"
+                value={wiederkehr.wiederkehr_turnus ?? 'monatlich'}
+                onChange={(e) =>
+                  setWiederkehr({
+                    ist_wiederkehrend: true,
+                    wiederkehr_turnus: e.target.value as WiederkehrTurnus,
+                  })
+                }
+              >
+                {WIEDERKEHR_TURNUS_VALUES.map((v) => (
+                  <option key={v} value={v}>
+                    {WIEDERKEHR_TURNUS_LABELS[v]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="btn primary" onClick={() => setArtGateOpen(false)}>
+              Weiter
+            </button>
+          </div>
+        ) : null}
+      </EditorSheet>
+    ) : (
+      wizard
+    ),
+    document.body
+  )
 }

@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
 import type { LeistungDrawerAction, LeistungRow } from '@/components/leistungen/types'
@@ -30,7 +29,7 @@ function Section({
 
 /**
  * Leistungs-Drawer: Position · Zuweisung.
- * Dokumentation → Bautagebuch · Abnahme → Auftrag abschließen.
+ * Aktionen (z. B. Zuweisung ändern) als Icon rechts oben — kein Footer-CTA.
  */
 export function LeistungDrawer({
   open,
@@ -45,6 +44,28 @@ export function LeistungDrawer({
   /** @deprecated */
   secondaryHint?: string | null
 }) {
+  const headerEnd =
+    actions.length > 0 ? (
+      <div className="flex items-center gap-0.5">
+        {actions.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            className="editor-sheet__icon-btn"
+            disabled={a.disabled}
+            aria-label={a.label}
+            title={a.label}
+            onClick={() => {
+              onClose()
+              a.onClick()
+            }}
+          >
+            <MockIcon ctx="default" n={a.icon ?? 'user'} size={20} />
+          </button>
+        ))}
+      </div>
+    ) : undefined
+
   if (!row) {
     return (
       <EditorSheet open={open} onClose={onClose} title="Leistung" size="lg">
@@ -53,26 +74,6 @@ export function LeistungDrawer({
     )
   }
 
-  const footer =
-    actions.length > 0 ? (
-      <div className="ldr-cta">
-        {actions.map((a) => (
-          <Button
-            key={a.id}
-            type="button"
-            variant={a.variant ?? 'secondary'}
-            disabled={a.disabled}
-            onClick={() => {
-              onClose()
-              a.onClick()
-            }}
-          >
-            <span>{a.label}</span>
-          </Button>
-        ))}
-      </div>
-    ) : null
-
   return (
     <EditorSheet
       open={open}
@@ -80,7 +81,7 @@ export function LeistungDrawer({
       title={row.bezeichnung}
       crumb={row.gewerkName ? `${row.gewerkName} >` : null}
       size="lg"
-      footer={footer}
+      headerEnd={headerEnd}
     >
       <Section title="Position" icon="file-text">
         <div className="props">

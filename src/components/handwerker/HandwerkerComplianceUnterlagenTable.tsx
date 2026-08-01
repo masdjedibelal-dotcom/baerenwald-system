@@ -109,6 +109,13 @@ export function HandwerkerComplianceUnterlagenTable({
     return { title, meta, status, typMeta }
   }
 
+  const uploadBtn = (
+    <Button type="button" variant="primary" size="sm" onClick={openAdd}>
+      <MockIcon ctx="btn" n="upload" size={14} />
+      Upload
+    </Button>
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -120,18 +127,19 @@ export function HandwerkerComplianceUnterlagenTable({
             Hochgeladene Nachweise und Dokumente dieses Handwerkers.
           </p>
         </div>
-        {hochgeladen.length > 0 ? (
-          <Button type="button" variant="primary" size="sm" onClick={openAdd}>
-            <MockIcon ctx="btn" n="plus" size={14} />
-            Hinzufügen
-          </Button>
-        ) : null}
+        {uploadBtn}
       </div>
 
       {hochgeladen.length === 0 ? (
-        <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-          Noch keine Unterlagen.
-        </p>
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+            Noch keine Unterlagen.
+          </p>
+          <Button type="button" variant="primary" onClick={openAdd}>
+            <MockIcon ctx="btn" n="upload" size={16} />
+            Dokument oder Foto hochladen
+          </Button>
+        </div>
       ) : isMobile ? (
         <div className="dok-cards">
           {hochgeladen.map((doc) => {

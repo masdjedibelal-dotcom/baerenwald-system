@@ -2,8 +2,10 @@
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { Check } from 'lucide-react'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
@@ -326,13 +328,6 @@ export function PositionAddSheet({
             ? !canConfirmGewerk
             : !canConfirmKatalog
 
-  const confirmLabel =
-    mode === 'gewerk'
-      ? 'Gewerk übernehmen'
-      : mode === 'preisliste'
-        ? 'Übernehmen'
-        : 'Hinzufügen'
-
   useKiAssistDraftConsumer(open, ['position', 'text'], (d) => {
     // KI-Übernahme: immer auf Frei-Karte schreiben und vorhandene Werte überschreiben
     if (d.type === 'position') {
@@ -375,21 +370,31 @@ export function PositionAddSheet({
     }
   })
 
-  const showFooter =
-    mode === 'frei' ||
-    mode === 'freitext' ||
-    mode === 'nachlass' ||
-    mode === 'gewerk' ||
-    (mode === 'preisliste' && picked)
+  // Nur Text aus Titel/Beschreibung an KI — nicht die Default-Menge „1 Stück“
+  const kiDraftSeed = (() => {
+    if (mode === 'freitext') {
+      const name = freitext.name.trim()
+      const desc = freitext.beschreibung.trim()
+      if (!name && !desc) return null
+      return [name, desc].filter(Boolean).join(' — ')
+    }
+    if (mode === 'frei') {
+      const name = frei.name.trim()
+      const desc = frei.beschreibung.trim()
+      if (!name && !desc) return null
+      return [
+        name,
+        desc,
+        frei.menge > 0 ? `${frei.menge} ${frei.einheit}` : '',
+        frei.preis > 0 ? `${frei.preis} €` : '',
+      ]
+        .filter(Boolean)
+        .join(' — ')
+    }
+    return null
+  })()
 
-  const kiDraftSeed =
-    mode === 'freitext'
-      ? [freitext.name, freitext.beschreibung].filter(Boolean).join(' — ') || null
-      : mode === 'frei'
-        ? [frei.name, frei.beschreibung, frei.menge ? `${frei.menge} ${frei.einheit}` : '', frei.preis ? `${frei.preis} €` : '']
-            .filter(Boolean)
-            .join(' — ') || null
-        : null
+  const headerConfirmDisabled = confirmDisabled || (mode === 'preisliste' && pending)
 
   return (
     <EditorSheet
@@ -398,40 +403,36 @@ export function PositionAddSheet({
       title="Position hinzufügen"
       context="canvas"
       size="lg"
-      onConfirm={onConfirm}
-      confirmDisabled={confirmDisabled}
       headerEnd={
-        mode === 'nachlass' || mode === 'gewerk' ? null : (
-          <KiAssistIconButton
-            overSheet
-            scope="position"
-            title="Position mit KI formulieren"
-            extraHint={
-              preferredGewerkName
-                ? `Gewerk-Kontext: ${preferredGewerkName}. Eine freie Kalkulationsposition für Angebot/Rechnung.`
-                : 'Eine freie Kalkulationsposition für Angebot/Rechnung (Handwerk).'
-            }
-            draftInput={kiDraftSeed}
-            onBeforeOpen={() => {
-              // Preisliste → Frei, damit Übernahme sichtbare Felder hat
-              if (mode === 'preisliste') setMode('frei')
-            }}
-          />
-        )
-      }
-      footer={
-        showFooter ? (
-          <div className="sheet-footer-actions">
-            <MockBtn
-              kind="primary"
-              icon="check"
-              disabled={confirmDisabled || (mode === 'preisliste' && pending)}
-              onClick={onConfirm}
-            >
-              {confirmLabel}
-            </MockBtn>
-          </div>
-        ) : undefined
+        <div className="pos-add-sheet__header-actions">
+          {mode !== 'nachlass' && mode !== 'gewerk' ? (
+            <KiAssistIconButton
+              overSheet
+              scope="position"
+              title="Position mit KI formulieren"
+              extraHint={
+                preferredGewerkName
+                  ? `Gewerk-Kontext: ${preferredGewerkName}. Eine freie Kalkulationsposition für Angebot/Rechnung.`
+                  : 'Eine freie Kalkulationsposition für Angebot/Rechnung (Handwerk).'
+              }
+              draftInput={kiDraftSeed}
+              onBeforeOpen={() => {
+                // Preisliste → Frei, damit Übernahme sichtbare Felder hat
+                if (mode === 'preisliste') setMode('frei')
+              }}
+            />
+          ) : null}
+          <button
+            type="button"
+            className="editor-sheet__confirm"
+            disabled={headerConfirmDisabled}
+            onClick={onConfirm}
+            aria-label="Übernehmen"
+            title="Übernehmen"
+          >
+            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+          </button>
+        </div>
       }
     >
       <div className="picker-sheet__chips" role="group" aria-label="Art">
@@ -450,7 +451,7 @@ export function PositionAddSheet({
       </div>
 
       {activeGewerk && mode !== 'gewerk' && mode !== 'nachlass' ? (
-        <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+        <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Gewerk: <span className="font-medium text-bw-text">{activeGewerk}</span>
         </p>
       ) : null}
@@ -458,24 +459,21 @@ export function PositionAddSheet({
       {mode === 'preisliste' ? (
         <div className="space-y-3">
           {katalogGewerke.length > 0 ? (
-            <div className="picker-sheet__chips" role="group" aria-label="Gewerk">
-              <button
-                type="button"
-                className={cn('picker-sheet__chip', !gewerkFilter && 'is-active')}
-                onClick={() => setGewerkFilter(null)}
+            <div className="field">
+              <div className="field-label">Gewerk</div>
+              <select
+                className="sel"
+                value={gewerkFilter ?? ''}
+                onChange={(e) => setGewerkFilter(e.target.value || null)}
+                aria-label="Gewerk"
               >
-                Alle
-              </button>
-              {katalogGewerke.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={cn('picker-sheet__chip', gewerkFilter === g.id && 'is-active')}
-                  onClick={() => setGewerkFilter(g.id)}
-                >
-                  {g.name}
-                </button>
-              ))}
+                <option value="">Alle Gewerke</option>
+                {katalogGewerke.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : null}
 
@@ -513,7 +511,7 @@ export function PositionAddSheet({
                                 <li key={v.id}>
                                   <button
                                     type="button"
-                                    className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[length:var(--fs-meta)] ${
+                                    className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[length:var(--fs-text)] ${
                                       picked?.variante.id === v.id
                                         ? 'bg-emerald-50 text-emerald-950'
                                         : 'hover:bg-white'
@@ -540,14 +538,14 @@ export function PositionAddSheet({
 
           {picked ? (
             <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-              <p className="text-[length:var(--fs-meta)] font-medium text-emerald-950">
+              <p className="text-[length:var(--fs-text)] font-medium text-emerald-950">
                 {picked.position.titel}
                 {picked.variante.variante?.trim()
                   ? ` · ${picked.variante.variante}`
                   : ''}{' '}
                 · {formatEurBetrag(picked.variante.preis)} / {picked.variante.einheit}
               </p>
-              <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
+              <label className="block text-[length:var(--fs-text)] text-bw-text-muted">
                 Menge
                 <input
                   className="sel mt-0.5 w-full"
@@ -556,14 +554,13 @@ export function PositionAddSheet({
                   inputMode="decimal"
                 />
               </label>
-              <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
+              <label className="block text-[length:var(--fs-text)] text-bw-text-muted">
                 Beschreibung
                 <textarea
                   className="sel mt-0.5 w-full"
                   rows={3}
                   value={beschreibung}
-                  onChange={(e) => setBeschreibung(e.target.value)}
-                  placeholder="Projektspezifisch"
+                  onChange={(e) => setBeschreibung(e.target.value)}                  placeholder="Projektspezifisch"
                 />
               </label>
             </div>
@@ -654,36 +651,39 @@ export function PositionAddSheet({
               </select>
             </div>
           </div>
-          <div className="field">
-            <div className="field-label">{frei.regie ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}</div>
-            <div className="txt-prefix">
-              <span className="prefix">{frei.regie ? '€/h' : '€'}</span>
-              <input
-                className="txt"
-                type="number"
-                value={frei.preis}
-                onChange={(e) =>
-                  setFrei((f) => ({ ...f, preis: Number(e.target.value) || 0 }))
-                }
-              />
+          <div className="field pos-add-preis-ust">
+            <div className="pos-add-preis-ust__labels">
+              <div className="field-label">
+                {frei.regie ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
+              </div>
+              {showUst ? <div className="field-label">USt.</div> : null}
+            </div>
+            <div className="pos-add-preis-ust__row">
+              <div className="txt-prefix pos-add-preis-ust__preis">
+                <span className="prefix">{frei.regie ? '€/h' : '€'}</span>
+                <input
+                  className="txt"
+                  type="number"
+                  value={frei.preis}
+                  onChange={(e) =>
+                    setFrei((f) => ({ ...f, preis: Number(e.target.value) || 0 }))
+                  }
+                />
+              </div>
+              {showUst ? (
+                <select
+                  className="sel pos-add-preis-ust__ust"
+                  value={String(frei.ust)}
+                  onChange={(e) => setFrei((f) => ({ ...f, ust: Number(e.target.value) }))}
+                  aria-label="USt."
+                >
+                  <option value="19">19%</option>
+                  <option value="7">7%</option>
+                  <option value="0">0%</option>
+                </select>
+              ) : null}
             </div>
           </div>
-          {showUst ? (
-            <div className="field">
-              <div className="field-label">USt.</div>
-              <select
-                className="sel"
-                value={String(frei.ust)}
-                onChange={(e) => setFrei((f) => ({ ...f, ust: Number(e.target.value) }))}
-              >
-                <option value="19">19%</option>
-                <option value="7">7%</option>
-                <option value="0">0%</option>
-              </select>
-            </div>
-          ) : (
-            <div />
-          )}
           <div className="field">
             <div className="field-label">Zeilensumme</div>
             <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
@@ -802,7 +802,7 @@ export function PositionAddSheet({
               </select>
             </div>
           ) : (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
               Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.
             </p>
           )}
@@ -818,7 +818,7 @@ export function PositionAddSheet({
               placeholder="z.B. Trockenbau · 1. OG"
             />
           </div>
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Anschließend kannst du direkt Positionen für dieses Gewerk hinzufügen.
           </p>
         </div>

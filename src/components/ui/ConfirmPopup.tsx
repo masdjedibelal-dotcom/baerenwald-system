@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { trapFocus } from '@/lib/a11y/focus-trap'
+import { cn } from '@/lib/utils'
 
 /**
  * Zentriertes Bestätigungs-Popup (Mobil + Desktop) —
@@ -72,13 +73,26 @@ export function ConfirmPopup({
           </h2>
           {children ? <div className="confirm-popup__text">{children}</div> : null}
         </div>
-        <div className="confirm-popup__footer">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {cancelLabel}
-          </Button>
-          <Button type="button" variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
-            {confirmLabel}
-          </Button>
+        <div className={cn('confirm-popup__footer', danger && 'confirm-popup__footer--danger')}>
+          {danger ? (
+            <>
+              <Button type="button" variant="danger" onClick={onConfirm}>
+                {confirmLabel}
+              </Button>
+              <Button type="button" variant="primary" onClick={onClose}>
+                {cancelLabel}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="secondary" onClick={onClose}>
+                {cancelLabel}
+              </Button>
+              <Button type="button" variant="primary" onClick={onConfirm}>
+                {confirmLabel}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>,

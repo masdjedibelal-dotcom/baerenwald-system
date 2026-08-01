@@ -16,7 +16,7 @@ import {
   normalizeFunnelDaten,
 } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { STAFF_ANLIEGEN } from '@/lib/anfragen/staff-funnel-types'
+import { STAFF_ANLIEGEN, STAFF_ANLIEGEN_LABELS } from '@/lib/anfragen/staff-funnel-types'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
 import { BEREICH_LABELS, formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
@@ -299,7 +299,9 @@ export function buildAnfragePhaseSheetProps(lead: {
   push('Quelle', kanalLabel(lead.kanal ?? ''))
 
   const anliegenId = typeof fd.anliegen === 'string' ? fd.anliegen.trim() : ''
-  const anliegenLabel = STAFF_ANLIEGEN.find((a) => a.id === anliegenId)?.label
+  const anliegenLabel =
+    STAFF_ANLIEGEN.find((a) => a.id === anliegenId)?.label ??
+    STAFF_ANLIEGEN_LABELS[anliegenId]
   push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
   push('Vorhaben', strFromFunnel(fd, 'vorhaben'))
 

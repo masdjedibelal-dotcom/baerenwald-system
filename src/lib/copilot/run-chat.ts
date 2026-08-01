@@ -22,6 +22,7 @@ import {
   mergeAssistentUi,
   type AssistentUiPayload,
 } from '@/lib/copilot/assistent-ui'
+import { sanitizeAssistentChatText } from '@/lib/copilot/sanitize-chat-text'
 
 export type CopilotChatMessage = {
   role: 'user' | 'assistant'
@@ -122,11 +123,13 @@ export async function runCopilotChat(opts: {
       })
     }
 
-    const assistantText = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => (b.type === 'text' ? b.text : ''))
-      .join('\n')
-      .trim()
+    const assistantText = sanitizeAssistentChatText(
+      response.content
+        .filter((b) => b.type === 'text')
+        .map((b) => (b.type === 'text' ? b.text : ''))
+        .join('\n')
+        .trim()
+    )
 
     return {
       ok: true,

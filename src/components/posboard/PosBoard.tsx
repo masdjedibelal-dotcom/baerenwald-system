@@ -18,6 +18,7 @@ import {
   PosBoardKiSuggestions,
   type PosBoardSuggestContext,
 } from '@/components/posboard/PosBoardKiSuggestions'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -29,6 +30,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { Preisliste } from '@/lib/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { toast } from '@/components/ui/app-toast'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -232,6 +234,45 @@ export function PosBoard({
     onChange([...positionen, np])
     setEditId(draft?.name?.trim() ? null : id)
   }
+
+  // KI „Positionen“-Chat → mehrere freie Positionen auf einmal
+  useKiAssistDraftConsumer(editable && !addSheetOpen, ['positionen', 'position'], (d) => {
+    if (!onChange) return
+    if (d.type === 'positionen') {
+      const fallbackGewerk = defaultGewerk()
+      const added = d.items.map((it) =>
+        neuePosBoardLine({
+          gewerk: it.gewerk?.trim() || fallbackGewerk,
+          name: it.name,
+          beschreibung: it.beschreibung?.trim() || '',
+          menge: it.menge && it.menge > 0 ? it.menge : 1,
+          einheit: it.einheit?.trim() || 'Stück',
+          preis: it.preis != null && it.preis >= 0 ? it.preis : 0,
+          ust: 19,
+          kind: 'position',
+          position_quelle: 'frei',
+          variante_id: null,
+          preisliste_id: null,
+        })
+      )
+      if (!added.length) return
+      onChange([...positionen, ...added])
+      toast.success(
+        added.length === 1 ? 'Position übernommen' : `${added.length} Positionen übernommen`
+      )
+      return
+    }
+    if (d.type === 'position') {
+      addPosition(d.gewerk?.trim() || defaultGewerk(), {
+        name: d.name,
+        beschreibung: d.beschreibung?.trim() || '',
+        menge: d.menge && d.menge > 0 ? d.menge : 1,
+        einheit: d.einheit?.trim() || 'Stück',
+        preis: d.preis != null && d.preis >= 0 ? d.preis : 0,
+        ust: 19,
+      })
+    }
+  })
 
   const openAddSheet = (gewerk: string, mode: PositionAddMode = 'preisliste') => {
     setPreislisteTargetGewerk(gewerk)
@@ -592,16 +633,6 @@ export function PosBoard({
     [preislisten]
   )
 
-  const existingVarianteIds = useMemo(
-    () =>
-      new Set(
-        positionen
-          .map((p) => p.variante_id || p.preisliste_id)
-          .filter((id): id is string => Boolean(id))
-      ),
-    [positionen]
-  )
-
   return (
     <div className={className}>
       {title || headerAction ? (
@@ -691,24 +722,8 @@ export function PosBoard({
           </button>
         </div>
       ) : null}
-      {editable && suggestContext?.text?.trim() ? (
-        <PosBoardKiSuggestions
-          context={suggestContext}
-          existingVarianteIds={existingVarianteIds}
-          onAccept={(item) =>
-            addFromKatalog({
-              position: { titel: item.titel, gewerk_name: item.gewerk_name },
-              variante: {
-                id: item.variante_id,
-                beschreibung: item.beschreibung,
-                einheit: item.einheit,
-                preis: item.preis,
-              },
-              menge: 1,
-              beschreibung: item.beschreibung,
-            })
-          }
-        />
+      {editable ? (
+        <PosBoardKiSuggestions context={suggestContext} />
       ) : null}
       <PosTable
         groups={groups}
@@ -826,18 +841,8 @@ export function PosBoard({
             setGewerkAddPick('')
             setGewerkAddCustom('')
           }}
-          footer={
-            <div className="sheet-footer-actions">
-              <MockBtn
-                kind="primary"
-                icon="check"
-                disabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
-                onClick={() => confirmAddGewerk()}
-              >
-                Hinzufügen
-              </MockBtn>
-            </div>
-          }
+          onConfirm={() => confirmAddGewerk()}
+          confirmDisabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
         >
           {gewerkeZumHinzufuegen.length > 0 ? (
             <div className="field">

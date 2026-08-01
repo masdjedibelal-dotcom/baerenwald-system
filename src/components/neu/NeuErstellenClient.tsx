@@ -45,9 +45,9 @@ const TITEL_MAP: Record<Preset, string> = {
 }
 
 const ART_OPTIONS = [
-  { v: 'vorgang' as const, ic: 'folders', label: 'Vorgang', d: 'Anfrage, Angebot, Rechnung' },
-  { v: 'kunde' as const, ic: 'users', label: 'Kunde', d: 'Neuen Kunden anlegen' },
-  { v: 'handwerker' as const, ic: 'tool', label: 'Partner', d: 'Partnerbetrieb anlegen' },
+  { v: 'vorgang' as const, ic: 'folders', label: 'Vorgang' },
+  { v: 'kunde' as const, ic: 'users', label: 'Kunde' },
+  { v: 'handwerker' as const, ic: 'tool', label: 'Partner' },
 ]
 
 const VORGANG_OPTIONS = [
@@ -242,7 +242,6 @@ export function NeuErstellenClient({
                     <MockIcon ctx="emphasis" n={o.ic} size={22} />
                   </div>
                   <div className="t">{o.label}</div>
-                  <div className="d">{o.d}</div>
                 </button>
               ))}
             </div>
@@ -252,9 +251,6 @@ export function NeuErstellenClient({
         {!preset && art === 'vorgang' ? (
           <>
             <div className="form-section-h">Vorgangstyp</div>
-            <p className="mb-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
-              Öffnet den gleichen Weg wie der FAB — kein separates Kurzformular.
-            </p>
             <div className="chiprow" style={{ marginBottom: 22 }}>
               {VORGANG_OPTIONS.map((o) => (
                 <MockChip
@@ -290,7 +286,7 @@ export function NeuErstellenClient({
                 </select>
               </MockField>
               {firmaPflicht ? (
-                <MockField label={istHausverwaltung ? 'Firma' : 'Firma / Name'} required>
+                <MockField label="Firma" required full>
                   <input
                     className="txt"
                     value={f.name ?? ''}
@@ -299,10 +295,8 @@ export function NeuErstellenClient({
                     autoFocus
                   />
                 </MockField>
-              ) : (
-                <div />
-              )}
-              <MockField label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'} required={!firmaPflicht}>
+              ) : null}
+              <MockField label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'} required>
                 <input
                   className="txt"
                   value={f.vorname ?? ''}
@@ -311,7 +305,7 @@ export function NeuErstellenClient({
                   autoFocus={!firmaPflicht}
                 />
               </MockField>
-              <MockField label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'} required={!firmaPflicht}>
+              <MockField label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'} required>
                 <input
                   className="txt"
                   value={f.nachname ?? ''}

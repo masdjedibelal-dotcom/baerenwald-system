@@ -53,7 +53,7 @@ export async function planeArbeitstag() {
   for (const a of anfragen.slice(0, 3) as Array<{ id: string; kontakt_name?: string | null }>) {
     links.push({
       href: `/anfragen/${a.id}`,
-      label: `Anfrage · ${a.kontakt_name || a.id.slice(0, 8)}`,
+      label: a.kontakt_name?.trim() ? `Anfrage · ${a.kontakt_name.trim()}` : 'Anfrage öffnen',
       hint: 'Lead prüfen',
     })
   }
@@ -65,16 +65,33 @@ export async function planeArbeitstag() {
     })
   }
   for (const r of ueberfaellig.slice(0, 3)) {
+    const kunden = (r as { kunden?: unknown }).kunden
+    const name =
+      kunden && typeof kunden === 'object' && !Array.isArray(kunden) && 'name' in kunden
+        ? String((kunden as { name?: unknown }).name ?? '').trim()
+        : Array.isArray(kunden) && kunden[0] && typeof kunden[0] === 'object' && 'name' in kunden[0]
+          ? String((kunden[0] as { name?: unknown }).name ?? '').trim()
+          : ''
     links.push({
       href: `/rechnungen/${r.id}`,
-      label: `Rechnung · ${r.rechnungsnummer || r.id.slice(0, 8)}`,
+      label: name ? `Rechnung · ${name}` : 'Rechnung öffnen',
       hint: 'Mahnung?',
     })
   }
-  for (const o of (angebote as Array<{ id: string; angebotsnr?: string | null }>).slice(0, 2)) {
+  for (const o of (
+    angebote as Array<{
+      id: string
+      leads?: { kontakt_name?: string | null; kunden?: { name?: string | null } | null } | null
+    }>
+  ).slice(0, 2)) {
+    const lead = o.leads
+    const name =
+      (lead && typeof lead === 'object' && !Array.isArray(lead)
+        ? lead.kunden?.name?.trim() || lead.kontakt_name?.trim()
+        : '') || ''
     links.push({
       href: `/angebote/${o.id}`,
-      label: `Angebot · ${o.angebotsnr || o.id.slice(0, 8)}`,
+      label: name ? `Angebot · ${name}` : 'Angebot öffnen',
     })
   }
 

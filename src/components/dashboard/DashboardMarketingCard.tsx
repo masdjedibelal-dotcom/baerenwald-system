@@ -163,7 +163,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
       <div className="card-b" style={{ paddingTop: 4 }}>
         {tab === 'marketing' ? (
           <>
-            <div className="mkt-kpi-grid">
+            <div className="mkt-kpi-grid mkt-kpi-grid--3">
               <CompactKpi
                 label="Website-Besuche"
                 value={data.pageviewsOk ? formatNum(data.pageviews) : '—'}
@@ -203,21 +203,6 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                 onErrorClick={
                   !data.funnelOk && data.funnelError
                     ? () => setErrorDetail(data.funnelError)
-                    : undefined
-                }
-              />
-              <CompactKpi
-                label="E-Mail-Zustellrate"
-                value={
-                  data.resendOk && data.deliveryRatePct != null
-                    ? `${formatNum(data.deliveryRatePct)}%`
-                    : '—'
-                }
-                detail={data.resendOk ? 'E-Mail' : 'Fehler'}
-                muted={!data.resendOk || data.deliveryRatePct == null}
-                onErrorClick={
-                  !data.resendOk && data.resendError
-                    ? () => setErrorDetail(data.resendError)
                     : undefined
                 }
               />

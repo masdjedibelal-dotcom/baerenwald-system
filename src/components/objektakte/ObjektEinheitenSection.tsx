@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
   createObjektEinheit,
@@ -16,31 +16,6 @@ import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
 const COLS = 'minmax(0, 1.4fr) 90px 110px 100px 28px'
-
-function EinheitFormFooter({
-  pending,
-  onSave,
-}: {
-  pending: boolean
-  onSave: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="kunde-create-footer">
-      <button
-        type="button"
-        className="btn secondary"
-        onClick={() => requestClose?.()}
-        disabled={pending}
-      >
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="check" disabled={pending} onClick={onSave}>
-        {pending ? '…' : 'Speichern'}
-      </MockBtn>
-    </div>
-  )
-}
 
 /** Mock: Einheiten-Tabelle Bezeichnung · Fläche · Status · Miete · Chevron */
 export function ObjektEinheitenSection({
@@ -236,7 +211,9 @@ export function ObjektEinheitenSection({
         crumb="Einheiten >"
         dirty={dirty}
         size="md"
-        footer={<EinheitFormFooter pending={pending} onSave={speichern} />}
+        onConfirm={speichern}
+        confirmDisabled={pending || !bezeichnung.trim()}
+        confirmBusy={pending}
       >
         <div className="kunde-create">
           {err ? <p className="kunde-create__err">{err}</p> : null}

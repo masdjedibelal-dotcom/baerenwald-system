@@ -10,7 +10,7 @@ import { STAFF_FUNNEL_STEP_LABELS } from '@/lib/anfragen/staff-funnel-types'
 const BERATUNG_BEREICHE = new Set(['schimmel', 'anbau', 'baum_notfall'])
 
 export function needsBeratungPfad(state: StaffFunnelState): boolean {
-  if (state.situation === 'gewerbe' || state.anliegen === 'gewerbe' || state.anliegen === 'termin') {
+  if (state.situation === 'gewerbe' || state.anliegen === 'gewerbe') {
     return true
   }
   if (state.bereiche.some((b) => BERATUNG_BEREICHE.has(b))) return true

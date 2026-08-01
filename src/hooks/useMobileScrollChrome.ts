@@ -9,6 +9,12 @@ type ScrollChrome = {
   hideChrome: boolean
 }
 
+/** App-Shell scrollt in `main.page`, nicht auf `window`. */
+function resolvePageScroller(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  return document.querySelector<HTMLElement>('main.page')
+}
+
 /**
  * Mobil-Chrome: scrolled ab ~36px (Detail Hybrid: Nav ↔ CTA).
  * hideChrome = Scroll-Richtung (Legacy).
@@ -26,11 +32,14 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
       return
     }
 
-    lastY.current = window.scrollY
+    const page = resolvePageScroller()
+    const getY = () => (page ? page.scrollTop : window.scrollY || 0)
+
+    lastY.current = getY()
 
     const update = () => {
       ticking.current = false
-      const y = window.scrollY
+      const y = getY()
       const prev = lastY.current
       const delta = y - prev
 
@@ -54,8 +63,9 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
     }
 
     update()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const target: EventTarget = page ?? window
+    target.addEventListener('scroll', onScroll, { passive: true })
+    return () => target.removeEventListener('scroll', onScroll)
   }, [enabled])
 
   return { scrolled, hideChrome }

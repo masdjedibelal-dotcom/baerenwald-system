@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
@@ -23,12 +25,15 @@ export function ActionSheet({
   /** Swipe-dismiss unterdrücken (z. B. verschachtelter Flow) */
   swipeDismissBlocked?: boolean
 }) {
+  const [mounted, setMounted] = useState(false)
   const { dragZoneProps, sheetMotionStyle } = useSheetSwipeDismiss({
     onDismiss: onClose,
     blocked: swipeDismissBlocked,
   })
 
-  if (!open) return null
+  useEffect(() => setMounted(true), [])
+
+  if (!open || !mounted) return null
 
   const flat = flattenItems(items)
   const regular = flat.filter((it) => !it.danger)
@@ -39,10 +44,10 @@ export function ActionSheet({
     item.onClick()
   }
 
-  return (
+  return createPortal(
     <>
       <div
-        className="z-sidepanel fixed inset-0 bg-black/40 md:hidden"
+        className="z-modal fixed inset-0 bg-black/40 md:hidden"
         onClick={onClose}
         role="presentation"
         aria-hidden
@@ -58,30 +63,31 @@ export function ActionSheet({
           ...sheetMotionStyle,
         }}
       >
-        <div
-          className="flex justify-center pb-2 pt-3"
-          {...dragZoneProps}
-          aria-hidden
-        >
+        <div className="flex justify-center pb-1 pt-3" {...dragZoneProps} aria-hidden>
           <div className="h-1 w-10 rounded-full bg-bw-border" />
         </div>
 
-        <div
-          className="flex items-center justify-between border-b border-bw-border px-4 py-2"
-          {...dragZoneProps}
-        >
-          <span className="text-[length:var(--fs-title)] font-semibold text-bw-text">{title}</span>
+        <div className="flex items-center gap-2 border-b border-bw-border px-3 py-2" {...dragZoneProps}>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-bw-text-muted hover:bg-bw-hover"
+            className="editor-sheet__icon-btn"
             aria-label="Schließen"
+            title="Schließen"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden />
           </button>
+          <span className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold text-bw-text">
+            {title}
+          </span>
         </div>
 
-        <div className="overflow-y-auto overscroll-contain px-3 py-2">
+        <div className="overflow-y-auto overscroll-contain px-3 py-2 pb-3">
+          {regular.length === 0 && danger.length === 0 ? (
+            <p className="px-3 py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+              Keine Aktionen
+            </p>
+          ) : null}
           {regular.map((it) => (
             <button
               key={it.label}
@@ -96,7 +102,9 @@ export function ActionSheet({
               ) : null}
               <span className="min-w-0 flex-1">{it.label}</span>
               {it.hint ? (
-                <span className="shrink-0 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">{it.hint}</span>
+                <span className="shrink-0 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
+                  {it.hint}
+                </span>
               ) : null}
             </button>
           ))}
@@ -124,6 +132,7 @@ export function ActionSheet({
           ) : null}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   )
 }

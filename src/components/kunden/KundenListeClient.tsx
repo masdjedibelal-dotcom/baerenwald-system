@@ -21,6 +21,7 @@ import { runDuplicateKunde } from '@/lib/list-actions'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import { TypBadge } from '@/components/kunden/TypBadge'
 import { cn } from '@/lib/utils'
 import { mergeKunden } from '@/app/actions/kunden'
 import { Modal } from '@/components/ui/Modal'
@@ -604,8 +605,6 @@ export function KundenListeClient({
           displayItems.map((k) => {
             const tel = k.telefon?.trim() || ''
             const mail = k.email?.trim() || ''
-            const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
-            const typLabel = kundeTypLabel(k.typ)
             const copy = () => runDuplicateKunde(k.id, router)
             const edit = () => openDetail(k.id)
             const row = isMobile ? (
@@ -638,12 +637,15 @@ export function KundenListeClient({
                   </div>
                 </div>
                 <div className="vg-status">
-                  <span className="pill-tag">{typLabel}</span>
+                  <TypBadge typ={k.typ ?? 'privat'} />
                 </div>
                 <div className="vg-kunde">
-                  <span className="vg-kunde__name" title={contactSub}>
-                    {contactSub}
+                  <span className="vg-kunde__name" title={tel || undefined}>
+                    {tel || '—'}
                   </span>
+                </div>
+                <div className="vg-datum" title={mail || undefined}>
+                  {mail || '—'}
                 </div>
               </div>
             ) : (
@@ -676,7 +678,7 @@ export function KundenListeClient({
                   {kundeListenName(k)}
                 </div>
                 <div className="lc-pills">
-                  <span className="pill-tag">{typLabel}</span>
+                  <TypBadge typ={k.typ ?? 'privat'} />
                 </div>
                 <div className="lc-desk" style={{ color: 'var(--text-2)' }}>
                   {tel || '—'}

@@ -70,15 +70,21 @@ export function AuftragBautagebuchSection({
           </p>
         </div>
         {!disabled ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="bt-feed-h__actions">
             {onAnfordern ? (
               <Button type="button" variant="secondary" size="sm" onClick={onAnfordern}>
                 Anfordern
               </Button>
             ) : null}
-            <Button type="button" variant="primary" size="sm" onClick={onAdd}>
-              + Eintrag
-            </Button>
+            <button
+              type="button"
+              className="btn primary sm bt-feed-h__add"
+              onClick={onAdd}
+              aria-label="Eintrag hinzufügen"
+              title="Eintrag hinzufügen"
+            >
+              <MockIcon ctx="btn" n="plus" size={18} />
+            </button>
           </div>
         ) : null}
       </div>

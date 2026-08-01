@@ -580,7 +580,7 @@ export function AnfrageNeuForm({
 
   const formBody = (
     <div className="space-y-4">
-      <Card title="Kunde & Kontakt">
+      <Card title="Kunde & Kontakt" collapsible defaultOpen>
         <div className="space-y-4">
           {!isBearbeiten ? (
             <KundeAuswahlFeld

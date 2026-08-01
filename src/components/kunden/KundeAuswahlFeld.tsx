@@ -24,7 +24,7 @@ export function KundeAuswahlFeld({
   onKundeGewaehlt,
   disabled,
   label = 'Bestehender Kunde',
-  hint = 'Optional: Kunde suchen und Kontaktdaten übernehmen.',
+  hint,
 }: Props) {
   const [suche, setSuche] = useState('')
   const [treffer, setTreffer] = useState<Kunde[]>([])
@@ -83,7 +83,7 @@ export function KundeAuswahlFeld({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-bw-text-muted">{hint}</p>
+      {hint ? <p className="text-xs text-bw-text-muted">{hint}</p> : null}
       {ausgewaehlt ? (
         <div className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2">
           <div className="min-w-0 text-sm">

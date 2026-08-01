@@ -147,7 +147,8 @@ export function AngebotNeuForm({
   const [kundeSuche, setKundeSuche] = useState('')
   const [kundeTreffer, setKundeTreffer] = useState<Kunde[]>([])
   const [neuKundeOpen, setNeuKundeOpen] = useState(false)
-  const [neuName, setNeuName] = useState('')
+  const [neuVorname, setNeuVorname] = useState('')
+  const [neuNachname, setNeuNachname] = useState('')
   const [neuEmail, setNeuEmail] = useState('')
   const [neuTelefon, setNeuTelefon] = useState('')
 
@@ -314,13 +315,14 @@ export function AngebotNeuForm({
     let kid = kundeId
 
     if (!readonlyKunde && neuKundeOpen) {
-      if (!neuName.trim()) {
-        setError('Bitte Kundenname eingeben oder Kunde suchen.')
+      if (!neuVorname.trim() && !neuNachname.trim()) {
+        setError('Bitte Vor- und Nachname eingeben oder Kunde suchen.')
         return
       }
       setSaving(true)
       const created = await createKundeQuick({
-        name: neuName,
+        vorname: neuVorname.trim() || null,
+        nachname: neuNachname.trim() || null,
         email: neuEmail.trim() || null,
         telefon: neuTelefon.trim() || null,
       })
@@ -551,7 +553,16 @@ export function AngebotNeuForm({
             </button>
             {neuKundeOpen ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <Input label="Name" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
+                <Input
+                  label="Vorname"
+                  value={neuVorname}
+                  onChange={(e) => setNeuVorname(e.target.value)}
+                />
+                <Input
+                  label="Nachname"
+                  value={neuNachname}
+                  onChange={(e) => setNeuNachname(e.target.value)}
+                />
                 <Input
                   label="E-Mail"
                   type="email"

@@ -15,7 +15,6 @@ import {
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
-import { normalizeComplianceBadgeKey } from '@/components/handwerker/ComplianceBadge'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
@@ -100,10 +99,6 @@ function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
   }
 }
 
-function isComplianceNichtOk(h: HandwerkerZeile): boolean {
-  return normalizeComplianceBadgeKey(h.compliance_status) !== 'ok'
-}
-
 function handwerkerStatusBadge(h: HandwerkerZeile) {
   if (h.aktiver_einsatz) return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
   return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Verfügbar</MockBadge>
@@ -140,7 +135,6 @@ export function HandwerkerListeClient({
   const [gewerkChip, setGewerkChip] = useState('alle')
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
-  const [nurZuPruefen, setNurZuPruefen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
@@ -154,37 +148,21 @@ export function HandwerkerListeClient({
     }
   }, [searchParams, router])
 
-  const complianceCount = useMemo(
-    () => rows.filter((h) => isComplianceNichtOk(h)).length,
-    [rows]
-  )
-
   const gewerkChipOptions = useMemo(() => {
-    const opts: { label: string; value: string; count?: number; icon?: string }[] = [
+    const opts: { label: string; value: string; count?: number }[] = [
       { label: 'Alle Gewerke', value: 'alle', count: rows.length },
     ]
     for (const name of MOCK_GEWERK_NAMES) {
       opts.push({ label: name, value: resolveGewerkChipValue(name, gewerkeOptionen) })
     }
-    opts.push({
-      label: 'Compliance',
-      value: 'compliance',
-      count: complianceCount,
-      icon: 'alert-triangle',
-    })
     return opts
-  }, [gewerkeOptionen, rows.length, complianceCount])
+  }, [gewerkeOptionen, rows.length])
 
   const filteredBase = useMemo(() => {
     const needle = query.trim().toLowerCase()
     const nameNeedle = fName.trim().toLowerCase()
     return rows.filter((h) => {
-      if (gewerkChip === 'compliance') {
-        if (!isComplianceNichtOk(h)) return false
-      } else if (gewerkChip !== 'alle') {
-        if (!matchesGewerk(h, gewerkChip, gewerkeOptionen)) return false
-      }
-      if (nurZuPruefen && !isComplianceNichtOk(h)) return false
+      if (gewerkChip !== 'alle' && !matchesGewerk(h, gewerkChip, gewerkeOptionen)) return false
       if (nameNeedle && !handwerkerDisplayName(h).toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
       const pool = [
@@ -198,7 +176,7 @@ export function HandwerkerListeClient({
         .toLowerCase()
       return pool.includes(needle)
     })
-  }, [rows, gewerkChip, nurZuPruefen, query, fName, gewerkeOptionen])
+  }, [rows, gewerkChip, query, fName, gewerkeOptionen])
 
   const toggleSort = (col: SortCol) => {
     setSortCol((c) => {
@@ -233,13 +211,12 @@ export function HandwerkerListeClient({
   }, [filteredBase, sortCol, sortDir])
 
   const activeFilterCount =
-    (gewerkChip !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0) + (nurZuPruefen ? 1 : 0)
+    (gewerkChip !== 'alle' ? 1 : 0) + (query ? 1 : 0) + (fName ? 1 : 0)
 
   function resetFilters() {
     setGewerkChip('alle')
     setQuery('')
     setFName('')
-    setNurZuPruefen(false)
   }
 
   const selectedCount = Object.values(selected).filter(Boolean).length
@@ -272,7 +249,7 @@ export function HandwerkerListeClient({
   )
   const resizeOffset = selectMode ? 1 : 0
 
-  const paginationResetKey = `${gewerkChip}|${query}|${fName}|${nurZuPruefen}|${sortCol}|${sortDir}`
+  const paginationResetKey = `${gewerkChip}|${query}|${fName}|${sortCol}|${sortDir}`
   const {
     pageItems,
     infiniteItems,
@@ -331,7 +308,7 @@ export function HandwerkerListeClient({
         </MockField>
       </div>
       <div className="form-section-h">Gewerk</div>
-      <div className="chiprow" style={{ marginBottom: 16 }}>
+      <div className="chiprow">
         {(['alle', ...MOCK_GEWERK_NAMES] as const).map((g) => {
           const value = g === 'alle' ? 'alle' : resolveGewerkChipValue(g, gewerkeOptionen)
           return (
@@ -340,15 +317,6 @@ export function HandwerkerListeClient({
             </MockChip>
           )
         })}
-      </div>
-      <div className="form-section-h">Compliance</div>
-      <div className="chiprow">
-        <MockChip active={!nurZuPruefen} onClick={() => setNurZuPruefen(false)}>
-          Alle
-        </MockChip>
-        <MockChip active={nurZuPruefen} onClick={() => setNurZuPruefen(true)}>
-          Nur zu prüfen
-        </MockChip>
       </div>
     </>
   )
@@ -362,7 +330,6 @@ export function HandwerkerListeClient({
               key={o.value}
               active={gewerkChip === o.value}
               count={o.count}
-              icon={o.icon}
               onClick={() => setGewerkChip(o.value)}
             >
               {o.label}
@@ -631,7 +598,6 @@ export function HandwerkerListeClient({
             const primaryGewerk = pills[0] ?? '—'
             const tel = h.telefon?.trim() || ''
             const mail = h.email?.trim() || ''
-            const contactSub = [tel, mail].filter(Boolean).join(' · ') || '—'
             const copy = () => runDuplicateHandwerker(h.id, router)
             const edit = () => openDetail(h.id)
             const row = isMobile ? (
@@ -669,9 +635,12 @@ export function HandwerkerListeClient({
                   </span>
                 </div>
                 <div className="vg-kunde">
-                  <span className="vg-kunde__name" title={contactSub}>
-                    {contactSub}
+                  <span className="vg-kunde__name" title={tel || undefined}>
+                    {tel || '—'}
                   </span>
+                </div>
+                <div className="vg-datum" title={mail || undefined}>
+                  {mail || '—'}
                 </div>
               </div>
             ) : (

@@ -14,12 +14,7 @@ import {
   type RateDrawerMahnung,
   type RateDrawerRate,
 } from '@/components/vorgang/RateDrawer'
-import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
-import { saveAuftragZahlungsplan, erfasseExterneAbschlagZahlung } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import {
-  sendRechnung,
-  updateRechnungStatus,
-} from '@/app/(dashboard)/rechnungen/actions'
+import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { loadRechnungWizardBootstrap as loadWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -176,7 +171,6 @@ export function VorgangZahlungTab({
   const [plan, setPlan] = useState<Zahlungsplan>(initial)
   const [editorOpen, setEditorOpen] = useState(false)
   const [openRateId, setOpenRateId] = useState<string | null>(null)
-  const [mahnungRechnungId, setMahnungRechnungId] = useState<string | null>(null)
 
   useEffect(() => {
     setPlan(initial)
@@ -543,10 +537,22 @@ export function VorgangZahlungTab({
       const editId = editableBelegId(rate)
       if (editId) {
         ctas.push({
+          id: 'open',
+          label: 'Öffnen',
+          icon: 'eye',
+          onClick: () => {
+            setOpenRateId(null)
+            if (aktuelleRechnungId === editId) {
+              router.push(`/rechnungen/${editId}?tab=uebersicht`)
+              return
+            }
+            router.push(`/rechnungen/${editId}`)
+          },
+        })
+        ctas.push({
           id: 'edit',
           label: 'Bearbeiten',
           icon: 'pencil',
-          primary: true,
           onClick: () => openRechnungBearbeiten(editId),
         })
       } else {
@@ -554,44 +560,9 @@ export function VorgangZahlungTab({
           id: 'invoice',
           label: 'Erstellen',
           icon: 'file-invoice',
-          primary: true,
           onClick: () => {
             setOpenRateId(null)
             onCreateInvoice?.(rate.zeileId ? { zeileId: rate.zeileId } : { voll: true })
-          },
-        })
-      }
-      if (variant === 'auftrag' && auftragId && rate.zeileId && !editId) {
-        ctas.push({
-          id: 'extern-bezahlt',
-          label: 'Bereits bezahlt',
-          icon: 'check',
-          onClick: () => {
-            const raw = window.prompt(
-              `Betrag brutto für „${rate.label}“ (leer = Planbetrag ${formatEurBetrag(rate.betrag)}):`,
-              String(rate.betrag || '')
-            )
-            if (raw == null) return
-            const parsed = raw.trim() === '' ? rate.betrag : Number(String(raw).replace(',', '.'))
-            if (!Number.isFinite(parsed) || parsed <= 0) {
-              toast.error('Ungültiger Betrag')
-              return
-            }
-            startTransition(async () => {
-              const res = await erfasseExterneAbschlagZahlung({
-                auftragId,
-                zeileId: rate.zeileId!,
-                brutto: parsed,
-              })
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('Externe Zahlung erfasst — Rate als bezahlt hinterlegt')
-              setOpenRateId(null)
-              onRefresh?.()
-              router.refresh()
-            })
           },
         })
       }
@@ -599,84 +570,6 @@ export function VorgangZahlungTab({
     }
 
     if ((rate.status === 'gestellt' || rate.status === 'bezahlt') && rechnungId) {
-      if (rate.status === 'gestellt') {
-        ctas.push({
-          id: 'paid',
-          label: 'Zahlung',
-          icon: 'check',
-          primary: true,
-          onClick: () => {
-            startTransition(async () => {
-              const res = await updateRechnungStatus(rechnungId, 'bezahlt')
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('Als bezahlt markiert (ohne Kunden-Mail)')
-              setOpenRateId(null)
-              onRefresh?.()
-              router.refresh()
-            })
-          },
-        })
-        if (faelligUeberfaellig(rate.faellig)) {
-          const nextStufe = openMahnungen.length + 1
-          ctas.push({
-            id: 'mahnung',
-            label: `Mahnung ${Math.min(nextStufe, 3)}`,
-            icon: 'alert-triangle',
-            onClick: () => {
-              setMahnungRechnungId(rechnungId)
-            },
-          })
-        }
-      }
-      ctas.push({
-        id: 'edit',
-        label: 'Bearbeiten',
-        icon: 'pencil',
-        primary: rate.status === 'bezahlt',
-        onClick: () => openRechnungBearbeiten(rechnungId),
-      })
-      if (rate.status === 'gestellt') {
-        ctas.push({
-          id: 'resend',
-          label: 'Senden',
-          icon: 'send',
-          onClick: () => {
-            startTransition(async () => {
-              const res = await sendRechnung(rechnungId)
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('Rechnung erneut versendet')
-              onRefresh?.()
-              router.refresh()
-            })
-          },
-        })
-      }
-      if (rate.status === 'bezahlt') {
-        ctas.push({
-          id: 'reset',
-          label: 'Zurücksetzen',
-          icon: 'history',
-          onClick: () => {
-            startTransition(async () => {
-              const res = await updateRechnungStatus(rechnungId, 'gesendet')
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('Zahlung zurückgesetzt')
-              setOpenRateId(null)
-              onRefresh?.()
-              router.refresh()
-            })
-          },
-        })
-      }
       ctas.push({
         id: 'open',
         label: 'Öffnen',
@@ -689,6 +582,12 @@ export function VorgangZahlungTab({
           }
           router.push(`/rechnungen/${rechnungId}`)
         },
+      })
+      ctas.push({
+        id: 'edit',
+        label: 'Bearbeiten',
+        icon: 'pencil',
+        onClick: () => openRechnungBearbeiten(rechnungId),
       })
       return ctas
     }
@@ -839,11 +738,26 @@ export function VorgangZahlungTab({
   if (empty) {
     return (
       <>
-        <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
+        <MockCard
+          title="Zahlung"
+          icon="calculator"
+          className="zahlplan-shell"
+          actions={
+            canEditPlan ? (
+              <MockBtn
+                sm
+                kind="ghost"
+                icon="plus"
+                title="Abschlagsplan anlegen"
+                onClick={() => setEditorOpen(true)}
+              />
+            ) : null
+          }
+        >
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
             <div className="zahlplan-empty__title">
-              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch nicht abgerechnet'}
+              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch kein Abschlagsplan'}
             </div>
             <div className="zahlplan-empty__text">
               {variant === 'angebot' ? (
@@ -853,11 +767,16 @@ export function VorgangZahlungTab({
                 </>
               ) : (
                 <>
-                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b> — Einzelrechnung
-                  oder Abschläge wählst du beim Erstellen.
+                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b> — optional in
+                  Abschläge aufteilen, danach je Rate eine Rechnung erstellen.
                 </>
               )}
             </div>
+            {canEditPlan ? (
+              <MockBtn kind="primary" icon="plus" onClick={() => setEditorOpen(true)}>
+                Abschlagsplan anlegen
+              </MockBtn>
+            ) : null}
           </div>
         </MockCard>
         {canEditPlan ? (
@@ -1034,25 +953,6 @@ export function VorgangZahlungTab({
           onSave={speichern}
           saving={pending}
           frozenIds={frozenRateIds}
-        />
-      ) : null}
-
-      {mahnungRechnungId ? (
-        <ZahlungserinnerungMailModal
-          open
-          onClose={() => setMahnungRechnungId(null)}
-          rechnungId={mahnungRechnungId}
-          rechnungsnummer={
-            rechnungById.get(mahnungRechnungId)?.rechnungsnummer?.trim() || 'Rechnung'
-          }
-          erinnerung7SentAt={rechnungById.get(mahnungRechnungId)?.erinnerung_7_sent_at}
-          erinnerung21SentAt={rechnungById.get(mahnungRechnungId)?.erinnerung_21_sent_at}
-          onSent={() => {
-            setMahnungRechnungId(null)
-            setOpenRateId(null)
-            onRefresh?.()
-            router.refresh()
-          }}
         />
       ) : null}
     </>

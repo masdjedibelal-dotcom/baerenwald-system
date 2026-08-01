@@ -196,9 +196,75 @@ export async function listCrmNotifications(
 }
 
 export async function getCrmNotificationUnreadCount(): Promise<number> {
-  const res = await listCrmNotifications('ungelesen')
-  if (!res.ok) return 0
-  return res.unreadCount
+  const userId = await currentUserId()
+  if (!userId) return 0
+
+  const supabase = createClient()
+  const since = sinceIso()
+  const keys: string[] = []
+
+  const [leadsRes, peRes, aufRes] = await Promise.all([
+    supabase
+      .from('leads')
+      .select('id')
+      .is('geloescht_am', null)
+      .gte('created_at', since)
+      .limit(40),
+    supabase
+      .from('position_eintraege')
+      .select('id, auftrag_id, auftrag_positionen(auftrag_id)')
+      .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
+      .gte('created_at', since)
+      .limit(40),
+    supabase
+      .from('auftraege')
+      .select('id')
+      .eq('status', 'abgeschlossen')
+      .gte('updated_at', since)
+      .limit(40),
+  ])
+
+  // Falls geloescht_am fehlt: ohne Filter nachladen
+  let leadIds = (leadsRes.data ?? []).map((r) => String(r.id))
+  if (leadsRes.error && /geloescht_am/i.test(leadsRes.error.message)) {
+    const retry = await supabase
+      .from('leads')
+      .select('id')
+      .gte('created_at', since)
+      .limit(40)
+    leadIds = (retry.data ?? []).map((r) => String(r.id))
+  } else if (leadsRes.error) {
+    leadIds = []
+  }
+
+  for (const id of leadIds) keys.push(`neue_anfrage:${id}`)
+
+  for (const row of peRes.data ?? []) {
+    const pos = row.auftrag_positionen as
+      | { auftrag_id?: string | null }
+      | { auftrag_id?: string | null }[]
+      | null
+    const posRow = Array.isArray(pos) ? pos[0] : pos
+    const auftragId =
+      (row.auftrag_id as string | null)?.trim() || posRow?.auftrag_id?.trim() || null
+    if (!auftragId) continue
+    keys.push(`handwerker_update:${row.id}`)
+  }
+
+  for (const row of aufRes.data ?? []) {
+    keys.push(`auftrag_abgeschlossen:${row.id}`)
+  }
+
+  if (!keys.length) return 0
+
+  const { data: reads } = await supabase
+    .from('crm_notification_reads')
+    .select('source_key')
+    .eq('user_id', userId)
+    .in('source_key', keys)
+
+  const readSet = new Set((reads ?? []).map((r) => String(r.source_key)))
+  return keys.filter((k) => !readSet.has(k)).length
 }
 
 export async function markCrmNotificationRead(

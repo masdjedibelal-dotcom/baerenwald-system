@@ -303,15 +303,9 @@ export function AuftragLeistungenTab({
               ? undefined
               : (row) => [
                   {
-                    id: 'eintrag',
-                    label: 'Tagebuch-Eintrag',
-                    variant: 'ghost',
-                    onClick: () => openTagebuch(row.id),
-                  },
-                  {
                     id: 'zuweisen',
                     label: 'Zuweisung ändern',
-                    variant: 'ghost',
+                    icon: 'user',
                     onClick: () => setZuweisungIds([row.id]),
                   },
                 ]

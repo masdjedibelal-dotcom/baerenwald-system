@@ -116,7 +116,7 @@ export function LeistungenTab({
   /** Sammelaktionen — nur Auftrag (Spec). */
   bulkActions?: LeistungenTabBulkAction[]
   drawerActionsForRow?: (row: LeistungRow) => LeistungDrawerAction[]
-  /** z. B. Button „Tagebucheintrag“ unter der Tabelle */
+  /** Optionaler Block unter der Tabelle */
   belowTable?: ReactNode
   emptyTitle?: string
   emptyHint?: string

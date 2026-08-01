@@ -218,7 +218,7 @@ export function TodoEditorSheet({
             onChange={(e) => setFaelligAm(e.target.value)}
           />
           <div>
-            <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">
+            <div className="mb-1 text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
               Priorität
             </div>
             <div className="seg">
@@ -244,13 +244,13 @@ export function TodoEditorSheet({
 
         {linksLocked ? (
           lockedLinks?.label ? (
-            <p className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+            <p className="text-[length:var(--fs-text)] text-[var(--text-3)]">
               Verknüpft: {lockedLinks.label}
             </p>
           ) : null
         ) : (
           <div className="space-y-3 border-t border-[var(--border)] pt-3">
-            <p className="text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">
+            <p className="text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
               Verknüpfung
             </p>
             <Combobox

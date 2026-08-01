@@ -369,35 +369,30 @@ export function KalenderTerminEditorSheet({
           />
         </div>
 
-        <div className="full">
-          <div className="mb-1 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)]">
-            Adresse
-          </div>
-          <div className="form-grid" style={{ margin: 0 }}>
-            <div className="full">
-              <Input
-                label="Straße"
-                value={strasse}
-                onChange={(e) => setStrasse(e.target.value)}
-                placeholder="Musterstraße"
-                autoComplete="street-address"
-              />
-            </div>
+        <div className="full form-grid" style={{ margin: 0 }}>
+          <div className="full">
             <Input
-              label="Hausnummer"
-              value={hausnummer}
-              onChange={(e) => setHausnummer(e.target.value)}
-              placeholder="12"
-            />
-            <Input
-              label="PLZ"
-              value={plz}
-              onChange={(e) => setPlz(e.target.value)}
-              placeholder="80331"
-              inputMode="numeric"
-              autoComplete="postal-code"
+              label="Anschrift"
+              value={strasse}
+              onChange={(e) => setStrasse(e.target.value)}
+              placeholder="Musterstraße"
+              autoComplete="street-address"
             />
           </div>
+          <Input
+            label="Hausnummer"
+            value={hausnummer}
+            onChange={(e) => setHausnummer(e.target.value)}
+            placeholder="12"
+          />
+          <Input
+            label="PLZ"
+            value={plz}
+            onChange={(e) => setPlz(e.target.value)}
+            placeholder="80331"
+            inputMode="numeric"
+            autoComplete="postal-code"
+          />
         </div>
 
         <div className="full">

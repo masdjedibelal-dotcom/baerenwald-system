@@ -12,7 +12,6 @@ import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
@@ -27,16 +26,6 @@ type DocRow = {
   dokumentId?: string
   beschreibung: string
   freigabe: boolean
-}
-
-type ViewState = {
-  id: string
-  name: string
-  url: string
-  isImage: boolean
-  date: string
-  size: string | null
-  beschreibung: string
 }
 
 const COLS = 'minmax(0, 1fr) auto'
@@ -60,8 +49,10 @@ function formatDatum(iso: string): string {
   }
 }
 
-function isImageDoc(name: string, url: string): boolean {
-  return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(`${name} ${url}`)
+function openDokumentDatei(url: string) {
+  const href = url.trim()
+  if (!href) return
+  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 function normalizeAuftragAngebote(
@@ -105,7 +96,6 @@ export function KundenDokumenteTab({
     Record<string, { name?: string; beschreibung: string; freigabe: boolean; created_at?: string }>
   >({})
   const [editId, setEditId] = useState<string | null>(null)
-  const [view, setView] = useState<ViewState | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -285,20 +275,7 @@ export function KundenDokumenteTab({
       }
       toast.success('Dokument gelöscht')
       if (editId === row.id) setEditId(null)
-      if (view?.id === row.id) setView(null)
       onReload()
-    })
-  }
-
-  const openView = (d: DocRow) => {
-    setView({
-      id: d.id,
-      name: d.name,
-      url: d.href,
-      isImage: isImageDoc(d.name, d.href),
-      date: formatDatum(d.created_at),
-      size: formatBytes(d.groesse_bytes),
-      beschreibung: d.beschreibung,
     })
   }
 
@@ -370,7 +347,7 @@ export function KundenDokumenteTab({
                   key={d.id}
                   title={d.name}
                   meta={meta}
-                  onClick={() => openView(d)}
+                  onClick={() => openDokumentDatei(d.href)}
                   badge={
                     <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
                       {d.freigabe ? 'Kunde' : 'intern'}
@@ -401,13 +378,13 @@ export function KundenDokumenteTab({
                   role={editing ? undefined : 'button'}
                   tabIndex={editing ? undefined : 0}
                   onClick={() => {
-                    if (!editing) openView(d)
+                    if (!editing) openDokumentDatei(d.href)
                   }}
                   onKeyDown={(e) => {
                     if (editing) return
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      openView(d)
+                      openDokumentDatei(d.href)
                     }
                   }}
                 >
@@ -466,79 +443,6 @@ export function KundenDokumenteTab({
           </div>
         )}
       </MockDokumenteCard>
-
-      <MockModal
-        open={!!view}
-        onClose={() => setView(null)}
-        icon={view?.isImage ? 'photo' : 'file-text'}
-        title={view?.name ?? 'Dokument'}
-        sub={view ? `${view.date}${view.size ? ` · ${view.size}` : ''}` : undefined}
-        footer={
-          <>
-            <MockBtn
-              sm
-              kind="ghost"
-              icon="pencil"
-              onClick={() => {
-                if (!view) return
-                setEditId(view.id)
-                setView(null)
-              }}
-            >
-              Bearbeiten
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn sm kind="primary" icon="x" onClick={() => setView(null)}>
-              Schließen
-            </MockBtn>
-          </>
-        }
-      >
-        {view ? (
-          view.isImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={view.url}
-              alt={view.name}
-              style={{ width: '100%', borderRadius: 8, display: 'block' }}
-            />
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: 'center',
-                background: 'var(--bg-soft)',
-                borderRadius: 10,
-                border: '0.5px solid var(--border)',
-              }}
-            >
-              <MockIcon
-                ctx="empty"
-                n="file-text"
-                size={44}
-                style={{ color: 'var(--text-4)' }}
-              />
-              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 10 }}>{view.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-                <a
-                  href={view.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn ghost sm"
-                  style={{ marginTop: 12, display: 'inline-flex' }}
-                >
-                  Datei öffnen
-                </a>
-              </div>
-            </div>
-          )
-        ) : null}
-        {view?.beschreibung ? (
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 12 }}>
-            {view.beschreibung}
-          </div>
-        ) : null}
-      </MockModal>
     </>
   )
 }

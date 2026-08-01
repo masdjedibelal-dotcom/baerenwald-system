@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { DocActionBar } from '@/components/surfaces/primitives'
-import { ActionIcon } from '@/components/ui/ActionIcon'
 import { Toggle } from '@/components/ui/Toggle'
+import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
@@ -64,7 +63,16 @@ function FunnelIcon({ name }: { name: string }) {
   )
 }
 
-function MeldeadresseFields({
+function splitStrasseHausnummer(raw: string): { strasse: string; hausnummer: string } {
+  const m = raw.match(/^(.*?)(?:\s+(\d+\S*))?$/)
+  return {
+    strasse: (m?.[1] ?? raw).trim(),
+    hausnummer: (m?.[2] ?? '').trim(),
+  }
+}
+
+/** Kundenadresse — immer sichtbar im Kunde-Block. */
+function KundenAdresseFields({
   state,
   patch,
 }: {
@@ -81,33 +89,82 @@ function MeldeadresseFields({
               ? `${state.strasse} ${state.hausnummer}`.trim()
               : state.strasse
           }
-          onChange={(e) => {
-            const raw = e.target.value
-            const m = raw.match(/^(.*?)(?:\s+(\d+\S*))?$/)
-            patch({
-              strasse: (m?.[1] ?? raw).trim(),
-              hausnummer: (m?.[2] ?? '').trim(),
-            })
-          }}
+          onChange={(e) => patch(splitStrasseHausnummer(e.target.value))}
           placeholder="z.B. Lindenstr. 24"
+          autoComplete="street-address"
         />
       </MockField>
-      <MockField label="PLZ">
+      <div className="full grid gap-3 sm:grid-cols-2">
+        <MockField label="PLZ">
+          <input
+            className="input"
+            value={state.plz}
+            onChange={(e) => patch({ plz: e.target.value.slice(0, 5) })}
+            placeholder="80796"
+            inputMode="numeric"
+            maxLength={5}
+            autoComplete="postal-code"
+          />
+        </MockField>
+        <MockField label="Ort">
+          <input
+            className="input"
+            value={state.ort}
+            onChange={(e) => patch({ ort: e.target.value })}
+            placeholder="München"
+            autoComplete="address-level2"
+          />
+        </MockField>
+      </div>
+    </>
+  )
+}
+
+/** Leistungs-/Objektadresse, wenn abweichend von der Kundenadresse. */
+function MeldeadresseFields({
+  state,
+  patch,
+}: {
+  state: StaffFunnelState
+  patch: (p: Partial<StaffFunnelState>) => void
+}) {
+  return (
+    <>
+      <MockField label="Straße (Objekt / Leistung)" full>
         <input
           className="input"
-          value={state.plz}
-          onChange={(e) => patch({ plz: e.target.value })}
-          placeholder="80796"
+          value={
+            state.objektHausnummer.trim()
+              ? `${state.objektStrasse} ${state.objektHausnummer}`.trim()
+              : state.objektStrasse
+          }
+          onChange={(e) => {
+            const s = splitStrasseHausnummer(e.target.value)
+            patch({ objektStrasse: s.strasse, objektHausnummer: s.hausnummer })
+          }}
+          placeholder="z.B. Baustellenstr. 12"
         />
       </MockField>
-      <MockField label="Ort / Region">
-        <input
-          className="input"
-          value={state.ort}
-          onChange={(e) => patch({ ort: e.target.value })}
-          placeholder="München"
-        />
-      </MockField>
+      <div className="full grid gap-3 sm:grid-cols-2">
+        <MockField label="PLZ (Objekt)">
+          <input
+            className="input"
+            value={state.objektPlz}
+            onChange={(e) => patch({ objektPlz: e.target.value.slice(0, 5) })}
+            placeholder="80796"
+            inputMode="numeric"
+            maxLength={5}
+          />
+        </MockField>
+        <MockField label="Ort (Objekt)">
+          <input
+            className="input"
+            value={state.objektOrt}
+            onChange={(e) => patch({ objektOrt: e.target.value })}
+            placeholder="München"
+          />
+        </MockField>
+      </div>
     </>
   )
 }
@@ -218,7 +275,7 @@ export function StaffFunnelWizard({
       email: k.email ?? '',
       telefon: k.telefon ?? '',
       kundentyp: hv ? 'verwaltung' : k.typ === 'gewerbe' ? 'gewerbe' : state.kundentyp || 'eigentuemer',
-      ...(meldeAbweichend ? {} : adresse),
+      ...adresse,
     })
   }
 
@@ -234,26 +291,29 @@ export function StaffFunnelWizard({
       nachname: '',
       email: '',
       telefon: '',
-      kundentyp: state.anliegen === 'hausverwaltung' ? 'verwaltung' : state.anliegen === 'gewerbe' ? 'gewerbe' : '',
+      kundentyp: state.anliegen === 'gewerbe' ? 'gewerbe' : '',
       plz: '',
       ort: '',
       strasse: '',
       hausnummer: '',
+      objektPlz: '',
+      objektOrt: '',
+      objektStrasse: '',
+      objektHausnummer: '',
     })
     setMeldeAbweichend(false)
   }
 
   function setMeldeAbweichendOn(on: boolean) {
     setMeldeAbweichend(on)
-    if (on) {
-      patch({ plz: '', ort: '', strasse: '', hausnummer: '' })
-      return
+    if (!on) {
+      patch({
+        objektPlz: '',
+        objektOrt: '',
+        objektStrasse: '',
+        objektHausnummer: '',
+      })
     }
-    if (bestandskunde && kundeAdresse) {
-      patch(kundeAdresse)
-      return
-    }
-    patch({ plz: '', ort: '', strasse: '', hausnummer: '' })
   }
 
   function selectAnliegen(id: StaffAnliegenId) {
@@ -264,23 +324,21 @@ export function StaffFunnelWizard({
       bereiche: id === 'gewerbe' ? ['gewerbe'] : [],
       fachdetails: {},
       groessen: {},
-      kundentyp:
-        id === 'hausverwaltung'
-          ? 'verwaltung'
-          : id === 'gewerbe'
-            ? 'gewerbe'
-            : state.kundentyp,
-      kanal: id === 'hausverwaltung' ? 'hv_manuell' : state.kanal === 'hv_manuell' ? 'telefon' : state.kanal,
-      preisModus: id === 'termin' || id === 'gewerbe' ? 'komplex' : 'rahmen',
+      groessenEinheiten: {},
+      kundentyp: id === 'gewerbe' ? 'gewerbe' : state.kundentyp === 'gewerbe' ? '' : state.kundentyp,
+      preisModus: id === 'gewerbe' ? 'komplex' : 'rahmen',
     })
   }
 
-  function toggleBereich(v: string) {
-    setState((s) => {
-      const has = s.bereiche.includes(v)
-      const bereiche = has ? s.bereiche.filter((x) => x !== v) : [...s.bereiche, v]
-      return { ...s, bereiche }
-    })
+  function setBereich(v: string) {
+    setState((s) => ({
+      ...s,
+      bereiche: v ? [v] : [],
+      fachdetails: {},
+      groessen: {},
+      groessenEinheiten: {},
+      badAusstattung: '',
+    }))
   }
 
   async function submit() {
@@ -334,11 +392,14 @@ export function StaffFunnelWizard({
 
   const isFormular = state.erfassungsModus === 'formular'
   const showBereiche = isFormular && state.anliegen !== 'gewerbe' && Boolean(state.anliegen)
-  const showPreis = isFormular && Boolean(state.anliegen)
   const dyn = useMemo(() => staffFunnelDynamicBlocks(state), [state])
   const fachKeys = useMemo(() => staffFunnelFachdetailKeys(state), [state])
   const groesseBereiche = useMemo(() => staffFunnelGroesseBereiche(state), [state])
   const showDetails = isFormular && Boolean(state.anliegen) && dyn.any
+  const needsFirma =
+    state.anliegen === 'gewerbe' ||
+    state.kundentyp === 'verwaltung' ||
+    state.kundentyp === 'gewerbe'
 
   if (!open || !mounted) return null
 
@@ -347,21 +408,19 @@ export function StaffFunnelWizard({
       open={open}
       title="Anfrage erfassen"
       onClose={onClose}
-      onDiscard={onClose}
+      onSave={() => {
+        if (loading) return
+        void submit()
+      }}
       saveBusy={loading}
-      docActions={
-        <DocActionBar
-          actions={[
-            {
-              id: 'anlegen',
-              label: loading ? 'Anlegen…' : 'Anfrage anlegen',
-              onClick: () => {
-                if (loading) return
-                void submit()
-              },
-              icon: <ActionIcon n="check" size={20} />,
-            },
-          ]}
+      footerCta={
+        <StaffPreisIndikation
+          min={isFormular ? state.preisMin : null}
+          max={isFormular ? state.preisMax : null}
+          komplex={
+            isFormular &&
+            (state.preisModus === 'komplex' || state.anliegen === 'gewerbe')
+          }
         />
       }
       className="staff-funnel staff-funnel--mock"
@@ -426,22 +485,20 @@ export function StaffFunnelWizard({
 
             {showBereiche ? (
               <section className="sf-sec">
-                <h3 className="sf-sec-l">Bereiche</h3>
-                <div className="sf-pills" role="group" aria-label="Bereiche">
-                  {bereichOptions.map((b) => {
-                    const on = state.bereiche.includes(b.value)
-                    return (
-                      <button
-                        key={b.value}
-                        type="button"
-                        className={cn('sf-pill', on && 'on')}
-                        onClick={() => toggleBereich(b.value)}
-                      >
-                        {b.label}
-                      </button>
-                    )
-                  })}
-                </div>
+                <h3 className="sf-sec-l">Bereich</h3>
+                <select
+                  className="input"
+                  value={state.bereiche[0] ?? ''}
+                  onChange={(e) => setBereich(e.target.value)}
+                  aria-label="Bereich"
+                >
+                  <option value="">Bitte wählen</option>
+                  {bereichOptions.map((b) => (
+                    <option key={b.value} value={b.value}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
               </section>
             ) : null}
 
@@ -608,21 +665,6 @@ export function StaffFunnelWizard({
               </section>
             ) : null}
 
-            {showPreis ? (
-              <section className="sf-sec">
-                <StaffPreisIndikation
-                  min={state.preisMin}
-                  max={state.preisMax}
-                  komplex={state.preisModus === 'komplex' || state.anliegen === 'termin'}
-                  hinweis={
-                    state.preisHinweis ||
-                    (state.anliegen === 'termin'
-                      ? 'Termin / Beratung — Preis entsteht im Gespräch.'
-                      : 'Orientierung wie auf der Website')
-                  }
-                />
-              </section>
-            ) : null}
           </>
         ) : (
           <section className="sf-sec">
@@ -649,7 +691,8 @@ export function StaffFunnelWizard({
         )}
 
         <section className="sf-sec">
-          <MockFormSection title="Kunde">
+          <Card title="Kunde" collapsible defaultOpen>
+            <MockFormSection>
             <div className="full">
               <Toggle
                 label="Bestandskunde"
@@ -678,61 +721,50 @@ export function StaffFunnelWizard({
             ) : (
               <>
                 <MockField label="Kundentyp" full>
-                  <div className="sf-radio-list" role="radiogroup" aria-label="Kundentyp">
-                    {KUNDENTYP_OPTIONS.map((o) => (
-                      <label key={o.value} className="sf-radio">
-                        <input
-                          type="radio"
-                          name="sf-kundentyp"
-                          value={o.value}
-                          checked={state.kundentyp === o.value}
-                          onChange={() => patch({ kundentyp: o.value })}
-                        />
-                        <span>{o.label}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <StaffChoiceGrid
+                    columns={2}
+                    options={KUNDENTYP_OPTIONS}
+                    value={state.kundentyp}
+                    onChange={(v) => patch({ kundentyp: v })}
+                  />
                 </MockField>
-                {state.anliegen === 'hausverwaltung' || state.kundentyp === 'verwaltung' ? (
-                  <MockField label="Firma" full>
+                {needsFirma ? (
+                  <MockField label="Firma" full required>
                     <input
                       className="input"
                       value={state.firmaName}
                       onChange={(e) => patch({ firmaName: e.target.value })}
+                      placeholder="Muster GmbH"
+                      autoComplete="organization"
                     />
                   </MockField>
                 ) : null}
-                <MockField label="Name" required full>
-                  <input
-                    className="input"
-                    value={
-                      state.firmaName.trim()
-                        ? state.firmaName
-                        : [state.vorname, state.nachname].filter(Boolean).join(' ')
-                    }
-                    onChange={(e) => {
-                      const v = e.target.value
-                      if (
-                        state.firmaName.trim() ||
-                        state.kundentyp === 'verwaltung' ||
-                        state.kundentyp === 'gewerbe'
-                      ) {
-                        patch({ firmaName: v })
-                        return
-                      }
-                      const parts = v.trim().split(/\s+/)
-                      if (parts.length <= 1) {
-                        patch({ vorname: '', nachname: v })
-                      } else {
-                        patch({
-                          vorname: parts[0] ?? '',
-                          nachname: parts.slice(1).join(' '),
-                        })
-                      }
-                    }}
-                    placeholder="Maria Koch"
-                  />
-                </MockField>
+                <div className="full grid gap-3 sm:grid-cols-2">
+                  <MockField
+                    label={needsFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}
+                    required={!needsFirma}
+                  >
+                    <input
+                      className="input"
+                      value={state.vorname}
+                      onChange={(e) => patch({ vorname: e.target.value })}
+                      placeholder="Maria"
+                      autoComplete="given-name"
+                    />
+                  </MockField>
+                  <MockField
+                    label={needsFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}
+                    required={!needsFirma}
+                  >
+                    <input
+                      className="input"
+                      value={state.nachname}
+                      onChange={(e) => patch({ nachname: e.target.value })}
+                      placeholder="Koch"
+                      autoComplete="family-name"
+                    />
+                  </MockField>
+                </div>
                 <MockField label="Telefon">
                   <input
                     className="input"
@@ -752,44 +784,53 @@ export function StaffFunnelWizard({
               </>
             )}
 
+            <KundenAdresseFields state={state} patch={patch} />
             <div className="full">
               <Toggle
-                label="Meldeadresse abweichend"
-                hint={
-                  bestandskunde
-                    ? 'Objektadresse weicht von der Kundenadresse ab'
-                    : 'Baustellenadresse zusätzlich erfassen'
-                }
+                label="Leistungsort abweichend"
                 checked={meldeAbweichend}
                 onChange={setMeldeAbweichendOn}
               />
             </div>
             {meldeAbweichend ? <MeldeadresseFields state={state} patch={patch} /> : null}
-          </MockFormSection>
+            </MockFormSection>
+          </Card>
         </section>
 
         <section className="sf-sec">
-          <MockFormSection title="Anfragedaten">
+          <Card title="Anfragedaten" collapsible defaultOpen>
+            <MockFormSection>
             <MockField label="Zeitraum" full>
-              <StaffChoiceGrid
-                columns={2}
-                options={ZEITRAUM_ERNEUERN_OPTIONS}
+              <select
+                className="input"
                 value={state.zeitraum}
-                onChange={(v) => patch({ zeitraum: v })}
-              />
+                onChange={(e) => patch({ zeitraum: e.target.value })}
+                aria-label="Zeitraum"
+              >
+                <option value="">Bitte wählen</option>
+                {ZEITRAUM_ERNEUERN_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </MockField>
             <MockField label="Herkunft" full>
-              <StaffChoiceGrid
-                columns={2}
-                options={STAFF_KANAL.map((k) => ({
-                  value: k,
-                  label: KANAL_LABELS[k] ?? k,
-                }))}
+              <select
+                className="input"
                 value={state.kanal}
-                onChange={(v) => patch({ kanal: v as LeadKanal })}
-              />
+                onChange={(e) => patch({ kanal: e.target.value as LeadKanal })}
+                aria-label="Herkunft"
+              >
+                {STAFF_KANAL.map((k) => (
+                  <option key={k} value={k}>
+                    {KANAL_LABELS[k] ?? k}
+                  </option>
+                ))}
+              </select>
             </MockField>
           </MockFormSection>
+          </Card>
         </section>
       </div>
     </DocumentCanvas>

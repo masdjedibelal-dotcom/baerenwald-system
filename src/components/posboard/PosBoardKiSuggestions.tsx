@@ -1,11 +1,7 @@
 'use client'
 
-import { useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import {
-  suggestKatalogPositionen,
-  type KatalogSuggestItem,
-} from '@/app/(dashboard)/katalog/suggest-actions'
+import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { cn } from '@/lib/utils'
 
 export type PosBoardSuggestContext = {
@@ -14,157 +10,51 @@ export type PosBoardSuggestContext = {
 }
 
 type Props = {
-  context: PosBoardSuggestContext
-  existingVarianteIds?: Set<string> | string[]
-  onAccept: (item: KatalogSuggestItem) => void
+  /** Optionaler Anfrage-/Projektkontext (nur als Hinweis, kein Auto-Vorschlag) */
+  context?: PosBoardSuggestContext | null
   className?: string
 }
 
 /**
- * KI-/Katalog-Vorschläge am PosBoard: laden, anzeigen, ausblenden (ohne löschen), übernehmen.
- * Lokales Loading — kein globaler actionBusy-Overlay.
+ * Öffnet den Assistenten im Modus „mehrere Positionen“.
+ * Nutzer beschreibt die Arbeiten im Chat → Übernehmen legt alle Positionen an.
  */
-export function PosBoardKiSuggestions({
-  context,
-  existingVarianteIds,
-  onAccept,
-  className,
-}: Props) {
-  const [items, setItems] = useState<KatalogSuggestItem[] | null>(null)
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set())
-  const [panelOpen, setPanelOpen] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+export function PosBoardKiSuggestions({ context, className }: Props) {
+  const { openScoped } = useAssistent()
 
-  const existing = existingVarianteIds
-    ? existingVarianteIds instanceof Set
-      ? existingVarianteIds
-      : new Set(existingVarianteIds)
-    : new Set<string>()
-
-  async function load() {
-    setError(null)
-    setPending(true)
-    try {
-      const list = await suggestKatalogPositionen({
-        text: context.text,
-        gewerkHints: context.gewerkHints,
-        limit: 8,
-      })
-      setItems(list)
-      setPanelOpen(true)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Vorschläge fehlgeschlagen')
-    } finally {
-      setPending(false)
-    }
+  function openChat() {
+    const hints = context?.gewerkHints?.filter(Boolean) ?? []
+    const ctxText = context?.text?.trim() ?? ''
+    const extraParts = [
+      'Nutzer beschreibt Arbeiten im Chat. Daraus mehrere konkrete Kalkulationspositionen erzeugen.',
+      'Kein Katalog-Matching und keine Vorschläge ohne Nutzerbeschreibung.',
+      hints.length ? `Gewerk-Hinweise: ${hints.join(', ')}.` : null,
+      ctxText
+        ? `Optionaler Projekt-/Anfragekontext (nur falls hilfreich, nicht automatisch in Positionen umsetzen):\n${ctxText.slice(0, 1200)}`
+        : null,
+    ]
+    openScoped({
+      scopeId: 'positionen',
+      layer: 'over-sheet',
+      extraHint: extraParts.filter(Boolean).join('\n'),
+      draftInput: null,
+    })
   }
-
-  const visible =
-    items?.filter((i) => !hiddenIds.has(i.variante_id) && !existing.has(i.variante_id)) ?? []
-  const hiddenCount = items
-    ? items.filter((i) => hiddenIds.has(i.variante_id)).length
-    : 0
 
   return (
     <div className={cn('mb-3 rounded-lg border border-bw-border bg-bw-surface-2/60', className)}>
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-        <MockIcon ctx="btn" n="sparkles" size={14} />
-        <span className="text-[13px] font-semibold text-bw-text">KI Positionen</span>
-        <div className="flex-1" />
-        {items && items.length > 0 ? (
-          <button
-            type="button"
-            className="btn ghost sm"
-            onClick={() => setPanelOpen((v) => !v)}
-          >
-            {panelOpen ? 'Ausblenden' : 'Einblenden'}
-            {hiddenCount > 0 && !panelOpen ? ` (${hiddenCount} versteckt)` : ''}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="btn secondary sm"
-          disabled={pending || !context.text.trim()}
-          onClick={() => void load()}
-        >
-          {pending ? 'Sucht…' : items ? 'Neu vorschlagen' : 'Vorschlagen'}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+        <MockIcon ctx="default" n="sparkles" size={14} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-bw-text">KI Positionen</p>
+          <p className="text-[11px] leading-snug text-bw-text-muted">
+            Arbeiten beschreiben — mehrere Positionen auf einmal übernehmen
+          </p>
+        </div>
+        <button type="button" className="btn primary sm" onClick={openChat}>
+          Beschreiben
         </button>
       </div>
-
-      {pending ? (
-        <div className="flex items-center gap-2 border-t border-bw-border px-3 py-3 text-[12px] text-bw-text-muted">
-          <span className="page-loading__spinner page-loading__spinner--sm" aria-hidden />
-          Sucht passende Positionen…
-        </div>
-      ) : null}
-
-      {error ? (
-        <p className="border-t border-bw-border px-3 py-2 text-[12px] text-danger">{error}</p>
-      ) : null}
-
-      {!pending && panelOpen && items ? (
-        <div className="space-y-1.5 border-t border-bw-border px-3 py-2">
-          {visible.length === 0 ? (
-            <p className="text-[12px] text-bw-text-muted">
-              {items.length === 0
-                ? 'Keine passenden Katalog-Positionen gefunden.'
-                : 'Alle Vorschläge ausgeblendet oder bereits übernommen.'}
-            </p>
-          ) : (
-            visible.map((item) => (
-              <div
-                key={item.variante_id}
-                className="flex flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-2 text-[12px]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-bw-text">
-                    {item.titel}
-                    <span className="ml-1.5 rounded bg-[#E8F5EE] px-1.5 py-0.5 text-[10px] font-semibold text-[#2E7D52]">
-                      KI
-                    </span>
-                  </p>
-                  <p className="truncate text-bw-text-muted">
-                    {[item.gewerk_name, item.variante, item.preis_label, item.reason]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn ghost sm"
-                  title="Ausblenden"
-                  onClick={() =>
-                    setHiddenIds((prev) => {
-                      const next = new Set(prev)
-                      next.add(item.variante_id)
-                      return next
-                    })
-                  }
-                >
-                  <MockIcon ctx="btn" n="eye" size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="btn primary sm"
-                  onClick={() => onAccept(item)}
-                >
-                  Übernehmen
-                </button>
-              </div>
-            ))
-          )}
-          {hiddenCount > 0 ? (
-            <button
-              type="button"
-              className="text-[11px] text-[#2E7D52] underline"
-              onClick={() => setHiddenIds(new Set())}
-            >
-              {hiddenCount} ausgeblendete wieder anzeigen
-            </button>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   )
 }

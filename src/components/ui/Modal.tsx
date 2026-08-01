@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { X } from 'lucide-react'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +13,7 @@ interface ModalProps {
   title: ReactNode
   /** Optionaler Untertitel unter dem Titel (Mock-Header) */
   subtitle?: ReactNode
-  /** Optional links neben dem Titel (z. B. Icon-Kreis) */
+  /** Optional neben dem Titel (z. B. Icon) — nach dem Schließen-Button links */
   leading?: ReactNode
   children: ReactNode
   footer?: ReactNode
@@ -85,6 +85,15 @@ export function Modal({
         style={{ width: SIZE_WIDTH[size] }}
       >
         <div className="modal-h">
+          <button
+            type="button"
+            className="editor-sheet__icon-btn"
+            onClick={onClose}
+            title="Schließen"
+            aria-label="Schließen"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
           {leading ? <div className="icon">{leading}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div id={titleId} className="title">
@@ -92,14 +101,6 @@ export function Modal({
             </div>
             {subtitle ? <div className="sub">{subtitle}</div> : null}
           </div>
-          <MockBtn
-            icon="x"
-            kind="ghost"
-            sm
-            onClick={onClose}
-            title="Schließen"
-            aria-label="Schließen"
-          />
         </div>
         <div className="modal-b">{children}</div>
         {footer ? (

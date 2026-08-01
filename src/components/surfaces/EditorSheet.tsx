@@ -113,7 +113,10 @@ export function EditorSheet({
     return () => window.removeEventListener('ki-field-overlay', on)
   }, [])
   const pauseFocusTrap = Boolean(
-    (assistent?.open && assistent.scoped?.layer === 'over-sheet') || fieldOverlayOpen
+    (assistent?.open && assistent.scoped?.layer === 'over-sheet') ||
+      fieldOverlayOpen ||
+      (typeof overlayClassName === 'string' &&
+        overlayClassName.includes('editor-sheet-overlay--recessed'))
   )
   const [mounted, setMounted] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)

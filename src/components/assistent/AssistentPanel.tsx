@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
+import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
 import { KiChatComposer } from '@/components/assistent/KiChatComposer'
 import { buildAssistentContextHint } from '@/lib/copilot/assistent-context'
 import {
@@ -12,6 +13,7 @@ import {
   stripBwApplyBlock,
   type KiAssistDraft,
 } from '@/lib/copilot/ki-assist-scopes'
+import { sanitizeAssistentChatText } from '@/lib/copilot/sanitize-chat-text'
 import {
   emptyAssistentUi,
   type AssistentNavLink,
@@ -167,6 +169,52 @@ function PositionDraftCard({
           .filter(Boolean)
           .join(' · ') || 'Menge / Preis offen'}
       </p>
+      <button
+        type="button"
+        className="btn primary sm ki-pos-draft-card__apply"
+        disabled={disabled}
+        onClick={onApply}
+      >
+        {applyLabel}
+      </button>
+    </div>
+  )
+}
+
+function PositionenDraftCard({
+  draft,
+  onApply,
+  disabled,
+  applyLabel,
+}: {
+  draft: Extract<KiAssistDraft, { type: 'positionen' }>
+  onApply: () => void
+  disabled?: boolean
+  applyLabel: string
+}) {
+  return (
+    <div className="ki-pos-draft-card">
+      <div className="ki-pos-draft-card__head">
+        {draft.items.length} Positionen zum Übernehmen
+      </div>
+      <ul className="ki-pos-draft-card__list">
+        {draft.items.map((it, i) => (
+          <li key={`${it.name}-${i}`}>
+            <span className="ki-pos-draft-card__name">{it.name}</span>
+            <span className="ki-pos-draft-card__meta">
+              {[
+                it.menge != null && it.menge > 0
+                  ? `${it.menge} ${it.einheit?.trim() || 'Stk.'}`
+                  : null,
+                it.preis != null && it.preis >= 0 ? formatEurBetrag(it.preis) : null,
+                it.gewerk?.trim() || null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </li>
+        ))}
+      </ul>
       <button
         type="button"
         className="btn primary sm ki-pos-draft-card__apply"
@@ -349,7 +397,15 @@ export function AssistentPanel() {
     }
     setPendingDraft(draft)
     if (scoped?.layer === 'over-sheet') {
-      toast.success('Position übernommen')
+      const n =
+        draft.type === 'positionen'
+          ? draft.items.length
+          : draft.type === 'position'
+            ? 1
+            : 0
+      toast.success(
+        n > 1 ? `${n} Positionen übernommen` : n === 1 ? 'Position übernommen' : 'Übernommen'
+      )
       closePanel()
       return
     }
@@ -485,10 +541,14 @@ export function AssistentPanel() {
             <>
               {messages.map((m, i) => {
                 const draft = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
-                const display =
+                const displayRaw =
                   m.role === 'assistant' && draft
                     ? stripBwApplyBlock(m.content) || m.content
                     : m.content
+                const display =
+                  m.role === 'assistant'
+                    ? sanitizeAssistentChatText(displayRaw)
+                    : displayRaw
                 return (
                   <div
                     key={`${m.role}-${i}`}
@@ -497,16 +557,32 @@ export function AssistentPanel() {
                     <div
                       className={cn(
                         'assistent-bubble',
-                        m.role === 'assistant' ? 'assistent-bubble--ai' : 'assistent-bubble--user'
+                        m.role === 'assistant' ? 'assistent-bubble--ai' : 'assistent-bubble--user',
+                        m.role === 'assistant' && 'assistent-bubble--md'
                       )}
                     >
-                      {display}
+                      {m.role === 'assistant' ? (
+                        <AssistentMarkdown content={display} onNavigate={navigateCrm} />
+                      ) : (
+                        display
+                      )}
                     </div>
                     {draft?.type === 'position' ? (
                       <PositionDraftCard
                         draft={draft}
                         disabled={pending}
                         applyLabel={overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
+                        onApply={() => applyDraftFromMessage(m.content)}
+                      />
+                    ) : draft?.type === 'positionen' ? (
+                      <PositionenDraftCard
+                        draft={draft}
+                        disabled={pending}
+                        applyLabel={
+                          overSheet
+                            ? `Alle ${draft.items.length} übernehmen`
+                            : `Alle ${draft.items.length} in Formular`
+                        }
                         onApply={() => applyDraftFromMessage(m.content)}
                       />
                     ) : draft ? (

@@ -60,6 +60,8 @@ export type LeistungMangelAnzeige = {
 export type LeistungDrawerAction = {
   id: string
   label: string
+  /** Header-Icon (MockIcon), z. B. „user“ für Zuweisung */
+  icon?: string
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   onClick: () => void
   disabled?: boolean

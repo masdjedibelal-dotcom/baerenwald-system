@@ -213,15 +213,33 @@ export async function searchKunden(q: string) {
 }
 
 export async function createKundeQuick(input: {
-  name: string
+  vorname?: string | null
+  nachname?: string | null
+  /** @deprecated Prefer vorname/nachname — kept for callers that still pass a full name */
+  name?: string | null
   email: string | null
   telefon: string | null
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const vorname = (input.vorname ?? '').trim()
+  const nachname = (input.nachname ?? '').trim()
+  const legacy = (input.name ?? '').trim()
+  if (!vorname && !nachname && !legacy) {
+    return { ok: false, message: 'Vorname oder Nachname ist Pflicht.' }
+  }
+  let v = vorname
+  let n = nachname
+  if (!v && !n && legacy) {
+    const parts = legacy.split(/\s+/)
+    v = parts[0] ?? ''
+    n = parts.slice(1).join(' ')
+  }
   const { data, error } = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
       .insert({
-        name: input.name.trim(),
+        name: null,
+        vorname: v || null,
+        nachname: n || null,
         email: input.email?.trim() || null,
         telefon: input.telefon?.trim() || null,
         typ: 'privat',

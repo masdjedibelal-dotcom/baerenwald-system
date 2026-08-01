@@ -91,8 +91,6 @@ export function buildDashboardKpiSnapshot(input: {
   } else if (m.gscError) {
     lines.push(`- GSC: Fehler (${m.gscError})`)
   }
-  if (m.resendOk) lines.push(`- Mail Delivery-Rate: ${m.deliveryRatePct ?? '—'}%`)
-  else if (m.resendError) lines.push(`- Mail: Fehler (${m.resendError})`)
   if (m.funnelOk && m.funnelStages?.length) {
     lines.push('- Rechner-Funnel:')
     for (const s of m.funnelStages) {

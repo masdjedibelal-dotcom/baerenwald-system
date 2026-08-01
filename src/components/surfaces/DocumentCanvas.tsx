@@ -20,6 +20,11 @@ export type DocumentCanvasProps = {
   /** Wenn gesetzt: beschrifteter Header-CTA statt nur Check-Icon (Mock „Anfrage anlegen“) */
   saveLabel?: string
   saveBusy?: boolean
+  /**
+   * Ersetzt den Standard-✓ rechts im Header (z. B. Vorschau + Speichern/Senden-Menü).
+   * Wenn gesetzt, werden onSave / saveLabel im Header ignoriert.
+   */
+  headerEnd?: ReactNode
   /** DocBar Verwerfen — einzige destruktive Exit mit Confirm */
   onDiscard?: () => void
   docActions?: ReactNode
@@ -59,6 +64,7 @@ export function DocumentCanvas({
   onSave,
   saveLabel,
   saveBusy,
+  headerEnd,
   onDiscard,
   docActions,
   children,
@@ -268,7 +274,16 @@ export function DocumentCanvas({
             </p>
           ) : null}
         </div>
-        {onSave ? (
+        {headerEnd != null ? (
+          <div
+            className={cn(
+              'document-canvas__header-end',
+              interactionLocked && 'pointer-events-none opacity-60'
+            )}
+          >
+            {headerEnd}
+          </div>
+        ) : onSave ? (
           saveLabel ? (
             <button
               type="button"

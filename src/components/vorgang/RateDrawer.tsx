@@ -7,7 +7,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { formatDatum, cn } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import type { ZahlplanRateStatus } from '@/lib/rechnungen/zahlungsplan'
 
 export type RateDrawerMahnung = {
@@ -65,8 +65,7 @@ function sec(title: string, icon: string, body: ReactNode) {
 }
 
 /**
- * Phase 7 — RateDrawer: Lese-Abschnitte + Footer-CTAs (EditorSheet rechts).
- * Spec §9 / Mock ZahlplanCard.
+ * RateDrawer: Lese-Abschnitte; Aktionen (Öffnen / Bearbeiten) als Icons rechts oben.
  */
 export function RateDrawer({
   open,
@@ -81,6 +80,25 @@ export function RateDrawer({
   onClose: () => void
   ctas?: RateDrawerCta[]
 }) {
+  const headerEnd =
+    ctas.length > 0 ? (
+      <div className="flex items-center gap-0.5">
+        {ctas.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="editor-sheet__icon-btn"
+            disabled={c.disabled}
+            aria-label={c.label}
+            title={c.label}
+            onClick={c.onClick}
+          >
+            <MockIcon ctx="default" n={c.icon ?? 'eye'} size={20} />
+          </button>
+        ))}
+      </div>
+    ) : undefined
+
   if (!rate) {
     return (
       <EditorSheet open={open} onClose={onClose} title="Abschlag">
@@ -99,42 +117,13 @@ export function RateDrawer({
     Boolean(r.faellig) &&
     new Date(String(r.faellig).slice(0, 10)) < new Date(new Date().toDateString())
 
-  const footer =
-    ctas.length > 0 ? (
-      <div
-        className="rate-drawer-cta rate-drawer-cta--tiles"
-        role="toolbar"
-        aria-label="Aktionen"
-      >
-        {ctas.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={cn('rate-drawer-cta__tile', c.primary && 'is-primary')}
-            disabled={c.disabled}
-            onClick={c.onClick}
-          >
-            {c.icon ? <MockIcon ctx="btn" n={c.icon} size={18} /> : null}
-            <span className="rate-drawer-cta__lbl">{c.label}</span>
-          </button>
-        ))}
-      </div>
-    ) : (
-      <div className="rate-drawer-cta rate-drawer-cta--tiles">
-        <button type="button" className="rate-drawer-cta__tile is-primary" onClick={onClose}>
-          <MockIcon ctx="btn" n="x" size={18} />
-          <span className="rate-drawer-cta__lbl">Schließen</span>
-        </button>
-      </div>
-    )
-
   return (
     <EditorSheet
       open={open}
       onClose={onClose}
       title={r.label || 'Abschlag'}
       crumb={sheetCrumb}
-      footer={footer}
+      headerEnd={headerEnd}
       size="lg"
     >
       {sec(

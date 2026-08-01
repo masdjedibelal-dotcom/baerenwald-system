@@ -29,11 +29,11 @@ export function ctaVerbLabel(label: string): string {
 }
 
 type Props = {
-  /** Haupt-CTA — mobil zentriert wenn allein, sonst ~¾ Breite mit Overflow */
+  /** Haupt-CTA — mobil floating unten */
   primary?: DetailActionDef | null
   /**
-   * Zweite Action: Desktop als eigener Button,
-   * mobil wandert sie ins ⋯-Menü (nur falls Menü existiert).
+   * Zweite Action: Desktop + Mobil als Secondary-Button neben Primary
+   * (nicht im ⋯-Menü).
    */
   secondary?: DetailActionDef | null
   menuItems?: ActionsMenuItem[]
@@ -155,21 +155,9 @@ export function DetailActionsBar({
     [menuItems, primary?.label]
   )
 
-  const mobileMenuItems = useMemo((): ActionsMenuItem[] => {
-    if (!secondary) return cleanMenuItems
-    const item: ActionsMenuItem = {
-      label: secondary.label,
-      icon: secondary.icon ? (
-        <ActionIcon n={secondary.icon} size={16} />
-      ) : undefined,
-      onClick: secondary.onClick,
-    }
-    if (!cleanMenuItems.length) return [item]
-    return [item, 'sep', ...cleanMenuItems]
-  }, [secondary, cleanMenuItems])
-
-  const showOverflow = hasMenuContent(mobileMenuItems)
+  const showOverflow = hasMenuContent(cleanMenuItems)
   const alonePrimary = Boolean(primary) && !showOverflow && !secondary
+  const pairCtas = Boolean(primary && secondary)
 
   const menuTrigger = (compact: boolean, items: ActionsMenuItem[], className?: string) => (
     <ActionsMenu
@@ -218,7 +206,7 @@ export function DetailActionsBar({
 
   const mobileTopOverflow =
     mounted && isMobile && showOverflow && topActionsEl
-      ? createPortal(menuTrigger(true, mobileMenuItems), topActionsEl)
+      ? createPortal(menuTrigger(true, cleanMenuItems), topActionsEl)
       : null
 
   const mobileBar =
@@ -229,18 +217,43 @@ export function DetailActionsBar({
               'detail-mobile-action-bar md:hidden',
               !scrolled && 'detail-mobile-action-bar--hidden',
               scrolled && 'detail-mobile-action-bar--nav-replaced',
-              'detail-mobile-action-bar--solo'
+              alonePrimary && 'detail-mobile-action-bar--solo',
+              pairCtas && 'detail-mobile-action-bar--pair'
             )}
             role="toolbar"
             aria-label="Aktionen"
             aria-hidden={!scrolled}
           >
-            <div className="detail-mobile-action-bar__inner detail-mobile-action-bar__inner--solo">
+            <div
+              className={cn(
+                'detail-mobile-action-bar__inner',
+                alonePrimary && 'detail-mobile-action-bar__inner--solo',
+                pairCtas && 'detail-mobile-action-bar__inner--pair'
+              )}
+            >
+              {secondary ? (
+                <button
+                  type="button"
+                  className="btn secondary detail-mobile-action-bar__secondary"
+                  onClick={secondary.onClick}
+                  disabled={secondary.disabled}
+                  aria-label={secondary.label}
+                >
+                  {secondary.icon ? <ActionIcon n={secondary.icon} size={16} /> : null}
+                  <span className="detail-mobile-action-bar__label min-w-0 truncate">
+                    {secondary.label}
+                  </span>
+                </button>
+              ) : null}
               <ActionControl
                 action={primary}
                 size="md"
                 compact={false}
-                className="detail-mobile-action-bar__primary detail-mobile-action-bar__primary--solo"
+                className={cn(
+                  'detail-mobile-action-bar__primary',
+                  alonePrimary && 'detail-mobile-action-bar__primary--solo',
+                  pairCtas && 'detail-mobile-action-bar__primary--pair'
+                )}
               />
             </div>
           </div>,

@@ -11,8 +11,6 @@ import {
   type MarketingDateRange,
   type RechnerFunnelStep,
 } from '@/lib/ki-hub/sources/posthog'
-import { fetchResendSummary } from '@/lib/ki-hub/sources/resend'
-
 export type DashboardMarketingTopQuery = {
   query: string
   clicks: number
@@ -40,9 +38,6 @@ export type DashboardMarketingSnapshot = {
   gscOk: boolean
   gscError: string | null
   topQueries: DashboardMarketingTopQuery[]
-  deliveryRatePct: number | null
-  resendOk: boolean
-  resendError: string | null
   /** Rechner-Funnel (PostHog) */
   funnelOk: boolean
   funnelError: string | null
@@ -155,7 +150,7 @@ export async function loadDashboardMarketing(
 ): Promise<DashboardMarketingSnapshot> {
   const range = marketingDateRange(zeitraumFilter)
 
-  const [posthog, funnel, google, resend] = await Promise.all([
+  const [posthog, funnel, google] = await Promise.all([
     fetchPostHogSummary(range).catch(() => ({
       status: 'unavailable' as const,
       error: 'PostHog nicht erreichbar',
@@ -169,11 +164,6 @@ export async function loadDashboardMarketing(
     fetchGscSummary(range).catch(() => ({
       status: 'unavailable' as const,
       error: 'Search Console nicht erreichbar',
-      data: undefined,
-    })),
-    fetchResendSummary().catch(() => ({
-      status: 'unavailable' as const,
-      error: 'Resend nicht erreichbar',
       data: undefined,
     })),
   ])
@@ -207,10 +197,6 @@ export async function loadDashboardMarketing(
         }))
       : []
 
-  const rateRaw = resend.data?.delivery_rate_pct
-  const deliveryRatePct =
-    typeof rateRaw === 'number' && Number.isFinite(rateRaw) ? rateRaw : null
-
   const rechnerStart =
     funnel.status === 'ok' && funnel.data ? funnel.data.start : null
   const rechnerLead =
@@ -229,9 +215,6 @@ export async function loadDashboardMarketing(
     gscOk: google.status === 'ok',
     gscError: google.status === 'ok' ? null : (google.error ?? 'Nicht verbunden'),
     topQueries,
-    deliveryRatePct,
-    resendOk: resend.status === 'ok',
-    resendError: resend.status === 'ok' ? null : (resend.error ?? 'Nicht verbunden'),
     funnelOk: funnel.status === 'ok',
     funnelError:
       funnel.status === 'ok'

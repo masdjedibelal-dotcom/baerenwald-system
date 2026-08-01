@@ -151,7 +151,7 @@ export function TagebuchAnfordernSheet({
           <div>
             <div className="input-label mb-2">Gewerke / Leistungen</div>
             {!leistungen.length ? (
-              <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              <p className="text-[length:var(--fs-text)] text-bw-text-muted">
                 Diesem Partner sind keine Leistungen zugewiesen — Anforderung gilt für den ganzen
                 Auftrag.
               </p>

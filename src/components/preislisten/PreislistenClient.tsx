@@ -348,13 +348,9 @@ export function PreislistenClient({
         context="detail"
         dirty={dirty}
         size="md"
-        footer={
-          <div className="kunde-create-footer" style={{ justifyContent: 'flex-end' }}>
-            <MockBtn kind="primary" icon="check" disabled={pending} onClick={handleSave}>
-              {pending ? '…' : editLeistung ? 'Speichern' : 'Anlegen'}
-            </MockBtn>
-          </div>
-        }
+        onConfirm={handleSave}
+        confirmDisabled={pending || !form.leistung.trim() || !form.gewerk_id}
+        confirmBusy={pending}
       >
         <div className="kunde-create">
           {err ? <p className="kunde-create__err">{err}</p> : null}

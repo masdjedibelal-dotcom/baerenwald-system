@@ -21,6 +21,9 @@ import { INDIVIDUELL_TYP_SLUG } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 
 const BUCKET = 'partner-dokumente'
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+const ACCEPT =
+  'image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif'
 
 const EIGENE_UNTERLAGE: ComplianceDokumentTyp = {
   id: 'individuell-fallback',
@@ -47,9 +50,13 @@ function defaultGueltigBis(typ: ComplianceDokumentTyp, existing?: PartnerDokumen
   return ''
 }
 
+function fileBaseName(name: string): string {
+  return name.replace(/\.[^.]+$/, '').trim() || name
+}
+
 /**
- * Compliance-Unterlage hochladen / bearbeiten — EditorSheet Split-over.
- * Neu: optional Vorlage, dann Titel → Beschreibung → Datei → Gültig bis.
+ * Compliance-Unterlage hochladen / bearbeiten.
+ * Neu: Datei (Dok/Foto ≤5 MB) → Gültig bis → Art → Titel/Beschreibung optional.
  */
 export function PartnerDokumentEditorSheet({
   open,
@@ -66,7 +73,7 @@ export function PartnerDokumentEditorSheet({
   handwerkerId: string
   typ: ComplianceDokumentTyp | null
   typen?: ComplianceDokumentTyp[]
-  /** Neu-Upload: Vorlage optional wählbar */
+  /** Neu-Upload: Art des Dokuments wählbar */
   allowTypPick?: boolean
   existing: PartnerDokument | null
   onSaved?: () => void
@@ -82,7 +89,7 @@ export function PartnerDokumentEditorSheet({
 
   const pickOptions = useMemo(
     () => [
-      { value: '', label: 'Ohne Vorlage' },
+      { value: '', label: 'Eigene Unterlage' },
       ...typen
         .filter((t) => t.slug !== INDIVIDUELL_TYP_SLUG)
         .map((t) => ({ value: t.slug, label: t.bezeichnung })),
@@ -123,16 +130,16 @@ export function PartnerDokumentEditorSheet({
           bezeichnung: existing.bezeichnung || existing.typ,
         }
       setSelectedSlug(existing.typ)
-      setTitel(existing.bezeichnung?.trim() || t.bezeichnung)
-      setBeschreibung(existing.notizen?.trim() || t.beschreibung?.trim() || '')
+      setTitel(existing.bezeichnung?.trim() || '')
+      setBeschreibung(existing.notizen?.trim() || '')
       setGueltigBis(defaultGueltigBis(t, existing))
       return
     }
 
     setSelectedSlug(typ?.slug && typ.slug !== INDIVIDUELL_TYP_SLUG ? typ.slug : '')
     const initial = typ && typ.slug !== INDIVIDUELL_TYP_SLUG ? typ : EIGENE_UNTERLAGE
-    setTitel(initial.bezeichnung === EIGENE_UNTERLAGE.bezeichnung ? '' : initial.bezeichnung)
-    setBeschreibung(initial.beschreibung?.trim() || '')
+    setTitel('')
+    setBeschreibung('')
     setGueltigBis(defaultGueltigBis(initial, null))
   }, [open, typ, existing, typen])
 
@@ -141,17 +148,41 @@ export function PartnerDokumentEditorSheet({
     const t = selectedSlug
       ? typen.find((x) => x.slug === selectedSlug) ?? EIGENE_UNTERLAGE
       : EIGENE_UNTERLAGE
-    setTitel(selectedSlug ? t.bezeichnung : '')
-    setBeschreibung(t.beschreibung?.trim() || '')
     setGueltigBis(defaultGueltigBis(t, null))
   }, [selectedSlug, open, existing, allowTypPick, typen])
 
   const isEdit = Boolean(existing)
-  const hatDatei = Boolean(file || existing?.datei_url)
-  const canSave = Boolean(effectiveTyp && titel.trim() && (isEdit || file || existing?.datei_url))
+  const canSave = Boolean(effectiveTyp && (isEdit || file))
 
   function markDirty() {
     setDirty(true)
+  }
+
+  function onPickFile(next: File | null) {
+    if (!next) {
+      setFile(null)
+      markDirty()
+      return
+    }
+    if (next.size > MAX_FILE_BYTES) {
+      toast.error('Datei zu groß — maximal 5 MB.')
+      if (fileRef.current) fileRef.current.value = ''
+      setFile(null)
+      return
+    }
+    setFile(next)
+    markDirty()
+  }
+
+  function resolvedTitel(): string {
+    const manual = titel.trim()
+    if (manual) return manual
+    if (selectedSlug && effectiveTyp && effectiveTyp.slug !== INDIVIDUELL_TYP_SLUG) {
+      return effectiveTyp.bezeichnung
+    }
+    if (file) return fileBaseName(file.name)
+    if (existing?.bezeichnung?.trim()) return existing.bezeichnung.trim()
+    return effectiveTyp?.bezeichnung || 'Unterlage'
   }
 
   async function openDatei() {
@@ -181,15 +212,13 @@ export function PartnerDokumentEditorSheet({
   }
 
   function speichern() {
-    if (!effectiveTyp || !titel.trim()) {
-      toast.error('Bitte Titel angeben.')
-      return
-    }
+    if (!effectiveTyp) return
     if (!isEdit && !file) {
-      toast.error('Bitte eine Datei auswählen.')
+      toast.error('Bitte Dokument oder Foto auswählen (max. 5 MB).')
       return
     }
 
+    const bezeichnung = resolvedTitel()
     const mehrfach =
       Boolean(effectiveTyp.mehrfach_erlaubt) || effectiveTyp.slug === INDIVIDUELL_TYP_SLUG
 
@@ -208,7 +237,7 @@ export function PartnerDokumentEditorSheet({
             handwerker_id: handwerkerId,
             auftrag_id: null,
             typ: effectiveTyp.slug,
-            bezeichnung: titel.trim(),
+            bezeichnung,
             gueltig_bis: gueltigBis.trim() || null,
             datei_url: path,
             notizen: beschreibung.trim() || null,
@@ -218,17 +247,17 @@ export function PartnerDokumentEditorSheet({
             await supabase.storage.from(BUCKET).remove([path])
             throw new Error(ins.message)
           }
-          toast.success(isEdit ? 'Unterlage aktualisiert' : `${effectiveTyp.bezeichnung} hochgeladen`)
+          toast.success(isEdit ? 'Unterlage aktualisiert' : 'Unterlage hochgeladen')
         } else if (existing) {
           const r = await updatePartnerDokument(existing.id, handwerkerId, {
-            bezeichnung: titel.trim(),
+            bezeichnung,
             gueltig_bis: gueltigBis.trim() || null,
             notizen: beschreibung.trim() || null,
           })
           if (!r.ok) throw new Error(r.message)
           toast.success('Unterlage gespeichert')
         } else {
-          toast.error('Bitte eine Datei auswählen.')
+          toast.error('Bitte Dokument oder Foto auswählen.')
           return
         }
         setDirty(false)
@@ -274,7 +303,7 @@ export function PartnerDokumentEditorSheet({
     >
       <div className="space-y-4">
         {partnerHint ? (
-          <p className="m-0 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="m-0 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             {partnerHint}
             {existing?.hochgeladen_am
               ? ` · ${String(existing.hochgeladen_am).slice(0, 10)}`
@@ -282,9 +311,53 @@ export function PartnerDokumentEditorSheet({
           </p>
         ) : null}
 
+        <div className="form-field">
+          <label className="form-field-label">
+            Dokument oder Foto {!isEdit ? <span aria-hidden>*</span> : null}
+          </label>
+          {existing?.datei_url && !file ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <button type="button" className="btn ghost sm" onClick={() => void openDatei()}>
+                <ActionIcon n="file" size={14} />
+                Aktuelle Datei öffnen
+              </button>
+              <span className="text-[length:var(--fs-text)] text-bw-text-muted">
+                oder neue Datei wählen zum Ersetzen
+              </span>
+            </div>
+          ) : null}
+          <input
+            ref={fileRef}
+            type="file"
+            className="input"
+            accept={ACCEPT}
+            disabled={pending}
+            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+          />
+          <p className="mt-1 mb-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+            PDF oder Foto · max. 5 MB
+          </p>
+          {file ? (
+            <p className="mt-1 mb-0 text-[length:var(--fs-text)] text-bw-text-muted">
+              {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+            </p>
+          ) : null}
+        </div>
+
+        <Input
+          label="Gültig bis"
+          type="date"
+          value={gueltigBis}
+          disabled={pending}
+          onChange={(e) => {
+            setGueltigBis(e.target.value)
+            markDirty()
+          }}
+        />
+
         {allowTypPick && !existing ? (
           <Select
-            label="Vorlage"
+            label="Art des Dokuments"
             value={selectedSlug}
             options={pickOptions}
             disabled={pending}
@@ -296,7 +369,7 @@ export function PartnerDokumentEditorSheet({
         ) : null}
 
         {effectiveTyp?.beschreibung && selectedSlug ? (
-          <p className="m-0 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="m-0 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             {effectiveTyp.beschreibung}
           </p>
         ) : null}
@@ -304,8 +377,8 @@ export function PartnerDokumentEditorSheet({
         <Input
           label="Titel"
           value={titel}
-          required
           disabled={pending}
+          placeholder="Optional"
           onChange={(e) => {
             setTitel(e.target.value)
             markDirty()
@@ -314,65 +387,28 @@ export function PartnerDokumentEditorSheet({
 
         <Textarea
           label="Beschreibung"
-          rows={4}
+          rows={3}
           plain
           value={beschreibung}
           disabled={pending}
+          placeholder="Optional"
           onChange={(e) => {
             setBeschreibung(e.target.value)
             markDirty()
           }}
-          hint="Optional — z. B. Versicherungsnummer, Hinweise zur Prüfung."
+          hint="Optional — z. B. Versicherungsnummer oder Hinweise."
         />
-
-        <div className="form-field">
-          <label className="form-field-label">
-            Datei {!isEdit ? <span aria-hidden>*</span> : null}
-          </label>
-          {existing?.datei_url && !file ? (
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <button type="button" className="btn ghost sm" onClick={() => void openDatei()}>
-                <ActionIcon n="file" size={14} />
-                Aktuelle Datei öffnen
-              </button>
-              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-                oder neue Datei wählen zum Ersetzen
-              </span>
-            </div>
-          ) : null}
-          <input
-            ref={fileRef}
-            type="file"
-            className="input"
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-            disabled={pending}
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null)
-              markDirty()
-            }}
-          />
-          {file ? (
-            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">{file.name}</p>
-          ) : null}
-        </div>
-
-        {hatDatei ? (
-          <Input
-            label="Gültig bis"
-            type="date"
-            value={gueltigBis}
-            disabled={pending}
-            onChange={(e) => {
-              setGueltigBis(e.target.value)
-              markDirty()
-            }}
-          />
-        ) : null}
 
         {existing ? (
           <div className="flex flex-wrap gap-2 pt-1">
             {existing.datei_url ? (
-              <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void openDatei()}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => void openDatei()}
+              >
                 <ActionIcon n="eye" size={14} />
                 Ansehen
               </Button>

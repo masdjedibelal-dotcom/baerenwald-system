@@ -28,6 +28,11 @@ export function PartnerCreateSheet({
   const [pending, startTransition] = useTransition()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')
+  const [vorname, setVorname] = useState('')
+  const [nachname, setNachname] = useState('')
+  const [strasseNr, setStrasseNr] = useState('')
+  const [plz, setPlz] = useState('')
+  const [ort, setOrt] = useState('')
   const [tel, setTel] = useState('')
   const [mail, setMail] = useState('')
   const [notizen, setNotizen] = useState('')
@@ -38,6 +43,11 @@ export function PartnerCreateSheet({
     if (!open) return
     setFirma('')
     setGewerkSlug('')
+    setVorname('')
+    setNachname('')
+    setStrasseNr('')
+    setPlz('')
+    setOrt('')
     setTel('')
     setMail('')
     setNotizen('')
@@ -65,16 +75,22 @@ export function PartnerCreateSheet({
       return
     }
 
+    const adresseParts = [
+      strasseNr.trim() || null,
+      [plz.trim(), ort.trim()].filter(Boolean).join(' ') || null,
+    ].filter(Boolean)
+    const adresse = adresseParts.length > 0 ? adresseParts.join(', ') : null
+
     startTransition(async () => {
       const r = await createHandwerker({
         firma: firma.trim() || null,
-        vorname: null,
-        nachname: null,
+        vorname: vorname.trim() || null,
+        nachname: nachname.trim() || null,
         email: mail.trim() || null,
         telefon: tel.trim() || null,
         whatsapp: null,
         webseite: null,
-        adresse: null,
+        adresse,
         gewerke: [gewerkSlug],
         subkategorie: null,
         ist_fachbetrieb: true,
@@ -144,6 +160,60 @@ export function PartnerCreateSheet({
               ))}
             </select>
           </MockField>
+        </MockFormSection>
+
+        <MockFormSection title="Ansprechpartner" icon="user" columns={2}>
+          <MockField label="Vorname">
+            <input
+              className="input"
+              value={vorname}
+              onChange={(e) => mark(() => setVorname(e.target.value))}
+              placeholder="Max"
+              autoComplete="given-name"
+            />
+          </MockField>
+          <MockField label="Nachname">
+            <input
+              className="input"
+              value={nachname}
+              onChange={(e) => mark(() => setNachname(e.target.value))}
+              placeholder="Mustermann"
+              autoComplete="family-name"
+            />
+          </MockField>
+        </MockFormSection>
+
+        <MockFormSection title="Anschrift" icon="map-pin" columns={2}>
+          <MockField label="Straße und Hausnummer" full>
+            <input
+              className="input"
+              value={strasseNr}
+              onChange={(e) => mark(() => setStrasseNr(e.target.value))}
+              placeholder="Musterstraße 12"
+              autoComplete="street-address"
+            />
+          </MockField>
+          <div className="kunde-create__plz-ort full">
+            <MockField label="PLZ">
+              <input
+                className="input"
+                value={plz}
+                onChange={(e) => mark(() => setPlz(e.target.value))}
+                placeholder="80331"
+                autoComplete="postal-code"
+                inputMode="numeric"
+              />
+            </MockField>
+            <MockField label="Ort">
+              <input
+                className="input"
+                value={ort}
+                onChange={(e) => mark(() => setOrt(e.target.value))}
+                placeholder="München"
+                autoComplete="address-level2"
+              />
+            </MockField>
+          </div>
         </MockFormSection>
 
         <MockFormSection title="Kontakt" icon="phone" columns={2}>
