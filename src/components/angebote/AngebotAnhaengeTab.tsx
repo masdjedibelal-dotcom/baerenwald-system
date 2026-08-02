@@ -42,59 +42,67 @@ function openDokumentDatei(url: string) {
   window.open(href, '_blank', 'noopener,noreferrer')
 }
 
+type RechnungKurz = {
+  id: string
+  created_at?: string | null
+  rechnungsnummer?: string | null
+  status?: string | null
+  rechnungsdatum?: string | null
+  gesendet_at?: string | null
+  pdf_url?: string | null
+  rechnung_art?: string | null
+  abschlag_index?: number | null
+  beleg_typ?: string | null
+}
+
+/**
+ * Badge-Zähler für den Dokumente-Tab (Upload + Angebot-PDF + optional Fotos/Rechnungen).
+ */
+export function anzahlAngebotAnhaenge(
+  detail: AngebotDetail,
+  dokumente: LeadDokumentRow[],
+  opts?: { includeFotos?: boolean; rechnungenCount?: number }
+): number {
+  const rechnungenCount = opts?.rechnungenCount ?? 0
+  if (opts?.includeFotos) {
+    return 1 + parseProjektFotos(detail.fotos_urls).length + rechnungenCount
+  }
+  return dokumente.length + 1 + rechnungenCount
+}
+
 /**
  * Angebot → Dokumente: gleiche Liste wie Anfrage (Lead-Uploads + Angebote + Rechnungen).
  * Fallback ohne Lead: PDF + Projektfotos.
  */
 export function AngebotAnhaengeTab({
   detail,
-  leadDokumente = [],
-  leadAngebote = [],
-  leadRechnungen = [],
+  leadId: leadIdProp = null,
+  dokumente = [],
+  rechnungen = [],
   onReload,
 }: {
   detail: AngebotDetail
-  leadDokumente?: LeadDokumentRow[]
-  leadAngebote?: {
-    id: string
-    created_at: string
-    angebotsnr?: string | null
-    pdf_url?: string | null
-  }[]
-  leadRechnungen?: {
-    id: string
-    created_at?: string | null
-    rechnungsnummer?: string | null
-    status?: string | null
-    rechnungsdatum?: string | null
-    gesendet_at?: string | null
-    pdf_url?: string | null
-    rechnung_art?: string | null
-    abschlag_index?: number | null
-    beleg_typ?: string | null
-  }[]
+  leadId?: string | null
+  dokumente?: LeadDokumentRow[]
+  rechnungen?: RechnungKurz[]
   onReload: () => void
 }) {
-  const leadId = detail.lead_id?.trim() || null
+  const leadId = leadIdProp?.trim() || detail.lead_id?.trim() || null
 
   if (leadId) {
     return (
       <AnfrageDokumenteTab
         leadId={leadId}
-        dokumente={leadDokumente}
-        angebote={
-          leadAngebote.length > 0
-            ? leadAngebote
-            : [
-                {
-                  id: detail.id,
-                  created_at: detail.created_at,
-                  angebotsnr: detail.angebotsnr,
-                  pdf_url: detail.pdf_url,
-                },
-              ]
-        }
-        rechnungen={leadRechnungen}
+        dokumente={dokumente}
+        angebote={[
+          {
+            id: detail.id,
+            created_at: detail.created_at,
+            angebotsnr: detail.angebotsnr,
+            pdf_url: detail.pdf_url,
+          },
+        ]}
+        rechnungen={rechnungen}
         onReload={onReload}
       />
     )
