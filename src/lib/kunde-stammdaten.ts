@@ -5,13 +5,22 @@ export type KundeStammPick = Pick<
   | 'name'
   | 'vorname'
   | 'nachname'
-  | 'adresse'
   | 'strasse'
   | 'hausnummer'
   | 'plz'
   | 'ort'
   | 'typ'
->
+> & {
+  /** Legacy-Feld; optional, weil Embeds oft nur strasse/hausnummer liefern. */
+  adresse?: string | null
+}
+
+/** Minimal für Straße+Hausnummer (Rechnung/PDF/Wizard). */
+export type KundeAdresseZeilePick = {
+  adresse?: string | null
+  strasse?: string | null
+  hausnummer?: string | null
+}
 
 /** Minimalfelder für Listen- und Suchanzeige (Firma vor Ansprechpartner). */
 export type KundeListenNamePick = {
@@ -49,16 +58,16 @@ export function kundeDisplayName(k: KundeListenNamePick): string {
   return person || '—'
 }
 
-export function kundeStrasse(k: KundeStammPick): string | null {
+export function kundeStrasse(k: KundeAdresseZeilePick): string | null {
   return k.strasse?.trim() || k.adresse?.trim() || null
 }
 
-export function kundeHausnummer(k: KundeStammPick): string | null {
+export function kundeHausnummer(k: KundeAdresseZeilePick): string | null {
   return k.hausnummer?.trim() || null
 }
 
 /** Straße + Hausnummer in einer Zeile (Rechnung/PDF). */
-export function kundeStrasseHausnummerZeile(k: KundeStammPick): string | null {
+export function kundeStrasseHausnummerZeile(k: KundeAdresseZeilePick): string | null {
   const str = kundeStrasse(k)
   const nr = kundeHausnummer(k)
   if (str && nr) return `${str} ${nr}`
@@ -66,7 +75,7 @@ export function kundeStrasseHausnummerZeile(k: KundeStammPick): string | null {
 }
 
 /** Denormalisiertes adresse-Feld für Alt-Code / Export. */
-export function kundeAdresseLegacy(k: KundeStammPick): string | null {
+export function kundeAdresseLegacy(k: KundeAdresseZeilePick): string | null {
   return kundeStrasseHausnummerZeile(k)
 }
 

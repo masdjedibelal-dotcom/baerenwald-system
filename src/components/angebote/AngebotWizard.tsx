@@ -251,9 +251,7 @@ export function AngebotWizard({
         ''
       )
     : ''
-  const sheetAnschrift = sheetKunde
-    ? kundeStrasseHausnummerZeile(sheetKunde) || sheetKunde.adresse?.trim() || null
-    : null
+  const sheetAnschrift = sheetKunde ? kundeStrasseHausnummerZeile(sheetKunde) : null
   const sheetStadt = [sheetKunde?.plz?.trim(), sheetKunde?.ort?.trim()]
     .filter(Boolean)
     .join(' ')
