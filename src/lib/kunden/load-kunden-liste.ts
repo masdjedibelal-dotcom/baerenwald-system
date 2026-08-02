@@ -58,7 +58,7 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
   }
 
   const leadCount = new Map<string, number>()
-  for (const r of leadById.values()) {
+  for (const r of Array.from(leadById.values())) {
     if (r.kunde_id) leadCount.set(r.kunde_id, (leadCount.get(r.kunde_id) ?? 0) + 1)
     if (r.auftraggeber_kunde_id && r.auftraggeber_kunde_id !== r.kunde_id) {
       leadCount.set(

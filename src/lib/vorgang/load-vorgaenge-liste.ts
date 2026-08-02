@@ -75,7 +75,9 @@ export async function loadVorgaengeListe(): Promise<{
     return { rows: [], error: leadsRes.error?.message ?? 'Leads konnten nicht geladen werden.' }
   }
 
-  const leadIds = (leadsRes.data as Array<{ id: string }>).map((l) => l.id).filter(Boolean)
+  const leadIds = (leadsRes.data ?? [])
+    .map((l) => String((l as { id?: unknown }).id ?? ''))
+    .filter(Boolean)
 
   const emptySatellites = {
     data: [] as unknown[],

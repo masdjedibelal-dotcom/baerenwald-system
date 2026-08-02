@@ -222,7 +222,7 @@ export function KundeModal({
         strasse: splitAddr.strasse || null,
         hausnummer: splitAddr.hausnummer || null,
         notizen: notizen || null,
-        ...(firmaPflicht ? { name: firmaName.trim() || null } : {}),
+        ...(firmaPflicht ? { name: firmaName.trim() || undefined } : {}),
       }
       onClose()
       if (stayOnPage) {
