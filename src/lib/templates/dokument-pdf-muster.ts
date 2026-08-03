@@ -307,6 +307,7 @@ function musterAbschlussHtml(firm: FirmenEinstellungen): string {
     fotoUrls: [],
     mitBautagebuch: true,
     mitFotos: false,
+    mitPreisen: false,
   })
 }
 
