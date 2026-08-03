@@ -621,6 +621,7 @@ async function sendZahlungsbestaetigungForRechnung(
       sichtbar_fuer_kunde: true,
       fuer_kunde_freigegeben: true,
       freigegeben_at: now,
+      email_log_id: mail.emailLogId ?? null,
     })
   }
 
@@ -989,6 +990,7 @@ export async function sendRechnung(
       sichtbar_fuer_kunde: true,
       fuer_kunde_freigegeben: true,
       freigegeben_at: now,
+      email_log_id: mail.emailLogId ?? null,
     })
   }
 
@@ -1399,6 +1401,7 @@ export async function sendZahlungserinnerungMail(
       sichtbar_fuer_kunde: true,
       fuer_kunde_freigegeben: true,
       freigegeben_at: now,
+      email_log_id: mail.emailLogId ?? null,
     })
   }
 

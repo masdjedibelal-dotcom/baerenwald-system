@@ -511,6 +511,7 @@ export async function startAuftragArbeit(
   const notifyKunde = options?.notifyKunde === true
   const email = notifyKunde ? detail.kunden.email : null
   let mailGesendet = false
+  let mailLogId: string | null = null
 
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
@@ -541,6 +542,7 @@ export async function startAuftragArbeit(
       console.warn('[startAuftragArbeit] Mail:', sent.error)
     } else {
       mailGesendet = true
+      mailLogId = sent.emailLogId ?? null
     }
   }
 
@@ -554,6 +556,7 @@ export async function startAuftragArbeit(
       : 'Status „In Arbeit“ (ohne Kunden-Mail).',
     erstellt_von: uid,
     sichtbar_fuer_kunde: mailGesendet,
+    email_log_id: mailLogId,
   })
 
   return { ok: true as const }
@@ -577,6 +580,7 @@ export async function setAuftragZurAbnahme(
   const notifyKunde = options?.notifyKunde === true
   const email = notifyKunde ? detail.kunden.email : null
   let mailGesendet = false
+  let mailLogId: string | null = null
 
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
@@ -603,6 +607,7 @@ export async function setAuftragZurAbnahme(
         console.warn('[setAuftragZurAbnahme] Mail:', sent.error)
       } else {
         mailGesendet = true
+        mailLogId = sent.emailLogId ?? null
       }
     }
   }
@@ -617,6 +622,7 @@ export async function setAuftragZurAbnahme(
       : 'Status „Abnahme“ (ohne Kunden-Mail).',
     erstellt_von: uid,
     sichtbar_fuer_kunde: mailGesendet,
+    email_log_id: mailLogId,
   })
 
   return { ok: true as const }
@@ -796,6 +802,7 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     beschreibung: `Phase „${phaseLabel}“, E-Mail an Handwerker`,
     handwerker_id: input.handwerkerId,
     erstellt_von: uid,
+    email_log_id: sent.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)

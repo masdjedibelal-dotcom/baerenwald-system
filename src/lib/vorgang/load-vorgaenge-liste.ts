@@ -18,6 +18,11 @@ import {
 import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { resolveListeWiederkehr } from '@/lib/vorgang/wiederkehrend'
+import {
+  hatAktivenAbschlagsplan,
+  istRechnungGestelltOderBezahlt,
+  parseZahlungsplan,
+} from '@/lib/rechnungen/zahlungsplan'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
@@ -91,7 +96,7 @@ export async function loadVorgaengeListe(): Promise<{
           db
             .from('angebote')
             .select(
-              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch'
+              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
@@ -245,6 +250,7 @@ export async function loadVorgaengeListe(): Promise<{
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
     ersetzt_durch?: string | null
+    zahlungsplan?: unknown
   }>
   const auftraege = (auftraegeRes.data ?? []) as Array<{
     id: string
@@ -491,7 +497,14 @@ export async function loadVorgaengeListe(): Promise<{
 
     // Abgeschlossener Auftrag ohne Voll-/Schlussrechnung → Rechnung/Offen
     // („Offen“). Reine Abschläge gewinnen die Phase nicht (isPhaseWinningRechnung).
+    // Bei aktivem Abschlagsplan: keinen synthetischen Gesamt-Vorgang — nur gestellte Abschläge.
+    const leadAngRaw = angeboteByLead.get(lead.id) ?? []
+    const hatAbschlagsplan = leadAngRaw.some((a) =>
+      hatAktivenAbschlagsplan(parseZahlungsplan(a.zahlungsplan))
+    )
+
     const rechnungAusstehend =
+      !hatAbschlagsplan &&
       resolved.phase === 'auftrag' &&
       resolved.unterstatus === 'abgeschlossen' &&
       !leadRechnungen.some(isPhaseWinningRechnung)
@@ -535,6 +548,7 @@ export async function loadVorgaengeListe(): Promise<{
 
     // Abschläge als eigene Zeilen (auch wenn Stamm als „Rechnung ausstehend“ läuft).
     // Nach Voll-/Schlussrechnung: weitere Rechnungen als Satelliten.
+    // Bei Abschlagsplan: nur gestellte Abschlag-/Schlussrechnungen (keine Entwürfe, kein Gesamt).
     const showSatelliten =
       resolved.phase === 'rechnung' ||
       resolved.phase === 'auftrag' ||
@@ -543,9 +557,12 @@ export async function loadVorgaengeListe(): Promise<{
       for (const r of leadRechnungen) {
         if (r.status === 'storniert' || r.status === 'entwurf') continue
         if (resolved.entityId === r.id) continue
-        // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
-        if (resolved.phase === 'auftrag' || rechnungAusstehend) {
-          const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
+        const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
+        if (hatAbschlagsplan) {
+          if (art !== 'abschlag' && art !== 'schluss') continue
+          if (!istRechnungGestelltOderBezahlt(r.status)) continue
+        } else if (resolved.phase === 'auftrag' || rechnungAusstehend) {
+          // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
           if (art !== 'abschlag') continue
         }
         const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)

@@ -798,6 +798,7 @@ export type AuftragTimelineEvent = {
   sichtbar_fuer_kunde: boolean
   fuer_kunde_freigegeben?: boolean
   freigegeben_at?: string | null
+  email_log_id?: string | null
   created_at: string
 }
 

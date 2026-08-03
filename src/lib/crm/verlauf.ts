@@ -92,6 +92,7 @@ export function isLeadVerlaufRelevant(ev: LeadTimelineRow): boolean {
 }
 
 export function isAuftragVerlaufRelevant(ev: AuftragTimelineEvent): boolean {
+  if (ev.email_log_id) return true
   return AUFTRAG_WHITELIST.has(normTyp(ev.typ))
 }
 
@@ -147,6 +148,35 @@ function auftragInspect(ev: AuftragTimelineEvent): VerlaufInspectTarget {
   const typ = ev.typ
   const t = normTyp(typ)
   const fotos = Array.isArray(ev.foto_urls) ? ev.foto_urls.filter(Boolean) : null
+
+  if (ev.email_log_id) {
+    // Rechnungs-Mails: Filter „Rechnungen“, Klick öffnet Mail-Vorschau (PDF)
+    if (t === 'rechnung_gesendet' || t === 'rechnung_bezahlt' || t === 'rechnung_erinnerung') {
+      return {
+        kind: 'rechnung',
+        title,
+        description,
+        createdAt,
+        typ,
+        emailLogId: ev.email_log_id,
+        fotoUrls: fotos,
+        rechnungId: null,
+        href: ev.auftrag_id ? `/auftraege/${ev.auftrag_id}?tab=finanzen` : '/vorgaenge?tab=rechnung',
+        hrefLabel: 'Zur Abrechnung',
+      }
+    }
+    return {
+      kind: 'email',
+      title,
+      description,
+      createdAt,
+      typ,
+      emailLogId: ev.email_log_id,
+      fotoUrls: fotos,
+      href: ev.auftrag_id ? `/auftraege/${ev.auftrag_id}` : null,
+      hrefLabel: ev.auftrag_id ? 'Zum Auftrag' : null,
+    }
+  }
 
   if (t === 'rechnung_gesendet' || t === 'rechnung_bezahlt' || t === 'rechnung_erinnerung') {
     return {
@@ -207,18 +237,27 @@ function toItem(
 }
 
 /**
- * Dedup: Wenn Lead-Mails existieren, Auftrag-Mail-Zeilen ohne echten Log weglassen
- * (sonst doppelte Auftragsbestätigung).
+ * Dedup: Auftragsbestätigung nicht doppelt (Lead-Mail + Auftrag-Mail).
+ * Auftrag-Mails mit eigenem email_log_id behalten (Bautagebuch, Nachtrag, …).
  */
 function dedupeAuftragMailsAgainstLeadEmails(
   leadItems: VerlaufBuiltItem[],
   auftragItems: VerlaufBuiltItem[]
 ): VerlaufBuiltItem[] {
+  const leadEmailIds = new Set(
+    leadItems
+      .map((i) => i.inspect?.emailLogId?.trim())
+      .filter((id): id is string => Boolean(id))
+  )
   const hasLeadEmail = leadItems.some((i) => i.inspect?.kind === 'email')
-  if (!hasLeadEmail) return auftragItems
   return auftragItems.filter((i) => {
     const t = normTyp(i.inspect?.typ)
-    return t !== 'mail_kunde' && t !== 'mail_handwerker'
+    if (t !== 'mail_kunde' && t !== 'mail_handwerker') return true
+    const logId = i.inspect?.emailLogId?.trim()
+    if (logId && leadEmailIds.has(logId)) return false
+    if (logId) return true
+    if (hasLeadEmail) return false
+    return true
   })
 }
 
@@ -339,4 +378,114 @@ export function asTimelineItems(items: VerlaufBuiltItem[]): TimelineItem[] {
     linkLabel,
     onLinkClick,
   }))
+}
+
+/** Filter-Chips / Card-Farben für die Aktivitäts-Ansicht */
+export type VerlaufCardKategorie =
+  | 'email'
+  | 'angebot'
+  | 'rechnung'
+  | 'termin'
+  | 'status'
+  | 'offen'
+  | 'sonstiges'
+
+export const VERLAUF_CARD_FILTERS: {
+  id: VerlaufCardKategorie | 'alle'
+  label: string
+  icon?: string
+}[] = [
+  { id: 'alle', label: 'Alle' },
+  { id: 'email', label: 'E-Mails', icon: 'mail' },
+  { id: 'angebot', label: 'Angebote', icon: 'file-invoice' },
+  { id: 'rechnung', label: 'Rechnungen', icon: 'receipt' },
+  { id: 'termin', label: 'Termine', icon: 'calendar-event' },
+  { id: 'status', label: 'Status', icon: 'activity' },
+  { id: 'offen', label: 'Offen', icon: 'circle' },
+]
+
+export function verlaufCardKategorie(item: VerlaufBuiltItem): VerlaufCardKategorie {
+  if (item.state === 'open' || item.source === 'open') return 'offen'
+  const kind = item.inspect?.kind
+  if (kind === 'email') return 'email'
+  if (kind === 'angebot') return 'angebot'
+  if (kind === 'rechnung') return 'rechnung'
+  const typ = normTyp(item.inspect?.typ)
+  if (typ === 'termin' || typ === 'besichtigung') return 'termin'
+  if (
+    typ === 'created' ||
+    typ === 'auftrag_erstellt' ||
+    typ === 'arbeit_gestartet' ||
+    typ === 'zur_abnahme' ||
+    typ === 'abnahme' ||
+    typ === 'abnahme_abgeschlossen' ||
+    typ.startsWith('org_freigabe') ||
+    typ.startsWith('nachtrag') ||
+    typ.startsWith('baustopp')
+  ) {
+    return 'status'
+  }
+  if (typ === 'mail_kunde' || typ === 'mail_handwerker' || typ.includes('mail')) return 'email'
+  return 'sonstiges'
+}
+
+export type VerlaufCardView = {
+  kategorie: VerlaufCardKategorie
+  badge: string
+  title: string
+  subtitle: string | null
+  meta: string[]
+  dateLabel: string
+  clickable: boolean
+}
+
+export function verlaufCardView(item: VerlaufBuiltItem): VerlaufCardView {
+  const kategorie = verlaufCardKategorie(item)
+  const raw = (item.text ?? '').trim()
+  const split = raw.includes(' — ')
+    ? raw.split(' — ')
+    : raw.includes(' – ')
+      ? raw.split(' – ')
+      : null
+  const title = (split?.[0] ?? item.inspect?.title ?? (raw || 'Ereignis')).trim()
+  const subtitle =
+    (split?.slice(1).join(' — ') || item.inspect?.description || '').trim() || null
+
+  const badgeByKat: Record<VerlaufCardKategorie, string> = {
+    email: 'E-Mail',
+    angebot: 'Angebot',
+    rechnung: 'Rechnung',
+    termin: 'Termin',
+    status: 'Status',
+    offen: 'Offen',
+    sonstiges: 'Aktivität',
+  }
+  let badge = badgeByKat[kategorie]
+  const typ = normTyp(item.inspect?.typ)
+  if (kategorie === 'email' && typ.includes('handwerker')) badge = 'E-Mail · Partner'
+  if (typ === 'rechnung_bezahlt') badge = 'Bezahlt'
+  if (typ === 'rechnung_erinnerung') badge = 'Mahnung'
+  if (typ === 'angebot_angenommen') badge = 'Angenommen'
+
+  const meta: string[] = []
+  if (item.inspect?.emailLogId) meta.push('Vorschau')
+  if (item.inspect?.fotoUrls && item.inspect.fotoUrls.length > 0) {
+    meta.push(
+      `${item.inspect.fotoUrls.length} Foto${item.inspect.fotoUrls.length === 1 ? '' : 's'}`
+    )
+  }
+  if (item.inspect?.hrefLabel && item.inspect.href) {
+    meta.push(item.inspect.hrefLabel.replace(/^Zum /, ''))
+  }
+  if (kategorie === 'offen') meta.push('Nächster Schritt')
+
+  return {
+    kategorie,
+    badge,
+    title,
+    subtitle: subtitle && subtitle !== title ? subtitle : null,
+    meta: meta.slice(0, 3),
+    dateLabel: item.time,
+    clickable: Boolean(item.inspect) && item.state !== 'open',
+  }
 }

@@ -537,6 +537,15 @@ export function VorgangZahlungTab({
       const editId = editableBelegId(rate)
       if (editId) {
         ctas.push({
+          id: 'send',
+          label: 'Senden',
+          icon: 'send',
+          onClick: () => {
+            setOpenRateId(null)
+            openRechnungBearbeiten(editId)
+          },
+        })
+        ctas.push({
           id: 'open',
           label: 'Öffnen',
           icon: 'eye',

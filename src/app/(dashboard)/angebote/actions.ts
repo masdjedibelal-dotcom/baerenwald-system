@@ -2548,6 +2548,7 @@ export async function createAuftragFromAngebot(
     maximumFractionDigits: 2,
   })} €`
 
+  let kundeMailLogId: string | null = null
   if (sendKunde && kunde.email?.trim()) {
     const toList =
       opts?.to?.map((e) => e.trim()).filter(Boolean) ??
@@ -2582,6 +2583,7 @@ export async function createAuftragFromAngebot(
     if (!mailRes.success) {
       return { ok: false, message: mailRes.error ?? 'Kunden-Mail fehlgeschlagen' }
     }
+    kundeMailLogId = mailRes.emailLogId ?? null
     if (angebot.lead_id && mailRes.emailLogId) {
       const tl = await insertLeadTimelineEvent(supabaseAdmin, {
         lead_id: angebot.lead_id,
@@ -2595,6 +2597,7 @@ export async function createAuftragFromAngebot(
     }
   }
 
+  const hwMailLogById = new Map<string, string>()
   if (sendHw) {
     const partnerLink = buildPartnerLoginLink()
     await Promise.all(
@@ -2620,7 +2623,7 @@ export async function createAuftragFromAngebot(
           },
           branding
         )
-        await sendMail({
+        const hwMail = await sendMail({
           typ: 'handwerker_anfrage',
           an: email,
           anName: z.handwerker?.name ?? null,
@@ -2631,6 +2634,7 @@ export async function createAuftragFromAngebot(
           angebotId,
           auftragId,
         })
+        if (hwMail.emailLogId) hwMailLogById.set(z.handwerker_id, hwMail.emailLogId)
       })
     )
   }
@@ -2666,6 +2670,7 @@ export async function createAuftragFromAngebot(
         titel: 'E-Mail an Kundin (Auftragsbestätigung)',
         beschreibung: `An ${kunde.email.trim()}`,
         sichtbar_fuer_kunde: true,
+        email_log_id: kundeMailLogId,
       })
     )
   }
@@ -2681,6 +2686,7 @@ export async function createAuftragFromAngebot(
           titel: `E-Mail an Handwerker: ${z.handwerker?.name ?? '—'}`,
           beschreibung: `An ${email}`,
           handwerker_id: z.handwerker_id,
+          email_log_id: hwMailLogById.get(z.handwerker_id) ?? null,
         })
       )
     }

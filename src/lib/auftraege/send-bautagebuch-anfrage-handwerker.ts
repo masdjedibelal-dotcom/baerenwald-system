@@ -16,7 +16,9 @@ export async function sendHandwerkerBautagebuchAnfrage(input: {
   notiz?: string | null
   positionIds?: string[] | null
   angefordertVonUserId?: string | null
-}): Promise<{ ok: true; anfrageId: string } | { ok: false; message: string }> {
+}): Promise<
+  { ok: true; anfrageId: string; emailLogId?: string | null } | { ok: false; message: string }
+> {
   const auftragId = input.auftragId.trim()
   const handwerkerId = input.handwerkerId.trim()
   if (!auftragId || !handwerkerId) {
@@ -117,7 +119,7 @@ async function finishSend(opts: {
   auftragTitel: string
   notiz: string | null
   positionIds: string[]
-}): Promise<{ ok: true; anfrageId: string } | { ok: false; message: string }> {
+}): Promise<{ ok: true; anfrageId: string; emailLogId?: string | null } | { ok: false; message: string }> {
   const relativeLink = `${partnerVorgangLink(opts.auftragId)}&focus=bautagebuch&anfrage=${encodeURIComponent(opts.anfrageId)}`
   const portalLink = `${buildPartnerVorgangPortalUrl(opts.auftragId)}&focus=bautagebuch&anfrage=${encodeURIComponent(opts.anfrageId)}`
 
@@ -158,5 +160,5 @@ async function finishSend(opts: {
     sendMail: false,
   })
 
-  return { ok: true, anfrageId: opts.anfrageId }
+  return { ok: true, anfrageId: opts.anfrageId, emailLogId: mailRes.emailLogId ?? null }
 }

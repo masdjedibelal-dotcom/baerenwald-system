@@ -459,6 +459,7 @@ export async function sendNachtragEmailAnKunde(
     beschreibung: `Link: ${link}`,
     erstellt_von: user.id,
     sichtbar_fuer_kunde: true,
+    email_log_id: mail.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)
@@ -527,6 +528,7 @@ export async function sendNachtragErinnerungAnKunde(
     titel: 'Nachtrag: Erinnerung versendet',
     beschreibung: link,
     erstellt_von: user.id,
+    email_log_id: mail.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)

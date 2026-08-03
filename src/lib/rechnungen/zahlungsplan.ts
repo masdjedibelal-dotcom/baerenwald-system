@@ -687,6 +687,14 @@ export function rechnungPositionenMitAuftrag(
   return norm
 }
 
+/** Gestellt/bezahlt — Entwürfe zählen nicht als abgerechnet (einzeln senden). */
+export function istRechnungGestelltOderBezahlt(status: string | null | undefined): boolean {
+  const st = String(status ?? '')
+    .trim()
+    .toLowerCase()
+  return st === 'gesendet' || st === 'versendet' || st === 'bezahlt'
+}
+
 export function abschlagBereitsAbgerechnet(
   zeileId: string,
   rechnungen: RechnungAbschlagLink[],
@@ -696,7 +704,7 @@ export function abschlagBereitsAbgerechnet(
     (r) =>
       r.id !== ausserRechnungId &&
       r.zahlungsplan_abschlag_id === zeileId &&
-      r.status !== 'storniert' &&
+      istRechnungGestelltOderBezahlt(r.status) &&
       (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
   )
 }
@@ -706,7 +714,7 @@ export function berechneBereitsGestellt(
 ): { nettoGeschaetzt: number; brutto: number } {
   let brutto = 0
   for (const r of rechnungen) {
-    if (r.status === 'storniert') continue
+    if (!istRechnungGestelltOderBezahlt(r.status)) continue
     if (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss') {
       brutto += Number(r.brutto ?? 0)
     }
@@ -714,9 +722,9 @@ export function berechneBereitsGestellt(
   return { nettoGeschaetzt: 0, brutto }
 }
 
-/** Nicht stornierte Abschlag-/Schluss-/Vollrechnung (ohne Art → trotzdem zählen). */
+/** Gestellte Abschlag-/Schluss-/Vollrechnung (Entwürfe zählen nicht gegen VK). */
 function istGestellteAbrechnungRelevant(r: RechnungAbschlagLink): boolean {
-  if (String(r.status ?? '') === 'storniert') return false
+  if (!istRechnungGestelltOderBezahlt(r.status)) return false
   const art = String(r.rechnung_art ?? '')
     .trim()
     .toLowerCase()
@@ -829,6 +837,33 @@ export function naechsteOffeneAbschlagZeile(
     if (!abschlagBereitsAbgerechnet(z.id, rechnungen)) return z
   }
   return null
+}
+
+/**
+ * Nächste Rate zum Versenden: erste nicht gestellte/bezahlte Zeile,
+ * inkl. vorhandenem Entwurf (wenn beim Plan-Anlegen alle RE erzeugt wurden).
+ */
+export function naechsteAbschlagZumVersenden(
+  kontext: AuftragAbrechnungKontext,
+  rechnungen: RechnungAbschlagLink[]
+): { zeile: ZahlungsplanZeileBerechnet; rechnungId: string | null } | null {
+  for (const z of kontext.zeilen) {
+    if (abschlagBereitsAbgerechnet(z.id, rechnungen)) continue
+    const draft = rechnungen.find(
+      (r) =>
+        r.zahlungsplan_abschlag_id === z.id &&
+        String(r.status ?? '') === 'entwurf' &&
+        String(r.beleg_typ ?? '') !== 'gutschrift' &&
+        (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
+    )
+    return { zeile: z, rechnungId: draft?.id ?? null }
+  }
+  return null
+}
+
+/** Aktiver Abschlagsplan (mind. eine Zeile). */
+export function hatAktivenAbschlagsplan(plan: Zahlungsplan | null | undefined): boolean {
+  return Boolean(plan?.zeilen?.length)
 }
 
 export function buildAbschlagPauschalPosition(input: {

@@ -22,6 +22,11 @@ import {
   createRechnungEntwurf,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
+import {
+  ensureAbschlagEntwuerfeForAuftrag,
+  storniereAbschlagEntwuerfeForAuftrag,
+  storniereVerwaisteVollEntwuerfe,
+} from '@/lib/rechnungen/ensure-abschlag-entwuerfe'
 
 /**
  * Spec Q2: Unverbindlicher Zahlplan-Vorschlag liegt auf `angebote.zahlungsplan`.
@@ -130,9 +135,18 @@ export async function saveAuftragZahlungsplan(
     return { ok: false, message: error.message }
   }
 
+  // Verwaiste Voll-Entwürfe (z. B. nach Auftrag→Rechnung ohne Plan) bereinigen
+  const stornoVoll = await storniereVerwaisteVollEntwuerfe(auftragId)
+  if (!stornoVoll.ok) return stornoVoll
+
+  // Alle Abschläge sofort als Entwürfe — Versand einzeln
+  const entwuerfe = await ensureAbschlagEntwuerfeForAuftrag(auftragId, normalized)
+  if (!entwuerfe.ok) return entwuerfe
+
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath(`/angebote/${angRef.angebotId}`)
   revalidatePath('/vorgaenge')
+  revalidatePath('/rechnungen')
   return { ok: true }
 }
 
@@ -181,9 +195,13 @@ export async function clearAuftragZahlungsplan(
 
   if (error) return { ok: false, message: error.message }
 
+  const stornoDrafts = await storniereAbschlagEntwuerfeForAuftrag(auftragId)
+  if (!stornoDrafts.ok) return stornoDrafts
+
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath(`/angebote/${angRef.angebotId}`)
   revalidatePath('/vorgaenge')
+  revalidatePath('/rechnungen')
   return { ok: true }
 }
 
@@ -272,6 +290,17 @@ export async function erfasseExterneAbschlagZahlung(input: {
       ok: false,
       message: 'Für diese Rate existiert bereits eine gestellte/bezahlte Rechnung.',
     }
+  }
+
+  const bestehenderEntwurf = links.find(
+    (l) =>
+      l.zahlungsplan_abschlag_id === zeileId &&
+      String(l.status) === 'entwurf' &&
+      (l.rechnung_art === 'abschlag' || l.rechnung_art === 'schluss')
+  )
+  if (bestehenderEntwurf) {
+    const storno = await updateRechnungStatus(bestehenderEntwurf.id, 'storniert')
+    if (!storno.ok) return storno
   }
 
   const { data: auftragPosRows } = await supabase

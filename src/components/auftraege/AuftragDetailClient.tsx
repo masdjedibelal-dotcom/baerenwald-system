@@ -70,7 +70,15 @@ import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-he
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
-import { auftragHatZahlungOffen, auftragSummenAusPositionen, parseZahlungsplan } from '@/lib/rechnungen/zahlungsplan'
+import {
+  auftragHatZahlungOffen,
+  auftragSummenAusPositionen,
+  berechneZahlungsplan,
+  hatAktivenAbschlagsplan,
+  naechsteAbschlagZumVersenden,
+  parseZahlungsplan,
+  zahlplanAbgerechnetAusLinks,
+} from '@/lib/rechnungen/zahlungsplan'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -858,15 +866,47 @@ export function AuftragDetailClient({
     [detail.status, rechnungenListe, auftragNettoSumme]
   )
 
-  /** Offener RE-Entwurf → Primary „Bearbeiten“ statt erneut „Erstellen“. */
+  const zahlungsplanParsed = useMemo(() => {
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    return parseZahlungsplan(
+      (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+    )
+  }, [detail.angebote])
+
+  /** Nächste Abschlags-Rate zum Versenden (Entwurf bevorzugt). */
+  const naechsterAbschlagVersand = useMemo(() => {
+    if (!hatAktivenAbschlagsplan(zahlungsplanParsed) || !zahlungsplanParsed) return null
+    const links = rechnungenListe.map((r) => ({
+      id: r.id,
+      status: String(r.status),
+      zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
+      rechnung_art: r.rechnung_art ?? null,
+      brutto: r.brutto,
+      beleg_typ: r.beleg_typ ?? null,
+    }))
+    const kontext = berechneZahlungsplan(
+      zahlungsplanParsed,
+      auftragNettoSumme,
+      19,
+      zahlplanAbgerechnetAusLinks(links)
+    )
+    return naechsteAbschlagZumVersenden(kontext, links)
+  }, [zahlungsplanParsed, rechnungenListe, auftragNettoSumme])
+
+  /** Offener RE-Entwurf → Primary „Senden/Bearbeiten“ statt erneut „Erstellen“. */
   const offenerRechnungEntwurfId = useMemo(() => {
+    if (naechsterAbschlagVersand?.rechnungId) return naechsterAbschlagVersand.rechnungId
     const draft = rechnungenListe.find((r) => {
       if (String(r.status) !== 'entwurf') return false
       if (String(r.beleg_typ ?? '') === 'gutschrift') return false
       return true
     })
     return draft?.id ?? null
-  }, [rechnungenListe])
+  }, [rechnungenListe, naechsterAbschlagVersand])
+
+  const hatAbschlagZumSenden = Boolean(
+    naechsterAbschlagVersand && !zahlungOffen && detail.status === 'abgeschlossen'
+  )
 
   const openRechnungBearbeiten = useCallback(
     (rechnungId: string) => {
@@ -1060,12 +1100,15 @@ export function AuftragDetailClient({
               const cta = primaryCta('auftrag', detail.status, {
                 abnahmeFaellig: detail.status === 'abnahme',
                 rechnungBezahlt: !zahlungOffen && detail.status === 'abgeschlossen',
+                naechsterAbschlagSenden: hatAbschlagZumSenden,
               })
               if (!cta) return null
               if (cta.id === 'rechnung_erstellen' && offenerRechnungEntwurfId) {
                 return {
-                  label: 'Rechnung bearbeiten',
-                  icon: 'pencil',
+                  label: hatAbschlagZumSenden
+                    ? 'Nächsten Abschlag senden'
+                    : 'Rechnung bearbeiten',
+                  icon: hatAbschlagZumSenden ? 'send' : 'pencil',
                   onClick: () => openRechnungBearbeiten(offenerRechnungEntwurfId),
                 }
               }

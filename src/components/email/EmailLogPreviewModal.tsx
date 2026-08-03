@@ -40,13 +40,20 @@ export function EmailLogPreviewModal({
     })
   }, [open, emailLogId])
 
-  const pdfHref = row?.angebot_id ? `/api/angebote/${row.angebot_id}/pdf` : null
+  const pdfHref = row?.angebot_id
+    ? `/api/angebote/${row.angebot_id}/pdf`
+    : row?.rechnung_id
+      ? `/api/rechnungen/${row.rechnung_id}/pdf`
+      : null
+
+  const title =
+    row?.richtung === 'empfangen' ? 'Empfangene E-Mail' : 'Gesendete E-Mail'
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Gesendete E-Mail"
+      title={title}
       size="lg"
       footer={
         <Button type="button" variant="secondary" onClick={onClose}>

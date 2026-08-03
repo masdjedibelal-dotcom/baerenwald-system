@@ -221,7 +221,8 @@ async function markAuftragAbgeschlossen(
   auftragId: string,
   beschreibung: string,
   perMail: boolean,
-  abschlussPdfUrl?: string | null
+  abschlussPdfUrl?: string | null,
+  emailLogId?: string | null
 ) {
   const detail = await loadAuftragDetail(auftragId)
   const now = new Date().toISOString()
@@ -264,6 +265,7 @@ async function markAuftragAbgeschlossen(
     sichtbar_fuer_kunde: perMail,
     fuer_kunde_freigegeben: perMail,
     freigegeben_at: perMail ? now : null,
+    email_log_id: perMail ? emailLogId ?? null : null,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)
@@ -611,7 +613,13 @@ export async function sendAbschlussdokumentationAnKunde(
       ? `Auftrag abgeschlossen. An den Kunden versendet: ${labels.join(', ')}.`
       : 'Auftrag abgeschlossen.'
 
-  await markAuftragAbgeschlossen(auftragId, beschreibung, true, abschlussUrl)
+  await markAuftragAbgeschlossen(
+    auftragId,
+    beschreibung,
+    true,
+    abschlussUrl,
+    sent.emailLogId ?? null
+  )
   return { ok: true, sentLabels: labels, closedWithoutMail: false }
 }
 

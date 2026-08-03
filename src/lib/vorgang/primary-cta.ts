@@ -30,6 +30,8 @@ export type PrimaryCtaContext = {
   rechnungBezahlt?: boolean
   /** Rechnung überfällig */
   ueberfaellig?: boolean
+  /** Abschlagsplan aktiv → „Nächsten Abschlag senden“ statt „Rechnung erstellen“ */
+  naechsterAbschlagSenden?: boolean
 }
 
 function norm(status: string | null | undefined): string {
@@ -110,6 +112,13 @@ export function primaryCta(
       if (ctx.rechnungBezahlt) {
         return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
       }
+      if (ctx.naechsterAbschlagSenden) {
+        return {
+          id: 'rechnung_erstellen',
+          label: 'Nächsten Abschlag senden',
+          icon: 'send',
+        }
+      }
       return { id: 'rechnung_erstellen', label: 'Rechnung erstellen', icon: 'file-invoice' }
     }
     return null
@@ -117,9 +126,19 @@ export function primaryCta(
 
   // rechnung
   if (ui === 'ausstehend') {
+    if (ctx.naechsterAbschlagSenden) {
+      return {
+        id: 'rechnung_erstellen',
+        label: 'Nächsten Abschlag senden',
+        icon: 'send',
+      }
+    }
     return { id: 'rechnung_erstellen', label: 'Rechnung erstellen', icon: 'file-invoice' }
   }
   if (ui === 'entwurf') {
+    if (ctx.naechsterAbschlagSenden) {
+      return { id: 'rechnung_versenden', label: 'Abschlag senden', icon: 'send' }
+    }
     return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
   }
   if (ui === 'versendet' || ui === 'ueberfaellig') {

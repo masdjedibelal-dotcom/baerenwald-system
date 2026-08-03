@@ -526,7 +526,7 @@ export async function sendBautagebuchAnKunde(input: {
   if (!toList.length) return { ok: false, message: 'Bitte mindestens eine An-Adresse eingeben.' }
   const ccList = input.cc?.map((v) => v.trim()).filter(Boolean)
 
-  await sendMail({
+  const sent = await sendMail({
     typ: 'projekt_update',
     an: toList.length === 1 ? toList[0]! : toList,
     anName: built.kundeName,
@@ -538,6 +538,9 @@ export async function sendBautagebuchAnKunde(input: {
     auftragId: input.auftragId,
     kontextTyp: 'auftrag',
   })
+  if (!sent.success) {
+    return { ok: false, message: sent.error ?? 'E-Mail fehlgeschlagen' }
+  }
 
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
@@ -546,6 +549,7 @@ export async function sendBautagebuchAnKunde(input: {
     beschreibung: `${eintrag.titel} — ${built.betreff}`,
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
+    email_log_id: sent.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)
@@ -628,6 +632,7 @@ export async function anfrageHandwerkerBautagebuchEintrag(input: {
       : 'Partner per E-Mail und Portal zur Bautagebuch-Dokumentation aufgefordert.',
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
+    email_log_id: res.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId.trim()}`)

@@ -47,6 +47,7 @@ import {
   auftragSummenAusPositionen,
   berechneBereitsGestellt,
   berechneZahlungsplan,
+  naechsteAbschlagZumVersenden,
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
@@ -458,23 +459,31 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         basis.gesamtNetto,
         rechnungen
       )
-      const zeile = opts?.abschlagZeileId?.trim()
-        ? kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
-        : naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
-      if (!zeile) {
+      const versand = opts?.abschlagZeileId?.trim()
+        ? (() => {
+            const zeile =
+              kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
+            if (!zeile) return null
+            if (abschlagBereitsAbgerechnet(zeile.id, rechnungen)) return null
+            const draft = rechnungen.find(
+              (r) =>
+                r.zahlungsplan_abschlag_id === zeile.id &&
+                String(r.status ?? '') === 'entwurf'
+            )
+            return { zeile, rechnungId: draft?.id ?? null }
+          })()
+        : naechsteAbschlagZumVersenden(kontext, rechnungen)
+      if (!versand) {
         return {
           ok: false,
           message: opts?.abschlagZeileId?.trim()
-            ? 'Abschlag nicht gefunden.'
+            ? abschlagBereitsAbgerechnet(opts.abschlagZeileId.trim(), rechnungen)
+              ? 'Für diesen Abschlag existiert bereits eine Rechnung.'
+              : 'Abschlag nicht gefunden.'
             : 'Alle Abschläge sind bereits abgerechnet.',
         }
       }
-      if (abschlagBereitsAbgerechnet(zeile.id, rechnungen)) {
-        return {
-          ok: false,
-          message: 'Für diesen Abschlag existiert bereits eine Rechnung.',
-        }
-      }
+      const zeile = versand.zeile
       meta = {
         ...metaDefaults,
         zahlungsart: 'abschlaege',
@@ -500,6 +509,65 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         gesamtNetto: kontext.gesamtNetto,
         gesamtBrutto: kontext.gesamtBrutto,
         bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+      }
+
+      let positionen = basis.positionen
+      const abschlagMeta = abschlag
+      if (abschlagMeta && zahlungsplan) {
+        const kontextPos = berechneZahlungsplanMitIst(
+          zahlungsplan,
+          basis.gesamtNetto,
+          rechnungen
+        )
+        const zeilePos = kontextPos.zeilen.find((z) => z.id === abschlagMeta.zeileId) ?? null
+        if (zeilePos) {
+          positionen = positionenFuerAbschlagRechnung({
+            zeile: zeilePos,
+            allePositionen: basis.positionen,
+            plan: zahlungsplan,
+            gesamtNetto: basis.gesamtNetto,
+            auftragsReferenz: basis.auftragsReferenz,
+            projektTitel: basis.projektTitel ?? '',
+            bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+            vorherigeAbschlaege: rechnungen,
+            ausserRechnungId: versand.rechnungId,
+          })
+        }
+      }
+
+      let rechnungId: string | null = versand.rechnungId
+      let rechnungsnummer: string | null = null
+      if (rechnungId) {
+        const { data: nrRow } = await supabase
+          .from('rechnungen')
+          .select('rechnungsnummer')
+          .eq('id', rechnungId)
+          .maybeSingle()
+        rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
+      }
+
+      return {
+        ok: true,
+        bootstrap: {
+          rechnungId,
+          rechnungsnummer,
+          auftragId,
+          angebotId: basis.angebot_id,
+          kundeId: basis.kunde_id,
+          kunde: kunde ?? null,
+          positionen,
+          meta,
+          auftragsReferenz: basis.auftragsReferenz,
+          projektTitel: basis.projektTitel,
+          modus,
+          abschlag,
+          zahlungsplan,
+          zahlungsplanBearbeiten,
+          gesamtNetto: basis.gesamtNetto,
+          rechnungenAbschlag: rechnungen,
+          ist_wiederkehrend: basis.ist_wiederkehrend,
+          wiederkehr_turnus: basis.wiederkehr_turnus,
+        },
       }
     } else if (opts?.vollOhnePlan) {
       zahlungsplan = null
@@ -542,6 +610,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     }
 
     let positionen = basis.positionen
+    let draftRechnungId: string | null = null
     if (abschlag && zahlungsplan) {
       const kontextPos = berechneZahlungsplanMitIst(
         zahlungsplan,
@@ -550,6 +619,12 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       )
       const zeilePos = kontextPos.zeilen.find((z) => z.id === abschlag.zeileId) ?? null
       if (zeilePos) {
+        const draft = rechnungen.find(
+          (r) =>
+            r.zahlungsplan_abschlag_id === zeilePos.id &&
+            String(r.status ?? '') === 'entwurf'
+        )
+        draftRechnungId = draft?.id ?? null
         positionen = positionenFuerAbschlagRechnung({
           zeile: zeilePos,
           allePositionen: basis.positionen,
@@ -559,15 +634,26 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           projektTitel: basis.projektTitel ?? '',
           bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
           vorherigeAbschlaege: rechnungen,
+          ausserRechnungId: draftRechnungId,
         })
       }
+    }
+
+    let rechnungsnummer: string | null = null
+    if (draftRechnungId) {
+      const { data: nrRow } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', draftRechnungId)
+        .maybeSingle()
+      rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
     }
 
     return {
       ok: true,
       bootstrap: {
-        rechnungId: null,
-        rechnungsnummer: null,
+        rechnungId: draftRechnungId,
+        rechnungsnummer,
         auftragId,
         angebotId: basis.angebot_id,
         kundeId: basis.kunde_id,

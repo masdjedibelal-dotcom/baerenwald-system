@@ -441,6 +441,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     sichtbar_fuer_kunde: true,
     fuer_kunde_freigegeben: true,
     freigegeben_at: new Date().toISOString(),
+    email_log_id: mail.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)
