@@ -117,7 +117,9 @@ export async function loadHwEingangsrechnungen(
 
   const raw = (data ?? []) as unknown as RawZuweisung[]
   const withPdf = raw.filter((r) => Boolean(r.hw_rechnung_pdf_url?.trim()))
-  const angebotIds = [...new Set(withPdf.map((r) => r.angebot_id).filter(Boolean))]
+  const angebotIds = Array.from(
+    new Set(withPdf.map((r) => r.angebot_id).filter(Boolean))
+  )
 
   const auftragByAngebot = new Map<string, { id: string; titel: string | null }>()
   if (angebotIds.length > 0) {
